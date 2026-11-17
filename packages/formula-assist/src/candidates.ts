@@ -6,8 +6,11 @@
 import type { FormulaEdit } from "@sheetwrite/core";
 import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
-/** The signals, strongest first, as #801 lists them. */
-export const SIGNALS = ["neighbours", "shape", "roles", "patterns", "syntax"] as const;
+/**
+ * The signals that earn their keep on the benchmark, strongest first. #801
+ * also listed argument roles and repeats within a formula; they saved nothing.
+ */
+export const SIGNALS = ["neighbours", "shape", "syntax"] as const;
 
 /** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];

@@ -15,6 +15,8 @@ import type { Proposal, Signal } from "../candidates.js";
 const MIN_INSERT = 2;
 /** One to three letters can be a column name, as in `AB` of `AB12`. */
 const COLUMN_LETTERS = /^[A-Z]{1,3}$/i;
+/** Constants that are also functions: as a constant they are far more common, so they get no `(`. */
+const CONSTANTS: Readonly<Record<string, true>> = { TRUE: true, FALSE: true };
 /** Sheet names a formula can name without quotes; others need the `'` the user types first. */
 const PLAIN_NAME = /^[A-Z_][A-Z0-9_.]*$/i;
 const LETTERS = 26;
@@ -138,7 +140,8 @@ class Syntax implements Signal {
     );
     const matches = analysis.completion?.matches ?? [];
     const [fn] = matches;
-    if (matches.length === 1 && sheets.length === 0 && fn !== undefined) {
+    const constant = fn !== undefined && CONSTANTS[fn.name.toUpperCase()] === true;
+    if (matches.length === 1 && sheets.length === 0 && fn !== undefined && !constant) {
       return { text: `${fn.name}(`, reason: "functionName" };
     }
     const [only] = sheets;

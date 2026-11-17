@@ -1,95 +1,76 @@
-// Signal 2 of #801, the shape of the data: under or beside a run of numbers,
-// the cell most likely sums it, or takes the average, count, largest or
-// smallest of it once that function is typed. The runs are AutoSum's own and
-// the filled blocks right above and right to the left of the cell.
+// The shape of the data: once a range's first cell and `:` are typed, its
+// end is where the block of filled cells from that cell ends, the cell
+// Ctrl+Shift+Arrow would reach. A range that runs along the edited cell's
+// row or column stops right before the cell.
 
-import { cellA1, type FormulaEdit, type Range, type SheetId } from "@sheetwrite/core";
-import type { FormulaAnalysis } from "@sheetwrite/core/functions";
+import { cellA1, type FormulaEdit, type SheetId } from "@sheetwrite/core";
+import type { FormulaAnalysis, FormulaReference } from "@sheetwrite/core/functions";
 
 import type { Proposal, Signal } from "../candidates.js";
 
-/** Functions that take a run as their only argument. */
-const AGGREGATES: Readonly<Record<string, true>> = {
-  SUM: true,
-  AVERAGE: true,
-  COUNT: true,
-  COUNTA: true,
-  MAX: true,
-  MIN: true,
-  MEDIAN: true,
-  PRODUCT: true,
-};
-
-function rangeText(range: Range): string {
-  const start = cellA1(range.start.row, range.start.col);
-  const end = cellA1(range.end.row, range.end.col);
-  return start === end ? start : `${start}:${end}`;
-}
-
-/** A run next to the cell, as A1 text, and which run it is. */
-interface Run {
-  readonly text: string;
-  readonly reason: "autoSum" | "columnBlock" | "rowBlock";
-}
-
-/**
- * The filled block that ends right before the cell going up (`dRow` −1) or
- * left (`dCol` −1), without a text cell at its far end (a header or label).
- */
-function block(edit: FormulaEdit, dRow: number, dCol: number): Range | null {
-  const { cell, reads } = edit;
-  const sheet: SheetId = cell.sheet;
-  const row = cell.row + dRow;
-  const col = cell.col + dCol;
-  if (row < 0 || col < 0 || typeof reads.value(sheet, row, col) !== "number") return null;
-
-  const edge = reads.edge(sheet, row, col, dRow, dCol);
-  const far = dRow === 0 ? { row, col: edge } : { row: edge, col };
-  const startsWithLabel = typeof reads.value(sheet, far.row, far.col) === "string";
-  const start = startsWithLabel ? { row: far.row - dRow, col: far.col - dCol } : far;
-  return { sheet, start, end: { row, col } };
-}
-
-/** The distinct runs next to the edited cell. */
-function runs(edit: FormulaEdit): Run[] {
-  const { cell, reads } = edit;
-  const found: Run[] = [];
-  const add = (range: Range | null, reason: Run["reason"]): void => {
-    if (range === null) return;
-    const text = rangeText(range);
-    if (!found.some((run) => run.text === text)) found.push({ text, reason });
-  };
-  add(reads.autoSumRange(cell.sheet, cell.row, cell.col), "autoSum");
-  add(block(edit, -1, 0), "columnBlock");
-  add(block(edit, 0, -1), "rowBlock");
-  return found;
+/** `$` before the column, the row, both or neither, as the range's first cell has them. */
+function anchored(start: string, row: number, col: number): string {
+  const plain = cellA1(row, col);
+  const letters = plain.replace(/[0-9]+$/, "");
+  const digits = plain.slice(letters.length);
+  const absoluteCol = start.startsWith("$");
+  const absoluteRow = /\$[0-9]+$/.test(start);
+  return `${absoluteCol ? "$" : ""}${letters}${absoluteRow ? "$" : ""}${digits}`;
 }
 
 class Shape implements Signal {
-  private readonly runs: readonly Run[];
-
-  constructor(edit: FormulaEdit) {
-    this.runs = runs(edit);
-  }
+  constructor(private readonly edit: FormulaEdit) {}
 
   proposals(text: string, analysis: FormulaAnalysis): Proposal[] {
-    const proposals: Proposal[] = this.runs.map((run) => ({
-      formula: `=SUM(${run.text})`,
-      signal: "shape",
-      reason: `sumFromStart, ${run.reason}`,
-    }));
-    const call = analysis.call;
-    const name = call?.name.toUpperCase() ?? "";
-    if (call?.argumentIndex === 0 && AGGREGATES[name] === true && text.endsWith("(")) {
-      for (const run of this.runs) {
-        proposals.push({ formula: `${text}${run.text})`, signal: "shape", reason: run.reason });
-      }
+    if (!text.endsWith(":")) return [];
+    const start = analysis.references.at(-1);
+    if (start === undefined || start.to !== text.length - 1) return [];
+    if (start.start.row !== start.end.row || start.start.col !== start.end.col) return [];
+
+    const sheet = this.sheetOf(start);
+    if (sheet === null) return [];
+    return this.ends(sheet, start).map(({ row, col, reason }) => {
+      const startText = text.slice(start.from, start.to).replace(/^.*!/, "");
+      return { formula: `${text}${anchored(startText, row, col)}`, signal: "shape", reason };
+    });
+  }
+
+  private sheetOf(reference: FormulaReference): SheetId | null {
+    const { cell, reads } = this.edit;
+    const name = reference.sheet?.toUpperCase();
+    if (name === undefined) return cell.sheet;
+    return reads.workbook().sheets.find((entry) => entry.name.toUpperCase() === name)?.id ?? null;
+  }
+
+  /** Where the block from the range's first cell ends, by the reason it ends there. */
+  private ends(
+    sheet: SheetId,
+    reference: FormulaReference,
+  ): { row: number; col: number; reason: string }[] {
+    const { cell, reads } = this.edit;
+    const { row, col } = reference.start;
+    const own = sheet === cell.sheet;
+    if (own && row === cell.row && col < cell.col) {
+      const end = Math.min(reads.edge(sheet, row, col, 0, 1), cell.col - 1);
+      return end > col ? [{ row, col: end, reason: "rangeAlongRow" }] : [];
     }
-    return proposals;
+    if (own && col === cell.col && row < cell.row) {
+      const end = Math.min(reads.edge(sheet, row, col, 1, 0), cell.row - 1);
+      return end > row ? [{ row: end, col, reason: "rangeAlongColumn" }] : [];
+    }
+
+    const ends: { row: number; col: number; reason: string }[] = [];
+    if (reads.value(sheet, row + 1, col) !== null) {
+      ends.push({ row: reads.edge(sheet, row, col, 1, 0), col, reason: "rangeDown" });
+    }
+    if (reads.value(sheet, row, col + 1) !== null) {
+      ends.push({ row, col: reads.edge(sheet, row, col, 0, 1), reason: "rangeRight" });
+    }
+    return ends;
   }
 }
 
-/** Open the shape-of-the-data signal of one edit; it finds the runs once. */
+/** Open the shape-of-the-data signal of one edit. */
 export function openShape(edit: FormulaEdit): Signal {
   return new Shape(edit);
 }
