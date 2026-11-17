@@ -426,7 +426,6 @@ export class OverlayPainter {
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintNotes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
 
     const selection = this.deps.selection();
     if (!selection.isEmpty) {
@@ -445,6 +444,8 @@ export class OverlayPainter {
       this.paintFillHandle(theme, contentTop, scrollLeft);
     }
 
+    // As in Excel, the moving border of a cut shows over the selection.
+    this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
