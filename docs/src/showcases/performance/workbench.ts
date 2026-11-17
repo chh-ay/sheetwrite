@@ -10,7 +10,6 @@ import {
   type FullExportAttempt,
   SCALE_COLUMNS,
   SCALE_EVICTION_STRESS_STORAGE,
-  SCALE_LOGICAL_CELLS,
   SCALE_ROWS,
   SCALE_STORAGE,
   type ScanAttempt,
@@ -336,8 +335,10 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
             }),
           );
           setGridState("ready");
+          // One line on a phone, like the loading line it replaces, so the
+          // page below does not move when the Grid becomes ready.
           setStatus(
-            `${stressed ? "Optional 1 MiB eviction stress active. " : ""}Ready: exactly ${SCALE_ROWS.toLocaleString("en")} rows × ${SCALE_COLUMNS.toLocaleString("en")} columns = ${SCALE_LOGICAL_CELLS.toLocaleString("en")} logical addresses. Only requested tiles may become resident.`,
+            `Ready${stressed ? " with the 1 MiB ceiling" : ""}. Only the tiles you visit load.`,
           );
         })
         .catch((error: unknown) => {
