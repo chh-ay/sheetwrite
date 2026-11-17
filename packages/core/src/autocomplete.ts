@@ -5,9 +5,12 @@
  */
 
 import { parseCellLiteralInput, parseCurrencyInput } from "./cell-input.js";
+import type { SheetwriteStore } from "./store.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
+import type { Store } from "./types/store.js";
 
 /**
  * The most rows read each way from the edited cell, so one edit's read stays
@@ -147,4 +150,66 @@ export function columnCompletions(
     typeof parseCellLiteralInput(typed, "date") === "string" && parseCurrencyInput(typed) === null
       ? completions.complete(typed)
       : null;
+}
+
+/** What AutoComplete reads of the grid an edit is in. */
+export interface CompletionHost {
+  readonly store: Store;
+  readonly loadable: SheetwriteStore | null;
+  activeSheet(): SheetId;
+  rowCount(): number;
+  toDataRow(viewRow: number): number;
+  dataEdge(viewRow: number, col: number, dRow: number, dCol: number): number | null;
+}
+
+/**
+ * The cell editor's AutoComplete for an edit of view row `row` in `col`: it
+ * completes the editor's text in place, with the added text selected after
+ * the caret, and returns the entry it shows, or null. It completes only
+ * while the caret is at the end of the text, and never a formula. A store
+ * without an engine gets no completion.
+ */
+export function editCompletion(
+  host: CompletionHost,
+  row: number,
+  col: number,
+): (field: HTMLTextAreaElement) => string | null {
+  const engine = storeEngine(host.store);
+  if (engine === null) return () => null;
+  const sheet = host.activeSheet();
+  const complete = columnCompletions(
+    {
+      engine,
+      sheet,
+      sorted: host.loadable?.hasView(sheet) ?? false,
+      rowCount: host.rowCount(),
+      toDataRow: (viewRow) => host.toDataRow(viewRow),
+      filled: (viewRow, column) => {
+        const value = host.store.getCell({
+          sheet,
+          row: host.toDataRow(viewRow),
+          col: column,
+        }).resolved;
+        return value !== null && value !== "";
+      },
+      dataEdge: (viewRow, column, dRow, dCol) => host.dataEdge(viewRow, column, dRow, dCol),
+    },
+    row,
+    col,
+  );
+  return (field) => {
+    const typed = field.value;
+    if (
+      typed.startsWith("=") ||
+      field.selectionStart !== typed.length ||
+      field.selectionEnd !== typed.length
+    ) {
+      return null;
+    }
+    const entry = complete(typed);
+    if (entry === null || entry.length <= typed.length) return null;
+    field.value = typed + entry.slice(typed.length);
+    field.setSelectionRange(typed.length, field.value.length);
+    return entry;
+  };
 }

@@ -81,12 +81,12 @@ export interface BeginEditOptions {
   /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
   onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
   /**
-   * Excel's AutoComplete: the one entry that the typed text begins, or null.
-   * Asked after each typed character while the caret is at the end of the
-   * text, and after an IME composition ends; never for a formula. The added
-   * text shows selected.
+   * Excel's AutoComplete: completes the field's text in place, with the added
+   * text selected, and returns the entry it shows, or null. Asked after each
+   * typed character, after the key that opened the editor and after an IME
+   * composition ends.
    */
-  complete?: (typed: string) => string | null;
+  complete?: (field: HTMLTextAreaElement) => string | null;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -307,23 +307,9 @@ export class EditController {
     this.opts?.onText(ta.value);
   };
 
-  /** Complete the typed text from the column, with the added text selected. */
+  /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
   private autoComplete(ta: HTMLTextAreaElement): void {
-    const complete = this.opts?.complete;
-    const typed = ta.value;
-    if (
-      !complete ||
-      typed.startsWith("=") ||
-      ta.selectionStart !== typed.length ||
-      ta.selectionEnd !== typed.length
-    ) {
-      return;
-    }
-    const entry = complete(typed);
-    if (entry === null || entry.length <= typed.length) return;
-    ta.value = typed + entry.slice(typed.length);
-    ta.setSelectionRange(typed.length, ta.value.length);
-    this.completion = entry;
+    this.completion = this.opts?.complete?.(ta) ?? null;
   }
 
   /** The user moved into the cell editor: formula help follows the caret here. */

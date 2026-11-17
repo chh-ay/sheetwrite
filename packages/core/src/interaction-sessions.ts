@@ -290,16 +290,14 @@ export class InteractionSessions {
    * Excel's AutoComplete for an edit of view row `row` in `col` (see
    * `autocomplete.ts`). Its code loads with the first edit; while it loads,
    * nothing is completed, and once it arrives the edit that a key opened is
-   * completed at once. Stores without an engine, and hosts that turn
-   * AutoComplete off, get no completion.
+   * completed at once. Hosts that turn AutoComplete off get no completion.
    */
   private completion(
     row: number,
     col: number,
     typed: boolean,
-  ): ((typed: string) => string | null) | undefined {
-    const engine = storeEngine(this.deps.store);
-    if (engine === null || !this.deps.autoComplete()) return undefined;
+  ): ((field: HTMLTextAreaElement) => string | null) | undefined {
+    if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
       this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
@@ -307,34 +305,9 @@ export class InteractionSessions {
         if (typed && this.generation === generation) this.editor.completeNow();
       });
     }
-    const sheet = this.deps.activeSheet();
-    let complete: ((typed: string) => string | null) | null = null;
-    return (text) => {
-      const module = this.autocomplete;
-      if (module === null) return null;
-      complete ??= module.columnCompletions(
-        {
-          engine,
-          sheet,
-          sorted: this.deps.loadable?.hasView(sheet) ?? false,
-          rowCount: this.deps.rowCount(),
-          toDataRow: (viewRow) => this.deps.toDataRow(viewRow),
-          filled: (viewRow, column) => {
-            const value = this.deps.store.getCell({
-              sheet,
-              row: this.deps.toDataRow(viewRow),
-              col: column,
-            }).resolved;
-            return value !== null && value !== "";
-          },
-          dataEdge: (viewRow, column, dRow, dCol) =>
-            this.deps.dataEdge(viewRow, column, dRow, dCol),
-        },
-        row,
-        col,
-      );
-      return complete(text);
-    };
+    let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
+    return (field) =>
+      (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
   }
 
   private editorLabel(row: number, col: number): string {
