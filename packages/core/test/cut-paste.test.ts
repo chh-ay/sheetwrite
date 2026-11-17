@@ -327,13 +327,12 @@ describe("cut and paste", () => {
     const h = harness;
     h.set(0, 0, 4);
     h.set(0, 1, 1);
-    const formats = [
-      {
-        range: range("s1", 0, 0, 2, 0),
-        when: { kind: "formula" as const, source: "=A1>B1" },
-        style: { bold: true },
-      },
-    ];
+    const format = {
+      range: range("s1", 0, 0, 2, 0),
+      when: { kind: "formula" as const, source: "=A1>B1" },
+      style: { bold: true },
+    };
+    const formats = [format];
     h.document.commit(
       [
         {
@@ -351,7 +350,7 @@ describe("cut and paste", () => {
           sheet: "s1",
           rule: {
             id: "replaced",
-            range: range("s1", 9, 3, 9, 3),
+            range: range("s1", 9, 2, 9, 2),
             condition: { kind: "list", values: [5] },
             policy: "warn",
           },
@@ -361,33 +360,33 @@ describe("cut and paste", () => {
       "api",
     );
 
-    // A1:B5 lands on D10:E14.
+    // A1:B5 lands on C10:D14.
     h.select(0, 0, 4, 1);
     await h.clipboard.cut();
-    h.select(9, 3);
+    h.select(9, 2);
     expect(await h.clipboard.paste()).toBe("done");
 
     const moved = h.store.getWorkbook().sheets[0]!;
     expect(moved.validationRules?.map((rule) => [rule.id, rule.range])).toEqual([
-      ["moved", range("s1", 9, 3, 11, 3)],
+      ["moved", range("s1", 9, 2, 11, 2)],
     ]);
     expect(moved.conditionalFormats).toEqual([
       {
-        ...formats[0],
-        range: range("s1", 9, 3, 11, 3),
-        when: { kind: "formula", source: "=D10>E10" },
+        ...format,
+        range: range("s1", 9, 2, 11, 2),
+        when: { kind: "formula", source: "=C10>D10" },
       },
     ]);
 
     h.document.undo();
     const restored = h.store.getWorkbook().sheets[0]!;
     expect(
-      restored.validationRules
-        ?.map((rule) => [rule.id, rule.range] as const)
-        .sort(([left], [right]) => left.localeCompare(right)),
+      [...(restored.validationRules ?? [])]
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((rule) => [rule.id, rule.range]),
     ).toEqual([
       ["moved", range("s1", 0, 0, 2, 0)],
-      ["replaced", range("s1", 9, 3, 9, 3)],
+      ["replaced", range("s1", 9, 2, 9, 2)],
     ]);
     expect(restored.conditionalFormats).toEqual(formats);
   });
