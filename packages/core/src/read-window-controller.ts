@@ -53,6 +53,9 @@ export class PaintedCells {
   }
 }
 
+/** Turns a window the store read into the window the grid paints. */
+export type PaintedWindowTransform = (view: VisibleWindowView) => VisibleWindowView;
+
 export interface ReadWindowControllerOptions {
   renderer: () => Renderer;
   /** Row header labels for view rows `rows`, or undefined when they are the view positions. */
@@ -85,6 +88,8 @@ export interface ReadWindowControllerOptions {
   }) => void;
   /** Receives a WASM trap from a frame's engine reads; without it the trap is rethrown. */
   onEngineTrap?: (cause: unknown) => void;
+  /** A change to each window before it paints, such as the Format Cells preview; null for none. */
+  previewWindow?: () => PaintedWindowTransform | null;
 }
 
 /** Owns paint/read plans, hydration demand, formula closure and residency. */
@@ -436,8 +441,10 @@ export class ReadWindowController {
         this.cachedPaneViews = [];
         // Store windows borrow a reusable value scratch array. Unrelated reads
         // must not overwrite a window retained across display-neutral edits.
-        this.lastPaintView = this.retainMainView(
-          this.options.store.getVisibleWindow(activeSheet, rows, this.windowedColumnIndices),
+        this.lastPaintView = this.previewed(
+          this.retainMainView(
+            this.options.store.getVisibleWindow(activeSheet, rows, this.windowedColumnIndices),
+          ),
         );
       }
 
@@ -532,9 +539,11 @@ export class ReadWindowController {
       const slot = panes.length;
       let view = this.cachedPaneViews[slot];
       if (refreshData || !view) {
-        view = this.retainPaneView(
-          this.options.store.getVisibleWindow(activeSheet, rows, columns),
-          slot,
+        view = this.previewed(
+          this.retainPaneView(
+            this.options.store.getVisibleWindow(activeSheet, rows, columns),
+            slot,
+          ),
         );
         this.cachedPaneViews[slot] = view;
       }
@@ -662,7 +671,7 @@ export class ReadWindowController {
 
       for (let index = 0; index < values.length; index++)
         values[index] = view.values[index] ?? null;
-      this.cachedDomMergeAnchorViews[slot] = { ...view, values };
+      this.cachedDomMergeAnchorViews[slot] = this.previewed({ ...view, values });
     }
   }
 
@@ -793,6 +802,10 @@ export class ReadWindowController {
       this.mainViewValuePool[index] = view.values[index] ?? null;
     }
     return { ...view, values: this.mainViewValuePool };
+  }
+
+  private previewed(view: VisibleWindowView): VisibleWindowView {
+    return this.options.previewWindow?.()?.(view) ?? view;
   }
 
   private retainPaneView(view: VisibleWindowView, slot: number): VisibleWindowView {
