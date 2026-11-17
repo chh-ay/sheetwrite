@@ -72,7 +72,9 @@ test("Options and Find All search the workbook from Excel's keys @portability", 
   await page.keyboard.press("Alt+i");
   const results = page.getByRole("listbox", { name: "Find all results" });
   await expect(results.getByRole("option")).toHaveCount(2);
-  await expect(page.locator(".sheetwrite-find-results-status")).toHaveText("2 cells found");
+  await expect(
+    page.locator(".sheetwrite-find-all-results .sheetwrite-find-results-status"),
+  ).toHaveText("2 cells found");
 
   await results.getByRole("option").nth(1).click();
   await expect
