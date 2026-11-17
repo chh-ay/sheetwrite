@@ -53,7 +53,8 @@ const letter = (col: number): string => String.fromCharCode(65 + col);
 /** Every formula the budget holds once the open cells are filled in. */
 export const FORMULA_COUNT = DEPARTMENTS.length * 2 + MONTHS.length + 1;
 
-function budgetWorkbook(): Workbook {
+/** The budget's sheets; the recorded demo's stage (docs/src/figures/assist-stage.ts) uses it too. */
+export function budgetWorkbook(): Workbook {
   const money = { type: "number", numberFormat: "$#,##0" } as const;
   return {
     activeSheet: BUDGET_SHEET,
@@ -88,7 +89,7 @@ function isOpen(row: number, col: number): boolean {
 }
 
 /** The budget's values and formulas, with the open cells left empty. */
-function budgetOperations(): DocumentOp[] {
+export function budgetOperations(): DocumentOp[] {
   const operations: DocumentOp[] = [];
   const put = (sheet: string, row: number, col: number, value: string | number): void => {
     if (isOpen(row, col) && sheet === BUDGET_SHEET) return;
@@ -171,7 +172,7 @@ export function createFormulaAssistScenario(host: HTMLElement): FormulaAssistSce
     snapshot,
     focusCell(id) {
       const cell = OPEN_CELLS[id];
-      grid?.select({ row: cell.row, col: cell.col });
+      grid?.setSelection({ kind: "cell", addr: { sheet: BUDGET_SHEET, row: cell.row, col: cell.col } });
       host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Formula bar"]')?.focus();
     },
     reset() {
