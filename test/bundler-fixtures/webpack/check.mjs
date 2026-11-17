@@ -53,6 +53,17 @@ const FIND_MARKER = "sheetwrite-find-replace-row";
 // The AutoFilter's commands and dropdown load on first use, together; the
 // message Data › Filter shows outside a range of data survives minifiers.
 const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
+// Merge and Merge & Center load on first use, with the dialog shell of their
+// warning; the warning's text and the dialog's backdrop class survive minifiers.
+const MERGE_MARKER = "Merging cells only keeps the upper-left value";
+const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
+// Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
+// Webpack may give the dialog shell a chunk of its own or copy it into the
+// merge, cell commands and Format Cells chunks.
+const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
+// The commands of the format, hide, insert and Format Cells keys load on first
+// use; the Currency key's format code survives minifiers.
+const CELL_COMMANDS_MARKER = "$#,##0.00_);($#,##0.00)";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -74,6 +85,10 @@ const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
+const mergeChunks = [];
+const formatCellsChunks = [];
+const dialogChunks = [];
+const cellCommandChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -97,6 +112,10 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
+  else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(CELL_COMMANDS_MARKER)) cellCommandChunks.push(file);
+  else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
+  else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -125,6 +144,14 @@ if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
+if (mergeChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack merge command chunk, got ${mergeChunks.length}`);
+if (formatCellsChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
+if (dialogChunks.length > 1)
+  throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
+if (cellCommandChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack cell commands chunk, got ${cellCommandChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -161,6 +188,20 @@ if (mainCode.includes(FIND_MARKER)) {
 }
 if (mainCode.includes(AUTOFILTER_MARKER)) {
   throw new Error("The AutoFilter commands are in webpack's main.js; they must load lazily");
+}
+if (mainCode.includes(DIALOG_MARKER)) {
+  throw new Error("The dialog shell is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(MERGE_MARKER)) {
+  throw new Error("The merge command is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(FORMAT_CELLS_MARKER)) {
+  throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(CELL_COMMANDS_MARKER)) {
+  throw new Error(
+    "The format, hide and insert commands are in webpack's main.js; they must load lazily",
+  );
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -211,6 +252,10 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       autoFilterChunks,
+      mergeChunks,
+      formatCellsChunks,
+      dialogChunks,
+      cellCommandChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

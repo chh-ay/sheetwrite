@@ -106,6 +106,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       ],
     },
     { action: "separator" },
+    { action: "formatCells" },
+    { action: "separator" },
     { action: "pivotFields", visible: inPivot },
     { action: "separator" },
     { action: "editNote", label: "New note", visible: (context) => !hasNote(context) },
@@ -146,6 +148,7 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   editNote: "note",
   deleteNote: "note",
   pivotFields: "pivotTable",
+  formatCells: "format",
 };
 
 /** Drops hidden rows, then leading, trailing and doubled separators. */
@@ -198,6 +201,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   editNote: "Edit note",
   deleteNote: "Delete note",
   pivotFields: "PivotTable Fields",
+  formatCells: "Format cells…",
 };
 
 function actionHandler(
@@ -294,6 +298,9 @@ function actionHandler(
 
     case "pivotFields":
       return () => actions.showPivotFields();
+
+    case "formatCells":
+      return () => actions.formatCells();
 
     default:
       return () => {};

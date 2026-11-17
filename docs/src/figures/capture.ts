@@ -381,6 +381,29 @@ const PAGE_SHOTS: readonly Shot[] = [
 ];
 
 /**
+ * The section pages' opening captures, cropped for tablets and phones: each
+ * keeps the part of the view the section is about, at a size that reads at
+ * those widths. Points are from the top-left of the capture's stage.
+ */
+const SECTION_CROPS: Readonly<
+  Record<
+    string,
+    { readonly tablet: NonNullable<Shot["crop"]>; readonly phone: NonNullable<Shot["crop"]> }
+  >
+> = {
+  // The ribbon's left groups, the formula bar and columns A to E; then columns C to E and the selection.
+  "grid-overview": { tablet: { x: 8, y: 0 }, phone: { x: 248, y: 158 } },
+  // The table under its merged title; then its first three columns.
+  report: { tablet: { x: 0, y: 100 }, phone: { x: 48, y: 120 } },
+  // The PivotChart; then the pivot beside it.
+  "pivot-chart": { tablet: { x: 360, y: 158 }, phone: { x: 48, y: 158 } },
+  // The filtered columns; then Month, Region and Product.
+  filter: { tablet: { x: 8, y: 0 }, phone: { x: 48, y: 66 } },
+  // The formula bar over the sheet; then the formula over the selected cell.
+  "formula-bar": { tablet: { x: 0, y: 0 }, phone: { x: 100, y: 66 } },
+};
+
+/**
  * The 0.7.0 highlight cards: a shot's view, cropped to the panel or control
  * the card is about, so it reads at a card's width on any screen.
  */
@@ -398,6 +421,27 @@ const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
 
 const SHOTS: readonly Shot[] = [
   ...PAGE_SHOTS,
+  ...PAGE_SHOTS.flatMap((shot) => {
+    const crops = SECTION_CROPS[shot.name];
+    return crops === undefined
+      ? []
+      : [
+          {
+            ...shot,
+            name: `${shot.name}-tablet`,
+            size: "sectionTablet" as const,
+            stage: shot.size,
+            crop: crops.tablet,
+          },
+          {
+            ...shot,
+            name: `${shot.name}-phone`,
+            size: "sectionPhone" as const,
+            stage: shot.size,
+            crop: crops.phone,
+          },
+        ];
+  }),
   ...PAGE_SHOTS.flatMap((shot) => {
     const crop = CARD_CROPS[shot.name];
     return crop === undefined

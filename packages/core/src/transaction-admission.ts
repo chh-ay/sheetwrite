@@ -1,3 +1,4 @@
+import { releaseOwnedArrays } from "./json-bytes.js";
 import type { DocumentOp, MutationIssue } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { ApplyTransactionResult, Transaction } from "./types/transaction.js";
@@ -107,6 +108,8 @@ export function beginGridTransactionAdmission(
   const guards = guardsByGrid.get(grid);
   if (!guards || guards.size === 0) return EMPTY_DECISION;
 
+  // Guards receive the operations; measurements after them must not trust them.
+  releaseOwnedArrays();
   const reservations: GridTransactionAdmissionReservation[] = [];
   let inspectedOperations = false;
   try {

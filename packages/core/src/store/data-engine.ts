@@ -109,7 +109,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { canAddSheetName, validateSheetName } from "../sheet-name.js";
+import { operationAcceptsSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -2216,11 +2216,16 @@ export class StoreDataEngine {
     return this.view.dataEdge(sheet, row, col, dRow, dCol);
   }
 
-  /** Cells whose text matches `query`, scanned in WASM and returned row-major. */
+  /** Cells that Find's `query` matches, scanned in WASM and returned row-major. */
   searchCells(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): CellAddress[] {
     const flat = this.searchCellsFlat(sheet, query, opts);
 
@@ -2237,7 +2242,12 @@ export class StoreDataEngine {
   searchCellsFlat(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): Uint32Array {
     this.requireCompleteQuery(sheet);
     const handle = this.sheets.handleOf(sheet);
@@ -2249,6 +2259,7 @@ export class StoreDataEngine {
       query,
       !opts.matchCase,
       opts.wholeCell ?? false,
+      opts.lookIn !== "values",
     );
   }
 
@@ -3630,7 +3641,11 @@ export class StoreDataEngine {
             .filter((candidate) => candidate.id !== patch.sheet)
             .map((candidate) => candidate.name),
         );
-        if (!name.ok || !this.renameSheetFormulaIdentity(patch.sheet, name.name)) return false;
+        if (
+          !operationAcceptsSheetName(name) ||
+          !this.renameSheetFormulaIdentity(patch.sheet, name.name)
+        )
+          return false;
         sheet.name = name.name;
         this.refreshNamedFormulas();
         return true;
@@ -4505,7 +4520,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!canAddSheetName(name)) return false;
+    if (!operationAcceptsSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,

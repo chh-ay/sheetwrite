@@ -10,7 +10,7 @@ import {
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { answerDialog, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -94,6 +94,8 @@ describe("createToolbar", () => {
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeUndefined();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeUndefined();
     await click("merge");
+    // A1:B2 holds values, so the merge asks first, as in Excel.
+    await answerDialog(host, "OK");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
     await click("unmerge");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(0);

@@ -27,6 +27,7 @@ import type {
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
 import {
+  answerDialog,
   coveredPage,
   keepXlsxSlots,
   makeColumnarData,
@@ -657,6 +658,24 @@ describe("setBlock arrays at every entry point", () => {
     });
     return { entries, counter };
   };
+  /** Text over the byte limit of `limitedGrid`. */
+  const overLimit = "kept, now longer than the byte limit allows";
+  /** A grid whose byte limit fits `setBlock(["kept", "text"])` exactly. */
+  const limitedGrid = (workbook = makeWorkbook(4)) => {
+    const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+    if (!exact.ok) throw new Error("expected a measurable block");
+    return new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes },
+    });
+  };
+  /** Entry 0 becomes a getter that reads 1 the first time and `overLimit` after. */
+  const smallThenOverLimit = (operation: DocumentOp | undefined) => {
+    if (operation?.op !== "setBlock") throw new Error("expected a setBlock");
+    return withGetter<CellScalar>(operation.block.values, 0, (count) =>
+      count === 1 ? 1 : overLimit,
+    ).counter;
+  };
   const entryPoints: Array<
     [string, (grid: GridImpl, patches: DocumentOp[]) => ApplyTransactionResult]
   > = [
@@ -775,7 +794,81 @@ describe("setBlock arrays at every entry point", () => {
       });
       belowLimit.destroy();
     });
+
+    it(`${name} stores the measured values when an operation from a change event is sent again`, () => {
+      const grid = limitedGrid();
+      const emitted: DocumentOp[] = [];
+      grid.on("change", (event) => emitted.push(...event.transaction.patches));
+      expect(apply(grid, [setBlock(["kept", "text"])]).status).toBe("applied");
+      const kept = emitted[0];
+      if (!kept) throw new Error("expected the emitted setBlock");
+      const getter = smallThenOverLimit(kept);
+
+      expect(apply(grid, [kept]).status).toBe("applied");
+      expect(getter.reads).toBe(1);
+      expect(cellAt(grid, 0)).toBe(1);
+      grid.destroy();
+    });
+
+    it(`${name} rejects a hole that Array.prototype would fill`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      const holey: CellScalar[] = ["kept"];
+      holey.length = 2;
+      Object.defineProperty(Array.prototype, 1, {
+        value: "inherited",
+        configurable: true,
+        writable: true,
+      });
+      const result = (() => {
+        try {
+          return apply(grid, [setBlock(holey)]);
+        } finally {
+          delete (Array.prototype as unknown as Record<number, unknown>)[1];
+        }
+      })();
+      expect(result.status).toBe("rejected");
+      expect(cellAt(grid, 1)).toBeNull();
+      grid.destroy();
+    });
   }
+
+  it("re-measures an entry a permission callback turned into a getter", () => {
+    // The resolver is asked only about edits to a protected range.
+    const workbook = makeWorkbook(4);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("fixture is missing its sheet");
+    sheet.protectedRanges = [{ id: "locked", range }];
+    const grid = limitedGrid(workbook);
+    let installed = false;
+    grid.setProtectionResolver(({ operation }) => {
+      if (!installed) smallThenOverLimit(operation);
+      installed = true;
+      return "allow";
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+      "rejected",
+    );
+    expect(cellAt(grid, 0)).toBeNull();
+    grid.destroy();
+  });
+
+  it("re-measures an entry a sync guard turned into a getter", () => {
+    const grid = limitedGrid();
+    const disposeAdmission = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        smallThenOverLimit(operations[0]);
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+      "rejected",
+    );
+    expect(cellAt(grid, 0)).toBeNull();
+    disposeAdmission();
+    grid.destroy();
+  });
 
   it("grid.applyTransaction sends, undoes and redoes the value an entry getter returned once", () => {
     const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
@@ -1253,10 +1346,11 @@ describe("transactional document metadata", () => {
     }
   });
 
-  it("emits and histories merge, row height, freeze, conditional, and group operations", () => {
+  it("emits and histories merge, row height, freeze, conditional, and group operations", async () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
     const events: ChangeEvent[] = [];
     grid.on("change", (event) => events.push(event));
 
@@ -1265,6 +1359,7 @@ describe("transactional document metadata", () => {
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
     grid.actions.merge();
+    await answerDialog(host, "OK");
     const mergeEvent = events.at(-1);
     if (!mergeEvent) throw new Error("expected merge to emit a transaction");
     const replayWorkbook = makeWorkbook(10);
@@ -1745,6 +1840,10 @@ describe("element height cap measurement", () => {
 });
 
 describe("undo and redo selection", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
   it("selects the cells undo and redo change, as Excel does", () => {
     const workbook = makeWorkbook(20);
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
@@ -1772,5 +1871,34 @@ describe("undo and redo selection", () => {
     expect(grid.getSelection()).toEqual(changed);
 
     grid.destroy();
+  });
+});
+
+describe("a sheet named History", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("is refused only to a user's rename, so undo gives the name back", () => {
+    const workbook = makeWorkbook(5);
+    const first = workbook.sheets[0]!;
+    workbook.sheets = [
+      { ...first, name: "History" },
+      { ...first, id: "s2", name: "Notes" },
+    ];
+    const store = new SheetwriteStore(workbook);
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const names = (): string[] => store.getWorkbook().sheets.map((sheet) => sheet.name);
+
+    expect(grid.renameSheet("s1", "Data").status).toBe("applied");
+    expect(grid.renameSheet("s2", "History")).toMatchObject({
+      status: "rejected",
+      issues: [{ code: "reserved" }],
+    });
+    grid.undo();
+    expect(names()).toEqual(["History", "Notes"]);
+
+    grid.destroy();
+    store.dispose();
   });
 });

@@ -98,6 +98,7 @@ use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, Runtime
 use statistic_args::StatisticCall;
 pub(crate) use subtotal::ast_calls_subtotal;
 use value::{bool_from_value, cached_formula_value, compare_values, text_from_value};
+pub(crate) use wildcard::Wildcard;
 
 const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
