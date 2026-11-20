@@ -18,15 +18,20 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
 }
 
-/** The dialog sits in the middle of the window, as Excel's do, even under the
- * docs site's `* { margin: 0 }` reset. */
+/**
+ * The dialog sits in the middle of the window, as Excel's do, even under the
+ * docs site's `* { margin: 0 }` reset. The window's middle leaves out the
+ * page's scrollbar, as the top layer does.
+ */
 async function expectCentred(page: Page, dialog: Locator): Promise<void> {
   const box = await dialog.boundingBox();
   if (!box) throw new Error("The dialog must have a box");
-  const viewport = page.viewportSize();
-  if (!viewport) throw new Error("The page must have a viewport");
-  expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
-  expect(Math.abs(box.y + box.height / 2 - viewport.height / 2)).toBeLessThanOrEqual(1);
+  const { width, height } = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+  }));
+  expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(box.y + box.height / 2 - height / 2)).toBeLessThanOrEqual(1);
 }
 
 /** Put `m1` and `m2` in row 6's first two cells (A6:B6) and select them. */
