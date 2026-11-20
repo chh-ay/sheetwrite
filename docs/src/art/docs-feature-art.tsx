@@ -862,6 +862,105 @@ export function KeyboardShortcutsDiagram() {
   );
 }
 
+/** Editing and clipboard: Paste Special adding copied numbers to the target cells. */
+export function PasteSpecialDiagram() {
+  const copied = [
+    [0, 0, "5"],
+    [0, 1, "10"],
+  ] as const;
+  return (
+    <FlowFigure
+      note="Transpose pastes rows as columns, and Paste Link writes formulas such as =$A$1 instead of the contents."
+      steps={[
+        {
+          title: "Copy A1:A3",
+          sheet: {
+            cols: 3,
+            rows: 3,
+            cells: [...copied, [2, 0, "20"], [2, 1, "20"], [2, 2, "20"]],
+            ranges: [
+              { from: [0, 0], to: [0, 2], tone: "accent" },
+              { from: [2, 0], to: [2, 2], tone: "muted" },
+            ],
+          },
+          lines: ["A3 is blank"],
+        },
+        {
+          title: "Paste Special on C1",
+          lines: ["Paste: Values", "Operation: Add", "Skip blanks"],
+          tone: "accent",
+        },
+        {
+          title: "C1:C3 after",
+          sheet: {
+            cols: 3,
+            rows: 3,
+            cells: [...copied, [2, 0, "25"], [2, 1, "30"], [2, 2, "20"]],
+            ranges: [{ from: [2, 0], to: [2, 2], tone: "accent" }],
+          },
+          lines: ["20 + 5 and 20 + 10;", "C3 keeps its 20"],
+        },
+      ]}
+      text={{
+        title: "What Paste Special with Add does",
+        description:
+          "A1:A3 holds 5, 10 and a blank, and C1:C3 holds 20 in each cell. Copy A1:A3, select C1 and open Paste Special with Paste: Values, Operation: Add and Skip blanks. C1 becomes 25 and C2 becomes 30, and C3 keeps its 20 because the copied cell is blank. Transpose pastes rows as columns, and Paste Link writes formulas such as =$A$1 instead of the contents.",
+      }}
+    />
+  );
+}
+
+/** Search: the find bar's options, then Find All listing the matches of every sheet. */
+export function FindAllDiagram() {
+  return (
+    <FlowFigure
+      note="Find Next also goes on to the next sheet that has a match, and shows that sheet."
+      steps={[
+        { title: "Options", lines: ["Within: Workbook", "Look in: Values"] },
+        {
+          title: "Find All",
+          lines: ["Every visible sheet,", "in tab order"],
+          tone: "accent",
+        },
+        { title: "12 cells found", lines: ["Sheet, cell, value", "and formula of each"] },
+        { title: "Click a result", lines: ["Its sheet shows and", "the cell is selected"] },
+      ]}
+      text={{
+        title: "How Find All searches a workbook",
+        description:
+          "In the find bar's Options, set Within to Workbook and Look in to Values. Find All then searches every visible sheet in tab order, skipping hidden sheets, and lists each match with its sheet, cell, value and formula, counted as, for example, 12 cells found. Clicking a result shows its sheet and selects the cell. Find Next also goes on to the next sheet that has a match.",
+      }}
+    />
+  );
+}
+
+/** Validation: the alert a typed value that fails a rule gets, by the rule's policy. */
+export function ValidationAlertsDiagram() {
+  return (
+    <FanFigure
+      source={{
+        title: "A typed value fails a rule",
+        lines: ["It is checked before", "it is stored"],
+      }}
+      text={{
+        title: "The alert a value that fails a rule gets",
+        description:
+          "A typed value that fails a validation rule is checked before it is stored, and the rule's policy picks Excel's alert. A reject rule shows a Stop alert with Retry and Cancel. A warn rule shows a Warning alert, where Yes keeps the value and No or Cancel do not, or with errorStyle information an Information alert, where OK keeps it and Cancel drops it. An allow rule shows no alert and stores the value as typed.",
+      }}
+      tiles={[
+        { eyebrow: "reject", title: "Stop", lines: ["Retry or Cancel"], tone: "danger" },
+        { eyebrow: "warn", title: "Warning", lines: ["Yes keeps it;", "No or Cancel"] },
+        {
+          eyebrow: "warn, information",
+          title: "Information",
+          lines: ["OK keeps it;", "Cancel drops it"],
+        },
+        { eyebrow: "allow", title: "No alert", lines: ["Stored as typed"], tone: "muted" },
+      ]}
+    />
+  );
+}
+
 /** Feature diagrams by the name a placement uses. */
 export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "grid-handle": GridHandleDiagram,
@@ -890,4 +989,7 @@ export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "formulas-section": FormulasSectionDiagram,
   autofilter: AutoFilterDiagram,
   "keyboard-shortcuts": KeyboardShortcutsDiagram,
+  "paste-special": PasteSpecialDiagram,
+  "find-all": FindAllDiagram,
+  "validation-alerts": ValidationAlertsDiagram,
 };
