@@ -20,18 +20,18 @@ async function open(page: Page): Promise<void> {
 
 /**
  * The dialog sits in the middle of the window, as Excel's do, even under the
- * docs site's `* { margin: 0 }` reset. The window's middle leaves out the
- * page's scrollbar, as the top layer does.
+ * docs site's `* { margin: 0 }` reset. Chromium centres it in the window less
+ * the page's stable scrollbar gutter (`scrollbar-gutter: stable`), which no
+ * DOM measure reports, so the centre may be up to half a scrollbar (8 px)
+ * off. A dialog in the corner is hundreds of pixels off.
  */
 async function expectCentred(page: Page, dialog: Locator): Promise<void> {
   const box = await dialog.boundingBox();
   if (!box) throw new Error("The dialog must have a box");
-  const { width, height } = await page.evaluate(() => ({
-    width: document.documentElement.clientWidth,
-    height: document.documentElement.clientHeight,
-  }));
-  expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThanOrEqual(1);
-  expect(Math.abs(box.y + box.height / 2 - height / 2)).toBeLessThanOrEqual(1);
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("The page must have a viewport");
+  expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(8);
+  expect(Math.abs(box.y + box.height / 2 - viewport.height / 2)).toBeLessThanOrEqual(8);
 }
 
 /** Put `m1` and `m2` in row 6's first two cells (A6:B6) and select them. */
