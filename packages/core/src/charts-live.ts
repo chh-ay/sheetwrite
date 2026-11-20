@@ -305,6 +305,7 @@ function requestPivotViews(store: Store): void {
  *
  * Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
  *
+ * @param store - The store that holds the workbook, such as `grid.store`.
  * @param sheet - Stable ID of the sheet that holds the chart.
  * @param id - The chart's ID.
  * @returns The chart's resolved series, labels and settings, or `null`.
