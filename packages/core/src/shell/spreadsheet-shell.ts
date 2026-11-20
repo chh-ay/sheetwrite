@@ -160,6 +160,8 @@ function shellGridConfig(config: GridConfig | undefined): GridConfig {
  * DOM, and is safe to call twice.
  *
  * @param host - Element the shell is appended to and fills; give it a size.
+ * @param options - Options for the grid the shell creates, the toolbar or
+ *   ribbon, and event callbacks.
  */
 export function createSpreadsheetShell(
   host: HTMLElement,
