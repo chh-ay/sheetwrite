@@ -1,8 +1,11 @@
 import { beforeAll, expect, it } from "bun:test";
 
 import { initSheetwrite } from "@sheetwrite/core";
-import { xlsxAddon } from "@sheetwrite/xlsx";
 
+// The XLSX add-on from its source, as the XLSX package's own tests install it. The add-on
+// registry keeps the first add-on of a name, so installing the built package here would stand
+// in for the source one in every later test file of the run, and coverage would miss it.
+import { xlsxAddon } from "../../xlsx/src/index.js";
 import { barMisses, QUALITY_BAR } from "../bench/bar.js";
 import { REPLAY_SETS, replayWorkbooks } from "../bench/corpora.js";
 import { replayMetrics, replaySet } from "../bench/replay.js";
