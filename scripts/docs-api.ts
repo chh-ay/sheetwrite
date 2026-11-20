@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, normalize } from "node:path";
 
@@ -23,19 +23,16 @@ import { formatDeclaration, formatTypeExpression } from "../docs/src/lib/sheetwr
 import { contentPathForRoute } from "./docs-content-checks.js";
 import { entryLabel, entrySlug } from "./docs-paths.js";
 import {
-  exists,
   frontmatter,
   type MarkdownDocument,
   MIGRATION_ROUTES,
   PACKAGE_DIRECTORIES,
   posix,
-  repositoryRoot,
   REQUIRED_SEARCH_TARGETS,
 } from "./docs-shared.js";
 import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
-import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 function packageSourcePath(packageName: string, source: string): string {
   const separator = source.indexOf("#");
@@ -678,96 +675,24 @@ async function unionAliasIndex(
   return aliases;
 }
 
-interface WorkspaceDependent {
-  readonly name: string;
-  readonly kind: "dependency" | "peer" | "optional" | "dev";
-}
-
 interface SymbolReference {
   readonly packageName: string;
   readonly name: string;
   readonly route: string;
 }
 
-interface WorkspaceManifest {
-  name?: string;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
-}
-
-/** Declaration order is precedence: a package that both depends on and dev-depends on
- * another workspace reports the runtime edge, which is what a reader needs. */
-const DEPENDENCY_KINDS: ReadonlyArray<
-  readonly [WorkspaceDependent["kind"], keyof WorkspaceManifest]
-> = [
-  ["dependency", "dependencies"],
-  ["optional", "optionalDependencies"],
-  ["peer", "peerDependencies"],
-  ["dev", "devDependencies"],
-];
-
-async function workspaceManifests(): Promise<WorkspaceManifest[]> {
-  const root = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8")) as {
-    workspaces?: string[];
-  };
-  const directories: string[] = [];
-  for (const workspace of root.workspaces ?? []) {
-    if (!workspace.endsWith("/*")) {
-      directories.push(join(repositoryRoot, workspace));
-      continue;
-    }
-    const parent = join(repositoryRoot, workspace.slice(0, -2));
-    if (!(await exists(parent))) continue;
-    for (const entry of await readdir(parent, { withFileTypes: true })) {
-      if (entry.isDirectory()) directories.push(join(parent, entry.name));
-    }
-  }
-  const manifests: WorkspaceManifest[] = [];
-  for (const directory of directories) {
-    const path = join(directory, "package.json");
-    if (!(await exists(path))) continue;
-    manifests.push(JSON.parse(await readFile(path, "utf8")) as WorkspaceManifest);
-  }
-  return manifests;
-}
-
 /**
- * Reverse indexes behind "Referenced by", built once per generation: the workspace
- * packages that depend on each package, and the documented exports whose declaration
- * names a symbol. Both come from repository manifests, so the section never claims a
- * consumer the repository cannot show.
+ * The reverse index behind "Referenced by", built once per generation: the
+ * documented exports whose declaration names a symbol. It comes from the API
+ * manifest, so the section never claims a reference the repository cannot show.
  */
 export interface ConsumerIndex {
-  readonly dependents: ReadonlyMap<string, readonly WorkspaceDependent[]>;
   readonly references: ReadonlyMap<string, readonly SymbolReference[]>;
 }
 
-const EMPTY_CONSUMER_INDEX: ConsumerIndex = { dependents: new Map(), references: new Map() };
+const EMPTY_CONSUMER_INDEX: ConsumerIndex = { references: new Map() };
 
-export async function consumerIndex(manifest: PublicApiManifest): Promise<ConsumerIndex> {
-  const dependents = new Map<string, WorkspaceDependent[]>();
-  for (const workspace of await workspaceManifests()) {
-    if (workspace.name === undefined) continue;
-    const declared = new Map<string, WorkspaceDependent["kind"]>();
-    for (const [kind, field] of DEPENDENCY_KINDS) {
-      for (const dependency of Object.keys(workspace[field] ?? {})) {
-        if (!declared.has(dependency)) declared.set(dependency, kind);
-      }
-    }
-    for (const [dependency, kind] of declared) {
-      if (dependency === workspace.name) continue;
-      dependents.set(dependency, [
-        ...(dependents.get(dependency) ?? []),
-        { name: workspace.name, kind },
-      ]);
-    }
-  }
-  for (const list of dependents.values()) {
-    list.sort((left, right) => left.name.localeCompare(right.name));
-  }
-
+export function consumerIndex(manifest: PublicApiManifest): ConsumerIndex {
   const references = new Map<string, SymbolReference[]>();
   for (const pkg of manifest.packages) {
     for (const entry of pkg.entryPoints) {
@@ -785,59 +710,39 @@ export async function consumerIndex(manifest: PublicApiManifest): Promise<Consum
       }
     }
   }
-  return { dependents, references };
+  return { references };
 }
 
-/** Published packages: the only dependents a public API page lists. */
-const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set(PUBLISHABLE_PACKAGE_ORDER);
-
 /**
- * "Referenced by": the published packages that depend on the symbol's package,
- * and the public exports whose declarations name it. An empty list is left
- * out, and so is the section when both are empty.
+ * "Referenced by": the public exports whose declarations name the symbol. The
+ * section is left out when there are none. Every page of a package would list
+ * the same dependent packages, so they are not shown.
  */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
-  const dependents = (consumers.dependents.get(pkg.name) ?? []).filter((dependent) =>
-    PUBLISHED_PACKAGES.has(dependent.name),
-  );
   const references = (consumers.references.get(item.name) ?? []).filter(
     (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
   );
-  if (dependents.length === 0 && references.length === 0) return "";
-  const body = ["## Referenced by", "", '<div class="api-consumers" data-pagefind-ignore>'];
-  if (dependents.length > 0) {
-    body.push(
-      `<p class="api-consumers-label">Packages that depend on <code>${html(pkg.name)}</code></p>`,
-      "",
-      '<ul class="api-consumer-list">',
-      ...dependents.map(
-        (dependent) =>
-          `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+  if (references.length === 0) return "";
+  const body = [
+    "## Referenced by",
+    "",
+    '<div class="api-consumers" data-pagefind-ignore>',
+    `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
+    "",
+    '<ul class="api-consumer-list">',
+    ...references
+      .slice(0, REFERENCE_DISPLAY_LIMIT)
+      .map(
+        (reference) =>
+          `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
       ),
-      "</ul>",
-      "",
-    );
-  }
-  if (references.length > 0) {
+  ];
+  if (references.length > REFERENCE_DISPLAY_LIMIT) {
     body.push(
-      `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
-      "",
-      '<ul class="api-consumer-list">',
-      ...references
-        .slice(0, REFERENCE_DISPLAY_LIMIT)
-        .map(
-          (reference) =>
-            `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
-        ),
+      `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
     );
-    if (references.length > REFERENCE_DISPLAY_LIMIT) {
-      body.push(
-        `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
-      );
-    }
-    body.push("</ul>");
   }
-  body.push("</div>", "");
+  body.push("</ul>", "</div>", "");
   return body.join("\n");
 }
 
@@ -1262,6 +1167,29 @@ export async function renderSymbolPage(
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
   const fields = item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+  // A variants section earns its space only for structured unions; scalar
+  // unions read best inline in the (expanded) declaration, where identifiers
+  // are highlighted, hoverable, and linked.
+  const structuredVariants = shape.variants.some((variant) => variant.includes("{"))
+    ? shape.variants
+    : [];
+  // One consistent model: the code section is always "Declaration", always
+  // pretty-printed. When no Members or Variants section tells the story, it is
+  // the page's primary content: it opens right under the summary, so the
+  // signature comes before the examples and fields. Otherwise it closes the
+  // page, collapsed.
+  const isDeclarationPrimary = shape.members.length === 0 && structuredVariants.length === 0;
+  const declarationSection = [
+    "## Declaration",
+    "",
+    await renderDeclaration(
+      // `declare` is parser scaffolding, not information a reader needs.
+      shape.formatted.replace(/^declare /, ""),
+      isDeclarationPrimary,
+    ),
+    "",
+  ];
+
   // The examples follow the summary; at desktop width they sit in an aside
   // beside the summary and the rest of the reference.
   const hasAside = parts.examples.length > 0;
@@ -1276,6 +1204,7 @@ export async function renderSymbolPage(
     sourceRow(source),
     "</dl>",
     "",
+    ...(isDeclarationPrimary ? declarationSection : []),
   ];
   if (hasAside) {
     body.push(
@@ -1311,12 +1240,6 @@ export async function renderSymbolPage(
     body.push(renderMembers(pkg, entry, item, members, routes, aliases), "");
   }
 
-  // A variants section earns its space only for structured unions; scalar
-  // unions read best inline in the (expanded) declaration, where identifiers
-  // are highlighted, hoverable, and linked.
-  const structuredVariants = shape.variants.some((variant) => variant.includes("{"))
-    ? shape.variants
-    : [];
   if (structuredVariants.length > 0) {
     body.push(
       `## Variants <span class="api-count" data-pagefind-ignore>${structuredVariants.length}</span>`,
@@ -1330,18 +1253,8 @@ export async function renderSymbolPage(
     body.push("</div>", "");
   }
 
-  // One consistent model: the code section is always "Declaration", always
-  // pretty-printed. It collapses only when Members/Variants already tell the
-  // story above it; otherwise it is the page's primary content and expands.
   body.push(
-    "## Declaration",
-    "",
-    await renderDeclaration(
-      // `declare` is parser scaffolding, not information a reader needs.
-      shape.formatted.replace(/^declare /, ""),
-      shape.members.length === 0 && structuredVariants.length === 0,
-    ),
-    "",
+    ...(isDeclarationPrimary ? [] : declarationSection),
     renderReferencedBy(pkg, item, consumers),
   );
   if (hasAside) body.push("</div>", "", "</div>");
@@ -1597,7 +1510,11 @@ export interface UndocumentedApi {
   readonly packageName: string;
   /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
   readonly members: readonly string[];
-  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  /**
+   * Function parameters with neither an `@param` nor a documented type to fall
+   * back on (`fn(name)`). Once a function has one `@param`, every parameter
+   * needs its own, because the code hover panel lists only the tagged ones.
+   */
   readonly parameters: readonly string[];
   /**
    * Functions whose return value has neither `@returns` nor a documented type;
@@ -1634,10 +1551,12 @@ export function undocumentedApi(
           item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
         if (fields === undefined) continue;
         const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        const tagged = parts.parameters.size > 0;
         for (const parameter of fields.parameters) {
           const name = parameter.name.replace(/^\.\.\./, "");
-          const described =
-            parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
+          const described = tagged
+            ? parts.parameters.get(name)
+            : fieldTypeSummary(parameter.type, pkg, routes);
           if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
         }
         if (returnsNothing(fields.returns)) continue;

@@ -535,6 +535,8 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
  * ```
  * @param host - Element the grid renders into. The grid fills it and follows its
  *   size, so give it a height.
+ * @param opts - The workbook, its data or datasource, and the grid's settings
+ *   and callbacks.
  * @see Grid
  * @see GridOptions
  */
