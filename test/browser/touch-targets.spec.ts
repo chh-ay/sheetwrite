@@ -93,7 +93,15 @@ test.describe("on a touch screen", () => {
     expect(tooSmall(tabRow)).toEqual([]);
     expect(overlapping(tabRow)).toEqual([]);
 
-    const paste = await targets(page, '.sheetwrite-ribbon [aria-label="Paste options"]');
+    // At 390 px the Clipboard group folds into one button that opens it.
+    const ribbon = page.getByRole("region", { name: "Ribbon" });
+    if (!(await ribbon.getByRole("button", { name: "Paste options" }).isVisible())) {
+      await ribbon
+        .getByRole("group", { name: "Clipboard", exact: true })
+        .getByRole("button", { name: "Clipboard", exact: true })
+        .click();
+    }
+    const paste = await targets(page, '[aria-label="Paste options"]');
     expect(paste).toHaveLength(1);
     expect(tooSmall(paste)).toEqual([]);
 
