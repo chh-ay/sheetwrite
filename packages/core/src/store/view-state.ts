@@ -332,19 +332,25 @@ export class StoreViewState {
       : this.wasm.distinctValues(handle, col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
-    const texts = column.takeTexts();
+    // Every text in one string, decoded once, then sliced by UTF-16 length.
+    const text = column.takeTextJoined();
+    const textLengths = column.takeTextLengths();
     const styles = column.takeStyles();
     const counts = column.takeCounts();
     column.free();
 
     const out: CellScalar[] = new Array(kinds.length);
     let numberAt = 0;
-    let textAt = 0;
+    let textIndex = 0;
+    let textOffset = 0;
 
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
-      else if (kinds[i] === KIND_STRING) out[i] = texts[textAt++] ?? null;
-      else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
+      else if (kinds[i] === KIND_STRING) {
+        const end = textOffset + (textLengths[textIndex++] ?? 0);
+        out[i] = text.slice(textOffset, end);
+        textOffset = end;
+      } else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
       else out[i] = null;
     }
 
