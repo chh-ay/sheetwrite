@@ -143,7 +143,8 @@ function VueRoute() {
           },
           {
             title: "Your server confirms each edit",
-            detail: "An accepted edit waits in the pending queue until the host's version moves on.",
+            detail:
+              "An accepted edit waits in the pending queue until the host's version moves on.",
           },
         ]}
         sourcePath="docs/src/showcases/VueWorkbench.ts"
