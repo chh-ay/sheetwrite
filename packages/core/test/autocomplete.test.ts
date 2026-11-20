@@ -270,6 +270,24 @@ describe("AutoComplete's list", () => {
     key("Enter");
     expect(value(4)).toBe("Nor");
   });
+
+  it("reads the column at the first typed key: text pasted before it lists nothing", async () => {
+    mount(["North", "Northeast"]);
+    at(2);
+    key("F2");
+    const field = editor();
+    field.value = "Nor";
+    field.setSelectionRange(3, 3);
+    field.dispatchEvent(new InputEvent("input", { inputType: "insertFromPaste", bubbles: true }));
+    expect(host.querySelector(".sheetwrite-entry-list")).toBeNull();
+
+    await type("t");
+    expect(
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
+        (option) => option.textContent,
+      ),
+    ).toEqual(["North", "Northeast"]);
+  });
 });
 
 // https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f

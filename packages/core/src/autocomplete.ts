@@ -248,7 +248,10 @@ export function pickListEntries(host: CompletionHost, row: number, col: number):
  * Page Down, Home and End move, Enter or Tab puts the entry in the editor
  * for the editor to commit, Escape leaves the list, and any other key types
  * on. A click on an entry puts it in the cell. Only while the caret is at
- * the end of the text, and never a formula.
+ * the end of the text, and never a formula. The column is read at the first
+ * typed character: a change that is not typed (a paste, a deletion) lists
+ * entries only once one was, so opening an edit and changing its text never
+ * waits for the read.
  */
 class CellCompletion implements EditCompletion {
   private readonly lookup: (typed: string) => CompletionLookup;
@@ -258,6 +261,8 @@ class CellCompletion implements EditCompletion {
   private list: EntryList | null = null;
   /** Alt+Down moved into the list, so the list keys act on it. */
   private inList = false;
+  /** A typed character has looked the text up, so later changes list too. */
+  private lookedUp = false;
 
   constructor(
     lookup: (typed: string) => CompletionLookup,
@@ -274,7 +279,11 @@ class CellCompletion implements EditCompletion {
   complete(field: HTMLTextAreaElement, typed: boolean): string | null {
     const text = field.value;
     const atEnd = field.selectionStart === text.length && field.selectionEnd === text.length;
-    const found = text.startsWith("=") || !atEnd ? NO_MATCH : this.lookup(text);
+    let found = NO_MATCH;
+    if (atEnd && !text.startsWith("=") && (typed || this.lookedUp)) {
+      this.lookedUp = true;
+      found = this.lookup(text);
+    }
     this.showList(field, found.matches);
     const { entry } = found;
     if (!typed || entry === null || entry.length <= text.length) return null;
