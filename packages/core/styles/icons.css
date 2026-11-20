@@ -74,6 +74,30 @@
   --sheetwrite-icon-x: -13.5;
   --sheetwrite-icon-y: 0;
 }
+.sheetwrite-icon[data-icon="pasteValues"] {
+  --sheetwrite-icon-x: -15;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="pasteFormulas"] {
+  --sheetwrite-icon-x: -16.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="pasteFormatting"] {
+  --sheetwrite-icon-x: -18;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="pasteTranspose"] {
+  --sheetwrite-icon-x: -19.5;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="pasteLink"] {
+  --sheetwrite-icon-x: -21;
+  --sheetwrite-icon-y: 0;
+}
+.sheetwrite-icon[data-icon="pasteSpecial"] {
+  --sheetwrite-icon-x: -22.5;
+  --sheetwrite-icon-y: 0;
+}
 .sheetwrite-icon[data-icon="bold"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -1.5;
@@ -276,6 +300,10 @@
 }
 .sheetwrite-icon[data-icon="formatCells"] {
   --sheetwrite-icon-x: -18;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="autoFillOptions"] {
+  --sheetwrite-icon-x: -19.5;
   --sheetwrite-icon-y: -7.5;
 }
 .sheetwrite-icon[data-icon="sortAsc"] {

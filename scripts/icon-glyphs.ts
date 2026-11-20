@@ -52,6 +52,13 @@ const AXES = "M4 4v16h16";
 const COLUMNS = "M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10";
 const COLUMNS_FILL = "M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z";
 const PIE = "M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z";
+/**
+ * Paste's board, narrowed and open at its bottom right, where each paste
+ * option draws its mark (Values, Formulas, Formatting and the others).
+ */
+const PASTE_BOARD =
+  "M8.5 4.5h-2A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21H11M17 10V6a1.5 1.5 0 0 0-1.5-1.5h-2";
+const PASTE_CLIP = "M9 3h4a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5H9a.5.5 0 0 1-.5-.5v-2A.5.5 0 0 1 9 3Z";
 
 /** A rectangle with the sheet's 1.5-unit corner radius, as most frames use. */
 function frame(x: number, y: number, width: number, height: number): string {
@@ -128,6 +135,48 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M8.5 20 4 15.5a1.5 1.5 0 0 1 0-2.1L12.9 4.5a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L10.6 20Z",
         "M8.5 20H20",
         "M8.5 9 15 15.5",
+      ],
+    ],
+    // Paste's options: the board with the option's mark. Values: digits;
+    // Formulas: fx; Formatting: a brush; Transpose: a turning arrow; Paste
+    // Link: a chain link; Paste Special…: a document of choices.
+    [
+      "pasteValues",
+      [PASTE_BOARD, PASTE_CLIP, "M14 13.5 15.5 12v9", "M18 13.5a1.75 1.75 0 1 1 3 1.25L18 21h3.5"],
+    ],
+    [
+      "pasteFormulas",
+      [
+        PASTE_BOARD,
+        PASTE_CLIP,
+        "M17 12.5h-.5A1.5 1.5 0 0 0 15 14v7M13.5 16H17",
+        "m18 16.5 3.5 4.5m0-4.5L18 21",
+      ],
+    ],
+    [
+      "pasteFormatting",
+      [PASTE_BOARD, PASTE_CLIP, tint("M14 12h7v3.5h-7Z"), "M14 12h7v3.5h-7Z", "M17.5 15.5V21"],
+    ],
+    [
+      "pasteTranspose",
+      [PASTE_BOARD, PASTE_CLIP, "M13.5 13H17a2.5 2.5 0 0 1 2.5 2.5V21", "m17.5 19 2 2 2-2"],
+    ],
+    [
+      "pasteLink",
+      [
+        PASTE_BOARD,
+        PASTE_CLIP,
+        "M15.5 14.5h-1a2.5 2.5 0 0 0 0 5h1M18 14.5h1a2.5 2.5 0 0 1 0 5h-1M15 17h3.5",
+      ],
+    ],
+    [
+      "pasteSpecial",
+      [
+        PASTE_BOARD,
+        PASTE_CLIP,
+        "M14.5 11H18l3 3v5.5a1.5 1.5 0 0 1-1.5 1.5h-5a1.5 1.5 0 0 1-1.5-1.5v-7a1.5 1.5 0 0 1 1.5-1.5Z",
+        "M18 11v3h3",
+        "M15.5 17.5h3",
       ],
     ],
   ],
@@ -355,6 +404,18 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M10 17H4.5A1.5 1.5 0 0 1 3 15.5v-11A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5V10",
         "M3 10h14M10 3v14",
         "M18.5 12.5a1.77 1.77 0 0 1 2.5 2.5l-5.5 5.5-3.5 1 1-3.5Z",
+      ],
+    ],
+    // Auto Fill Options: the source cell, tinted, with its fill handle, the
+    // filled cells below it dotted, and the menu's arrow.
+    [
+      "autoFillOptions",
+      [
+        tint("M4 3.5h9v5H4Z"),
+        "M4 3.5h9v5H4Z",
+        guide("M4 8.5v11h9v-11M4 14h9"),
+        bold("M13 8.5h.01"),
+        "m15.5 16 2.5 2.5 2.5-2.5",
       ],
     ],
   ],

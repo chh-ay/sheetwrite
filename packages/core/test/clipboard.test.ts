@@ -279,6 +279,9 @@ function makeHarness(
       }
     },
     onCutChange: (range) => cutMarks.push(range),
+    loadPasteSpecial: () => import("../src/paste-special.js"),
+    askPasteSpecial: async () => null,
+    sheetName: () => "Sheet 1",
   });
 
   return {
@@ -885,6 +888,9 @@ describe("spill clipboard commands", () => {
         document.commit(patches, reason);
       },
       onCutChange: () => {},
+      loadPasteSpecial: () => import("../src/paste-special.js"),
+      askPasteSpecial: async () => null,
+      sheetName: () => "Sheet 1",
     });
     const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
     return {

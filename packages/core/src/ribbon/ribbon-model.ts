@@ -528,7 +528,28 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             run: (grid) => grid.actions.paste(),
             items: [
               item("Paste", (grid) => grid.actions.paste(), "paste"),
-              item("Paste Values", (grid) => grid.actions.pasteValues()),
+              item("Values", (grid) => grid.actions.pasteValues(), "pasteValues"),
+              item(
+                "Formulas",
+                (grid) => grid.actions.pasteSpecial({ paste: "formulas" }),
+                "pasteFormulas",
+              ),
+              item(
+                "Formatting",
+                (grid) => grid.actions.pasteSpecial({ paste: "formats" }),
+                "pasteFormatting",
+              ),
+              item(
+                "Transpose",
+                (grid) => grid.actions.pasteSpecial({ transpose: true }),
+                "pasteTranspose",
+              ),
+              item("Paste Link", (grid) => grid.actions.pasteSpecial({ link: true }), "pasteLink"),
+              item(
+                "Paste Special…",
+                (grid) => grid.actions.pasteSpecial({ ask: true }),
+                "pasteSpecial",
+              ),
             ],
           },
           button("Cut", "cut", (grid) => grid.actions.cut()),

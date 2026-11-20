@@ -63,6 +63,9 @@ const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
 // Data › Data Validation's command and dialog load on first use; their class
 // names survive minifiers. Webpack may copy the dialog shell into the chunk.
 const DATA_VALIDATION_MARKER = "sheetwrite-data-validation";
+// Paste Special's choices and dialog load on first use; their class names
+// survive minifiers. Webpack may copy the dialog shell into the chunk.
+const PASTE_SPECIAL_MARKER = "sheetwrite-paste-special";
 // The Keyboard shortcuts panel loads on first use; its dialog class survives
 // minifiers. Like Format Cells, its chunk may hold a copy of the dialog shell.
 const KEYBOARD_SETTINGS_MARKER = "sheetwrite-keyboard-settings";
@@ -97,6 +100,7 @@ const autoFilterChunks = [];
 const formatCellsChunks = [];
 const dataValidationChunks = [];
 const keyboardSettingsChunks = [];
+const pasteSpecialChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
 const dashboardChunks = [];
@@ -127,6 +131,7 @@ for (const file of lazyChunks) {
   else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
   else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboardSettingsChunks.push(file);
+  else if (code.includes(PASTE_SPECIAL_MARKER)) pasteSpecialChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
@@ -174,6 +179,11 @@ if (keyboardSettingsChunks.length !== 1)
   throw new Error(
     `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboardSettingsChunks.length}`,
   );
+if (pasteSpecialChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`,
+  );
+}
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (sheetTabPanelChunks.length !== 1) {
@@ -223,6 +233,9 @@ if (mainCode.includes(DIALOG_MARKER)) {
 }
 if (mainCode.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(PASTE_SPECIAL_MARKER)) {
+  throw new Error("Paste Special is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(DATA_VALIDATION_MARKER)) {
   throw new Error("Data Validation is in webpack's main.js; it must load lazily");
@@ -282,6 +295,7 @@ const assets = publicFiles.map((file) => {
       formatCellsChunks,
       dataValidationChunks,
       keyboardSettingsChunks,
+      pasteSpecialChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,

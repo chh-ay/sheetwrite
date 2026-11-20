@@ -979,6 +979,12 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
+      loadPasteSpecial: () => import("./paste-special.js"),
+      askPasteSpecial: (ownCopy) =>
+        this.openDialog(import("./paste-special.js"), (special, host) =>
+          special.pasteSpecialDialog(host, ownCopy),
+        ),
+      sheetName: (sheet) => this.sheetById(sheet)?.name,
       keepValidation: () => this.config?.paste?.keepValidation === true,
       onValidationRefused: (refused, warned) => {
         this.validationRefusedNotice(refused, warned);
@@ -1149,6 +1155,8 @@ export class GridImpl implements Grid {
       cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
       paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
       pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
+      // Ctrl+Alt+V opens Excel's Paste Special dialog.
+      pasteSpecial: () => this.runKeyboardClipboard(this.clipboard.pasteSpecial({ ask: true })),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
       onEditStart: () => {
@@ -1202,6 +1210,15 @@ export class GridImpl implements Grid {
       fillTarget: () => this.interactions.fillPreview,
       fillHandleScreen: (contentTop, scrollLeft) =>
         this.interactions.fillHandleScreen(contentTop, scrollLeft),
+      fillTip: () => this.interactions.fillTip,
+      fillValuesArea: () => this.interactions.fillValuesArea,
+      fillValueAt: (row, col) => this.interactions.fillValueAt(row, col),
+      rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
+      autoFillTarget: () => this.interactions.autoFillTarget,
+      openAutoFillOptions: (clientX, clientY) => {
+        this.interactions.openAutoFillOptions(clientX, clientY);
+      },
+      icons: () => this.config?.icons,
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
@@ -4218,6 +4235,7 @@ export class GridImpl implements Grid {
       cut: () => this.clipboard.cut(),
       paste: () => this.clipboard.paste(),
       pasteValues: () => this.clipboard.pasteValues(),
+      pasteSpecial: (options) => this.clipboard.pasteSpecial(options),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => {
         try {
