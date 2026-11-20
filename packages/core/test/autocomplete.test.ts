@@ -275,6 +275,8 @@ describe("AutoComplete's list", () => {
     mount(["North", "Northeast"]);
     at(2);
     key("F2");
+    // AutoComplete loads with the grid's first edit; let it arrive before the paste.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const field = editor();
     field.value = "Nor";
     field.setSelectionRange(3, 3);
