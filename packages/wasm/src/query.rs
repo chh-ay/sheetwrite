@@ -1295,7 +1295,7 @@ fn resolved_text<'a>(
 ///
 /// The texts are kept end to end in one string with their UTF-16 lengths, so
 /// JavaScript decodes them in one call and slices them. Decoding one string
-/// per value took about 40% of AutoComplete's read of 100,000 entries.
+/// per value took about 40% of the cell editor's completion read of 100,000 entries.
 #[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
