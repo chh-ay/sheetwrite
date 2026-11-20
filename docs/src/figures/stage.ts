@@ -47,9 +47,10 @@ const PLACEHOLDER_WORKBOOK: Workbook = {
  * `ribbon` (full or compact), `width` and `height` of the stage in CSS
  * pixels, `links=1` to give the workbook a linked workbook, `layout=tablet`
  * or `layout=phone` for a narrow dashboard layout, `history=1` to start its
- * version history with a named version, and `presentation=data-grid` for
- * column headers named by field. Marks the document `data-figure-ready` once
- * the first frame is drawn.
+ * version history with a named version, `presentation=data-grid` for
+ * column headers named by field, and `keys=1` to turn on the Keyboard
+ * shortcuts panel. Marks the document `data-figure-ready` once the first
+ * frame is drawn.
  */
 async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<void> {
   document.documentElement.dataset.theme = params.get("theme") === "dark" ? "dark" : "light";
@@ -82,6 +83,7 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
       workbook: PLACEHOLDER_WORKBOOK,
       theme: siteGridTheme(),
       presentation,
+      ...(params.get("keys") === "1" ? { config: { keyboardSettings: true } } : {}),
       addons: {
         queries: {
           fetchSource: async () => ({

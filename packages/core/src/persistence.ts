@@ -77,6 +77,8 @@ export class PersistenceError extends SheetwriteError {
  * @param snapshot - A saved `WorkbookSnapshot`, as `Grid.exportSnapshot` or
  *   `fromXlsxWorkbook` returns it. It is validated first; an invalid one throws
  *   a `PersistenceError` with code `invalid-snapshot`.
+ * @param options - Grid options other than `workbook` and `data`, and resource
+ *   limits for this load that replace the defaults.
  */
 export function createGridFromSnapshot(
   host: HTMLElement,

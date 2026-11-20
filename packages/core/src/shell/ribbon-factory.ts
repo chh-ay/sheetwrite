@@ -25,6 +25,9 @@ export interface RibbonOptions extends RibbonConfig {
  * `destroy`.
  *
  * @param host - Element the ribbon is appended to.
+ * @param grid - The grid whose commands the ribbon runs.
+ * @param options - The layout, which commands show, icon overrides, and
+ *   focus and height callbacks.
  */
 export function createRibbon(
   host: HTMLElement,
