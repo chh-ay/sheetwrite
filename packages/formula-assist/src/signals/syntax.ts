@@ -138,8 +138,12 @@ class Syntax implements Signal {
     ];
     if (names.some((name) => name.toUpperCase().startsWith(typed))) return null;
 
+    // Hidden and very hidden sheets stay out, as they do from the sheet tabs and every list.
     const sheets = workbook.sheets.filter(
-      (entry) => PLAIN_NAME.test(entry.name) && entry.name.toUpperCase().startsWith(typed),
+      (entry) =>
+        (entry.visibility ?? "visible") === "visible" &&
+        PLAIN_NAME.test(entry.name) &&
+        entry.name.toUpperCase().startsWith(typed),
     );
     const matches = analysis.completion?.matches ?? [];
     const [fn] = matches;
