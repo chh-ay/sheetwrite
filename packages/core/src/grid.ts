@@ -535,6 +535,8 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
  * ```
  * @param host - Element the grid renders into. The grid fills it and follows its
  *   size, so give it a height.
+ * @param opts - The workbook, its data or datasource, and the grid's settings
+ *   and callbacks.
  * @see Grid
  * @see GridOptions
  */
@@ -2127,15 +2129,22 @@ export class GridImpl implements Grid {
   /**
    * What a screen reader hears after the cell at view `row`, `col`: its note,
    * and the input message of its validation rule, which Excel shows beside it.
+   * The mirror asks for each cell it shows whenever its window moves, so a
+   * sheet without notes or rules answers at once, and a cell without both
+   * builds no list.
    */
   private cellDescription(row: number, col: number): string | null {
+    if (!this.sheetById(this.activeSheet)?.notes?.length && !this.sheet().validationRules?.length) {
+      return null;
+    }
     const note = this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col });
     const rule = this.validationRuleAt(row, col);
     const input =
       rule && hasInputMessage(rule)
         ? [rule.inputTitle, rule.inputMessage].filter(Boolean).join(": ")
         : "";
-    return [note ? `Note: ${note}` : "", input].filter(Boolean).join(". ") || null;
+    if (!note) return input || null;
+    return input ? `Note: ${note}. ${input}` : `Note: ${note}`;
   }
 
   /**
