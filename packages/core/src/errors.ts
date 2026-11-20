@@ -474,9 +474,10 @@ function isSheetwriteErrorContext(context: unknown): context is SheetwriteErrorC
 }
 
 /**
- * Canonical envelope for thrown and callback-delivered Sheetwrite failures.
- * The message is cut to an 8 KiB UTF-8 budget, and so is the sum of the
- * context strings, because both can quote host or file data.
+ * The error Sheetwrite throws or passes to callbacks.
+ *
+ * Note: the message is cut to 8 KiB of UTF-8, and so are the context strings
+ * together, because both can quote host or file data.
  */
 export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
   /** Error class name; subclasses such as `PersistenceError` set their own. */

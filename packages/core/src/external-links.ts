@@ -130,6 +130,9 @@ function formulasNaming(
  * recalculates the formulas that read them, as Excel's "Update Values" does.
  * Links whose resolver gives `null` or fails keep their saved values.
  *
+ * @param grid - The grid whose workbook holds the links.
+ * @param resolve - Gives the current values of one linked workbook, or `null`
+ *   when it is not available.
  * @param books - Names of the linked workbooks to update; all links when omitted. Case is ignored.
  * @returns One result per link asked for, in link order.
  * @throws SheetwriteError with code `aborted` when the grid is destroyed while `resolve` runs.
@@ -202,6 +205,7 @@ export async function updateExternalLinks(
  * saved values until the next update. One undoable change. Returns whether
  * the document applied it.
  *
+ * @param grid - The grid whose workbook holds the link.
  * @param book - Name of the linked workbook to change; case is ignored.
  * @param next - The new workbook's name, as formulas write it, and its location.
  * @returns `false` when no link has that name or the document refused the change.
@@ -240,6 +244,7 @@ export function changeExternalLinkSource(
  * text, such as `#N/A`. One undoable change. Returns whether the document
  * applied it.
  *
+ * @param grid - The grid whose workbook holds the links.
  * @param books - Names of the linked workbooks to break; case is ignored.
  * @returns `false` when the document refused the change.
  */
