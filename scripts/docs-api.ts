@@ -1512,7 +1512,11 @@ export interface UndocumentedApi {
   readonly packageName: string;
   /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
   readonly members: readonly string[];
-  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  /**
+   * Function parameters with neither an `@param` nor a documented type to fall
+   * back on (`fn(name)`). Once a function has one `@param`, every parameter
+   * needs its own, because the code hover panel lists only the tagged ones.
+   */
   readonly parameters: readonly string[];
   /**
    * Functions whose return value has neither `@returns` nor a documented type;
@@ -1549,10 +1553,12 @@ export function undocumentedApi(
           item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
         if (fields === undefined) continue;
         const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        const tagged = parts.parameters.size > 0;
         for (const parameter of fields.parameters) {
           const name = parameter.name.replace(/^\.\.\./, "");
-          const described =
-            parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
+          const described = tagged
+            ? parts.parameters.get(name)
+            : fieldTypeSummary(parameter.type, pkg, routes);
           if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
         }
         if (returnsNothing(fields.returns)) continue;

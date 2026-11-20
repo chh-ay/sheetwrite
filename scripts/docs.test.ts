@@ -201,12 +201,13 @@ describe("API reference pages", () => {
     };
     await prepareDeclarationShapes([shape, make, run].map((item) => parseableDeclaration(item)));
     expect(undocumentedApi(manifest)).toEqual([
-      // `call` once for both overloads; `shape` reads CountShape's summary;
+      // `call` once for both overloads; `shape` has a documented type, but
+      // `makeThing` tags `size`, so the hover panel would leave `shape` out;
       // `runThing` returns nothing to describe.
       {
         packageName: "@sheetwrite/core",
         members: ["CountShape.bare", "CountShape.call"],
-        parameters: ["makeThing(label)"],
+        parameters: ["makeThing(label)", "makeThing(shape)"],
         returns: ["makeThing"],
       },
     ]);

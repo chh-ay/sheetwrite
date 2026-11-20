@@ -106,7 +106,22 @@ A workbook search looks in every visible sheet in tab order and skips hidden she
 
 **≡ Find all** lists every match with its sheet, cell, value and formula, and counts them ("12 cells found"). Click a result, or move through the list with the arrow keys, to go to that cell. The list follows the search as you type or change an option.
 
-On Windows and Linux, Alt and a letter reach the controls as in Excel's dialog: Alt+N the Find field, Alt+F Find Next, Alt+I Find All, Alt+T Options, Alt+H Within, Alt+S Search, Alt+L Look in, Alt+C Match case, Alt+O Match entire cell contents, Alt+E the Replace field, Alt+R Replace and Alt+A Replace All.
+On Windows and Linux, Alt and a letter reach each control, as in Excel's dialog:
+
+| Keys | Control |
+| --- | --- |
+| Alt+N | Find field |
+| Alt+F | Find Next |
+| Alt+I | Find All |
+| Alt+T | Options |
+| Alt+H | Within |
+| Alt+S | Search |
+| Alt+L | Look in |
+| Alt+C | Match case |
+| Alt+O | Match entire cell contents |
+| Alt+E | Replace field |
+| Alt+R | Replace |
+| Alt+A | Replace All |
 
 ## Wildcards and Look in
 
