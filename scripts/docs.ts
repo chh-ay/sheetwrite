@@ -281,9 +281,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
 
   const linkRoutes = documentationLinkRoutes(manifest);
-  // "Referenced by" reads repository manifests and the whole API surface, so it is
-  // indexed once here rather than per symbol page.
-  const consumers = await consumerIndex(manifest);
+  // "Referenced by" reads the whole API surface, so it is indexed once here
+  // rather than per symbol page.
+  const consumers = consumerIndex(manifest);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
