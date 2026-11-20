@@ -3,6 +3,8 @@ title: Pivot tables
 description: "Summarize a range or table into a pivot table with rows, columns, values and filters, edit it from the field list, and keep it through undo and sync."
 ---
 
+A pivot table summarizes a range or table by the fields you choose, as Excel's PivotTable does. Users change it from the PivotTable Fields list, and it updates when its source cells change.
+
 ```ts prelude="core" partial="requires a full-engine grid with Month, Region and Revenue columns" title="Revenue by month and region"
 grid.setPivot({
   id: "revenue",
