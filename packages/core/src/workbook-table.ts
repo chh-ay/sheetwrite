@@ -398,6 +398,8 @@ function validStyle(
 /**
  * Validate one canonical table against sheet bounds and workbook-global identities.
  *
+ * @param table - The table to check.
+ * @param sheet - The sheet the table is on; the table must fit inside it.
  * @param existing - Tables already accepted; the new one must not share an ID or
  *   name with them, or overlap them.
  * @param limits - The limits to check against; defaults to the built-in limits.
