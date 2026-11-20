@@ -127,23 +127,23 @@ function ReactRoute() {
         prompt="Filter a market, then select an ARR cell and enter a value or formula. Workbook totals include every account; the market KPI reports the selected market. Open Secondary tools for search, CSV import, exports, and renderer controls."
         proof={[
           {
-            title: "Controlled queries",
-            detail: "Market and segment filters, ranking, and search flow from React state.",
+            title: "Filters from React state",
+            detail: "React state sets the market and segment filters, the ranking and the search.",
           },
           {
             title: "Formulas and KPIs",
             detail:
-              "Summary cards read real engine formulas (SUM over a named range, AVG, SUMIF per market) and recalculate on every edit.",
+              "The summary cards are real formulas, such as SUM over a named range and SUMIF per market, and they update on every edit.",
           },
           {
-            title: "Reset reconciliation",
+            title: "Rebuilds keep React state",
             detail:
-              "Dataset reloads and renderer swaps rebuild the grid; the surviving React state re-applies itself on ready.",
+              "Reloading the data or switching the renderer builds a new grid, and React state applies itself again once the grid is ready.",
           },
           {
-            title: "Data workflows",
+            title: "Import and export",
             detail:
-              "CSV import lands as one undoable commit; CSV/XLSX exports hand off to the interoperability proofs.",
+              "A CSV import is one change you can undo. CSV and XLSX exports download the workbook.",
           },
         ]}
         sourcePath="docs/src/showcases/ReactWorkbench.tsx"

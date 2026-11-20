@@ -18,7 +18,7 @@ import vueWorkbenchStylesheet from "@docs/styles/vue-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
 
 const description =
-  "Reject a protected workbook edit, inspect the exact policy issue, authorize the finance role, and commit the same mutation through Vue-owned state.";
+  "See an edit to a protected cell rejected and why, switch to the finance role, then make the same edit. Vue state drives the grid throughout.";
 
 /** The workbench's panels, in the page's static HTML (the workbench renders in the browser). */
 const panels: readonly FrameworkPanel[] = [
@@ -124,30 +124,30 @@ function VueRoute() {
         guide="/docs/frameworks/vue/"
         packageName="@sheetwrite/vue"
         panels={panels}
-        prompt="Attempt the protected G1 edit in the Total column as Reviewer. Inspect the rejection, authorize Finance lead, then commit the same edit."
+        prompt="As Reviewer, try to edit the protected cell G1 in the Total column. Read why it was rejected, switch the role to Finance lead, then make the same edit."
         proof={[
           {
-            title: "Policy result beside the mutation",
+            title: "Rejected, then allowed",
             detail:
-              "The selected cell, access rule, rejection, role change, and accepted commit stay in one causal view.",
+              "The selected cell, its access rule, the rejected edit, the role change and the accepted edit show side by side.",
           },
           {
-            title: "Vue-native authority",
+            title: "Vue props, Grid API",
             detail:
-              "Reactive props drive the published adapter while every workbook change crosses the real Grid API.",
+              "Reactive props drive the Vue adapter, and every workbook change goes through the Grid API.",
           },
           {
-            title: "Attached workbook tools",
+            title: "Notes and events beside the grid",
             detail:
-              "The selected-cell note editor and adapter event feed stay accessible while native tabs own sheet lifecycle.",
+              "The note editor for the selected cell and the adapter's event feed stay open beside the grid, and the sheet tabs work as usual.",
           },
           {
-            title: "Host acknowledgement",
-            detail: "Accepted edits enter the real pending queue before the host version advances.",
+            title: "Your server confirms each edit",
+            detail: "An accepted edit waits in the pending queue until the host's version moves on.",
           },
         ]}
         sourcePath="docs/src/showcases/VueWorkbench.ts"
-        title="A governed edit, from rejection to commit."
+        title="An edit rejected, then allowed."
       >
         <Island component={VueWorkbenchIsland} name="workbench-vue" props={{}} />
       </FrameworkPage>
