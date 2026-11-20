@@ -12,7 +12,7 @@ import { formulaAssistAddon } from "@sheetwrite/formula-assist";
 await initSheetwrite({ addons: [formulaAssistAddon()] });
 ```
 
-Grids created after `initSheetwrite` show suggestions in their [formula bar](/docs/features/grid/toolbar-and-ribbon/). The add-on adds nothing to the page's first load until it is installed. Its entry only registers it, and the predictor loads on the first formula edit.
+Grids created after `initSheetwrite` show suggestions in their [formula bar](/docs/features/grid/toolbar-and-ribbon/). The add-on adds nothing to the page's first load until it is installed. Its entry only registers it. The predictor is a separate chunk that starts loading when the grid mounts, so it is ready by the first formula edit.
 
 ## What it adds to Excel
 

@@ -56,7 +56,9 @@ function doubledColumn(): SheetwriteStore {
   return SheetwriteStore.fromSnapshot(snapshot);
 }
 
-it("registers a suggester whose first edit waits for the predictor chunk, then suggests", async () => {
+it("fetches the predictor when the grid mounts; an edit opened before it arrives waits for it", async () => {
+  const edit = await openFormulaEdit(doubledColumn(), { sheet: "s", row: 2, col: 1 });
+  const analysis = analyzeFormula("=", 1, edit.functions());
   let suggester: FormulaSuggester | undefined;
   const addon = formulaAssistAddon();
   const context = {
@@ -65,11 +67,9 @@ it("registers a suggester whose first edit waits for the predictor chunk, then s
       return () => undefined;
     },
   } as Partial<SheetwriteAddonGridContext<unknown>> as SheetwriteAddonGridContext<unknown>;
+  // Mounting the grid starts the chunk's load, and an edit opens at once, before it arrives.
   addon.grid?.(context);
   if (suggester === undefined) throw new Error("The add-on registered no suggester");
-
-  const edit = await openFormulaEdit(doubledColumn(), { sheet: "s", row: 2, col: 1 });
-  const analysis = analyzeFormula("=", 1, edit.functions());
   const first = suggester.open(edit);
   // The predictor chunk is still loading: nothing shows, and Excel's keys apply.
   expect(first.suggest("=", analysis)).toBeNull();

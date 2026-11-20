@@ -1,7 +1,8 @@
 // @sheetwrite/formula-assist: predicts the rest of the formula typed in the
 // formula bar and shows it as dimmed text, accepted with Tab. This entry only
-// registers the add-on; the predictor is a chunk of its own that loads on the
-// first formula edit.
+// registers the add-on; the predictor is a chunk of its own that starts
+// loading when a grid with the add-on mounts, so it is there by the first
+// formula edit, and is never part of the page's first load.
 
 import type {
   FormulaEdit,
@@ -83,6 +84,11 @@ const suggester: FormulaSuggester = {
 export function formulaAssistAddon(): SheetwriteAddon {
   return {
     name: "formulaAssist",
-    grid: ({ formulaSuggestions }) => formulaSuggestions(suggester),
+    grid: ({ formulaSuggestions }) => {
+      // An edit that opens before the chunk arrives suggests nothing until the next key, so
+      // fetch it now. A failed load is retried by the first edit, which reports it.
+      loadPredictor().catch(() => undefined);
+      return formulaSuggestions(suggester);
+    },
   };
 }

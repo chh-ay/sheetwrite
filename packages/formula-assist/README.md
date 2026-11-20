@@ -15,7 +15,7 @@ import { formulaAssistAddon } from "@sheetwrite/formula-assist";
 await initSheetwrite({ addons: [formulaAssistAddon()] });
 ```
 
-Grids created after `initSheetwrite` get suggestions in their formula bar. The cell editor keeps Excel's AutoComplete. The add-on entry only registers itself; the predictor loads on the first formula edit.
+Grids created after `initSheetwrite` get suggestions in their formula bar. The cell editor keeps Excel's AutoComplete. The add-on entry only registers itself; the predictor is a separate chunk that starts loading when the grid mounts.
 
 ## Keys
 
