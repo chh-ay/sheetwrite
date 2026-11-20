@@ -3,6 +3,8 @@ title: Validation, protection and notes
 description: Restrict what users can enter, protect ranges from local edits, and attach plain-text notes to cells.
 ---
 
+Validation rules check what users type, as Excel's Data Validation does. Protected ranges refuse local edits, and notes attach plain text to a cell.
+
 ```ts prelude="core" partial="requires an initialized grid with the rows shown below" title="A list rule, a protected header row, and a note"
 grid.setValidationRule({
   id: "status",
