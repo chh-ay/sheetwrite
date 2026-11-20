@@ -1055,6 +1055,8 @@ html:has(.sw-nav-dialog[open]) {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--sw-space-0-5) var(--sw-space-3);
+  /* Cards in a row share a height; the rows stay at the top, so every title starts on one line. */
+  align-content: start;
   align-items: center;
   min-height: 44px;
   padding: var(--sw-space-4);
