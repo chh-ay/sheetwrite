@@ -580,6 +580,17 @@ fn formula_metadata(
     )
 }
 
+/// The reads of `ast` after an edit rewrote its references. A rewrite of
+/// references changes no function call and no name, so the formula's
+/// volatility stays as it was and is not worked out again.
+fn rewritten_reads(ast: &Ast, names: NameScope<'_>) -> ReadSet {
+    if !ast_contains_let(ast) {
+        return ReadSet::from_ast(ast, names);
+    }
+    let expanded = expand_let_reachable_ast(ast).ok();
+    ReadSet::from_ast(expanded.as_ref().unwrap_or(ast), names)
+}
+
 /// Stored derived-cell metadata: parsed formulas and plain references share the
 /// same Rust-owned read-set/dependency graph, while retaining distinct
 /// persistence kinds at the ABI boundary.
@@ -929,18 +940,18 @@ impl FormulaEntry {
         entry
     }
 
-    /// Applies `rewrite` to the entry's tree. When it reports a change, the
-    /// read metadata follows the new tree, and the source text is marked so
-    /// that its references are written from the tree when it is read; the
-    /// rest stays as the user wrote it, as in Excel. Returns whether anything
-    /// changed. Out of line, so the edits that call it share one copy.
+    /// Applies `rewrite`, which changes only references, to the entry's
+    /// tree. When it reports a change, the reads follow the new tree, and the
+    /// source text is marked so that its references are written from the tree
+    /// when it is read; the rest stays as the user wrote it, as in Excel.
+    /// Returns whether anything changed. Out of line, so the edits that call
+    /// it share one copy.
     #[inline(never)]
     fn rewrite_ast(
         &mut self,
         names: NameScope<'_>,
         rewrite: impl FnOnce(&mut Ast) -> bool,
     ) -> bool {
-        let uses_names = self.uses_names();
         let Some(ast) = &mut self.ast else {
             return false;
         };
@@ -948,13 +959,11 @@ impl FormulaEntry {
             return false;
         }
 
-        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast), uses_names);
-        self.reads = reads;
+        self.reads = rewritten_reads(ast, names);
 
         // A plain reference has no source text: its tree is the target.
         let has_text = self.flags & Self::REFERENCE == 0;
         self.set_flag(Self::STALE_REFERENCES, has_text);
-        self.set_volatile(volatile);
         true
     }
 
@@ -1087,7 +1096,6 @@ impl FormulaEntry {
         names: NameScope<'_>,
         sheet_names: &[String],
     ) -> bool {
-        let uses_names = self.uses_names();
         let Some(ast) = &mut self.ast else {
             return false;
         };
@@ -1097,9 +1105,7 @@ impl FormulaEntry {
 
         // A relinked reference writes the same text, so the source stays as
         // the user wrote it instead of being written again from the tree.
-        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast), uses_names);
-        self.reads = reads;
-        self.set_volatile(volatile);
+        self.reads = rewritten_reads(ast, names);
         true
     }
 
