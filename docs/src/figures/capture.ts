@@ -34,6 +34,12 @@ const CAPTURE_TIME = new Date("2026-11-04T15:00:00Z");
 /** How long one stage may take to draw its first frame. */
 const READY_TIMEOUT_MS = 60_000;
 
+/** A point a crop starts from, in CSS pixels. */
+interface ShotPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
 /** One screenshot: the stage query, its size, and the steps that open its view. */
 interface Shot {
   name: string;
@@ -43,9 +49,10 @@ interface Shot {
    * `items`: keep only the dashboard's items, with the dashboard's 12 px margin.
    * `panel`: the shot's size from the side panel's top-right corner, with the grid beside it.
    * `{ x, y }`: the shot's size from that point of the stage.
+   * `{ dialog: { x, y } }`: the shot's size from that point of the open grid dialog.
    */
-  crop?: "items" | "panel" | { readonly x: number; readonly y: number };
-  /** The size of the stage a `panel` or `{ x, y }` crop is taken from. */
+  crop?: "items" | "panel" | ShotPoint | { readonly dialog: ShotPoint };
+  /** The size of the stage a `panel`, `{ x, y }` or dialog crop is taken from. */
   stage?: ShotSize;
   /** With `crop: "items"`, the titles of the items to keep; every item by default. */
   cropItems?: readonly string[];
@@ -378,6 +385,93 @@ const PAGE_SHOTS: readonly Shot[] = [
     query: { sheet: "formulas", ribbon: "compact" },
     steps: (page) => select(page, { kind: "cell", addr: { sheet: "formulas", row: 0, col: 0 } }),
   },
+  // The 0.7.0 Excel editing highlights. Each opens the view its card crops.
+  {
+    name: "autofilter",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.toggleAutoFilter());
+      await page.locator(".sheetwrite-shell-grid").focus();
+      await page.keyboard.press("Alt+ArrowDown");
+      await page.getByRole("dialog").first().waitFor();
+      await settle(page);
+    },
+  },
+  {
+    name: "cut-paste",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "range", range: ordersRange(2, 2, 5, 4) });
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.cut());
+      // The paste target beside the cut cells, where the move would land.
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 2, col: 5 } });
+    },
+  },
+  {
+    name: "paste-special",
+    size: "app",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "range", range: ordersRange(1, 3, 4, 4) });
+      await page.locator(".sheetwrite-shell-grid").focus();
+      await page.keyboard.press("Control+c");
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 1, col: 6 } });
+      await page.locator(".sheetwrite-shell-grid").focus();
+      await page.keyboard.press("Control+Alt+v");
+      await page.getByRole("dialog").first().waitFor();
+      await settle(page);
+    },
+  },
+  {
+    name: "data-validation",
+    size: "app",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.dataValidation());
+      await page.getByRole("dialog").first().waitFor();
+      await settle(page);
+    },
+  },
+  {
+    name: "format-cells",
+    size: "app",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 2 } });
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.formatCells());
+      await page.getByRole("dialog").first().waitFor();
+      await settle(page);
+    },
+  },
+  {
+    name: "keyboard-shortcuts",
+    size: "app",
+    query: { sheet: "orders", ribbon: "compact", keys: "1" },
+    steps: async (page) => {
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.openKeyboardSettings());
+      await page.getByRole("dialog").first().waitFor();
+      await settle(page);
+    },
+  },
+  {
+    name: "autocomplete",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 3, col: 1 } });
+      await page.locator(".sheetwrite-shell-grid").focus();
+      // The first key opens the editor and loads AutoComplete; "Am" then
+      // matches only Americas, so the editor shows the rest of it selected.
+      await page.keyboard.type("A");
+      await settle(page);
+      await page.keyboard.type("m");
+      await settle(page);
+    },
+  },
 ];
 
 /**
@@ -417,6 +511,17 @@ const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
   "formula-help": { x: 30, y: 100 },
   // The compact ribbon's group menus and the open Number menu.
   "compact-ribbon": { x: 160, y: 0 },
+  // The Region column's filter dropdown: its value list with the row counts.
+  autofilter: { x: 120, y: 270 },
+  // The cut cells' moving border and the cell the paste would move them to.
+  "cut-paste": { x: 240, y: 140 },
+  // Each dialog from its tabs or its first group, without the window's edges.
+  "paste-special": { dialog: { x: 20, y: 0 } },
+  "data-validation": { dialog: { x: 12, y: 44 } },
+  "format-cells": { dialog: { x: 12, y: 44 } },
+  "keyboard-shortcuts": { dialog: { x: 12, y: 44 } },
+  // The cell editor and the AutoComplete list of the entries it matches.
+  autocomplete: { x: 40, y: 140 },
 };
 
 const SHOTS: readonly Shot[] = [
@@ -511,10 +616,15 @@ async function settle(page: Page) {
 /** The clip of a `panel` or `{ x, y }` crop: the shot's size, from the panel's top-right corner or the point. */
 async function cropBox(
   page: Page,
-  crop: "panel" | { readonly x: number; readonly y: number },
+  crop: "panel" | ShotPoint | { readonly dialog: ShotPoint },
   size: ShotSize,
 ) {
   const { width, height } = SHOT_SIZES[size];
+  if (typeof crop === "object" && "dialog" in crop) {
+    const box = await page.locator(".sheetwrite-dialog[open]").boundingBox();
+    if (box === null) throw new Error("No grid dialog is open to crop to");
+    return { x: box.x + crop.dialog.x, y: box.y + crop.dialog.y, width, height };
+  }
   const box = await page
     .locator(crop === "panel" ? ".sheetwrite-panel-host" : "#stage")
     .boundingBox();
@@ -543,6 +653,8 @@ async function capture(shot: Shot, origin: string, scratch: string) {
           colorScheme: theme,
           locale: "en-US",
           timezoneId: "UTC",
+          // Cut writes the clipboard before it marks the cells, as in a browser tab.
+          permissions: ["clipboard-read", "clipboard-write"],
         });
         const query = new URLSearchParams({
           ...shot.query,
