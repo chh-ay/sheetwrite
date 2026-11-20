@@ -165,7 +165,12 @@ Ctrl/Cmd + Alt + V (Ctrl + Cmd + V on a Mac, as in Excel for Mac), Home › Past
 | Values and number formats (U) | Values with their number formats. |
 | All merging conditional formats (G) | Everything; the target cells' conditional formats stay beside the copied ones. |
 
-**Operation** (None O, Add D, Subtract S, Multiply M, Divide I) combines each copied number with the target cell's: two numbers give the result, and a formula on either side gives a formula, such as `=(5)+20`. A blank counts as 0, text that reads as a number counts as that number, and a cell with other text is left as it is. **Skip blanks** (B) leaves a target cell as it is where the copied cell is blank. **Transpose** (E) pastes rows as columns; each formula's relative references shift by the move of its own cell. **Paste Link** (L) writes formulas that refer to the copied cells instead of their contents: `=$A$1` for one cell, `=A1` and so on for more, with the sheet's name from another sheet (`=Data!A1`).
+Four more options change how the cells land:
+
+- **Operation** (None O, Add D, Subtract S, Multiply M, Divide I) combines each copied number with the target cell's. Two numbers give the result. A formula on either side gives a formula, such as `=(5)+20`. A blank counts as 0, text that reads as a number counts as that number, and a cell with other text is left as it is.
+- **Skip blanks** (B) leaves a target cell as it is where the copied cell is blank.
+- **Transpose** (E) pastes rows as columns. Each formula's relative references shift by the move of its own cell.
+- **Paste Link** (L) writes formulas that refer to the copied cells instead of their contents: `=$A$1` for one cell, `=A1` and so on for more, with the sheet's name from another sheet (`=Data!A1`).
 
 Home › Paste and the context menu's Paste Options row also offer the common choices in one click: Paste, Values, Formulas, Formatting, Transpose and Paste Link.
 

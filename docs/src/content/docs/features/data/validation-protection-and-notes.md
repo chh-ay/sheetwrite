@@ -3,6 +3,8 @@ title: Validation, protection and notes
 description: Restrict what users can enter, protect ranges from local edits, and attach plain-text notes to cells.
 ---
 
+Validation rules check what users type, as Excel's Data Validation does. Protected ranges refuse local edits, and notes attach plain text to a cell.
+
 ```ts prelude="core" partial="requires an initialized grid with the rows shown below" title="A list rule, a protected header row, and a note"
 grid.setValidationRule({
   id: "status",
@@ -47,19 +49,59 @@ The setup has ten columns and at least 100 rows; A1:C3 contain the invoice data 
 
 `DataValidationRule` covers Excel's Allow choices: any value, whole number and decimal (`number`), list, date, time, text length and custom, and a checkbox. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and Excel's Error Alert and Input Message.
 
-**Data › Data Validation** opens Excel's dialog for the selection: Settings (Allow, Data, the bounds, Source, In-cell dropdown, Formula, Ignore blank), Input Message and Error Alert. OK gives the selected cells the rule as one undoable step; cells of a larger rule leave it, and the rest of that rule stays. "Apply these changes to all other cells with the same settings" changes the whole rule instead. Clear All then OK removes the rule. When the selection holds several kinds of rule, or cells with and without one, Excel's question comes first. The command is `grid.actions.dataValidation()`.
+### The Data Validation dialog
 
-A list's `source` is what Excel's Source box takes: a range such as `"=$H$2:$H$5"` or `"=Lists!$A$1:$A$9"`, or a defined name such as `"=Regions"`. The list shows the cells' current values, so it follows edits to them, and its references follow inserted and deleted rows and columns. Bounds can be formulas too (`"=B1"`, `"=TODAY()"`), and a custom rule passes a value when its formula is TRUE with the value in the cell, as `"=COUNTIF($A:$A,A1)=1"` refuses duplicates. Formulas are relative to the rule's top-left cell, as in Excel. Text compares with list items without case, as in Excel.
+**Data › Data Validation** opens Excel's dialog for the selection, with its three tabs: Settings (Allow, Data, the bounds, Source, In-cell dropdown, Formula, Ignore blank), Input Message and Error Alert. The command is `grid.actions.dataValidation()`.
 
-A selected cell of a list rule shows a dropdown arrow just right of it, as in Excel. The arrow and Alt+Down open the list, an ARIA `combobox` with a `listbox`. Typing in the cell opens the list too, and the list keeps only the items that contain the typed text, ignoring case, as Excel's AutoComplete for dropdown lists does. Up and Down highlight an item; Enter stores it, Tab stores it and moves, and Escape cancels. Without a highlighted item, Enter stores the item the text names, or the text as typed, which the rule then checks. F2 and a double-click edit the cell's text, as in Excel. Checkbox rules open a real ARIA `checkbox`; Space toggles it.
+- **OK** applies the rule to the selected cells as one undoable step. Selected cells that belonged to a larger rule leave it, and the rest of that rule stays.
+- **Apply these changes to all other cells with the same settings** changes the whole rule instead.
+- **Clear All**, then OK, removes the rule.
+- When the selection holds several kinds of rule, or cells with and without one, Excel's question comes first.
 
-A typed value that fails a rule shows Excel's error alert before it is stored. A `reject` rule shows a Stop alert: Retry returns to the entry with its text selected, and Cancel drops it. A `warn` rule shows a Warning alert (Yes keeps the value, No returns to the entry, Cancel drops it), or with `errorStyle: "information"` an Information alert (OK keeps the value, Cancel drops it). The alert shows `errorTitle` and `helpText`, or Excel's default message. A formula is checked by its result. An `allow` rule, Excel's alert turned off, stores the value without a word.
+### Lists, bounds and custom rules
+
+A list's `source` is what Excel's Source box takes: a range such as `"=$H$2:$H$5"` or `"=Lists!$A$1:$A$9"`, or a defined name such as `"=Regions"`. The list shows the cells' current values, so it follows edits to them. Its references follow inserted and deleted rows and columns.
+
+Bounds can be formulas too (`"=B1"`, `"=TODAY()"`). A custom rule passes a value when its formula is TRUE with the value in the cell: `"=COUNTIF($A:$A,A1)=1"` refuses duplicates. Formulas are relative to the rule's top-left cell, and text matches list items without case, as in Excel.
+
+### The dropdown list
+
+A selected cell of a list rule shows a dropdown arrow just right of it, as in Excel. The arrow and Alt+Down open the list, an ARIA `combobox` with a `listbox`. Typing in the cell opens the list too, and keeps only the items that contain the typed text, ignoring case, as Excel's AutoComplete for dropdown lists does.
+
+| Key | Result |
+| --- | --- |
+| Up, Down | Highlight an item. |
+| Enter | Store the highlighted item. With none highlighted, store the item the text names, or the text as typed, which the rule then checks. |
+| Tab | Store the item and move on. |
+| Escape | Close the list and keep the cell as it was. |
+| F2, double-click | Edit the cell's text, as in Excel. |
+
+Checkbox rules open a real ARIA `checkbox`; Space toggles it.
+
+### Error alerts and input messages
+
+A typed value that fails a rule shows Excel's error alert before it is stored. A formula is checked by its result. The alert shows `errorTitle` and `helpText`, or Excel's default message.
+
+| Rule | Alert and its buttons |
+| --- | --- |
+| `reject` | **Stop.** Retry returns to the entry with its text selected; Cancel drops it. |
+| `warn` | **Warning.** Yes keeps the value; No returns to the entry; Cancel drops it. |
+| `warn` with `errorStyle: "information"` | **Information.** OK keeps the value; Cancel drops it. |
+| `allow` | **None,** as with Excel's alert turned off: the value is stored as typed. |
 
 While a cell of a rule is selected, the rule's `inputTitle` and `inputMessage` show in a box below it, as in Excel, unless `showInputMessage` is `false`. Screen readers hear the input message as the cell's description.
 
-Typing, fill, clear and host transactions pass through the same validation boundary. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own (Paste Values keeps the target's rules). A paste from outside the grid keeps the target's rules.
+### Paste and validation
 
-With `GridConfig.paste.keepValidation: true`, a paste keeps the target's rules instead. A value a `reject` rule refuses is not pasted, a value a `warn` rule refuses lands, and the status bar names both kinds of cell, such as "3 cells refused: B4, B7, B9.", with a **Select them** button. This is an addition on top of Excel: a dropdown list keeps working after a paste, and the user sees at once which pasted values did not fit.
+Typing, fill, clear and host transactions pass through the same validation check. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own. Paste Values, and a paste from outside the grid, keep the target's rules.
+
+With `GridConfig.paste.keepValidation: true`, a paste keeps the target's rules instead, and checks the values:
+
+- a value a `reject` rule refuses is not pasted;
+- a value a `warn` rule refuses lands;
+- the status bar names both kinds of cell, such as "3 cells refused: B4, B7, B9.", with a **Select them** button.
+
+This goes beyond Excel: a dropdown list keeps working after a paste, and the user sees at once which pasted values did not fit.
 
 ## Protection
 
