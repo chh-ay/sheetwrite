@@ -473,7 +473,8 @@ export class Ribbon {
   private fitTabs(): void {
     const list = this.tabList;
     for (const tab of this.tabs) delete tab.dataset.overflow;
-    const overflows = (): boolean => list.scrollWidth > list.clientWidth;
+    // Both widths round to whole pixels, so fractional tab widths can differ by one.
+    const overflows = (): boolean => list.scrollWidth > list.clientWidth + 1;
     this.moreTabsButton.hidden = !overflows();
     for (let index = this.tabs.length - 1; index >= 0 && overflows(); index -= 1) {
       const tab = this.tabs[index];
