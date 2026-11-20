@@ -859,7 +859,8 @@ html:has(.sw-nav-dialog[open]) {
     .sw-terminal__copy,
     .sw-document__colophon a,
     .sw-release-strip a,
-    .sw-prose td a
+    .sw-prose td a,
+    .compat-result__body > a
   ) {
     position: relative;
   }
@@ -869,7 +870,8 @@ html:has(.sw-nav-dialog[open]) {
     .sw-terminal__copy,
     .sw-release-strip a,
     .sw-prose td a,
-    .sw-document__colophon a
+    .sw-document__colophon a,
+    .compat-result__body > a
   )::after {
     position: absolute;
     top: min(0px, calc(50% - 22px));
