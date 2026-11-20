@@ -3741,6 +3741,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
  * Validate and canonically order a schema-1 snapshot without hydrating runtime state.
  *
  * @param input - A snapshot from outside your code, such as parsed JSON.
+ * @param options - The storage model to check capacity against, and resource
+ *   limits that replace the defaults.
  */
 export function validateWorkbookSnapshot(
   input: unknown,
