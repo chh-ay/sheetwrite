@@ -116,6 +116,7 @@ function describeRecords(grid: Grid): string {
  * interrupting.
  *
  * @param host - Element the status is appended to.
+ * @param grid - The grid whose selection and mode the status follows.
  */
 export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece {
   const output = document.createElement("output");
