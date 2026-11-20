@@ -313,6 +313,7 @@
   display: block;
   margin-top: var(--sw-space-2);
   color: var(--sw-fg-muted);
+  font-size: var(--sw-text-eyebrow);
   text-align: center;
 }
 .sw-chrome-result [aria-disabled="true"] {
