@@ -183,6 +183,58 @@
   height: 100%;
 }
 
+/* The fill handle's value tip and the Auto Fill Options button after a fill
+   (src/overlay-painter.ts). Both sit in the overlay, positioned by transform. */
+.sheetwrite-fill-tip,
+.sheetwrite-auto-fill-options {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  box-shadow: var(--sheetwrite-menu-shadow, 0 2px 6px rgba(0, 0, 0, 0.18));
+}
+
+/* The values a dragged fill will write, drawn faintly in their cells. */
+.sheetwrite-fill-values {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.sheetwrite-fill-values[hidden] {
+  display: none;
+}
+
+.sheetwrite-fill-tip {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font: var(--sheetwrite-widget-font, 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  white-space: nowrap;
+}
+
+.sheetwrite-auto-fill-options {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sheetwrite-auto-fill-options:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-fill-tip[hidden],
+.sheetwrite-auto-fill-options[hidden] {
+  display: none;
+}
+
 /* Cell notes (src/note-popover.ts): the hover card and the editor share one
    look. Both are position: fixed under the grid host, so the widget variables
    reach them and overflow cannot clip them. The amber edge matches the corner
@@ -371,6 +423,37 @@
 
 .sheetwrite-dialog-choice:has(input:disabled) {
   opacity: 0.55;
+}
+
+/* Paste Special (src/paste-special.ts): Paste and Operation in two columns
+   each, as Excel's dialog; Paste Link sits apart from OK and Cancel. */
+.sheetwrite-paste-special {
+  display: grid;
+  gap: 10px;
+}
+
+.sheetwrite-paste-special-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(6, auto);
+  gap: 4px 16px;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+}
+
+.sheetwrite-paste-special-group + .sheetwrite-paste-special-group {
+  grid-template-rows: repeat(3, auto);
+}
+
+.sheetwrite-paste-special-checks {
+  display: flex;
+  gap: 24px;
+}
+
+.sheetwrite-paste-special-dialog .sheetwrite-dialog-button:first-child {
+  margin-right: auto;
 }
 
 /* The data-validation error alert (src/validation-alert.ts): the style's

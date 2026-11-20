@@ -104,6 +104,33 @@
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
+/* A row of icon buttons under its label, as Excel's "Paste Options:". Each
+   button shows its name in a tooltip and gives it to screen readers. */
+.sheetwrite-context-menu-inline-label {
+  padding: 4px 10px 2px 8px;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-context-menu-inline > div:last-child {
+  display: flex;
+  gap: 2px;
+  padding: 0 4px 2px;
+}
+
+.sheetwrite-context-menu-inline .sheetwrite-context-menu-item {
+  justify-content: center;
+  min-width: 28px;
+  padding: 0;
+}
+
+.sheetwrite-context-menu-inline
+  :is(.sheetwrite-context-menu-label, .sheetwrite-context-menu-shortcut) {
+  display: none;
+}
+
 /* AutoFilter dropdown: the menu of a header's filter button. */
 .sheetwrite-autofilter {
   --sheetwrite-context-menu-ready: 1;

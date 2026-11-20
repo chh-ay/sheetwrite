@@ -4,7 +4,9 @@ import {
   encodeDelimitedText,
   parseDelimitedText,
 } from "./delimited-text.js";
+import type { CopiedConditionalFormat, CopiedNote } from "./paste-rules.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
+import type { Range } from "./types/coordinates.js";
 import type { CopiedValidation } from "./validation-transfer.js";
 
 // Text beginning with `=`, `+`, `-`, `@`, tab or carriage return gets a leading
@@ -80,4 +82,15 @@ export interface ClipboardSnapshot {
   tsv: string;
   /** True when produced by cut; only the grid that cut the cells moves them on paste. */
   cut: boolean;
+  /**
+   * The copied cells in data rows, for Paste Link and the copied notes and
+   * rules; null when a sorted view splits them or the payload is foreign.
+   */
+  source?: Range | null;
+  /** Notes of the copied cells. */
+  notes?: readonly CopiedNote[];
+  /** The parts of conditional formats over the copied cells. */
+  conditionalFormats?: readonly CopiedConditionalFormat[];
+  /** Widths of the copied columns, for Paste Special's Column widths. */
+  columnWidths?: readonly number[];
 }

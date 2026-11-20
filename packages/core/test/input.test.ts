@@ -252,6 +252,125 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
+  describe("fill handle feedback", () => {
+    const originalRaf = globalThis.requestAnimationFrame;
+    beforeEach(() => {
+      // Paint the overlay at once, so the tip and the button are observable.
+      globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+        callback(0);
+        return 0;
+      }) as typeof globalThis.requestAnimationFrame;
+    });
+    afterEach(() => {
+      globalThis.requestAnimationFrame = originalRaf;
+    });
+
+    const at = (row: number) => ({ sheet: "s1", row, col: 1 });
+
+    it("shows the value the last cell will get beside the dragged fill handle, as Excel does", () => {
+      const { grid, store, scroller, workbook, host } = makeGrid();
+      store.applyTransaction({
+        patches: [
+          { op: "set", addr: at(1), value: { kind: "literal", value: 10 } },
+          { op: "set", addr: at(2), value: { kind: "literal", value: 20 } },
+        ],
+      });
+      grid.setSelection({
+        kind: "range",
+        range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      });
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(2, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(7, 1, workbook)));
+      const tip = host.querySelector<HTMLElement>("[role=tooltip].sheetwrite-fill-tip");
+      expect(tip?.hidden).toBe(false);
+      expect(tip?.textContent).toBe("70");
+
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(7, 1, workbook)));
+      expect(tip?.hidden).toBe(true);
+      expect(store.getCell(at(7)).resolved).toBe(70);
+      grid.destroy();
+      store.dispose();
+    });
+
+    it("shows the value every new cell will get, in place, while the fill handle drags", () => {
+      const { grid, store, scroller, workbook, host } = makeGrid();
+      store.applyTransaction({
+        patches: [
+          { op: "set", addr: at(1), value: { kind: "literal", value: 10 } },
+          { op: "set", addr: at(2), value: { kind: "literal", value: 20 } },
+        ],
+      });
+      grid.setSelection({
+        kind: "range",
+        range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      });
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(2, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(7, 1, workbook)));
+      const canvas = host.querySelector<HTMLCanvasElement>("canvas.sheetwrite-fill-values");
+      const context = canvas?.getContext("2d") as unknown as { calls: Record<string, number> };
+      expect(canvas?.hidden).toBe(false);
+      // Rows 4 to 8 each show their value: 30, 40, 50, 60, 70.
+      expect(context.calls.fillText).toBe(5);
+
+      // Esc ends the drag without filling, as in Excel.
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+      expect(canvas?.hidden).toBe(true);
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(7, 1, workbook)));
+      expect(store.getCell(at(7)).resolved).toBe(70.5);
+      grid.destroy();
+      store.dispose();
+    });
+
+    it("redoes a fill from the Auto Fill Options button as one undo step", () => {
+      const { grid, store, scroller, workbook, host } = makeGrid();
+      store.applyTransaction({
+        patches: [
+          { op: "set", addr: at(1), value: { kind: "literal", value: 10 }, style: { bold: true } },
+        ],
+      });
+      grid.setSelection({ kind: "cell", addr: at(1) });
+      const before = [2, 3, 4].map((row) => store.getCell(at(row)).resolved);
+      const choose = (label: string): void => {
+        host.querySelector<HTMLElement>(".sheetwrite-auto-fill-options")?.click();
+        const rows = host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu-item");
+        [...rows].find((row) => row.textContent === label)?.click();
+      };
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(4, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(4, 1, workbook)));
+      // One number is copied; Fill Series counts it up instead.
+      expect(store.getCell(at(4)).resolved).toBe(10);
+      const button = host.querySelector<HTMLButtonElement>(".sheetwrite-auto-fill-options");
+      expect(button?.hidden).toBe(false);
+      expect(button?.getAttribute("aria-label")).toBe("Auto Fill Options");
+
+      choose("Fill Series");
+      expect([2, 3, 4].map((row) => store.getCell(at(row)).resolved)).toEqual([11, 12, 13]);
+      expect(store.getCell(at(4)).style.bold).toBe(true);
+
+      choose("Fill Formatting Only");
+      expect([2, 3, 4].map((row) => store.getCell(at(row)).resolved)).toEqual(before);
+      expect(store.getCell(at(4)).style.bold).toBe(true);
+
+      choose("Fill Without Formatting");
+      expect(store.getCell(at(4)).resolved).toBe(10);
+      expect(store.getCell(at(4)).style.bold).toBeUndefined();
+
+      grid.actions.undo();
+      expect([2, 3, 4].map((row) => store.getCell(at(row)).resolved)).toEqual(before);
+      expect(store.getCell(at(4)).style.bold).toBeUndefined();
+      // Another edit ends the offer.
+      expect(button?.hidden).toBe(true);
+      grid.destroy();
+      store.dispose();
+    });
+  });
+
   it("fills down as far as the next column's data on a fill-handle double-click", () => {
     const { grid, store, scroller, workbook, host } = makeGrid();
     store.applyTransaction({

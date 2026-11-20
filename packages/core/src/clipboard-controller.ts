@@ -14,16 +14,28 @@ import {
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "./hyperlink.js";
+import {
+  conditionalFormatPastePatches,
+  copyConditionalFormats,
+  copyNotes,
+  notePastePatches,
+  type PasteArea,
+} from "./paste-rules.js";
+import type { PasteSourceCells, TargetCell } from "./paste-special.js";
 import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
+import { referenceSheetName } from "./sheet-copy.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
-import type { ClipboardOutcome } from "./types/grid.js";
+import type { ClipboardOutcome, PasteSpecialOptions } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
 import { failingValidationRule, type ValidationReads } from "./validation-rule.js";
 import { copiedValidation, validationPastePatches } from "./validation-transfer.js";
+
+/** Paste Special's code, which loads on first use. */
+type PasteSpecialModule = typeof import("./paste-special.js");
 
 export interface ClipboardControllerDeps {
   /** The grid's scope; its close stops every clipboard action that is still running. */
@@ -39,6 +51,12 @@ export interface ClipboardControllerDeps {
   commit: (patches: DocumentOp[], reason: CommitReason) => void;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
+  /** Load Paste Special's code. */
+  loadPasteSpecial: () => Promise<PasteSpecialModule>;
+  /** Ask with the Paste Special dialog; `ownCopy` is false for another application's cells. */
+  askPasteSpecial: (ownCopy: boolean) => Promise<PasteSpecialOptions | null>;
+  /** A sheet's name, for Paste Link's references to another sheet. */
+  sheetName: (sheet: SheetId) => string | undefined;
   /** Whether a paste keeps the target's validation rules (`GridConfig.paste.keepValidation`), read per paste. */
   keepValidation?: () => boolean;
   /**
@@ -90,6 +108,20 @@ interface PendingCut {
   /** How many of its rows the selection did not show. */
   hidden: number;
 }
+
+/**
+ * What a paste read from the clipboard: the cut that waits, this grid's own
+ * copy, another grid's copy, a table from another application, or text; or
+ * how the read ended without one.
+ */
+type ClipboardPayload =
+  | { kind: "cut"; cut: PendingCut }
+  | { kind: "internal" | "foreign"; snapshot: ClipboardSnapshot }
+  | { kind: "html"; grid: CellWrite[][] }
+  | { kind: "text"; text: string }
+  | { kind: "outcome"; outcome: ClipboardOutcome };
+
+const EMPTY: ClipboardPayload = { kind: "outcome", outcome: "empty" };
 
 /** Private-format MIME type used for rich Sheetwrite clipboard payloads. */
 export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
@@ -627,6 +659,37 @@ export class ClipboardController {
     return this.pasteFrom(true);
   }
 
+  /**
+   * Excel's Paste Special. Its code loads while the clipboard is read. With
+   * `ask`, the dialog opens at once, as Excel's does, and the clipboard is read
+   * after OK, within the click that browsers ask of a clipboard read. As in
+   * Excel, it is not available while a cut waits for its paste.
+   */
+  async pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
+    if (this.deps.readOnly() || this.pendingCut || !this.pasteTarget()) return "empty";
+    if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
+    let chosen: PasteSpecialOptions | null = options;
+    if (options.ask) {
+      // The last copy from this grid is the likely payload; another's has no notes or rules.
+      chosen = await this.deps.askPasteSpecial(this.trusted !== null);
+      if (chosen === null) return "empty";
+    }
+    const read = this.reads.next();
+    try {
+      const [payload, special] = await Promise.all([
+        this.readPayload(read, navigator.clipboard, false),
+        this.deps.loadPasteSpecial(),
+      ]);
+      if (payload.kind === "outcome") return payload.outcome;
+      const target = this.pasteTarget();
+      if (payload.kind === "cut" || !target || this.deps.readOnly()) return "empty";
+      this.applyPasteSpecial(special, payload, target, chosen);
+      return "done";
+    } finally {
+      read.close();
+    }
+  }
+
   private async pasteFrom(valuesOnly: boolean): Promise<ClipboardOutcome> {
     if (this.deps.readOnly()) return "empty";
     const target = this.pasteTarget();
@@ -667,19 +730,50 @@ export class ClipboardController {
     return target;
   }
 
-  /** Every clipboard read awaits; a paste whose scope closed meanwhile writes nothing. */
+  /** Paste what the clipboard holds. */
   private async readAndPaste(
     read: Scope,
     clipboard: Clipboard,
     focus: PasteTarget,
     valuesOnly: boolean,
   ): Promise<ClipboardOutcome> {
+    const payload = await this.readPayload(read, clipboard, valuesOnly);
+    switch (payload.kind) {
+      case "outcome":
+        return payload.outcome;
+      case "cut":
+        return this.pasteCut(payload.cut, focus, valuesOnly);
+      case "internal":
+        this.pasteInternal(payload.snapshot, focus, valuesOnly);
+        return "done";
+      case "foreign":
+        this.pasteExternalSnapshot(payload.snapshot, focus, valuesOnly);
+        return "done";
+      case "html":
+        this.pasteExternalHtml(payload.grid, focus);
+        return "done";
+      case "text":
+        this.pasteExternal(payload.text, focus);
+        return "done";
+    }
+  }
+
+  /**
+   * Read what the clipboard holds. Every read awaits; a read whose scope
+   * closed meanwhile gives nothing. A payload other than the waiting cut ends
+   * the cut.
+   */
+  private async readPayload(
+    read: Scope,
+    clipboard: Clipboard,
+    valuesOnly: boolean,
+  ): Promise<ClipboardPayload> {
     let richReadFailed = false;
 
     if (typeof clipboard.read === "function") {
       try {
         const items = await clipboard.read();
-        if (read.closed) return "empty";
+        if (read.closed) return EMPTY;
         for (const item of items) {
           const customType = item.types.includes(SHEETWRITE_WEB_CLIPBOARD_FORMAT)
             ? SHEETWRITE_WEB_CLIPBOARD_FORMAT
@@ -688,21 +782,16 @@ export class ClipboardController {
               : null;
           if (!customType) continue;
           const envelope = parseClipboardJson(await (await item.getType(customType)).text());
-          if (read.closed) return "empty";
+          if (read.closed) return EMPTY;
           if (!envelope) continue;
-          if (this.pendingCut?.token === envelope.token) {
-            return this.pasteCut(this.pendingCut, focus, valuesOnly);
-          }
+          if (this.pendingCut?.token === envelope.token)
+            return { kind: "cut", cut: this.pendingCut };
           // A cut that was pasted or ended does not paste again, as in Excel.
-          if (this.endedCutToken === envelope.token) return "empty";
+          if (this.endedCutToken === envelope.token) return EMPTY;
           this.endCut();
-          if (this.trusted?.token === envelope.token) {
-            this.pasteInternal(this.trusted.snapshot, focus, valuesOnly);
-          } else {
-            this.pasteExternalSnapshot(envelope.snapshot, focus, valuesOnly);
-          }
-
-          return "done";
+          return this.trusted?.token === envelope.token
+            ? { kind: "internal", snapshot: this.trusted.snapshot }
+            : { kind: "foreign", snapshot: envelope.snapshot };
         }
 
         // The clipboard no longer holds the cut: this is a plain paste.
@@ -710,20 +799,17 @@ export class ClipboardController {
         for (const item of items) {
           if (!item.types.includes("text/html")) continue;
           const html = await (await item.getType("text/html")).text();
-          if (read.closed) return "empty";
+          if (read.closed) return EMPTY;
           const grid = parseClipboardHtml(html, valuesOnly);
           if (!grid) continue;
-          this.pasteExternalHtml(grid, focus);
-          return "done";
+          return { kind: "html", grid };
         }
 
         for (const item of items) {
           if (!item.types.includes("text/plain")) continue;
           const text = await (await item.getType("text/plain")).text();
-          if (read.closed) return "empty";
-          if (text.length === 0) return "empty";
-          this.pasteExternal(text, focus);
-          return "done";
+          if (read.closed || text.length === 0) return EMPTY;
+          return { kind: "text", text };
         }
       } catch {
         richReadFailed = true;
@@ -731,17 +817,16 @@ export class ClipboardController {
     }
 
     if (typeof clipboard.readText !== "function") {
-      return richReadFailed ? "blocked" : "unsupported";
+      return { kind: "outcome", outcome: richReadFailed ? "blocked" : "unsupported" };
     }
 
     try {
       const text = await clipboard.readText();
-      if (read.closed || text.length === 0) return "empty";
+      if (read.closed || text.length === 0) return EMPTY;
       this.endCut();
-      this.pasteExternal(text, focus);
-      return "done";
+      return { kind: "text", text };
     } catch {
-      return "blocked";
+      return { kind: "outcome", outcome: "blocked" };
     }
   }
 
@@ -792,35 +877,22 @@ export class ClipboardController {
     valuesOnly: boolean,
   ): void {
     // Copy shifts every relative formula ref by the block's rigid displacement.
-    // Hyperlink source ranges move to the paste destination, while stable
-    // internal targets remain unchanged. The copied cells' validation rules
-    // replace those of the cells the paste covers, as in Excel.
     const targetAnchorRow = this.deps.toDataRow(focus.row);
     const deltaRow = targetAnchorRow - snapshot.anchor.row;
     const deltaCol = focus.col - snapshot.anchor.col;
-    const extraPatches: DocumentOp[] = valuesOnly
+    const width = snapshot.cells[0]?.length ?? 0;
+    // The pasted cells take the copied notes, conditional formats and validation
+    // rules too, as in Excel; `paste.keepValidation` keeps the target's rules.
+    const area = valuesOnly ? null : this.pasteArea(focus, snapshot.cells.length, width);
+    const extras: DocumentOp[] = valuesOnly
       ? []
       : [
-          ...(this.deps.keepValidation?.() ? [] : this.validationPatches(snapshot, focus)),
-          ...snapshot.hyperlinks.map((source) => ({
-            op: "setHyperlink" as const,
-            sheet: this.deps.activeSheet(),
-            hyperlink: {
-              ...cloneCellHyperlink(source),
-              id: createHyperlinkId(),
-              range: {
-                sheet: this.deps.activeSheet(),
-                start: {
-                  row: source.range.start.row + deltaRow,
-                  col: source.range.start.col + deltaCol,
-                },
-                end: {
-                  row: source.range.end.row + deltaRow,
-                  col: source.range.end.col + deltaCol,
-                },
-              },
-            },
-          })),
+          ...this.hyperlinkPatches(snapshot, deltaRow, deltaCol, false),
+          ...this.rulePatches(snapshot, area, {
+            notes: true,
+            conditionalFormats: "replace",
+            validation: this.deps.keepValidation?.() !== true,
+          }),
         ];
 
     this.commitBlock(
@@ -837,33 +909,256 @@ export class ClipboardController {
           style: cell.style,
         };
       },
-      extraPatches,
+      extras,
     );
   }
 
   /**
-   * The rule changes of pasting `snapshot` at `focus`: the target's rules
-   * leave the pasted cells and the copied rules land on them. None when the
-   * pasted rows are not one block of data rows, as under a sorted view.
+   * The copied hyperlinks at the paste: their source ranges move to it (turned
+   * when the paste transposes), while internal targets stay as they are.
    */
-  private validationPatches(snapshot: ClipboardSnapshot, focus: PasteTarget): DocumentOp[] {
-    const sheet = this.deps.sheet();
-    const copied = snapshot.validation ?? [];
-    if (copied.length === 0 && !sheet.validationRules?.length) return [];
-    const height = snapshot.cells.length;
-    const width = snapshot.cells[0]?.length ?? 0;
-    const rows = focus.rows % height === 0 && focus.cols % width === 0 ? focus.rows : height;
-    // A paste cut short by the sheet's last row carries no rules past it.
-    if (focus.row + rows > this.deps.store.viewRowCount(this.deps.activeSheet())) return [];
-    const firstRow = this.deps.toDataRow(focus.row);
-    for (let row = 1; row < rows; row++) {
-      if (this.deps.toDataRow(focus.row + row) !== firstRow + row) return [];
-    }
-    return validationPastePatches(
+  private hyperlinkPatches(
+    snapshot: ClipboardSnapshot,
+    deltaRow: number,
+    deltaCol: number,
+    transpose: boolean,
+  ): DocumentOp[] {
+    const sheet = this.deps.activeSheet();
+    const { anchor } = snapshot;
+    const moved = (cell: CellRef): CellRef =>
+      transpose
+        ? {
+            row: anchor.row + deltaRow + (cell.col - anchor.col),
+            col: anchor.col + deltaCol + (cell.row - anchor.row),
+          }
+        : { row: cell.row + deltaRow, col: cell.col + deltaCol };
+    return snapshot.hyperlinks.map((source) => ({
+      op: "setHyperlink" as const,
       sheet,
-      copied,
-      { rows: height, cols: width },
-      { row: firstRow, col: focus.col, rows: focus.rows, cols: focus.cols },
+      hyperlink: {
+        ...cloneCellHyperlink(source),
+        id: createHyperlinkId(),
+        range: { sheet, start: moved(source.range.start), end: moved(source.range.end) },
+      },
+    }));
+  }
+
+  /** The copied notes, conditional formats and validation rules at `area`; none without an area. */
+  private rulePatches(
+    snapshot: ClipboardSnapshot,
+    area: PasteArea | null,
+    parts: {
+      readonly notes: boolean;
+      readonly conditionalFormats: "replace" | "merge" | null;
+      readonly validation: boolean;
+    },
+  ): DocumentOp[] {
+    if (area === null) return [];
+    const sheet = this.deps.sheet();
+    const block = { rows: snapshot.cells.length, cols: snapshot.cells[0]?.length ?? 0 };
+    return [
+      ...(parts.notes ? notePastePatches(sheet, snapshot.notes ?? [], block, area) : []),
+      ...(parts.conditionalFormats
+        ? conditionalFormatPastePatches(
+            sheet,
+            snapshot.conditionalFormats ?? [],
+            block,
+            area,
+            parts.conditionalFormats === "merge",
+          )
+        : []),
+      ...(parts.validation
+        ? validationPastePatches(sheet, snapshot.validation ?? [], block, area, {
+            transpose: area.transpose,
+          })
+        : []),
+    ];
+  }
+
+  /**
+   * The cells, in data rows and columns, that a paste of a `rows` × `cols`
+   * block (after a transpose) fills at `target`: the selection when it is a
+   * whole multiple of the block, which then repeats, as cells do. Null when a
+   * sorted view or hidden columns split them, or they pass the sheet's end:
+   * notes and rules then stay as they are.
+   */
+  private pasteArea(
+    target: PasteTarget,
+    rows: number,
+    cols: number,
+    transpose = false,
+  ): PasteArea | null {
+    if (rows === 0 || cols === 0) return null;
+    const repeat = target.rows % rows === 0 && target.cols % cols === 0;
+    const filledRows = repeat ? target.rows : rows;
+    const filledCols = repeat ? target.cols : cols;
+    const sheet = this.deps.activeSheet();
+    if (target.row + filledRows > this.deps.store.viewRowCount(sheet)) return null;
+    const first = this.deps.toDataRow(target.row);
+    for (let row = 1; row < filledRows; row++) {
+      if (this.deps.toDataRow(target.row + row) !== first + row) return null;
+    }
+    const visible = this.deps.colIndices();
+    const at = visible.indexOf(target.col);
+    for (let col = 0; col < filledCols; col++) {
+      if (visible[at + col] !== target.col + col) return null;
+    }
+    return { sheet, row: first, col: target.col, rows: filledRows, cols: filledCols, transpose };
+  }
+
+  /** A target cell as it is before a paste: its content, value and format. */
+  private targetCell(viewRow: number, col: number): TargetCell {
+    const addr = { sheet: this.deps.activeSheet(), row: this.deps.toDataRow(viewRow), col };
+    const resolved = this.deps.store.getCell(addr);
+    const formula = this.deps.store.getFormula(addr);
+    const ref = formula === null ? this.deps.store.getRefTarget(addr) : null;
+    return {
+      value:
+        formula !== null
+          ? { kind: "formula", src: formula }
+          : ref !== null
+            ? { kind: "ref", target: ref }
+            : { kind: "literal", value: resolved.resolved },
+      resolved: resolved.resolved,
+      style: resolved.style,
+    };
+  }
+
+  /**
+   * The copied cells as Paste Special reads them. Cells from elsewhere than
+   * this grid's copy are read as typed input for the column they land in, as
+   * Paste reads them.
+   */
+  private pasteSourceCells(
+    payload: Exclude<ClipboardPayload, { kind: "cut" | "outcome" }>,
+  ): PasteSourceCells {
+    const columns = this.deps.sheet().columns;
+    const external = (write: CellWrite, targetCol: number): ClipboardCell => {
+      const { value, style } = externalCellWrite(write, columns[targetCol]?.type ?? "text");
+      return { value, resolved: value.kind === "literal" ? value.value : null, style: style ?? {} };
+    };
+    const rows: readonly (readonly unknown[])[] =
+      payload.kind === "text"
+        ? parseTsv(payload.text)
+        : payload.kind === "html"
+          ? payload.grid
+          : payload.snapshot.cells;
+    const height = rows.length;
+    const width = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
+    switch (payload.kind) {
+      case "internal":
+        return { height, width, cellAt: (row, col) => payload.snapshot.cells[row]?.[col] };
+      case "foreign":
+        return {
+          height,
+          width,
+          cellAt: (row, col, targetCol) => {
+            const cell = payload.snapshot.cells[row]?.[col];
+            return cell && external(cell, targetCol);
+          },
+        };
+      case "html":
+        return {
+          height,
+          width,
+          cellAt: (row, col, targetCol) => {
+            const cell = payload.grid[row]?.[col];
+            return cell && external(cell, targetCol);
+          },
+        };
+      case "text":
+        return {
+          height,
+          width,
+          cellAt: (row, col, targetCol) => {
+            const text = (rows[row]?.[col] as string | undefined) ?? "";
+            return external({ value: { kind: "literal", value: text } }, targetCol);
+          },
+        };
+    }
+  }
+
+  /** Write a Paste Special of `payload` at `target`, as one undo step. */
+  private applyPasteSpecial(
+    special: PasteSpecialModule,
+    payload: Exclude<ClipboardPayload, { kind: "cut" | "outcome" }>,
+    target: PasteTarget,
+    options: PasteSpecialOptions,
+  ): void {
+    const snapshot = payload.kind === "internal" ? payload.snapshot : null;
+    const sheet = this.deps.activeSheet();
+    const range = snapshot?.source ?? null;
+    const sourceName = range ? this.deps.sheetName(range.sheet) : undefined;
+    const delta = snapshot
+      ? {
+          row: this.deps.toDataRow(target.row) - snapshot.anchor.row,
+          col: target.col - snapshot.anchor.col,
+        }
+      : null;
+    const origin = delta && {
+      delta,
+      link:
+        range && sourceName !== undefined
+          ? { range, sheet: range.sheet === sheet ? null : referenceSheetName(sourceName) }
+          : null,
+    };
+    const cells = this.pasteSourceCells(payload);
+    const plan = special.planPasteSpecial(cells, options, origin);
+    const { parts } = plan;
+    const transpose = options.transpose === true;
+    // A link refers to each copied cell once; it does not repeat over the selection.
+    const at = options.link === true ? { ...target, rows: 1, cols: 1 } : target;
+
+    if (parts.columnWidths) {
+      const widths = snapshot?.columnWidths ?? [];
+      const visible = this.deps.colIndices();
+      const first = visible.indexOf(target.col);
+      const count =
+        widths.length > 0 && target.cols % widths.length === 0 ? target.cols : widths.length;
+      const patches: DocumentOp[] = [];
+      for (let index = 0; index < count; index++) {
+        const col = visible[first + index];
+        const width = widths[index % widths.length];
+        if (col === undefined || width === undefined) break;
+        patches.push({ op: "setColumn", sheet, col, patch: { width } });
+      }
+      this.deps.commit(patches, "paste");
+      return;
+    }
+
+    const area = snapshot ? this.pasteArea(at, plan.height, plan.width, transpose) : null;
+    const extras =
+      snapshot && delta && options.link !== true
+        ? [
+            ...(parts.hyperlinks
+              ? this.hyperlinkPatches(snapshot, delta.row, delta.col, transpose)
+              : []),
+            ...this.rulePatches(snapshot, area, {
+              notes: parts.notes,
+              conditionalFormats: parts.conditionalFormats,
+              // Validation pastes only rules; All keeps the target's rules with `paste.keepValidation`, as Paste does.
+              validation:
+                parts.validation &&
+                (options.paste === "validation" || this.deps.keepValidation?.() !== true),
+            }),
+          ]
+        : [];
+    if (parts.content === null && parts.style === null) {
+      this.deps.commit(extras, "paste");
+      return;
+    }
+    this.commitBlock(
+      at,
+      plan.height,
+      () => plan.width,
+      (row, col, targetCol, repeat) => {
+        let read: TargetCell | undefined;
+        return plan.cellAt(row, col, targetCol, repeat, () => {
+          read ??= this.targetCell(at.row + repeat.row + row, targetCol);
+          return read;
+        });
+      },
+      extras,
     );
   }
 
@@ -1301,8 +1596,19 @@ export class ClipboardController {
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    const validation =
-      source && !merged ? copiedValidation(this.deps.sheet().validationRules ?? [], source) : [];
-    return { anchor, cells, hyperlinks, validation, tsv: rowsToTsv(values), cut, source };
+    const sheet = this.deps.sheet();
+    return {
+      anchor,
+      cells,
+      hyperlinks,
+      tsv: rowsToTsv(values),
+      cut,
+      source,
+      // Paste and Paste Special carry these to the target, as in Excel.
+      notes: source ? copyNotes(sheet, source) : [],
+      conditionalFormats: source ? copyConditionalFormats(sheet, source) : [],
+      validation: source && !merged ? copiedValidation(sheet.validationRules ?? [], source) : [],
+      columnWidths: selectedColumns.map((col) => sheet.columns[col]?.width ?? 0),
+    };
   }
 }

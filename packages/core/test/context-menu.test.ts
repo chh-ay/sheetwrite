@@ -207,7 +207,8 @@ describe("ContextMenu", () => {
     key(document.activeElement, "End");
     expect(focusedId()).toBe("editNote");
     key(document.activeElement, "Home");
-    for (let step = 0; step < 3; step += 1) key(document.activeElement, "ArrowDown");
+    // Cut, Copy, the Paste Options row (one stop), Paste Special…, then Insert.
+    for (let step = 0; step < 4; step += 1) key(document.activeElement, "ArrowDown");
     expect(focusedId()).toBe("insert");
 
     // Right opens the submenu on its first row; Left or Escape returns to the parent.

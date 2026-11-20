@@ -144,7 +144,40 @@ Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then p
 
 `paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose.
 
-Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel.
+Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel. A paste of cells copied in the same grid also brings their notes and conditional formats, which replace the target cells' own, as Excel's Paste does.
+
+### Paste Special
+
+Ctrl/Cmd + Alt + V (Ctrl + Cmd + V on a Mac, as in Excel for Mac), Home › Paste › Paste Special… and the context menu open Excel's Paste Special dialog ([Paste options](https://support.microsoft.com/en-us/excel/paste-options)). Each choice has its letter key, as in Excel: press the underlined letter, alone or with Alt.
+
+| Paste | What lands on the target cells |
+| --- | --- |
+| All (A) | Everything, as Paste does. |
+| Formulas (F) | Formulas and constants; the target cells keep their formats. |
+| Values (V) | The copied cells' values; the target cells keep their formats. |
+| Formats (T) | Formats and conditional formats; the target cells keep their values. |
+| Comments and Notes (C) | Only the notes. |
+| Validation (N) | Only the data validation rules. |
+| All using Source theme (H) | Everything, as All: a workbook has one theme. |
+| All except borders (X) | Everything; the target cells keep their borders. |
+| Column widths (W) | Only the copied columns' widths. |
+| Formulas and number formats (R) | Formulas and constants with their number formats. |
+| Values and number formats (U) | Values with their number formats. |
+| All merging conditional formats (G) | Everything; the target cells' conditional formats stay beside the copied ones. |
+
+**Operation** (None O, Add D, Subtract S, Multiply M, Divide I) combines each copied number with the target cell's: two numbers give the result, and a formula on either side gives a formula, such as `=(5)+20`. A blank counts as 0, text that reads as a number counts as that number, and a cell with other text is left as it is. **Skip blanks** (B) leaves a target cell as it is where the copied cell is blank. **Transpose** (E) pastes rows as columns; each formula's relative references shift by the move of its own cell. **Paste Link** (L) writes formulas that refer to the copied cells instead of their contents: `=$A$1` for one cell, `=A1` and so on for more, with the sheet's name from another sheet (`=Data!A1`).
+
+Home › Paste and the context menu's Paste Options row also offer the common choices in one click: Paste, Values, Formulas, Formatting, Transpose and Paste Link.
+
+From code, `grid.actions.pasteSpecial(options)` pastes without the dialog, with the names of Excel's `Range.PasteSpecial`:
+
+```ts prelude="core" partial="requires surrounding host state" title="Add the copied numbers to the selected cells"
+await grid.actions.pasteSpecial({ paste: "values", operation: "add" });
+await grid.actions.pasteSpecial({ transpose: true, skipBlanks: true });
+await grid.actions.pasteSpecial({ ask: true }); // the dialog chooses, as Ctrl+Alt+V
+```
+
+Cells copied from another application or another grid paste their values and formats: the dialog shows Comments and Notes, Validation, Column widths and Paste Link disabled, as their notes, rules and widths are unknown. The code of Paste Special and its dialog loads the first time it is used, while the clipboard is read. As in Excel, Paste Special is not available while a cut waits for its paste; it resolves `"empty"`. Each paste is one undo step and reaches collaborators as one change.
 
 ### Cut and paste moves cells
 
@@ -160,11 +193,11 @@ Cut and paste works as in Excel ([Move or copy cells and cell contents](https://
 
 The cut ends without a move when the user presses Esc, starts an edit, makes any other change, copies or cuts again, or when a change moves rows or cells on its sheet. A cut that was pasted or ended does not paste again; `paste()` resolves `"empty"`. When the clipboard holds something else by the time of the paste, for example text copied in another app, the paste is a plain paste and the cut ends. Pasting the cut in another app gives its values and leaves the cells in place.
 
-As in Excel, where Paste Special is not available after a cut, `pasteValues()` does nothing while a cut waits; it resolves `"empty"` and the cut stays. A move that would cut through a merged cell, a table, a pivot table or a spill range changes nothing, and so does a paste whose rows a sorted view splits.
+As in Excel, where Paste Special is not available after a cut, `pasteValues()` and `pasteSpecial()` do nothing while a cut waits; they resolve `"empty"` and the cut stays. A move that would cut through a merged cell, a table, a pivot table or a spill range changes nothing, and so does a paste whose rows a sorted view splits.
 
 ### Report the clipboard outcome
 
-`grid.actions.copy/cut/paste/pasteValues` return `Promise<ClipboardOutcome>` and never reject:
+`grid.actions.copy/cut/paste/pasteValues/pasteSpecial` return `Promise<ClipboardOutcome>` and never reject:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Tell the user when paste is blocked"
 const outcome = await grid.actions.paste();
@@ -211,9 +244,10 @@ grid.on("mutation-rejected", ({ issues }) => {
 | Option or method | Effect |
 | --- | --- |
 | `readOnly: true` | Turns off every mutating interaction: editing, clearing, fill, paste, and restyling. Navigation and selection still work. |
-| `config.keyboard.bindings` | Rebinds `copy`, `cut`, `paste`, `pasteValues`, `undo` and `redo`. See [Rebind an action](/docs/features/grid/selection-and-keyboard/#rebind-an-action). |
+| `config.keyboard.bindings` | Rebinds `copy`, `cut`, `paste`, `pasteValues`, `pasteSpecial`, `undo` and `redo`. See [Rebind an action](/docs/features/grid/selection-and-keyboard/#rebind-an-action). |
 | `grid.beginEdit(row, col, initial?, selectAll?)` | Opens the editor at a view cell, optionally with seed text or with all text selected. |
 | `grid.actions.paste()` / `pasteValues()` | Paste with formulas and styles, or values only. |
+| `grid.actions.pasteSpecial(options?)` | Excel's Paste Special: `paste`, `operation`, `skipBlanks`, `transpose`, `link`, or `ask` for the dialog. |
 | `grid.undo()` / `grid.redo()` | Step back or forward one transaction. |
 
 ## Edge cases and limits

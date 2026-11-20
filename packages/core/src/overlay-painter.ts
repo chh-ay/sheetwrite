@@ -1,11 +1,14 @@
 import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 import type { EditRect } from "./editor.js";
+import type { FillTip } from "./fill-controller.js";
+import { iconNode } from "./icons/resolve.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import { checkStylePart } from "./style-parts.js";
 import type { HighlightRange, PresenceOverlay, Range, SheetId } from "./types/coordinates.js";
 import type { AutoFilter, CellNote, DataValidationRule, Sheet } from "./types/document.js";
+import type { IconOverrides } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import { hasInputMessage, hasListDropdown } from "./validation-rule.js";
 
@@ -269,6 +272,20 @@ export interface OverlayPainterDeps {
   isEditing: () => boolean;
   fillTarget: () => SelRect | null;
   fillHandleScreen: (contentTop: number, scrollLeft: number) => { x: number; y: number } | null;
+  /** The value tip beside the fill handle while it is dragged. */
+  fillTip: () => FillTip | null;
+  /** The new cells of the dragged fill handle's fill, which show their values in place. */
+  fillValuesArea: () => SelRect | null;
+  /** What a cell of `fillValuesArea` will show; null for a formula. */
+  fillValueAt: (row: number, col: number) => { text: string; right: boolean } | null;
+  /** The view row at a content offset, to start the painted rows at the first one on screen. */
+  rowAtOffset: (contentY: number) => number;
+  /** The cells of the last fill, whose Auto Fill Options button shows at their bottom-right. */
+  autoFillTarget: () => SelRect | null;
+  /** Open Auto Fill Options at a viewport point, below its button. */
+  openAutoFillOptions: (clientX: number, clientY: number) => void;
+  /** The host's icon overrides. */
+  icons: () => IconOverrides | undefined;
   searchMatches: () => SearchMatchSet;
   searchActive: () => number;
   searchVersion: () => number;
@@ -383,6 +400,14 @@ export class OverlayPainter {
   private lastFillC0 = 0;
   private lastFillR1 = 0;
   private lastFillC1 = 0;
+  private lastFillTip: FillTip | null = null;
+  private lastAutoFillTarget: SelRect | null = null;
+  /** Excel's tip beside the dragged fill handle; made on the first drag. */
+  private tipElement: HTMLDivElement | null = null;
+  /** The Auto Fill Options button; made after the first fill. */
+  private autoFillButton: HTMLButtonElement | null = null;
+  /** The values a dragged fill will write, drawn faintly in their cells; made on the first drag. */
+  private fillValues: HTMLCanvasElement | null = null;
 
   constructor(parent: HTMLElement, deps: OverlayPainterDeps) {
     this.deps = deps;
@@ -484,6 +509,9 @@ export class OverlayPainter {
       this.paintFillHandle(theme, contentTop, scrollLeft);
     }
 
+    this.paintFillValues(theme, contentTop, scrollLeft, clientW, clientH);
+    this.paintFillTip();
+    this.paintAutoFillButton(theme, contentTop, scrollLeft, clientW, clientH);
     // As in Excel, the moving border of a cut shows over the selection.
     this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
@@ -543,6 +571,8 @@ export class OverlayPainter {
     const fillC0 = fill ? fill.c0 : 0;
     const fillR1 = fill ? fill.r1 : 0;
     const fillC1 = fill ? fill.c1 : 0;
+    const fillTip = this.deps.fillTip();
+    const autoFillTarget = this.deps.autoFillTarget();
 
     if (
       theme === this.lastPaintTheme &&
@@ -568,7 +598,9 @@ export class OverlayPainter {
       fillR0 === this.lastFillR0 &&
       fillC0 === this.lastFillC0 &&
       fillR1 === this.lastFillR1 &&
-      fillC1 === this.lastFillC1
+      fillC1 === this.lastFillC1 &&
+      fillTip === this.lastFillTip &&
+      autoFillTarget === this.lastAutoFillTarget
     ) {
       return true;
     }
@@ -597,6 +629,8 @@ export class OverlayPainter {
     this.lastFillC0 = fillC0;
     this.lastFillR1 = fillR1;
     this.lastFillC1 = fillC1;
+    this.lastFillTip = fillTip;
+    this.lastAutoFillTarget = autoFillTarget;
     return false;
   }
 
@@ -1334,6 +1368,154 @@ export class OverlayPainter {
       theme.selectionBorder,
     );
     sq.style.cursor = "crosshair";
+  }
+
+  /**
+   * The value each new cell of a dragged fill will get, drawn faintly in the
+   * cell, so the whole series shows before the release. Only the cells on
+   * screen are drawn, on one canvas: the cost follows the viewport, not the
+   * size of the fill.
+   */
+  private paintFillValues(
+    theme: Theme,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const area = this.deps.fillValuesArea();
+    let canvas = this.fillValues;
+    if (!area) {
+      if (canvas) canvas.hidden = true;
+      return;
+    }
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.className = "sheetwrite-fill-values";
+      canvas.setAttribute("aria-hidden", "true");
+      this.overlay.prepend(canvas);
+      this.fillValues = canvas;
+    }
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.ceil(clientW * ratio);
+    const height = Math.ceil(clientH * ratio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${clientW}px`;
+      canvas.style.height = `${clientH}px`;
+    }
+    canvas.hidden = false;
+    const zoom = this.deps.zoom();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, clientW, clientH);
+    context.font = theme.font;
+    context.fillStyle = theme.fg;
+    context.globalAlpha = 0.45;
+    context.textBaseline = "middle";
+
+    const { fr, frozenH } = this.deps.freeze();
+    const top = theme.headerHeight;
+    // Pinned rows first, then the body rows from the first one on screen.
+    const bodyStart = Math.max(area.r0, fr, this.deps.rowAtOffset(contentTop));
+    const rows: number[] = [];
+    for (let row = area.r0; row <= Math.min(area.r1, fr - 1); row++) rows.push(row);
+    for (let row = bodyStart; row <= area.r1; row++) {
+      if (this.deps.screenRect(row, area.c0, contentTop, scrollLeft).y >= clientH) break;
+      rows.push(row);
+    }
+    for (const row of rows) {
+      const clip = row < fr ? top : top + frozenH;
+      for (let col = area.c0; col <= area.c1; col++) {
+        const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
+        if (rect.x >= clientW) break;
+        if (rect.w <= 0 || rect.x + rect.w <= theme.rowHeaderWidth || rect.y + rect.h <= clip)
+          continue;
+        const value = this.deps.fillValueAt(row, col);
+        if (!value) continue;
+        context.save();
+        context.beginPath();
+        context.rect(rect.x, Math.max(rect.y, clip), rect.w, rect.h);
+        context.clip();
+        const x = value.right ? rect.x + rect.w - 4 * zoom : rect.x + 4 * zoom;
+        context.textAlign = value.right ? "right" : "left";
+        // The canvas draws text at the zoom the cells use.
+        context.setTransform(ratio * zoom, 0, 0, ratio * zoom, 0, 0);
+        context.fillText(value.text, x / zoom, (rect.y + rect.h / 2) / zoom);
+        context.restore();
+      }
+    }
+  }
+
+  /** Excel's tip beside the dragged fill handle: the value the last cell will get. */
+  private paintFillTip(): void {
+    const tip = this.deps.fillTip();
+    if (!tip) {
+      if (this.tipElement) this.tipElement.hidden = true;
+      return;
+    }
+    let element = this.tipElement;
+    if (!element) {
+      element = document.createElement("div");
+      element.className = "sheetwrite-fill-tip";
+      element.setAttribute("role", "tooltip");
+      this.overlay.appendChild(element);
+      this.tipElement = element;
+    }
+    element.hidden = false;
+    element.textContent = tip.text;
+    // Below and right of the pointer, clear of the crosshair.
+    element.style.transform = `translate(${tip.x + 12}px, ${tip.y + 16}px)`;
+  }
+
+  /** The Auto Fill Options button just outside the bottom-right corner of the last fill. */
+  private paintAutoFillButton(
+    theme: Theme,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const target = this.deps.autoFillTarget();
+    const corner = target
+      ? this.deps.screenRect(target.r1, target.c1, contentTop, scrollLeft)
+      : null;
+    const x = corner ? corner.x + corner.w + 1 : 0;
+    const y = corner ? corner.y + corner.h + 1 : 0;
+    if (
+      !corner ||
+      this.deps.isEditing() ||
+      x < theme.rowHeaderWidth ||
+      y < theme.headerHeight ||
+      x >= clientW ||
+      y >= clientH
+    ) {
+      if (this.autoFillButton) this.autoFillButton.hidden = true;
+      return;
+    }
+    let button = this.autoFillButton;
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "sheetwrite-auto-fill-options";
+      button.title = "Auto Fill Options";
+      button.setAttribute("aria-label", "Auto Fill Options");
+      button.setAttribute("aria-haspopup", "menu");
+      button.tabIndex = -1;
+      button.append(iconNode("autoFillOptions", this.deps.icons()));
+      // The grid keeps the focus, so the menu's choice acts on the filled cells.
+      button.addEventListener("pointerdown", (event) => event.preventDefault());
+      button.addEventListener("click", () => {
+        const box = button?.getBoundingClientRect();
+        if (box) this.deps.openAutoFillOptions(box.left, box.bottom);
+      });
+      this.overlay.appendChild(button);
+      this.autoFillButton = button;
+    }
+    button.hidden = false;
+    button.style.transform = `translate(${x}px, ${y}px)`;
   }
 
   private paintFlash(

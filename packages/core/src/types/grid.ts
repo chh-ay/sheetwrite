@@ -168,6 +168,55 @@ export interface CellEditor {
  */
 export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
 
+/**
+ * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s
+ * `XlPasteType`): everything, only formulas or values, only formats, only
+ * notes, only data validation, everything but borders, only column widths,
+ * formulas or values with their number formats, or everything with the
+ * target's conditional formats kept beside the copied ones.
+ */
+export type PasteSpecialKind =
+  | "all"
+  | "formulas"
+  | "values"
+  | "formats"
+  | "comments"
+  | "validation"
+  | "allUsingSourceTheme"
+  | "allExceptBorders"
+  | "columnWidths"
+  | "formulasAndNumberFormats"
+  | "valuesAndNumberFormats"
+  | "allMergingConditionalFormats";
+
+/** How Paste Special combines a copied number with the target cell's, as Excel's Operation. */
+export type PasteSpecialOperation = "none" | "add" | "subtract" | "multiply" | "divide";
+
+/**
+ * Excel's Paste Special choices. Without options, Paste Special pastes as
+ * Paste does.
+ *
+ * @example
+ * ```ts
+ * // Add the copied numbers to the selected cells, leaving their formats.
+ * await grid.actions.pasteSpecial({ paste: "values", operation: "add" });
+ * ```
+ */
+export interface PasteSpecialOptions {
+  /** What to paste; `"all"` by default. */
+  paste?: PasteSpecialKind;
+  /** Combine copied numbers with the target cells' numbers; `"none"` by default. */
+  operation?: PasteSpecialOperation;
+  /** Leave a target cell as it is where the copied cell is blank. */
+  skipBlanks?: boolean;
+  /** Paste the copied rows as columns and the columns as rows. */
+  transpose?: boolean;
+  /** Paste Link: formulas that refer to the copied cells instead of their contents. */
+  link?: boolean;
+  /** Open Excel's Paste Special dialog (Ctrl+Alt+V) and paste what the user chooses there. */
+  ask?: boolean;
+}
+
 /** Header semantics used by the retained canvas and accessibility mirror. */
 export type GridPresentation = "spreadsheet" | "data-grid";
 
@@ -365,6 +414,13 @@ export interface GridActions {
   paste(): Promise<ClipboardOutcome>;
   /** Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects. */
   pasteValues(): Promise<ClipboardOutcome>;
+  /**
+   * Excel's Paste Special: paste parts of the copied cells, combine their
+   * numbers with the target's, skip blanks, transpose or link. With
+   * `{ ask: true }` the Paste Special dialog chooses first (Ctrl+Alt+V). Not
+   * available while a cut waits, as in Excel. Never rejects.
+   */
+  pasteSpecial(options?: PasteSpecialOptions): Promise<ClipboardOutcome>;
   /** Clear the selected cells' contents, keeping their formatting; does nothing when read-only. */
   clearContents(): void;
   /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
@@ -554,6 +610,12 @@ export type ContextMenuActionName =
   | "cut"
   | "copy"
   | "paste"
+  | "pasteValues"
+  | "pasteFormulas"
+  | "pasteFormatting"
+  | "pasteTranspose"
+  | "pasteLink"
+  | "pasteSpecial"
   | "clearContents"
   | "merge"
   | "unmerge"
@@ -620,6 +682,7 @@ export type KeyboardAction =
   | "cut"
   | "paste"
   | "pasteValues"
+  | "pasteSpecial"
   | "undo"
   | "redo"
   | "find"
@@ -728,6 +791,12 @@ export interface ContextMenuItem {
   icon?: IconName;
   /** Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself. */
   items?: readonly ContextMenuItem[];
+  /**
+   * Show `items` inside this row as a row of icon buttons, labelled by
+   * their tooltips, as Excel's "Paste Options:" row, instead of a submenu.
+   * The Left and Right Arrow keys move between the buttons.
+   */
+  inline?: boolean;
 }
 
 /** Static rows or a context-aware factory evaluated each time the menu opens. */
