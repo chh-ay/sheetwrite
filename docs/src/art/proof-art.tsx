@@ -15,28 +15,28 @@ const proof = (...columns: (readonly CardBox[])[]) => (
 /** Proof pictures by proof title, for the collaboration showcase's proof cards. */
 export const COLLABORATION_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
   // Both clients' edits are sequenced once, and both end with the same cells.
-  "Convergence under ordering": () =>
+  "Both clients end the same": () =>
     proof(
       [{ title: "Client A" }, { title: "Client B" }],
       [{ title: "Server" }],
       [{ title: "Same cells", tone: "accent" }],
     ),
   // A retry with the same mutation id is applied once.
-  "Loss without double-apply": () =>
+  "A retry is applied once": () =>
     proof(
       [{ title: "Retry m7", lines: ["same id"] }],
       [{ title: "Server" }],
       [{ title: "Applied once", tone: "accent" }],
     ),
   // Edits queue while offline and drain in order on reconnect.
-  "Offline is a first-class state": () =>
+  "Keep editing offline": () =>
     proof(
       [{ title: "Offline", lines: ["edits queue"] }],
       [{ title: "Reconnect" }],
       [{ title: "Drain", lines: ["in order"], tone: "accent" }],
     ),
   // A version that arrives early waits for the gap; a stale base is a conflict.
-  "Gaps and conflicts stay explicit": () =>
+  "Gaps and conflicts are shown": () =>
     proof(
       [{ title: "v43 early" }, { title: "Stale base" }],
       [
@@ -45,7 +45,7 @@ export const COLLABORATION_PROOF_ART: Readonly<Record<string, () => JSX.Element>
       ],
     ),
   // A restore over four versions travels and applies as one batch.
-  "Atomic multi-version batches": () =>
+  "Big restores, all or nothing": () =>
     proof(
       [{ title: "Restore", lines: ["4 versions"] }],
       [{ title: "One batch", tone: "accent" }],
@@ -86,7 +86,7 @@ export const VANILLA_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
 /** Proof pictures by proof title, for the database showcase. */
 export const DATABASE_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
   // Two writers on the same base: one queue accepts the first, the second gets a conflict.
-  "Atomic sequencing": () =>
+  "No lost updates": () =>
     proof(
       [{ title: "A · base v5" }, { title: "B · base v5" }],
       [{ title: "Queue" }],
@@ -96,21 +96,21 @@ export const DATABASE_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
       ],
     ),
   // A retry with the same mutation id gets the original version back.
-  "Idempotent retries": () =>
+  "A retry is applied once": () =>
     proof(
       [{ title: "Retry m7", lines: ["same id"] }],
       [{ title: "Adapter" }],
       [{ title: "Stored once", lines: ["returns v6"], tone: "accent" }],
     ),
   // The operation log grows to its limit, then folds into one snapshot.
-  "Bounded storage": () =>
+  "Storage stays bounded": () =>
     proof(
       [{ title: "Log" }],
       [{ title: "Limit hit" }],
       [{ title: "Snapshot", lines: ["compacted"], tone: "accent" }],
     ),
   // A reload brings committed state and the pending queue back.
-  "Reload recovery": () =>
+  "Reload and carry on": () =>
     proof(
       [{ title: "IndexedDB" }],
       [{ title: "Reload" }],
@@ -124,7 +124,7 @@ export const DATABASE_PROOF_ART: Readonly<Record<string, () => JSX.Element>> = {
       [{ title: "One commit", lines: ["restoreBlock"], tone: "accent" }],
     ),
   // An undo over the limit is rejected; older steps stay undoable.
-  "Oversized undo": () =>
+  "An undo that is too large": () =>
     proof(
       [{ title: "Undo", lines: ["too large"] }],
       [{ title: "Rejected", tone: "danger" }],
