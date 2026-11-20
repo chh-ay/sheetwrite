@@ -1,6 +1,6 @@
 ---
 title: Upgrade to 0.7.0
-description: Replace the removed sort, revision and add-on registration APIs, update error and cancellation handling and direct engine calls, and review the sort order and formula results that change in 0.7.0.
+description: Replace the removed sort, revision and add-on registration APIs, accept the new document operations, rebind keys that Excel's defaults now take, update error handling, search, paste and validation code and direct engine calls, and review the behavior that changes in 0.7.0.
 ---
 
 > [!NOTE]
@@ -157,13 +157,42 @@ export function connect(grid: Grid, adapter: PersistenceAdapter, userId: string)
 
 ### Document operations
 
-0.7.0 adds these document operations: `permuteRows` (sort), `setRelationship`
+0.7.0 adds these document operations: `permuteRows` (sort), `moveCells`
+(cut and paste, and Insert and Delete that shift cells), `setRelationship`
 and `removeRelationship` (data model), `setQuery` and `removeQuery` (saved
-queries) and `setDashboardItem` and `removeDashboardItem` (dashboards). The
-commit reasons `"sort"` and `"restore"` are new, and
-`RowBridgeMetadataDelta.metadata` can be `"relationship"`. Update server-side
-validation and every `switch` over operations, commit reasons or metadata
-kinds before you accept 0.7.0 clients.
+queries) and `setDashboardItem` and `removeDashboardItem` (dashboards).
+`setSheetMeta` can carry `tabColor`. The commit reasons `"sort"` and
+`"restore"` are new, and `"cut"` is no longer emitted: cut leaves its cells in
+place until the paste moves them. `RowBridgeMetadataDelta.metadata` can be
+`"relationship"`. Update server-side validation and every `switch` over
+operations, commit reasons or metadata kinds before you accept 0.7.0 clients.
+
+Before:
+
+```js partial="0.6 code"
+const ACCEPTED = new Set(["set", "setRange", "setBlock", "clearRange"]);
+// A cut arrived as a clear with the "cut" reason, and the paste as ordinary cell writes.
+```
+
+After:
+
+```ts compile title="Accept the new operations on your server"
+import type { DocumentOp } from "@sheetwrite/core";
+
+const ACCEPTED = new Set<DocumentOp["op"]>([
+  "set",
+  "setRange",
+  "setBlock",
+  "clearRange",
+  "permuteRows",
+  "moveCells",
+]);
+
+export function accepts(op: DocumentOp): boolean {
+  // A cut and paste is one moveCells; Insert and Delete that shift cells add `shift: true`.
+  return ACCEPTED.has(op.op);
+}
+```
 
 ## Add-on registration
 
@@ -207,9 +236,10 @@ links are new in 0.7.0 and install the same way: `functionsAddon`,
 Add-ons set up once, in list order. A name listed twice in one call rejects
 with `invalid-argument`; a name installed by an earlier call is kept. Settings
 in `createGrid` for an add-on that `initSheetwrite` did not install reject with
-`invalid-argument`. Each add-on loads its heavy code on first use: the XLSX codec
-on the first XLSX call, the chart drawing code and the query engine when a grid
-that uses them is created, and the history panel on its first command.
+`invalid-argument`. Each add-on loads its heavy code on first use. The XLSX codec
+loads on the first XLSX call, and the chart drawing code and the query engine
+when a grid that uses them is created. The history panel loads on its first
+command.
 
 ## Errors and cancellation
 
@@ -287,11 +317,10 @@ add the new values.
 
 Synchronous sort, filter, hidden-row, row-group and view-clear methods of the
 store return the same `ApplyTransactionResult` as `applyTransaction`, so you can
-see a rejected or empty change:
-`setColumnFilter`, `filterBy`, `hideRows`, `showRows`,
-`groupRows`, `ungroupRows`, `setGroupCollapsed` and `clearView`, and
-`grid.sortBy`. Code that implements these method types, or assigns them to a
-callback type that returns `void`, must update the return type.
+see a rejected or empty change. They are `setColumnFilter`, `filterBy`,
+`hideRows`, `showRows`, `groupRows`, `ungroupRows`, `setGroupCollapsed`,
+`clearView` and `grid.sortBy`. Code that implements these method types, or
+assigns them to a callback type that returns `void`, must update the return type.
 
 Before:
 
@@ -368,6 +397,7 @@ export function retitleChart(grid: Grid, sheet: SheetId, view: ChartView, title:
 | `icons.css` loads `icons.svg` from beside it. | Nothing with Vite, webpack or Next.js. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. Without one, the build fails with `No loader is configured for ".svg" files: icons.svg`. |
 | The default icon sheet is a file from your origin, not a `data:` URL. | If you set `--sheetwrite-icon-sheet` only because your Content Security Policy blocks `data:` images, you can remove it. |
 | The parts are published under `@sheetwrite/core/styles/` and in each framework adapter. | To ship less CSS, import only the parts your grid uses; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts). |
+| The AutoFilter header buttons and the sheet tab menu draw their glyphs from the icon sheet. | If you import the parts yourself, include `icons.css` on a grid that shows filters or sheet tabs. `styles.css` includes it. |
 
 ## Direct engine calls
 
@@ -382,6 +412,7 @@ Most apps never call the engine directly. If you call `CellStore` from
 | `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | Removed: use `setBlockPacked`, `setSparseBlock` or `setColumnBlockPacked`. |
 | `DiffKernel.clearPage`, `DiffKernel.pageLength` | Removed: consume the page arrays, then call `compare` to start the next page; read the length of a returned page array. |
 | `setSheetName(sheet, id, name)` returned nothing and accepted any name | Returns whether it named the sheet. Like `renameSheet`, it refuses an empty name, a name another sheet holds in any case, and another sheet's id, and then changes nothing. |
+| `search(sheet, cols, query, caseInsensitive, wholeCell)` matched `query` as plain text | `query` takes Excel's wildcards: `*`, `?`, and `~` before a literal `*`, `?` or `~`. A sixth argument, `formulas`, matches a formula cell by its formula text; without it, cells match by their values. |
 
 Before:
 
@@ -433,14 +464,238 @@ changed.forEach((formula, position) => {
 });
 ```
 
+## Keyboard defaults
+
+The grid's keys follow Excel. These default keys are new, and each is a
+`KeyboardAction` that `config.keyboard.bindings` can rebind or turn off with
+`null`. A host context-menu item that already uses one of them now throws a
+`shortcut-conflict` error. See
+[Keyboard shortcuts](/docs/features/grid/keyboard-shortcuts/).
+
+| Keys (Ctrl, or Cmd on a Mac) | Actions |
+| --- | --- |
+| Ctrl+B or Ctrl+2, Ctrl+I or Ctrl+3, Ctrl+U or Ctrl+4, Ctrl+5 | `bold`, `italic`, `underline`, `strikethrough` |
+| Ctrl+; and Ctrl+Shift+; | `insertDate`, `insertTime` |
+| Ctrl+A | `selectAll`: the current region, then the whole sheet |
+| Ctrl+D and Ctrl+R | `fillDown`, `fillRight` |
+| Ctrl+Shift+~, !, @, #, $, % and ^ | `formatGeneral`, `formatNumber`, `formatTime`, `formatDate`, `formatCurrency`, `formatPercent`, `formatScientific` |
+| Ctrl+9, Ctrl+Shift+9, Ctrl+0, Ctrl+Shift+0 | `hideRows`, `unhideRows`, `hideColumns`, `unhideColumns` |
+| Ctrl++ and Ctrl+- | `insertCells`, `deleteCells` |
+| Ctrl+1 | `formatCells` |
+| Ctrl+Alt+V (Ctrl+Cmd+V on a Mac) | `pasteSpecial` |
+| Ctrl+Shift+L | `toggleFilter` |
+| Ctrl+PageDown and Ctrl+PageUp, or Ctrl+Alt+PageDown and Ctrl+Alt+PageUp | `nextSheet`, `previousSheet` |
+| Shift+F11 | `insertSheet` |
+
+Backspace is no longer a `clearContents` key: it clears only the active cell
+and opens the editor, as in Excel. Delete still clears the selection. Enter and
+Tab move the active cell instead of opening the editor; F2 opens it.
+
+Before:
+
+```js partial="0.6 code"
+const config = {
+  contextMenu: [{ id: "bookmark", label: "Bookmark", shortcut: "Mod+B", onClick: addBookmark }],
+};
+```
+
+After:
+
+```ts compile title="Keep a host key that a new default uses"
+import type { GridConfig } from "@sheetwrite/core";
+
+export function bookmarkConfig(addBookmark: () => void): GridConfig {
+  return {
+    // Bold keeps Ctrl+2, so Ctrl+B stays with your command.
+    keyboard: { bindings: { bold: ["Mod+2"] } },
+    contextMenu: [
+      { id: "bookmark", label: "Bookmark", shortcut: "Mod+B", onClick: () => addBookmark() },
+    ],
+  };
+}
+```
+
+## The active cell of a selection
+
+Extending a selection with Shift+Arrow, Shift-click or a drag keeps the cell
+where it started active, as in Excel. A range, row, column or multi selection
+reports that cell as `active` when it is not the selection's first cell, and
+`setSelection` accepts it. Code that took the far corner of a range as the cell
+the user edits must read `active` instead.
+
+Before:
+
+```js partial="0.6 code"
+const selection = grid.getSelection();
+const cell = selection.kind === "range" ? selection.range.end : selection.addr;
+```
+
+After:
+
+```ts compile title="Read the active cell"
+import type { CellAddress, Grid } from "@sheetwrite/core";
+
+export function activeCell(grid: Grid): CellAddress | null {
+  const selection = grid.getSelection();
+  if (selection === null) return null;
+  switch (selection.kind) {
+    case "cell":
+      return selection.addr;
+    case "range":
+      return selection.active ?? { sheet: selection.range.sheet, ...selection.range.start };
+    case "row":
+      return selection.active ?? { sheet: selection.sheet, row: selection.row, col: 0 };
+    case "column":
+      return selection.active ?? { sheet: selection.sheet, row: 0, col: selection.col };
+    case "multi": {
+      const last = selection.ranges[selection.ranges.length - 1];
+      return selection.active ?? (last ? { sheet: last.sheet, ...last.start } : null);
+    }
+  }
+}
+```
+
+## Find and Replace
+
+Search works as Excel's Find does. See [Search](/docs/features/grid/search/).
+
+| 0.6 | 0.7.0 |
+| --- | --- |
+| `*` and `?` in a query matched themselves | They are wildcards: `*` matches any run of characters and `?` one character. Search for a literal one with `~*` or `~?`. |
+| A formula cell matched by its result | It matches by its formula text unless `lookIn: "values"`. Replace rewrites formula text. |
+| `search` searched the whole sheet | With more than one cell selected on the active sheet, it searches only the selection. Select one cell, or pass `within: "workbook"`, to search more. |
+| `search`, `findNext` and `findPrev` moved a highlight | They also select the match and scroll to it, so typing after Find edits that cell. |
+
+Before:
+
+```js partial="0.6 code"
+grid.search("5*"); // cells that hold the text "5*"
+grid.search("1200"); // also formula cells whose result is 1200
+```
+
+After:
+
+```ts compile title="Search for literal wildcards and for results"
+import type { Grid } from "@sheetwrite/core";
+
+export function findLiteralStar(grid: Grid) {
+  return grid.search("5~*");
+}
+
+export function findResult(grid: Grid) {
+  return grid.search("1200", { lookIn: "values" });
+}
+```
+
+## Paste and data validation
+
+A paste works as Excel's does with data validation: the pasted values land
+unchecked, and the cells the paste covers take the copied cells' rules in place
+of their own, as one undo step. In 0.6 a paste kept the target's rules and
+silently dropped each value a rule rejected. Paste Values and a paste from
+another application keep the target's rules. The store no longer checks
+validation for a commit with the `"paste"` reason. A paste of cells copied in
+the same grid also brings their notes and conditional formats.
+
+To keep the target cells' rules, as 0.6 did, set `paste.keepValidation`. A
+value that a `reject` rule refuses is then not pasted, and the status bar names
+the refused cells.
+
+Before:
+
+```js partial="0.6 code"
+createGrid(host, { workbook, config: { toolbar: true } });
+```
+
+After:
+
+```ts compile title="Keep the target's validation rules on paste"
+import { createGrid, type GridOptions } from "@sheetwrite/core";
+
+export function mountGrid(host: HTMLElement, workbook: GridOptions["workbook"]) {
+  return createGrid(host, {
+    workbook,
+    config: { toolbar: true, paste: { keepValidation: true } },
+  });
+}
+```
+
+## Validation rule and filter types
+
+`DataValidationCondition` and `ColumnFilter` have new members. A `switch` over
+their `kind` that lists every case, or code that reads a field without
+checking the kind, must handle them.
+
+| Type | New in 0.7.0 |
+| --- | --- |
+| `DataValidationCondition` | `{ kind: "any" }`, `{ kind: "time", ... }`, `{ kind: "custom", formula }`, and a list from a range or a name, `{ kind: "list", source: "=$H$2:$H$5" }`, which has no `values` |
+| `DataValidationComparison` | `min`, `max` and `value` can be formula text, such as `"=TODAY()"`, as well as a number |
+| `DataValidationRule` | `inCellDropdown`, `errorStyle`, `errorTitle`, `showInputMessage`, `inputTitle` and `inputMessage` |
+| `ColumnFilter` | `{ kind: "custom", join, conditions }` for Excel's custom AutoFilter, and `{ kind: "dynamic", type }` for its Date Filters |
+
+Before:
+
+```js partial="0.6 code"
+function choices(rule) {
+  return rule.condition.kind === "list" ? rule.condition.values : [];
+}
+```
+
+After:
+
+```ts compile title="Read a list rule's own items"
+import type { CellScalar, DataValidationRule } from "@sheetwrite/core";
+
+export function choices(rule: DataValidationRule): readonly CellScalar[] {
+  const { condition } = rule;
+  // A list from a range or a defined name has `source` instead of `values`.
+  return "values" in condition ? condition.values : [];
+}
+```
+
+## Sheet names
+
+`validateSheetName` reports the new code `reserved` for History, which Excel
+reserves. A user's rename to History is refused; adding a sheet, undo, a
+version restore and XLSX files keep the name. New sheets from the + button,
+the tab menu's Insert and Shift+F11 are named `Sheet4`, with no space, instead
+of `Sheet 4`.
+
+Before:
+
+```js partial="0.6 code"
+const messages = {
+  blank: "Enter a name.",
+  "too-long": "Use 31 characters or fewer.",
+  "forbidden-character": "Remove : \\ / ? * [ or ].",
+  "edge-apostrophe": "Remove the apostrophe at the start or end.",
+  duplicate: "Another sheet has this name.",
+};
+```
+
+After:
+
+```ts compile title="A message for each sheet name problem"
+import type { SheetNameIssueCode } from "@sheetwrite/core";
+
+export const SHEET_NAME_MESSAGES: Record<SheetNameIssueCode, string> = {
+  blank: "Enter a name.",
+  "too-long": "Use 31 characters or fewer.",
+  "forbidden-character": "Remove : \\ / ? * [ or ].",
+  "edge-apostrophe": "Remove the apostrophe at the start or end.",
+  reserved: "History is reserved.",
+  duplicate: "Another sheet has this name.",
+};
+```
+
 ## Behavior changes you will notice
 
 ### Excel sort order
 
-Every sort uses Excel's sort order: text compares without
-case in Excel's character order and skips apostrophes and hyphens, errors sort
-after `FALSE` and `TRUE` and are equal to each other, and blank cells are last
-in both directions. A saved view sort with mixed-case text, errors, or blank
+Every sort uses Excel's sort order. Text compares without case in Excel's
+character order and skips apostrophes and hyphens. Errors sort after `FALSE` and
+`TRUE` and are equal to each other. Blank cells are last in both directions. A
+saved view sort with mixed-case text, errors, or blank
 cells in a descending sort shows a different order after the upgrade. Sorting a
 spilled column uses the spilled values.
 
@@ -479,8 +734,8 @@ the sort on the table's header buttons.
 | XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. |
 | A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. A transaction whose `addRows` or `addColumns` would pass `maxRowsPerSheet`, `maxColumnsPerSheet`, `maxLogicalCellsPerSheet` or, for a dense sheet, `maxDenseCells` is rejected with a `resource-limit` issue that names the limit. Insert Row and Insert Column show the limit in an alert. |
 | A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. |
-| A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references: renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. |
-| Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does: references follow the moved cells instead of becoming `#REF!`, a range loses a moved row at its edge and grows by one that lands inside it, and a move that would split a table is refused. |
+| A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references. Renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. |
+| Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does. References follow the moved cells instead of becoming `#REF!`. A range loses a moved row at its edge and grows by one that lands inside it. A move that would split a table is refused. |
 | Cut no longer empties its cells: it marks them, and the next paste moves them with the new `moveCells` operation, as Excel's Cut and Paste does. References to the moved cells follow them, and the move is one undo step. A server or store that checks operation kinds must accept `moveCells`; the `"cut"` commit reason is no longer emitted. See [Cut and paste moves cells](/docs/features/grid/editing-and-clipboard/#cut-and-paste-moves-cells). |
 | Array formulas whose size comes from a cell, such as `=SEQUENCE($C$1)`, spill in every formula of a recalculation; the third and later ones no longer show `#NUM!`. |
 | On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. |
@@ -499,19 +754,51 @@ the sort on the table's header buttons.
 | The number-format box and `grid.getFocusCellStyle()` show the column's `numberFormat` when the cell's style sets none. | Nothing; a cell in a percentage column no longer shows "General". |
 | Each paint writes the screen-reader mirror as its last step. A `scroll` listener runs before that write. | A `scroll` listener that reads the mirror sees the previous paint's rows. |
 
+### Editing, filters and sheets
+
+| Change | What to do |
+| --- | --- |
+| AutoComplete is on: typing a text entry completes it from the same column, and Enter stores the completed entry. | Set `config: { autoComplete: false }` to turn it off. |
+| An entry typed into a cell keeps the cell's formatting, bold and number format included. What a user types into a Text (`@`) cell stays text, so `0123` keeps its zero. | Nothing. `parseCellInput` takes the cell's number format as an optional third argument, for a formula bar of your own. |
+| Insert, delete, hide and auto-fit row and column commands act on every row or column of the selection. | Nothing. |
+| Undo and redo select the cells they change; a change on another sheet makes that sheet active. | Nothing. |
+| Column filters keep through inserted and deleted rows, and move with their columns. In 0.6 any row or column edit cleared them. | Nothing. |
+| XLSX import turns rows an Excel AutoFilter hid into filtered rows, not hidden rows. | Nothing. Clearing the filter shows them, as in Excel. |
+| A cut over a filtered range moves the rows the filter hides too, as in Excel. Copy, delete, formatting and the fill handle still act only on the rows the filter shows. | Nothing. |
+| New sheets from the + button, Insert and Shift+F11 start with columns A to Z and 1,000 rows, instead of one column and 100 rows. The + button adds the sheet after the active one. | Nothing. A sheet added with `addSheet` without `columns` fills the grid's width with empty columns. |
+
 ### setBlock cell arrays
 
 | Change | What to do |
 | --- | --- |
-| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change: every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation, and getters there are still rejected without running. store.applyTransaction returns and emits a copy of a transaction that contains setBlock. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
+| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change. Every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation. Getters there are still rejected without running. `store.applyTransaction` returns and emits a copy of a transaction that contains `setBlock`. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
 
 ### Dense workbooks past maxDenseCells
 
 | Change | What to do |
 | --- | --- |
-| A dense-storage workbook no longer stops at `maxDenseCells` (5,000,000 cells). In 0.6.1 a snapshot past it failed with `SnapshotResourceError("maxDenseCells")`. Now the sheets past it load in local pages, which are never evicted and always loaded, so they still behave as dense sheets (`isPaged` is false), and a row or column insert that would pass it moves the sheet into local pages instead of being refused. | Nothing, unless you load untrusted snapshots: see the next row. |
+| A dense-storage workbook no longer stops at `maxDenseCells` (5,000,000 cells). In 0.6.1 a snapshot past it failed with `SnapshotResourceError("maxDenseCells")`. Now the sheets past it load in local pages, which are never evicted and always loaded, so they still behave as dense sheets (`isPaged` is false). A row or column insert that would pass it moves the sheet into local pages instead of being refused. | Nothing, unless you load untrusted snapshots: see the next row. |
 | With the default limits, the most cells an untrusted dense-storage snapshot can make the engine hold rises from 5,000,000 to 25,000,000: 5,000,000 dense and 20,000,000 in local pages. A sheet filled to the full local budget held 625 MB of WASM memory in our measurement. | To keep 0.6.1's ceiling, pass `snapshotResourceLimits: { maxLocalPagedCells: 0 }`; any lower value bounds local pages. Lowering `maxDenseCells` also lowers what the engine allocates densely: the store gives both limits to the engine. |
 | Local sheets share a new limit, `maxLocalPagedCells` in `SnapshotResourceLimits` (20,000,000 cells by default, also the engine's ceiling). A snapshot past it fails with `SnapshotResourceError("maxLocalPagedCells")`, and an `addRows` or `addColumns` that would pass it is rejected with a `resource-limit` issue whose resource is `local-paged-cells`. That code replaces `dense-cells`, which pre-release builds of 0.7.0 reported for an insert past `maxDenseCells`. `maxDenseCells` and `maxLocalPagedCells` are capped at the engine's ceilings (5,000,000 and 20,000,000); a larger value acts as the ceiling. | Match `local-paged-cells` where you matched `dense-cells`. |
+
+Before:
+
+```js partial="0.6 code"
+// 0.6.1 refused a snapshot past 5,000,000 cells.
+const grid = createGridFromSnapshot(host, untrusted);
+```
+
+After:
+
+```ts compile title="Keep 0.6.1's ceiling for untrusted snapshots"
+import { createGridFromSnapshot } from "@sheetwrite/core";
+
+export function openUntrusted(host: HTMLElement, untrusted: unknown) {
+  return createGridFromSnapshot(host, untrusted, {
+    snapshotResourceLimits: { maxLocalPagedCells: 0 },
+  });
+}
+```
 
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
