@@ -17,8 +17,12 @@ export interface XlsxCodecContext {
   warningCount: number;
   /** OOXML spellings of cell and defined-name formulas, computed in one batch. */
   formulas?: ReadonlyMap<string, string>;
+  /** On export, the formula sources whose result is an array; Excel needs them marked as dynamic arrays. */
+  arrayFormulas?: ReadonlySet<string>;
   /** On import, the book name of each `[n]` link index of file formulas. */
   externalBooks?: readonly (string | undefined)[];
+  /** On import, the cell `cm` values that mark a formula as a dynamic array. */
+  dynamicArrayMetadata?: ReadonlySet<string>;
   /** On export, the file spelling of a formula that names linked workbooks (`[1]` for `[Budget.xlsx]`). */
   externalFormula?: (formula: string) => string;
 }

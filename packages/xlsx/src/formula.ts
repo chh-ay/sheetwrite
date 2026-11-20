@@ -57,29 +57,42 @@ const PLAIN_XLSX_FORMULA = new RegExp(
   `^=?(?:${XLSX_STRING}|${XLSX_CELL}|${XLSX_NUMBER}|${XLSX_OPERATOR})*$`,
 );
 
+/** What the writer needs to know of a workbook's formulas. */
+export interface ExportFormulas {
+  /** The OOXML spelling of each distinct cell and defined-name formula source. */
+  readonly formulas: ReadonlyMap<string, string>;
+  /** The sources whose result is an array, which Excel needs marked as dynamic arrays. */
+  readonly arrayFormulas: ReadonlySet<string>;
+}
+
 /**
- * Convert the workbook's distinct formula sources in one engine call. On
- * export, plain sources skip the call; a workbook with no other formula leaves
- * the engine unloaded.
+ * Convert the workbook's distinct formula sources to OOXML spelling and find
+ * those whose result is an array, in one engine session. Plain sources keep
+ * their spelling, and only a range can make one an array, so a plain source
+ * without `:` skips the engine; a workbook with no other formula leaves the
+ * engine unloaded.
  */
-export async function convertWorkbookFormulas(
-  snapshot: WorkbookSnapshot,
-  direction: "import" | "export",
-): Promise<ReadonlyMap<string, string>> {
-  const formulas = workbookFormulaSources(snapshot);
-  const pending =
-    direction === "export"
-      ? formulas.filter((source) => !PLAIN_XLSX_FORMULA.test(source))
-      : formulas;
+export async function exportWorkbookFormulas(snapshot: WorkbookSnapshot): Promise<ExportFormulas> {
+  const sources = workbookFormulaSources(snapshot);
+  const pending = sources.filter(
+    (source) => source.includes(":") || !PLAIN_XLSX_FORMULA.test(source),
+  );
+  const arrayFormulas = new Set<string>();
   const converted =
     pending.length === 0
       ? new Map<string, string>()
-      : await withXlsxFormulaEngine((engine) => convertFormulaSources(engine, pending, direction));
-  if (pending.length === formulas.length) return converted;
+      : await withXlsxFormulaEngine((engine) => {
+          for (const index of engine.arrayFormulas(pending)) {
+            const source = pending[index];
+            if (source !== undefined) arrayFormulas.add(source);
+          }
+          return convertFormulaSources(engine, pending, "export");
+        });
+  if (pending.length === sources.length) return { formulas: converted, arrayFormulas };
 
-  const results = new Map(converted);
-  for (const source of formulas) {
-    if (!results.has(source)) results.set(source, source);
+  const formulas = new Map(converted);
+  for (const source of sources) {
+    if (!formulas.has(source)) formulas.set(source, source);
   }
-  return results;
+  return { formulas, arrayFormulas };
 }

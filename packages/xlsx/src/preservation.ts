@@ -95,7 +95,7 @@ const MACRO_WORKBOOK_CONTENT = "application/vnd.ms-excel.sheet.macroEnabled.main
 const RELATIONSHIPS_CONTENT = "application/vnd.openxmlformats-package.relationships+xml";
 /** The writer owns these names; a retained part with one of them would collide or go stale. */
 const REWRITTEN_PART =
-  /^(?:\[content_types\]\.xml|_rels\/\.rels|xl\/workbook\.xml|xl\/_rels\/workbook\.xml\.rels|xl\/styles\.xml|xl\/sharedstrings\.xml|xl\/worksheets\/|xl\/tables\/table\d+\.xml|xl\/comments\d*\.xml|xl\/drawings\/vmldrawing\d*\.vml|xl\/drawings\/_rels\/vmldrawing)/i;
+  /^(?:\[content_types\]\.xml|_rels\/\.rels|xl\/workbook\.xml|xl\/_rels\/workbook\.xml\.rels|xl\/styles\.xml|xl\/sharedstrings\.xml|xl\/metadata\.xml|xl\/worksheets\/|xl\/tables\/table\d+\.xml|xl\/comments\d*\.xml|xl\/drawings\/vmldrawing\d*\.vml|xl\/drawings\/_rels\/vmldrawing)/i;
 const CHART_CONTENT = /drawingml\.chart/i;
 /** Below the engine's argument-count limit for `String.fromCharCode(...chunk)`. */
 const BASE64_CHUNK_BYTES = 24 * 1024;

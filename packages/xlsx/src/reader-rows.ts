@@ -2,7 +2,7 @@ import type { CellValue, SheetSnapshot, SnapshotCell } from "@sheetwrite/core";
 import { cellA1 } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
-import { parseCellReference } from "./cell-reference.js";
+import { type CellRect, parseCellRect, parseCellReference } from "./cell-reference.js";
 import { linkedFormula } from "./external-links.js";
 import { MAIN_NAMESPACES, META_MARKER, META_STEM } from "./format.js";
 import { OpcPackage } from "./opc.js";
@@ -109,6 +109,9 @@ export async function ingestWorksheetRows(
   const collapsedRows = new Set<number>();
   let internalMetadata = false;
   const inheritedColumnStyles = new Map<number, string>();
+  // The areas of the dynamic arrays read so far that reach the current row:
+  // Sheetwrite computes the values Excel saved in their covered cells.
+  let spillAreas: CellRect[] = [];
   let columnStylesRead = false;
   let columnsPrecedeRows = false;
   const cellsBeforeSheet = usage.cells;
@@ -177,6 +180,7 @@ export async function ingestWorksheetRows(
     const rowStyle = xmlBoolean(xmlAttribute(rowElement, "customFormat"))
       ? xmlAttribute(rowElement, "s")
       : undefined;
+    if (spillAreas.length > 0) spillAreas = spillAreas.filter((area) => area.r1 >= row);
     let inferredCol = 0;
     for (const cellElement of xmlChildren(rowElement, "c")) {
       const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
@@ -199,6 +203,13 @@ export async function ingestWorksheetRows(
       if (formulaElement) {
         const formulaText = decodeXstring(formulaElement.text);
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
+        const cellMetadata = xmlAttribute(cellElement, "cm");
+        const dynamicArray =
+          formulaType === "array" &&
+          cellMetadata !== undefined &&
+          context.dynamicArrayMetadata?.has(cellMetadata) === true;
+        const spillArea = dynamicArray && parseCellRect(xmlAttribute(formulaElement, "ref") ?? "");
+        if (spillArea) spillAreas.push(spillArea);
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
           if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
@@ -211,7 +222,8 @@ export async function ingestWorksheetRows(
             }
           }
           value = null;
-        } else if (formulaType !== "normal") {
+        } else if (formulaType !== "normal" && !dynamicArray) {
+          // A legacy array formula (Ctrl+Shift+Enter) has no Sheetwrite equivalent.
           emitWarning(rowContext, {
             code: "unsupported-feature",
             message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
@@ -235,6 +247,16 @@ export async function ingestWorksheetRows(
         } else {
           value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
         }
+      } else if (
+        spillAreas.some(
+          (area) =>
+            address.col >= area.c0 &&
+            address.col <= area.c1 &&
+            address.row >= area.r0 &&
+            (address.row > area.r0 || address.col > area.c0),
+        )
+      ) {
+        value = null;
       } else {
         value = literalFromCell(
           cellElement,

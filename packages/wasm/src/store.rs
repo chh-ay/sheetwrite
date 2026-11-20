@@ -2736,6 +2736,20 @@ impl CellStore {
             .map_or(u32::MAX, |anchor| anchor.1)
     }
 
+    /// `[row, col, row_end, col_end]` of each installed spill on `sheet`, the
+    /// anchor's row and column first; empty for an unknown sheet. An XLSX
+    /// export writes each one as a dynamic array with its values.
+    #[wasm_bindgen(js_name = spillRanges)]
+    pub fn spill_ranges(&self, sheet: usize) -> Vec<u32> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        data.spill
+            .installed_ranges()
+            .flat_map(|range| [range.anchor.0, range.anchor.1, range.row_end, range.col_end])
+            .collect()
+    }
+
     /// Row-major mask aligned with render-window layout; `1` marks a derived
     /// spill cell and deliberately excludes the anchor.
     #[wasm_bindgen(js_name = spillDerivedMask)]

@@ -27,7 +27,14 @@ import {
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
 import { autoFilterXml } from "./writer-autofilter.js";
-import { quotedSheet, cellXml, hyperlinkStyledRows } from "./writer-cells.js";
+import {
+  cellXml,
+  hyperlinkStyledRows,
+  quotedSheet,
+  type SheetDynamicArrays,
+  type SpillOutput,
+  spillKey,
+} from "./writer-cells.js";
 import { appendTableRule, sortStateFits, tableXml } from "./writer-tables.js";
 import type { AbsoluteCell, WorkbookWriteHook, ExtraRelationship } from "./writer.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
@@ -49,6 +56,8 @@ export interface SheetWriteResult {
       readonly rels: Uint8Array;
     };
   }[];
+  /** Whether a cell was written as a dynamic array, which needs `xl/metadata.xml`. */
+  readonly dynamicArrays: boolean;
 }
 
 const COMMENTS_REL = `${RELATIONSHIPS_NS}/comments`;
@@ -244,6 +253,44 @@ function indexSheetRows(sheet: SheetSnapshot) {
   return byRow;
 }
 
+/**
+ * Add the values each spill shows in the cells it covers, which Excel files
+ * keep there. A covered cell with only a style keeps its style.
+ */
+function addSpillValues(
+  sheet: SheetSnapshot,
+  byRow: Map<number, AbsoluteCell[]>,
+  spills: readonly SpillOutput[],
+): void {
+  for (const spill of spills) {
+    const rowEnd = Math.min(spill.row + spill.rows, sheet.rowCount);
+    const colEnd = Math.min(spill.col + spill.cols, sheet.columns.length);
+    for (let row = spill.row; row < rowEnd; row++) {
+      const cells = byRow.get(row) ?? [];
+      const indexByCol = new Map(cells.map((cell, index) => [cell.col, index]));
+      for (let col = spill.col; col < colEnd; col++) {
+        if (row === spill.row && col === spill.col) continue;
+        const value = spill.values[(row - spill.row) * spill.cols + col - spill.col] ?? null;
+        const index = indexByCol.get(col);
+        const existing = index === undefined ? undefined : cells[index];
+        if (index !== undefined && existing !== undefined) {
+          cells[index] = {
+            ...existing,
+            source: { ...existing.source, value: { kind: "literal", value } },
+          };
+        } else if (value !== null) {
+          cells.push({
+            row,
+            col,
+            source: { rowOffset: row, colOffset: col, value: { kind: "literal", value } },
+          });
+        }
+      }
+      if (cells.length > 0) byRow.set(row, cells);
+    }
+  }
+}
+
 interface WorksheetOutlines {
   readonly outlineLevels: ReadonlyMap<number, number>;
   readonly collapsedOutlineRows: ReadonlySet<number>;
@@ -328,6 +375,7 @@ function* writeSheetRows(
   /** Rows the AutoFilter hides, which Excel stores hidden. */
   filtered: ReadonlySet<number>,
   hook: WorkbookWriteHook | undefined,
+  arrays: SheetDynamicArrays,
 ): Generator<Uint8Array> {
   const { collapsedOutlineRows, outlineLevels, collapsedSummaries } = outlines;
   xml.append("<sheetData>");
@@ -351,7 +399,7 @@ function* writeSheetRows(
     for (const cell of cells) {
       processed += 1;
       if ((processed & 4_095) === 0) checkAbort(context);
-      xml.append(cellXml(snapshot, sheet, cell, styles, context));
+      xml.append(cellXml(snapshot, sheet, cell, styles, context, arrays));
       const chunk = xml.drain();
       if (chunk) yield* chunk;
     }
@@ -462,7 +510,7 @@ function appendSheetRelationships(
   hook: WorkbookWriteHook | undefined,
   pivotRelationships: readonly ExtraRelationship[],
   pivotCharts: ReadonlyMap<string, PivotChartData> | undefined,
-): SheetWriteResult {
+): Omit<SheetWriteResult, "dynamicArrays"> {
   let comments: Uint8Array | undefined;
   let vml: Uint8Array | undefined;
   const relationshipEntries: {
@@ -616,8 +664,15 @@ export function* writeSheet(
   pivotRelationships: readonly ExtraRelationship[] = [],
   pivotCharts?: ReadonlyMap<string, PivotChartData>,
   filteredRows: readonly number[] = [],
+  /** The sheet's installed spills, whose values the export writes in the covered cells. */
+  spills: readonly SpillOutput[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = indexSheetRows(sheet);
+  addSpillValues(sheet, byRow, spills);
+  const arrays: SheetDynamicArrays = {
+    spills: new Map(spills.map((spill) => [spillKey(spill.row, spill.col), spill])),
+    written: false,
+  };
   const rowMetadata = new Map(sheet.rowMeta ?? []);
 
   const outlines = sheetOutlines(sheet, context);
@@ -644,6 +699,7 @@ export function* writeSheet(
     outlines,
     new Set(filteredRows),
     hook,
+    arrays,
   );
 
   appendSheetFormats(xml, sheet, styles, context);
@@ -663,5 +719,5 @@ export function* writeSheet(
   xml.append("</worksheet>");
   const chunk = xml.drain(true);
   if (chunk) yield* chunk;
-  return result;
+  return { ...result, dynamicArrays: arrays.written };
 }

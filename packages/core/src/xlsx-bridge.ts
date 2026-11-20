@@ -3,7 +3,9 @@ import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
 import { autoFilterBody } from "./store/autofilter.js";
+import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
+import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { ColumnarData } from "./types/data.js";
 import type { SheetSnapshot, Workbook, WorkbookSnapshot } from "./types/document.js";
@@ -11,6 +13,7 @@ import type { Grid } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type {
   XlsxResourceLimits,
+  XlsxSpillExport,
   XlsxWorkbookExportContext,
   XlsxWorkbookOptions,
 } from "./types/xlsx.js";
@@ -264,9 +267,9 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
 
 /**
  * The export context with what only the store's engine can compute: the
- * current output of worksheet pivots, the static content of dashboards and
- * the values of charts over pivots. The module loads only for a workbook with
- * a pivot or a dashboard.
+ * rows AutoFilters hide, the spills, the current output of worksheet pivots,
+ * the static content of dashboards and the values of charts over pivots. The
+ * pivot module loads only for a workbook with a pivot or a dashboard.
  */
 async function withEngineContent(
   source: ReturnType<typeof workbookSnapshotOf>,
@@ -275,7 +278,13 @@ async function withEngineContent(
   if (store === undefined) return source.context;
   const sheets = source.snapshot.sheets;
   const filteredRows = autoFilteredRows(store, sheets);
-  const context = filteredRows.size > 0 ? { ...source.context, filteredRows } : source.context;
+  const engine = storeEngine(store);
+  const spills = engine ? sheetSpills(engine, sheets) : new Map<SheetId, XlsxSpillExport[]>();
+  const context = {
+    ...source.context,
+    ...(filteredRows.size > 0 ? { filteredRows } : {}),
+    ...(spills.size > 0 ? { spills } : {}),
+  };
   const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
   const dashboards = sheets.some(isDashboard);
   if (!pivots && !dashboards) return context;
@@ -309,6 +318,32 @@ function autoFilteredRows(
     if (rows.length > 0) hidden.set(sheet.id, rows);
   }
   return hidden;
+}
+
+/** Each worksheet's installed spills and their values, which Excel files keep in the covered cells. */
+function sheetSpills(
+  engine: StoreDataEngine,
+  sheets: readonly SheetSnapshot[],
+): Map<SheetId, XlsxSpillExport[]> {
+  const spills = new Map<SheetId, XlsxSpillExport[]>();
+  for (const sheet of sheets) {
+    if (isDashboard(sheet)) continue;
+    const ranges = engine.spillRanges(sheet.id);
+    if (ranges.length === 0) continue;
+    const entries: XlsxSpillExport[] = [];
+    for (let index = 0; index < ranges.length; index += 4) {
+      const [row = 0, col = 0, rowEnd = 0, colEnd = 0] = ranges.subarray(index, index + 4);
+      const cells: { row: number; col: number }[] = [];
+      for (let r = row; r <= rowEnd; r++)
+        for (let c = col; c <= colEnd; c++) cells.push({ row: r, col: c });
+      const values: CellScalar[] = engine
+        .captureResolvedCells(sheet.id, cells)
+        .map((cell) => cell.resolved);
+      entries.push({ row, col, rows: rowEnd - row + 1, cols: colEnd - col + 1, values });
+    }
+    spills.set(sheet.id, entries);
+  }
+  return spills;
 }
 
 /**

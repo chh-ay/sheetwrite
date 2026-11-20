@@ -1,6 +1,7 @@
 // XLSX backend contracts shared by core's XLSX bridge and the XLSX add-on.
 // No runtime values live here.
 
+import type { CellScalar } from "./cell.js";
 import type { ChartView } from "./chart.js";
 import type { SheetId } from "./coordinates.js";
 import type { DashboardExport } from "./dashboard.js";
@@ -131,6 +132,20 @@ export interface XlsxWorkbookOptions {
   powerQuery?: PowerQueryCodec;
 }
 
+/** @internal One installed spill and the values it shows now. */
+export interface XlsxSpillExport {
+  /** Row of the formula that spills. */
+  readonly row: number;
+  /** Column of the formula that spills. */
+  readonly col: number;
+  /** Rows the spill covers, the formula's own row included. */
+  readonly rows: number;
+  /** Columns the spill covers, the formula's own column included. */
+  readonly cols: number;
+  /** Every covered cell's value, row by row: the formula's own value first. */
+  readonly values: readonly CellScalar[];
+}
+
 /** @internal Core-owned provenance for snapshots it materialized during this call. */
 export interface XlsxWorkbookExportContext {
   readonly sourceTracked?: boolean;
@@ -147,6 +162,11 @@ export interface XlsxWorkbookExportContext {
   readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
   /** The rows each worksheet AutoFilter hides, by sheet; Excel stores them hidden. */
   readonly filteredRows?: ReadonlyMap<SheetId, readonly number[]>;
+  /**
+   * The installed spills of each worksheet, by sheet. Excel marks their
+   * formulas as dynamic arrays and keeps their values in the covered cells.
+   */
+  readonly spills?: ReadonlyMap<SheetId, readonly XlsxSpillExport[]>;
 }
 
 /** Optional backend contract for complete workbook XLSX interchange. */

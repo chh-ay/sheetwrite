@@ -2048,6 +2048,11 @@ export class StoreDataEngine {
     return { sheet: addr.sheet, row, col };
   }
 
+  /** Each installed spill on `sheet` as `row, col, rowEnd, colEnd`, four numbers per spill. */
+  spillRanges(sheet: SheetId): Uint32Array {
+    return this.wasm.spillRanges(this.sheets.handleOf(sheet));
+  }
+
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null {
     return referenceTargetFromPacked(
