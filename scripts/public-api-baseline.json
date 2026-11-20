@@ -175,6 +175,7 @@
     "@sheetwrite/core#.#MAX_HYPERLINK_ID_LENGTH": "b8a86df7955b",
     "@sheetwrite/core#.#MAX_HYPERLINK_TARGET_LENGTH": "cd5650dffe5b",
     "@sheetwrite/core#.#MAX_ITERATIONS": "e263cabe2dcc",
+    "@sheetwrite/core#.#MAX_VALIDATION_FORMULA_LENGTH": "896013db9cf1",
     "@sheetwrite/core#.#Measure": "e26d2bc00c8d",
     "@sheetwrite/core#.#MeasureStatus": "9f200b4c90ce",
     "@sheetwrite/core#.#MemoryPersistenceAdapter": "4602524ce67b",

@@ -12,6 +12,7 @@ import type {
 import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
+  MAX_VALIDATION_FORMULA_LENGTH,
 } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
@@ -39,6 +40,14 @@ export function parseValidation(
   const ranges = (xmlAttribute(element, "sqref") ?? "").trim().split(/\s+/).filter(Boolean);
   const formula1 = xmlChild(element, "formula1")?.text;
   const formula2 = xmlChild(element, "formula2")?.text;
+  // Snapshot validation refuses a formula longer than Excel's limit, which
+  // would fail the whole import, so such a rule is dropped instead.
+  let formulaTooLong = false;
+  const formulaText = (formula: string): string => {
+    const text = `=${decodeXstring(formula)}`;
+    if (text.length > MAX_VALIDATION_FORMULA_LENGTH) formulaTooLong = true;
+    return text;
+  };
   let condition: DataValidationCondition | undefined;
   if (type === "none") {
     condition = { kind: "any" };
@@ -46,9 +55,9 @@ export function parseValidation(
     condition =
       formula1.startsWith('"') && formula1.endsWith('"')
         ? { kind: "list", values: quotedListValues(formula1.slice(1, -1)) }
-        : { kind: "list", source: `=${decodeXstring(formula1)}` };
+        : { kind: "list", source: formulaText(formula1) };
   } else if (type === "custom" && formula1 !== undefined) {
-    condition = { kind: "custom", formula: `=${decodeXstring(formula1)}` };
+    condition = { kind: "custom", formula: formulaText(formula1) };
   } else if (
     type === "decimal" ||
     type === "whole" ||
@@ -62,7 +71,7 @@ export function parseValidation(
       const number = Number(formula);
       return formula.trim() !== "" && Number.isFinite(number)
         ? number + serialShift
-        : `=${decodeXstring(formula)}`;
+        : formulaText(formula);
     };
     const operator = xmlAttribute(element, "operator") ?? "between";
     const comparison = validationComparison(operator, operand(formula1), operand(formula2));
@@ -93,6 +102,14 @@ export function parseValidation(
       type === "date" || type === "time" || type === "textLength"
         ? { kind: type, ...bounds }
         : { kind: "number", ...bounds, ...(type === "whole" ? { integer: true } : {}) };
+  }
+  if (formulaTooLong) {
+    emitWarning(context, {
+      code: "validation-loss",
+      message: `Excel validation formula exceeds ${MAX_VALIDATION_FORMULA_LENGTH} characters and was dropped`,
+      sheet,
+    });
+    return [];
   }
   if (!condition || ranges.length === 0) {
     emitWarning(context, {

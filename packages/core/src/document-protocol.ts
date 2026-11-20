@@ -1391,7 +1391,7 @@ function validateHyperlinkShape(
 }
 
 /** The longest formula Excel takes in a data validation rule. */
-const MAX_VALIDATION_FORMULA_LENGTH = 255;
+export const MAX_VALIDATION_FORMULA_LENGTH = 255;
 
 /** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
 function validationFormula(value: unknown): value is string {
