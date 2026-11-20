@@ -40,6 +40,8 @@ export type {
  *   return preview.status === "value" ? String(preview.value) : "";
  * }
  * ```
+ * @param store - The store that holds the workbook, such as `grid.store`.
+ * @param cell - The cell the formula is previewed in; its references are relative to it.
  * @param text - The formula to preview, starting with `=`.
  * @see /docs/features/formulas/formula-help/
  */

@@ -47,6 +47,8 @@ const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\
  * no grid calls; Escape restores the displayed reference.
  *
  * @param host - Element the name box is appended to.
+ * @param grid - The grid the name box reads and selects in.
+ * @param options - The accessible label, and how to return focus to the grid.
  */
 export function createNameBox(
   host: HTMLElement,
@@ -205,6 +207,8 @@ export interface FormulaBarPiece extends ShellPiece {
  * shows formula help as the cell editor does.
  *
  * @param host - Element the formula bar is appended to.
+ * @param grid - The grid whose focused cell the bar shows and edits.
+ * @param options - The accessible label, and how to return focus to the grid.
  */
 export function createFormulaBar(
   host: HTMLElement,
