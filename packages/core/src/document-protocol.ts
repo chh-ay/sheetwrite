@@ -43,7 +43,7 @@ import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./p
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { DYNAMIC_DATE_FILTERS, validFilterCondition } from "./store/autofilter.js";
-import { normalizeMerge } from "./store/ranges.js";
+import { MAX_VALIDATION_RULES, normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -885,6 +885,14 @@ export function assertWorkbookAllocationLimits(
         "maxMetadataEntries",
         MAX_CONDITIONAL_FORMAT_RULES,
         sheet.conditionalFormats!.length,
+      );
+    }
+
+    if ((sheet.validationRules?.length ?? 0) > MAX_VALIDATION_RULES) {
+      throw new SnapshotResourceError(
+        "maxMetadataEntries",
+        MAX_VALIDATION_RULES,
+        sheet.validationRules!.length,
       );
     }
 
@@ -1846,6 +1854,14 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   });
 
   const validationRules = optionalArray(sheet, "validationRules", path, errors);
+  if (validationRules && validationRules.length > MAX_VALIDATION_RULES) {
+    invalid(
+      errors,
+      `${path}.validationRules`,
+      `Data validation rule limit ${MAX_VALIDATION_RULES} exceeded`,
+      "resource-limit",
+    );
+  }
   validationRules?.forEach((entry, index) => {
     validateValidationRuleShape(entry, `${path}.validationRules[${index}]`, errors);
   });
