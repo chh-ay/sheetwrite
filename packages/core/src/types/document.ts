@@ -535,7 +535,9 @@ export type MutationIssue =
        * or the durable pending queue; or the document limit a row or column
        * insert would pass (`sheet-rows`, `sheet-columns` and `sheet-cells`
        * per sheet, `local-paged-cells` across the workbook's local sheets,
-       * which dense sheets past `maxDenseCells` continue in).
+       * which dense sheets past `maxDenseCells` continue in); or
+       * `validation-checks`, the work a transaction's data validation may
+       * take, counted in rule tests, list cells read and formula results.
        */
       resource:
         | "operations"
@@ -549,7 +551,8 @@ export type MutationIssue =
         | "sheet-rows"
         | "sheet-columns"
         | "sheet-cells"
-        | "local-paged-cells";
+        | "local-paged-cells"
+        | "validation-checks";
       /** Count or incrementally observed encoded bytes at rejection. */
       actual: number;
       /** Configured inclusive ceiling for the resource. */

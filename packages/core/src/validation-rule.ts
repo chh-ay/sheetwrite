@@ -25,10 +25,52 @@ export const DEFAULT_VALIDATION_ERROR =
 /** The error alert's title for a rule without its own title. */
 export const DEFAULT_VALIDATION_TITLE = "Data Validation";
 
+/** The items of a list, and their keys as an entry is compared with them. */
+export interface ValidationList {
+  readonly items: readonly CellScalar[];
+  readonly keys: ReadonlySet<string>;
+}
+
+/** The list of `items`. */
+export function validationList(items: readonly CellScalar[]): ValidationList {
+  const keys = new Set<string>();
+  for (const item of items) if (item !== null) keys.add(itemKey(item));
+  return { items, keys };
+}
+
+/** The keys of each rule's own items, made once per list. */
+const valueKeys = new WeakMap<readonly CellScalar[], ReadonlySet<string>>();
+/** The keys of a source that names no range. */
+const NO_KEYS: ReadonlySet<string> = new Set();
+
+function ownItemKeys(values: readonly CellScalar[]): ReadonlySet<string> {
+  let keys = valueKeys.get(values);
+  if (!keys) {
+    keys = validationList(values).keys;
+    valueKeys.set(values, keys);
+  }
+  return keys;
+}
+
+/** A check that needed more than its budget; the transaction it checks is refused. */
+export class ValidationBudgetError extends Error {
+  override readonly name = "ValidationBudgetError";
+
+  constructor(
+    /** The budget of one check. */
+    readonly budget: number,
+    /** What the check had spent when it stopped. */
+    readonly spent: number,
+  ) {
+    super(`Data validation needed more than ${budget} steps`);
+  }
+}
+
 /**
  * What checking a rule reads from the workbook: formula results and the
- * cells of a list's source. Without it, the formula parts of a rule pass
- * every value, as do parts the engine cannot evaluate.
+ * items of a list's source. Without it, the formula parts of a rule pass
+ * every value, as do parts the engine cannot evaluate. Inside {@link check},
+ * each source is read once, and the reads and tests spend one budget.
  */
 export interface ValidationReads {
   /**
@@ -41,11 +83,25 @@ export interface ValidationReads {
     trial?: CellScalar,
   ): FormulaPreviewValue | undefined;
   /**
-   * The cells of `reference` (a range such as `$A$1:$A$9` or `Lists!A1:A9`,
-   * or a defined name, without `=`) in reading order, read from the sheet of
-   * `addr` unless the reference names one; undefined when it is no range.
+   * The list in `reference` (a range such as `$A$1:$A$9` or `Lists!A1:A9`,
+   * or a defined name, without `=`): its cells in reading order, read from
+   * the sheet of `addr` unless the reference names one; undefined when it is
+   * no range.
    */
-  range(reference: string, addr: Readonly<CellAddress>): readonly CellScalar[] | undefined;
+  list(reference: string, addr: Readonly<CellAddress>): ValidationList | undefined;
+  /**
+   * Run one check: the grid's check of an entry and the store's check when
+   * it is written, or the checks of a paste. Within it each list source is
+   * read once, and everything the check reads or tests spends one budget; a
+   * check nested in another is part of it.
+   * @throws {@link ValidationBudgetError} when the check needs more than its budget.
+   */
+  check<T>(run: () => T): T;
+  /**
+   * Spend `units` of the budget of the check that runs, if one does.
+   * @throws {@link ValidationBudgetError} when the budget runs out.
+   */
+  charge(units: number): void;
 }
 
 /** The alert style of `rule`, from its policy when the rule names none. */
@@ -119,8 +175,17 @@ export function validationListItems(
   const condition = rule.condition;
   if (condition.kind !== "list") return [];
   if ("values" in condition) return condition.values;
-  const reference = formulaAt(rule, condition.source, addr).replace(/^=/, "");
-  return reads?.range(reference, addr) ?? [];
+  return sourceList(rule, condition.source, addr, reads)?.items ?? [];
+}
+
+/** The list of a rule's `source` in the cell `addr`. */
+function sourceList(
+  rule: DataValidationRule,
+  source: string,
+  addr: Readonly<CellAddress>,
+  reads: ValidationReads | undefined,
+): ValidationList | undefined {
+  return reads?.list(formulaAt(rule, source, addr).replace(/^=/, ""), addr);
 }
 
 /** A list item's text as Excel compares it with an entry: without case. */
@@ -186,18 +251,19 @@ export function validationAccepts(
   reads?: ValidationReads,
 ): boolean {
   if (value === null && (rule.allowBlank ?? true)) return true;
+  reads?.charge(1);
   const condition = rule.condition;
   switch (condition.kind) {
     case "any":
       return true;
     case "list": {
       if (condition.allowCustom === true) return true;
-      let items: readonly CellScalar[];
-      if ("values" in condition) items = condition.values;
-      else if (addr && reads) items = validationListItems(rule, addr, reads);
+      let keys: ReadonlySet<string>;
+      if ("values" in condition) keys = ownItemKeys(condition.values);
+      else if (addr && reads)
+        keys = sourceList(rule, condition.source, addr, reads)?.keys ?? NO_KEYS;
       else return true;
-      const key = itemKey(value);
-      return items.some((item) => item !== null && itemKey(item) === key);
+      return keys.has(itemKey(value));
     }
     case "checkbox": {
       const checked = condition.checkedValue ?? true;
