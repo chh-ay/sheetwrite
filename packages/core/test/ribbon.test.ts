@@ -549,6 +549,48 @@ it("gives the grid the panel's height back when minimized", async () => {
   expect(document.activeElement).toBe(host);
 });
 
+it("moves the tabs that do not fit into a More tabs menu instead of cutting one off", async () => {
+  const { host, openTab, press } = await setup();
+  const list = host.querySelector<HTMLElement>('.sheetwrite-ribbon [role="tablist"]');
+  const more = host.querySelector<HTMLButtonElement>('.sheetwrite-ribbon [aria-label="More tabs"]');
+  if (list === null || more === null) throw new Error("ribbon not mounted");
+  const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')].filter((tab) => !tab.hidden);
+  const names = (elements: readonly HTMLElement[]) => elements.map((tab) => tab.textContent);
+  const inRow = () => tabs.filter((tab) => tab.dataset.overflow === undefined);
+  // Every tab is 60 px wide, and the row has room for three.
+  let room = 180;
+  Object.defineProperties(list, {
+    clientWidth: { configurable: true, get: () => room },
+    scrollWidth: { configurable: true, get: () => inRow().length * 60 },
+  });
+  expect(tabs.length).toBeGreaterThan(3);
+
+  openTab(tabs[0]!.textContent ?? "");
+  expect(names(inRow())).toEqual(names(tabs.slice(0, 3)));
+  expect(more.hidden).toBe(false);
+
+  press(more);
+  const items = [
+    ...host.querySelectorAll<HTMLElement>(
+      '[role="menu"][aria-label="More tabs"] [role="menuitem"]',
+    ),
+  ];
+  expect(names(items)).toEqual(names(tabs.slice(3)));
+  // Picking the last tab selects it and keeps it in the row, in tab order.
+  const last = tabs.at(-1)!;
+  press(items.at(-1)!);
+  expect(last.getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(last);
+  expect(names(inRow())).toEqual(names([...tabs.slice(0, 2), last]));
+  expect(host.querySelector('[role="menu"][aria-label="More tabs"]')).toBeNull();
+
+  // With room for every tab, the menu button goes away.
+  room = 1_000;
+  openTab(tabs[0]!.textContent ?? "");
+  expect(names(inRow())).toEqual(names(tabs));
+  expect(more.hidden).toBe(true);
+});
+
 it("reserves a compact ribbon's own height before its chunk mounts, so the grid never moves", async () => {
   const workbook: Workbook = {
     activeSheet: "s1",

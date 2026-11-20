@@ -1,8 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { hasOpaqueForeground } from "./canvas-assertions.js";
-import { expect, fitsViewport, nextFrames, screenshotPixels, test } from "./fixtures.js";
+import { expect, fitsViewport, nextFrames, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -174,30 +173,6 @@ test("at 320 px the tabs scroll beside the layout buttons instead of under them 
   if (tab === null || button === null) throw new Error("The View tab or layout button is hidden");
   expect(tab.x + tab.width).toBeLessThanOrEqual(button.x);
   expect(await fitsViewport(page)).toBe(true);
-});
-
-test("at 390 px a cut-off tab label stays clear of the layout button", async ({ page }) => {
-  await open(page, 390, 844);
-  const ribbon = page.getByRole("region", { name: "Ribbon" });
-  const tabList = ribbon.getByRole("tablist", { name: "Ribbon tabs" });
-  await tabList.scrollIntoViewIfNeeded();
-  await page.mouse.move(0, 0);
-  const list = await tabList.boundingBox();
-  const button = await ribbon.getByRole("button", { name: "Compact ribbon" }).boundingBox();
-  if (list === null || button === null) throw new Error("The tab list or layout button is hidden");
-  // The tabs do not fit at this width, so a label is cut at the list's end.
-  expect(await tabList.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
-  // Between the layout button and the last six pixels of the tab list there
-  // is only plain tab-row background, no part of a tab label.
-  const strip = await page.screenshot({
-    clip: {
-      x: list.x + list.width - 6,
-      y: button.y,
-      width: button.x - (list.x + list.width - 6),
-      height: button.height,
-    },
-  });
-  expect(hasOpaqueForeground(await screenshotPixels(page, strip))).toBe(false);
 });
 
 for (const mode of ["full", "compact"] as const) {
