@@ -178,7 +178,7 @@ import type {
   GridOptions,
   GridPanel,
   GridPresentation,
-  ReplaceChange,
+  ReplacePreview,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -2333,8 +2333,8 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
-  previewReplaceAll(replacement: string): ReplaceChange[] {
-    return this.searchController.previewReplaceAll(replacement);
+  previewReplaceAll(replacement: string, limit?: number): ReplacePreview {
+    return this.searchController.previewReplaceAll(replacement, limit);
   }
 
   getShortcutLabel(action: KeyboardAction): string {
