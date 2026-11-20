@@ -398,7 +398,9 @@ a {
   padding: 0.12em 0.36em;
   color: var(--sw-fg-strong);
   background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
-  font: 0.86em var(--sw-font-mono);
+  /* Slightly smaller than the text around it, but never under 12 px: inside
+     small labels and table headers, 0.86em alone gives 10–11 px. */
+  font: max(0.86em, var(--sw-text-eyebrow)) var(--sw-font-mono);
   /* A long identifier breaks inside the chip instead of widening the page. */
   overflow-wrap: anywhere;
 }
