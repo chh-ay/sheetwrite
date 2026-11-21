@@ -78,6 +78,8 @@ export interface ClipboardControllerDeps {
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Undo the last local change, as Ctrl+Z does. */
   undo: () => void;
+  /** Redo the last undone change, as Ctrl+Y does. */
+  redo?: () => void;
   /**
    * The newest entry of the undo history, compared by identity: the edit the
    * next {@link undo} reverts. `null` when there is none.
@@ -140,8 +142,12 @@ interface CellWrite {
  */
 type PasteRows = "sheet" | "view" | "shown";
 
-/** A paste's commit, or `null` when there was nothing to commit. */
-type PasteCommit = ApplyTransactionResult | null;
+/**
+ * A paste's commit; a paste refused before it commits, and why (a sentence
+ * in lower case, as `onPasteRefused` takes it); or `null` when there was
+ * nothing to commit.
+ */
+type PasteCommit = ApplyTransactionResult | { status: "refused"; reason: string } | null;
 
 /** The top-left cell a paste lands on, and the size of the selection it may repeat to fill. */
 interface PasteTarget extends CellRef {
@@ -1143,7 +1149,9 @@ export class ClipboardController {
     if (result === null) return "empty";
     if (result.status === "applied") return "done";
     if (result.status === "noop" && result.reason === "empty") return "empty";
-    this.deps.onPasteRefused?.(commitRefusalReason(result));
+    this.deps.onPasteRefused?.(
+      result.status === "refused" ? result.reason : commitRefusalReason(result),
+    );
     return "rejected";
   }
 
@@ -1172,7 +1180,9 @@ export class ClipboardController {
     this.pastingShownRows = true;
     try {
       this.deps.undo();
-      this.pasteOutcome(last.paste());
+      // A refused paste on the shown rows keeps the paste it would have
+      // replaced: the undo is taken back.
+      if (this.pasteOutcome(last.paste()) === "rejected") this.deps.redo?.();
     } finally {
       this.pastingShownRows = false;
     }
@@ -1842,6 +1852,19 @@ export class ClipboardController {
           ? sheetRows + addedRows - firstDataRow
           : this.deps.store.viewRowCount(activeSheet) - focus.row,
     );
+    // A sorted view's rows, and the shown rows of Paste into visible rows
+    // only, cannot grow as the sheet's rows do: a block taller than the rows
+    // below the selected cell is refused, not cut off.
+    if (availableRows < height) {
+      const left = Math.max(0, availableRows);
+      const rows = `${left.toLocaleString("en-US")} ${shown ? "visible row" : "row"}${left === 1 ? " is" : "s are"}`;
+      return {
+        status: "refused",
+        reason:
+          `the paste has ${height.toLocaleString("en-US")} rows, but only ${rows} left ` +
+          `from the selected cell down${shown ? "" : " in the sorted view"}.`,
+      };
+    }
     const grow: DocumentOp[] =
       addedRows > 0 ? [{ op: "addRows", sheet: activeSheet, at: sheetRows, count: addedRows }] : [];
     const hiddenRows =
