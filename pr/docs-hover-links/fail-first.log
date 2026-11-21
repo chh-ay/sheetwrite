@@ -1,0 +1,13 @@
+(pass) hover see-also tags link guide paths and API names [897.31ms]
++ [
++   "/docs/api/core/indexed-db-history-storage/#indexed-db-history-storage-list",
++   "/docs/api/core/indexed-db-history-storage/#indexed-db-history-storage-list",
++   "/docs/api/core/indexed-db-history-storage/#indexed-db-history-storage-list",
++   "/docs/api/core/indexed-db-history-storage/#indexed-db-history-storage-list",
++ ]
+- Expected  - 1
++ Received  + 6
+(fail) a name the sample declares links no API member that shares it [418.80ms]
+(pass) manifest docs split into the hover summary and its tags [0.26ms]
+ 2 pass
+ 1 fail
