@@ -44,6 +44,34 @@ test("a moved page redirects permanently and forwards its old heading link", asy
   await page.goto("/docs/guides/configuration/#datasource-pages");
   await expect(page).toHaveURL(/\/docs\/features\/data\/datasources\/#requests-and-pages$/);
   await expect(page.locator("#requests-and-pages")).toBeVisible();
+  // The heading stayed on the redirect target under a new id; the fragment follows it.
+  await page.goto("/docs/guides/collaboration/#revisions");
+  await expect(page).toHaveURL(/\/docs\/features\/collaboration\/#restoring-versions$/);
+  await expect(page.locator("#restoring-versions")).toBeInViewport();
+});
+
+test("a long outline keeps the entry being read in view and shows that more entries follow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/releases/0.7.0/");
+  await waitForHydration(page);
+  const rail = page.getByRole("navigation", { name: "On this page" });
+  // The outline is longer than its column, so it scrolls there.
+  expect(await rail.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect(rail).toHaveAttribute("data-more", "end");
+  // Read down to the last entry: it is marked and shown inside the column.
+  const last = rail.getByRole("link").last();
+  const id = decodeURIComponent((await last.getAttribute("href"))?.slice(1) ?? "");
+  // Its heading just below the sticky header, where lib/shell.ts reads.
+  await page.evaluate((heading) => {
+    const top = document.getElementById(heading)?.getBoundingClientRect().top ?? 0;
+    window.scrollTo(0, window.scrollY + top - 80);
+  }, id);
+  await expect(last).toHaveAttribute("aria-current", "location");
+  const [railBox, lastBox] = await Promise.all([rail.boundingBox(), last.boundingBox()]);
+  expect(lastBox && railBox && lastBox.y + lastBox.height <= railBox.y + railBox.height).toBe(true);
+  await expect(rail).toHaveAttribute("data-more", "start");
 });
 
 test("the landing loads no grid runtime, and its social image and version match the files", async ({
