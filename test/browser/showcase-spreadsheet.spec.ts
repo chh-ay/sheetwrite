@@ -209,7 +209,12 @@ for (const mode of ["full", "compact"] as const) {
     await expect(insert).toBeFocused();
     await expect(insert).toHaveAttribute("aria-selected", "true");
     await insert.press("Home");
+    // The tab list's Home key goes to its first tab, File.
+    const file = ribbon.getByRole("tab", { name: "File", exact: true });
+    await expect(file).toBeFocused();
+    await file.press("ArrowRight");
     await expect(home).toBeFocused();
+    await expect(home).toHaveAttribute("aria-selected", "true");
 
     await select(page, "B2");
     const bold = ribbon.getByRole("button", { name: "Bold", exact: true });
