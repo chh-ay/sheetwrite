@@ -50,9 +50,16 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
-  // The filter narrows the static cards to a non-empty part of them.
-  await expect.poll(async () => (await shownOwners()).length).toBeLessThan(owners.length);
-  expect((await shownOwners()).length).toBeGreaterThan(0);
+  // The filter shows exactly the cards its group labels, and some.
+  await expect
+    .poll(() =>
+      shownLaunchers
+        .locator(".sw-hub-launch__meta")
+        .evaluateAll((labels) => [...new Set(labels.map((label) => label.textContent?.trim()))]),
+    )
+    .toEqual(["Data & scale"]);
+  const dataGroup = page.locator(".sw-hub-launch__meta", { hasText: /^\s*Data & scale\s*$/ });
+  await expect(shownLaunchers).toHaveCount(await launchers.filter({ has: dataGroup }).count());
   await allFilter.click();
   await expect(shownLaunchers).toHaveCount(owners.length);
   // Every owning showcase URL resolves.

@@ -17,6 +17,10 @@ test("an old heading link is forwarded, and a long outline keeps the entry being
   await page.goto("/docs/guides/configuration/#datasource-pages");
   await expect(page).toHaveURL(/\/docs\/features\/data\/datasources\/#requests-and-pages$/);
   await expect(page.locator("#requests-and-pages")).toBeInViewport();
+  // A heading renamed on the redirect target swaps the fragment in place.
+  await page.goto("/docs/guides/collaboration/#revisions");
+  await expect(page).toHaveURL(/\/docs\/features\/collaboration\/#restoring-versions$/);
+  await expect(page.locator("#restoring-versions")).toBeInViewport();
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/docs/releases/0.7.0/");
@@ -334,6 +338,20 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
     { timeout: SEARCH_TIMEOUT_MS },
   );
 
+  // A plain word finds its guide among the first three pages, even when Pagefind ranks it low.
+  await field.fill("charts");
+  await expect
+    .poll(async () =>
+      [
+        ...new Set(
+          await results.evaluateAll((options) =>
+            options.map((option) => option.getAttribute("href")?.split("#")[0]),
+          ),
+        ),
+      ].slice(0, 3),
+    )
+    .toContain("/docs/features/analysis/charts/");
+
   // Code names rank their API page first; words and questions their guide.
   // search-ranking.test.ts owns the ranking rules; these rows prove the real index feeds them.
   for (const [query, href] of [
@@ -342,6 +360,7 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
     ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
     ["how do I use sheetwrite with svelte", "/docs/frameworks/svelte/"],
     ["how to use conditional formatting", "/docs/features/formatting/conditional-formats/"],
+    ["how do I add a chart", "/docs/features/analysis/charts/"],
   ] as const) {
     await field.fill(query);
     await expect
@@ -349,9 +368,11 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
       .toBe(href);
   }
 
-  // Test routes stay out of the index ("XLSX verification" also finds the kept-parts guide).
+  // Test routes stay out of the index: wait for this query's own result, the kept-parts guide.
   await field.fill("XLSX verification");
-  await expect(dialog.locator("a[href^='/docs/']").first()).toBeVisible();
+  await expect(
+    dialog.locator("a[href^='/docs/import-export/kept-parts-and-round-trips/']").first(),
+  ).toBeVisible();
   await expect(dialog.locator("a[href^='/test/']")).toHaveCount(0);
 
   await field.fill("qqzzxx");

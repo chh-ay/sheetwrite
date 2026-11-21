@@ -66,6 +66,39 @@ test("Try it runs the example, reruns an edit, reports an error at its line, and
   await expect(frame.locator("#grid canvas").first()).toBeAttached();
 });
 
+/** Layout rounds boxes to device pixels. */
+const BOX_ROUNDING_PX = 1;
+
+test("on a phone the editor wraps long lines in both layers, like the page's code block", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/docs/start/first-grid/");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Try it" }).first().click();
+  await expect(page.locator(".sw-playground").getByRole("status")).toHaveText(/^Ran in/, {
+    timeout: RUN_TIMEOUT_MS,
+  });
+  const layout = await page
+    .locator(".sw-playground__editor")
+    .first()
+    .evaluate((element) => {
+      const pre = element.querySelector("pre");
+      const textarea = element.querySelector("textarea");
+      if (pre === null || textarea === null) throw new Error("The editor has no layers");
+      return {
+        fits:
+          element.scrollWidth <= element.clientWidth &&
+          textarea.scrollWidth <= textarea.clientWidth,
+        preHeight: pre.getBoundingClientRect().height,
+        textHeight: textarea.scrollHeight,
+      };
+    });
+  expect(layout.fits).toBe(true);
+  // Both layers wrap to the same rows, so the coloured text stays under the caret.
+  expect(Math.abs(layout.preHeight - layout.textHeight)).toBeLessThanOrEqual(BOX_ROUNDING_PX);
+});
+
 test("every feature guide's runnable example runs without an error", async ({ page }) => {
   for (const path of [
     "/docs/features/formatting/conditional-formats/",
