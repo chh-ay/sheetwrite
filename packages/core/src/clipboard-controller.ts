@@ -151,9 +151,11 @@ function escapeHtml(value: string): string {
  * Excel's General gives it (`12%` in `0%`).
  */
 function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellWrite {
-  const { value, numberFormat } = parseCellEntry(source, type);
+  const parsed = parseCellEntry(source, type);
+  const { value, numberFormat } = parsed;
   if (value.kind === "formula") return { value: { kind: "literal", value: `'${value.src}` } };
-  return numberFormat === undefined ? { value } : { value, style: { numberFormat } };
+  // A paste reads many cells; the parsed entry is the write when it has no format.
+  return numberFormat === undefined ? parsed : { value, style: { numberFormat } };
 }
 
 /**
