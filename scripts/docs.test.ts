@@ -661,3 +661,39 @@ describe("adapter documentation contract", () => {
     );
   });
 });
+
+describe("API page paths", () => {
+  /** The page route of each export of one `@sheetwrite/core/testing` entry. */
+  const pageRoutes = (exports: ApiExport[]): Map<string, string> => {
+    const entry = entryPoint("./testing", exports);
+    const routes = documentationLinkRoutes({
+      formatVersion: 2,
+      packages: [{ name: "@sheetwrite/core", entryPoints: [entry] }],
+    });
+    return new Map(exports.map((item) => [item.name, routes.get(item.name)?.[0]?.route ?? ""]));
+  };
+
+  it("gives two names that differ only in letter case their own pages, the type's with its kind", () => {
+    const routes = pageRoutes([
+      apiExport("ShownSuggestion", "interface", "interface ShownSuggestion { text: string; }"),
+      apiExport("shownSuggestion", "function", "function shownSuggestion(): ShownSuggestion;"),
+      apiExport("GhostOnScreen", "interface", "interface GhostOnScreen { text: string; }"),
+    ]);
+    // The function keeps the address it had before the type was exported.
+    expect(routes.get("shownSuggestion")).toBe("/docs/api/core-testing/shown-suggestion/");
+    expect(routes.get("ShownSuggestion")).toBe(
+      "/docs/api/core-testing/shown-suggestion-interface/",
+    );
+    expect(routes.get("GhostOnScreen")).toBe("/docs/api/core-testing/ghost-on-screen/");
+  });
+
+  it("fails when names still fold to one page after the kind", () => {
+    expect(() =>
+      pageRoutes([
+        apiExport("fooBar", "function", "function fooBar(): void;"),
+        apiExport("foo_bar", "function", "function foo_bar(): void;"),
+        apiExport("FOO_BAR", "function", "function FOO_BAR(): void;"),
+      ]),
+    ).toThrow(/fold to the same path "foo-bar-function"/);
+  });
+});

@@ -18,6 +18,7 @@ import {
 } from "typescript/unstable/ast";
 import { API, type Project } from "typescript/unstable/async";
 
+import { apiAnchor as anchor, apiPageSlugs } from "../docs/src/lib/api-page-slugs.js";
 import { MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { repositorySourceUrl } from "../docs/src/lib/repository.js";
 import { formatDeclaration, formatTypeExpression } from "../docs/src/lib/sheetwrite-code-hovers.js";
@@ -445,14 +446,6 @@ const KIND_LABELS: Readonly<Record<string, string>> = {
   type: "Types",
   variable: "Variables",
 };
-
-export function anchor(value: string): string {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 const DECLARATION_KEYWORD =
   /^(?:declare|export|abstract|interface|type|class|enum|function|const|let|var|namespace)\b/;
@@ -1169,8 +1162,29 @@ function renderMembers(
   return ["## Members", "", ...index, ...groups].join("\n");
 }
 
+/** Page slugs by entry point, worked out once per entry: a slug depends on its neighbours' names. */
+const entryPageSlugs = new WeakMap<ApiEntryPoint, ReadonlyMap<string, string>>();
+
+/**
+ * Where an export's page lives under the docs content root, without the
+ * extension: `api/<entry>/<slug>`. Names that fold to one slug get a kind
+ * suffix (api-page-slugs.ts).
+ */
+export function symbolPagePath(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
+  let slugs = entryPageSlugs.get(entry);
+  if (slugs === undefined) {
+    slugs = apiPageSlugs(entry.exports);
+    entryPageSlugs.set(entry, slugs);
+  }
+  const slug = slugs.get(item.name);
+  if (slug === undefined) {
+    throw new Error(`${pkg.name} ${entry.subpath} does not export ${item.name}`);
+  }
+  return `api/${entrySlug(pkg.name, entry.subpath)}/${slug}`;
+}
+
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
-  return `/docs/api/${entrySlug(pkg.name, entry.subpath)}/${anchor(item.name)}/`;
+  return `/docs/${symbolPagePath(pkg, entry, item)}/`;
 }
 
 export async function renderSymbolPage(
