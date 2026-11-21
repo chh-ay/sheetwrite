@@ -16,6 +16,8 @@ Every exported subpath has one explicit classification:
 | `testing-only` | Deterministic harnesses for consumers' tests; never production code. |
 | `asset` | CSS, Worker, or WASM bytes rather than a TypeScript symbol surface. |
 
+The `internal` entry points are the engine packages (`@sheetwrite/wasm`, `@sheetwrite/formulas` and `@sheetwrite/wasm/history`) and `@sheetwrite/core/codec`, which is for Sheetwrite's own codecs; no compatibility promise.
+
 The [generated API index](/docs/api/) lists every package entry point, its classification, and every compiler-visible export. Beside it, the repository keeps a reviewed list of export names and signature digests, which the release check compares with the build.
 
 ## What the manifest records
