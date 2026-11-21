@@ -23,6 +23,10 @@ type DateTokenKind =
   | "weekdayLong"
   | "hour"
   | "second"
+  /** `[h]`, `[m]` and `[s]`: elapsed time in hours, minutes or seconds. */
+  | "elapsedHours"
+  | "elapsedMinutes"
+  | "elapsedSeconds"
   | "ampm"
   | "literal";
 
@@ -362,6 +366,28 @@ function getCurrencySymbol(): string {
   return currencySymbol;
 }
 
+/**
+ * The elapsed-time token of the bracket `section[open..close]`: `[h]`, `[mm]`
+ * and `[ss]` give hours, minutes and seconds; anything else (a color, a
+ * condition or a locale) gives `null`.
+ */
+function elapsedKind(section: string, open: number, close: number): DateTokenKind | null {
+  if (close <= open + 1) return null;
+  const lower = section[open + 1]!.toLowerCase();
+  for (let index = open + 2; index < close; index++) {
+    if (section[index]!.toLowerCase() !== lower) return null;
+  }
+  if (lower === "h") return "elapsedHours";
+  if (lower === "m") return "elapsedMinutes";
+  return lower === "s" ? "elapsedSeconds" : null;
+}
+
+const ELAPSED_KINDS: ReadonlySet<DateTokenKind> = new Set([
+  "elapsedHours",
+  "elapsedMinutes",
+  "elapsedSeconds",
+]);
+
 function tokenizeDate(section: string): DateToken[] {
   const tokens: DateToken[] = [];
   for (let index = 0; index < section.length;) {
@@ -376,6 +402,23 @@ function tokenizeDate(section: string): DateToken[] {
     if (section[index] === "\\" && index + 1 < section.length) {
       tokens.push({ kind: "literal", pad: false, text: section[index + 1]! });
       index += 2;
+      continue;
+    }
+
+    if (section[index] === "[") {
+      const close = section.indexOf("]", index + 1);
+      if (close < 0) {
+        tokens.push({ kind: "literal", pad: false, text: "[" });
+        index++;
+        continue;
+      }
+      const kind = elapsedKind(section, index, close);
+      tokens.push(
+        kind === null
+          ? { kind: "literal", pad: false, text: decodeLiteral(section.slice(index, close + 1)) }
+          : { kind, pad: close - index > 2, text: "" },
+      );
+      index = close + 1;
       continue;
     }
 
@@ -413,7 +456,7 @@ function tokenizeDate(section: string): DateToken[] {
     let literal = "";
     while (
       index < section.length &&
-      !/[ymdhs"\\]/i.test(section[index]!) &&
+      !/[ymdhs"\\[]/i.test(section[index]!) &&
       !/^(am\/pm|a\/p)/i.test(section.slice(index))
     ) {
       literal += section[index++]!;
@@ -434,6 +477,8 @@ function compileDateFormat(section: string): DateToken[] | null {
     if (char === "[" && !quoted) {
       const close = section.indexOf("]", index + 1);
       if (close >= 0) {
+        // Elapsed time shows as a time; other brackets show nothing.
+        if (elapsedKind(section, index, close) !== null) visible += section[index + 1];
         index = close;
         continue;
       }
@@ -452,13 +497,15 @@ function resolveMonthMinute(tokens: DateToken[]): void {
     let minute = false;
     for (let previous = index - 1; previous >= 0; previous--) {
       if (tokens[previous]!.kind === "literal") continue;
-      minute = tokens[previous]!.kind === "hour";
+      const kind = tokens[previous]!.kind;
+      minute = kind === "hour" || kind === "elapsedHours";
       break;
     }
     if (!minute) {
       for (let next = index + 1; next < tokens.length; next++) {
         if (tokens[next]!.kind === "literal") continue;
-        minute = tokens[next]!.kind === "second";
+        const kind = tokens[next]!.kind;
+        minute = kind === "second" || kind === "elapsedSeconds";
         break;
       }
     }
@@ -509,7 +556,9 @@ function calendarFormatter(
  * 1900, which has the year, month and time Excel shows for its fictional 29
  * February, so only the day of the month changes. Weekday names follow Excel's
  * count through `serialToWeekdayDate`, which differs from the real date's before 1
- * March 1900.
+ * March 1900. Elapsed time (`[h]:mm:ss`) counts whole seconds from serial 0,
+ * rounded as Excel shows them, and the minutes and seconds beside it come from
+ * the same count.
  */
 function renderDate(serial: number, tokens: readonly DateToken[], locale: string): string {
   const date = serialToDate(serial);
@@ -517,8 +566,14 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
   const month = date.getUTCMonth() + 1;
   const day = Math.floor(serial) === FICTIONAL_LEAP_DAY_SERIAL ? 29 : date.getUTCDate();
   const hour24 = date.getUTCHours();
-  const minute = date.getUTCMinutes();
-  const second = date.getUTCSeconds();
+  let minute = date.getUTCMinutes();
+  let second = date.getUTCSeconds();
+  const elapsed = tokens.some((token) => ELAPSED_KINDS.has(token.kind));
+  const totalSeconds = elapsed ? Math.round(serial * 86_400) : 0;
+  if (elapsed) {
+    minute = Math.floor(totalSeconds / 60) % 60;
+    second = totalSeconds % 60;
+  }
   const usesAmPm = tokens.some((token) => token.kind === "ampm");
   let output = "";
   for (const token of tokens) {
@@ -574,6 +629,19 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
       case "second":
         output += token.pad ? String(second).padStart(2, "0") : String(second);
         break;
+
+      case "elapsedHours":
+      case "elapsedMinutes":
+      case "elapsedSeconds": {
+        const count =
+          token.kind === "elapsedHours"
+            ? Math.floor(totalSeconds / 3600)
+            : token.kind === "elapsedMinutes"
+              ? Math.floor(totalSeconds / 60)
+              : totalSeconds;
+        output += token.pad ? String(count).padStart(2, "0") : String(count);
+        break;
+      }
 
       case "ampm":
         output += hour24 < 12 ? "AM" : "PM";

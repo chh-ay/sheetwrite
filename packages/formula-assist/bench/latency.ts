@@ -22,7 +22,8 @@ import {
 import { analyzeFormula } from "@sheetwrite/core/functions";
 import { openFormulaEdit, shownSuggestion } from "@sheetwrite/core/testing";
 
-import { openPrediction } from "../src/predictor.js";
+import { attachPredictor, SIGNALS } from "../src/predictor.js";
+import { SLICE_MS, WorkbookPatterns } from "../src/workbook-patterns.js";
 
 const DATA_ROWS = 100_000;
 const PRODUCTS = 50;
@@ -177,6 +178,28 @@ function summary(samples: number[]): Summary {
 
 await initSheetwrite();
 const store = SheetwriteStore.fromSnapshot(workbook());
+
+/** Heap in use after a full collection, in bytes. */
+function heapUsed(): number {
+  Bun.gc(true);
+  return process.memoryUsage().heapUsed;
+}
+
+// Count the workbook's formulas in idle slices, as a grid does after it mounts.
+const heapBefore = heapUsed();
+const counting = new WorkbookPatterns(store, "idle");
+const slices: number[] = [];
+const countStarted = performance.now();
+for (let more = true; more;) {
+  const sliceStarted = performance.now();
+  more = counting.step(sliceStarted + SLICE_MS);
+  slices.push(performance.now() - sliceStarted);
+}
+const countMs = performance.now() - countStarted;
+const countBytes = heapUsed() - heapBefore;
+counting.dispose();
+
+const predictor = attachPredictor(store, { signals: SIGNALS, build: "now" });
 const open: number[] = [];
 const suggest: number[] = [];
 /** Everything the formula bar does per key: the analysis, `suggest`, and the ghost's own analysis. */
@@ -190,7 +213,7 @@ try {
     const functions = edit.functions();
 
     let started = performance.now();
-    const session = openPrediction(edit);
+    const session = predictor.open(edit);
     open.push(performance.now() - started);
     for (let length = 1; length <= target.formula.length; length++) {
       const text = target.formula.slice(0, length);
@@ -210,6 +233,7 @@ try {
     store.applyTransaction({ patches: [{ op: "set", addr: cell, value: restored }] });
   }
 } finally {
+  predictor.dispose();
   store.dispose();
 }
 
@@ -218,6 +242,9 @@ const result = {
   open: summary(open),
   suggest: summary(suggest),
   perKey: summary(perKey),
+  slices: summary(slices),
+  countMs,
+  countBytes,
   budgetMs: BUDGET_MS,
 };
 const MS_DIGITS = 3;
@@ -225,6 +252,7 @@ const rows: [string, Summary][] = [
   ["open (per edit)", result.open],
   ["suggest (per key)", result.suggest],
   ["formula bar per key (analysis, suggest, ghost)", result.perKey],
+  ["counting the workbook, per idle slice", result.slices],
 ];
 process.stdout.write(
   "| Step | Calls | p50 (ms) | p95 (ms) | max (ms) |\n| --- | ---: | ---: | ---: | ---: |\n",
@@ -233,6 +261,10 @@ for (const [label, stats] of rows) {
   const times = [stats.p50, stats.p95, stats.max].map((ms) => ms.toFixed(MS_DIGITS));
   process.stdout.write(`| ${label} | ${stats.count} | ${times.join(" | ")} |\n`);
 }
+const KIB = 1024;
+process.stdout.write(
+  `\nCounting the workbook: ${countMs.toFixed(0)} ms in ${slices.length} idle slices; heap ${(countBytes / KIB).toFixed(0)} KiB after it.\n`,
+);
 if (values.json !== undefined) await writeFile(values.json, `${JSON.stringify(result, null, 2)}\n`);
 const worst = Math.max(result.open.p95, result.suggest.p95);
 if (worst >= BUDGET_MS) {

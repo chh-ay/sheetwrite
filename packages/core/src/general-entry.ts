@@ -164,26 +164,37 @@ function generalTime(text: string): GeneralNumber | null {
   return { value, numberFormat: seconds ? "h:mm:ss" : "h:mm" };
 }
 
-const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?$/;
+const SLASH_DATE = /^(\d{1,2})\/(\d{1,2}|\d{4})(?:\/(\d{2}|\d{4}))?$/;
 const DAY_MONTH_YEAR = /^(\d{1,2})[-\s]([A-Za-z]{3,9})(?:[-\s](\d{2}|\d{4}))?$/;
 const MONTH_DAY_YEAR = /^([A-Za-z]{3,9})\s(\d{1,2}),?\s(\d{4})$/;
-const MONTH_YEAR = /^([A-Za-z]{3,9})[-\s](\d{2}|\d{4})$/;
+const MONTH_NUMBER = /^([A-Za-z]{3,9})[-\s](\d{1,2}|\d{4})$/;
+
+/**
+ * A date of a month and one number, as Excel reads it: day and month of the
+ * current year when that day exists, else the first of the month in that
+ * year, else text. `Jan-26` is 26 January, `Feb-30` is February 1930 and
+ * `1/99` is January 1999.
+ * https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/two-digit-year-numbers
+ */
+function twoPartDate(month: number, number: string): GeneralNumber | null {
+  if (number.length <= 2) {
+    const day = componentsToSerial(new Date().getFullYear(), month, Number(number), 0, 0, 0);
+    if (day !== null) return { value: day, numberFormat: "d-mmm" };
+  }
+  const first = componentsToSerial(fullYear(number), month, 1, 0, 0, 0);
+  return first === null ? null : { value: first, numberFormat: "mmm-yy" };
+}
 
 /** A date with no time: the forms Excel's General reads in the US English locale. */
 function generalDate(text: string): GeneralNumber | null {
   const slash = SLASH_DATE.exec(text);
   if (slash) {
     const [, month, day, year] = slash;
-    const serial = componentsToSerial(
-      year === undefined ? new Date().getFullYear() : fullYear(year),
-      Number(month),
-      Number(day),
-      0,
-      0,
-      0,
-    );
+    if (year === undefined) return twoPartDate(Number(month), day!);
+    if (day!.length > 2) return null;
+    const serial = componentsToSerial(fullYear(year), Number(month), Number(day), 0, 0, 0);
     if (serial === null) return null;
-    return { value: serial, numberFormat: year === undefined ? "d-mmm" : "m/d/yyyy" };
+    return { value: serial, numberFormat: "m/d/yyyy" };
   }
   const dayMonth = DAY_MONTH_YEAR.exec(text);
   if (dayMonth) {
@@ -211,12 +222,10 @@ function generalDate(text: string): GeneralNumber | null {
       month === 0 ? null : componentsToSerial(Number(year), month, Number(day), 0, 0, 0);
     return serial === null ? null : { value: serial, numberFormat: "d-mmm-yy" };
   }
-  const monthYear = MONTH_YEAR.exec(text);
-  if (monthYear) {
-    const [, name, year] = monthYear;
-    const month = monthOf(name!);
-    const serial = month === 0 ? null : componentsToSerial(fullYear(year!), month, 1, 0, 0, 0);
-    return serial === null ? null : { value: serial, numberFormat: "mmm-yy" };
+  const monthNumber = MONTH_NUMBER.exec(text);
+  if (monthNumber) {
+    const month = monthOf(monthNumber[1]!);
+    return month === 0 ? null : twoPartDate(month, monthNumber[2]!);
   }
   const iso = parseDateInput(text);
   if (iso === null) return null;

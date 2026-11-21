@@ -6,12 +6,15 @@
 import type { FormulaEdit } from "@sheetwrite/core";
 import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
+import type { WorkbookPatterns } from "./workbook-patterns.js";
+
 /**
- * The signals that earn their keep on the benchmark, strongest first. #801
- * also listed argument roles and repeats within a formula, and a range
- * finisher was tried for the shape of the data; none saved a keystroke.
+ * The signals that earn their keep on the benchmark. #801 also listed
+ * argument roles, repeats within a formula and the ranges AutoSum picks; the
+ * formulas typed in the session and the same cell on other sheets were tried
+ * too. None of those paid on the benchmark.
  */
-export const SIGNALS = ["neighbours", "syntax"] as const;
+export const SIGNALS = ["neighbours", "syntax", "column", "workbook"] as const;
 
 /** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];
@@ -36,8 +39,8 @@ export interface Signal {
   proposals(text: string, analysis: FormulaAnalysis): readonly Proposal[];
 }
 
-/** Opens a signal for one edit. */
-export type OpenSignal = (edit: FormulaEdit) => Signal;
+/** Opens a signal for one edit; `patterns` is what the predictor has counted of the workbook. */
+export type OpenSignal = (edit: FormulaEdit, patterns: WorkbookPatterns | null) => Signal;
 
 /** Characters typed after the `=` at most counted apart; more count as this many. */
 const MOST_TYPED = 3;
@@ -57,9 +60,32 @@ export function calibrationKey(proposal: Proposal, text: string): string {
   return `${proposal.signal}|${proposal.reason}|${typedBucket(text)}`;
 }
 
-/** A suggestion is shown only at this confidence or above… */
-const SHOW_AT = 0.9;
-/** …and only when it leads the next different candidate by this much. */
+/**
+ * The largest of `steps` (ascending) that `value` reaches, as part of a
+ * reason: `≥5` for 7 with steps 1, 2, 5, 20. Calibration counts each bucket apart.
+ */
+export function bucket(value: number, steps: readonly number[]): string {
+  let reached = steps[0] ?? 0;
+  for (const step of steps) if (value >= step) reached = step;
+  return `≥${reached}`;
+}
+
+/**
+ * A suggestion shows only when one of its proposals reaches the bar of its
+ * signal. The column and workbook signals decide alone where the neighbours
+ * have nothing to say, and there they were wrong more often than their
+ * confidence over all keys says; on the development sets, any bar from 97%
+ * to 99% gives them the same savings without more wrong suggestions.
+ */
+const SHOW_AT: Readonly<Record<SignalName, number>> = {
+  neighbours: 0.9,
+  syntax: 0.9,
+  column: 0.98,
+  workbook: 0.98,
+};
+/** The bar for the shared start of two candidates, which together are this likely. */
+const SHARED_AT = 0.9;
+/** A suggestion shows only when it leads the next different candidate by this much. */
 export const LEAD = 0.15;
 /** A shared start of disagreeing candidates is shown only from this many characters. */
 const MIN_SHARED = 2;
@@ -94,6 +120,8 @@ interface Ranked {
   signal: SignalName;
   /** The highest confidence of one member, whose signal the group reports. */
   best: number;
+  /** Whether one member reaches the bar of its signal. */
+  shows: boolean;
 }
 
 /**
@@ -115,10 +143,12 @@ export function rank(text: string, candidates: Iterable<Candidate>): Ranked[] {
         confidence: candidate.confidence,
         signal: candidate.signal,
         best: candidate.confidence,
+        shows: candidate.confidence >= SHOW_AT[candidate.signal],
       });
       continue;
     }
     group.confidence = 1 - (1 - group.confidence) * (1 - candidate.confidence);
+    group.shows ||= candidate.confidence >= SHOW_AT[candidate.signal];
     if (candidate.confidence > group.best) {
       group.best = candidate.confidence;
       group.signal = candidate.signal;
@@ -145,16 +175,17 @@ export interface Choice {
 
 /**
  * The one suggestion to show for `ranked`, or null. The best candidate shows
- * when it is likely enough and clearly ahead of the next. When the two best
- * disagree only later on, their shared start shows if together they are
- * likely enough: it is right whichever of them the user means.
+ * when one of its proposals reaches its signal's bar and it is clearly ahead
+ * of the next. When the two best disagree only later on, their shared start
+ * shows if together they are likely enough and the best reaches its bar: it
+ * is right whichever of them the user means.
  */
 export function choose(ranked: readonly Ranked[]): Choice | null {
   const [best, next] = ranked;
   if (best === undefined) return null;
 
   const lead = best.confidence - (next?.confidence ?? 0);
-  if (best.confidence >= SHOW_AT && lead >= LEAD) {
+  if (best.shows && lead >= LEAD) {
     return { text: best.continuation, signal: best.signal, confidence: best.confidence };
   }
   if (next === undefined) return null;
@@ -162,6 +193,6 @@ export function choose(ranked: readonly Ranked[]): Choice | null {
   const shared = sharedLength(best.continuation, next.continuation);
   // Different formulas exclude each other, so their chances add up.
   const together = Math.min(1, best.confidence + next.confidence);
-  if (shared < MIN_SHARED || together < SHOW_AT) return null;
+  if (shared < MIN_SHARED || together < SHARED_AT || !best.shows) return null;
   return { text: best.continuation.slice(0, shared), signal: best.signal, confidence: together };
 }

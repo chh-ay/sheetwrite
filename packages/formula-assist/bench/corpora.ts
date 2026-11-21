@@ -30,8 +30,18 @@ export const REPLAY_SETS = [
   "enron-dev",
   "enron-dev2",
   "enron-dev-large",
+  "enron-dev-large-whole",
   "enron-heldout",
+  "enron-heldout-whole",
 ] as const;
+
+/** The sets the repository holds, without the held-out set; the others are built by enron/build.ts. */
+export const DEVELOPMENT_SETS: readonly ReplaySetName[] = [
+  "conformance",
+  "fixtures",
+  "enron-dev",
+  "enron-dev2",
+];
 
 /** One replay set's name. */
 export type ReplaySetName = (typeof REPLAY_SETS)[number];
@@ -41,7 +51,7 @@ function sheetSnapshot(
   id: string,
   name: string,
   order: number,
-  size: { rows: number; cols: number },
+  size: { rows: number; cols: number; hidden?: boolean },
   cells: CellBlock["cells"],
 ): SheetSnapshot {
   const columns: Column[] = Array.from({ length: size.cols }, (_, index) => ({
@@ -57,6 +67,7 @@ function sheetSnapshot(
     rowCount: size.rows,
     columns,
     cells: [{ startRow: 0, startCol: 0, rowCount: size.rows, colCount: size.cols, cells }],
+    ...(size.hidden === true ? { visibility: "hidden" as const } : {}),
   };
 }
 
@@ -161,6 +172,8 @@ interface EnronSample {
       readonly name: string;
       readonly rows: number;
       readonly cols: number;
+      /** Set on hidden sheets in the whole-workbook sets. */
+      readonly hidden?: true;
       readonly cells: readonly (readonly [number, number, CellScalar])[];
     }[];
     readonly targets: readonly (readonly [number, number, number])[];
@@ -244,17 +257,18 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
 }
 
 /**
- * One set of the Enron sample: `dev`, `dev2` and `dev-large` to tune on,
- * `heldout` for the gate only (see enron/README.md). `dev-large` is not
- * committed; enron/build.ts builds it.
+ * One set of the Enron sample: `dev`, `dev2`, `dev-large` and
+ * `dev-large-whole` to tune on, `heldout` and `heldout-whole` to measure only
+ * (see enron/README.md). The `dev-large` and `-whole` sets are not
+ * committed; enron/build.ts builds them.
  */
 async function* enronWorkbooks(
-  set: "dev" | "dev2" | "dev-large" | "heldout",
+  set: "dev" | "dev2" | "dev-large" | "dev-large-whole" | "heldout" | "heldout-whole",
 ): AsyncGenerator<ReplayWorkbook> {
   const path = new URL(`./enron/${set}.json`, import.meta.url);
   if (!(await Bun.file(path).exists())) {
     throw new Error(
-      `${path.pathname} is missing: build it with bench/enron/build.ts --dev-large (see enron/README.md)`,
+      `${path.pathname} is missing: build it with bench/enron/build.ts --${set.replace("heldout", "held-out")} (see enron/README.md)`,
     );
   }
   const sample: unknown = JSON.parse(await readFile(path, "utf8"));
@@ -266,7 +280,7 @@ async function* enronWorkbooks(
         `s${index}`,
         sheet.name,
         index,
-        { rows: sheet.rows, cols: sheet.cols },
+        { rows: sheet.rows, cols: sheet.cols, hidden: sheet.hidden === true },
         sheet.cells.map(([row, col, value]) => ({
           rowOffset: row,
           colOffset: col,
@@ -325,5 +339,9 @@ export function replayWorkbooks(set: ReplaySetName): AsyncGenerator<ReplayWorkbo
       return enronWorkbooks("dev2");
     case "enron-dev-large":
       return enronWorkbooks("dev-large");
+    case "enron-dev-large-whole":
+      return enronWorkbooks("dev-large-whole");
+    case "enron-heldout-whole":
+      return enronWorkbooks("heldout-whole");
   }
 }
