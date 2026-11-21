@@ -1126,7 +1126,7 @@ struct DistinctLimit {
 /// scan that only lists stops at `limit` values and marks pool ids with one
 /// bit, so it never zero-fills four bytes per id of the string pool. Both are
 /// one function, so the dropdown's counted scan runs the code that listing
-/// calls (AutoComplete, the pivot field list) keep optimized.
+/// calls (the cell editor's completion, the pivot field list) keep optimized.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,
