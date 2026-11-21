@@ -91,29 +91,29 @@ const COLLABORATION_PAGE: ProofPageContent = {
   title: "Two clients, one shared history, no lost updates.",
   verification: [
     {
-      title: "Convergence under ordering",
+      title: "Both clients end the same",
       detail:
-        "Every commit is sequenced once by the server and fanned out; both grids, live formulas included, converge to identical state.",
+        "The server puts every commit in one order and sends it to each client, so both grids, live formulas included, end with the same cells.",
     },
     {
-      title: "Loss without double-apply",
+      title: "A retry is applied once",
       detail:
-        "Drop an acknowledgement, retry with the same mutation id, and the server answers duplicate: applied exactly once, at the original version.",
+        "Drop an acknowledgement and retry with the same mutation id: the server answers duplicate, and the edit is applied once, at its original version.",
     },
     {
-      title: "Offline is a first-class state",
+      title: "Keep editing offline",
       detail:
-        "An offline client keeps committing into its durable IndexedDB queue; reconnecting drains the queue in order through the same synchronization flow.",
+        "An offline client keeps saving its edits to its IndexedDB queue. On reconnect, the queue is sent in order through the same sync flow.",
     },
     {
-      title: "Gaps and conflicts stay explicit",
+      title: "Gaps and conflicts are shown",
       detail:
-        "Out-of-order broadcasts buffer until the gap closes; stale base versions surface as conflicts that recover through the documented rebase loop.",
+        "A version that arrives early waits until the missing one comes. An edit on an old version shows as a conflict, which the client recovers from through the rebase loop the guide describes.",
     },
     {
-      title: "Atomic multi-version batches",
+      title: "Big restores, all or nothing",
       detail:
-        "A restore that is larger than one server version becomes one atomic batch: the server stores every version or none, and the peer applies the whole batch in a single transaction.",
+        "A restore larger than one server version is sent as one batch: the server stores every version or none, and the other client applies the whole batch in one transaction.",
     },
   ],
 };

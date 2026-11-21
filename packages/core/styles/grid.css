@@ -322,15 +322,23 @@
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #333333));
 }
 
-/* Modal dialogs (src/dialog.ts): the merge warning, Insert and Delete, and
-   Format Cells. Each is a <dialog> in the top layer, centred in the window
-   as Excel's are. A short window scrolls the body; the title and the buttons
-   stay in view. */
+/* Modal dialogs (src/dialog.ts): Format Cells, Data Validation, Paste
+   Special, Insert and Delete, the alerts and Keyboard shortcuts. Each is a
+   <dialog> in the top layer, centred in the window as Excel's are. A short
+   window scrolls the body; the title and the buttons stay in view. The
+   browser centres a modal dialog only through its default `margin: auto`,
+   which a host page's reset (`* { margin: 0 }`) removes, so the dialog sets
+   its own place and size. */
 .sheetwrite-dialog::backdrop {
   background: var(--sheetwrite-dialog-backdrop, rgba(0, 0, 0, 0.2));
 }
 
 .sheetwrite-dialog {
+  position: fixed;
+  inset: 0;
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
   max-width: min(480px, calc(100% - 32px));
   max-height: calc(100% - 32px);
   padding: 16px;

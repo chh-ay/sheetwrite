@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { createGridController } from "../src/grid-controller.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_BINDINGS } from "../src/keymap.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, KeyboardOptions, Workbook } from "../src/types.js";
@@ -137,7 +138,7 @@ describe("opening the panel", () => {
     expect(host.querySelector(".sheetwrite-keyboard-settings")).toBeNull();
   });
 
-  it("is a labelled dialog that lists each command with its keys and Excel's default", async () => {
+  it("is a labelled dialog that lists every command with its keys and Excel's default", async () => {
     const { grid, host } = setup();
     const panel = await open(grid, host);
 
@@ -145,7 +146,10 @@ describe("opening the panel", () => {
     expect(panel.getAttribute("aria-modal")).toBe("true");
     const title = host.querySelector(`#${panel.getAttribute("aria-labelledby")}`);
     expect(title?.textContent).toBe("Keyboard shortcuts");
-    expect(shownCommands(panel)).toHaveLength(37);
+    // Every command with keys, so a new one cannot miss the panel.
+    expect(shownCommands(panel).toSorted()).toEqual(Object.keys(DEFAULT_BINDINGS).toSorted());
+    const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
+    expect(pasteSpecial.querySelector("th")?.textContent).toBe("Paste Special");
     const bold = panel.querySelector<HTMLElement>('tr[data-action="bold"]')!;
     expect(bold.querySelector("th")?.textContent).toBe("Bold");
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");

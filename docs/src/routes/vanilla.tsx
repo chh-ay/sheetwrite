@@ -43,27 +43,27 @@ function VanillaRoute() {
         guide="/docs/frameworks/vanilla/"
         packageName="@sheetwrite/core"
         proofArt={VANILLA_PROOF_ART}
-        prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. Host state shows each ownership boundary."
+        prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. Host state shows what your code owns at each step."
         proof={[
           {
-            title: "Explicit lifecycle",
+            title: "Create and destroy",
             detail:
-              "createWorkbench and destroy() bound every generation: no listeners, chrome, or canvas survive teardown.",
+              "createWorkbench builds each grid, and destroy() removes it: no listener, toolbar or canvas stays behind.",
           },
           {
-            title: "Construction-bound truth",
+            title: "Rebuild or change in place",
             detail:
-              "Renderer and data path rebuild the grid and live in the URL; read-only flips on the running instance.",
+              "A new renderer or data path builds a new grid, and the URL keeps the choice. Read-only changes the running grid.",
           },
           {
-            title: "Host-owned paging",
+            title: "Your code loads the pages",
             detail:
-              "The page source, its latency, and its abort path are host code; allocation stats read back from the store.",
+              "Your page source loads each page, with its own delay and cancel. The store reports how much it holds.",
           },
           {
-            title: "Honest Worker fallback",
+            title: "A visible worker fallback",
             detail:
-              "A failed Worker boot emits renderer-fallback and keeps painting on the main thread. Requested and active renderers are always visible.",
+              "When the worker can't start, the grid emits renderer-fallback and paints on the main thread. The page shows the renderer you asked for and the one in use.",
           },
         ]}
         sourcePath="docs/src/showcases/vanilla-workbench.ts"

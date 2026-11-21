@@ -85,34 +85,34 @@ const DATABASE_PAGE: ProofPageContent = {
   title: "Edit once. Reload the same durable document.",
   verification: [
     {
-      title: "Atomic sequencing",
+      title: "No lost updates",
       detail:
-        "Each commit compares its base version against the stored head inside one serialized adapter queue. Stale writers get a recoverable conflict, never a lost update.",
+        "Each commit checks its base version against the stored latest version, one commit at a time. A writer on an old version gets a conflict it can recover from, so no update is lost.",
     },
     {
-      title: "Idempotent retries",
+      title: "A retry is applied once",
       detail:
-        "Lose an acknowledgement and retry with the same mutation id: the server answers duplicate with the original version and applies nothing twice.",
+        "If an acknowledgement is lost and the client retries with the same mutation id, the server answers duplicate with the original version and applies nothing twice.",
     },
     {
-      title: "Bounded storage",
+      title: "Storage stays bounded",
       detail:
-        "The operation tail is capped by record count and bytes; crossing either bound folds the tail into one compacted snapshot record. Watch the gauges.",
+        "The stored operations are capped by count and by bytes. Past either cap, they fold into one compacted snapshot. Watch the gauges.",
     },
     {
-      title: "Reload recovery",
+      title: "Reload and carry on",
       detail:
-        "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
+        "Close and reopen the session, or reload this page: the saved state and the queue of unsent edits come back from IndexedDB, once.",
     },
     {
       title: "Large undo",
       detail:
-        "Clearing 100,000 cells and undoing once restores them through one compressed restoreBlock commit: one history step, one server version, and the commit journal shows the bytes before and after compression.",
+        "Clearing 100,000 cells and undoing once restores them in one compressed restoreBlock commit: one history step and one server version. The commit journal shows the size before and after compression.",
     },
     {
-      title: "Oversized undo",
+      title: "An undo that is too large",
       detail:
-        "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable. Try it under the 128-byte limit in the failure lab.",
+        "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that step and keeps older steps undoable. Try it under the 128-byte limit in the failure lab.",
     },
   ],
 };
