@@ -17,7 +17,6 @@ test("logical-clock directional prefetch stays resident and bounded", async ({ p
     if (!run) throw new Error("Prefetch trace fixture is unavailable");
     return run();
   });
-  console.log(`PREFETCH_BROWSER_TRACE ${JSON.stringify(report)}`);
 
   // Bounds are on the fixture's logical clock, not on compositor frames.
   expect(report.repetitions.length).toBeGreaterThan(0);

@@ -93,17 +93,19 @@ afterEach(() => {
 });
 
 describe("host formula functions", () => {
-  it("apply init functions to every grid and grid-specific functions to their grid only", () => {
+  it("apply init functions to every grid, and grid-specific functions, which win by name, to their grid only", () => {
     const taxed = gridWith([define(TAX_RATE, taxRate)]).store;
     const plain = gridWith([]).store;
+    const replaced = gridWith([define(metadata("PAGEID"), () => 8)]).store;
 
-    for (const store of [taxed, plain]) {
+    for (const store of [taxed, plain, replaced]) {
       setFormula(store, 0, 0, "=PAGEID()");
       setFormula(store, 0, 1, '=TAXRATE("EU")');
     }
 
-    expect(taxed.getCell(address(0, 0)).resolved).toBe(7);
-    expect(plain.getCell(address(0, 0)).resolved).toBe(7);
+    expect([taxed, plain, replaced].map((store) => store.getCell(address(0, 0)).resolved)).toEqual([
+      7, 7, 8,
+    ]);
     expect(taxed.getCell(address(0, 1)).resolved).toBe(EU_RATE);
     expect(plain.getCell(address(0, 1)).resolved).toBe("#NAME?");
   });
@@ -147,17 +149,6 @@ describe("host formula functions", () => {
     grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: links(300, [rows]) }] });
     expect(calls).toBeGreaterThanOrEqual(rows);
     expect(grid.store.getCell(address(0, 0)).resolved).toBe(300);
-  });
-
-  it("let a grid-specific function replace an init function of the same name in that grid", () => {
-    const replaced = gridWith([define(metadata("PAGEID"), () => 8)]).store;
-    const other = gridWith([]).store;
-
-    setFormula(replaced, 0, 0, "=PAGEID()");
-    setFormula(other, 0, 0, "=PAGEID()");
-
-    expect(replaced.getCell(address(0, 0)).resolved).toBe(8);
-    expect(other.getCell(address(0, 0)).resolved).toBe(7);
   });
 
   it("calculate with their inputs, survive memory release, and leave only formula text in snapshots", async () => {

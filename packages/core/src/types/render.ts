@@ -107,6 +107,12 @@ export interface Viewport {
    * `Theme.selectionBorder`, as Excel shows a filtered list's numbers in blue.
    */
   filteredRows?: { start: number; end: number };
+  /**
+   * The AutoFilter header cells in view: their view row and their first and
+   * last columns. Their text lays out in a box that ends before the filter
+   * button, as in Excel.
+   */
+  filterHeader?: { row: number; start: number; end: number };
 }
 
 /** One frozen-pane paint: a window plus the clip rect and scroll offsets it paints with. */
@@ -125,6 +131,8 @@ export interface PanePaint {
   rowNumbers?: Uint32Array;
   /** The filtered list's rows, like `Viewport.filteredRows`. */
   filteredRows?: { start: number; end: number };
+  /** The AutoFilter header cells, like `Viewport.filterHeader`. */
+  filterHeader?: { row: number; start: number; end: number };
 }
 
 export interface Renderer {

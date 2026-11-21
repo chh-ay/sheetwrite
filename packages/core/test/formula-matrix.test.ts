@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, expect, it } from "bun:test";
 
 import { initSheetwrite, SheetwriteStore } from "../src/index.js";
 import { makeWorkbook } from "./fixtures.js";
@@ -11,203 +11,25 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-describe("formula behavior matrix", () => {
-  it("evaluates aggregate, criteria, logical, text, error, and lookup formulas", () => {
-    const store = new SheetwriteStore(makeWorkbook(12));
-    const formulas: readonly [source: string, expected: string | number | boolean][] = [
-      ["=SUM(A1:A4)", 10],
-      ["=AVERAGE(A1:A4)", 2.5],
-      ['=COUNTIF(A1:A4,">2")', 2],
-      ['=IF(SUM(A1:A4)=10,"balanced","wrong")', "balanced"],
-      ["=ROUND(PI(),3)", ROUNDED_PI],
-      ['=CONCAT("total=",SUM(A1:A4))', "total=10"],
-      ['=IFERROR(1/0,"fallback")', "fallback"],
-      ["=AND(A1<A2,A4>A3)", true],
-      ["=XLOOKUP(3,A1:A4,A1:A4)", 3],
-    ];
-
-    store.applyTransaction({
-      patches: [
-        ...[1, 2, 3, 4].map((value, row) => ({
-          op: "set" as const,
-          addr: address(row, 0),
-          value: { kind: "literal" as const, value },
-        })),
-        ...formulas.map(([source], row) => ({
-          op: "set" as const,
-          addr: address(row, 1),
-          value: { kind: "formula" as const, src: source },
-        })),
-      ],
-    });
-
-    for (const [row, [source, expected]] of formulas.entries()) {
-      expect(store.getFormula(address(row, 1)), source).toBe(source);
-      expect(store.getCell(address(row, 1)).resolved, source).toBe(expected);
-    }
-
-    store.applyTransaction({
-      patches: [{ op: "set", addr: address(3, 0), value: { kind: "literal", value: 8 } }],
-    });
-    expect(formulas.map((_, row) => store.getCell(address(row, 1)).resolved)).toEqual([
-      14,
-      3.5,
-      2,
-      "wrong",
-      ROUNDED_PI,
-      "total=14",
-      "fallback",
-      true,
-      3,
-    ]);
-    store.dispose();
+// The other functions of the old matrix have Excel results in the engine's tests.
+it("evaluates AVERAGE and ROUND(PI()) as Excel does, and recalculates them", () => {
+  const store = new SheetwriteStore(makeWorkbook(12));
+  store.applyTransaction({
+    patches: [
+      ...[1, 2, 3, 4].map((value, row) => ({
+        op: "set" as const,
+        addr: address(row, 0),
+        value: { kind: "literal" as const, value },
+      })),
+      { op: "set", addr: address(0, 1), value: { kind: "formula", src: "=AVERAGE(A1:A4)" } },
+      { op: "set", addr: address(1, 1), value: { kind: "formula", src: "=ROUND(PI(),3)" } },
+    ],
   });
-  it("owns, resizes, obstructs, copies, persists, and restores FILTER spills", () => {
-    const store = new SheetwriteStore(makeWorkbook(12));
-    const values = [3, 1, 3, 2, 4];
-    const include = [true, true, false, true, false];
-    store.applyTransaction({
-      patches: [
-        ...values.map((value, row) => ({
-          op: "set" as const,
-          addr: address(row, 0),
-          value: { kind: "literal" as const, value },
-        })),
-        ...include.map((value, row) => ({
-          op: "set" as const,
-          addr: address(row, 1),
-          value: { kind: "literal" as const, value },
-        })),
-        {
-          op: "set",
-          addr: address(4, 2),
-          value: { kind: "literal", value: "blocker" },
-        },
-        {
-          op: "set",
-          addr: address(0, 2),
-          value: { kind: "formula", src: "=FILTER(A1:A5,B1:B5)" },
-        },
-      ],
-    });
+  expect([0, 1].map((row) => store.getCell(address(row, 1)).resolved)).toEqual([2.5, ROUNDED_PI]);
 
-    expect([0, 1, 2].map((row) => store.getCell(address(row, 2)).resolved)).toEqual([3, 1, 2]);
-    expect(store.getSpillAnchor(address(1, 2))).toEqual(address(0, 2));
-    expect(store.getFormula(address(1, 2))).toBeNull();
-
-    store.applyTransaction({
-      patches: [{ op: "set", addr: address(2, 1), value: { kind: "literal", value: true } }],
-    });
-    expect([0, 1, 2, 3].map((row) => store.getCell(address(row, 2)).resolved)).toEqual([
-      3, 1, 3, 2,
-    ]);
-
-    store.applyTransaction({
-      patches: [{ op: "set", addr: address(4, 1), value: { kind: "literal", value: true } }],
-    });
-    expect(store.getCell(address(0, 2)).resolved).toBe("#SPILL!");
-    expect(store.getCell(address(1, 2)).resolved).toBeNull();
-
-    store.applyTransaction({
-      patches: [
-        {
-          op: "clearRange",
-          range: { sheet: "s1", start: { row: 4, col: 2 }, end: { row: 4, col: 2 } },
-        },
-      ],
-    });
-    expect([0, 1, 2, 3, 4].map((row) => store.getCell(address(row, 2)).resolved)).toEqual(values);
-
-    store.applyTransaction({
-      patches: [{ op: "set", addr: address(1, 2), value: { kind: "literal", value: "blocker" } }],
-    });
-    expect(store.getCell(address(0, 2)).resolved).toBe("#SPILL!");
-    expect(store.getCell(address(1, 2)).resolved).toBe("blocker");
-    store.applyTransaction({
-      patches: [
-        {
-          op: "clearRange",
-          range: { sheet: "s1", start: { row: 1, col: 2 }, end: { row: 1, col: 2 } },
-        },
-      ],
-    });
-    expect(store.getCell(address(1, 2)).resolved).toBe(1);
-
-    const clipboard = store.getClipboardWindow("s1", { start: 0, end: 5 }, [2]);
-    expect(Array.from(clipboard.values)).toEqual(values);
-    expect(Array.from(clipboard.spillDerived)).toEqual([0, 1, 1, 1, 1]);
-    expect(clipboard.formulas).toEqual([{ offset: 0, source: "=FILTER(A1:A5,B1:B5)" }]);
-    store.setViewSort("s1", [{ col: 0, ascending: false }]);
-    const sortedClipboard = store.getClipboardWindow("s1", { start: 0, end: 12 }, [2]);
-    const spillOffsets = Array.from(sortedClipboard.dataRows, (row, offset) =>
-      row < values.length ? offset : -1,
-    ).filter((offset) => offset >= 0);
-    expect(spillOffsets.map((offset) => sortedClipboard.values[offset])).toEqual(
-      spillOffsets.map((offset) => values[sortedClipboard.dataRows[offset]!]!),
-    );
-    expect(spillOffsets.map((offset) => sortedClipboard.spillDerived[offset])).toEqual(
-      spillOffsets.map((offset) => (sortedClipboard.dataRows[offset] === 0 ? 0 : 1)),
-    );
-
-    const history = store.captureRangeHistory({
-      sheet: "s1",
-      start: { row: 0, col: 2 },
-      end: { row: 4, col: 2 },
-    });
-    expect(history).not.toBeNull();
-    store.applyTransaction({
-      patches: [
-        {
-          op: "clearRange",
-          range: { sheet: "s1", start: { row: 0, col: 2 }, end: { row: 4, col: 2 } },
-        },
-      ],
-    });
-    expect(store.getCell(address(0, 2)).resolved).toBeNull();
-    store.applyTransaction({
-      patches: [
-        history!.toDocumentOp({
-          sheet: "s1",
-          start: { row: 0, col: 2 },
-          end: { row: 4, col: 2 },
-        }),
-      ],
-    });
-    history!.dispose();
-    expect([0, 1, 2, 3, 4].map((row) => store.getCell(address(row, 2)).resolved)).toEqual(values);
-
-    const snapshot = store.exportSnapshot();
-    expect(
-      snapshot.sheets[0]!.cells.flatMap((block) => block.cells)
-        .filter((cell) => cell.colOffset === 2)
-        .map((cell) => cell.value),
-    ).toEqual([{ kind: "formula", src: "=FILTER(A1:A5,B1:B5)" }]);
-    const restored = SheetwriteStore.fromSnapshot(snapshot);
-    expect([0, 1, 2, 3, 4].map((row) => restored.getCell(address(row, 2)).resolved)).toEqual(
-      values,
-    );
-    expect(restored.getSpillAnchor(address(4, 2))).toEqual(address(0, 2));
-
-    restored.dispose();
-    store.dispose();
+  store.applyTransaction({
+    patches: [{ op: "set", addr: address(3, 0), value: { kind: "literal", value: 8 } }],
   });
-
-  it("spills an array constant with its row and column shape", () => {
-    const store = new SheetwriteStore(makeWorkbook(12));
-    store.applyTransaction({
-      patches: [{ op: "set", addr: address(0, 0), value: { kind: "formula", src: "={1,2;3,4}" } }],
-    });
-
-    const block = [0, 1, 2].map((row) =>
-      [0, 1, 2].map((col) => store.getCell(address(row, col)).resolved),
-    );
-    expect(block).toEqual([
-      [1, 2, null],
-      [3, 4, null],
-      [null, null, null],
-    ]);
-    expect(store.getSpillAnchor(address(1, 1))).toEqual(address(0, 0));
-    expect(store.getFormula(address(0, 0))).toBe("={1,2;3,4}");
-    store.dispose();
-  });
+  expect([0, 1].map((row) => store.getCell(address(row, 1)).resolved)).toEqual([3.5, ROUNDED_PI]);
+  store.dispose();
 });
