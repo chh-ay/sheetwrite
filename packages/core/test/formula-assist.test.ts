@@ -291,4 +291,17 @@ describe("fixes for live errors", () => {
     expect(textarea.value).toBe("=SalesUnits*2");
     named.dispose();
   });
+
+  it("commits the fixed formula on Enter, as without a fix", async () => {
+    const { textarea, state } = beginEdit();
+    await typeUntilListed(textarea, "=SU", "SUM");
+
+    type(textarea, "=SUMM(A1:A3)");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SUM(A1:A3)");
+    // The caret now ends the name SUM, but the fix opens no function list.
+    expect(itemsOf()).toEqual([]);
+    textarea.dispatchEvent(keydown("Enter"));
+    expect(state.committed).toBe("=SUM(A1:A3)");
+  });
 });
