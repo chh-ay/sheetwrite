@@ -84,16 +84,23 @@ checks every operation or commit reason must accept them; see
 `@sheetwrite/core/history` lists, reads and restores versions through a
 `HistoryStorageAdapter`. See
 [Opt-in version archives](/docs/features/data/persistence/#opt-in-version-archives)
-and [Migrating from `RevisionCoordinator`](/docs/features/collaboration/#migrating-from-revisioncoordinator).
+and [Restoring versions](/docs/features/collaboration/#restoring-versions).
 
 | Removed | Use instead |
 | --- | --- |
 | `RevisionCoordinator`, `RevisionCoordinatorOptions`, `RevisionCoordinatorEvent` | `HistoryArchive.open({ documentId, storage })` |
 | `RevisionAdapter` | `HistoryStorageAdapter`, or the built-in `MemoryHistoryStorage` and `IndexedDbHistoryStorage` |
+| `RevisionAdapter.listRevisions` | `HistoryStorageAdapter` (`list`) behind `HistoryArchive.listVersions` |
+| `RevisionAdapter.loadRevision` | `HistoryArchive.readVersion` |
+| `RevisionAdapter.restoreRevision` | `HistoryArchive.restoreVersion`; the restore is an ordinary commit through `PersistenceAdapter.commit` or `commitBatch` |
 | `RevisionCoordinator.list()`, `RevisionSummary` | `HistoryArchive.listVersions()`, which returns `HistoryVersion` pages |
 | `RevisionCoordinator.preview()` | `HistoryArchive.readVersion()`, then `createGridFromSnapshot(host, snapshot, { readOnly: true })` |
 | `RevisionCoordinator.restore()`, `RevisionRestoreRequest`, `RevisionRestoreResponse` | `HistoryArchive.restoreVersion(grid, id, scope, { sync })` |
 | The `revision-failed` error code and the `revision` error operation | `HistoryError` codes |
+
+A server that kept revisions as full snapshots can serve them through a
+`HistoryStorageAdapter`, or start a history archive from its current snapshot
+with `HistoryArchive.initialize` and record commits with `CommitJournal`.
 
 Before:
 
