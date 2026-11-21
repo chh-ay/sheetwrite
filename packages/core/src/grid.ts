@@ -988,6 +988,7 @@ export class GridImpl implements Grid {
       rowSpan: (first, last) => this.rowSpan(first, last),
       commit: (patches, reason) => this.document.commit(patches, reason),
       undo: () => this.undo(),
+      redo: () => this.redo(),
       lastUndo: () => this.document.lastUndo,
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
