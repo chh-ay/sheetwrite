@@ -93,7 +93,9 @@ While a cell of a rule is selected, the rule's `inputTitle` and `inputMessage` s
 
 ### Paste and validation
 
-Typing, fill, clear and host transactions pass through the same validation check. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own. Paste Values, and a paste from outside the grid, keep the target's rules.
+Typing, clear and host transactions pass through the same validation check. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own. Paste Values, and a paste from outside the grid, keep the target's rules.
+
+A fill does the same as in Excel: the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R land their values unchecked, and each filled cell takes the rules of the source cell it repeats, in place of its own; a rule over the whole source extends over the filled cells. Copy Cells, Fill Series and Fill Formatting Only in Auto Fill Options do too, since Excel counts a cell's validation with its formats; Fill Without Formatting keeps the filled cells' own rules. `paste.keepValidation` applies to pastes only.
 
 With `GridConfig.paste.keepValidation: true`, a paste keeps the target's rules instead, and checks the values:
 
@@ -134,7 +136,7 @@ Sheets can also carry `validationRules`, `protectedRanges` and `notes` in the wo
 ## Edge cases and limits
 
 - Remote operations bypass the protection policy. Protection is client UX, not authorization: a server must enforce its own authorization.
-- Validation applies to typing, fill, clear and host transactions. A paste lands its values unchecked, as in Excel, unless `paste.keepValidation` is on.
+- Validation applies to typing, clear and host transactions. A paste or a fill lands its values unchecked, as in Excel, unless `paste.keepValidation` is on for a paste.
 
 ## See also
 
