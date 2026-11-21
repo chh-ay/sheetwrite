@@ -149,6 +149,10 @@
       "reason": "Conditional export selection is verified by Node and browser consumer contracts"
     },
     {
+      "path": "packages/wasm/src/calc.rs",
+      "reason": "Module wiring and sheet limits only; the formula code lives in calc/ and is covered there"
+    },
+    {
       "path": "packages/wasm/src/lib.rs",
       "reason": "Module wiring only; behavior is covered through crate contract tests"
     }
