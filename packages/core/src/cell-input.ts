@@ -183,6 +183,11 @@ export function parseCellEntry(
   if (BOOLEAN_TEXT.test(trimmed)) {
     return { value: { kind: "literal", value: trimmed.toUpperCase() === "TRUE" } };
   }
+  // Most entries are plain decimals, which need no other reading where `.` is the decimal point.
+  if (locale === undefined || locale === "en-US") {
+    const plain = parsePlainDecimal(trimmed, 0, trimmed.length);
+    if (plain !== undefined) return { value: { kind: "literal", value: plain } };
+  }
   const number = parseGeneralNumber(trimmed, locale);
   if (number === null) return { value: { kind: "literal", value: raw } };
   const value: CellValue = { kind: "literal", value: number.value };
