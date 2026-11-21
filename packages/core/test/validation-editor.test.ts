@@ -108,6 +108,26 @@ describe("ValidationEditor", () => {
     list.editor.destroy();
   });
 
+  // #1095: Excel keeps the cell's value in sight while its list is open.
+  it("leaves the cell in sight when opened without typing, until the first typed text", () => {
+    const { editor, input } = openList();
+    const box = input.parentElement;
+    const current = document.querySelector('[role="option"][aria-selected="true"]');
+    // Nothing covers the cell: the list opens below it, its own value highlighted.
+    expect(box?.style.top).toBe(`${rect.y + rect.h}px`);
+    expect(input.style.height).toBe("");
+    expect(current?.textContent).toBe("East");
+    expect(document.activeElement).toBe(input);
+
+    // Typing replaces the value: the box moves over the cell and filters the list.
+    type(input, "s");
+    expect(input.parentElement).toBe(box);
+    expect(box?.style.top).toBe(`${rect.y}px`);
+    expect(input.style.height).toBe(`${rect.h}px`);
+    expect(shownItems()).toEqual(["South", "East", "West", "North-East", "South-West"]);
+    editor.destroy();
+  });
+
   it("renders a keyboard-toggleable checkbox with checked state", () => {
     const editor = new ValidationEditor(host());
     const commits: CellScalar[] = [];

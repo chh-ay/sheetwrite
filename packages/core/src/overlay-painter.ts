@@ -1,4 +1,4 @@
-import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
+import { filterButtonRect, intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 import type { EditRect } from "./editor.js";
 import type { FillTip } from "./fill-controller.js";
@@ -19,28 +19,11 @@ const PRESENCE_MARKER_SIZE = 8;
 const NOTE_INDICATOR_SIZE = 8;
 const NOTE_INDICATOR_COLOR = "#f59e0b";
 
-/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
-const FILTER_BUTTON_SIZE = 16;
-
 /** Gap between a selected cell and its validation input message. */
 const INPUT_MESSAGE_GAP = 4;
 
 /** Edge of the dropdown arrow beside a selected list cell, in CSS pixels at zoom 1. */
 const LIST_BUTTON_SIZE = 18;
-
-/**
- * Where an AutoFilter header cell's filter button sits: a square at the
- * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
- */
-export function filterButtonRect(cell: { x: number; y: number; w: number; h: number }): {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-} {
-  const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
-  return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
-}
 
 /**
  * Where the dropdown arrow of a selected list cell sits: a square just right
