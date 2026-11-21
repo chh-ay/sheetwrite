@@ -1,0 +1,2 @@
+[after] wide: theme=dark media=wide-dark-poster.webp,wide-dark-loop.webm
+[after] narrow: theme=dark media=narrow-dark-poster.webp,narrow-dark-loop.webm
