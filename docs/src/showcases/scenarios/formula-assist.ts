@@ -192,7 +192,10 @@ export function createFormulaAssistScenario(host: HTMLElement): FormulaAssistSce
         kind: "cell",
         addr: { sheet: BUDGET_SHEET, row: cell.row, col: cell.col },
       });
-      host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Formula bar"]')?.focus();
+      // Select the bar's text, so a formula typed into a filled cell replaces it.
+      const bar = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Formula bar"]');
+      bar?.focus();
+      bar?.select();
     },
     reset() {
       const current = grid;

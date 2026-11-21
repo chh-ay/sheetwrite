@@ -86,6 +86,19 @@ async function openLab(page: Page, lab: string): Promise<void> {
   await expect(page.locator(`#interop-lab-${lab}-panel`)).toBeVisible();
 }
 
+test("a link to #<lab> opens that lab and scrolls to it", async ({ page }) => {
+  await page.goto("/showcases/interoperability/#delimited");
+  const tab = page.getByTestId("interop-lab-delimited");
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#interop-lab-delimited-panel")).toBeVisible();
+  await expect(tab).toBeInViewport();
+
+  await page.evaluate(() => {
+    window.location.hash = "security";
+  });
+  await expect(page.getByTestId("interop-lab-security")).toHaveAttribute("aria-selected", "true");
+});
+
 test("the evidence vault answers from the checked data and browses its checks", async ({
   page,
 }) => {
