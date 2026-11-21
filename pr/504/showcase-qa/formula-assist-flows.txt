@@ -1,0 +1,32 @@
+PASS [fa-chromium-1440] open  
+PASS [fa-chromium-1440] Finance's total: = then Tab ghost=["SUM(B6:G6)"]; bar after Tab='=SUM(B6:G6)' editor='=SUM(B6:G6)'; after Enter bar='=SUM(B6:G6)' 
+PASS [fa-chromium-1440] Finance's share: = then Tab ghost=["H6/H$13"]; bar after Tab='=H6/H$13' editor='=H6/H$13'; after Enter bar='=H6/H$13' 
+PASS [fa-chromium-1440] March's total: = then Tab ghost=["SUM(D2:D11)"]; bar after Tab='=SUM(D2:D11)' editor='=SUM(D2:D11)'; after Enter bar='=SUM(D2:D11)' 
+PASS [fa-chromium-1440] People's total: = then Tab ghost=["SUM(B9:G9)"]; bar after Tab='=SUM(B9:G9)' editor='=SUM(B9:G9)'; after Enter bar='=SUM(B9:G9)' 
+PASS [fa-chromium-1440] People's share: = then Tab ghost=["H9/H$13"]; bar after Tab='=H9/H$13' editor='=H9/H$13'; after Enter bar='=H9/H$13' 
+FAIL [fa-chromium-1440] Ctrl+Right takes one word, Esc hides  locator.waitFor: Timeout 4000ms exceeded. | Call log: |   - waiting for locator('.sheetwrite-formula-ghost').first() to be visible | 
+PASS [fa-chromium-1440] Reset  
+PASS [fa-chromium-390] open  
+PASS [fa-chromium-390] Finance's total: = then Tab ghost=["SUM(B6:G6)"]; bar after Tab='=SUM(B6:G6)' editor='=SUM(B6:G6)'; after Enter bar='=SUM(B6:G6)' 
+PASS [fa-chromium-390] Finance's share: = then Tab ghost=["H6/H$13"]; bar after Tab='=H6/H$13' editor='=H6/H$13'; after Enter bar='=H6/H$13' 
+PASS [fa-chromium-390] March's total: = then Tab ghost=["SUM(D2:D11)"]; bar after Tab='=SUM(D2:D11)' editor='=SUM(D2:D11)'; after Enter bar='=SUM(D2:D11)' 
+PASS [fa-chromium-390] People's total: = then Tab ghost=["SUM(B9:G9)"]; bar after Tab='=SUM(B9:G9)' editor='=SUM(B9:G9)'; after Enter bar='=SUM(B9:G9)' 
+PASS [fa-chromium-390] People's share: = then Tab ghost=["H9/H$13"]; bar after Tab='=H9/H$13' editor='=H9/H$13'; after Enter bar='=H9/H$13' 
+FAIL [fa-chromium-390] Ctrl+Right takes one word, Esc hides  locator.waitFor: Timeout 4000ms exceeded. | Call log: |   - waiting for locator('.sheetwrite-formula-ghost').first() to be visible | 
+PASS [fa-chromium-390] Reset  
+PASS [fa-firefox-1440] open  
+PASS [fa-firefox-1440] Finance's total: = then Tab ghost=["SUM(B6:G6)"]; bar after Tab='=SUM(B6:G6)' editor='=SUM(B6:G6)'; after Enter bar='=SUM(B6:G6)' 
+PASS [fa-firefox-1440] Finance's share: = then Tab ghost=["H6/H$13"]; bar after Tab='=H6/H$13' editor='=H6/H$13'; after Enter bar='=H6/H$13' 
+PASS [fa-firefox-1440] March's total: = then Tab ghost=["SUM(D2:D11)"]; bar after Tab='=SUM(D2:D11)' editor='=SUM(D2:D11)'; after Enter bar='=SUM(D2:D11)' 
+PASS [fa-firefox-1440] People's total: = then Tab ghost=["SUM(B9:G9)"]; bar after Tab='=SUM(B9:G9)' editor='=SUM(B9:G9)'; after Enter bar='=SUM(B9:G9)' 
+PASS [fa-firefox-1440] People's share: = then Tab ghost=["H9/H$13"]; bar after Tab='=H9/H$13' editor='=H9/H$13'; after Enter bar='=H9/H$13' 
+FAIL [fa-firefox-1440] Ctrl+Right takes one word, Esc hides  locator.waitFor: Timeout 4000ms exceeded. | Call log: |   - waiting for locator('.sheetwrite-formula-ghost').first() to be visible | 
+PASS [fa-firefox-1440] Reset  
+PASS [fa-firefox-390] open  
+PASS [fa-firefox-390] Finance's total: = then Tab ghost=["SUM(B6:G6)"]; bar after Tab='=SUM(B6:G6)' editor='=SUM(B6:G6)'; after Enter bar='=SUM(B6:G6)' 
+PASS [fa-firefox-390] Finance's share: = then Tab ghost=["H6/H$13"]; bar after Tab='=H6/H$13' editor='=H6/H$13'; after Enter bar='=H6/H$13' 
+PASS [fa-firefox-390] March's total: = then Tab ghost=["SUM(D2:D11)"]; bar after Tab='=SUM(D2:D11)' editor='=SUM(D2:D11)'; after Enter bar='=SUM(D2:D11)' 
+PASS [fa-firefox-390] People's total: = then Tab ghost=["SUM(B9:G9)"]; bar after Tab='=SUM(B9:G9)' editor='=SUM(B9:G9)'; after Enter bar='=SUM(B9:G9)' 
+PASS [fa-firefox-390] People's share: = then Tab ghost=["H9/H$13"]; bar after Tab='=H9/H$13' editor='=H9/H$13'; after Enter bar='=H9/H$13' 
+FAIL [fa-firefox-390] Ctrl+Right takes one word, Esc hides  locator.waitFor: Timeout 4000ms exceeded. | Call log: |   - waiting for locator('.sheetwrite-formula-ghost').first() to be visible | 
+PASS [fa-firefox-390] Reset  
