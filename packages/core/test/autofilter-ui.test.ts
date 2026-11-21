@@ -201,6 +201,52 @@ describe("AutoFilter in the grid", () => {
     expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
   });
 
+  it("groups only the numbers that show as dates in a mostly-date column, as Excel does", async () => {
+    // Three dates of 2026, then 15%, $4.50 and a plain 7 in the same column.
+    const rows = [
+      ["Date", "Qty"],
+      [46037, 1],
+      [46068, 2],
+      [0.15, 3],
+      [4.5, 4],
+      [7, 5],
+      [46027, 6],
+      ["N", 7],
+    ];
+    const formats: (string | undefined)[] = [
+      undefined,
+      "m/d/yyyy",
+      "m/d/yyyy",
+      "0%",
+      "$#,##0.00",
+      undefined,
+      "m/d/yyyy",
+    ];
+    const { grid, host } = mount(rows);
+    grid.applyTransaction({
+      patches: formats.flatMap((numberFormat, row) =>
+        numberFormat
+          ? [
+              {
+                op: "set" as const,
+                addr: { sheet: "s1", row, col: 0 },
+                value: { kind: "literal" as const, value: rows[row]?.[0] ?? null },
+                style: { numberFormat },
+              },
+            ]
+          : [],
+      ),
+    });
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 7, col: 1 } });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    press(host, "ArrowDown", { altKey: true });
+    const dialog = await dropdown();
+    const labels = [...dialog.querySelectorAll(".sheetwrite-autofilter-label")].map(
+      (label) => label.textContent,
+    );
+    expect(labels).toEqual(["(Select All)", "2026", "15%", "$4.50", "7", "N"]);
+  });
+
   it("lists a date column by year, month and day with Date Filters, and prices as their cells show", async () => {
     // 2 January 2026, 2 February 2026 and 1 January 2025, in the cells' own formats.
     const rows = [
@@ -481,7 +527,7 @@ describe("AutoFilter in the grid", () => {
 
   it("shows the rows Hide Rows hid, from the cut notice's Show them", async () => {
     stubClipboard();
-    const { grid } = mount();
+    const { grid, host } = mount();
     // Sheet row 2 (banana) is hidden; view rows 1 and 2 show apple and fig.
     grid.hideRows([2]);
     grid.setSelection({
@@ -492,6 +538,9 @@ describe("AutoFilter in the grid", () => {
     const notice = document.querySelector<HTMLElement>(".sheetwrite-action-status");
     expect(notice?.textContent).toBe("This cut includes 1 hidden row. Show them");
     notice?.querySelector("button")?.click();
+    // The grid keeps the keys, so Ctrl+Z can undo it. A boolean: on a failure, bun's
+    // diff of two DOM elements walks the whole document and never ends.
+    expect(document.activeElement === host).toBe(true);
     expect(grid.hiddenRows()).toEqual([]);
     grid.undo();
     expect(grid.hiddenRows()).toEqual([2]);
