@@ -9,4 +9,4 @@ XLSX export now marks formulas whose result is an array, such as `=SEQUENCE(3)`,
 
 XLSX import reads Excel's dynamic arrays as formulas that spill again, without the cached values of the cells they cover. Legacy array formulas (Ctrl+Shift+Enter, `t="array"` without `cm`) are still kept as text with a warning.
 
-The engines have two new exports for this: `xlsxArrayFormulas` and the `CellStore` method `spillRanges`.
+The engines have two new exports for this: `xlsxArrayFormulas` and the `CellStore` method `spillRanges`. Core's `XlsxFormulaEngine` has the matching `arrayFormulas(formulas)`.
