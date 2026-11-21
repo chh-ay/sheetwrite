@@ -8,6 +8,7 @@ use super::super::value::{aggregate_number, bool_from_value};
 use super::super::EvalPass;
 use super::descriptive;
 use crate::calc::{Ast, Func};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use std::cmp::Ordering;
@@ -102,14 +103,17 @@ fn argument_shape(
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
-        _ if !is_reference(ast) && !ast_produces_array(ast, pass.shapes()) => Ok((1, 1, 1)),
+        _ if !is_reference(ast, store.name_scope(sheet))
+            && !ast_produces_array(ast, pass.shapes(store.name_scope(sheet))) =>
+        {
+            Ok((1, 1, 1))
+        }
         Ast::Missing
         | Ast::Parameter { .. }
         | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -462,7 +466,9 @@ fn frequency(
 fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let mut numbers = Vec::new();
     for arg in args {
-        let from_range = is_reference(arg) || ast_produces_array(arg, evaluation.pass.shapes());
+        let names = evaluation.store.name_scope(evaluation.sheet);
+        let from_range =
+            is_reference(arg, names) || ast_produces_array(arg, evaluation.pass.shapes(names));
         for value in &evaluation.matrix(arg)?.values {
             if let Some(number) = aggregate_number(value, from_range)? {
                 // -0 and 0 are the same value.
@@ -503,7 +509,7 @@ fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix
     Ok(EvalMatrix::new(modes.len(), 1, modes))
 }
 
-fn is_reference(ast: &Ast) -> bool {
+fn is_reference(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Cell(..)
         | Ast::SheetCell(..)
@@ -511,10 +517,15 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::Range(..)
         | Ast::SheetRange(..)
         | Ast::AbsRange(..)
-        | Ast::NamedRange(..)
         | Ast::Structured(..) => true,
-        Ast::LetSlot { expression, .. } => is_reference(expression),
-        Ast::NamedFormula(named) => is_reference(&named.expression),
+        Ast::LetSlot { expression, .. } => is_reference(expression, names),
+        Ast::DefinedName(id, _) => {
+            let read = names.read(*id);
+            read.range().is_some()
+                || read
+                    .formula()
+                    .is_some_and(|expression| is_reference(expression, names))
+        }
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)

@@ -221,8 +221,7 @@ fn unary_parts(ast: &Ast) -> Option<(UnaryOp, &Ast)> {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -266,8 +265,7 @@ fn binary_parts(ast: &Ast) -> Option<BinaryParts<'_>> {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)

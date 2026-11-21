@@ -153,8 +153,10 @@ fn push_data(
     context: &mut Context<'_, '_>,
     values: &mut FuncAccumulator,
 ) -> Result<(), FormulaError> {
-    let range = range_from_ast(ast, context.sheet);
-    if range.is_none() && !super::super::array::ast_produces_array(ast, context.pass.shapes()) {
+    let names = context.store.name_scope(context.sheet);
+    let range = range_from_ast(ast, names);
+    if range.is_none() && !super::super::array::ast_produces_array(ast, context.pass.shapes(names))
+    {
         return Err(FormulaError::Value);
     }
     let matrix = context.matrix(ast)?;

@@ -21,6 +21,7 @@ use std::ptr;
 
 use crate::calc::{Ast, Func};
 use crate::memory::MemoryOwnerStats;
+use crate::store::names::NameScope;
 use crate::types::EvalResult;
 
 use super::reference::ast_contains_runtime_ref;
@@ -28,8 +29,9 @@ use super::{ast_produces_array, expand_let_ast, valid_let_name};
 
 /// Rewrites, in place, the uses of the bindings of every LET in `ast` that
 /// [`let_resolvable`] accepts. Each outermost such LET numbers its slots from
-/// zero in tree order, nested LETs included.
-pub(crate) fn resolve_let_names(ast: &mut Ast) {
+/// zero in tree order, nested LETs included. The formula's defined names
+/// are read through `names`.
+pub(crate) fn resolve_let_names(ast: &mut Ast, names: NameScope<'_>) {
     #[cfg(test)]
     if !RESOLVE_LET_NAMES.with(std::cell::Cell::get) {
         return;
@@ -38,7 +40,7 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
     // A LET resolves its own nested LETs, or none of them when it is not
     // resolvable.
     if let Ast::Func(Func::Let, args) = ast {
-        if let_resolvable(args) {
+        if let_resolvable(args, names) {
             let mut bindings = Vec::new();
             let mut next = 0;
             resolve_scope(args, &mut bindings, &mut next);
@@ -46,7 +48,7 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
         return;
     }
     ast.fold_children_mut(&mut |child| {
-        resolve_let_names(child);
+        resolve_let_names(child, names);
         false
     });
 }
@@ -67,37 +69,38 @@ thread_local! {
 /// - nothing in it resolves references at run time (`OFFSET`, `INDIRECT`),
 ///   and on the full engine it calls no analysis function, so `LAMBDA`
 ///   capture and calls through bindings keep the expanding path.
-pub(crate) fn let_resolvable(args: &[Ast]) -> bool {
+pub(crate) fn let_resolvable(args: &[Ast], names: NameScope<'_>) -> bool {
     expand_let_ast(args).is_ok()
-        && args.iter().all(|arg| !ast_contains_runtime_ref(arg))
-        && lets_have_scalar_bindings(args)
+        && args.iter().all(|arg| !ast_contains_runtime_ref(arg, names))
+        && lets_have_scalar_bindings(args, names)
 }
 
 /// Whether each LET call in `args` (the arguments of a LET) has only scalar
 /// bindings, and nothing outside the core function set is called.
-fn lets_have_scalar_bindings(args: &[Ast]) -> bool {
+fn lets_have_scalar_bindings(args: &[Ast], names: NameScope<'_>) -> bool {
     let last = args.len().saturating_sub(1);
-    args[..last]
-        .chunks(2)
-        .all(|pair| pair.get(1).is_some_and(scalar_binding))
-        && args.get(last).is_some_and(nested_lets_scalar)
+    args[..last].chunks(2).all(|pair| {
+        pair.get(1)
+            .is_some_and(|binding| scalar_binding(binding, names))
+    }) && args
+        .get(last)
+        .is_some_and(|result| nested_lets_scalar(result, names))
 }
 
-fn nested_lets_scalar(ast: &Ast) -> bool {
+fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
+    let nested = |child: &Ast| nested_lets_scalar(child, names);
     match ast {
-        Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args),
+        Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args, names),
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
-        Ast::Func(_, args) => args.iter().all(nested_lets_scalar),
+        Ast::Func(_, args) => args.iter().all(nested),
         #[cfg(not(feature = "analysis"))]
         Ast::UnknownFunc(call) => {
             let args = &call.args;
-            args.iter().all(nested_lets_scalar)
+            args.iter().all(nested)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            nested_lets_scalar(left) && nested_lets_scalar(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => nested_lets_scalar(inner),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => nested(left) && nested(right),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => nested(inner),
         _ => true,
     }
 }
@@ -106,16 +109,15 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
 /// binding's name, a call with a scalar result ([`call_has_scalar_result`]),
 /// or an operator over constants, single cells, names and such calls. A bare
 /// cell is not one, because a function reads it as a one-cell range.
-pub(crate) fn scalar_binding(expression: &Ast) -> bool {
+pub(crate) fn scalar_binding(expression: &Ast, names: NameScope<'_>) -> bool {
     match expression {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Name(_) => true,
         Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_) => {
-            scalar_operand(expression)
+            scalar_operand(expression, names)
         }
-        Ast::Func(..) => call_has_scalar_result(expression),
+        Ast::Func(..) => call_has_scalar_result(expression, names),
         Ast::Missing
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -135,7 +137,7 @@ pub(crate) fn scalar_binding(expression: &Ast) -> bool {
     }
 }
 
-fn scalar_operand(ast: &Ast) -> bool {
+fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Num(_)
         | Ast::Str(_)
@@ -145,13 +147,12 @@ fn scalar_operand(ast: &Ast) -> bool {
         | Ast::AbsCell(..)
         | Ast::SheetCell(..) => true,
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            scalar_operand(left) && scalar_operand(right)
+            scalar_operand(left, names) && scalar_operand(right, names)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner),
-        Ast::Func(..) => call_has_scalar_result(ast),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner, names),
+        Ast::Func(..) => call_has_scalar_result(ast, names),
         Ast::Missing
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Range(..)
@@ -178,7 +179,7 @@ fn scalar_operand(ast: &Ast) -> bool {
 /// - on the full engine, analysis functions, whose array hooks decide their
 ///   shape;
 /// - calls whose arguments hold a LET that cannot resolve.
-fn call_has_scalar_result(call: &Ast) -> bool {
+fn call_has_scalar_result(call: &Ast, names: NameScope<'_>) -> bool {
     let Ast::Func(func, args) = call else {
         return false;
     };
@@ -199,7 +200,8 @@ fn call_has_scalar_result(call: &Ast) -> bool {
     ) {
         return false;
     }
-    !ast_produces_array(call, super::Shapes::NONE) && args.iter().all(nested_lets_scalar)
+    !ast_produces_array(call, super::Shapes::top(names))
+        && args.iter().all(|arg| nested_lets_scalar(arg, names))
 }
 
 /// One visible binding while resolving: its name and slot.
@@ -437,6 +439,8 @@ mod tests {
 
     #[test]
     fn only_lets_with_scalar_bindings_within_the_limits_resolve() {
+        let store = CellStore::new();
+        let names = store.name_scope(0);
         for source in [
             "=LET(x,1,x+1)",
             "=LET(x,A1*$C$1,y,x+1,z,y*x,x+y+z)",
@@ -448,7 +452,7 @@ mod tests {
             "=LET(x,SUM(A1:A3),LET(y,ROUND(x/7,3),x+y))",
             "=LET(v,XLOOKUP(2,A1:A3,A1:A3),v*10)",
         ] {
-            assert!(let_resolvable(&let_args(source)), "{source}");
+            assert!(let_resolvable(&let_args(source), names), "{source}");
         }
         for source in [
             "=LET(x,A1:A3,SUM(x))",
@@ -458,7 +462,7 @@ mod tests {
             "=LET(x,1,OFFSET(A1,1,1)+x)",
             "=LET(x,1)",
         ] {
-            assert!(!let_resolvable(&let_args(source)), "{source}");
+            assert!(!let_resolvable(&let_args(source), names), "{source}");
         }
     }
 
