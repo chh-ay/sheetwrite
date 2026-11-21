@@ -1,6 +1,7 @@
 // Add-on contracts for @sheetwrite/core.
 // No runtime values live here.
 
+import type { FormulaSuggester } from "./formula-suggestion.js";
 import type { Grid } from "./grid.js";
 import type { QueryCommands } from "./query.js";
 import type { ChartRendererFactory, ChartViewProviderFactory } from "./store.js";
@@ -56,6 +57,13 @@ export interface SheetwriteAddonGridContext<Settings> {
    * `command` with `"open"` or `"save"`.
    */
   historyCommand(command: (action: "open" | "save") => void): void;
+  /**
+   * Gives the grid's formula bar a suggester: while a formula is typed in the
+   * bar, its suggestion shows as dimmed text after the caret and Tab takes
+   * it. The grid removes it when it is destroyed; the returned function
+   * removes it earlier.
+   */
+  formulaSuggestions(suggester: FormulaSuggester): () => void;
 }
 
 /**
