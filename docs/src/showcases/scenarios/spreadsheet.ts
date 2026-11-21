@@ -263,7 +263,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
       grid: {
         workbook: salesWorkbook(),
         theme: siteGridTheme(),
-        config: {},
+        config: { keyboardSettings: true },
         addons: {
           queries: {
             fetchSource: async () => ({

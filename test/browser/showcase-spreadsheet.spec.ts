@@ -37,6 +37,18 @@ function cell(page: Page, sheet: string, row: number, col: number) {
   );
 }
 
+test("File › Keyboard Shortcuts opens the shortcuts panel", async ({ page }) => {
+  await open(page);
+  await page.getByRole("tab", { name: "File", exact: true }).click();
+  await page.getByRole("button", { name: "Keyboard Shortcuts" }).click();
+  const panel = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(panel).toBeVisible();
+  await panel
+    .getByRole("searchbox", { name: "Search commands or press keys" })
+    .fill("paste special");
+  await expect(panel).toContainText("Paste Special");
+});
+
 test("ribbon commands edit the workbook and AutoSum totals the ledger", async ({ page }) => {
   await open(page);
   const ribbon = page.getByRole("region", { name: "Ribbon" });
