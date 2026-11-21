@@ -107,7 +107,7 @@ const FORBIDDEN_NAMES = [
  * `vueEvents` mirrors `handlerEvents` in template casing; `docs.test.ts` checks
  * that casing and input-contract drift against `GridOptions`.
  */
-export const ADAPTER_DOC_CONTRACT = {
+const ADAPTER_DOC_CONTRACT = {
   packages: ["@sheetwrite/react", "@sheetwrite/svelte", "@sheetwrite/vue"],
   inputs: [
     "workbook",

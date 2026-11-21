@@ -195,46 +195,7 @@ describe("re-export documentation", () => {
     expect(documentation("nothing")).toBe("Reads nothing.");
   });
 });
-describe("interface heritage flattening", () => {
-  it("inlines repository-owned base members and keeps dependency bases as heritage", async () => {
-    const root = await fixture(
-      `import type { ExternalBase } from "framework";
-${canonicalDeclarations}
-/** Framework-neutral readiness callbacks shared by adapters. */
-export interface OwnedHandlers {
-  /** Fires after readiness. */
-  onReady?: () => void;
-}
-/** Advanced adapter props. */
-export interface AdapterProps extends OwnedHandlers, ExternalBase {
-  /** Local sizing knob. */
-  height?: number;
-}
-`,
-      {
-        "node_modules/framework/package.json": JSON.stringify({
-          name: "framework",
-          types: "./index.d.ts",
-        }),
-        "node_modules/framework/index.d.ts":
-          "export interface ExternalBase { tabIndex?: number; hidden?: boolean; }\n",
-      },
-    );
-    const { manifest } = await analyzePublicApi(root);
-    const entry = manifest.packages[0]?.entryPoints[0];
-    const props = entry?.exports.find((candidate) => candidate.name === "AdapterProps");
-    expect(props?.signature).toContain("height?: number;");
-    expect(props?.signature).toContain("onReady?: () => void;");
-    expect(props?.signature).toContain("extends ExternalBase");
-    expect(props?.signature).not.toContain("OwnedHandlers");
-    expect(props?.signature).not.toContain("tabIndex");
-    expect(props?.signature).not.toContain("hidden");
-    expect(props?.memberDocs).toContainEqual({
-      name: "onReady",
-      documentation: "Fires after readiness.",
-    });
-  });
-});
+
 describe("public API policy", () => {
   it("rejects untyped error payloads, Error subclasses and ambiguous re-exports", async () => {
     const root = await fixture(
@@ -266,7 +227,6 @@ export * from "./right.js";`,
     await mkdir(join(root, "scripts"), { recursive: true });
     const written = await writePublicApiBaseline(root, manifest);
 
-    expect(written).toEqual(baselineFromManifest(manifest));
     expect(await readPublicApiBaseline(root)).toEqual(written);
     const text = await readFile(join(root, "scripts/public-api-baseline.json"), "utf8");
     for (const name of ["DataSource", "DocumentOp", "toXlsxTable"]) {

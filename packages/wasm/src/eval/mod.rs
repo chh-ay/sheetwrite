@@ -2260,10 +2260,12 @@ impl CellStore {
             } else {
                 args.get(2)
             };
-            return if let Some(branch) = chosen {
-                self.eval_ast(branch, sheet, pass, depth + 1)
-            } else {
-                Value::Number(0.0)
+            // As in Excel: an omitted `value_if_false` gives FALSE, and an
+            // empty branch (`IF(TRUE,)`, `IF(FALSE,1,)`) gives 0.
+            return match chosen {
+                Some(Ast::Missing) => Value::Number(0.0),
+                Some(branch) => self.eval_ast(branch, sheet, pass, depth + 1),
+                None => Value::Bool(false),
             };
         }
 

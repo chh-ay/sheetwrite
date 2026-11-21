@@ -378,6 +378,25 @@ fn index_zero_selects_a_whole_row_or_column() {
     ]);
 }
 
+/// Microsoft Support, "IF function": a false test with no `value_if_false`
+/// (no comma after `value_if_true`) returns FALSE; an empty argument after
+/// the comma returns 0, and so does an empty `value_if_true`. "IFS function":
+/// no TRUE condition returns #N/A.
+#[test]
+fn if_and_ifs_follow_the_microsoft_rules_for_missing_branches() {
+    assert_results(&[
+        ("=IF(FALSE,1)", "FALSE"),
+        ("=IF(1>2,\"yes\")", "FALSE"),
+        ("=IF(Data!A1>2,\"big\")", "FALSE"),
+        ("=IF(TRUE,1)", "1"),
+        ("=IF(FALSE,1,)", "0"),
+        ("=IF(TRUE,)", "0"),
+        ("=IF(TRUE,,1)", "0"),
+        ("=IFS(FALSE,1)", "#N/A"),
+        ("=IFS(1>2,1,Data!A1>5,2)", "#N/A"),
+    ]);
+}
+
 #[test]
 fn argument_errors_are_returned_unchanged() {
     assert_results(&[

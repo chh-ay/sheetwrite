@@ -4,6 +4,11 @@
  * scrolls through a native `.sheetwrite-scroller`, so one page-level observer
  * can mark each viewport while columns stay hidden on the right; CSS draws a
  * fade on that edge (`data-more-right`).
+ *
+ * Nothing here reads layout while a Grid scrolls: a read in a scroll handler
+ * makes the browser lay out what the Grid's last frame changed a second time,
+ * which Firefox pays for in every frame of a sideways scroll. The edge is set
+ * when the scroll ends and whenever a size changes.
  */
 
 const SCROLLER_SELECTOR = ".sheetwrite-scroller";
@@ -24,18 +29,33 @@ function updateEdges(scroller: HTMLElement): void {
 
 /** Watches one Grid viewport; the returned function stops every observation it started. */
 function watchScroller(scroller: HTMLElement, resize: ResizeObserver): () => void {
-  const onScroll = () => updateEdges(scroller);
-  scroller.addEventListener("scroll", onScroll, { passive: true });
+  // The position is read after the scroll ends where the browser says so, else on every scroll.
+  const settled = "onscrollend" in window ? "scrollend" : "scroll";
+  const onSettled = () => updateEdges(scroller);
+  scroller.addEventListener(settled, onSettled, { passive: true });
   resize.observe(scroller);
   // The sizer grows when columns load or resize, without a scroller resize.
   const sizer = scroller.firstElementChild;
   if (sizer !== null) resize.observe(sizer);
   updateEdges(scroller);
   return () => {
-    scroller.removeEventListener("scroll", onScroll);
+    scroller.removeEventListener(settled, onSettled);
     resize.unobserve(scroller);
     if (sizer !== null) resize.unobserve(sizer);
   };
+}
+
+/** Whether `nodes` holds a Grid scroller, or an element with one inside. */
+function holdsScroller(nodes: NodeList): boolean {
+  for (const node of nodes) {
+    if (
+      node instanceof Element &&
+      (node.matches(SCROLLER_SELECTOR) || node.querySelector(SCROLLER_SELECTOR) !== null)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Page-level wiring; returns the uninstall function. */
@@ -65,7 +85,17 @@ export function installGridScrollHints(root: HTMLElement = document.body): () =>
     }
   };
 
-  const mutations = new MutationObserver(sync);
+  // A Grid rewrites its screen-reader cells in every frame it scrolls; only
+  // added or removed elements that hold a scroller change what is watched.
+  const mutations = new MutationObserver((records) => {
+    if (
+      records.some(
+        (record) => holdsScroller(record.addedNodes) || holdsScroller(record.removedNodes),
+      )
+    ) {
+      sync();
+    }
+  });
   mutations.observe(root, { childList: true, subtree: true });
   sync();
   return () => {
