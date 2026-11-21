@@ -277,9 +277,13 @@ describe("custom key combinations", () => {
     "rejects the malformed combination %p from untyped callers",
     (shortcut) => {
       // The type already rejects "Hyper+K"; JavaScript callers still reach the parser.
-      expect(() =>
-        mount({ contextMenu: [item([], "bad", shortcut as unknown as KeyShortcut)] }),
-      ).toThrow(expect.objectContaining({ code: "invalid-shortcut" }));
+      let error: unknown;
+      try {
+        mount({ contextMenu: [item([], "bad", shortcut as unknown as KeyShortcut)] });
+      } catch (caught) {
+        error = caught;
+      }
+      expect((error as { code?: string } | undefined)?.code).toBe("invalid-shortcut");
     },
   );
 });

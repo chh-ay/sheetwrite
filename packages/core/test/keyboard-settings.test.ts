@@ -155,7 +155,7 @@ describe("opening the panel", () => {
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");
     expect(byLabel(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
     // The search box has focus, so typing searches at once.
-    expect(document.activeElement).toBe(byLabel(panel, "Search commands or press keys"));
+    expect(document.activeElement === byLabel(panel, "Search commands or press keys")).toBe(true);
   });
 });
 
@@ -228,11 +228,11 @@ describe("recording keys", () => {
     press(document.activeElement as HTMLElement, "Escape");
     expect(status(panel)).toBe("Stopped recording. Italic keeps Ctrl+I, Ctrl+3.");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).not.toBeNull();
-    expect(document.activeElement).toBe(byLabel(panel, "Change Ctrl+I for Italic"));
+    expect(document.activeElement === byLabel(panel, "Change Ctrl+I for Italic")).toBe(true);
 
     press(document.activeElement as HTMLElement, "Escape");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).toBeNull();
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement === opener).toBe(true);
     expect(events).toEqual([]);
   });
 
@@ -286,7 +286,7 @@ describe("conflicts", () => {
 
     record(panel, "Change Ctrl+B for Bold", "u", { ctrlKey: true, code: "KeyU" });
     expect(prompt.textContent).toContain("Ctrl+U is assigned to Underline.");
-    expect(document.activeElement).toBe(button(prompt, "Swap"));
+    expect(document.activeElement === button(prompt, "Swap")).toBe(true);
     button(prompt, "Cancel").click();
     expect(events).toEqual([]);
 

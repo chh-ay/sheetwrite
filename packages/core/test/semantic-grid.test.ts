@@ -272,7 +272,7 @@ describe("custom editor canonical lifecycle", () => {
       addr: { sheet: "s1", row: 1, col: 1 },
     });
     expect(changes).toBeGreaterThanOrEqual(2);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
 
     grid.undo();
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
@@ -297,7 +297,7 @@ describe("custom editor canonical lifecycle", () => {
     input = activeEditorInput(host);
     press(input, "Escape");
     expect(stats.cancels).toBe(1);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
     await Promise.resolve();
     expect(stats.mounts).toBe(4);
     expect(stats.destroys).toBe(4);
@@ -381,7 +381,7 @@ describe("custom editor canonical lifecycle", () => {
     const { grid, host } = mountGrid({ workbook, editors: { stepper: editor } });
 
     grid.beginEdit(0, 0);
-    expect(document.activeElement).toBe(activeEditorInput(host));
+    expect(document.activeElement === activeEditorInput(host)).toBe(true);
     pressLikeWebKit(host.querySelector<HTMLButtonElement>(".sheetwrite-custom-editor button")!);
     expect({ commits, steps }).toEqual({ commits: 0, steps: 1 });
     expect(host.querySelector(".sheetwrite-custom-editor")).not.toBeNull();
@@ -688,7 +688,7 @@ describe("custom editor canonical lifecycle", () => {
     press(activeEditorInput(host), "Escape");
     expect(hookSignals).toEqual([true, true]);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
     expect(reported).toHaveLength(1);
 
     grid.beginEdit(0, 0);

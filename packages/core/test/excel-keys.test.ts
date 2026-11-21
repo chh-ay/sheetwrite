@@ -298,7 +298,7 @@ describe("the cell editor", () => {
     await answerDialog(host, "OK");
     const field = editor();
     expect(value(3, 2)).toBe("Phnom Penh");
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement === field).toBe(true);
     expect([field?.selectionStart, field?.selectionEnd]).toEqual([11, 12]);
     press("Escape");
 
@@ -486,12 +486,12 @@ describe("insert and delete keys", () => {
     ]);
     // A wide range defaults to Shift cells down; the focus starts on the chosen option.
     expect(choices[1]!.checked).toBe(true);
-    expect(document.activeElement).toBe(choices[1]!);
+    expect(document.activeElement === choices[1]!).toBe(true);
     choices[2]!.checked = true;
     await answerDialog(host, "OK");
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBe("Customer 1");
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
 
     // A tall range defaults to Shift cells left.
     select(0, 1, 3, 1);

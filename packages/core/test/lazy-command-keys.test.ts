@@ -39,7 +39,7 @@ it("types the keys pressed while the find bar loads into its field", async () =>
   }
 
   expect(input?.value).toBe("ap");
-  expect(document.activeElement).toBe(input);
+  expect(document.activeElement === input).toBe(true);
   // The keys went to the find bar, not into A1.
   expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
   grid.destroy();

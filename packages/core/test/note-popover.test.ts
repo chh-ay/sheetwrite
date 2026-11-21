@@ -85,13 +85,13 @@ describe("note hover card", () => {
 
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS - 1);
-    expect(noteCard(host)).toBeNull();
+    expect(noteCard(host) === null).toBe(true);
 
     jest.advanceTimersByTime(1);
     expect(noteCard(host)?.textContent).toBe("Check the totals");
     expect(noteCard(host)?.getAttribute("role")).toBe("tooltip");
     // The card does not take the focus.
-    expect(document.activeElement).toBe(focused);
+    expect(document.activeElement === focused).toBe(true);
   });
 
   it.each([
@@ -112,11 +112,11 @@ describe("note hover card", () => {
     const { host, grid: target } = mount();
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS);
-    expect(noteCard(host)).not.toBeNull();
+    expect(noteCard(host) === null).toBe(false);
 
     dismiss(host, target);
 
-    expect(noteCard(host)).toBeNull();
+    expect(noteCard(host) === null).toBe(true);
   });
 });
 
@@ -126,7 +126,7 @@ describe("note editor", () => {
 
     openEditor(target, NOTED);
     const editor = noteEditor(host);
-    expect(document.activeElement).toBe(editor);
+    expect(document.activeElement === editor).toBe(true);
     expect(editor.value).toBe("Check the totals");
 
     editor.value = "Totals checked";
@@ -134,7 +134,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Totals checked");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
 
     target.undo();
     expect(target.getNote(NOTED)).toBe("Check the totals");
@@ -161,7 +161,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
   });
 
   it("opens on the focus cell when Shift+F2 is pressed", () => {

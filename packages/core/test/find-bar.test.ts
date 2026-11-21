@@ -108,7 +108,7 @@ describe("FindBar", () => {
     bar.open();
     field("input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(bar.isOpen).toBe(false);
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
     expect(value(grid, 0)).toBe("Lovelace");
   });
 });

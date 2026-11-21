@@ -302,7 +302,7 @@ describe("Pick From Drop-down List", () => {
     const list = await elementAdded(host, ".sheetwrite-entry-list", HTMLDivElement);
     const options = [...list.querySelectorAll("[role=option]")].map((option) => option.textContent);
     expect(options).toEqual(["East", "North", "south", "West"]);
-    expect(document.activeElement).toBe(list);
+    expect(document.activeElement === list).toBe(true);
 
     for (const name of ["ArrowDown", "Enter"]) {
       list.dispatchEvent(
