@@ -29,6 +29,7 @@ import type { PasteSourceCells, TargetCell } from "./paste-special.js";
 import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import { referenceSheetName } from "./sheet-copy.js";
+import { rangeContains, rangesIntersect } from "./store/ranges.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -777,6 +778,35 @@ function movesCellsOf(patch: DocumentOp, sheet: SheetId): boolean {
 }
 
 /**
+ * Whether `patch` changes cells in `range`: their values, styles, notes,
+ * links or merges, or their order, as a sort does.
+ */
+function changesCellsIn(patch: DocumentOp, range: Range): boolean {
+  switch (patch.op) {
+    case "set":
+    case "setNote":
+      return rangeContains(range, patch.addr);
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "clearRange":
+    case "setRangeStyle":
+    case "permuteRows":
+      return rangesIntersect(range, patch.range);
+    case "setHyperlink":
+      return rangesIntersect(range, patch.hyperlink.range);
+    case "addMerge":
+    case "removeMerge": {
+      const { r0, c0, r1, c1 } = patch.merge;
+      const merged = { sheet: patch.sheet, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
+      return rangesIntersect(range, merged);
+    }
+    default:
+      return false;
+  }
+}
+
+/**
  * One sparse `setRange` that writes `cells` (sheet rows and columns) over
  * their bounding range and leaves the range's other cells as they are, as one
  * `set` per cell would, in one operation; nothing for no cells.
@@ -886,8 +916,9 @@ export class ClipboardController {
 
   /**
    * Follow a committed change: the move of the pending cut ends it, and so
-   * does any other local edit, or a change that moves or removes cells of
-   * its sheet.
+   * does any other local edit. A peer's change ends it when it moves or
+   * removes cells of its sheet, or changes the cut cells, as Excel ends a
+   * cut when its cells change.
    */
   storeChanged(event: ChangeEvent): void {
     if (!this.pastingShownRows) this.hiddenRowsPaste = null;
@@ -898,7 +929,12 @@ export class ClipboardController {
       if (patches.some((patch) => patch.op === "moveCells")) this.endCut();
       return;
     }
-    if (event.source === "local" || patches.some((patch) => movesCellsOf(patch, cut.range.sheet))) {
+    if (
+      event.source === "local" ||
+      patches.some(
+        (patch) => movesCellsOf(patch, cut.range.sheet) || changesCellsIn(patch, cut.range),
+      )
+    ) {
       this.endCut();
     }
   }
