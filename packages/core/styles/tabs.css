@@ -79,6 +79,7 @@
 .sheetwrite-tab:focus,
 .sheetwrite-tab-options-button:focus,
 .sheetwrite-tab-add:focus,
+.sheetwrite-tab-scroll:focus,
 .sheetwrite-tab-menu-item:focus,
 .sheetwrite-tab-unhide > button:focus {
   outline: none;
@@ -92,6 +93,7 @@
 
 .sheetwrite-tab-options-button:focus-visible,
 .sheetwrite-tab-add:focus-visible,
+.sheetwrite-tab-scroll:focus-visible,
 .sheetwrite-tab-menu-item:focus-visible,
 .sheetwrite-tab-unhide > button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
@@ -124,7 +126,8 @@
    centres meet the labels' optical centre (the middle of the x-height), not
    the middle of the button box. */
 .sheetwrite-tab-options-button,
-.sheetwrite-tab-add {
+.sheetwrite-tab-add,
+.sheetwrite-tab-scroll {
   display: inline-block;
   flex: none;
   height: calc(100% - 6px);
@@ -185,17 +188,55 @@
   align-self: center;
   font-weight: 650;
   line-height: 1;
-  /* When the tabs overflow the strip, the strip scrolls and + stays in view
-     at its right edge, over the tabs scrolled under it. */
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+}
+
+/* The trailing scroll arrow and +. When the tabs overflow, the strip scrolls
+   and these stay in view at its right edge, over the tabs scrolled under
+   them. */
+.sheetwrite-tab-end {
   position: sticky;
   right: 0;
   z-index: 1;
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: center;
+  gap: 3px;
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+}
+
+/* Excel's tab scroll arrows: shown while the tabs overflow (sheet-tabs.ts);
+   the one at the end reached is dimmed. */
+.sheetwrite-tab-scroll {
+  width: 24px;
+  /* A touch target: at least 24 px, also where the bar's height rounds down. */
+  min-height: 24px;
+  padding: 0;
+  align-self: center;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+  line-height: 1;
+}
+
+.sheetwrite-tab-scroll-previous {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.sheetwrite-tab-scroll[hidden] {
+  display: none;
+}
+
+.sheetwrite-tab-scroll[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .sheetwrite-tab-options-button:hover,
 .sheetwrite-tab-options-button[aria-expanded="true"],
-.sheetwrite-tab-add:hover {
+.sheetwrite-tab-add:hover,
+.sheetwrite-tab-scroll:not([aria-disabled="true"]):hover {
   border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
   background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
@@ -294,7 +335,7 @@
   cursor: pointer;
 }
 
-.sheetwrite-tab-unhide-menu {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) {
   position: absolute;
   z-index: 6;
   right: 0;
@@ -310,18 +351,18 @@
   box-shadow: var(--sheetwrite-menu-shadow, 0 8px 24px rgb(60 64 67 / 20%));
 }
 
-.sheetwrite-tab-unhide-menu[popover] {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[popover] {
   position: fixed;
   right: auto;
   bottom: auto;
   margin: 0;
 }
 
-.sheetwrite-tab-unhide-menu[hidden] {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[hidden] {
   display: none;
 }
 
-.sheetwrite-tab-unhide-menu button {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button {
   padding: 0.45rem 0.55rem;
   border: 0;
   border-radius: 4px;
@@ -333,8 +374,14 @@
   cursor: pointer;
 }
 
-.sheetwrite-tab-unhide-menu button:is(:hover, :focus-visible) {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button:is(:hover, :focus-visible) {
   background: var(--sheetwrite-menu-hover, #f1f3f4);
+}
+
+/* The active sheet in the list of all sheets. */
+.sheetwrite-tab-list button[aria-current="true"] {
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+  font-weight: 680;
 }
 
 .sheetwrite-tab-error {
@@ -421,6 +468,7 @@
 
   .sheetwrite-tab-options-button,
   .sheetwrite-tab-add,
+  .sheetwrite-tab-scroll,
   .sheetwrite-tab-unhide {
     height: 100%;
   }

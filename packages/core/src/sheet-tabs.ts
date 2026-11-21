@@ -92,6 +92,10 @@ const OPTIONS_BUTTON_WIDTH = 32;
 const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
 /** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
 const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
+/** A touch held this long on a scroll arrow opens the list of sheets, as a right-click does. */
+const LONG_PRESS_MS = 500;
+/** A touch that moves farther than this, in CSS px, is a scroll, not a long press. */
+const LONG_PRESS_SLOP = 10;
 
 /**
  * A tab bar glyph on a 20-unit grid; `strokeWidth` 1.33 matches the command
@@ -160,6 +164,14 @@ export class SheetTabs {
   private menuAnchor: { left: number; top: number } | null = null;
   private feedback: LifecycleFeedback | null = null;
   private unhideDismiss: (() => void) | null = null;
+  /** Closes the list of every sheet that the scroll arrows open. */
+  private sheetListDismiss: (() => void) | null = null;
+  /** The overflow cue (the scroll arrows) is updated once a frame at most. */
+  private overflowFrame = 0;
+  private readonly overflowObserver: ResizeObserver | null =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => this.scheduleOverflow());
   private buttons: HTMLButtonElement[] = [];
   private buttonIds: SheetId[] = [];
   private moveIndexes: number[] = [];
@@ -186,6 +198,8 @@ export class SheetTabs {
     host.setAttribute("aria-label", `${this.label} controls`);
     host.addEventListener("keydown", this.onKeydown);
     host.addEventListener("focusout", this.onFocusOut);
+    host.addEventListener("scroll", this.onStripScroll, { passive: true });
+    this.overflowObserver?.observe(host);
   }
 
   /** Reconciles the controlled workbook records while preserving transient focus/editor state by ID. */
@@ -251,9 +265,15 @@ export class SheetTabs {
     this.rendering = true;
     this.host.removeEventListener("keydown", this.onKeydown);
     this.host.removeEventListener("focusout", this.onFocusOut);
+    this.host.removeEventListener("scroll", this.onStripScroll);
+    this.overflowObserver?.disconnect();
+    if (this.overflowFrame !== 0) cancelAnimationFrame(this.overflowFrame);
+    this.overflowFrame = 0;
     this.clearMenuState();
     this.unhideDismiss?.();
     this.unhideDismiss = null;
+    this.sheetListDismiss?.();
+    this.sheetListDismiss = null;
     this.host.replaceChildren();
     this.host.removeAttribute("role");
     this.host.removeAttribute("aria-label");
@@ -302,6 +322,8 @@ export class SheetTabs {
     if (this.destroyed) return;
     this.unhideDismiss?.();
     this.unhideDismiss = null;
+    this.sheetListDismiss?.();
+    this.sheetListDismiss = null;
     const restoreFocus = forceFocus || this.host.contains(document.activeElement);
     const visible = this.visibleSheets();
     const hidden = this.hiddenSheets();
@@ -346,9 +368,16 @@ export class SheetTabs {
     tabstrip.appendChild(tablist);
     if (renameInput) tabstrip.appendChild(renameInput);
     if (activeOptions) tabstrip.appendChild(activeOptions);
-    fragment.appendChild(tabstrip);
+    // When the tabs overflow, an arrow at each edge says so and scrolls by a
+    // sheet, as Excel's tab scroll arrows do; a right-click on either lists
+    // every sheet. The trailing arrow and + stay at the strip's right edge.
+    fragment.append(this.createScrollArrow("previous"), tabstrip);
+    const end = document.createElement("div");
+    end.className = "sheetwrite-tab-end";
+    end.appendChild(this.createScrollArrow("next"));
+    if (!this.readOnly && this.onAdd) end.appendChild(this.createAddButton(this.onAdd));
+    fragment.appendChild(end);
 
-    if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton(this.onAdd));
     if (!this.readOnly && this.onUnhide && hidden.length > 0) {
       fragment.appendChild(this.createUnhideMenu(hidden, this.onUnhide));
     }
@@ -402,6 +431,7 @@ export class SheetTabs {
     const activeButton = this.buttonFor(this.activeId);
     if (activeButton && activeButton !== focusButton) this.scrollIntoView(activeButton);
     if (!editedInput && focusButton) this.scrollIntoView(focusButton);
+    this.updateOverflow();
   }
 
   private createTab(
@@ -999,22 +1029,221 @@ export class SheetTabs {
     for (const button of this.buttons) button.tabIndex = button === target ? 0 : -1;
   }
 
+  /**
+   * The part of the strip where a tab is in view, in viewport px: between the
+   * leading scroll arrow and the trailing arrow and + button, which stay at
+   * the strip's edges when the tabs overflow.
+   */
+  private viewEdges(): { left: number; right: number } {
+    const strip = this.host.getBoundingClientRect();
+    const previous = this.host.querySelector<HTMLElement>(".sheetwrite-tab-scroll-previous");
+    const end = this.host.querySelector<HTMLElement>(".sheetwrite-tab-end");
+    const left = previous && !previous.hidden ? previous.getBoundingClientRect().right : strip.left;
+    const endLeft = end?.getBoundingClientRect().left ?? strip.right;
+    return { left: Math.max(strip.left, left), right: Math.min(strip.right, endLeft) };
+  }
+
   private scrollIntoView(element: HTMLElement): void {
     // Only reveal the tab horizontally; the workbook may sit below the page fold.
-    const stripRect = this.host.getBoundingClientRect();
+    if (element.closest(".sheetwrite-tab-end") !== null) return;
+    const { left, right } = this.viewEdges();
     const tabRect = element.getBoundingClientRect();
-    // The Add sheet button sticks to the strip's right edge when the tabs
-    // overflow, so a tab is in view only left of it.
-    const add = this.host.querySelector<HTMLElement>(".sheetwrite-tab-add");
-    const right =
-      add === null || add === element
-        ? stripRect.right
-        : Math.min(stripRect.right, add.getBoundingClientRect().left);
-    if (tabRect.left < stripRect.left) {
-      this.host.scrollLeft += tabRect.left - stripRect.left;
+    if (tabRect.left < left) {
+      this.host.scrollLeft += tabRect.left - left;
     } else if (tabRect.right > right) {
       this.host.scrollLeft += tabRect.right - right;
     }
+  }
+
+  /** An arrow at one edge of the strip: shown while the tabs overflow, it scrolls by a sheet. */
+  private createScrollArrow(direction: "previous" | "next"): HTMLButtonElement {
+    const arrow = document.createElement("button");
+    arrow.type = "button";
+    arrow.className = `sheetwrite-tab-scroll sheetwrite-tab-scroll-${direction}`;
+    arrow.appendChild(createTabIcon(direction === "previous" ? "M12 5l-5 5 5 5" : "M8 5l5 5-5 5"));
+    const label = direction === "previous" ? "Show earlier sheets" : "Show later sheets";
+    arrow.setAttribute("aria-label", label);
+    arrow.title = `${label}. Right-click, or press and hold, for a list of all sheets.`;
+    arrow.setAttribute("aria-haspopup", "true");
+    arrow.setAttribute("aria-expanded", "false");
+    arrow.hidden = true;
+
+    // A press after a long press that opened the list must not also scroll.
+    let listOpenedByPress = false;
+    arrow.addEventListener("click", () => {
+      if (listOpenedByPress) {
+        listOpenedByPress = false;
+        return;
+      }
+      if (arrow.getAttribute("aria-disabled") !== "true") this.scrollBySheet(direction);
+    });
+    // As in Excel, a right-click on the arrows lists every sheet. The context
+    // menu key and Shift+F10 send the same event from the keyboard.
+    arrow.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      this.openSheetList(arrow);
+    });
+    // Touch: a long press does the same, as a right-click is not available.
+    arrow.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch") return;
+      const { clientX, clientY } = event;
+      const timer = setTimeout(() => {
+        listOpenedByPress = true;
+        this.openSheetList(arrow);
+      }, LONG_PRESS_MS);
+      const stop = (): void => {
+        clearTimeout(timer);
+        arrow.removeEventListener("pointerup", stop);
+        arrow.removeEventListener("pointercancel", stop);
+        arrow.removeEventListener("pointermove", move);
+      };
+      const move = (moved: PointerEvent): void => {
+        if (Math.hypot(moved.clientX - clientX, moved.clientY - clientY) > LONG_PRESS_SLOP) stop();
+      };
+      arrow.addEventListener("pointerup", stop);
+      arrow.addEventListener("pointercancel", stop);
+      arrow.addEventListener("pointermove", move);
+    });
+    return arrow;
+  }
+
+  private scheduleOverflow(): void {
+    if (this.overflowFrame !== 0 || this.destroyed) return;
+    this.overflowFrame = requestAnimationFrame(() => {
+      this.overflowFrame = 0;
+      this.updateOverflow();
+    });
+  }
+
+  private readonly onStripScroll = (): void => this.scheduleOverflow();
+
+  /** Shows the arrows while the tabs overflow, and disables the one at the end reached. */
+  private updateOverflow(): void {
+    if (this.destroyed) return;
+    const previous = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-scroll-previous");
+    const next = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-scroll-next");
+    if (!previous || !next) return;
+    const { scrollLeft, scrollWidth, clientWidth } = this.host;
+    const overflow = scrollWidth > clientWidth + 1;
+    if (previous.hidden === overflow) {
+      previous.hidden = !overflow;
+      next.hidden = !overflow;
+    }
+    if (!overflow) return;
+    const atStart = scrollLeft <= 1;
+    const atEnd = scrollLeft + clientWidth >= scrollWidth - 1;
+    previous.setAttribute("aria-disabled", String(atStart));
+    next.setAttribute("aria-disabled", String(atEnd));
+  }
+
+  /** Brings the next sheet that is out of view on that side fully into view, as Excel's arrows do. */
+  private scrollBySheet(direction: "previous" | "next"): void {
+    const { left, right } = this.viewEdges();
+    const tabs = this.buttons.map((tab) => tab.getBoundingClientRect());
+    if (direction === "next") {
+      const target = tabs.find((rect) => rect.right > right + 1);
+      if (target) this.host.scrollLeft += target.right - right;
+    } else {
+      // The last tab that starts left of the view: the first one hidden on that side.
+      const target = tabs.filter((rect) => rect.left < left - 1).at(-1);
+      if (target) this.host.scrollLeft -= left - target.left;
+    }
+    this.updateOverflow();
+  }
+
+  /**
+   * Excel's list of sheets: every visible sheet, the active one marked;
+   * choosing one activates it. It opens from the scroll arrows.
+   */
+  private openSheetList(anchor: HTMLButtonElement): void {
+    this.sheetListDismiss?.();
+    const list = document.createElement("div");
+    list.className = "sheetwrite-tab-list";
+    list.setAttribute("popover", "manual");
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", `All ${this.label.toLowerCase()}`);
+    // WebKit does not focus a pressed button; keep focus in the list.
+    list.addEventListener("mousedown", (event) => event.preventDefault());
+    const choices: HTMLButtonElement[] = [];
+    for (const { sheet } of this.visibleSheets()) {
+      const choice = document.createElement("button");
+      choice.type = "button";
+      choice.textContent = sheet.name;
+      if (sheet.id === this.activeId) choice.setAttribute("aria-current", "true");
+      choice.addEventListener("click", () => {
+        close(false);
+        this.focusedId = sheet.id;
+        this.feedback = null;
+        this.onActivate(sheet.id);
+        this.buttonFor(sheet.id)?.focus();
+      });
+      choices.push(choice);
+    }
+    list.append(...choices);
+
+    const onOutsidePointer = (event: PointerEvent): void => {
+      if (event.target instanceof Node && !list.contains(event.target) && event.target !== anchor) {
+        close(list.contains(document.activeElement));
+      }
+    };
+    // Removing the list blurs its focused choice, whose focusout closes again.
+    let closed = false;
+    const close = (restoreFocus: boolean): void => {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("pointerdown", onOutsidePointer, true);
+      if (typeof list.hidePopover === "function") {
+        try {
+          list.hidePopover();
+        } catch {
+          // The fallback path was open without placing the list in the top layer.
+        }
+      }
+      list.remove();
+      anchor.setAttribute("aria-expanded", "false");
+      if (this.sheetListDismiss === dismiss) this.sheetListDismiss = null;
+      if (restoreFocus && anchor.isConnected) anchor.focus();
+    };
+    const dismiss = (): void => close(false);
+    this.sheetListDismiss = dismiss;
+
+    list.addEventListener("keydown", (event) => {
+      const current = choices.indexOf(document.activeElement as HTMLButtonElement);
+      let target: number | null = null;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close(true);
+        return;
+      }
+      if (event.key === "ArrowDown") target = Math.min(choices.length - 1, current + 1);
+      else if (event.key === "ArrowUp") target = Math.max(0, current - 1);
+      else if (event.key === "Home") target = 0;
+      else if (event.key === "End") target = choices.length - 1;
+      if (target === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      choices[target]?.focus();
+    });
+    list.addEventListener("focusout", (event) => {
+      if (event.relatedTarget instanceof Node && list.contains(event.relatedTarget)) return;
+      close(false);
+    });
+
+    this.host.appendChild(list);
+    if (typeof list.showPopover === "function") {
+      list.showPopover();
+      const { left, top } = popupPosition(
+        anchor.getBoundingClientRect(),
+        list.getBoundingClientRect(),
+        CHOICES_PLACEMENT,
+      );
+      list.style.left = `${left}px`;
+      list.style.top = `${top}px`;
+    }
+    anchor.setAttribute("aria-expanded", "true");
+    document.addEventListener("pointerdown", onOutsidePointer, true);
+    (choices.find((choice) => choice.hasAttribute("aria-current")) ?? choices[0])?.focus();
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
