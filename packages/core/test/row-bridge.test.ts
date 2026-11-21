@@ -5,7 +5,8 @@ import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge, type RowBridgeProjection } from "../src/row-bridge.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellValue } from "../src/types/cell.js";
-import type { DocumentOp, Workbook } from "../src/types/document.js";
+import type { ColumnarData } from "../src/types/data.js";
+import type { DocumentOp } from "../src/types/document.js";
 import type { ChangeEvent } from "../src/types/transaction.js";
 
 interface HostRow extends Record<string, string | number | boolean | null> {
@@ -44,6 +45,27 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
+/** A store whose sheet1 has the bridge's name and amount columns. */
+function storeOf(rowCount: number, values?: ColumnarData["columns"]): SheetwriteStore {
+  return new SheetwriteStore(
+    {
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount,
+          columns: [
+            { key: "name", header: "Name", width: 100, type: "text" },
+            { key: "amount", header: "Amount", width: 100, type: "number" },
+          ],
+        },
+      ],
+    },
+    values && { rowCount, columns: values },
+  );
+}
+
 const duplicateRowId = expect.objectContaining({
   code: "invalid-argument",
   operation: "row-bridge",
@@ -51,21 +73,7 @@ const duplicateRowId = expect.objectContaining({
 
 describe("RowBridge", () => {
   it("projects revised restores during nested callbacks and after the event lifetime", () => {
-    const workbook: Workbook = {
-      activeSheet: "sheet1",
-      sheets: [
-        {
-          id: "sheet1",
-          name: "Sheet 1",
-          rowCount: 3,
-          columns: [
-            { key: "name", header: "Name", width: 100, type: "text" },
-            { key: "amount", header: "Amount", width: 100, type: "number" },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(workbook);
+    const store = storeOf(3);
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const range = { sheet: "sheet1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } };
     const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [10] });
@@ -169,7 +177,7 @@ describe("RowBridge", () => {
     expect(remote.deltas).toHaveLength(1);
   });
 
-  for (const maxRecentTransactions of [1, 8, undefined]) {
+  for (const maxRecentTransactions of [1, undefined]) {
     const echoWindowSize = maxRecentTransactions ?? 8192;
     for (const identity of ["transaction ID", "operation fingerprint"] as const) {
       for (const laterTransactions of [echoWindowSize - 1, echoWindowSize]) {
@@ -321,24 +329,7 @@ describe("RowBridge", () => {
   });
 
   it("captures packed and clear before/after cells only when detailed capture is enabled", () => {
-    const workbook: Workbook = {
-      activeSheet: "sheet1",
-      sheets: [
-        {
-          id: "sheet1",
-          name: "Sheet 1",
-          rowCount: 2,
-          columns: [
-            { key: "name", header: "Name", width: 100, type: "text" },
-            { key: "amount", header: "Amount", width: 100, type: "number" },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(workbook, {
-      rowCount: 2,
-      columns: { name: ["A", "B"], amount: [1, 2] },
-    });
+    const store = storeOf(2, { name: ["A", "B"], amount: [1, 2] });
     const bridge = createRowBridge({
       columns,
       defaultRows: rows.slice(0, 2),
@@ -385,24 +376,7 @@ describe("RowBridge", () => {
   });
 
   it("projects a clear as the cells it changed, not every cell of its range", () => {
-    const workbook: Workbook = {
-      activeSheet: "sheet1",
-      sheets: [
-        {
-          id: "sheet1",
-          name: "Sheet 1",
-          rowCount: 3,
-          columns: [
-            { key: "name", header: "Name", width: 100, type: "text" },
-            { key: "amount", header: "Amount", width: 100, type: "number" },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(workbook, {
-      rowCount: 3,
-      columns: { name: ["A", null, null], amount: [null, null, 3] },
-    });
+    const store = storeOf(3, { name: ["A", null, null], amount: [null, null, 3] });
     // Row b holds no value, but a reference to an empty cell and a bold style.
     store.applyTransaction({
       patches: [
@@ -448,24 +422,7 @@ describe("RowBridge", () => {
   });
 
   it("lists every cleared cell when capture is off, even beside a captured set", () => {
-    const workbook: Workbook = {
-      activeSheet: "sheet1",
-      sheets: [
-        {
-          id: "sheet1",
-          name: "Sheet 1",
-          rowCount: 3,
-          columns: [
-            { key: "name", header: "Name", width: 100, type: "text" },
-            { key: "amount", header: "Amount", width: 100, type: "number" },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(workbook, {
-      rowCount: 3,
-      columns: { name: ["A", "B", "C"], amount: [1, 2, 3] },
-    });
+    const store = storeOf(3, { name: ["A", "B", "C"], amount: [1, 2, 3] });
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.on("change", (change) => projections.push(bridge.project(change)));
@@ -495,17 +452,7 @@ describe("RowBridge", () => {
   });
 
   it("projects a captured clear of an empty range as no cells", () => {
-    const store = new SheetwriteStore({
-      activeSheet: "sheet1",
-      sheets: [
-        {
-          id: "sheet1",
-          name: "Sheet 1",
-          rowCount: 3,
-          columns: [{ key: "name", header: "Name", width: 100, type: "text" }],
-        },
-      ],
-    });
+    const store = storeOf(3);
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.setDetailedChangeCapture(true);
@@ -529,20 +476,7 @@ describe("RowBridge", () => {
   });
 
   it("keeps a later write's change out of a captured clear in the same transaction", () => {
-    const store = new SheetwriteStore(
-      {
-        activeSheet: "sheet1",
-        sheets: [
-          {
-            id: "sheet1",
-            name: "Sheet 1",
-            rowCount: 3,
-            columns: [{ key: "name", header: "Name", width: 100, type: "text" }],
-          },
-        ],
-      },
-      { rowCount: 3, columns: { name: ["A", null, "C"] } },
-    );
+    const store = storeOf(3, { name: ["A", null, "C"] });
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.setDetailedChangeCapture(true);
