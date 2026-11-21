@@ -105,6 +105,8 @@ export interface ClipboardControllerDeps {
     step: "cut" | "paste",
     rows: readonly { readonly start: number; readonly end: number }[],
   ) => void;
+  /** Called with what the user reads when a paste is larger than a paste may be. */
+  onTooLarge?: (message: string) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -205,6 +207,42 @@ function limited<T>(parse: () => T): T | DelimitedTextResourceError {
   } catch (error) {
     if (error instanceof DelimitedTextResourceError) return error;
     throw error;
+  }
+}
+
+/** What the user reads when a paste is larger than a paste may be. */
+function tooLargeMessage(error: DelimitedTextResourceError): string {
+  const count = (value: number): string => value.toLocaleString("en-US");
+  const megabytes = (bytes: number): string =>
+    `${(bytes / (1024 * 1024)).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`;
+  switch (error.resource) {
+    case "maxRows":
+      return `This paste has ${count(error.actual)} rows. A paste can have at most ${count(error.limit)}.`;
+    case "maxColumns":
+      return `This paste has ${count(error.actual)} columns. A paste can have at most ${count(error.limit)}.`;
+    case "maxCells":
+      return `This paste has ${count(error.actual)} cells. A paste can have at most ${count(error.limit)}.`;
+    case "maxFieldBytes":
+      return `A cell of this paste has ${megabytes(error.actual)} of text. A cell can have at most ${megabytes(error.limit)}.`;
+    default:
+      return `This paste has ${megabytes(error.actual)} of text. A paste can have at most ${megabytes(error.limit)}.`;
+  }
+}
+
+/**
+ * `paste`'s outcome; a paste larger than a paste may be is refused with
+ * `"too-large"`, and `onTooLarge` tells the user why.
+ */
+async function refusingTooLarge(
+  paste: Promise<ClipboardOutcome>,
+  onTooLarge: ((message: string) => void) | undefined,
+): Promise<ClipboardOutcome> {
+  try {
+    return await paste;
+  } catch (error) {
+    if (!(error instanceof DelimitedTextResourceError)) throw error;
+    onTooLarge?.(tooLargeMessage(error));
+    return "too-large";
   }
 }
 
@@ -817,10 +855,11 @@ export class ClipboardController {
 
   /**
    * Paste at the focus cell. Only the current controller's token restores rich
-   * formulas/refs; custom, HTML, and plain external inputs are inert.
+   * formulas/refs; custom, HTML, and plain external inputs are inert. A paste
+   * larger than a paste may be is refused with `"too-large"`.
    */
   paste(): Promise<ClipboardOutcome> {
-    return this.pasteFrom(false);
+    return refusingTooLarge(this.pasteFrom(false), this.deps.onTooLarge);
   }
 
   /**
@@ -828,7 +867,7 @@ export class ClipboardController {
    * styles. For external text this is identical to {@link paste}.
    */
   pasteValues(): Promise<ClipboardOutcome> {
-    return this.pasteFrom(true);
+    return refusingTooLarge(this.pasteFrom(true), this.deps.onTooLarge);
   }
 
   /**
@@ -837,7 +876,11 @@ export class ClipboardController {
    * after OK, within the click that browsers ask of a clipboard read. As in
    * Excel, it is not available while a cut waits for its paste.
    */
-  async pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
+  pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
+    return refusingTooLarge(this.pasteSpecialFrom(options), this.deps.onTooLarge);
+  }
+
+  private async pasteSpecialFrom(options: PasteSpecialOptions): Promise<ClipboardOutcome> {
     if (this.deps.readOnly() || this.pendingCut || !this.pasteTarget()) return "empty";
     if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
     let chosen: PasteSpecialOptions | null = options;

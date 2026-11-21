@@ -513,6 +513,35 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
+  it("refuses a paste wider than a sheet with a plain message, and resolves", async () => {
+    const { grid, store, host } = makeGrid();
+    // One row of 16,385 cells, one more than a paste may have.
+    const text = "\t".repeat(16_384);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () =>
+          Promise.resolve([
+            {
+              types: ["text/plain"],
+              getType: () => Promise.resolve(new Blob([text], { type: "text/plain" })),
+            },
+          ]),
+      },
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    const status = () => host.querySelector(".sheetwrite-action-status")?.textContent;
+    const message = "This paste has 16,385 columns. A paste can have at most 16,384.";
+
+    expect(await grid.actions.paste()).toBe("too-large");
+    expect(status()).toBe(message);
+    expect(await grid.actions.pasteSpecial({ paste: "values" })).toBe("too-large");
+    expect(await grid.actions.pasteValues()).toBe("too-large");
+    expect(status()).toBe(message);
+    grid.destroy();
+    store.dispose();
+  });
+
   it("copies the top row and its format into the selection with Ctrl+D", () => {
     const { grid, store, host } = makeGrid();
     store.applyTransaction({

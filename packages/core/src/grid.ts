@@ -1000,6 +1000,8 @@ export class GridImpl implements Grid {
         this.validationRefusedNotice(refused, warned);
       },
       validationReads: () => storeEngine(this.store)?.validationReads,
+      // A paste too large to land says how large it is.
+      onTooLarge: (message) => this.actionFeedback.show(message),
       // Excel's cut moves the rows a filter or Hide Rows hides without a word;
       // say so. Show them clears the filters and shows the step's hidden rows,
       // as one undo step.

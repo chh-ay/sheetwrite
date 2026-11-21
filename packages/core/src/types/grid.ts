@@ -165,8 +165,11 @@ export interface CellEditor {
  *   a read-only grid on paste), or the action stopped without a change to the
  *   grid because a newer action of the same kind (copy or cut, paste) started
  *   or the grid was destroyed first.
+ * - `"too-large"`: a paste was refused because the clipboard holds more rows,
+ *   columns, cells or text than a paste may have; the grid tells the user how
+ *   much, and the cells stay as they were.
  */
-export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "too-large";
 
 /**
  * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s
