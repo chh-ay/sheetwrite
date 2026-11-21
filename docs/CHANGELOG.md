@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A code hover panel opens next to the name it describes: 8 px below it, or 8 px above it when there is no room below. It could open far from the name, at the top of the page over the title, because it moved past the code block's tabs and title. The panel is at most 560 px wide (the docs text wraps), and the hovered name gets a tint and an accent underline instead of an outlined box that ran over the next character.
 - The data tools showcase, the only one without a picture of how it works, has a section with a blueprint figure of what its guarded columns do with an edit that breaks their rule: Units rejects −5, Freight saves $350 with a warning, and Order ID is locked.
 - The proof cards of the vanilla, React, Vue and Svelte workbenches (`/vanilla/`, `/react/`, `/vue/`, `/svelte/`) are blueprint pictures, like the other showcases, and their titles and text are in plain words ("Create and destroy" instead of "Explicit lifecycle"). They were the last pictures in the old card style, so `Art.tsx` and the old art classes in `art.css` are gone. The database and collaboration proof cards are in plain words too ("A retry is applied once" instead of "Idempotent retries").
 - Search ranks the pages whose title or a heading holds a query of several words as one phrase above the rest, and opens on that heading: "find all" finds "Options and Find All in the find bar" on the Search page before the text functions page, which only mentions FIND.

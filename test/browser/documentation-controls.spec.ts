@@ -295,6 +295,50 @@ test("leaving and revisiting a page leaves one copy of each code popover", async
   await expect(page.locator(`[id="${panelId}"]`)).toHaveCount(1);
 });
 
+/** The panel's distance from its symbol (`PANEL_OFFSET_PX` in `code-popovers.ts`). */
+const POPOVER_GAP_PX = 8;
+/** Layout rounds boxes to device pixels. */
+const POPOVER_GAP_TOLERANCE_PX = 1;
+/** The panel's width cap: 35rem at the 16 px root size. */
+const POPOVER_MAX_WIDTH_PX = 560;
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 834, height: 1112 },
+]) {
+  test(`at ${viewport.width} px a code popover opens 8 px from its symbol and inside the viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(INSTALLATION_URL);
+    await waitForHydration(page);
+    const trigger = page.locator('[data-sw-symbol="createGrid"]').filter({ visible: true }).first();
+    const panel = page.locator(
+      `[id="${await trigger.getAttribute("data-sw-code-popover-trigger")}"]`,
+    );
+
+    await trigger.hover();
+    await expect(panel).toBeVisible();
+
+    const symbol = await trigger.boundingBox();
+    const box = await panel.boundingBox();
+    if (symbol === null || box === null) throw new Error("The symbol or its panel has no box.");
+    const opensBelow = box.y >= symbol.y + symbol.height;
+    const gap = opensBelow ? box.y - (symbol.y + symbol.height) : symbol.y - (box.y + box.height);
+    expect(gap).toBeGreaterThanOrEqual(POPOVER_GAP_PX - POPOVER_GAP_TOLERANCE_PX);
+    expect(gap).toBeLessThanOrEqual(POPOVER_GAP_PX + POPOVER_GAP_TOLERANCE_PX);
+    // The panel starts at the symbol's column, unless that would push it past the viewport.
+    expect(box.x).toBeLessThanOrEqual(symbol.x + POPOVER_GAP_TOLERANCE_PX);
+    expect(box.x + box.width).toBeGreaterThan(symbol.x);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.width).toBeLessThanOrEqual(POPOVER_MAX_WIDTH_PX);
+  });
+}
+
 test.describe("on a touch screen", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 

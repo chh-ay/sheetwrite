@@ -13,7 +13,8 @@
  * content. A panel whose page leaves the document leaves with it.
  *
  * Positioning is the placement module's geometry: the panel is fixed to the
- * viewport and follows its line once per frame while the page scrolls.
+ * viewport, anchored to the hovered symbol, and follows it once per frame
+ * while the page scrolls.
  *
  * Pointer hover and keyboard focus open the same panel, which is the trigger's
  * accessible description (`aria-describedby`). On a touch screen a tap opens
@@ -21,16 +22,14 @@
  */
 import {
   type Box,
-  choosePanelPlacement,
-  type PanelPlacement,
+  choosePanelSide,
+  type PanelSide,
   panelFrame,
   type PlacementInput,
 } from "./code-popover-placement.js";
 
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
 const STORE_SELECTOR = "template.sw-code-popover-store";
-/** One code line; a wrapped line is one element over several visual rows. */
-const LINE_SELECTOR = ".ec-line";
 /** The sticky site header; panels never open underneath it. */
 const HEADER_SELECTOR = ".sw-docs-bar, .sw-header";
 /** Marks the trigger whose panel is open. */
@@ -42,10 +41,9 @@ const PANEL_OPEN_ATTRIBUTE = "data-open";
 
 /** Pointer travel time from a trigger to its panel before the panel closes. */
 const CLOSE_DELAY_MS = 90;
+/** Space between the panel and the hovered symbol. */
 const PANEL_OFFSET_PX = 8;
 const VIEWPORT_PADDING_PX = 12;
-/** A panel taller than the room beside its line shrinks and scrolls, down to this. */
-const PANEL_MIN_HEIGHT_PX = 160;
 /**
  * At most this many panels stay prepared; the oldest leave first. Each one is
  * laid out with the page, so preparing every panel would make every page
@@ -64,7 +62,7 @@ interface OpenPopover {
   trigger: HTMLElement;
   panel: HTMLElement;
   related: readonly HTMLElement[];
-  placement: PanelPlacement;
+  side: PanelSide;
   size: PanelSize;
   stopFollowing: () => void;
 }
@@ -213,33 +211,6 @@ function panelArea(): Box {
 }
 
 /**
- * The code block's tabs and title bar: Expressive Code's file tab and, for a
- * block inside a tab panel (the landing's framework tabs), that tab list.
- */
-function blockChrome(trigger: HTMLElement): Element[] {
-  const chrome: Element[] = [
-    ...(trigger.closest(".expressive-code")?.querySelectorAll("figcaption") ?? []),
-  ];
-  const tabId = trigger.closest('[role="tabpanel"]')?.getAttribute("aria-labelledby");
-  const tabList = tabId ? document.getElementById(tabId)?.closest('[role="tablist"]') : null;
-  if (tabList) chrome.push(tabList);
-  return chrome;
-}
-
-function lineOf(trigger: HTMLElement): Element {
-  return trigger.closest(LINE_SELECTOR) ?? trigger;
-}
-
-/** Where the line's text ends, on its widest visual row. */
-function lineTextEnd(line: Element): number {
-  const range = document.createRange();
-  range.selectNodeContents(line);
-  let end = 0;
-  for (const rect of range.getClientRects()) end = Math.max(end, rect.right);
-  return end;
-}
-
-/**
  * A panel's size without a height limit. Read once per panel and viewport
  * width; a prepared panel is already laid out, so the read forces no layout.
  */
@@ -253,43 +224,27 @@ function naturalSize(panel: HTMLElement): PanelSize {
 }
 
 /** Everything placement needs, read from the page in one pass. */
-function measure(
-  trigger: HTMLElement,
-  mentions: readonly HTMLElement[],
-  chrome: readonly Element[],
-  panel: PanelSize,
-): PlacementInput {
-  const line = lineOf(trigger);
-  return {
-    trigger: boxOf(trigger),
-    line: boxOf(line),
-    lineEnd: lineTextEnd(line),
-    panel,
-    mentions: mentions.map(boxOf),
-    chrome: chrome.map(boxOf),
-    viewport: panelArea(),
-    gap: PANEL_OFFSET_PX,
-    minHeight: PANEL_MIN_HEIGHT_PX,
-  };
+function measure(trigger: HTMLElement, panel: PanelSize): PlacementInput {
+  return { trigger: boxOf(trigger), panel, viewport: panelArea(), gap: PANEL_OFFSET_PX };
 }
 
-function positionPanel(panel: HTMLElement, placement: PanelPlacement, input: PlacementInput): void {
-  const { left, top, maxHeight } = panelFrame(placement, input);
+function positionPanel(panel: HTMLElement, side: PanelSide, input: PlacementInput): void {
+  const { left, top, maxHeight } = panelFrame(side, input);
   Object.assign(panel.style, { left: `${left}px`, top: `${top}px`, maxHeight: `${maxHeight}px` });
 }
 
 /**
- * Keeps the open panel on its line while the page or a code block scrolls and
- * while the window resizes, at most once per frame, on the side chosen when it
- * opened. Returns the stopper.
+ * Keeps the open panel on its symbol while the page or a code block scrolls
+ * and while the window resizes, at most once per frame, on the side chosen
+ * when it opened. Returns the stopper.
  */
-function followLine(): () => void {
+function followTrigger(): () => void {
   let frame: number | undefined;
   const reposition = (): void => {
     frame = undefined;
     if (activePopover === null) return;
-    const { trigger, panel, placement, size } = activePopover;
-    positionPanel(panel, placement, measure(trigger, [], [], size));
+    const { trigger, panel, side, size } = activePopover;
+    positionPanel(panel, side, measure(trigger, size));
   };
   const schedule = (): void => {
     frame ??= window.requestAnimationFrame(reposition);
@@ -326,15 +281,15 @@ export function openCodePopover(trigger: HTMLElement): void {
   // laid out, so these reads force no layout of its content.
   const related = relatedTriggers(trigger, panelId);
   const size = naturalSize(panel);
-  const input = measure(trigger, related, blockChrome(trigger), size);
-  const placement = choosePanelPlacement(input);
+  const input = measure(trigger, size);
+  const side = choosePanelSide(input);
 
   closePopover();
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
-  positionPanel(panel, placement, input);
+  positionPanel(panel, side, input);
   panel.setAttribute(PANEL_OPEN_ATTRIBUTE, "");
-  activePopover = { trigger, panel, related, placement, size, stopFollowing: followLine() };
+  activePopover = { trigger, panel, related, side, size, stopFollowing: followTrigger() };
 }
 
 function handlePointerOver(event: PointerEvent): void {
