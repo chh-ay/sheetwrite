@@ -96,6 +96,10 @@ const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
 const LONG_PRESS_MS = 500;
 /** A touch that moves farther than this, in CSS px, is a scroll, not a long press. */
 const LONG_PRESS_SLOP = 10;
+/** The list of all sheets shows this many before it scrolls. */
+const SHEET_LIST_ROWS = 12;
+/** The list of all sheets keeps this far inside the page's visible area, in CSS px. */
+const SHEET_LIST_MARGIN = 8;
 
 /**
  * A tab bar glyph on a 20-unit grid; `strokeWidth` 1.33 matches the command
@@ -277,6 +281,8 @@ export class SheetTabs {
     this.host.replaceChildren();
     this.host.removeAttribute("role");
     this.host.removeAttribute("aria-label");
+    this.host.removeAttribute("data-tabs-cut-start");
+    this.host.removeAttribute("data-tabs-cut-end");
     this.rendering = false;
     this.sheets = [];
     this.buttons = [];
@@ -1129,9 +1135,12 @@ export class SheetTabs {
       previous.hidden = !overflow;
       next.hidden = !overflow;
     }
+    const atStart = !overflow || scrollLeft <= 1;
+    const atEnd = !overflow || scrollLeft + clientWidth >= scrollWidth - 1;
+    // Cut tab text fades out before an arrow while that edge hides tabs (tabs.css).
+    this.host.toggleAttribute("data-tabs-cut-start", !atStart);
+    this.host.toggleAttribute("data-tabs-cut-end", !atEnd);
     if (!overflow) return;
-    const atStart = scrollLeft <= 1;
-    const atEnd = scrollLeft + clientWidth >= scrollWidth - 1;
     previous.setAttribute("aria-disabled", String(atStart));
     next.setAttribute("aria-disabled", String(atEnd));
   }
@@ -1179,7 +1188,18 @@ export class SheetTabs {
       });
       choices.push(choice);
     }
-    list.append(...choices);
+    // The choices scroll inside the list's frame, so the frame keeps its
+    // border and shadow while a fade at a cut edge shows there is more.
+    const items = document.createElement("div");
+    items.className = "sheetwrite-tab-list-items";
+    items.append(...choices);
+    list.append(items);
+    const markCutEdges = (): void => {
+      const { scrollTop, scrollHeight, clientHeight } = items;
+      items.toggleAttribute("data-more-above", scrollTop > 1);
+      items.toggleAttribute("data-more-below", scrollTop + clientHeight < scrollHeight - 1);
+    };
+    items.addEventListener("scroll", markCutEdges, { passive: true });
 
     const onOutsidePointer = (event: PointerEvent): void => {
       if (event.target instanceof Node && !list.contains(event.target) && event.target !== anchor) {
@@ -1233,14 +1253,31 @@ export class SheetTabs {
     this.host.appendChild(list);
     if (typeof list.showPopover === "function") {
       list.showPopover();
+      // Up to SHEET_LIST_ROWS sheets show before the list scrolls, and no
+      // more than the larger side of the anchor holds.
+      const anchorRect = anchor.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      const room =
+        Math.max(anchorRect.top, viewportHeight - anchorRect.bottom) -
+        CHOICES_PLACEMENT.gap -
+        2 * SHEET_LIST_MARGIN;
+      const row = choices[0]?.offsetHeight ?? 0;
+      const chrome = list.offsetHeight - items.offsetHeight;
+      const padding = items.scrollHeight - row * choices.length;
+      const rows = padding + row * SHEET_LIST_ROWS;
+      items.style.maxHeight = `${Math.max(row, Math.min(rows, room - chrome))}px`;
       const { left, top } = popupPosition(
-        anchor.getBoundingClientRect(),
+        anchorRect,
         list.getBoundingClientRect(),
         CHOICES_PLACEMENT,
       );
-      list.style.left = `${left}px`;
+      // Inside the page's visible width, which leaves out a scrollbar.
+      const width = list.offsetWidth;
+      list.style.left = `${Math.max(SHEET_LIST_MARGIN, Math.min(left, viewportWidth - width - SHEET_LIST_MARGIN))}px`;
       list.style.top = `${top}px`;
     }
+    markCutEdges();
     anchor.setAttribute("aria-expanded", "true");
     document.addEventListener("pointerdown", onOutsidePointer, true);
     (choices.find((choice) => choice.hasAttribute("aria-current")) ?? choices[0])?.focus();

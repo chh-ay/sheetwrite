@@ -233,6 +233,39 @@
   cursor: default;
 }
 
+/* While an edge of the strip hides tabs, the cut tab text fades out over
+   16 px before that edge's arrow, then a 4 px gap of the bar's background
+   (sheet-tabs.ts sets the data attributes). */
+:is(
+  [data-tabs-cut-start] > .sheetwrite-tab-scroll-previous,
+  [data-tabs-cut-end] > .sheetwrite-tab-end
+)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+}
+
+[data-tabs-cut-start] > .sheetwrite-tab-scroll-previous::before {
+  left: 100%;
+  background: linear-gradient(
+    to left,
+    transparent,
+    var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff))) 16px
+  );
+}
+
+[data-tabs-cut-end] > .sheetwrite-tab-end::before {
+  right: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff))) 16px
+  );
+}
+
 .sheetwrite-tab-options-button:hover,
 .sheetwrite-tab-options-button[aria-expanded="true"],
 .sheetwrite-tab-add:hover,
@@ -379,6 +412,41 @@
 }
 
 /* The active sheet in the list of all sheets. */
+/* The list's frame keeps its border and shadow; the choices scroll inside it,
+   and a cut edge fades out so the list shows it scrolls (sheet-tabs.ts sets
+   the data attributes and the height). */
+.sheetwrite-tab-list {
+  display: block;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+}
+
+.sheetwrite-tab-list-items {
+  display: grid;
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.sheetwrite-tab-list-items[data-more-below] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+.sheetwrite-tab-list-items[data-more-above] {
+  mask-image: linear-gradient(to top, #000 calc(100% - 28px), transparent);
+}
+
+.sheetwrite-tab-list-items[data-more-above][data-more-below] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent
+  );
+}
+
 .sheetwrite-tab-list button[aria-current="true"] {
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
   font-weight: 680;

@@ -126,3 +126,72 @@ test("tabs that fit show no scroll arrows", async ({ page }) => {
     0,
   );
 });
+
+/** Whether each edge of the strip draws the fade that cut tab text fades into. */
+function fades(page: Page): Promise<{ start: boolean; end: boolean }> {
+  return page.evaluate(() => {
+    const strip = document.querySelector(".sheetwrite-shell-tabs");
+    const drawn = (element: Element | null | undefined) =>
+      element ? getComputedStyle(element, "::before").content !== "none" : false;
+    return {
+      start: drawn(strip?.querySelector(".sheetwrite-tab-scroll-previous")),
+      end: drawn(strip?.querySelector(".sheetwrite-tab-end")),
+    };
+  });
+}
+
+test("cut tab text fades out before an arrow, only at an edge that hides tabs", async ({
+  page,
+}) => {
+  await open(page, 834, SHEETS);
+  expect(await fades(page)).toEqual({ start: false, end: true });
+  const next = page
+    .locator(".sheetwrite-shell-tabs")
+    .getByRole("button", { name: "Show later sheets" });
+  for (let press = 0; press < SHEETS.length && !(await tabInView(page, "History")); press++) {
+    await next.click();
+    await nextFrames(page);
+  }
+  expect(await fades(page)).toEqual({ start: true, end: false });
+
+  await open(page, 1_440, []);
+  expect(await fades(page)).toEqual({ start: false, end: false });
+});
+
+test("the list of all sheets stays inside the page and shows that it scrolls", async ({ page }) => {
+  // Twenty sheets: more than the list shows before it scrolls, and too many to fit at 1440 px.
+  const many = Array.from({ length: 17 }, (_, index) => `Region ${index + 1}`);
+  for (const width of [1_440, 834, 390, 320]) {
+    await open(page, width, many);
+    const next = page
+      .locator(".sheetwrite-shell-tabs")
+      .getByRole("button", { name: "Show later sheets" });
+    await next.click({ button: "right" });
+    const list = page.getByRole("group", { name: "All sheets" });
+    await expect(list).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const frame = document.querySelector(".sheetwrite-tab-list");
+      const items = document.querySelector<HTMLElement>(".sheetwrite-tab-list-items");
+      if (!frame || !items) return null;
+      const box = frame.getBoundingClientRect();
+      const row = items.querySelector("button")?.getBoundingClientRect().height ?? 0;
+      return {
+        inside:
+          box.left >= 0 &&
+          box.top >= 0 &&
+          box.right <= document.documentElement.clientWidth &&
+          box.bottom <= document.documentElement.clientHeight,
+        rowsShown: Math.round(items.clientHeight / row),
+        scrolls: items.scrollHeight > items.clientHeight,
+        moreBelow: items.hasAttribute("data-more-below"),
+        mask: getComputedStyle(items).maskImage,
+      };
+    });
+    expect(layout?.inside, `${width} px`).toBe(true);
+    expect(layout?.rowsShown, `${width} px`).toBeGreaterThanOrEqual(12);
+    expect(layout?.scrolls, `${width} px`).toBe(true);
+    expect(layout?.moreBelow, `${width} px`).toBe(true);
+    expect(layout?.mask, `${width} px`).toContain("gradient");
+    await page.keyboard.press("Escape");
+  }
+});
