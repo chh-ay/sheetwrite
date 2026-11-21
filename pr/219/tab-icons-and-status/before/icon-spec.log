@@ -1,0 +1,264 @@
+
+Running 9 tests using 1 worker
+
+  ✓  1 [chromium] › test/browser/status-beside-tabs.spec.ts:8:1 › the status never overlaps the sheet tabs, from 1440 px down to 320 px (9.4s)
+  ✘  2 [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability (994ms)
+  ✘  3 [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability (2.0s)
+  ✘  4 [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability (1.2s)
+  ✘  5 [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability (2.0s)
+  ✘  6 [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability (2.8s)
+  ✘  7 [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability (4.3s)
+  ✘  8 [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability (2.6s)
+  ✘  9 [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability (3.3s)
+
+
+  1) [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -4 px off",
+    +   "1440 px: more is -2 px off",
+    +   "834 px: add is -4 px off",
+    +   "834 px: more is -2 px off",
+    +   "390 px: add is -4 px off",
+    +   "390 px: more is -2 px off",
+    +   "320 px: add is -4 px off",
+    +   "320 px: more is -2 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--4809b-ses-spreadsheet-portability-chromium/error-context.md
+
+  2) [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -1 px off",
+    +   "1440 px: more is -2 px off",
+    +   "834 px: add is -1 px off",
+    +   "834 px: more is -2 px off",
+    +   "390 px: add is -1 px off",
+    +   "390 px: more is -2 px off",
+    +   "320 px: add is -1 px off",
+    +   "320 px: more is -2 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--fe53f-centre-on-react-portability-chromium/error-context.md
+
+  3) [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -4 px off",
+    +   "1440 px: more is -2 px off",
+    +   "834 px: add is -4 px off",
+    +   "834 px: more is -2 px off",
+    +   "390 px: add is -4 px off",
+    +   "390 px: more is -2 px off",
+    +   "320 px: add is -4 px off",
+    +   "320 px: more is -2 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--95346-ses-spreadsheet-portability-chromium/error-context.md
+
+  4) [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -1 px off",
+    +   "1440 px: more is -2 px off",
+    +   "834 px: add is -1 px off",
+    +   "834 px: more is -2 px off",
+    +   "390 px: add is -1 px off",
+    +   "390 px: more is -2 px off",
+    +   "320 px: add is -1 px off",
+    +   "320 px: more is -2 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--83c17-centre-on-react-portability-chromium/error-context.md
+
+  5) [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -5.000038146972656 px off",
+    +   "1440 px: more is -3.0000381469726562 px off",
+    +   "834 px: add is -5.000030517578125 px off",
+    +   "834 px: more is -3.000030517578125 px off",
+    +   "390 px: add is -5.000030517578125 px off",
+    +   "390 px: more is -3.000030517578125 px off",
+    +   "320 px: add is -5.000030517578125 px off",
+    +   "320 px: more is -3.000030517578125 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--4809b-ses-spreadsheet-portability-firefox/error-context.md
+
+  6) [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -1.9999771118164062 px off",
+    +   "1440 px: more is -2.9999771118164062 px off",
+    +   "834 px: add is -2.0000381469726562 px off",
+    +   "834 px: more is -3.0000381469726562 px off",
+    +   "390 px: add is -2.000030517578125 px off",
+    +   "390 px: more is -3.000030517578125 px off",
+    +   "320 px: add is -2.000030517578125 px off",
+    +   "320 px: more is -3.000030517578125 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--fe53f-centre-on-react-portability-firefox/error-context.md
+
+  7) [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -5.000038146972656 px off",
+    +   "1440 px: more is -3.0000381469726562 px off",
+    +   "834 px: add is -5.000030517578125 px off",
+    +   "834 px: more is -3.000030517578125 px off",
+    +   "390 px: add is -5.000030517578125 px off",
+    +   "390 px: more is -3.000030517578125 px off",
+    +   "320 px: add is -5.000030517578125 px off",
+    +   "320 px: more is -3.000030517578125 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--95346-ses-spreadsheet-portability-firefox/error-context.md
+
+  8) [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   "1440 px: add is -1.9999771118164062 px off",
+    +   "1440 px: more is -2.9999771118164062 px off",
+    +   "834 px: add is -2.0000381469726562 px off",
+    +   "834 px: more is -3.0000381469726562 px off",
+    +   "390 px: add is -2.000030517578125 px off",
+    +   "390 px: more is -3.000030517578125 px off",
+    +   "320 px: add is -2.000030517578125 px off",
+    +   "320 px: more is -3.000030517578125 px off",
+    + ]
+
+      79 |           }
+      80 |         }
+    > 81 |         expect(misaligned).toEqual([]);
+         |                            ^
+      82 |       });
+      83 |     }
+      84 |   });
+        at /home/vvin/checkouts/iconalign-base/test/browser/tab-icon-alignment.spec.ts:81:28
+
+    Error Context: test-results/playwright/tab-icon-alignment-at-DPR--83c17-centre-on-react-portability-firefox/error-context.md
+
+  8 failed
+    [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+    [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+    [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+    [chromium] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+    [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+    [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 1 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+    [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /showcases/spreadsheet/ @portability 
+    [firefox] › test/browser/tab-icon-alignment.spec.ts:66:7 › at DPR 2 › the + and ⋯ icons sit on the tab labels' optical centre on /react/ @portability 
+  1 passed (37.8s)
