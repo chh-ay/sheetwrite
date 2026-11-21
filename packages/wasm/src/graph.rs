@@ -798,6 +798,18 @@ impl SheetFormulas {
         }
     }
 
+    /// Seeds a remote edit like a local one until its cells outnumber the
+    /// sheet's formulas: past that, recalculating every formula costs less
+    /// than finding the readers of each cell.
+    pub(crate) fn mark_remote_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
+        self.mark_cells_dirty(keys);
+        if let DirtyState::Cells(cells) = &self.dirty {
+            if cells.cells.len() > self.count {
+                self.dirty = DirtyState::All;
+            }
+        }
+    }
+
     /// Large writes keep rectangle seeds rather than expanding every cell.
     pub(crate) fn mark_dirty_rect(&mut self, rect: DirtyRect) {
         if matches!(self.dirty, DirtyState::All) {

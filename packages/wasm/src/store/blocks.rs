@@ -762,7 +762,8 @@ impl CellStore {
                 );
             }
         }
-        if hydrating {
+        // As in `replace_cell_source`: only a remote edit seeds its cells.
+        if hydrating && !self.remote_load {
             sheet_data.formulas.mark_all_dirty();
         } else if block.offsets.len() == block.dimensions.0 * block.dimensions.1 {
             if let Some(rect) = DirtyRect::new(
@@ -773,6 +774,8 @@ impl CellStore {
             ) {
                 sheet_data.formulas.mark_dirty_rect(rect);
             }
+        } else if hydrating {
+            sheet_data.formulas.mark_remote_cells_dirty(keys());
         } else {
             sheet_data.formulas.mark_cells_dirty(keys());
         }

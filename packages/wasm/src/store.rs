@@ -146,6 +146,9 @@ pub struct CellStore {
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
+    /// Set while a page load applies edits another client committed, which
+    /// recalculate only the formulas that read them.
+    remote_load: bool,
     /// The defined names, by the id formulas hold, and the tables.
     pub(crate) bindings: names::Bindings,
     mutation_revision: u64,
@@ -205,6 +208,7 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             regex_patterns: std::cell::Cell::new(None),
             loading_page: 0,
+            remote_load: false,
             mutation_revision: 0,
             active_mutation_revision: None,
             bindings: names::Bindings::default(),
@@ -525,6 +529,16 @@ impl CellStore {
     #[wasm_bindgen(js_name = beginPageLoad)]
     pub fn begin_page_load(&mut self) {
         self.loading_page = self.loading_page.saturating_add(1);
+    }
+
+    /// Starts applying edits another client committed. As in a page load,
+    /// writes are stored values and keep cells with an unacknowledged edit;
+    /// unlike a page load, they recalculate only the formulas that read them,
+    /// as local edits do.
+    #[wasm_bindgen(js_name = beginRemoteLoad)]
+    pub fn begin_remote_load(&mut self) {
+        self.begin_page_load();
+        self.remote_load = true;
     }
 
     /// Writes the number `value` with style `style` to the cell at `row`,
@@ -1201,6 +1215,9 @@ impl CellStore {
     pub fn commit_sources(&mut self) -> i32 {
         let was_page_load = self.loading_page > 0;
         self.loading_page = self.loading_page.saturating_sub(1);
+        if self.loading_page == 0 {
+            self.remote_load = false;
+        }
 
         self.recompute_changed();
         self.active_mutation_revision = None;
@@ -1447,8 +1464,12 @@ impl CellStore {
             key,
             source,
         );
-        if hydrating {
+        // A snapshot or datasource page load recalculates the whole sheet; a
+        // remote edit recalculates the readers of its cell.
+        if hydrating && !self.remote_load {
             sheet_data.formulas.mark_all_dirty();
+        } else if hydrating {
+            sheet_data.formulas.mark_remote_cells_dirty([key]);
         } else if !prepared_rect {
             sheet_data.formulas.mark_cell_dirty(key);
         }
