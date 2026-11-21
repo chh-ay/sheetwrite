@@ -1,0 +1,1990 @@
+{
+  "chromium": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 745
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 771
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 442,
+          "width": 346
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 60,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 432
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 370
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 370
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 442,
+          "width": 346
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 60,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 432
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 346
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 372
+        }
+      ],
+      "pageScroll": -10
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 370
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 370
+        }
+      ],
+      "pageScroll": -10
+    }
+  ],
+  "firefox": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 755
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 781
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 756
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 412,
+          "width": 356
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 43,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 425
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 380
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 380
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "grid-methods-lead",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "grid-methods-views",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "lifecycle",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "error-handling",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "pivot-tables",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "lookup-criteria",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 412,
+          "width": 356
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 4,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "compatibility-limits",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 43,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 425
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "upgrade-update",
+      "frames": [
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        },
+        {
+          "cls": "wrap",
+          "cols": 0,
+          "scroll": 0,
+          "width": 356
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "upgrade-sort",
+      "frames": [
+        {
+          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        },
+        {
+          "cls": "",
+          "cols": 2,
+          "scroll": 0,
+          "width": 382
+        }
+      ],
+      "pageScroll": 0
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "name": "formatting-showcase",
+      "frames": [
+        {
+          "cls": "sw-table-frame",
+          "cols": 3,
+          "scroll": 0,
+          "width": 380
+        },
+        {
+          "cls": "",
+          "cols": 3,
+          "scroll": 0,
+          "width": 380
+        }
+      ],
+      "pageScroll": 0
+    }
+  ]
+}
