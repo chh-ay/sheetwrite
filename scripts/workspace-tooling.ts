@@ -113,11 +113,15 @@ const GENERATED_SOURCE_NODES: readonly CommandNode[] = [
   },
 ];
 
-/** The docs build checks the docs, then generates them and builds the site. */
+/**
+ * The docs build checks the docs, then generates them and builds the site.
+ * It builds the browser-test fixture pages too, as CI's production docs job
+ * does: the XLSX isolation check reads them.
+ */
 export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
   {
     id: "build:@sheetwrite/docs",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs", "build"],
+    command: ["bun", "run", "--filter", "@sheetwrite/docs", "build:test"],
   },
   {
     id: "verify:example-xlsx-isolation",
