@@ -188,6 +188,13 @@ function validValidationComparison(value: unknown, textLength: boolean): boolean
   );
 }
 
+/**
+ * The most data validation rules a sheet holds. A check of a value runs
+ * every rule over its cell, so the XLSX reader drops the rules past it, and
+ * snapshots and operations that pass it are refused.
+ */
+export const MAX_VALIDATION_RULES = 1_000;
+
 export function validValidationRules(sheet: Sheet, rules: readonly DataValidationRule[]): boolean {
   const ids = new Set<string>();
   for (const rule of rules) {

@@ -152,14 +152,17 @@ impl CellStore {
             })
             .collect::<TransferResult<Vec<_>>>()?;
 
-        let mut entry = FormulaEntry::transferred_source(
-            ast,
-            source,
-            ReadSet { cells, ranges },
-            is_reference,
-            features,
-        );
+        let mut entry = crate::eval::with_formula_origin((row, col), || {
+            FormulaEntry::transferred_source(
+                ast,
+                source,
+                ReadSet { cells, ranges },
+                features,
+                self.name_scope(sheet as usize),
+            )
+        });
         entry.set_source_error(source_error);
+        entry.set_reference(is_reference);
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(has_spill_refs);
         entry.set_produces_array(produces_array);
@@ -229,9 +232,11 @@ impl CellStore {
                 col_end: input.u32()?,
             };
 
+            let spelling = range.name.clone();
             store
-                .defined_names
-                .insert((scope, key), names::DefinedName::Range(range));
+                .bindings
+                .names
+                .insert(scope, key, &spelling, names::DefinedName::Range(range));
         }
 
         for _ in 0..input.count()? {
@@ -267,11 +272,11 @@ impl CellStore {
                 });
             }
 
-            store.tables.insert(table);
+            store.bindings.tables.insert(table);
         }
 
-        // The formulas below bind to the names, so resolve them first.
-        store.resolve_name_definitions();
+        // The formulas below read the names' formulas, so bind them first.
+        store.bind_name_definitions();
 
         store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;
@@ -339,23 +344,24 @@ impl CellStore {
 
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
-        out.usize(
-            self.defined_names
-                .values()
-                .filter(|name| matches!(name, names::DefinedName::Range(_)))
-                .count(),
-        );
+        let ranges: Vec<(Option<u32>, &str, &NamedRangeRef)> = self
+            .bindings
+            .names
+            .definitions()
+            .filter_map(|(scope, key, definition)| match definition {
+                names::DefinedName::Range(range) => Some((scope, key, range)),
+                names::DefinedName::Formula(_) => None,
+            })
+            .collect();
+        out.usize(ranges.len());
 
-        for ((scope, key), definition) in &self.defined_names {
-            let names::DefinedName::Range(range) = definition else {
-                continue;
-            };
+        for (scope, key, range) in ranges {
             out.bool(scope.is_some());
             if let Some(scope_sheet) = scope {
-                out.u32(*scope_sheet);
+                out.u32(scope_sheet);
             }
 
-            out.text(key);
+            out.text(&super::workbook_name_key(key));
             out.text(&range.name);
             out.u32(range.sheet);
             out.u32(range.row_start);
@@ -364,13 +370,9 @@ impl CellStore {
             out.u32(range.col_end);
         }
 
-        out.usize(
-            self.defined_names
-                .values()
-                .filter(|name| matches!(name, names::DefinedName::Formula(_)))
-                .count(),
-        );
-        for (scope, name, source) in self.named_formula_sources() {
+        let formulas: Vec<names::FormulaSource<'_>> = self.named_formula_sources().collect();
+        out.usize(formulas.len());
+        for (scope, name, source) in formulas {
             out.bool(scope.is_some());
             if let Some(scope_sheet) = scope {
                 out.u32(scope_sheet);
@@ -379,9 +381,9 @@ impl CellStore {
             out.text(source);
         }
 
-        out.usize(self.tables.len());
+        out.usize(self.bindings.tables.len());
 
-        for (_, table) in self.tables.iter() {
+        for (_, table) in self.bindings.tables.iter() {
             out.text(&table.id);
             out.text(&table.name);
             out.u32(table.sheet);
