@@ -96,6 +96,17 @@ async function regionRule(page: Page, fields: Record<string, unknown>): Promise<
   await page.locator(".sheetwrite").first().focus();
 }
 
+/** The box of `locator` once two frames in a row show it in the same place. */
+async function settledBox(page: Page, locator: Locator) {
+  let box = await locator.boundingBox();
+  for (;;) {
+    await nextFrames(page);
+    const next = await locator.boundingBox();
+    if (JSON.stringify(next) === JSON.stringify(box)) return next;
+    box = next;
+  }
+}
+
 function regionAtB10(page: Page): Promise<unknown> {
   return page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid;
@@ -795,7 +806,9 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   });
   const arrow = page.locator(".sheetwrite-list-button");
   await expect(arrow).toBeVisible();
-  const arrowBox = await arrow.boundingBox();
+  // The overlay paints the arrow on the next frames after the selection moved;
+  // read its box once two frames show it in the same place.
+  const arrowBox = await settledBox(page, arrow);
   if (!arrowBox) throw new Error("expected the dropdown arrow");
   // Probe: log focus moves and the list's life, to see why it closes.
   await page.evaluate(() => {
