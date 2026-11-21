@@ -48,8 +48,6 @@ mod statistics;
 mod subtotal;
 #[cfg(test)]
 mod subtotal_tests;
-#[cfg(test)]
-mod test_support;
 mod text;
 mod value;
 mod wildcard;

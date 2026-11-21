@@ -48,6 +48,95 @@ pub(crate) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) ->
     store.get_cell(sheet, row, col).string()
 }
 
+/// What a cell shows: its text or error code, `TRUE` or `FALSE`, its number
+/// in Rust's shortest form, or "" when it is blank.
+pub(crate) fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
+    let cell = store.get_cell(sheet, row, col);
+    match cell.string() {
+        Some(text) => text,
+        None if cell.kind() == crate::types::KIND_EMPTY => String::new(),
+        None if cell.kind() == crate::types::KIND_BOOL => {
+            if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into()
+        }
+        None => cell.num().to_string(),
+    }
+}
+
+/// Writes `data` from A1 of `sheet`: `=` starts a formula, `'` starts text,
+/// a finite number is a number, "" leaves the cell blank and anything else
+/// is text.
+pub(crate) fn write_cells(store: &mut CellStore, sheet: usize, data: &[&[&str]]) {
+    for (row, cells) in data.iter().enumerate() {
+        for (col, &input) in cells.iter().enumerate() {
+            if input.starts_with('=') {
+                store.set_formula(sheet, row, col, input, 0);
+            } else if let Some(text) = input.strip_prefix('\'') {
+                store.set_string(sheet, row, col, text, 0);
+            } else if let Some(number) = input.parse::<f64>().ok().filter(|n| n.is_finite()) {
+                store.set_number(sheet, row, col, number, 0);
+            } else if !input.is_empty() {
+                store.set_string(sheet, row, col, input, 0);
+            }
+        }
+    }
+}
+
+/// Evaluates each `(formula, expected)` case in its own row of column `col`
+/// and reports every mismatch at once. `expected` is the text the cell
+/// shows; `~x` is a number within one unit in the last digit of `x`, for
+/// results that are published rounded.
+pub(crate) fn assert_formulas<F: AsRef<str>>(
+    store: &mut CellStore,
+    sheet: usize,
+    col: usize,
+    cases: &[(F, &str)],
+) {
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, row, col, formula.as_ref(), 0);
+    }
+    store.commit_sources();
+    let mismatches: Vec<String> = cases
+        .iter()
+        .enumerate()
+        .filter_map(|(row, (formula, expected))| {
+            let actual = shown(store, sheet, row, col);
+            (!shows(&actual, expected)).then(|| {
+                format!(
+                    "{}: expected {expected:?}, got {actual:?}",
+                    formula.as_ref()
+                )
+            })
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
+}
+
+fn shows(actual: &str, expected: &str) -> bool {
+    let Some(published) = expected.strip_prefix('~') else {
+        return actual == expected;
+    };
+    let (mantissa, exponent) = published.split_once('E').unwrap_or((published, "0"));
+    let decimals = mantissa
+        .split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len());
+    let (Ok(power), Ok(expected)) = (exponent.parse::<i32>(), published.parse::<f64>()) else {
+        return false;
+    };
+    let last_digit = power - decimals as i32;
+    actual
+        .parse::<f64>()
+        .is_ok_and(|number| (number - expected).abs() <= 10f64.powi(last_digit))
+}
+
+/// One sheet with `data` from A1 and the cases in the column after it.
+pub(crate) fn assert_results_on<F: AsRef<str>>(data: &[&[&str]], cases: &[(F, &str)]) {
+    let width = data.iter().map(|row| row.len()).max().unwrap_or(0);
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(width + 1, data.len().max(cases.len()).max(1));
+    write_cells(&mut store, sheet, data);
+    assert_formulas(&mut store, sheet, width, cases);
+}
+
 pub(super) struct DecodedWindow {
     pub(super) kinds: Vec<u8>,
     pub(super) string_index: Vec<i32>,

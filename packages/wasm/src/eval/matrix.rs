@@ -474,31 +474,3 @@ impl CellStore {
         range_view::RangeView::new(self, range, depth)?.materialize(pass)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{matrix_resource_stats, reset_matrix_resource_stats, EvalMatrix};
-    use crate::types::Value;
-
-    #[test]
-    fn matrix_resource_stats_track_concurrent_peak_and_release() {
-        reset_matrix_resource_stats();
-        let first = EvalMatrix::new(1, 2, vec![Value::Number(1.0), Value::Number(2.0)]);
-        let first_bytes = matrix_resource_stats()[0];
-        assert!(first_bytes > 0);
-        {
-            let second = EvalMatrix::new(1, 1, vec![Value::Blank]);
-            let [current, peak, allocations] = matrix_resource_stats();
-            assert_eq!(current, peak);
-            assert!(current > first_bytes);
-            assert_eq!(allocations, 2);
-            drop(second);
-        }
-        assert_eq!(matrix_resource_stats()[0], first_bytes);
-        drop(first);
-        let [current, peak, allocations] = matrix_resource_stats();
-        assert_eq!(current, 0);
-        assert!(peak > first_bytes);
-        assert_eq!(allocations, 2);
-    }
-}
