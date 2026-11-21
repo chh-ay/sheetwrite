@@ -4,6 +4,7 @@
 pub(crate) mod analysis;
 mod areas;
 mod array;
+mod branches;
 mod criteria;
 #[cfg(feature = "host-functions")]
 pub(crate) mod custom;

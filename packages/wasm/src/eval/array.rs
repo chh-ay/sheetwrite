@@ -145,11 +145,12 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
         ) => true,
         Ast::Func(Func::Let, args) => args.iter().any(|arg| ast_produces_array(arg, _shapes)),
         Ast::Func(Func::Index, args) => index_selects_whole_axis(args),
-        Ast::Func(Func::Choose, args) => args.get(1..).is_some_and(|choices| {
-            choices
-                .iter()
-                .any(|choice| ast_produces_array(choice, _shapes))
-        }),
+        // A selecting argument that is an array lifts the call; an array in
+        // another argument is what the call can return.
+        Ast::Func(
+            Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
+            args,
+        ) => args.iter().any(|arg| ast_produces_array(arg, _shapes)),
         _ => false,
     }
 }
@@ -386,13 +387,12 @@ impl CellStore {
                     }
                     return self.dynamic_array_bound(&args[index as usize], formula_sheet, pass);
                 }
-                let mut bound = None;
-                for choice in &args[1..] {
-                    if let Some(Ok(cells)) = self.dynamic_array_bound(choice, formula_sheet, pass) {
-                        bound = Some(bound.map_or(cells, |current: usize| current.max(cells)));
-                    }
-                }
-                bound.map(Ok)
+                Some(Ok(self.branches_bound(args, formula_sheet, pass)))
+            }
+            Ast::Func(Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch, args)
+                if ast_produces_array(ast, pass.shapes(self.name_scope(formula_sheet))) =>
+            {
+                Some(Ok(self.branches_bound(args, formula_sheet, pass)))
             }
             _ => None,
         }
@@ -575,7 +575,15 @@ impl CellStore {
             Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
             Ast::Func(Func::TrimRange, args) => self.eval_trim_range(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Choose, args) => self.eval_choose(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Choose, args) => {
+                self.eval_branches_family(Func::Choose, args, sheet, pass, depth + 1)
+            }
+            Ast::Func(
+                func @ (Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch),
+                args,
+            ) if ast_produces_array(ast, pass.shapes(self.name_scope(sheet))) => {
+                self.eval_branches_family(*func, args, sheet, pass, depth + 1)
+            }
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }
@@ -742,6 +750,15 @@ impl CellStore {
                 return Ok((cols, rows, cells));
             }
             Ast::Func(Func::Sequence, args) => return sequence_shape(args),
+            Ast::Func(
+                func @ (Func::If
+                | Func::IfError
+                | Func::IfNa
+                | Func::Ifs
+                | Func::Switch
+                | Func::Choose),
+                args,
+            ) => return self.branches_shape(*func, args, formula_sheet, pass),
             Ast::Func(Func::Take | Func::Drop, args) => {
                 let source = args.first().ok_or(FormulaError::Value)?;
                 let (rows, cols, _) = self.matrix_shape(source, formula_sheet, pass)?;
@@ -1424,32 +1441,6 @@ impl CellStore {
             output_cols,
             values,
         )))
-    }
-
-    fn eval_choose(
-        &self,
-        args: &[Ast],
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
-        if args.len() < 2 {
-            return Err(FormulaError::Value);
-        }
-        let index = integer_arg(&self.scalar_array_arg(&args[0], sheet, pass, depth + 1))?;
-        if index <= 0 || index as usize >= args.len() {
-            return Err(FormulaError::Value);
-        }
-        let selected = &args[index as usize];
-        if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
-            return result;
-        }
-        EvalMatrix::validate_shape(1, 1, 1, 0)?;
-        Ok(EvalMatrix::new(
-            1,
-            1,
-            vec![self.scalar_array_arg(selected, sheet, pass, depth + 1)],
-        ))
     }
 }
 
