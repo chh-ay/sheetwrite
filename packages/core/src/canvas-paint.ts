@@ -5,6 +5,7 @@ import { formatNumber, numberFormatColor } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
+  CellFormat,
   CellScalar,
   CellStyle,
   CellVerticalAlign,
@@ -182,6 +183,25 @@ function withFontFamily(font: string, family: string): string {
   const themeFamilies = fromSize.slice(sizeToken.length).trim();
   const families = themeFamilies ? `"${family}", ${themeFamilies}` : `"${family}"`;
   return `${font.slice(0, sizeMatch.index)}${sizeToken} ${families}`;
+}
+
+/**
+ * Where a cell's text sits: its own alignment, else Excel's General rule,
+ * which centres logical values and right-aligns numbers (and every value of
+ * a number or currency column).
+ */
+export function cellAlign(
+  style: Pick<CellStyle, "align">,
+  value: CellScalar,
+  type: CellFormat | undefined,
+): CellAlign {
+  if (style.align !== undefined) return style.align;
+  if (typeof value === "boolean") return "center";
+  return type === "number" ||
+    type === "currency" ||
+    (type === "general" && typeof value === "number")
+    ? "right"
+    : "left";
 }
 
 /** Resolve the canvas font from the theme and cell style. */
@@ -1178,15 +1198,7 @@ function paintCell(
         : theme.fg),
   );
 
-  const align =
-    effective.align ??
-    (typeof value === "boolean"
-      ? "center"
-      : column?.type === "number" ||
-          column?.type === "currency" ||
-          (column?.type === "general" && typeof value === "number")
-        ? "right"
-        : "left");
+  const align = cellAlign(effective, value, column?.type);
   let text = cellDisplayText(value, numberFormat, column?.numberLocale);
   // A filter header's text pads on the left as usual and ends at its text box.
   const textW = textRight === undefined ? w : textRight + CELL_PAD - x;
