@@ -396,22 +396,12 @@ pub(super) struct Cursor<'a> {
     tokens: Option<std::vec::IntoIter<Tok<'a>>>,
     edge: ReferenceEdge,
     ahead: [Option<Tok<'a>>; LOOKAHEAD],
-    /// The byte span of each token in `ahead`, in `src`.
-    ahead_spans: [TokenSpan; LOOKAHEAD],
     ahead_start: usize,
     ahead_len: usize,
-    /// The span of the token lexed last.
-    lexed: TokenSpan,
-    /// The span of the token the parser read last.
-    read: TokenSpan,
     /// Tokens the parser has read.
     pub(super) consumed: usize,
     lex_error: Option<String>,
 }
-
-/// The start and end byte offsets of a token in the text a cursor lexes.
-/// Tokens from formula help's list have the empty span `(0, 0)`.
-pub(super) type TokenSpan = (usize, usize);
 
 impl<'a> Cursor<'a> {
     pub(super) const fn over_text(src: &'a str) -> Self {
@@ -421,11 +411,8 @@ impl<'a> Cursor<'a> {
             tokens: None,
             edge: ReferenceEdge::None,
             ahead: [None, None, None, None],
-            ahead_spans: [(0, 0); LOOKAHEAD],
             ahead_start: 0,
             ahead_len: 0,
-            lexed: (0, 0),
-            read: (0, 0),
             consumed: 0,
             lex_error: None,
         }
@@ -448,11 +435,9 @@ impl<'a> Cursor<'a> {
         }
 
         while self.index < self.src.len() {
-            let start = self.index;
             match lex_token_after(self.src, &mut self.index, self.edge) {
                 Ok(Some(tok)) => {
                     self.edge = ReferenceEdge::after(Some(&tok));
-                    self.lexed = (start, self.index);
                     return Some(tok);
                 }
                 Ok(None) => {}
@@ -474,9 +459,7 @@ impl<'a> Cursor<'a> {
             let Some(tok) = self.lex_next() else {
                 return false;
             };
-            let slot = (self.ahead_start + self.ahead_len) & (LOOKAHEAD - 1);
-            self.ahead[slot] = Some(tok);
-            self.ahead_spans[slot] = self.lexed;
+            self.ahead[(self.ahead_start + self.ahead_len) & (LOOKAHEAD - 1)] = Some(tok);
             self.ahead_len += 1;
         }
 
@@ -501,16 +484,10 @@ impl<'a> Cursor<'a> {
         }
 
         let tok = self.ahead[self.ahead_start].take();
-        self.read = self.ahead_spans[self.ahead_start];
         self.ahead_start = (self.ahead_start + 1) & (LOOKAHEAD - 1);
         self.ahead_len -= 1;
         self.consumed += 1;
         tok
-    }
-
-    /// The span of the token that [`Self::next`] returned last.
-    pub(super) const fn read_span(&self) -> TokenSpan {
-        self.read
     }
 
     /// The first lex error of the text, lexing whatever the parser left.

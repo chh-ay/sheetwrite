@@ -16,10 +16,11 @@
 //! behind on the thread.
 
 use super::*;
+use std::hash::Hasher;
 
-/// Where an `Ast::Cell` or `Ast::Range` of a parsed tree came from. A
-/// parse records one site per such node, in the order it makes them, which
-/// is the order of the text and of a walk over the tree's children.
+/// Where an `Ast::Cell` or `Ast::Range` of a parsed tree came from, found by
+/// [`scan_sites`] in the order the parser makes those nodes, which is the
+/// order of the text and of a walk over the tree's children.
 #[derive(Clone, Copy)]
 pub(super) enum RefSite {
     /// A cell reference: the token at this span.
@@ -42,6 +43,9 @@ enum SiteValue {
 /// A parsed formula kept for the formulas after it.
 #[derive(Default)]
 struct Template {
+    /// [`shape_hash`] of `text`: a formula is compared with this one only
+    /// when its hash is the same.
+    hash: u64,
     /// The formula's text, trimmed and without its `=`.
     text: String,
     sites: Vec<RefSite>,
@@ -51,8 +55,8 @@ struct Template {
 }
 
 /// How many shapes ingest keeps: a block written row by row meets the
-/// formulas of each column in turn. Every lookup compares against all of
-/// them, so the count stays small.
+/// formulas of each column in turn. Every lookup compares its shape hash
+/// with each of them, so the count stays small.
 const KEPT_SHAPES: usize = 4;
 
 /// The kept formulas and the scratch buffers of a lookup.
@@ -61,7 +65,7 @@ struct Templates {
     kept: Vec<Template>,
     /// The template the next new shape replaces once `kept` is full.
     next: usize,
-    /// The sites the parse in progress records.
+    /// The sites [`scan_sites`] lists for the formula being kept.
     sites: Vec<RefSite>,
     values: Vec<SiteValue>,
 }
@@ -75,15 +79,62 @@ thread_local! {
             values: Vec::new(),
         })
     };
+    static BACKOFF: std::cell::Cell<Backoff> = const {
+        std::cell::Cell::new(Backoff::START)
+    };
+}
+
+/// Misses in a row after which ingest stops looking for kept shapes.
+const MISS_LIMIT: u16 = 8;
+/// Formulas the first pause skips; each pause in a row is twice as long.
+const FIRST_PAUSE: u16 = 16;
+/// The longest pause: a run of formulas of one shape that starts in a pause
+/// is parsed in full for at most this many formulas.
+const LONGEST_PAUSE: u16 = 1024;
+
+/// When ingest looks for kept shapes. Formulas that repeat no shape, such as
+/// ones that differ in a number or name a sheet, would pay for the lookup and
+/// the copy of their text every time; after [`MISS_LIMIT`] misses in a row,
+/// ingest parses the next formulas without either, for a pause that doubles
+/// while the misses go on and resets at the first match.
+#[derive(Clone, Copy)]
+struct Backoff {
+    misses: u16,
+    /// Formulas left to parse without looking for a kept shape.
+    paused: u16,
+    next_pause: u16,
+}
+
+impl Backoff {
+    /// Looking for kept shapes, with no misses yet.
+    const START: Self = Self {
+        misses: 0,
+        paused: 0,
+        next_pause: FIRST_PAUSE,
+    };
+
+    fn missed(self) -> Self {
+        let misses = self.misses + 1;
+        if misses < MISS_LIMIT {
+            return Self { misses, ..self };
+        }
+        Self {
+            misses: 0,
+            paused: self.next_pause,
+            next_pause: self.next_pause.saturating_mul(2).min(LONGEST_PAUSE),
+        }
+    }
 }
 
 /// A store's hold on the kept formulas: dropping it drops them and their
-/// buffers. It has no size, so the store does not grow.
+/// buffers, and starts the next store's lookups afresh. It has no size, so
+/// the store does not grow.
 pub(crate) struct FormulaTemplatesHold;
 
 impl Drop for FormulaTemplatesHold {
     fn drop(&mut self) {
         TEMPLATES.take();
+        BACKOFF.set(Backoff::START);
     }
 }
 
@@ -96,37 +147,126 @@ enum Lookup {
     Miss,
 }
 
-/// The tree of formula text `body` (trimmed, without its `=`). With `reuse`,
-/// it is built from a kept formula of the same shape when there is one, and
-/// a parsed formula without sheet, table, defined name or LAMBDA is kept
-/// for the formulas after it. `parse` parses `body` and records its
-/// reference sites when it is given a list.
-pub(super) fn reuse_or_parse(
-    body: &str,
-    reuse: bool,
-    parse: impl FnOnce(Option<&mut Vec<RefSite>>) -> ParseResult,
-) -> ParseResult {
-    if !reuse {
-        return parse(None);
+/// Whether ingest looks for a kept shape for the next formula: not during a
+/// pause after many misses, which this counts down.
+pub(super) fn looks_for_shapes() -> bool {
+    let backoff = BACKOFF.get();
+    if backoff.paused == 0 {
+        return true;
     }
+    BACKOFF.set(Backoff {
+        paused: backoff.paused - 1,
+        ..backoff
+    });
+    false
+}
+
+/// The tree of formula text `body` (trimmed, without its `=`), built from a
+/// kept formula of the same shape when there is one, or else `parse`d. A
+/// parsed formula without sheet, table, defined name or LAMBDA is kept for
+/// the formulas after it. Out of line: a load that repeats no shape spends
+/// most formulas in a pause, and their parse should not carry this code.
+#[inline(never)]
+pub(super) fn reuse_or_parse(body: &str, parse: impl FnOnce() -> ParseResult) -> ParseResult {
+    let backoff = BACKOFF.get();
     let mut kept = TEMPLATES.take();
-    let shape = match kept.lookup(body) {
+    let mut hash = None;
+    let shape = match kept.lookup(body, &mut hash) {
         Lookup::Tree(tree) => {
             TEMPLATES.set(kept);
+            BACKOFF.set(Backoff::START);
             return Ok((tree, ParseFeatures::default()));
         }
         Lookup::Shape(index) => Some(index),
         Lookup::Miss => None,
     };
-    kept.sites.clear();
-    let parsed = parse(Some(&mut kept.sites));
+    BACKOFF.set(if shape.is_some() {
+        Backoff::START
+    } else {
+        backoff.missed()
+    });
+    let parsed = parse();
     if let Ok((tree, features)) = &parsed {
-        if depends_on_text_alone(*features) {
-            kept.keep(body, tree, shape);
+        if depends_on_text_alone(*features) && scan_sites(body, &mut kept.sites) {
+            let body_hash = hash.unwrap_or_else(|| shape_hash(body));
+            kept.keep(body, body_hash, tree, shape);
         }
     }
     TEMPLATES.set(kept);
     parsed
+}
+
+/// The start and end byte offsets of a token in formula text.
+type TokenSpan = (usize, usize);
+
+/// The span of a name token's text in `body`. The lexer slices an unquoted
+/// name out of the text; a quoted name's text is a string the lexer built,
+/// which lies outside `body`, so it has no span.
+fn span_in(body: &str, text: &str) -> Option<TokenSpan> {
+    let start = (text.as_ptr() as usize).checked_sub(body.as_ptr() as usize)?;
+    let end = start.checked_add(text.len())?;
+    (end <= body.len()).then_some((start, end))
+}
+
+/// Lists in `sites` the reference sites of `body`, a formula that parsed
+/// without sheet, table, defined name or LAMBDA, as the parser meets them:
+/// a name before `(` is a call, `TRUE` and `FALSE` are values, a name or a
+/// number before `:` starts a range whose end is the token after it, and any
+/// other name is a cell. `false` for a name that is none of these, which
+/// such a formula does not hold.
+fn scan_sites(body: &str, sites: &mut Vec<RefSite>) -> bool {
+    sites.clear();
+    let mut cursor = Cursor::over_text(body);
+    while let Some(tok) = cursor.next() {
+        let followed_by_colon = matches!(cursor.peek_at(0), Some(Tok::Colon));
+        if let Tok::Num(_) = tok {
+            if followed_by_colon {
+                let _ = cursor.next();
+                let _ = cursor.next();
+                sites.push(RefSite::Fixed);
+            }
+            continue;
+        }
+        let Tok::Ident(name, _) = tok else {
+            continue;
+        };
+        if matches!(cursor.peek_at(0), Some(Tok::LParen))
+            || name.eq_ignore_ascii_case("TRUE")
+            || name.eq_ignore_ascii_case("FALSE")
+        {
+            continue;
+        }
+        if followed_by_colon {
+            let Some(start) = AreaEnd::of_name(&name) else {
+                return false;
+            };
+            let _ = cursor.next();
+            let end_tok = cursor.next();
+            let end_span = if let Some(Tok::Ident(end_name, _)) = &end_tok {
+                span_in(body, end_name)
+            } else {
+                None
+            };
+            let both_cells = matches!(start, AreaEnd::Cell(..))
+                && matches!(
+                    end_tok.as_ref().and_then(AreaEnd::of),
+                    Some(AreaEnd::Cell(..))
+                );
+            let spans = (span_in(body, &name), end_span);
+            sites.push(
+                if let (true, (Some(first), Some(last))) = (both_cells, spans) {
+                    RefSite::Range(first, last)
+                } else {
+                    RefSite::Fixed
+                },
+            );
+        } else if parse_a1(&name).is_some() {
+            sites.push(span_in(body, &name).map_or(RefSite::Fixed, RefSite::Cell));
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 /// Whether a parsed tree with `features` is a function of its text: it
@@ -145,13 +285,53 @@ const fn depends_on_text_alone(features: ParseFeatures) -> bool {
     !(sheet_refs || names || table_refs || detached_sheets || lambdas)
 }
 
+/// A hash of formula text that every formula of one shape has: each run of
+/// letters, digits and `$` that starts with a letter or `$` and holds a
+/// digit, which may be a cell reference, counts as one marker, whatever its
+/// letters and digits. One pass over the text, so a formula that repeats no
+/// kept shape costs a few comparisons, not a walk of every kept formula.
+fn shape_hash(body: &str) -> u64 {
+    /// Stands for a run that may be a cell reference.
+    const REFERENCE: u8 = 0xFF;
+
+    let bytes = body.as_bytes();
+    let mut hasher = rustc_hash::FxHasher::default();
+    let mut index = 0;
+    while let Some(&byte) = bytes.get(index) {
+        if !(byte.is_ascii_alphabetic() || byte == b'$') {
+            hasher.write_u8(byte);
+            index += 1;
+            continue;
+        }
+        let start = index;
+        let mut holds_digit = false;
+        while let Some(&next) = bytes.get(index) {
+            if !(next.is_ascii_alphanumeric() || next == b'$') {
+                break;
+            }
+            holds_digit |= next.is_ascii_digit();
+            index += 1;
+        }
+        if holds_digit {
+            hasher.write_u8(REFERENCE);
+        } else {
+            hasher.write(bytes.get(start..index).unwrap_or_default());
+        }
+    }
+    hasher.finish()
+}
+
 impl Templates {
-    fn lookup(&mut self, body: &str) -> Lookup {
-        let Some(index) = self
-            .kept
-            .iter()
-            .position(|template| template.values_in(body, &mut self.values))
-        else {
+    /// The kept formula of `body`'s shape. `hash` caches `body`'s
+    /// [`shape_hash`], which only a lookup among kept formulas needs.
+    fn lookup(&mut self, body: &str, hash: &mut Option<u64>) -> Lookup {
+        if self.kept.is_empty() {
+            return Lookup::Miss;
+        }
+        let body_hash = *hash.get_or_insert_with(|| shape_hash(body));
+        let Some(index) = self.kept.iter().position(|template| {
+            template.hash == body_hash && template.values_in(body, &mut self.values)
+        }) else {
             return Lookup::Miss;
         };
         let Some(tree) = &self.kept[index].tree else {
@@ -166,10 +346,11 @@ impl Templates {
         }
     }
 
-    /// Keeps the parse of `body` (`tree` and `self.sites`). A formula of the
-    /// kept shape at `shape` keeps its tree there; a new shape keeps only
-    /// its text and sites until a second formula of that shape arrives.
-    fn keep(&mut self, body: &str, tree: &Ast, shape: Option<usize>) {
+    /// Keeps the parse of `body` (`tree` and `self.sites`), whose shape
+    /// hash is `hash`. A formula of the kept shape at `shape` keeps its tree
+    /// there; a new shape keeps only its text and sites until a second
+    /// formula of that shape arrives.
+    fn keep(&mut self, body: &str, hash: u64, tree: &Ast, shape: Option<usize>) {
         let index = match shape {
             Some(index) => index,
             None if self.kept.len() < KEPT_SHAPES => {
@@ -185,6 +366,7 @@ impl Templates {
         let Some(template) = self.kept.get_mut(index) else {
             return;
         };
+        template.hash = hash;
         template.text.clear();
         template.text.push_str(body);
         template.sites.clear();
