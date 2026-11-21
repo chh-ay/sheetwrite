@@ -26,7 +26,7 @@ await toXlsxWorkbookStream(store.exportSnapshot(), {
 
 The output contains the same XLSX parts as buffered export. ZIP entry order and container bytes can differ.
 
-[Try it live: resource-limit failures](/showcases/interoperability/#limits). The lab demonstrates typed limits, not a whole-file memory guarantee.
+[Try it live: resource-limit failures](/showcases/interoperability/#security). The lab demonstrates typed limits, not a whole-file memory guarantee.
 
 <details>
 <summary>Full setup</summary>

@@ -30,6 +30,11 @@ function RefreshStatus(props: { readonly snapshot: QueriesSnapshot | null }) {
       <Match when={props.snapshot?.definitionChanged}>
         <ShowcaseStatus tone="warn">Query changed: Refresh All to apply it</ShowcaseStatus>
       </Match>
+      <Match when={props.snapshot?.feedChanged}>
+        <ShowcaseStatus tone="warn">
+          New orders in the feed: Refresh All to load them
+        </ShowcaseStatus>
+      </Match>
       <Match when={props.snapshot?.lastRefresh?.status === "applied"}>
         <ShowcaseStatus tone="ok">Tables match the sources</ShowcaseStatus>
       </Match>
