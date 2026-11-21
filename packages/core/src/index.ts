@@ -45,6 +45,8 @@ export {
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
 
+export { MAX_VALIDATION_RULES } from "./store/ranges.js";
+
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 
 export {
