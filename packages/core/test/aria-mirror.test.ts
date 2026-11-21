@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, Grid, GridOptions } from "../src/types.js";
-import { scrollerOf } from "./fixtures.js";
+import { expectSameNode, scrollerOf } from "./fixtures.js";
 
 const ROW_COUNT = 1_000;
 const HOST_WIDTH = 400;
@@ -130,7 +130,7 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   expect(mirror(host).getAttribute("role")).toBe("grid");
   expect(host.getAttribute("role")).toBe("group");
   // The grid role owns only rows, not the host's chrome.
-  expect(host.querySelector('[role="grid"]') === mirror(host)).toBe(true);
+  expectSameNode(host.querySelector('[role="grid"]'), mirror(host));
   const owned = [...mirror(host).children].map((child) => child.getAttribute("role"));
   expect(new Set(owned)).toEqual(new Set(["row"]));
   expect(mirror(host).getAttribute("aria-rowcount")).toBe(String(ROW_COUNT + 1));
@@ -224,8 +224,8 @@ it("keeps its cells when a sideways scroll changes how many columns show", () =>
   const shown = headers(host);
   expect(shown.length).toBe(columnsBefore + 1);
   // The nodes stay; the new column's cells are added to them.
-  expect(rows(host)[1] === firstRow).toBe(true);
-  expect(firstRow?.querySelector('[role="gridcell"]') === firstCell).toBe(true);
+  expectSameNode(rows(host)[1], firstRow);
+  expectSameNode(firstRow?.querySelector('[role="gridcell"]'), firstCell);
   const lastColumn = Number(shown.at(-1)?.getAttribute("aria-colindex")) - 1;
   const lastCell = firstRow?.querySelectorAll('[role="gridcell"]')[shown.length - 1];
   expect(lastCell?.id).toBe(`${mirror(host).id}-0-${lastColumn}`);

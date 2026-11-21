@@ -5,6 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, WorkbookSnapshot } from "../src/types.js";
+import { expectSameNode } from "./fixtures.js";
 
 const ACTIONS_MODULE = "../src/autofilter-actions.js";
 let restoreStubs: () => void;
@@ -176,8 +177,7 @@ describe("AutoFilter in the grid", () => {
     expect(store.viewRowCount("s1")).toBe(9);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    // A boolean: on a failure, bun's diff of two DOM elements walks the whole document.
-    expect(document.activeElement === host).toBe(true);
+    expectSameNode(document.activeElement, host);
 
     press(host, "L", { ctrlKey: true, shiftKey: true });
     expect(grid.getAutoFilter()).toBeNull();
@@ -198,8 +198,9 @@ describe("AutoFilter in the grid", () => {
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
     press(host, "F2");
-    // B1 is 100 px wide; its 16 px button sits 2 px from the right edge.
-    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("82px");
+    // B1 is 100 px wide: its 16 px button sits 6 px from the right edge, and the
+    // text box ends 6 px before the button.
+    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("72px");
   });
 
   it("groups only the numbers that show as dates in a mostly-date column, as Excel does", async () => {
@@ -507,9 +508,8 @@ describe("AutoFilter in the grid", () => {
     expect(await grid.actions.cut()).toBe("done");
     expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
     notice()?.querySelector("button")?.click();
-    // The grid keeps the keys, so Ctrl+Z can undo it. A boolean: on a failure, bun's
-    // diff of two DOM elements walks the whole document and never ends.
-    expect(document.activeElement === host).toBe(true);
+    // The grid keeps the keys, so Ctrl+Z can undo it.
+    expectSameNode(document.activeElement, host);
     expect(grid.hiddenRows()).toEqual([]);
     grid.undo();
     expect(grid.hiddenRows()).toEqual([2]);
