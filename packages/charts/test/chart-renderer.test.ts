@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, expect, it } from "bun:test";
 
-import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
+import { initSheetwrite, SheetwriteStore, subscribeChartChanges } from "@sheetwrite/core";
 
 import { createChartRenderer } from "../src/chart-renderer.js";
 import { chartWorkbook, NOTES, SALES, setCell } from "./fixtures.js";
@@ -22,6 +22,30 @@ beforeAll(async () => {
 
 afterAll(() => {
   Object.assign(window, { requestAnimationFrame, cancelAnimationFrame });
+});
+
+// A failed test can leave frames behind; the next test starts with none.
+afterEach(() => pendingFrames.clear());
+
+it("redraws once per frame for a burst of changes to its chart", () => {
+  const store = new SheetwriteStore(chartWorkbook());
+  const renderer = createChartRenderer(store);
+  const host = document.createElement("div");
+  renderer.mount(host, SALES, SIZE);
+  let changes = 0;
+  const stopCounting = subscribeChartChanges(store, () => {
+    changes += 1;
+  });
+
+  setCell(store, 0, 0, 4);
+  setCell(store, 1, 0, 5);
+  setCell(store, 2, 0, 6);
+  stopCounting();
+
+  // Each edit is its own chart change, so one pending frame proves the renderer coalesced them.
+  expect([changes, pendingFrames.size]).toEqual([3, 1]);
+  renderer.dispose();
+  store.dispose();
 });
 
 it("redraws at a new size once per frame, ignores other charts' data, and stops when disposed", () => {
