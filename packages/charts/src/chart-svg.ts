@@ -581,7 +581,15 @@ function drawCategoryLabels(
   const labelExtent = vertical
     ? LINE_HEIGHT
     : Math.max(...labels.map((label) => textWidth(label))) + AXIS_LABEL_GAP;
-  const stride = Math.max(1, Math.ceil(labelExtent / band));
+  const fitStride = Math.max(1, Math.ceil(labelExtent / band));
+  // A horizontal label wider than its band moves right, by up to half the
+  // difference, to stay over the plot (below). The stride leaves room for
+  // that move, so the labels keep one spacing along the axis.
+  const widest = labelExtent - AXIS_LABEL_GAP;
+  const stride =
+    vertical || widest <= band
+      ? fitStride
+      : Math.max(fitStride, Math.ceil((1.5 * widest + AXIS_LABEL_GAP) / band - 0.5));
 
   // The right edge of the last horizontal label drawn.
   let drawnRight = Number.NEGATIVE_INFINITY;
@@ -602,9 +610,8 @@ function drawCategoryLabels(
     } else {
       const text = fitText(label, band * stride - AXIS_LABEL_GAP);
       // A label wider than its band stays over the plot: past the plot's left
-      // edge, the first one ran into the value axis's lowest label ($0). Kept
-      // over the plot, it can reach the next label on a narrow chart; then
-      // that next label is left out.
+      // edge, the first one ran into the value axis's lowest label ($0). A
+      // label that would still reach the one before it is left out.
       const half = textWidth(text) / 2;
       const x = Math.min(Math.max(plot.left + center, plot.left + half), plot.right - half);
       if (x - half < drawnRight + AXIS_LABEL_GAP) continue;
