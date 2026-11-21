@@ -1066,6 +1066,19 @@ export interface ReplaceChange {
 }
 
 /**
+ * What `previewReplaceAll` returns: the first changes Replace all would make,
+ * and how many it makes in all.
+ */
+export interface ReplacePreview {
+  /** The first changes, in search order: at most the `limit` asked for. */
+  changes: ReplaceChange[];
+  /** How many changes Replace all makes. */
+  total: number;
+  /** How many of them rewrite a formula's text. */
+  formulas: number;
+}
+
+/**
  * View-aware editable snapshot of one cell, for hosts building a detached
  * formula bar or cell inspector. `address` is the translated *data* address —
  * the correct target for `Grid.applyTransaction` even under an active
@@ -1573,12 +1586,13 @@ export interface Grid {
    */
   replaceAll(replacement: string): ReplaceResult;
   /**
-   * The changes `replaceAll(replacement)` would make, in search order, without
-   * writing: each cell or note with its text before and after. It comes from
-   * the same plan as `replaceAll`, so it lists exactly what that writes.
-   * Empty when read-only.
+   * The first `limit` (default 1,000) changes `replaceAll(replacement)` would
+   * make, in search order, without writing: each cell or note with its text
+   * before and after, and how many changes it makes in all. It comes from the
+   * same plan as `replaceAll`, so it lists exactly what that writes. Empty
+   * when read-only.
    */
-  previewReplaceAll(replacement: string): ReplaceChange[];
+  previewReplaceAll(replacement: string, limit?: number): ReplacePreview;
   /** Insert `count` (default 1) empty rows at row `at` of the active sheet, as one undo step. */
   insertRows(at: number, count?: number): void;
   /** Remove `count` (default 1) rows from row `at` of the active sheet, as one undo step. */
