@@ -268,6 +268,7 @@ grid.on("mutation-rejected", ({ issues }) => {
 - If the edited cell leaves the view, or the sheet structure changes, the grid cancels the editor.
 - Paste does nothing when `readOnly` is on; it resolves `"empty"`.
 - Cut on a read-only grid copies: nothing is marked or moved.
+- A paste that runs past the sheet's last row or column adds the rows and columns it needs, and a moved cut adds the rows it needs, in the same undo step, as Excel's 1,048,576 rows hold them. A sheet holds at most 1,000,000 rows; a paste that would end past them is refused with a message, as too large a pasted text is. Under a view sort or with Paste into visible rows only, a block that does not fit the rows below the selected cell is refused the same way.
 - An undo that is too large to send changes nothing and leaves the history; see [Undo a large clear](#undo-a-large-clear).
 
 ## See also
