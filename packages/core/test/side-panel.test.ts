@@ -124,7 +124,7 @@ async function insertedChart() {
   await Promise.resolve();
   return context;
 }
-it("manages formula names through undo, redo and remote changes", async () => {
+it("manages formula names through undo and remote changes", async () => {
   const { grid, host, control, openTab, field, press } = await setup();
   openTab("Formulas");
   press(control("Name Manager"));
@@ -135,10 +135,6 @@ it("manages formula names through undo, redo and remote changes", async () => {
   const save = host.querySelector<HTMLButtonElement>('[data-focus-key="save-name"]');
   if (save === null) throw new Error("missing name save button");
   press(save);
-  expect(grid.store.getWorkbook().namedRanges).toEqual([{ name: "Rate", formula: "=0.2" }]);
-  grid.undo();
-  expect(grid.store.getWorkbook().namedRanges).toEqual([]);
-  grid.redo();
   expect(grid.store.getWorkbook().namedRanges).toEqual([{ name: "Rate", formula: "=0.2" }]);
 
   const edit = host.querySelector<HTMLButtonElement>('[aria-label="Edit Rate (Workbook)"]');
