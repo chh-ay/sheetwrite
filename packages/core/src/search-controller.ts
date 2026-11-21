@@ -7,7 +7,13 @@ import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
-import type { ReplaceChange, ReplaceResult, SearchOptions, SearchResult } from "./types/grid.js";
+import type {
+  ReplaceChange,
+  ReplacePreview,
+  ReplaceResult,
+  SearchOptions,
+  SearchResult,
+} from "./types/grid.js";
 import type { ResolvedCell, Store } from "./types/store.js";
 
 export interface SearchControllerDeps {
@@ -160,7 +166,22 @@ interface Planned {
 /** The changes Replace all makes, and the operations that write them when it writes. */
 interface ReplacePlan {
   readonly patches: DocumentOp[];
+  /** The first `limit` changes. */
   readonly changes: ReplaceChange[];
+  readonly limit: number;
+  /** How many changes it makes, and how many of them rewrite a formula. */
+  total: number;
+  formulas: number;
+}
+
+/** How many changes the Replace all preview lists unless told otherwise. */
+const DEFAULT_PREVIEW_LIMIT = 1_000;
+
+/** Count `change` in `plan`, and list it while the plan lists fewer than its limit. */
+function addChange(plan: ReplacePlan, change: ReplaceChange): void {
+  plan.total += 1;
+  if (change.kind === "formula") plan.formulas += 1;
+  if (plan.changes.length < plan.limit) plan.changes.push(change);
 }
 
 /** Whether two lists hold the same cells in the same order. */
@@ -424,12 +445,15 @@ export class SearchController {
   }
 
   /**
-   * The changes {@link replaceAll} would make, in search order, without
-   * writing anything. Both come from one plan, so the preview shows exactly
-   * what Replace all writes. Empty on a read-only grid.
+   * The first `limit` changes {@link replaceAll} would make, in search order,
+   * and how many it makes, without writing anything. Both come from one plan,
+   * so the preview shows exactly what Replace all writes. Empty on a
+   * read-only grid.
    */
-  previewReplaceAll(replacement: string): ReplaceChange[] {
-    return this.deps.readOnly() ? [] : this.planReplaceAll(replacement, false).changes;
+  previewReplaceAll(replacement: string, limit = DEFAULT_PREVIEW_LIMIT): ReplacePreview {
+    if (this.deps.readOnly()) return { changes: [], total: 0, formulas: 0 };
+    const { changes, total, formulas } = this.planReplaceAll(replacement, false, limit);
+    return { changes, total, formulas };
   }
 
   /**
@@ -442,7 +466,7 @@ export class SearchController {
       return { replaced: 0, result: this.emitSearch() };
     }
 
-    const { patches, changes } = this.planReplaceAll(replacement, true);
+    const { patches, total } = this.planReplaceAll(replacement, true, Number.POSITIVE_INFINITY);
     if (patches.length > 0) {
       this.deps.commit(patches);
       this.found = this.scanAll(this.searchQuery, this.searchOpts);
@@ -452,15 +476,16 @@ export class SearchController {
       this.revealActiveMatch(false);
       this.deps.scheduleRender();
     }
-    return { replaced: changes.length, result: this.emitSearch() };
+    return { replaced: total, result: this.emitSearch() };
   }
 
   /**
    * Plan Replace all over every match. The preview passes `writes: false`:
-   * it needs only the changes, so it skips reading the new text into values.
+   * it needs only the changes, so it skips reading the new text into values,
+   * and it lists only the first `limit`.
    */
-  private planReplaceAll(replacement: string, writes: boolean): ReplacePlan {
-    const plan: ReplacePlan = { patches: [], changes: [] };
+  private planReplaceAll(replacement: string, writes: boolean, limit: number): ReplacePlan {
+    const plan: ReplacePlan = { patches: [], changes: [], limit, total: 0, formulas: 0 };
     for (const part of this.found.sheets) {
       const matches = part.set.materialize();
       if (this.searchOpts.lookIn === "notes")
@@ -503,7 +528,7 @@ export class SearchController {
             ? null
             : this.replacementFromCell(addr, replacement, cell);
       if (!planned) continue;
-      plan.changes.push(planned.change);
+      addChange(plan, planned.change);
       if (!writes) continue;
       if (scalarWrites) {
         plan.patches.push(this.patchOf(planned));
@@ -543,7 +568,7 @@ export class SearchController {
     for (const addr of matches) {
       const planned = this.noteReplacement(addr, notes.get(`${addr.row}:${addr.col}`), replacement);
       if (!planned) continue;
-      plan.changes.push(planned.change);
+      addChange(plan, planned.change);
       if (writes) plan.patches.push(this.patchOf(planned));
     }
   }
