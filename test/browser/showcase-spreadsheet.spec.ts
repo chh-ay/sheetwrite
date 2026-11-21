@@ -323,3 +323,34 @@ test("Shift+F11 inserts Excel's SheetN before the active sheet, the add button a
     "true",
   );
 });
+
+test("the name box goes to a cell on a row the filter hides, which the formula bar edits @portability", async ({
+  page,
+}) => {
+  await open(page);
+  // Keep only the orders of 1/2/2026: sheet rows 3 to 49 hide.
+  await select(page, "A1");
+  await page.keyboard.press("ControlOrMeta+Shift+L");
+  await page.evaluate(() => {
+    window.__sheetwriteSpreadsheetGrid?.setColumnFilter(0, { kind: "values", values: [46024] });
+  });
+
+  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
+  const formulaBar = page.getByRole("textbox", { name: "Formula bar" });
+  await select(page, "C5");
+  await expect(nameBox).not.toHaveAttribute("aria-invalid", "true");
+  await expect(nameBox).toHaveValue("C5");
+  const stored = await cell(page, "sales", 4, 2);
+  await expect(formulaBar).toHaveValue(String(stored.resolved));
+
+  // Typing edits the hidden cell in the formula bar, as in Excel.
+  await page.keyboard.type("Zoe");
+  await expect(formulaBar).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await cell(page, "sales", 4, 2)).resolved).toBe("Zoe");
+
+  // Down goes to the next row that shows: the empty row below the orders.
+  await select(page, "C5");
+  await page.keyboard.press("ArrowDown");
+  await expect(nameBox).toHaveValue("C50");
+});
