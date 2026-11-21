@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { waitForHydration } from "./fixtures.js";
 import { siteUrl } from "./playwright.config.js";
 
 // Browser contracts for shared documentation controls: framework tabs, the
@@ -22,11 +23,6 @@ function collectErrors(page: Page): PageErrors {
   });
   page.on("pageerror", (error) => errors.page.push(error.message));
   return errors;
-}
-
-/** Interactive steps need attached listeners; the root component marks hydration. */
-async function waitForHydration(page: Page): Promise<void> {
-  await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
 }
 
 async function blurFocus(page: Page): Promise<void> {

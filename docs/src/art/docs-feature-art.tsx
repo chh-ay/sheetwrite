@@ -113,8 +113,8 @@ export function FillDiagram() {
         },
         {
           title: "Formulas shift",
-          code: ["=A1 + $B$1", "one column right:", "=B1 + $B$1"],
-          lines: ["Relative parts move;", "$ parts stay"],
+          code: ["=A1 + $B$1 → =B1 + $B$1"],
+          lines: ["One column right: $ parts stay"],
         },
       ]}
       text={{
@@ -146,16 +146,16 @@ export function SearchStepsDiagram() {
         {
           title: 'search("error")',
           sheet: log("B2"),
-          lines: ["2 matches; B2 is", "the active one"],
+          lines: ["2 matches; B2 is the active one"],
         },
         {
           title: "findNext()",
           sheet: log("D7"),
-          lines: ["D7 is active and", "scrolled into view"],
+          lines: ["D7 is active and scrolled into view"],
         },
         {
           title: "replaceAll(text)",
-          lines: ["Replaces every match", "as an undoable change;", "clearSearch() ends it"],
+          lines: ["One undoable change for all matches;", "clearSearch() ends it"],
           tone: "accent",
         },
       ]}
@@ -206,6 +206,7 @@ export function SelectionShapesDiagram() {
 export function StatusTotalsDiagram() {
   return (
     <FlowFigure
+      note="The status bar updates on each selection and change."
       steps={[
         {
           title: "Select B1:B3",
@@ -223,7 +224,6 @@ export function StatusTotalsDiagram() {
         {
           title: "The status bar",
           code: ["Average: 8 · Count: 3", "Sum: 24 · 3 × 1 cells"],
-          lines: ["Updates on each", "selection and change"],
           tone: "accent",
         },
       ]}
@@ -242,7 +242,7 @@ export function RibbonCommandsDiagram() {
     <FanFigure
       source={{
         title: "One command model",
-        lines: ["The same commands, glyphs and enabled", "state, read from getCommandState"],
+        lines: ["One set of commands and glyphs;", "getCommandState gives their state"],
       }}
       text={{
         title: "The toolbar, the ribbons and your own controls share one command model",
@@ -393,8 +393,8 @@ export function ChartRangesDiagram() {
           },
         },
         {
-          title: "setChart",
-          code: ['kind: "line"', "categories: A2:A4", "values: B2:B4", "nameRange: B1"],
+          title: 'setChart: kind "line"',
+          code: ["categories: A2:A4", "values: B2:B4, nameRange: B1"],
         },
         {
           title: "A line chart, Revenue",
@@ -418,23 +418,55 @@ export function PivotOutputDiagram() {
       steps={[
         {
           title: "Source, Orders A1:C5",
-          code: [
-            "Month    Region    Revenue",
-            "2026-01  Americas      120",
-            "2026-01  EMEA           80",
-            "2026-02  Americas      140",
-            "2026-02  EMEA           60",
-          ],
+          sheet: {
+            cols: 3,
+            rows: 5,
+            cells: [
+              [0, 0, "Month"],
+              [1, 0, "Region"],
+              [2, 0, "Revenue"],
+              [0, 1, "2026-01"],
+              [1, 1, "Americas"],
+              [2, 1, "120"],
+              [0, 2, "2026-01"],
+              [1, 2, "EMEA"],
+              [2, 2, "80"],
+              [0, 3, "2026-02"],
+              [1, 3, "Americas"],
+              [2, 3, "140"],
+              [0, 4, "2026-02"],
+              [1, 4, "EMEA"],
+              [2, 4, "60"],
+            ],
+            ranges: [{ from: [0, 0], to: [2, 0], tone: "muted" }],
+          },
         },
-        { title: "setPivot", code: ["rows: Month", "columns: Region", "values: SUM(Revenue)"] },
+        { title: "setPivot", code: ["rows: Month · columns: Region", "values: SUM(Revenue)"] },
         {
           title: "Output at the anchor",
-          code: [
-            "Month    Americas  EMEA  Total",
-            "2026-01       120    80    200",
-            "2026-02       140    60    200",
-            "Total         260   140    400",
-          ],
+          sheet: {
+            cols: 4,
+            rows: 4,
+            cells: [
+              [0, 0, "Month"],
+              [1, 0, "Americas"],
+              [2, 0, "EMEA"],
+              [3, 0, "Total"],
+              [0, 1, "2026-01"],
+              [1, 1, "120"],
+              [2, 1, "80"],
+              [3, 1, "200"],
+              [0, 2, "2026-02"],
+              [1, 2, "140"],
+              [2, 2, "60"],
+              [3, 2, "200"],
+              [0, 3, "Total"],
+              [1, 3, "260"],
+              [2, 3, "140"],
+              [3, 3, "400"],
+            ],
+            ranges: [{ from: [1, 1], to: [3, 3], tone: "accent" }],
+          },
           tone: "accent",
         },
       ]}
@@ -476,7 +508,7 @@ export function WriteChecksDiagram() {
     <FanFigure
       source={{
         title: "A local write",
-        lines: ["An edit, paste, fill or clear, or a host transaction"],
+        lines: ["An edit, paste, fill or clear,", "or a host transaction"],
       }}
       text={{
         title: "What checks a local write, and what doesn't",
@@ -486,7 +518,7 @@ export function WriteChecksDiagram() {
       tiles={[
         {
           title: "Validation rule",
-          code: ["list, number, date,", "textLength, checkbox"],
+          code: ["list · number · date · …"],
           lines: ["reject, warn or allow"],
           tone: "accent",
         },
@@ -499,7 +531,7 @@ export function WriteChecksDiagram() {
         {
           title: "Note",
           code: ["setNote(addr, text)"],
-          lines: ["Plain text; checks", "nothing"],
+          lines: ["Plain text; checks nothing"],
           tone: "muted",
           unreached: true,
         },
@@ -551,11 +583,11 @@ export function GroupBySpillDiagram() {
         { title: "Orders A1:G12", lines: ["Region in column A,", "Revenue in column E"] },
         {
           title: "One formula",
-          code: ["=GROUPBY(A1:A12,", "  E1:E12, SUM)"],
+          code: ["=GROUPBY(A1:A12, E1:E12, SUM)"],
         },
         {
           title: "Spills a summary",
-          code: ["East     1550", "North    3090", "South    2720", "Total    7360"],
+          code: ["East 1550 · North 3090", "South 2720 · Total 7360"],
           tone: "accent",
         },
       ]}
@@ -584,7 +616,7 @@ export function FormulaHelpPartsDiagram() {
         {
           title: "Argument guide",
           code: ["ROUND(number, digits)"],
-          lines: ["The current argument", "in bold"],
+          lines: ["The current argument in bold"],
           tone: "accent",
         },
         { title: "Live errors", lines: ["Underlined where the", "engine's parser fails"] },
@@ -592,7 +624,7 @@ export function FormulaHelpPartsDiagram() {
         {
           title: "Result preview",
           code: ["= 0.99"],
-          lines: ["When the formula has", "no problem"],
+          lines: ["When the formula has no problem"],
         },
       ]}
     />
@@ -639,7 +671,7 @@ export function GridHandleDiagram() {
     <FanFigure
       source={{
         title: "createGrid(host, options) returns a Grid handle",
-        lines: ["Its methods, grouped by the task they do"],
+        lines: ["Its methods, grouped by task"],
       }}
       text={{
         title: "The Grid handle's methods by task",
@@ -649,18 +681,16 @@ export function GridHandleDiagram() {
       tiles={[
         {
           title: "Document",
-          code: ["applyTransaction", "insertRows", "styleRange", "undo · redo"],
+          code: ["applyTransaction · insertRows", "styleRange · undo · redo"],
         },
-        { title: "Selection", code: ["setSelection", "beginEdit", "search", "findNext"] },
+        { title: "Selection", code: ["setSelection · beginEdit", "search · findNext"] },
         {
           title: "Views",
-          code: ["sortBy", "setViewSort", "filterBy", "hideRows", "groupRows"],
+          code: ["sortBy · filterBy · hideRows", "setViewSort · groupRows"],
           tone: "muted",
         },
-        {
-          title: "Layout and lifecycle",
-          code: ["setFrozen", "setZoom", "setColumnWidth", "setTheme", "on · refresh", "destroy"],
-        },
+        { title: "Layout", code: ["setFrozen · setZoom · setTheme", "setColumnWidth"] },
+        { title: "Lifecycle", code: ["on · refresh · destroy"] },
       ]}
     />
   );
@@ -672,7 +702,7 @@ export function TouchGesturesDiagram() {
     <FanFigure
       source={{
         title: "A touch pointer goes down",
-        lines: ["Where it starts decides what the gesture does"],
+        lines: ["Where it starts decides", "what the gesture does"],
       }}
       text={{
         title: "What each touch gesture does",
@@ -680,16 +710,16 @@ export function TouchGesturesDiagram() {
           "A tap on a cell selects it, and a tap on a column header selects the column. A double-tap on a cell begins editing. A drag that starts on a plain cell scrolls natively: the grid neither captures the pointer nor prevents the default. A drag that starts on the fill handle fills, on a row or column boundary resizes, and on the border of a multi-cell selection extends it; these capture the pointer.",
       }}
       tiles={[
-        { title: "Tap", lines: ["Selects the cell;", "on a header, the", "column"] },
-        { title: "Double-tap", lines: ["Begins editing", "the cell"] },
+        { title: "Tap", lines: ["Selects the cell;", "on a header, the column"] },
+        { title: "Double-tap", lines: ["Begins editing the cell"] },
         {
           title: "Drag on a cell",
-          lines: ["Native scroll:", "no capture, no", "preventDefault"],
+          lines: ["Native scroll: no pointer capture,", "no preventDefault"],
           tone: "muted",
         },
         {
           title: "Drag on a handle",
-          lines: ["Fill handle: fill", "Boundary: resize", "Border: extend"],
+          lines: ["Fill handle fills; boundary resizes;", "selection border extends"],
         },
       ]}
     />
@@ -704,10 +734,7 @@ export function EditorLifecycleDiagram() {
         from: 1,
         step: {
           title: "Escape: cancel()",
-          lines: [
-            "context.signal aborts first; destroy()",
-            "runs once, and focus returns to the grid",
-          ],
+          lines: ["Aborts context.signal first;", "destroy() runs once; grid gets focus"],
           tone: "muted",
         },
       }}
@@ -747,11 +774,11 @@ export function ThemeLayersDiagram() {
         {
           title: "CSS custom properties",
           code: ["--sheetwrite-*"],
-          lines: ["read by resolveThemeFromCss", "from the host's style"],
+          lines: ["resolveThemeFromCss reads them"],
         },
         {
           title: "opts.theme · setTheme",
-          lines: ["A Partial<Theme> that", "wins last"],
+          lines: ["A Partial<Theme> that wins last"],
           tone: "accent",
         },
       ]}
@@ -845,11 +872,7 @@ export function KeyboardShortcutsDiagram() {
         from: 2,
         step: {
           title: "key-bindings-change",
-          lines: [
-            "The host stores the",
-            "bindings and passes them back",
-            "as config.keyboard.bindings",
-          ],
+          lines: ["The host stores them and passes", "config.keyboard.bindings back"],
           tone: "muted",
         },
       }}
@@ -887,7 +910,7 @@ export function PasteSpecialDiagram() {
         },
         {
           title: "Paste Special on C1",
-          lines: ["Paste: Values", "Operation: Add", "Skip blanks"],
+          lines: ["Paste: Values · Operation: Add", "Skip blanks"],
           tone: "accent",
         },
         {

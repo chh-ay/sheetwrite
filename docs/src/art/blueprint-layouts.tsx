@@ -1,7 +1,8 @@
-// The two shapes most docs figures take, laid out with the blueprint kit:
-// a flow (steps left to right, an optional outcome of one step below) and a
-// fan (one source over the things it reaches). Each lays itself out wide and
-// narrow from its text, so no figure types coordinates.
+// The shapes most docs figures take, laid out with the blueprint kit: a flow
+// (steps left to right, an optional outcome of one step below), a fan (one
+// source over the things it reaches), tiles, pairs, a sequence, an exchange
+// and a merge. Each lays itself out wide and narrow from its text, so no
+// figure types coordinates; the kit fits each drawing into its frame.
 import type { JSX } from "solid-js";
 
 import {
@@ -10,7 +11,12 @@ import {
   type BlueprintLayout,
   type BlueprintNode,
   type BlueprintText,
+  labelWidth,
+  linkGap,
   nodeHeight,
+  nodeWidth,
+  ROOM,
+  SPACING,
 } from "./blueprint.js";
 
 /** One box of a flow or fan: a title, caption lines and code lines. */
@@ -32,13 +38,12 @@ export interface FigureOutcome {
   readonly kind?: "fail" | "back";
 }
 
-const WIDE = 720;
-const NARROW = 360;
-const MARGIN = 8;
-/** The gap between boxes in a row, long enough for an arrow and its head. */
-const ROW_GAP = 32;
-/** The gap between rows, long enough for an arrow and its label. */
-const ROW_SPACE = 40;
+const WIDE = ROOM.wide;
+const NARROW = ROOM.narrow;
+const ROW_GAP = SPACING.link;
+const ROW_SPACE = SPACING.row;
+/** Where connectors fan into one box, the gap also holds the bends. */
+const FAN_GAP = SPACING.link + SPACING.tile;
 /** Narrow outcomes are indented by this much, so the main path runs past them on the left. */
 const INDENT = 36;
 
@@ -54,45 +59,55 @@ function box(
   return { id, ...node, rect: { x, y, w, h: h ?? nodeHeight(step) } };
 }
 
-/** About how wide a box must be for its longest line: mono code is wider per character than the body face. */
-function textWidth(step: FigureStep): number {
-  const body = Math.max(
-    step.title.length * 7,
-    ...(step.lines ?? []).map((line) => line.length * 6.2),
-  );
-  const code = Math.max(0, ...(step.code ?? []).map((line) => line.length * 6.7));
-  return Math.max(body, code) + 30;
-}
-
 function flowWide(
   steps: readonly FigureStep[],
   outcome: FigureOutcome | undefined,
 ): BlueprintLayout {
-  // Each box gets the width its longest line needs, and the rest of the row is shared evenly.
-  const room = WIDE - 2 * MARGIN - (steps.length - 1) * ROW_GAP;
-  const needs = steps.map(textWidth);
-  const spare = Math.max(0, room - needs.reduce((sum, need) => sum + need, 0)) / steps.length;
-  const widths = needs.map((need) => need + spare);
-  const scale = Math.min(1, room / widths.reduce((sum, width) => sum + width, 0));
-  const h = Math.max(...steps.map(nodeHeight));
-  let x = MARGIN;
+  // One row when the steps fit at the width their text needs: equal boxes
+  // when the widest fits its share, else each box its need and an equal
+  // share of the rest. A longer flow wraps: equal boxes, as many to a row as
+  // fit, the rows balanced, each row's last step joined down to the next
+  // row's first. A flow with an outcome keeps one row; when that row is too
+  // wide, the kit shows the stacked layout instead.
+  const needs = steps.map(nodeWidth);
+  const widest = Math.max(...needs);
+  const gaps = (steps.length - 1) * ROW_GAP;
+  const total = needs.reduce((sum, need) => sum + need, 0) + gaps;
+  const fit = Math.max(1, Math.floor((WIDE + ROW_GAP) / (widest + ROW_GAP)));
+  const rows = outcome !== undefined || total <= WIDE ? 1 : Math.ceil(steps.length / fit);
+  const across = Math.ceil(steps.length / rows);
+  const share = (WIDE - (across - 1) * ROW_GAP) / across;
+  const spare = Math.max(0, WIDE - total) / steps.length;
+  const widths =
+    rows === 1 && widest > share
+      ? needs.map((need) => need + spare)
+      : needs.map(() => Math.max(widest, share));
+  const h = Math.max(...steps.map((step) => nodeHeight(step)));
+  let x = 0;
   const nodes = steps.map((step, index) => {
-    const w = (widths[index] ?? 0) * scale;
-    const placed = box(`s${index}`, step, x, MARGIN, w, h);
+    if (index % across === 0) x = 0;
+    const w = widths[index] ?? widest;
+    const placed = box(`s${index}`, step, x, Math.floor(index / across) * (h + ROW_SPACE), w, h);
     x += w + ROW_GAP;
     return placed;
   });
-  const edges: BlueprintEdge[] = steps.slice(1).map((_, index) => ({
-    from: `s${index}`,
-    fromSide: "right",
-    to: `s${index + 1}`,
-    kind: "main",
-  }));
-  let height = MARGIN + h + MARGIN;
+  const edges: BlueprintEdge[] = steps.slice(1).map((_, index) =>
+    (index + 1) % across === 0
+      ? {
+          from: `s${index}`,
+          fromSide: "bottom",
+          toSide: "top",
+          to: `s${index + 1}`,
+          kind: "main",
+        }
+      : { from: `s${index}`, fromSide: "right", to: `s${index + 1}`, kind: "main" },
+  );
+  // An outcome keeps the flow on one row, so the row spans every step.
+  const rowWidth = widths.reduce((sum, w) => sum + w, 0) + gaps;
   if (outcome !== undefined) {
     const source = nodes[outcome.from];
     if (source === undefined) throw new Error(`No step ${outcome.from} for the outcome`);
-    const below = box("outcome", outcome.step, MARGIN, MARGIN + h + ROW_SPACE, WIDE - 2 * MARGIN);
+    const below = box("outcome", outcome.step, 0, h + ROW_SPACE, rowWidth);
     nodes.push(below);
     const centre = source.rect.x + source.rect.w / 2;
     edges.push({
@@ -102,36 +117,41 @@ function flowWide(
       toT: (centre - below.rect.x) / below.rect.w,
       kind: outcome.kind ?? "back",
     });
-    height = below.rect.y + below.rect.h + MARGIN;
   }
-  return { width: WIDE, height, nodes, edges };
+  return { nodes, edges };
+}
+
+/**
+ * How wide a stacked layout is: a phone's room, or wider when a box's text
+ * needs it, indented boxes with their indent; a wider drawing scales down to
+ * fit a phone instead of letting text cross its box.
+ */
+function stackWidth(full: readonly FigureStep[], indented: readonly FigureStep[] = []): number {
+  return Math.max(
+    NARROW,
+    ...full.map(nodeWidth),
+    ...indented.map((step) => nodeWidth(step) + INDENT),
+  );
 }
 
 function flowNarrow(
   steps: readonly FigureStep[],
   outcome: FigureOutcome | undefined,
 ): BlueprintLayout {
+  const width = stackWidth(steps, outcome === undefined ? [] : [outcome.step]);
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
-  let y = MARGIN;
+  let y = 0;
   steps.forEach((step, index) => {
-    nodes.push(box(`s${index}`, step, MARGIN, y, NARROW - 2 * MARGIN));
+    nodes.push(box(`s${index}`, step, 0, y, width));
     y += nodeHeight(step) + ROW_SPACE;
     if (outcome?.from === index) {
       // The outcome sits indented under its step; the main path passes it on the left.
-      nodes.push(
-        box(
-          "outcome",
-          outcome.step,
-          MARGIN + INDENT,
-          y - ROW_SPACE / 2 - 4,
-          NARROW - 2 * MARGIN - INDENT,
-        ),
-      );
+      nodes.push(box("outcome", outcome.step, INDENT, y - ROW_SPACE / 2 - 4, width - INDENT));
       y += nodeHeight(outcome.step) + ROW_SPACE / 2;
     }
   });
-  const pathT = 12 / (NARROW - 2 * MARGIN);
+  const pathT = 12 / width;
   steps.slice(1).forEach((_, index) => {
     edges.push({
       from: `s${index}`,
@@ -147,11 +167,11 @@ function flowNarrow(
       fromSide: "bottom",
       to: "outcome",
       t: 0.6,
-      toT: (0.6 * (NARROW - 2 * MARGIN) - INDENT) / (NARROW - 2 * MARGIN - INDENT),
+      toT: (0.6 * width - INDENT) / (width - INDENT),
       kind: outcome.kind ?? "back",
     });
   }
-  return { width: NARROW, height: y - ROW_SPACE + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 /** A flow: steps joined left to right, and an optional outcome of one step below them. */
@@ -174,19 +194,45 @@ export function FlowFigure(
 }
 
 function fanWide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
-  const top = box("source", source, MARGIN, MARGIN, WIDE - 2 * MARGIN);
-  const w = (WIDE - 2 * MARGIN - (tiles.length - 1) * ROW_GAP) / tiles.length;
-  const h = Math.max(...tiles.map(nodeHeight));
+  // Tiles share the row equally, a tile's gap apart, each at least as wide as
+  // the widest tile's text. When they don't fit in a row, they stack in a
+  // column beside the source, centred on it, every arrow branching from one
+  // trunk out of the source's middle.
+  const need = Math.max(...tiles.map(nodeWidth));
+  const gap = SPACING.tile;
+  const reached = (index: number) => tiles[index]?.unreached !== true;
+  if (tiles.length * (need + gap) - gap > WIDE) {
+    let y = 0;
+    const column = tiles.map((tile, index) => {
+      const placed = box(`t${index}`, tile, nodeWidth(source) + FAN_GAP, y, need);
+      y += placed.rect.h + gap;
+      return placed;
+    });
+    const height = y - gap;
+    const side = box("source", source, 0, 0, nodeWidth(source));
+    const centred = { ...side, rect: { ...side.rect, y: (height - side.rect.h) / 2 } };
+    return {
+      nodes: [centred, ...column],
+      edges: column
+        .filter((_, index) => reached(index))
+        .map((node) => ({
+          from: "source",
+          fromSide: "right" as const,
+          to: node.id,
+          toT: 0.5,
+          kind: "main" as const,
+        })),
+    };
+  }
+  const w = Math.max(need, (WIDE - (tiles.length - 1) * gap) / tiles.length);
+  const top = box("source", source, 0, 0, tiles.length * (w + gap) - gap);
+  const h = Math.max(...tiles.map((tile) => nodeHeight(tile)));
   const y = top.rect.y + top.rect.h + ROW_SPACE;
-  const nodes = tiles.map((tile, index) =>
-    box(`t${index}`, tile, MARGIN + index * (w + ROW_GAP), y, w, h),
-  );
+  const nodes = tiles.map((tile, index) => box(`t${index}`, tile, index * (w + gap), y, w, h));
   return {
-    width: WIDE,
-    height: y + h + MARGIN,
     nodes: [top, ...nodes],
     edges: nodes
-      .filter((_, index) => tiles[index]?.unreached !== true)
+      .filter((_, index) => reached(index))
       .map((node) => ({
         from: "source",
         fromSide: "bottom" as const,
@@ -198,18 +244,17 @@ function fanWide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLay
 }
 
 function fanNarrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
-  const top = box("source", source, MARGIN, MARGIN, NARROW - 2 * MARGIN);
-  let y = top.rect.y + top.rect.h + ROW_SPACE / 2;
+  const width = stackWidth([source], tiles);
+  const top = box("source", source, 0, 0, width);
+  let y = top.rect.y + top.rect.h + SPACING.tile;
   const nodes = tiles.map((tile, index) => {
-    const placed = box(`t${index}`, tile, MARGIN + INDENT, y, NARROW - 2 * MARGIN - INDENT);
-    y += placed.rect.h + ROW_SPACE / 2;
+    const placed = box(`t${index}`, tile, INDENT, y, width - INDENT);
+    y += placed.rect.h + SPACING.tile;
     return placed;
   });
   // Each tile is reached from the source's lower-left, down the gutter and across into its left side.
   const spineT = INDENT / 2 / top.rect.w;
   return {
-    width: NARROW,
-    height: y - ROW_SPACE / 2 + MARGIN,
     nodes: [top, ...nodes],
     edges: nodes
       .filter((_, index) => tiles[index]?.unreached !== true)
@@ -243,29 +288,28 @@ export function FanFigure(
   );
 }
 
-function tilesLayout(
-  tiles: readonly FigureStep[],
-  width: number,
-  columns: number,
-): BlueprintLayout {
-  const w = (width - 2 * MARGIN - ((columns - 1) * ROW_GAP) / 2) / columns;
+function tilesLayout(tiles: readonly FigureStep[], width: number, wanted: number): BlueprintLayout {
+  const gap = SPACING.tile;
+  const room = width;
+  // Fewer columns when the widest tile's text doesn't fit its share of the row.
+  const need = Math.max(...tiles.map(nodeWidth));
+  const columns = Math.max(1, Math.min(wanted, Math.floor((room + gap) / (need + gap))));
+  const w = Math.max(need, (room - (columns - 1) * gap) / columns);
   const rows: FigureStep[][] = [];
   tiles.forEach((tile, index) => {
     const row = Math.floor(index / columns);
     (rows[row] ??= []).push(tile);
   });
   const nodes: BlueprintNode[] = [];
-  let y = MARGIN;
+  let y = 0;
   rows.forEach((row, rowIndex) => {
-    const h = Math.max(...row.map(nodeHeight));
+    const h = Math.max(...row.map((tile) => nodeHeight(tile)));
     row.forEach((tile, column) =>
-      nodes.push(
-        box(`t${rowIndex * columns + column}`, tile, MARGIN + column * (w + ROW_GAP / 2), y, w, h),
-      ),
+      nodes.push(box(`t${rowIndex * columns + column}`, tile, column * (w + gap), y, w, h)),
     );
-    y += h + ROW_GAP / 2;
+    y += h + gap;
   });
-  return { width, height: y - ROW_GAP / 2 + MARGIN, nodes, edges: [] };
+  return { nodes, edges: [] };
 }
 
 /** Tiles: groups side by side, `columns` across wide and `narrowColumns` on phones, with no connectors. */
@@ -295,37 +339,39 @@ export interface FigurePair {
 }
 
 function pairsWide(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
-  const gap = ROW_GAP + 16;
-  const left = (width - 2 * MARGIN - gap) * share;
-  const right = width - 2 * MARGIN - gap - left;
+  const gap = ROW_GAP;
+  // Each side takes its share of the row, moved so both sides hold their
+  // widest text; when both can't, the row grows and the kit stacks the figure.
+  const room = width - gap;
+  const leftNeed = Math.max(...pairs.map((pair) => nodeWidth(pair.from)));
+  const rightNeed = Math.max(...pairs.map((pair) => nodeWidth(pair.to)));
+  const left = Math.max(leftNeed, Math.min(room * share, room - rightNeed));
+  const right = Math.max(rightNeed, room - left);
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
-  let y = MARGIN;
+  let y = 0;
   pairs.forEach((pair, index) => {
     const h = Math.max(nodeHeight(pair.from), nodeHeight(pair.to));
-    nodes.push(box(`a${index}`, pair.from, MARGIN, y, left, h));
-    nodes.push(box(`b${index}`, pair.to, MARGIN + left + gap, y, right, h));
+    nodes.push(box(`a${index}`, pair.from, 0, y, left, h));
+    nodes.push(box(`b${index}`, pair.to, left + gap, y, right, h));
     edges.push({ from: `a${index}`, fromSide: "right", to: `b${index}`, kind: "main" });
-    y += h + ROW_GAP / 2;
+    y += h + SPACING.tile;
   });
-  return { width, height: y - ROW_GAP / 2 + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 /** On phones each pair stacks: what goes in, and under it, indented, what comes out. */
 function pairsNarrow(pairs: readonly FigurePair[]): BlueprintLayout {
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
-  const full = NARROW - 2 * MARGIN;
-  let y = MARGIN;
+  const full = stackWidth(
+    pairs.map((pair) => pair.from),
+    pairs.map((pair) => pair.to),
+  );
+  let y = 0;
   pairs.forEach((pair, index) => {
-    const from = box(`a${index}`, pair.from, MARGIN, y, full);
-    const to = box(
-      `b${index}`,
-      pair.to,
-      MARGIN + INDENT,
-      y + from.rect.h + ROW_GAP / 2,
-      full - INDENT,
-    );
+    const from = box(`a${index}`, pair.from, 0, y, full);
+    const to = box(`b${index}`, pair.to, INDENT, y + from.rect.h + SPACING.tile, full - INDENT);
     nodes.push(from, to);
     edges.push({
       from: from.id,
@@ -338,7 +384,7 @@ function pairsNarrow(pairs: readonly FigurePair[]): BlueprintLayout {
     });
     y = to.rect.y + to.rect.h + ROW_GAP;
   });
-  return { width: NARROW, height: y - ROW_GAP + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 /** Pairs: what goes in on the left and what comes out on the right, one row each. */
@@ -373,28 +419,44 @@ export type SequenceStep =
     }
   | { readonly note: string; readonly lane: string; readonly tone?: BlueprintNode["tone"] };
 
-/** The vertical space one message takes, room for its label above the line. */
-const MESSAGE_STEP = 36;
+/** The vertical space one message takes: room for its label above the line, or a lost mark on it. */
+const MESSAGE_STEP = 60;
 /** A lane's lifeline is a bar this wide: messages start and end on its edges. */
 const LIFELINE = 28;
+/** From a note's bottom to the next message's line: the label above that line clears the note. */
+const AFTER_NOTE = 32;
 
 function sequenceLayout(
   lanes: readonly SequenceLane[],
   steps: readonly SequenceStep[],
   width: number,
-  noteWidth: number,
+  leastNoteWidth: number,
 ): BlueprintLayout {
-  const span = (width - 2 * MARGIN - noteWidth) / Math.max(1, lanes.length - 1);
-  const centre = new Map(
-    lanes.map((lane, index) => [lane.id, MARGIN + noteWidth / 2 + index * span]),
+  const messages = steps.filter((step) => "message" in step);
+  const headWidth = Math.max(...lanes.map((lane) => nodeWidth({ title: lane.name })));
+  const noteWidth = Math.max(
+    leastNoteWidth,
+    headWidth,
+    ...steps.map((step) => ("note" in step ? nodeWidth({ title: step.note }) : 0)),
   );
-  // Heads stay apart however wide the notes are; notes sit only on the outer lanes.
-  const headWidth = Math.min(noteWidth, span - 12);
+  // Lanes far enough apart for the heads, and for each message's label or lost mark between two lifelines.
+  const between = Math.max(
+    ...messages.map((step) =>
+      step.lost ? nodeWidth({ title: `${step.message} lost` }) : labelWidth(step.message),
+    ),
+  );
+  const span = Math.max(
+    (width - noteWidth) / Math.max(1, lanes.length - 1),
+    headWidth + SPACING.tile,
+    between + LIFELINE + 2 * SPACING.tile,
+  );
+  const centre = new Map(lanes.map((lane, index) => [lane.id, noteWidth / 2 + index * span]));
+  const headHeight = Math.max(...lanes.map((lane) => nodeHeight({ title: lane.name })));
   const heads = lanes.map((lane) => {
     const x = (centre.get(lane.id) ?? 0) - headWidth / 2;
-    return box(`head-${lane.id}`, { title: lane.name }, x, MARGIN, headWidth, 32);
+    return box(`head-${lane.id}`, { title: lane.name }, x, 0, headWidth, headHeight);
   });
-  const top = MARGIN + 32;
+  const top = headHeight;
   // Each lane is a column of segments: lifeline bars, broken where a note sits.
   const segments = new Map<string, BlueprintNode[]>(lanes.map((lane) => [lane.id, []]));
   const open = new Map<string, number>(lanes.map((lane) => [lane.id, top]));
@@ -433,7 +495,7 @@ function sequenceLayout(
       nodes.push(note);
       segments.get(step.lane)?.push(note);
       open.set(step.lane, y - 8 + h);
-      y += h + 12;
+      y += h + AFTER_NOTE;
     } else {
       pending.push({ step, y });
       y += MESSAGE_STEP;
@@ -455,14 +517,16 @@ function sequenceLayout(
       const start = rightward ? from.rect.x + from.rect.w : from.rect.x;
       const end = rightward ? to.rect.x : to.rect.x + to.rect.w;
       const mid = (start + end) / 2;
-      const markWidth = Math.min(84, Math.abs(end - start) - 24);
+      const title = `${step.message} lost`;
+      const markWidth = Math.min(nodeWidth({ title }), Math.abs(end - start) - 2 * SPACING.tile);
+      const markHeight = nodeHeight({ title });
       const mark = box(
         `lost-${index}`,
-        { title: `${step.message} lost` },
+        { title },
         mid - markWidth / 2,
-        level - 12,
+        level - markHeight / 2,
         markWidth,
-        24,
+        markHeight,
       );
       nodes.push({ ...mark, tone: "danger" });
       edges.push({
@@ -483,10 +547,9 @@ function sequenceLayout(
       toT: (level - to.rect.y) / to.rect.h,
       kind: step.kind ?? "main",
       label: step.message,
-      labelSide: "above",
     });
   });
-  return { width, height: bottom + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 /** A sequence: lanes side by side, messages between them top to bottom, and notes on a lane. */
@@ -515,13 +578,14 @@ export interface FigureLink {
 }
 
 function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]): BlueprintLayout {
-  // The gaps hold the labels, so they share the width with the boxes.
-  const gap = 120;
-  const w = (WIDE - 2 * MARGIN - (steps.length - 1) * gap) / steps.length;
-  const h = Math.max(...steps.map(nodeHeight), 72);
-  const nodes = steps.map((step, index) =>
-    box(`s${index}`, step, MARGIN + index * (w + gap), MARGIN, w, h),
+  // Each gap holds its labels above and below the connectors.
+  const gap = linkGap(
+    links.flatMap((link) => (link.back ? [link.forward, link.back] : [link.forward])),
   );
+  const w = Math.max((WIDE - (steps.length - 1) * gap) / steps.length, ...steps.map(nodeWidth));
+  // Tall enough that a pair of connectors, at 0.3 and 0.7 of the side, keep their arrowheads apart.
+  const h = Math.max(...steps.map((step) => nodeHeight(step)), 72);
+  const nodes = steps.map((step, index) => box(`s${index}`, step, index * (w + gap), 0, w, h));
   const edges: BlueprintEdge[] = links.flatMap((link, index) => [
     {
       from: `s${index}`,
@@ -530,7 +594,6 @@ function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]
       t: link.back ? 0.3 : 0.5,
       kind: "main" as const,
       label: link.forward,
-      labelSide: "above" as const,
     },
     ...(link.back
       ? [
@@ -541,34 +604,38 @@ function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]
             t: 0.7,
             kind: "back" as const,
             label: link.back,
-            labelSide: "below" as const,
           },
         ]
       : []),
   ]);
-  return { width: WIDE, height: MARGIN + h + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 function exchangeNarrow(
   steps: readonly FigureStep[],
   links: readonly FigureLink[],
 ): BlueprintLayout {
+  // Each label sits beside its connector, at 0.4 and 0.6 of the box's width, inside the box's span.
+  const widestLabel = Math.max(
+    0,
+    ...links.flatMap((link) => [link.forward, link.back ?? ""]).map(labelWidth),
+  );
+  const width = Math.max(stackWidth(steps), (SPACING.label + widestLabel) / 0.4);
   const nodes: BlueprintNode[] = [];
-  let y = MARGIN;
+  let y = 0;
   steps.forEach((step, index) => {
-    const placed = box(`s${index}`, step, MARGIN, y, NARROW - 2 * MARGIN);
+    const placed = box(`s${index}`, step, 0, y, width);
     nodes.push(placed);
-    y += placed.rect.h + 64;
+    y += placed.rect.h + ROW_SPACE;
   });
   const edges: BlueprintEdge[] = links.flatMap((link, index) => [
     {
       from: `s${index}`,
       fromSide: "bottom" as const,
       to: `s${index + 1}`,
-      t: 0.25,
+      t: link.back ? 0.4 : 0.5,
       kind: "main" as const,
       label: link.forward,
-      labelSide: "right" as const,
     },
     ...(link.back
       ? [
@@ -576,15 +643,14 @@ function exchangeNarrow(
             from: `s${index + 1}`,
             fromSide: "top" as const,
             to: `s${index}`,
-            t: 0.7,
+            t: 0.6,
             kind: "back" as const,
             label: link.back,
-            labelSide: "right" as const,
           },
         ]
       : []),
   ]);
-  return { width: NARROW, height: y - 64 + MARGIN, nodes, edges };
+  return { nodes, edges };
 }
 
 /** An exchange: boxes in a row, with what each passes to the next and what comes back. */
@@ -620,23 +686,24 @@ function facing(target: BlueprintNode, source: BlueprintNode, axis: "x" | "y"): 
 
 function mergeWide(sources: readonly FigureStep[], steps: readonly FigureStep[]): BlueprintLayout {
   const columns = steps.length + 1;
-  const gap = ROW_GAP + 24;
-  const w = (WIDE - 2 * MARGIN - (columns - 1) * gap) / columns;
-  const h = Math.max(...sources.map(nodeHeight));
-  const left: BlueprintNode[] = sources.map((source, index) =>
-    box(`in${index}`, source, MARGIN, MARGIN + index * (h + ROW_GAP / 2), w, h),
+  const gap = FAN_GAP;
+  const w = Math.max(
+    (WIDE - (columns - 1) * gap) / columns,
+    ...[...sources, ...steps].map(nodeWidth),
   );
-  const height = sources.length * h + (sources.length - 1) * (ROW_GAP / 2);
-  const stepHeight = Math.max(...steps.map(nodeHeight));
-  const y = MARGIN + (height - stepHeight) / 2;
+  const h = Math.max(...sources.map((source) => nodeHeight(source)));
+  const left: BlueprintNode[] = sources.map((source, index) =>
+    box(`in${index}`, source, 0, index * (h + SPACING.tile), w, h),
+  );
+  const height = sources.length * h + (sources.length - 1) * SPACING.tile;
+  const stepHeight = Math.max(...steps.map((step) => nodeHeight(step)));
+  const y = (height - stepHeight) / 2;
   const right = steps.map((step, index) =>
-    box(`s${index}`, step, MARGIN + (index + 1) * (w + gap), y, w, stepHeight),
+    box(`s${index}`, step, (index + 1) * (w + gap), y, w, stepHeight),
   );
   const first = right[0];
   if (first === undefined) throw new Error("A merge needs at least one step after its sources");
   return {
-    width: WIDE,
-    height: MARGIN + Math.max(height, stepHeight) + MARGIN,
     nodes: [...left, ...right],
     edges: [
       ...left.map((source) => ({
@@ -661,26 +728,28 @@ function mergeNarrow(
   sources: readonly FigureStep[],
   steps: readonly FigureStep[],
 ): BlueprintLayout {
-  // Two sources sit side by side; more stack, each on its own row.
-  const across = sources.length === 2 ? 2 : 1;
+  // Two sources sit side by side when both fit; otherwise they stack, each on its own row.
+  const need = Math.max(...sources.map(nodeWidth));
+  const across = sources.length === 2 && 2 * need + SPACING.tile <= NARROW ? 2 : 1;
   // Stacked sources are indented, so their connectors can drop down on the left.
   const inset = across === 1 ? INDENT : 0;
-  const w = (NARROW - 2 * MARGIN - inset - (across - 1) * (ROW_GAP / 2)) / across;
+  const width = Math.max(stackWidth(steps), inset + across * need + (across - 1) * SPACING.tile);
+  const w = (width - inset - (across - 1) * SPACING.tile) / across;
   const h = Math.max(...sources.map((source) => nodeHeight(source)));
   const nodes: BlueprintNode[] = sources.map((source, index) =>
     box(
       `in${index}`,
       source,
-      MARGIN + inset + (index % across) * (w + ROW_GAP / 2),
-      MARGIN + Math.floor(index / across) * (h + ROW_GAP / 2),
+      inset + (index % across) * (w + SPACING.tile),
+      Math.floor(index / across) * (h + SPACING.tile),
       w,
       h,
     ),
   );
   const rows = Math.ceil(sources.length / across);
-  let y = MARGIN + rows * h + (rows - 1) * (ROW_GAP / 2) + ROW_SPACE;
+  let y = rows * h + (rows - 1) * SPACING.tile + ROW_SPACE;
   const right = steps.map((step, index) => {
-    const placed = box(`s${index}`, step, MARGIN, y, NARROW - 2 * MARGIN);
+    const placed = box(`s${index}`, step, 0, y, width);
     y += placed.rect.h + ROW_SPACE;
     return placed;
   });
@@ -706,8 +775,6 @@ function mergeNarrow(
           kind: "main",
         }));
   return {
-    width: NARROW,
-    height: y - ROW_SPACE + MARGIN,
     nodes: [...nodes, ...right],
     edges: [
       ...sourceEdges,

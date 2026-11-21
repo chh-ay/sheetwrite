@@ -38,6 +38,8 @@ test.describe("the spreadsheet shell", () => {
 
   test("Tab stays in the sheet, and F6 cycles the shell's parts", async ({ page }) => {
     await focusGrid(page);
+    // The grid names its way out in its description.
+    await expect(page.locator(GRID)).toHaveAttribute("aria-description", /F6/);
     for (let press = 0; press < 3; press++) await page.keyboard.press("Tab");
     expect((await focusIn(page, GRID)).onGrid).toBe(true);
 
@@ -60,11 +62,6 @@ test.describe("the spreadsheet shell", () => {
     await page.keyboard.press("Escape");
     await page.keyboard.press("Tab");
     expect((await focusIn(page, GRID)).inGrid).toBe(false);
-  });
-
-  test("the grid names its way out once, in its description", async ({ page }) => {
-    await focusGrid(page);
-    await expect(page.locator(GRID)).toHaveAttribute("aria-description", /F6/);
   });
 });
 
