@@ -550,6 +550,26 @@ it("ties a one-letter word to its neighbour, so a large label breaks only betwee
   );
 });
 
+it("names a folded group on at most two lines, never stranding a one-letter word", async () => {
+  const { host, openTab } = await setup();
+  openTab("Data");
+  const folded = (group: string) =>
+    host.querySelector(
+      `.sheetwrite-ribbon-group[aria-label="${group}"] > .sheetwrite-ribbon-group-button .sheetwrite-ribbon-label`,
+    )?.textContent;
+  expect(folded("Get & Transform Data")).toBe("Get & Transform\nData");
+  expect(folded("Queries & Connections")).toBe("Queries\n& Connections");
+  expect(folded("Sort & Filter")).toBe("Sort\n& Filter");
+  expect(folded("Data Tools")).toBe("Data\nTools");
+  openTab("Home");
+  expect(folded("Clipboard")).toBe("Clipboard");
+  // The line feed is not part of the name.
+  const button = host.querySelector<HTMLElement>(
+    '.sheetwrite-ribbon-group[aria-label="Clipboard"] > .sheetwrite-ribbon-group-button',
+  );
+  expect(button?.getAttribute("aria-label")).toBe("Clipboard");
+});
+
 it("opens on Home when the File tab shows, as Excel does", async () => {
   const { host } = await setup(false, undefined, true, { keyboardSettings: true });
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];

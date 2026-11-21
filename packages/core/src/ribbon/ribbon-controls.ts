@@ -103,6 +103,17 @@ function iconButton(
 }
 
 /**
+ * Whether the space before `words[index]` must not break: a one-letter word
+ * stays with the word after it, or with the word before it when it ends the
+ * label.
+ */
+function tiedToPrevious(words: readonly string[], index: number): boolean {
+  return (
+    words[index - 1]?.length === 1 || (words[index]?.length === 1 && index === words.length - 1)
+  );
+}
+
+/**
  * A label's shown text, with each one-letter word tied by a no-break space to
  * the word after it, or to the word before it when it ends the label. A large
  * button's label then breaks only between whole phrases, as Excel's two-line
@@ -112,12 +123,31 @@ function wrappedLabel(label: string): string {
   const words = label.split(" ");
   let text = words[0] ?? "";
   for (let index = 1; index < words.length; index += 1) {
-    const word = words[index] ?? "";
-    const tied =
-      words[index - 1]?.length === 1 || (word.length === 1 && index === words.length - 1);
-    text += `${tied ? "\u00a0" : " "}${word}`;
+    text += `${tiedToPrevious(words, index) ? "\u00a0" : " "}${words[index] ?? ""}`;
   }
   return text;
+}
+
+/**
+ * A folded group's name on at most two lines, joined by a line feed: broken
+ * at the space that keeps the longer line shortest, never at a space
+ * {@link wrappedLabel} ties. "Get & Transform Data" reads "Get & Transform" /
+ * "Data"; a one-word name stays on one line.
+ */
+export function twoLineLabel(label: string): string {
+  const words = label.split(" ");
+  let breakAt = -1;
+  let longest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < words.length; index += 1) {
+    if (tiedToPrevious(words, index)) continue;
+    const first = words.slice(0, index).join(" ").length;
+    const second = words.slice(index).join(" ").length;
+    if (Math.max(first, second) >= longest) continue;
+    longest = Math.max(first, second);
+    breakAt = index;
+  }
+  if (breakAt === -1) return label;
+  return `${words.slice(0, breakAt).join(" ")}\n${words.slice(breakAt).join(" ")}`;
 }
 
 function commandButton(

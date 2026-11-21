@@ -305,6 +305,20 @@
   display: inline-flex;
 }
 
+/* A folded group shows only its button, which already names the group, as in
+   Excel's narrow ribbon. The button takes the caption's height and keeps the
+   two lines ribbon.ts breaks its name into. The compact ribbon's rules below
+   put it back on one line. */
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-label {
+  display: none;
+}
+
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-button[data-large] {
+  height: auto;
+  max-width: none;
+  white-space: pre;
+}
+
 .sheetwrite-ribbon-button,
 .sheetwrite-ribbon-split-arrow,
 .sheetwrite-ribbon-combo-arrow {

@@ -215,6 +215,68 @@ test("the Data tab's large Sort labels break between whole phrases @portability"
   }
 });
 
+for (const width of [390, 320]) {
+  test(`at ${width} px the full ribbon names a folded group on two lines at most, clear of every caption @portability`, async ({
+    page,
+  }) => {
+    await open(page, width, 844);
+    const ribbon = page.getByRole("region", { name: "Ribbon" });
+    const switcher = ribbon.getByRole("button", { name: "Compact ribbon" });
+    if ((await switcher.getAttribute("aria-pressed")) === "true") await switcher.click();
+    await expect(ribbon).toHaveAttribute("data-mode", "full");
+    const data = ribbon.getByRole("tab", { name: "Data", exact: true });
+    if (!(await data.isVisible())) {
+      await ribbon.getByRole("button", { name: "More tabs" }).click();
+      await page.getByRole("menuitem", { name: "Data", exact: true }).click();
+    }
+    await expect(data).toHaveAttribute("aria-selected", "true");
+    await nextFrames(page);
+
+    const problems = await ribbon.evaluate((element) => {
+      const panel = element.querySelector<HTMLElement>(".sheetwrite-ribbon-panel:not([hidden])");
+      if (panel === null) return ["no panel"];
+      const shown = (node: Element) => node.getClientRects().length > 0;
+      const folded = [
+        ...panel.querySelectorAll('[data-size="collapsed"] > .sheetwrite-ribbon-group-button'),
+      ];
+      const captions = [...panel.querySelectorAll(".sheetwrite-ribbon-group-label")].filter(shown);
+      const found: string[] = [];
+      if (folded.length === 0) found.push("no folded group");
+      for (const button of folded) {
+        const name =
+          button.getAttribute("aria-label") ??
+          button.parentElement?.getAttribute("aria-label") ??
+          "";
+        const label = button.querySelector(".sheetwrite-ribbon-label")?.firstChild;
+        const range = document.createRange();
+        const tops = new Set<number>();
+        const text = label?.textContent ?? "";
+        for (let index = 0; index < text.length && label; index += 1) {
+          if (/\s/.test(text[index] ?? "")) continue;
+          range.setStart(label, index);
+          range.setEnd(label, index + 1);
+          tops.add(Math.round(range.getBoundingClientRect().top));
+        }
+        if (tops.size > 2) found.push(`${name}: ${tops.size} lines`);
+        const box = button.getBoundingClientRect();
+        for (const caption of captions) {
+          const other = caption.getBoundingClientRect();
+          const overlap =
+            Math.min(box.right, other.right) - Math.max(box.left, other.left) > 0.5 &&
+            Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 0.5;
+          if (overlap) found.push(`${name} overlaps the caption ${caption.textContent}`);
+        }
+        const group = button.parentElement?.querySelector(".sheetwrite-ribbon-group-label");
+        if (group && shown(group)) found.push(`${name} still shows its caption`);
+        if (box.bottom > panel.getBoundingClientRect().bottom + 0.5)
+          found.push(`${name} runs past the panel`);
+      }
+      return found;
+    });
+    expect(problems).toEqual([]);
+  });
+}
+
 for (const mode of ["full", "compact"] as const) {
   test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
     page,
