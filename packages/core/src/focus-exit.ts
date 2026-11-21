@@ -55,9 +55,10 @@ export function focusOutside(region: HTMLElement, forward: boolean): boolean {
   if (all.length === 0) return false;
   const after = (element: HTMLElement): boolean =>
     (region.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-  const target = forward
-    ? (all.find(after) ?? all[0])
-    : (all.findLast((element) => !after(element)) ?? all.at(-1));
+  // `all` is in document order: the elements before the region, then those after it.
+  const next = all.findIndex(after);
+  const index = forward ? Math.max(next, 0) : (next <= 0 ? all.length : next) - 1;
+  const target = all[index];
   if (target === undefined) return false;
   target.focus();
   return document.activeElement === target;
