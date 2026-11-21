@@ -1,14 +1,16 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { createGrid, initSheetwrite } from "../src/grid.js";
-import type { KeyShortcut } from "../src/index.js";
+import type { ContextMenuItem, GridConfig, KeyShortcut } from "../src/index.js";
 import { createToolbar } from "../src/shell/toolbar-factory.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import type { Grid } from "../src/types.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 let platformDescriptor: PropertyDescriptor | undefined;
 let clipboardDescriptor: PropertyDescriptor | undefined;
+const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -17,8 +19,10 @@ beforeEach(() => {
   restoreCanvasStubs = installCanvasTestStubs();
   platformDescriptor = Object.getOwnPropertyDescriptor(navigator, "platform");
   clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  setPlatform("Linux x86_64");
 });
 afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
   restoreCanvasStubs();
   for (const [property, descriptor] of [
     ["platform", platformDescriptor],
@@ -30,18 +34,46 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800 });
-  Object.defineProperty(host, "clientHeight", { value: 400 });
-  document.body.append(host);
-  return host;
+function setPlatform(platform: string): void {
+  Object.defineProperty(navigator, "platform", { configurable: true, value: platform });
+}
+
+function mount(config: GridConfig): { host: HTMLDivElement; grid: Grid } {
+  const host = mountHost();
+  const grid = createGrid(host, { workbook: makeWorkbook(3), data: makeColumnarData(3), config });
+  cleanups.push(() => grid.destroy());
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+  return { host, grid };
+}
+
+/** A menu item that records its id when it runs. */
+function item(runs: string[], id: string, shortcut: KeyShortcut): ContextMenuItem {
+  return { id, label: id, shortcut, onClick: () => runs.push(id) };
+}
+
+function press(host: HTMLElement, key: string, modifiers: KeyboardEventInit = {}): boolean {
+  const event = new KeyboardEvent("keydown", {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...modifiers,
+  });
+  host.dispatchEvent(event);
+  return event.defaultPrevented;
 }
 
 function requiredElement(host: HTMLElement, selector: string): HTMLElement {
   const element = host.querySelector<HTMLElement>(selector);
   if (!element) throw new Error(`Missing grid control: ${selector}`);
   return element;
+}
+
+function menuLabel(host: HTMLElement, id: string): string | null | undefined {
+  host
+    .querySelector(".sheetwrite-scroller")
+    ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 80, clientY: 80 }));
+  return host.querySelector(`[data-context-menu-item="${id}"] .sheetwrite-context-menu-shortcut`)
+    ?.textContent;
 }
 
 describe("declarative keyboard bindings", () => {
@@ -170,29 +202,6 @@ describe("declarative keyboard bindings", () => {
   }
 });
 
-function setPlatform(platform: string): void {
-  Object.defineProperty(navigator, "platform", { configurable: true, value: platform });
-}
-
-function press(host: HTMLElement, key: string, modifiers: KeyboardEventInit = {}): boolean {
-  const event = new KeyboardEvent("keydown", {
-    key,
-    bubbles: true,
-    cancelable: true,
-    ...modifiers,
-  });
-  host.dispatchEvent(event);
-  return event.defaultPrevented;
-}
-
-function openMenuLabel(host: HTMLElement, id: string): string | null {
-  requiredElement(host, ".sheetwrite-scroller").dispatchEvent(
-    new MouseEvent("contextmenu", { bubbles: true, clientX: 80, clientY: 80 }),
-  );
-  return requiredElement(host, `[data-context-menu-item="${id}"] .sheetwrite-context-menu-shortcut`)
-    .textContent;
-}
-
 describe("custom key combinations", () => {
   for (const [platform, mod, label] of [
     ["MacIntel", { metaKey: true }, "⌘⇧J"],
@@ -201,142 +210,76 @@ describe("custom key combinations", () => {
     it(`runs a menu item's onClick from its ${platform} combination, in string or object form`, () => {
       setPlatform(platform);
       for (const shortcut of ["Mod+Shift+J", { key: "j", mod: true, shift: true }] as const) {
-        const host = mountHost();
         const runs: string[] = [];
-        const grid = createGrid(host, {
-          workbook: makeWorkbook(3),
-          data: makeColumnarData(3),
-          config: {
-            contextMenu: [
-              {
-                id: "jump",
-                label: "Jump",
-                shortcut,
-                onClick: (_grid, cell) => runs.push(`${cell?.row}:${cell?.col}`),
-              },
-            ],
-          },
+        const { host, grid } = mount({
+          contextMenu: [
+            {
+              id: "jump",
+              label: "Jump",
+              shortcut,
+              onClick: (_grid, cell) => runs.push(`${cell?.row}:${cell?.col}`),
+            },
+          ],
         });
-        try {
-          grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 2 } });
-          expect(press(host, "j", mod)).toBe(false);
-          expect(press(host, "J", { ...mod, shiftKey: true })).toBe(true);
-          expect(runs).toEqual(["1:2"]);
-          expect(openMenuLabel(host, "jump")).toBe(label);
-        } finally {
-          grid.destroy();
-          host.remove();
-        }
+        grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 2 } });
+        expect(press(host, "j", mod)).toBe(false);
+        expect(press(host, "J", { ...mod, shiftKey: true })).toBe(true);
+        // onClick gets the active cell.
+        expect(runs).toEqual(["1:2"]);
+        expect(menuLabel(host, "jump")).toBe(label);
       }
     });
   }
 
   it("reports a combination bound twice, and keeps the working configuration", () => {
-    setPlatform("Linux x86_64");
     const conflicting = {
       contextMenu: [{ id: "steal", label: "Steal copy", shortcut: "Ctrl+C", onClick: () => {} }],
     } as const;
-    expect(() =>
-      createGrid(mountHost(), {
-        workbook: makeWorkbook(3),
-        data: makeColumnarData(3),
-        config: conflicting,
-      }),
-    ).toThrow(expect.objectContaining({ code: "shortcut-conflict" }));
+    expect(() => mount(conflicting)).toThrow(
+      expect.objectContaining({ code: "shortcut-conflict" }),
+    );
 
-    const host = mountHost();
-    let runs = 0;
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [{ id: "jump", label: "Jump", shortcut: "Mod+J", onClick: () => runs++ }],
-      },
-    });
-    try {
-      expect(() => grid.setConfig(conflicting)).toThrow(
-        expect.objectContaining({ code: "shortcut-conflict" }),
-      );
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      press(host, "j", { ctrlKey: true });
-      expect(runs).toBe(1);
-    } finally {
-      grid.destroy();
-    }
-  });
-
-  it("runs Mod or Ctrl + Shift combinations with letters, digits and symbols", () => {
-    setPlatform("Linux x86_64");
-    const host = mountHost();
     const runs: string[] = [];
-    const item = (id: string, shortcut: KeyShortcut) => ({
-      id,
-      label: id,
-      shortcut,
-      onClick: () => runs.push(id),
-    });
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [
-          item("letter", "Mod+Shift+K"),
-          // Ctrl+Shift+1 to 6 are Excel's number-format keys; 8 is free.
-          item("digit", "Ctrl+Shift+8"),
-          item("symbol", "Mod+Shift+/"),
-          item("alt", "Mod+Alt+L"),
-        ],
-      },
-    });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      // With Shift held, the browser reports the shifted character in `key`.
-      press(host, "K", { ctrlKey: true, shiftKey: true, code: "KeyK" });
-      press(host, "*", { ctrlKey: true, shiftKey: true, code: "Digit8" });
-      press(host, "?", { ctrlKey: true, shiftKey: true, code: "Slash" });
-      press(host, "¬", { ctrlKey: true, altKey: true, code: "KeyL" });
-      // A plain "8" without Shift must not run the Shift+8 command.
-      press(host, "8", { ctrlKey: true, code: "Digit8" });
-      expect(runs).toEqual(["letter", "digit", "symbol", "alt"]);
-    } finally {
-      grid.destroy();
-    }
+    const { host, grid } = mount({ contextMenu: [item(runs, "jump", "Mod+J")] });
+    expect(() => grid.setConfig(conflicting)).toThrow(
+      expect.objectContaining({ code: "shortcut-conflict" }),
+    );
+    press(host, "j", { ctrlKey: true });
+    expect(runs).toEqual(["jump"]);
   });
 
-  it("keeps letter meaning on other layouts: AZERTY A on the Q key is A", () => {
-    setPlatform("Linux x86_64");
-    const host = mountHost();
+  it("runs Shift combinations by the shifted character, and letters by meaning on other layouts", () => {
     const runs: string[] = [];
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [
-          { id: "a", label: "A", shortcut: "Mod+Shift+A", onClick: () => runs.push("a") },
-          { id: "q", label: "Q", shortcut: "Mod+Shift+Q", onClick: () => runs.push("q") },
-        ],
-      },
+    const { host } = mount({
+      contextMenu: [
+        item(runs, "letter", "Mod+Shift+K"),
+        // Ctrl+Shift+1 to 6 are Excel's number-format keys; 8 is free.
+        item(runs, "digit", "Ctrl+Shift+8"),
+        item(runs, "symbol", "Mod+Shift+/"),
+        item(runs, "alt", "Mod+Alt+L"),
+        item(runs, "a", "Mod+Shift+A"),
+        item(runs, "q", "Mod+Shift+Q"),
+      ],
     });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      press(host, "A", { ctrlKey: true, shiftKey: true, code: "KeyQ" });
-      expect(runs).toEqual(["a"]);
-    } finally {
-      grid.destroy();
-    }
+    // With Shift held, the browser reports the shifted character in `key`.
+    press(host, "K", { ctrlKey: true, shiftKey: true, code: "KeyK" });
+    press(host, "*", { ctrlKey: true, shiftKey: true, code: "Digit8" });
+    press(host, "?", { ctrlKey: true, shiftKey: true, code: "Slash" });
+    press(host, "¬", { ctrlKey: true, altKey: true, code: "KeyL" });
+    // A plain "8" without Shift must not run the Shift+8 command.
+    press(host, "8", { ctrlKey: true, code: "Digit8" });
+    // AZERTY: A is on the Q key, and it is A.
+    press(host, "A", { ctrlKey: true, shiftKey: true, code: "KeyQ" });
+    expect(runs).toEqual(["letter", "digit", "symbol", "alt", "a"]);
   });
 
-  it("rejects malformed combinations from untyped callers", () => {
-    // The type already rejects "Hyper+K"; JavaScript callers still reach the parser.
-    const malformed = ["Mod+", "Hyper+K", "Shift+Shift+K", "Ctrl+Alt"] as unknown as KeyShortcut[];
-    for (const shortcut of malformed) {
+  it.each(["Mod+", "Hyper+K", "Shift+Shift+K", "Ctrl+Alt"])(
+    "rejects the malformed combination %p from untyped callers",
+    (shortcut) => {
+      // The type already rejects "Hyper+K"; JavaScript callers still reach the parser.
       expect(() =>
-        createGrid(mountHost(), {
-          workbook: makeWorkbook(3),
-          data: makeColumnarData(3),
-          config: { contextMenu: [{ id: "bad", label: "Bad", shortcut, onClick: () => {} }] },
-        }),
+        mount({ contextMenu: [item([], "bad", shortcut as unknown as KeyShortcut)] }),
       ).toThrow(expect.objectContaining({ code: "invalid-shortcut" }));
-    }
-  });
+    },
+  );
 });

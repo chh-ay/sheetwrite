@@ -88,9 +88,9 @@ describe("note hover card", () => {
     expect(noteCard(host)).toBeNull();
 
     jest.advanceTimersByTime(1);
-    const card = noteCard(host);
-    expect(card?.textContent).toBe("Check the totals");
-    expect(card?.getAttribute("role")).toBe("tooltip");
+    expect(noteCard(host)?.textContent).toBe("Check the totals");
+    expect(noteCard(host)?.getAttribute("role")).toBe("tooltip");
+    // The card does not take the focus.
     expect(document.activeElement).toBe(focused);
   });
 
@@ -177,21 +177,16 @@ describe("note editor", () => {
 });
 
 describe("deleteNote", () => {
-  it("removes the focus cell's note", () => {
-    const { grid: target } = mount();
-    target.setSelection({ kind: "cell", addr: NOTED });
-
-    target.actions.deleteNote();
-
-    expect(target.getNote(NOTED)).toBeNull();
-  });
-
-  it("keeps the note on a read-only grid", () => {
-    const { grid: target } = mount({ readOnly: true });
-    target.setSelection({ kind: "cell", addr: NOTED });
-
-    target.actions.deleteNote();
-
-    expect(target.getNote(NOTED)).toBe("Check the totals");
-  });
+  it.each([
+    [false, null],
+    [true, "Check the totals"],
+  ] as const)(
+    "removes the focus cell's note unless the grid is read-only (%p)",
+    (readOnly, note) => {
+      const { grid: target } = mount({ readOnly });
+      target.setSelection({ kind: "cell", addr: NOTED });
+      target.actions.deleteNote();
+      expect(target.getNote(NOTED)).toBe(note);
+    },
+  );
 });
