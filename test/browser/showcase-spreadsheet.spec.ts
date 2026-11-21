@@ -806,7 +806,9 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
         type,
         (event) => {
           const related = "relatedTarget" in event ? (event as FocusEvent).relatedTarget : null;
-          console.log(`probe ${type} ${name(event.target)} -> ${name(related)} active=${name(document.activeElement)} t=${performance.now().toFixed(1)}`);
+          console.log(
+            `probe ${type} ${name(event.target)} -> ${name(related)} active=${name(document.activeElement)} t=${performance.now().toFixed(1)}`,
+          );
         },
         true,
       );
