@@ -698,9 +698,17 @@ export class SheetTabs {
     button.appendChild(createTabIcon("M10 4v12M4 10h12", "1.33"));
     button.setAttribute("aria-label", "Add sheet");
     button.title = "Add sheet";
-    button.addEventListener("click", () =>
-      this.performLifecycle(this.activeId, () => onAdd(this.activeIndex() + 1)),
-    );
+    button.addEventListener("click", (event) => {
+      this.performLifecycle(this.activeId, () => {
+        const result = onAdd(this.activeIndex() + 1);
+        // The new sheet's tab takes the roving focus, not the tab that last had it.
+        this.focusedId = this.activeId;
+        return result;
+      });
+      // As a click on a tab does, a click on + gives the new sheet the keys, so
+      // typing goes to its A1, as in Excel.
+      if (event.detail > 0) this.focusSheet?.();
+    });
     return button;
   }
 

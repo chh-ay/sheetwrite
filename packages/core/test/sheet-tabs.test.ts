@@ -163,6 +163,34 @@ describe("SheetTabs", () => {
     expect(calls).toEqual(["add:1", "moveCopy:b", "tabColor:b"]);
   });
 
+  it("gives the new sheet the keys after +, not the tab that last had focus", () => {
+    tabs.destroy();
+    const focused: string[] = [];
+    let sheets = SHEETS;
+    tabs = new SheetTabs(host, {
+      onActivate: (id) => tabs.update(sheets, id),
+      focusSheet: () => focused.push("grid"),
+      onAdd: (index) => {
+        sheets = [
+          ...sheets.slice(0, index),
+          { id: `new${index}`, name: "Sheet4" },
+          ...sheets.slice(index),
+        ];
+        tabs.update(sheets, `new${index}`);
+        return applied(`new${index}`);
+      },
+    });
+    tabs.update(sheets, "b");
+    // The grid moves to Summary by its keys (Ctrl+PageDown); no tab has had focus.
+    tabs.update(sheets, "c");
+    const add = host.querySelector<HTMLButtonElement>('[aria-label="Add sheet"]')!;
+    add.focus();
+    add.click();
+    expect(document.activeElement?.getAttribute("data-sheet-id")).toBe("new3");
+    add.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    expect(focused).toEqual(["grid"]);
+  });
+
   it("shows a sheet's tab color", () => {
     tabs.update([{ ...SHEETS[0]!, tabColor: "#C00000" }, SHEETS[1]!, SHEETS[2]!], "b");
     const colored = tabButtons(host)[0]!;
