@@ -3,7 +3,7 @@
   "contract": "sheetwrite.formula-capabilities",
   "version": 1,
   "parserRules": {
-    "sourcePath": "packages/wasm/src/calc.rs",
+    "sourcePath": "packages/wasm/src/calc/functions.rs",
     "dispatch": "lookup_func(name.as_ref())",
     "caseSensitive": false,
     "spellingPattern": "^[A-Z][A-Z0-9.]*$"
@@ -7031,7 +7031,7 @@
     "implemented-assisted": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7061,7 +7061,7 @@
     "parser-assisted-evaluator-declared": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "declared",
@@ -7079,7 +7079,7 @@
     "parser-declared-target": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "declared",
@@ -7097,7 +7097,7 @@
     "analysis-distributions": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7115,7 +7115,7 @@
     "analysis-descriptive": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7133,7 +7133,7 @@
     "analysis-dates": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7151,7 +7151,7 @@
     "analysis-finance": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7169,7 +7169,7 @@
     "analysis-regression": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7190,7 +7190,7 @@
     "analysis-math": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7212,7 +7212,7 @@
     "analysis-database": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7230,7 +7230,7 @@
     "analysis-reshape": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7248,7 +7248,7 @@
     "analysis-lambda": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7266,7 +7266,7 @@
     "analysis-groupby": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7284,7 +7284,7 @@
     "implemented-random": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7305,7 +7305,7 @@
     "implemented-dynamic-reference": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7323,7 +7323,7 @@
     "implemented-reference-operators": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7349,7 +7349,7 @@
     "implemented-reference-information": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7370,7 +7370,7 @@
     "analysis-compatibility": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7392,7 +7392,7 @@
     "analysis-hypothesis": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7410,7 +7410,7 @@
     "analysis-engineering": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7433,7 +7433,7 @@
     "analysis-securities": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7455,7 +7455,7 @@
     "analysis-depreciation": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7473,7 +7473,7 @@
     "analysis-discrete": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7491,7 +7491,7 @@
     "analysis-bytes": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
@@ -7513,7 +7513,7 @@
     "analysis-pivot-data": {
       "parser": {
         "status": "implemented",
-        "paths": ["packages/wasm/src/calc.rs"]
+        "paths": ["packages/wasm/src/calc/functions.rs"]
       },
       "evaluator": {
         "status": "implemented",
