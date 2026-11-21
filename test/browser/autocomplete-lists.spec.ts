@@ -15,7 +15,11 @@ declare global {
 async function open(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1_600, height: 900 });
   await page.goto("/showcases/spreadsheet/");
-  await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
+  // The lists read the grid the showcase publishes once its workbook is
+  // ready. A cold engine start can take longer than the default 5 s.
+  await page.waitForFunction(() => window.__sheetwriteSpreadsheetGrid !== undefined, null, {
+    timeout: 30_000,
+  });
 }
 
 async function select(page: Page, reference: string): Promise<void> {
