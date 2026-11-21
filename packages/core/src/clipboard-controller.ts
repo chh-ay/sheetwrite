@@ -238,11 +238,13 @@ function limited<T>(parse: () => T): T | DelimitedTextResourceError {
   }
 }
 
-/** Why a paste larger than a paste may be was refused, as the user reads it. */
+/**
+ * Why a paste larger than a paste may be was refused, as the user reads it.
+ * Text is measured only up to its limit, so its size is "more than" the limit.
+ */
 function tooLargeReason(error: DelimitedTextResourceError): string {
   const count = (value: number): string => value.toLocaleString("en-US");
-  const megabytes = (bytes: number): string =>
-    `${(bytes / (1024 * 1024)).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`;
+  const megabytes = `${(error.limit / (1024 * 1024)).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`;
   switch (error.resource) {
     case "maxRows":
       return `this paste has ${count(error.actual)} rows, and a paste can have at most ${count(error.limit)}.`;
@@ -251,9 +253,9 @@ function tooLargeReason(error: DelimitedTextResourceError): string {
     case "maxCells":
       return `this paste has ${count(error.actual)} cells, and a paste can have at most ${count(error.limit)}.`;
     case "maxFieldBytes":
-      return `a cell of this paste has ${megabytes(error.actual)} of text, and a cell can have at most ${megabytes(error.limit)}.`;
+      return `a cell of this paste has more than ${megabytes} of text, the most a cell can have.`;
     default:
-      return `this paste has ${megabytes(error.actual)} of text, and a paste can have at most ${megabytes(error.limit)}.`;
+      return `this paste has more than ${megabytes} of text, the most a paste can have.`;
   }
 }
 
@@ -262,8 +264,10 @@ function commitRefusalReason(
   result: Exclude<ApplyTransactionResult, { status: "applied" }>,
 ): string {
   switch (result.status) {
-    case "rejected":
-      return `${result.issues[0]?.message ?? "the change was refused"}.`;
+    case "rejected": {
+      const message = result.issues[0]?.message ?? "the change was refused";
+      return message.endsWith(".") ? message : `${message}.`;
+    }
     case "conflict":
       return "the sheet changed meanwhile. Paste again.";
     case "noop":
