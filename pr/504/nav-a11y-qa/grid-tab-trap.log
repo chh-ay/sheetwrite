@@ -1,0 +1,8 @@
+$ node trap.mjs http://127.0.0.1:<develop docs build>   (develop 3114079f4, Chromium 1.63, 1440x900)
+/showcases/spreadsheet/ Tab -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-6
+/showcases/spreadsheet/ Shift+Tab -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-6
+/showcases/spreadsheet/ Escape then Tab -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-7
+/showcases/spreadsheet/ Escape then Shift+Tab -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-7
+/showcases/spreadsheet/ F6 -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-6
+/showcases/spreadsheet/ Control+Tab -> div.sheetwrite-shell-grid sheetwri Spreadsheet grid adesc=sheetwrite-grid-1-1-6
+/showcases/spreadsheet/ Tab presses to leave the grid: >60
