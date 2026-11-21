@@ -60,8 +60,9 @@ function mountNameBox(options: Parameters<typeof createNameBox>[2] = {}) {
 
 function mountFormulaBar() {
   const { grid, store, host } = makeGrid();
-  const input = track(createFormulaBar(host, grid, {})).element as HTMLTextAreaElement;
-  return { grid, store, host, input };
+  const piece = track(createFormulaBar(host, grid, {}));
+  const input = piece.element as HTMLTextAreaElement;
+  return { grid, store, host, piece, input };
 }
 
 function multiSheetWorkbook(): Workbook {
@@ -253,6 +254,48 @@ describe("createNameBox", () => {
     expect(grid.getActiveSheetCell()).toEqual({ sheet: "s1", row: 2, col: 0 });
   });
 
+  it("edits, clears and leaves a cell on a hidden row, as Excel's Go To does", () => {
+    const { grid, store, host } = makeGrid();
+    const box = track(createNameBox(host, grid, {})).element as HTMLInputElement;
+    const field = track(createFormulaBar(host, grid, {})).element as HTMLTextAreaElement;
+    const press = (target: HTMLElement, key: string): void => {
+      target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    };
+    const a3 = { sheet: "s1", row: 2, col: 0 };
+    const sheetFocus: unknown[] = [];
+    grid.on("selection", (event) => sheetFocus.push(event.sheetFocus));
+
+    // Only the Tokyo rows show: sheet rows 2, 5, 8 and so on. A3 is hidden.
+    grid.filterBy(2, "Tokyo");
+    expect(grid.goToCell(a3)).toBe(true);
+    expect(sheetFocus.at(-1)).toEqual(a3);
+    expect(box.value).toBe("A3");
+    expect(field.value).toBe("Customer 2");
+
+    // Typing on the grid edits the cell in the formula bar; Enter stores it.
+    press(host, "x");
+    expect(document.activeElement).toBe(field);
+    expect(field.value).toBe("x");
+    press(field, "Enter");
+    expect(store.getCell(a3).resolved).toBe("x");
+
+    // Delete clears it.
+    press(host, "Delete");
+    expect(store.getCell(a3).resolved).toBeNull();
+
+    // Right stays on the hidden row; Down goes to the next row that shows (A5).
+    press(host, "ArrowRight");
+    expect(box.value).toBe("B3");
+    press(host, "ArrowDown");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(box.value).toBe("B5");
+
+    // A clear filter shows the hidden active cell's row, which it then selects.
+    expect(grid.goToCell(a3)).toBe(true);
+    grid.clearView();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: a3 });
+  });
+
   it("marks invalid or out-of-bounds references without touching the grid", () => {
     const { grid, input, enter } = mountNameBox();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
@@ -310,14 +353,96 @@ describe("createFormulaBar", () => {
     expect(input.value).toBe(stable);
   });
 
-  it("does not open the cell editor from the bar in read-only mode", () => {
-    const { grid, host, input } = mountFormulaBar();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
-    grid.setReadOnly(true);
-    input.focus();
-    input.value = "x";
-    input.dispatchEvent(new InputEvent("input", { inputType: "insertText" }));
-    expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
+  it("blocks commits in read-only mode", () => {
+    const { grid, store, piece, input } = mountFormulaBar();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
+    piece.setReadOnly(true);
+    expect(input.readOnly).toBe(true);
+
+    input.value = "should-not-land";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Customer 1");
+  });
+
+  describe("shares one draft with the cell editor", () => {
+    function setup() {
+      const { grid, store, host, input: bar } = mountFormulaBar();
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+      const cellEditor = (): HTMLTextAreaElement | null =>
+        host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+      const type = (field: HTMLTextAreaElement, value: string, inputType = "insertText") => {
+        field.value = value;
+        field.dispatchEvent(new InputEvent("input", { inputType }));
+      };
+      return { grid, store, bar, cellEditor, type };
+    }
+
+    it("shows every change in the cell editor in the bar, and Escape restores both", () => {
+      const { grid, bar, cellEditor, type } = setup();
+      expect(bar.value).toBe("Customer 2");
+      grid.beginEdit(2, 0, "=");
+      expect(bar.value).toBe("=");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "=SUM(");
+      expect(bar.value).toBe("=SUM(");
+      type(editor, "=SUM(\nB1)", "insertLineBreak");
+      expect(bar.value).toBe("=SUM(\nB1)");
+      type(editor, "=SUM(", "historyUndo");
+      expect(bar.value).toBe("=SUM(");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+    });
+
+    it("shows typing in the bar in the cell without moving focus, and commits from the bar", () => {
+      const { store, bar, cellEditor, type } = setup();
+      bar.focus();
+      type(bar, "Typed");
+      expect(cellEditor()?.value).toBe("Typed");
+      expect(document.activeElement).toBe(bar);
+      type(bar, "Typed in bar", "insertFromPaste");
+      expect(cellEditor()?.value).toBe("Typed in bar");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Typed in bar");
+      expect(bar.value).toBe("Typed in bar");
+    });
+
+    it("cancels the cell's draft when Escape is pressed in the bar", () => {
+      const { store, bar, cellEditor, type } = setup();
+      bar.focus();
+      type(bar, "draft");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Customer 2");
+    });
+
+    it("keeps the edit open when focus moves from the cell editor into the bar", () => {
+      const { grid, store, bar, cellEditor, type } = setup();
+      grid.beginEdit(2, 0, "a");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "ab");
+      bar.focus();
+      expect(cellEditor()).toBe(editor);
+      type(bar, "abc");
+      expect(editor.value).toBe("abc");
+      editor.focus();
+      type(editor, "abcd");
+      expect(bar.value).toBe("abcd");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("abcd");
+    });
+
+    it("does not open the cell editor from the bar in read-only mode", () => {
+      const { grid, bar, cellEditor, type } = setup();
+      grid.setReadOnly(true);
+      bar.focus();
+      type(bar, "x");
+      expect(cellEditor()).toBeNull();
+    });
   });
 });
 
@@ -404,6 +529,8 @@ describe("createSpreadsheetShell", () => {
 
     shell.setTheme({ bg: "#123456" });
     expect(shell.element.style.getPropertyValue("--sheetwrite-widget-bg")).toBe("#123456");
+    shell.setActiveSheet("s2");
+    expect(shell.grid.getActiveSheet()).toBe("s2");
 
     shell.destroy();
   });

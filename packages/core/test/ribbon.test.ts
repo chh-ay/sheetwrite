@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { renderControl } from "../src/ribbon/ribbon-controls.js";
+import { ribbonHeight } from "../src/ribbon/ribbon-metrics.js";
 import { RibbonPopup } from "../src/ribbon/ribbon-popup.js";
 import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -238,6 +239,12 @@ it.each(["full", "compact"] as const)(
       expect(cell(0, 0).style.border?.bottom).toBeUndefined();
       expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
       expect(document.activeElement).toBe(options);
+
+      press(options);
+      key(document.activeElement as HTMLElement, "Escape");
+      expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
+      expect(options.getAttribute("aria-expanded")).toBe("false");
+      expect(document.activeElement).toBe(options);
     } finally {
       requestFrame.mockRestore();
     }
@@ -409,14 +416,58 @@ it("fills from a palette pick and clears with No Fill", async () => {
   expect(cell(0, 0).style.backgroundColor).toBeUndefined();
 });
 
+it("ties a one-letter word to its neighbour, so a large label breaks only between phrases", async () => {
+  const { control, openTab } = await setup();
+  openTab("Data");
+  const ascending = control("Sort A to Z");
+  const label = ascending.querySelector(".sheetwrite-ribbon-label");
+  // "Sort" / "A to Z" on two lines; the name and tooltip keep plain spaces.
+  expect(label?.textContent).toBe("Sort A\u00a0to\u00a0Z");
+  expect(ascending.title).toBe("Sort A to Z");
+  const descending = control("Sort Z to A").querySelector(".sheetwrite-ribbon-label");
+  expect(descending?.textContent).toBe("Sort Z\u00a0to\u00a0A");
+  expect(control("Custom Sort").querySelector(".sheetwrite-ribbon-label")?.textContent).toBe(
+    "Custom Sort",
+  );
+});
+
+it("names a folded group on at most two lines, never stranding a one-letter word", async () => {
+  const { host, openTab } = await setup();
+  openTab("Data");
+  const folded = (group: string) =>
+    host.querySelector(
+      `.sheetwrite-ribbon-group[aria-label="${group}"] > .sheetwrite-ribbon-group-button .sheetwrite-ribbon-label`,
+    )?.textContent;
+  expect(folded("Get & Transform Data")).toBe("Get & Transform\nData");
+  expect(folded("Queries & Connections")).toBe("Queries\n& Connections");
+  expect(folded("Sort & Filter")).toBe("Sort\n& Filter");
+  expect(folded("Data Tools")).toBe("Data\nTools");
+  openTab("Home");
+  expect(folded("Clipboard")).toBe("Clipboard");
+  // The line feed is not part of the name.
+  const button = host.querySelector<HTMLElement>(
+    '.sheetwrite-ribbon-group[aria-label="Clipboard"] > .sheetwrite-ribbon-group-button',
+  );
+  expect(button?.getAttribute("aria-label")).toBe("Clipboard");
+});
+
 it("opens on Home when the File tab shows, as Excel does", async () => {
   const { host } = await setup(false, undefined, true, { keyboardSettings: true });
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
-  expect(tabs.filter((tab) => !tab.hidden).map((tab) => tab.textContent)[0]).toBe("File");
+  const file = tabs.find((tab) => tab.textContent === "File");
+  const home = tabs.find((tab) => tab.textContent === "Home");
+  if (file === undefined || home === undefined) throw new Error("no File or Home tab");
+  expect(file.hidden).toBe(false);
+  // Identity checks: a failing toBe on DOM nodes prints whole elements, which is slow.
+  expect(tabs[0] === file).toBe(true);
+
   const selected = host.querySelector('.sheetwrite-ribbon [role="tab"][aria-selected="true"]');
   expect(selected?.textContent).toBe("Home");
+  expect(selected === home).toBe(true);
   const panel = host.querySelector(".sheetwrite-ribbon-panel:not([hidden])");
-  expect(panel?.getAttribute("aria-labelledby")).toBe(selected?.id);
+  expect(panel?.getAttribute("aria-labelledby")).toBe(home.id);
+  expect(home.tabIndex).toBe(0);
+  expect(file.tabIndex).toBe(-1);
 });
 
 it("gives the grid the panel's height back when minimized", async () => {
@@ -432,6 +483,84 @@ it("gives the grid the panel's height back when minimized", async () => {
 
   home.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
   expect(viewport.style.top).toBe("122px");
+});
+
+it("moves the tabs that do not fit into a More tabs menu instead of cutting one off", async () => {
+  const { host, openTab, press } = await setup();
+  const list = host.querySelector<HTMLElement>('.sheetwrite-ribbon [role="tablist"]');
+  const more = host.querySelector<HTMLButtonElement>('.sheetwrite-ribbon [aria-label="More tabs"]');
+  if (list === null || more === null) throw new Error("ribbon not mounted");
+  const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')].filter((tab) => !tab.hidden);
+  const names = (elements: readonly HTMLElement[]) => elements.map((tab) => tab.textContent);
+  const inRow = () => tabs.filter((tab) => tab.dataset.overflow === undefined);
+  // Every tab is 60 px wide, and the row has room for three.
+  let room = 180;
+  Object.defineProperties(list, {
+    clientWidth: { configurable: true, get: () => room },
+    scrollWidth: { configurable: true, get: () => inRow().length * 60 },
+  });
+  expect(tabs.length).toBeGreaterThan(3);
+
+  openTab(tabs[0]!.textContent ?? "");
+  expect(names(inRow())).toEqual(names(tabs.slice(0, 3)));
+  expect(more.hidden).toBe(false);
+
+  press(more);
+  const items = [
+    ...host.querySelectorAll<HTMLElement>(
+      '[role="menu"][aria-label="More tabs"] [role="menuitem"]',
+    ),
+  ];
+  expect(names(items)).toEqual(names(tabs.slice(3)));
+  // Picking the last tab selects it and keeps it in the row, in tab order.
+  const last = tabs.at(-1)!;
+  press(items.at(-1)!);
+  expect(last.getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(last);
+  expect(names(inRow())).toEqual(names([...tabs.slice(0, 2), last]));
+  expect(host.querySelector('[role="menu"][aria-label="More tabs"]')).toBeNull();
+
+  // With room for every tab, the menu button goes away.
+  room = 1_000;
+  openTab(tabs[0]!.textContent ?? "");
+  expect(names(inRow())).toEqual(names(tabs));
+  expect(more.hidden).toBe(true);
+});
+
+it("reserves a compact ribbon's own height before its chunk mounts, so the grid never moves", async () => {
+  const workbook: Workbook = {
+    activeSheet: "s1",
+    sheets: [
+      {
+        id: "s1",
+        name: "Sheet",
+        rowCount: 1,
+        columns: [{ key: "a", header: "A", type: "number", width: 100 }],
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
+  document.body.appendChild(host);
+  const config: GridConfig = { ribbon: { mode: "compact" } };
+  const grid = new GridImpl(host, { workbook, config }, new SheetwriteStore(workbook));
+  grids.push(grid);
+  const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
+  if (viewport === null) throw new Error("grid not mounted");
+
+  // Tab row (30 px) plus the compact panel (36 px), in the first frame and after mount.
+  expect(viewport.style.top).toBe("66px");
+  await ribbonMounted(host);
+  expect(host.querySelector(".sheetwrite-ribbon")?.getAttribute("data-mode")).toBe("compact");
+  expect(viewport.style.top).toBe("66px");
+});
+
+it("sizes the reserved ribbon by its layout and the host width", () => {
+  expect(ribbonHeight({}, 300)).toBe(122);
+  expect(ribbonHeight({ mode: "compact" }, 1_600)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 767)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 768)).toBe(122);
+  expect(ribbonHeight({ mode: "auto", compactWidth: 1_000 }, 900)).toBe(66);
 });
 
 it("replaces a glyph in every ribbon control that shows it, by glyph name", async () => {

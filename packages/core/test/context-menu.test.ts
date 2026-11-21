@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe("ContextMenu", () => {
-  it("dispatches built-in actions to their GridActions methods", () => {
+  it("dispatches every built-in action to its GridActions method", () => {
     const host = mountHost();
     const calls: PropertyKey[] = [];
     const actions = new Proxy(
@@ -44,14 +44,26 @@ describe("ContextMenu", () => {
         },
       },
     ) as GridActions;
-    // One action of the same name, and each action whose GridActions method has another name.
     const actionMethods = [
       ["cut", "cut"],
+      ["paste", "paste"],
+      ["clearContents", "clearContents"],
+      ["unmerge", "unmerge"],
+      ["insertRowAbove", "insertRowAbove"],
+      ["deleteRow", "deleteRow"],
       ["hideRow", "hideRows"],
       ["showAllRows", "showRows"],
       ["autoFitRow", "autoFitRows"],
+      ["insertColumnLeft", "insertColumnLeft"],
+      ["insertColumnRight", "insertColumnRight"],
+      ["deleteColumn", "deleteColumn"],
       ["showAllColumns", "showColumns"],
       ["autoFitColumn", "autoFitColumns"],
+      ["clearFilter", "clearFilter"],
+      ["exportCsv", "exportCsv"],
+      ["exportXlsx", "exportXlsx"],
+      ["insertCells", "insertCells"],
+      ["deleteCells", "deleteCells"],
     ] as const;
     const menu = new ContextMenu(
       host,
@@ -148,6 +160,21 @@ describe("ContextMenu", () => {
 
     grid.setReadOnly(true);
     expect(openAt(0, 2)).not.toContain("pivotFields");
+  });
+
+  it("shows Excel's cell dialogs: Cells… first in Insert and Delete, and Format cells…", () => {
+    const { host, grid, menu } = liveMenu();
+    const cell = { sheet: "s1", row: 1, col: 1 };
+    grid.setSelection({ kind: "cell", addr: cell });
+    menu.open({ cell, clientX: 10, clientY: 10 });
+    const openSubmenu = (id: string): void =>
+      openMenu(host).querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
+
+    expect(rowIds(openMenu(host))).toContain("formatCells");
+    openSubmenu("insert");
+    expect(rowIds(openMenu(host, 1))[0]).toBe("insertCells");
+    openSubmenu("delete");
+    expect(rowIds(openMenu(host, 1))[0]).toBe("deleteCells");
   });
 
   it("moves through the menu and its submenus with the keyboard", () => {
