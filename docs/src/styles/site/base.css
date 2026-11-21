@@ -554,6 +554,22 @@ a {
   }
 }
 
+/* Every copy button draws the site's copy icon at the icon size, in a square
+   with the small radius, like the package command's (content-blocks.css).
+   `.frame` outranks Expressive Code's own `.expressive-code .copy` rules. */
+.expressive-code .frame .copy button {
+  border-radius: var(--sw-radius-sm);
+}
+
+.expressive-code .frame .copy button::after {
+  inset: calc(50% - var(--sw-icon-sm) / 2);
+  margin: 0;
+  -webkit-mask-image: var(--sw-icon-mask-copy);
+  mask-image: var(--sw-icon-mask-copy);
+  -webkit-mask-size: 100%;
+  mask-size: 100%;
+}
+
 .sw-tabs {
   margin: var(--sw-space-6) 0 var(--sw-space-10);
   border: var(--sw-border-width) solid var(--sw-border);

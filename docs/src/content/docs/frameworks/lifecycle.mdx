@@ -7,7 +7,7 @@ Every adapter follows one lifecycle:
 
 1. mount the framework component;
 2. initialize the shared WASM runtime;
-3. create one `Grid` generation;
+3. create one `Grid`, called a *generation* (each replacement `Grid` is the next generation);
 4. publish readiness;
 5. reset only when structural ownership changes;
 6. destroy the generation on unmount.
@@ -42,6 +42,7 @@ grid.destroy();
 <Sheetwrite
   columns={columns}
   defaultRows={rows}
+  height={420}
   onGridChange={persist}
   onReady={({ grid, generation, reason }) => observe(grid, generation, reason)}
 />
@@ -65,6 +66,7 @@ grid.destroy();
 <Sheetwrite
   :columns="columns"
   :default-rows="rows"
+  :height="420"
   @grid-change="persist"
   @ready="({ grid, generation, reason }) => observe(grid, generation, reason)"
 />
@@ -91,14 +93,14 @@ The template ref exposes `{ grid }` after readiness. `defaultRows` seeds the doc
     observe(grid, generation, reason);
 </script>
 
-<Sheetwrite {columns} defaultRows={rows} onGridChange={persist} onReady={handleReady} />
+<Sheetwrite {columns} defaultRows={rows} height={420} onGridChange={persist} onReady={handleReady} />
 ```
 
 ```svelte prelude="svelte" partial="requires workbook and datasource declarations" title="Svelte advanced grid"
 <script lang="ts">
   import type { Grid } from "@sheetwrite/core";
   import type { GridReadyEvent } from "@sheetwrite/core/adapter";
-  let gridRef: Grid | undefined;
+  let gridRef = $state<Grid | undefined>();
   const handleReady = ({ grid }: GridReadyEvent) => connect(grid);
 </script>
 
@@ -129,7 +131,7 @@ Structural changes are different. Every reset-classified input is compared by id
 | Change | Result |
 | --- | --- |
 | `workbook`, `data`, `datasource`, `datasourceStorage`, `presentation` | New generation, `reason: "input-reset"` |
-| `editors`, `protectionResolver`, `mutationPolicy`, `transactionResourceLimits` | New generation, `reason: "input-reset"` |
+| `editors`, `protectionResolver`, `mutationPolicy`, `transactionResourceLimits`, `hyperlinkActivation`, `addons` | New generation, `reason: "input-reset"` |
 | `renderer`, `workerUrl`, `renderers` | New generation, `reason: "renderer-reset"` |
 | `columns`, `defaultRows`, `sheetName` (simple component) | New derived document, `reason: "input-reset"` |
 | `theme`, `readOnly`, `config`, `overscan`, `minColumns` | In-place update, no reset |
@@ -146,13 +148,13 @@ function persist(event: ChangeEvent): void {
 }
 ```
 
-Use `event.reason` for audit context, not to reconstruct the transaction. For offline durability and replay, persist operations with `SheetwriteStore` or your own `PersistenceAdapter`.
+Use `event.commitReason` for audit context, not to reconstruct the transaction. For offline durability and replay, persist operations with `SheetwriteStore` or your own `PersistenceAdapter`.
 
 ## Initialization failures
 
 Framework components surface initialization errors instead of rendering a dead grid. React uses `fallback` and `onInitializationError`; Vue and Svelte support fallback content or slots plus their error callback/event.
 
-WASM initialization is process-wide and monotonic: every adapter converges on the same runtime, and when several pass an explicit `wasmSource` concurrently, the first source wins. While initialization has not yet succeeded, a changed `wasmSource` or a remount retries it; after the runtime is ready, the source is fixed for the process.
+A page starts the WASM runtime only once, and every adapter uses that runtime. When several adapters pass a `wasmSource` at the same time, the first one is used. Until the start succeeds, a changed `wasmSource` or a remount tries again. After the runtime is ready, its source stays the same until the page reloads.
 
 ## Server rendering
 
@@ -162,4 +164,4 @@ Importing an adapter during SSR is safe, but the grid initializes only after a b
 - Nuxt: `<ClientOnly>`;
 - SvelteKit: a browser-only branch or client-mounted component.
 
-No framework owns the global runtime. All adapters converge on the same monotonic initializer.
+No framework owns the runtime. All adapters use the same one-time initializer.

@@ -4,9 +4,10 @@ description: Understand the ARIA grid mirror, keyboard behavior, focus, and visi
 ---
 
 The grid paints to a `<canvas>`, which assistive technology can not read. To make
-it navigable, Sheetwrite maintains a parallel **ARIA shadow tree**: a
-visually-hidden DOM mirror of the visible window that carries the grid semantics,
-while the canvas itself is hidden from the accessibility tree.
+it navigable, Sheetwrite keeps a **screen-reader mirror**, also called the
+SR-only mirror because only screen readers (SR) perceive it: a visually hidden
+DOM copy of the visible window that carries the grid semantics. The canvas itself
+is hidden from the accessibility tree.
 
 ```ts prelude="core" partial="requires the grid and host from Full setup" title="Focus a cell, then read the mirror"
 grid.setSelection({ kind: "cell", addr: { sheet: "sheet1", row: 0, col: 0 } });

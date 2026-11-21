@@ -77,7 +77,7 @@ Mouse and pen behave classically: any drag from a cell extends the selection, an
 
 ## Options
 
-Touch has no options of its own. The gestures above follow the same settings as the mouse: for example, `readOnly: true` turns off drag-to-fill, and an active sort or filter view hides the fill handle.
+Touch has no options of its own. The gestures above follow the same settings as the mouse: for example, `readOnly: true` turns off drag-to-fill. Under a filter, hidden rows or a view sort, the fill handle still shows and fills only the rows that show, as in Excel.
 
 ## Edge cases and limits
 

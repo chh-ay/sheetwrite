@@ -149,7 +149,7 @@ The find bar needs `@sheetwrite/core/styles/find.css`. `@sheetwrite/core/styles.
 
 - An active search picks up matches that a value edit adds or removes, without scrolling.
 - On sheets with formulas or references, an active search rescans after each edit, including edits to off-screen inputs or other sheets. This keeps matches whose computed text changes.
-- Numbers are searched by their stored value, such as `1234.5`, not by the text a number format shows.
+- A number with no number format, or in General, is searched by the text General shows, such as `1234.5`. A number in another format is searched by its text, as [above](#options-and-result).
 - `highlightCells(ranges, color?)` highlights arbitrary ranges independently of search. Pass `null` to clear; `color` overrides the theme highlight color. See [Temporary highlights](/docs/features/grid/context-menu/#temporary-highlights).
 - Set `config.find: false` to turn off the Ctrl+F widget. The methods still work.
 

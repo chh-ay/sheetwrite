@@ -377,6 +377,39 @@ describe("API reference pages", () => {
       returns: "Promise<T[]>",
     });
   });
+
+  it("links Source to a file in the repository, never to build output", async () => {
+    const chartAnchor: ApiExport = {
+      ...apiExport("ChartAnchor", "interface", "interface ChartAnchor { row: number; }"),
+      // A re-export resolves to the declaration file of the package it comes from.
+      source: "../core/dist/types/chart.d.ts#L7",
+    };
+    const chartsEntry = entryPoint(".", [chartAnchor]);
+    const chartsPage = await renderSymbolPage(
+      { name: "@sheetwrite/charts", entryPoints: [chartsEntry] },
+      chartsEntry,
+      chartAnchor,
+    );
+    expect(chartsPage).toContain(
+      '<a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L10"><code>packages/core/src/types/chart.ts#L10</code></a>',
+    );
+
+    const cellOut: ApiExport = {
+      ...apiExport("CellOut", "class", "class CellOut {}"),
+      // wasm-bindgen writes this file at build time; the repository has no copy.
+      source: "pkg/sheetwrite_wasm.d.ts#L7",
+    };
+    const wasmEntry = entryPoint(".", [cellOut]);
+    const wasmPage = await renderSymbolPage(
+      { name: "@sheetwrite/wasm", entryPoints: [wasmEntry] },
+      wasmEntry,
+      cellOut,
+    );
+    expect(wasmPage).toContain(
+      "<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code> (generated at build time)</dd></div>",
+    );
+    expect(wasmPage).not.toContain("blob/develop/packages/wasm/pkg/");
+  });
 });
 
 describe("documentation content", () => {

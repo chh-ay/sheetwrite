@@ -93,7 +93,7 @@ startup succeeded. See [Worker rendering](/docs/features/worker-rendering/).
 
 Off-screen literal edits avoid display work when they cannot affect the view.
 Sheets with formulas or references still rescan active search results after edits
-to avoid stale computed matches. View rows, selection, and scrolling reconcile
+to avoid stale computed matches. Displayed rows, selection, and scrolling are updated
 before change listeners run. Durable synchronization queues no longer scan all
 pending commits on each local commit.
 

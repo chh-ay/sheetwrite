@@ -6,7 +6,7 @@ import {
 } from "@docs/lib/navigation.js";
 import type { OutlineItem } from "@docs/lib/outline.js";
 import { editUrl, reportProblemUrl } from "@docs/lib/page-links.js";
-import { type JSX, Show } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 
 import { DOCS_CARD_ART } from "../art/docs-art.js";
 import { SECTION_HEADER_ART, SECTION_MARKS } from "../art/docs-pictures.js";
@@ -123,6 +123,27 @@ function SectionArt(props: { readonly href: string | undefined }) {
   );
 }
 
+/**
+ * A title that is one code name (`IndexedDbPendingCommitStorageErrorCode`,
+ * `@sheetwrite/react/styles/dashboard.css`) gets places to wrap: after each
+ * `/` and `.`, and where a lower-case letter meets a capital. Without them a
+ * name too long for the line broke at any letter, leaving "d.css" or "de"
+ * alone on a line. A title with spaces wraps at its spaces.
+ */
+function WrappableTitle(props: { readonly title: string }): JSX.Element {
+  if (/\s/.test(props.title)) return props.title;
+  return (
+    <For each={props.title.split(/(?<=[/.])|(?<=[a-z])(?=[A-Z])/)}>
+      {(part, index) => (
+        <>
+          {index() > 0 ? <wbr /> : null}
+          {part}
+        </>
+      )}
+    </For>
+  );
+}
+
 export function DocsShell(props: DocsShellProps) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as the eyebrow than as part of a display-size heading.
@@ -167,7 +188,9 @@ export function DocsShell(props: DocsShellProps) {
           </Show>
           <SectionArt href={props.activeHref} />
           <h1>
-            <span data-pagefind-meta="title">{titleMain}</span>
+            <span data-pagefind-meta="title">
+              <WrappableTitle title={titleMain} />
+            </span>
             <Show when={props.kind}>
               {(kind) => (
                 <span class="api-status" data-kind={kind()} data-pagefind-ignore>

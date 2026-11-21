@@ -87,11 +87,7 @@ function NoteBox(props: Note) {
 
 export default function CollaborationFlow() {
   return (
-    <figure
-      aria-label="One edit through the collaboration protocol"
-      class="sw-collab-flow"
-      role="region"
-    >
+    <figure aria-label="One edit through the collaboration protocol" class="sw-collab-flow">
       <div class="sw-collab-flow__frame">
         <svg aria-labelledby="sw-collab-flow-title" role="img" viewBox="0 0 760 560">
           <title id="sw-collab-flow-title">

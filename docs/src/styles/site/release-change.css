@@ -144,8 +144,11 @@
   color: var(--sw-danger);
 }
 
-/* The phone toggle: a real checkbox behind its label, shown only on phones. */
+/* The phone toggle: a real checkbox behind its label, shown only on phones.
+   Wider layouts show every row and no label, so the checkbox leaves the tab
+   order there too. */
 .change__toggle {
+  display: none;
   position: absolute;
   width: 1px;
   height: 1px;
@@ -394,6 +397,10 @@
   /* Row 11 on: PHONE_ROWS in docs/src/lib/release-change.ts is 10. */
   .change__toggle:not(:checked) + .change__rows .change__row:nth-child(n + 11) {
     display: none;
+  }
+
+  .change__toggle {
+    display: block;
   }
 
   .change__toggle-label {

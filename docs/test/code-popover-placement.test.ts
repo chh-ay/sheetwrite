@@ -1,50 +1,49 @@
 import { expect, it } from "bun:test";
 
-import { choosePanelPlacement } from "../src/lib/code-popover-placement.js";
+import {
+  choosePanelSide,
+  panelFrame,
+  type PlacementInput,
+} from "../src/lib/code-popover-placement.js";
 
-// The code popover tests place real panels through the other paths.
+// The browser tests place real panels; these cover the geometry's choices.
 
-it("without room beside, opens a panel past the mentions next to the line", () => {
-  const box = (left: number, top: number, width: number, height: number) => ({
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-  });
-  // A code line at y 400–420 in an 800 px wide viewport, its text ending at x 700.
-  const placement = choosePanelPlacement({
-    trigger: box(400, 400, 60, 20),
-    line: box(380, 400, 700, 20),
-    lineEnd: 700,
-    panel: { width: 360, height: 160 },
-    mentions: [box(420, 300, 60, 20), box(420, 480, 60, 20), box(420, 520, 60, 20)],
-    chrome: [],
-    viewport: box(12, 76, 800 - 24, 812),
-    gap: 8,
-    minHeight: 120,
-  });
-  expect(placement).toEqual({ side: "above", shift: 100 });
+const box = (left: number, top: number, width: number, height: number) => ({
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
 });
 
-it("keeps a panel off the code block's tabs, opening it above them", () => {
-  const box = (left: number, top: number, width: number, height: number) => ({
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-  });
-  // The first line of a block (y 400–420) with its tab list at y 340–390, a
-  // mention below, and no room beside the line.
-  const placement = choosePanelPlacement({
-    trigger: box(400, 400, 60, 20),
-    line: box(380, 400, 700, 20),
-    lineEnd: 700,
-    panel: { width: 360, height: 120 },
-    mentions: [box(420, 440, 60, 20)],
-    chrome: [box(380, 340, 400, 50)],
-    viewport: box(12, 76, 800 - 24, 812),
+/** A 17 px tall symbol at x 400 and y `triggerTop`, in a 1440 × 900 viewport under a 64 px header. */
+function input(triggerTop: number, panel = { width: 560, height: 280 }): PlacementInput {
+  return {
+    trigger: box(400, triggerTop, 80, 17),
+    panel,
+    viewport: box(12, 76, 1440 - 24, 900 - 76 - 12),
     gap: 8,
-    minHeight: 120,
-  });
-  expect(placement).toEqual({ side: "above", shift: 60 });
+  };
+}
+
+it("opens below the symbol, 8 px from it, when the panel fits there", () => {
+  const placement = input(400);
+  expect(choosePanelSide(placement)).toBe("below");
+  expect(panelFrame("below", placement)).toEqual({ left: 400, top: 425, maxHeight: 280 });
+});
+
+it("opens above the symbol, 8 px from it, when only that side has room", () => {
+  const placement = input(669);
+  expect(choosePanelSide(placement)).toBe("above");
+  expect(panelFrame("above", placement)).toEqual({ left: 400, top: 381, maxHeight: 280 });
+});
+
+it("takes the roomier side and cuts the panel to it when neither side fits", () => {
+  const placement = input(300, { width: 560, height: 700 });
+  expect(choosePanelSide(placement)).toBe("below");
+  expect(panelFrame("below", placement)).toEqual({ left: 400, top: 325, maxHeight: 563 });
+});
+
+it("moves a panel left to keep it inside the viewport", () => {
+  const placement = { ...input(400), trigger: box(1300, 400, 80, 17) };
+  expect(panelFrame("below", placement).left).toBe(1428 - 560);
 });
