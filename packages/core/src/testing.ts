@@ -1,5 +1,5 @@
 export { installDatasourceClockForTest } from "./datasource-controller.js";
-export { shownSuggestion } from "./formula-ghost.js";
+export { type GhostOnScreen, shownSuggestion } from "./formula-ghost.js";
 export { openFormulaEdit } from "./formula-suggestions.js";
 export { suggestionWordEnds } from "./formula-words.js";
 

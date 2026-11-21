@@ -95,7 +95,7 @@ While a cell of a rule is selected, the rule's `inputTitle` and `inputMessage` s
 
 Typing, clear and host transactions pass through the same validation check. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own. Paste Values, and a paste from outside the grid, keep the target's rules.
 
-A fill does the same as in Excel: the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R land their values unchecked, and each filled cell takes the rules of the source cell it repeats, in place of its own; a rule over the whole source extends over the filled cells. Copy Cells, Fill Series and Fill Formatting Only in Auto Fill Options do too, since Excel counts a cell's validation with its formats; Fill Without Formatting keeps the filled cells' own rules. `paste.keepValidation` applies to pastes only.
+A fill works as in Excel. The fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R land their values unchecked. Each filled cell takes the rules of the source cell it repeats, in place of its own. A rule over the whole source extends over the filled cells. Copy Cells, Fill Series and Fill Formatting Only in Auto Fill Options do the same, because Excel counts a cell's validation with its formats. Fill Without Formatting keeps the filled cells' own rules. `paste.keepValidation` applies to pastes only.
 
 With `GridConfig.paste.keepValidation: true`, a paste keeps the target's rules instead, and checks the values:
 
@@ -124,7 +124,7 @@ Plain-text notes use `setNote(addr, text)` and `getNote(addr)`. The focused cell
 | `DataValidationRule.allowBlank` | `boolean` | Blank cells are allowed unless you turn this off. |
 | `DataValidationRule.errorStyle` | `"stop"`, `"warning"`, `"information"` | The error alert's style: `stop` for `reject`, `warning` (default) or `information` for `warn`. |
 | `DataValidationRule.errorTitle` / `helpText` | `string` | The error alert's title (32 characters at most) and message (255). |
-| `DataValidationRule.inputTitle` / `inputMessage` | `string` | The input message's title and text, shown beside a selected cell. |
+| `DataValidationRule.inputTitle` / `inputMessage` | `string` | The input message's title and text, shown in a box below a selected cell. |
 | `DataValidationRule.showInputMessage` | `boolean` | Show the input message; `true` unless you turn it off. |
 | `ProtectedRange.label` / `permissionKey` | `string` | Optional metadata for the resolver and UI. |
 | `GridOptions.protectionResolver` / `grid.setProtectionResolver(resolver, mode?)` | `(request) => "allow" \| "deny"` | Decides each local write to a protected range. |

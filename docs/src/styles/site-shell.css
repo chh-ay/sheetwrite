@@ -132,14 +132,16 @@ html[data-nav-reveal="pending"] .sw-sidebar__nav {
 }
 /* Page rows and group rows: icon, label, then a badge or chevron. */
 /* Rows of 34 px; the icon sits in a fixed column so every label starts on
-   the same line. */
+   the same line. Rows align to the top, padded so one line sits in the
+   middle of 34 px, and the icons centre on the first line: a label that
+   wraps keeps its icon beside its first line, not between its lines. */
 .sw-sidebar__nav a,
 .sw-nav-subgroup > summary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--sw-space-3);
   min-height: 2.125rem;
-  padding: var(--sw-space-1) var(--sw-space-3);
+  padding: calc((2.125rem - 1lh) / 2) var(--sw-space-3);
   border-radius: var(--sw-radius-md);
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-small);
@@ -158,6 +160,10 @@ html[data-nav-reveal="pending"] .sw-sidebar__nav {
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
   color: var(--sw-fg-muted);
+}
+.sw-sidebar__nav a > .sw-icon,
+.sw-nav-subgroup > summary > .sw-icon {
+  margin-block: calc((1lh - var(--sw-icon-sm)) / 2);
 }
 .sw-sidebar__nav a:is(:hover, :focus-visible) > .sw-icon,
 .sw-nav-subgroup > summary:is(:hover, :focus-visible) > .sw-icon:first-child {
@@ -353,11 +359,18 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-document__header {
   margin-bottom: var(--sw-space-10);
 }
-/* The page's group, in the accent colour above the title. */
+/* The page's group, in the accent colour above the title, after the icon its
+   sidebar entry shows: the same glyph, in the label's colour and size. */
 .sw-document__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
   margin: 0 0 var(--sw-space-2);
   color: var(--sw-accent-strong);
   font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+}
+.sw-document__eyebrow > .sw-icon {
+  --sw-icon-accent: currentColor;
 }
 .sw-document__header h1 {
   display: flex;
@@ -496,6 +509,22 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-toc a[aria-current="location"] {
   border-left-color: var(--sw-accent);
   color: var(--sw-accent-strong);
+}
+/* A long outline scrolls in its column; lib/shell.ts marks an end that hides
+   entries, and that edge fades, because overlay scroll bars show nothing. */
+.sw-toc[data-more="end"] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sw-space-12)), transparent);
+}
+.sw-toc[data-more="start"] {
+  mask-image: linear-gradient(to top, #000 calc(100% - var(--sw-space-12)), transparent);
+}
+.sw-toc[data-more="start end"] {
+  mask-image: linear-gradient(
+    transparent,
+    #000 var(--sw-space-12),
+    #000 calc(100% - var(--sw-space-12)),
+    transparent
+  );
 }
 .sw-toc li[data-depth="1"],
 .sw-toc-inline li[data-depth="1"] {

@@ -20,7 +20,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { analyzeFormula } from "@sheetwrite/core/functions";
-import { openFormulaEdit, shownSuggestion } from "@sheetwrite/core/testing";
+import { type GhostOnScreen, openFormulaEdit, shownSuggestion } from "@sheetwrite/core/testing";
 
 import { attachPredictor, SIGNALS } from "../src/predictor.js";
 import { SLICE_MS, WorkbookPatterns } from "../src/workbook-patterns.js";
@@ -215,6 +215,7 @@ try {
     let started = performance.now();
     const session = predictor.open(edit);
     open.push(performance.now() - started);
+    let ghost: GhostOnScreen | null = null;
     for (let length = 1; length <= target.formula.length; length++) {
       const text = target.formula.slice(0, length);
       const keyStarted = performance.now();
@@ -222,7 +223,8 @@ try {
       started = performance.now();
       const suggestion = session.suggest(text, analysis);
       suggest.push(performance.now() - started);
-      const shown = shownSuggestion(text, analysis, suggestion);
+      const shown = shownSuggestion(text, analysis, suggestion, ghost);
+      ghost = shown === null ? null : { text, shown };
       // The bar analyses the text with the ghost to colour the ranges it names.
       if (shown !== null) analyzeFormula(text + shown.text, text.length, functions);
       perKey.push(performance.now() - keyStarted);

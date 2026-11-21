@@ -4,9 +4,10 @@ description: Understand the ARIA grid mirror, keyboard behavior, focus, and visi
 ---
 
 The grid paints to a `<canvas>`, which assistive technology can not read. To make
-it navigable, Sheetwrite maintains a parallel **ARIA shadow tree**: a
-visually-hidden DOM mirror of the visible window that carries the grid semantics,
-while the canvas itself is hidden from the accessibility tree.
+it navigable, Sheetwrite keeps a **screen-reader mirror**, also called the
+SR-only mirror because only screen readers (SR) perceive it: a visually hidden
+DOM copy of the visible window that carries the grid semantics. The canvas itself
+is hidden from the accessibility tree.
 
 ```ts prelude="core" partial="requires the grid and host from Full setup" title="Focus a cell, then read the mirror"
 grid.setSelection({ kind: "cell", addr: { sheet: "sheet1", row: 0, col: 0 } });
@@ -90,6 +91,21 @@ requestAnimationFrame(() => {
 
 The visual layers — the scroller, the overlay, and the `<canvas>` — are all marked
 `aria-hidden="true"`, so screen readers ignore the pixels and read the mirror.
+
+## Leaving the grid with the keyboard
+
+Inside the grid, Tab and Shift + Tab move the active cell, as in Excel. Two
+keys take the focus out of the grid, so the keyboard is never trapped:
+
+- **F6 and Shift + F6** move to the next or previous part of the window, as
+  Excel's F6 does. In the [spreadsheet shell](/docs/features/grid/toolbar-and-ribbon/)
+  the parts are the ribbon or toolbar, the formula bar, the sheet, the sheet
+  tabs and the status bar. A grid on its own moves to the page's next or
+  previous control.
+- **Escape, then Tab or Shift + Tab**, when no cell is being edited, moves to
+  the page's next or previous control.
+
+The host's `aria-description` says this once, when the focus enters the grid. A host that sets its own `aria-description` keeps it.
 
 ## The SR-only mirror
 

@@ -134,7 +134,7 @@ adds a total row by default.
 =PIVOTBY(A1:A12, B1:B12, E1:E12, SUM)
 ```
 
-| | Chair | Desk | Lamp | Total |
+| Region | Chair | Desk | Lamp | Total |
 | --- | ---: | ---: | ---: | ---: |
 | East | 560 | 750 | 240 | 1550 |
 | North | 480 | 2250 | 360 | 3090 |

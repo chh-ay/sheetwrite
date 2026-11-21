@@ -886,6 +886,25 @@ function clipCell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
 }
 
 /**
+ * The text a cell shows before it is fitted to its width: TRUE or FALSE, a
+ * number in its format (General when it has none), or the text itself. The
+ * canvas paints it and the screen-reader mirror reads it, so both say the
+ * same. Numbers come from the formatted-text cache.
+ *
+ * @param value - The cell's resolved value.
+ * @param format - The cell's number-format code, from its style or its column.
+ * @param locale - The column's number locale.
+ */
+export function cellDisplayText(
+  value: string | number | boolean,
+  format: string | undefined,
+  locale: string | undefined,
+): string {
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return typeof value === "number" ? formatNumber(value, format, locale) : value;
+}
+
+/**
  * A General number narrowed to fit `available` pixels, as Excel narrows it in
  * a narrow column: fewer decimals, then scientific notation. Null when the
  * format is not General or no form fits, where Excel shows `####`. Only a
@@ -996,14 +1015,7 @@ function paintCell(
           (column?.type === "general" && typeof value === "number")
         ? "right"
         : "left");
-  let text =
-    typeof value === "boolean"
-      ? value
-        ? "TRUE"
-        : "FALSE"
-      : numeric
-        ? formatNumber(value, numberFormat, column?.numberLocale)
-        : value;
+  let text = cellDisplayText(value, numberFormat, column?.numberLocale);
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {

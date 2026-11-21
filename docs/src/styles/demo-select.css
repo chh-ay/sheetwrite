@@ -94,6 +94,8 @@
     outline: 0;
     color: var(--sw-fg);
     font: var(--sw-weight-medium) var(--sw-text-small) var(--font-sans);
+    /* "Mid-market" and "Self-serve" stay whole; the popup grows instead. */
+    white-space: nowrap;
     cursor: default;
   }
 

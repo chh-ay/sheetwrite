@@ -12,7 +12,7 @@ Choose a framework in the header once. Every framework-aware example uses that p
 npm install @sheetwrite/core
 ```
 
-```ts prelude="framework" partial="requires workbook and data declarations" title="Vanilla"
+```ts prelude="framework" partial="requires workbook and data declarations"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -29,11 +29,11 @@ The host owns initialization and must destroy the returned `Grid` when its DOM l
 npm install @sheetwrite/react
 ```
 
-```tsx prelude="react" partial="requires component-owned columns and rows" title="React"
+```tsx prelude="react" partial="requires component-owned columns and rows"
 import { Sheetwrite } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 
-export function Workbook() {
+export function WorkbookView() {
   return <Sheetwrite columns={columns} defaultRows={rows} height={520} />;
 }
 ```
@@ -47,7 +47,7 @@ The adapter initializes WASM after client mount. Use a client component boundary
 npm install @sheetwrite/vue
 ```
 
-```vue prelude="vue" partial="requires component-owned columns and rows" title="Vue"
+```vue prelude="vue" partial="requires component-owned columns and rows"
 <script setup lang="ts">
 import { Sheetwrite } from "@sheetwrite/vue";
 import "@sheetwrite/vue/styles.css";
@@ -67,7 +67,7 @@ The adapter initializes WASM after client mount. Use a client-only boundary in N
 npm install @sheetwrite/svelte
 ```
 
-```svelte prelude="svelte" partial="requires component-owned columns and rows" title="Svelte"
+```svelte prelude="svelte" partial="requires component-owned columns and rows"
 <script lang="ts">
   import { Sheetwrite } from "@sheetwrite/svelte";
   import "@sheetwrite/svelte/styles.css";
@@ -95,7 +95,7 @@ The adapter host, its `Grid`, and WASM initialization are client-owned. Server r
 
 ## Runtime initialization
 
-Zero-argument `initSheetwrite()` is canonical for the imperative package. It is re-entrant: concurrent calls share one initialization, retries work after failure, and repeats after success are no-ops. Framework adapters call the same initializer on mount.
+With `@sheetwrite/core`, call `initSheetwrite()` with no arguments. You can call it more than once: calls at the same time share one start, a failed start can be tried again, and calls after a successful start do nothing. Framework adapters call the same initializer on mount.
 
 Pass a source only for unsupported bundlers, public-asset policies, or controlled delivery:
 
@@ -144,6 +144,50 @@ await initSheetwrite({ engine: formulas });
 ## Failure UI and retries
 
 React accepts `fallback`; Vue and Svelte use fallback content or slots. Initialization failures reach `onInitializationError` or Vue's `initialization-error`. A changed explicit source or remount can retry after failure.
+
+### When the WebAssembly file does not load
+
+`initSheetwrite()` rejects with a `SheetwriteError` whose `code` is `"initialization-failed"`. Its `message` is the browser's own error text, and its `cause` is the browser's error. Find that text below. The texts come from Chromium (Chrome, Edge), Firefox and Safari's WebKit in November 2026; other browser versions can word them differently.
+
+#### The server answers 404 for the `.wasm` file
+
+- Chromium: `Failed to execute 'compile' on 'WebAssembly': HTTP status code is not ok`
+- Firefox: `WebAssembly: Response has unsupported MIME type 'text/html' expected 'application/wasm'`
+- Safari: `Unexpected response MIME type. Expected 'application/wasm'`
+
+Open the `.wasm` URL from the network panel. If the file is missing, make your bundler emit it, or copy it to a public folder and pass that URL as `source`.
+
+#### The server answers with an HTML page instead of the file
+
+A single-page-app fallback can answer every unknown path with its HTML page and status 200.
+
+- Chromium: `WebAssembly.instantiate(): expected magic word 00 61 73 6d, found 3c 21 64 6f @+0`
+- Firefox: `wasm validation error: at offset 4: failed to match magic number`
+- Safari: `WebAssembly.Module doesn't parse at byte 0: module doesn't start with '\0asm'`
+
+Exclude `.wasm` files from the fallback rewrite. The URL must download a binary that starts with the bytes `00 61 73 6d`.
+
+#### A Content Security Policy blocks WebAssembly
+
+- Chromium: `Compiling or instantiating WebAssembly module violates the following Content Security policy directive because 'unsafe-eval' is not an allowed source of script`
+- Firefox: `call to WebAssembly.instantiateStreaming() blocked by CSP`
+- Safari: `Refused to create a WebAssembly object because 'unsafe-eval' or 'wasm-unsafe-eval' is not an allowed source of script`
+
+Add `'wasm-unsafe-eval'` to the `script-src` directive. It allows WebAssembly without allowing `eval()`.
+
+#### The request fails
+
+The browser is offline, or an extension, a proxy or a CORS rule blocks the request.
+
+- Chromium: `Failed to fetch`
+- Firefox: `NetworkError when attempting to fetch resource.`
+- Safari: `Load failed`
+
+Find the failed request in the network panel and remove the block. A failed start can be tried again: call `initSheetwrite()` again, or remount the component.
+
+#### The server sends the wrong MIME type
+
+A wrong MIME type alone does not stop the load. When the server sends the file as `application/octet-stream` or another type, the browser cannot compile it while it downloads, and the console shows this warning: "`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower." The grid still starts. Serve `.wasm` files as `application/wasm` to remove the warning and make the start faster.
 
 ## Optional feature assets
 

@@ -22,7 +22,8 @@ export const MOVED_HEADINGS: Readonly<Record<string, Readonly<Record<string, str
 
 /**
  * After a redirect, the new page receives the old fragment. When that heading
- * now lives on another page, this returns that page; otherwise undefined.
+ * now lives on another page, or on this page under a new id, this returns its
+ * address; otherwise undefined.
  */
 export function forwardedHeading(
   href: string,
@@ -36,7 +37,7 @@ export function forwardedHeading(
   for (const page of Object.values(movedPages)) {
     if (page.to !== href) continue;
     const target = page.anchors[anchor];
-    if (target !== undefined && !target.startsWith(`${href}#`)) return target;
+    if (target !== undefined && target !== `${href}#${anchor}`) return target;
   }
   return undefined;
 }

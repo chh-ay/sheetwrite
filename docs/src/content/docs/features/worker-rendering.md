@@ -108,6 +108,11 @@ the grid paints on the main thread with `CanvasRenderer`. It emits one
 `renderer-fallback` event with a `SheetwriteError`. The grid keeps working:
 worker rendering is an improvement, never a requirement.
 
+The grid also falls back when the worker stops later: after a crash, a message
+one side cannot read, no `ready` reply in 10 seconds, or a lost 2D context.
+`error.context.failure` names the cause; see
+[Error handling](/docs/concepts/error-handling/#recovery-by-boundary).
+
 ## Limitation: no custom renderers
 
 Custom cell renderers are functions, and functions can't be sent to a worker.

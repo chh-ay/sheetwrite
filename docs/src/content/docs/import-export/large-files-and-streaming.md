@@ -3,7 +3,7 @@ title: Large files and streaming
 description: Read seekable files and write bounded chunks while retaining explicit XLSX resource limits.
 ---
 
-```ts prelude="core" partial="requires an initialized store and a host-owned WritableStream<Uint8Array> named destination" title="Stream a workbook to a destination"
+```ts prelude="core" partial="requires an initialized grid and a host-owned WritableStream<Uint8Array> named destination" title="Stream a workbook to a destination"
 import { toXlsxWorkbookStream, initSheetwrite } from "@sheetwrite/core";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
@@ -11,7 +11,7 @@ await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const destination: WritableStream<Uint8Array>;
 const controller = new AbortController();
-await toXlsxWorkbookStream(store.exportSnapshot(), {
+await toXlsxWorkbookStream(grid.exportSnapshot(), {
   signal: controller.signal,
   onWarning: (warning) => console.warn(warning.code, warning.message),
 }).pipeTo(destination);
@@ -26,7 +26,7 @@ await toXlsxWorkbookStream(store.exportSnapshot(), {
 
 The output contains the same XLSX parts as buffered export. ZIP entry order and container bytes can differ.
 
-[Try it live: resource-limit failures](/showcases/interoperability/#limits). The lab demonstrates typed limits, not a whole-file memory guarantee.
+[Try it live: resource-limit failures](/showcases/interoperability/#security). The lab demonstrates typed limits, not a whole-file memory guarantee.
 
 <details>
 <summary>Full setup</summary>
@@ -68,7 +68,7 @@ Replace the counting consumer with the host's actual writable destination to sav
 | `toXlsxWorkbookStream(snapshot, options?)` | Workbook snapshot | `ReadableStream<Uint8Array>`. |
 | `fromXlsxWorkbookFile(file, options?)` | Seekable `File` or `Blob` | `Promise<WorkbookSnapshot>`. |
 
-CSV/TSV remain core-only; XLSX requires backend registration. Existing string and `Uint8Array` APIs remain available.
+CSV/TSV remain core-only; XLSX needs the add-on: `initSheetwrite({ addons: [xlsxAddon()] })`. Existing string and `Uint8Array` APIs remain available.
 
 Both buffered and Blob XLSX import retain the ZIP directory and parse each worksheet incrementally from bounded inflated chunks. Neither builds a whole-worksheet string or XML tree. Snapshot cells are built as rows stream, with one cell representation rather than a second parsed record. The snapshot still holds **every imported cell**: streaming is not a lazy or constant-memory workbook store.
 

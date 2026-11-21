@@ -137,25 +137,69 @@ describe("ghost text", () => {
     expect(ghostText()).toBe("C4");
   });
 
-  it("shows nothing while the function list is open unless an entry inserts the same text", async () => {
-    const { type } = await field(true);
-    answers.set("=VL", "OOKUP(");
+  /** Type `=VL` until the function list shows: the list loads after formula help. */
+  async function listLoaded(type: (text: string) => void): Promise<void> {
     await waitFor(() => {
       type("=VL");
       return document.querySelector('[role="option"]') !== null;
     }, "the function list");
-    expect(ghostText()).toBe("OOKUP(");
+  }
+
+  function activeEntry(): string | null {
+    return document.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
+  }
+
+  it("shows a suggestion while the function list is open when it starts with an entry's text", async () => {
+    const { textarea, type } = await field(true);
+    await listLoaded(type);
 
     answers.set("=SU", "MPRODUCT(A1:A3)");
     type("=SU");
-    expect(ghostText()).toBeNull();
+    expect(ghostText()).toBe("MPRODUCT(A1:A3)");
+    expect(activeEntry()).toBe("SUMPRODUCT");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SUMPRODUCT(A1:A3)");
 
-    answers.set("=SU", "MPRODUCT(");
-    type("=SU");
-    expect(ghostText()).toBe("MPRODUCT(");
-    expect(document.querySelector('[role="option"][aria-selected="true"]')?.textContent).toBe(
-      "SUMPRODUCT",
-    );
+    // No entry starts a new suggestion: Tab stays the list's, as in Excel.
+    answers.set("=B", "4*C4");
+    type("=B");
+    expect(ghostText()).toBeNull();
+  });
+
+  it("keeps the suggestion while the user types it, also when the function list opens", async () => {
+    const { textarea, type } = await field(true);
+    await listLoaded(type);
+
+    answers.set("=", "SUM(B2:B4)");
+    type("=");
+    expect(ghostText()).toBe("SUM(B2:B4)");
+    type("=S");
+    expect(ghostText()).toBe("UM(B2:B4)");
+    type("=Su");
+    expect(ghostText()).toBe("M(B2:B4)");
+    expect(activeEntry()).toBe("SUM");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SuM(B2:B4)");
+
+    answers.set("=", "B4*C4");
+    type("=");
+    type("=B");
+    expect(ghostText()).toBe("4*C4");
+    type("=B5");
+    expect(ghostText()).toBeNull();
+  });
+
+  it("gives Tab to the function list once the user moves to another entry", async () => {
+    const { textarea, type } = await field(true);
+    await listLoaded(type);
+
+    answers.set("=", "SUM(B2:B4)");
+    type("=");
+    type("=S");
+    textarea.dispatchEvent(keydown("ArrowDown"));
+    const entry = activeEntry();
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe(`=${entry}(`);
   });
 
   it("moves to the next argument on Tab when the call still lacks a required one", async () => {
