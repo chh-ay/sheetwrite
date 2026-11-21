@@ -68,7 +68,7 @@ Shapes are exact row-by-column dimensions; equal cell counts with different dime
 
 - `COUNTIF(criteria_range, criterion)` accepts one matrix and one scalar criterion.
 - `COUNTIFS(criteria_range1, criterion1, …)` requires one or more range/criterion pairs. Every criteria range must have exactly the shape of the first.
-- `SUMIF(criteria_range, criterion, [value_range])` and `AVERAGEIF(...)` use `criteria_range` as the value range when the third argument is omitted. When supplied, `value_range` must have exactly the same shape; Sheetwrite does not implement Excel's top-left range extension.
+- `SUMIF(criteria_range, criterion, [value_range])` and `AVERAGEIF(...)` use `criteria_range` as the value range when the third argument is omitted. When supplied, they read as many cells as `criteria_range` has, starting at the top-left cell of `value_range`, as Excel does: `=SUMIF(A1:A3,">0",B1)` sums `B1:B3`.
 - `SUMIFS(value_range, criteria_range1, criterion1, …)`, `AVERAGEIFS`, `MAXIFS`, and `MINIFS` require one or more pairs after the value range. Every criteria range must exactly match the value range.
 
 A mismatch or malformed pair list returns `#VALUE!`. Matching result-range errors propagate. Text, booleans, and blanks in a numeric result range are ignored. A criteria sum with no numeric matches is `0`; an average is `#DIV/0!`; `MAXIFS`/`MINIFS` return `0`.
@@ -87,7 +87,7 @@ A mismatch or malformed pair list returns `#VALUE!`. Matching result-range error
 
 ## Lookup semantics
 
-- `INDEX(range, row, [column], [area_num])` uses 1-based indices and returns one scalar. Zero/negative indices return `#VALUE!`; array-return row/column projections are not implemented. `area_num` selects an area of a union, such as `=INDEX((A1:B2,D1:E2),1,1,2)`; an `area_num` after the last area returns `#REF!`.
+- `INDEX(range, row, [column], [area_num])` uses 1-based indices. A zero row returns the whole column, and a zero column returns the whole row, as an array that spills. A negative index returns `#VALUE!`, and a fraction is ignored. `area_num` selects an area of a union, such as `=INDEX((A1:B2,D1:E2),1,1,2)`; an `area_num` after the last area returns `#REF!`.
 - `MATCH(key, range, 0)` is exact. Match type `1` returns the largest value less than or equal to the key from ascending data. `-1` returns the smallest value greater than or equal to the key from descending data. Invalid ordering returns `#N/A` rather than a plausible wrong row.
 - `VLOOKUP`/`HLOOKUP` use exact matching when the final argument is false. The omitted/true mode uses correctly ordered approximate data and returns the largest value less than or equal to the key.
 - `XLOOKUP` supports exact, next-smaller (`-1`), next-larger (`1`), and wildcard (`2`) match modes; forward/reverse and ordered binary-search modes are accepted. `if_not_found` is optional. If it is omitted—including via an interior empty argument—the result is `#N/A`.

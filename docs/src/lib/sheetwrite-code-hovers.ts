@@ -87,6 +87,11 @@ interface RenderedHover {
   tags: readonly [name: string, text: string | undefined][];
   seeRoutes?: ReadonlyMap<string, string>;
   referenceRoute?: string;
+  /**
+   * The page or member row that holds the hovered symbol's own examples;
+   * unset when the reference link is only the page of the symbol's type.
+   */
+  exampleRoute?: string;
   /** When set, the trigger itself is an anchor: hover previews, click navigates. */
   navigable?: boolean;
   /** The token is an exported Sheetwrite API name, not a local or a member. */
@@ -543,8 +548,8 @@ function tagLabel(name: string): Element {
  * large panel one long style task. Symbol pages hold them under "Examples";
  * a member route already points at the member row that holds its own.
  */
-function exampleHref(referenceRoute: string): string {
-  return referenceRoute.includes("#") ? referenceRoute : `${referenceRoute}#examples`;
+function exampleHref(exampleRoute: string): string {
+  return exampleRoute.includes("#") ? exampleRoute : `${exampleRoute}#examples`;
 }
 
 /** `@see` targets separated by commas, each linked when it names a page. */
@@ -566,8 +571,8 @@ function seeAlsoTargets(values: readonly string[], rendered: RenderedHover): Ele
 /** The panel's one link line: "See also Grid, GridOptions · Example". */
 function linksLine(seeAlso: readonly string[], rendered: RenderedHover, hasExample: boolean) {
   const example =
-    hasExample && rendered.referenceRoute !== undefined
-      ? h("a.sw-code-popover__tag-link", { href: exampleHref(rendered.referenceRoute) }, "Example")
+    hasExample && rendered.exampleRoute !== undefined
+      ? h("a.sw-code-popover__tag-link", { href: exampleHref(rendered.exampleRoute) }, "Example")
       : undefined;
   if (seeAlso.length === 0 && example === undefined) return undefined;
   const parts: ElementContent[] = [];
@@ -732,10 +737,22 @@ export function referenceRouteForHover(
   signature: string,
   routes: ReadonlyMap<string, string>,
 ): string | undefined {
-  const direct = routes.get(target);
-  if (direct !== undefined) return direct;
+  return routes.get(target) ?? typeRouteOf(signature, routes, target);
+}
+
+/**
+ * The page of the one Sheetwrite symbol a signature names besides the hovered
+ * name itself (`let error: SheetwriteError` links SheetwriteError); none when
+ * it names several or none.
+ */
+function typeRouteOf(
+  signature: string,
+  routes: ReadonlyMap<string, string>,
+  hoveredName: string,
+): string | undefined {
   const referencedRoutes = new Set<string>();
   for (const match of signature.matchAll(/[A-Za-z_$][\w$]*/g)) {
+    if (match[0] === hoveredName) continue;
     const route = routes.get(match[0]);
     if (route !== undefined) referencedRoutes.add(route);
   }
@@ -772,23 +789,27 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
 
-  const resolveManifest = async (): Promise<void> => {
-    if (referenceRoutes && memberReferences && symbolPreviews) return;
-    try {
-      const { readFile } = await import("node:fs/promises");
-      const { join } = await import("node:path");
-      const manifestPath = join(options.cwd, "src/generated/public-api.json");
-      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
-      referenceRoutes = apiReferenceRoutes(manifest);
-      memberReferences = apiMemberReferences(manifest);
-      symbolPreviews = apiSymbolPreviews(manifest);
-    } catch {
-      // Docs generation has not run yet; hovers simply render without links.
-      referenceRoutes = new Map();
-      memberReferences = new Map();
-      symbolPreviews = new Map();
-    }
-  };
+  // The build compiles every generated API page at once, and each asks for
+  // the manifest before the first read ends. One shared read keeps one copy
+  // of the file in memory instead of one per page.
+  let manifestRead: Promise<void> | undefined;
+  const resolveManifest = (): Promise<void> =>
+    (manifestRead ??= (async () => {
+      try {
+        const { readFile } = await import("node:fs/promises");
+        const { join } = await import("node:path");
+        const manifestPath = join(options.cwd, "src/generated/public-api.json");
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
+        referenceRoutes = apiReferenceRoutes(manifest);
+        memberReferences = apiMemberReferences(manifest);
+        symbolPreviews = apiSymbolPreviews(manifest);
+      } catch {
+        // Docs generation has not run yet; hovers simply render without links.
+        referenceRoutes = new Map();
+        memberReferences = new Map();
+        symbolPreviews = new Map();
+      }
+    })());
 
   return definePlugin({
     name: "sheetwrite-code-hovers",
@@ -866,6 +887,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                   docs: preview.docs,
                   tags: preview.tags,
                   referenceRoute: link.route,
+                  exampleRoute: link.route,
                   navigable: true,
                   isApiName: true,
                 },
@@ -901,9 +923,14 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           // DOM and standard-library names (`document`, `style.height`) are
           // never Sheetwrite APIs, even when a Sheetwrite member shares the name.
           const isLibrarySymbol = hover.origin === "lib";
-          const memberReference = isLibrarySymbol
-            ? undefined
-            : memberDocsFor(hover.target, accessibleSignature, members);
+          // A name the sample declares (`const list = …`) is the sample's own:
+          // no Sheetwrite symbol is looked up by its name, though its type
+          // still links to the type's page.
+          const isSampleSymbol = hover.origin === "snippet";
+          const memberReference =
+            isLibrarySymbol || isSampleSymbol
+              ? undefined
+              : memberDocsFor(hover.target, accessibleSignature, members);
           // Without its own docs the hover shows the manifest member's summary and tags.
           const docsFromMember = hover.docs === undefined ? memberReference : undefined;
           const tags = docsFromMember?.tags ?? hover.tags ?? [];
@@ -912,10 +939,15 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
             const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
           }
+          // The symbol's own page or member row, which holds its examples;
+          // else the page of the one Sheetwrite type its signature names.
+          const ownRoute =
+            isLibrarySymbol || isSampleSymbol
+              ? undefined
+              : (routes.get(hover.target) ?? memberReference?.route);
           const referenceRoute = isLibrarySymbol
             ? undefined
-            : (referenceRouteForHover(hover.target, accessibleSignature, routes) ??
-              memberReference?.route);
+            : (ownRoute ?? typeRouteOf(accessibleSignature, routes, hover.target));
           const [wideSignature, narrowSignature] = await Promise.all([
             formatSignature(accessibleSignature, 68),
             formatSignature(accessibleSignature, 34),
@@ -951,6 +983,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 tags,
                 seeRoutes,
                 referenceRoute,
+                exampleRoute: ownRoute,
                 navigable: referenceRoute !== undefined,
                 isApiName: !isLibrarySymbol && routes.has(hover.target),
                 symbol: isLibrarySymbol ? undefined : hover.target,

@@ -21,7 +21,7 @@ import {
   TIME_TYPES,
 } from "./format-presets.js";
 import { formatPreview } from "./format-preview.js";
-import { formatNumber } from "./number-format.js";
+import { formatNumber, numberFormatColor } from "./number-format.js";
 import type { PaintedWindowTransform } from "./read-window-controller.js";
 import type { SelRect } from "./selection.js";
 import type { StyleActionsDeps } from "./style-actions.js";
@@ -343,6 +343,9 @@ export function formatCellsDialog(
       }
     }
     sample.textContent = shown;
+    // Excel's sample shows the number in its section's color, such as `[Red]`.
+    sample.style.color =
+      typeof input.sample === "number" ? (numberFormatColor(input.sample, code) ?? "") : "";
   };
   // Choosing Custom starts from the code the other settings made, as Excel does.
   category.addEventListener("change", () => {

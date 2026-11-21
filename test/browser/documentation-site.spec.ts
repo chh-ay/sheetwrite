@@ -44,6 +44,34 @@ test("a moved page redirects permanently and forwards its old heading link", asy
   await page.goto("/docs/guides/configuration/#datasource-pages");
   await expect(page).toHaveURL(/\/docs\/features\/data\/datasources\/#requests-and-pages$/);
   await expect(page.locator("#requests-and-pages")).toBeVisible();
+  // The heading stayed on the redirect target under a new id; the fragment follows it.
+  await page.goto("/docs/guides/collaboration/#revisions");
+  await expect(page).toHaveURL(/\/docs\/features\/collaboration\/#restoring-versions$/);
+  await expect(page.locator("#restoring-versions")).toBeInViewport();
+});
+
+test("a long outline keeps the entry being read in view and shows that more entries follow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/releases/0.7.0/");
+  await waitForHydration(page);
+  const rail = page.getByRole("navigation", { name: "On this page" });
+  // The outline is longer than its column, so it scrolls there.
+  expect(await rail.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect(rail).toHaveAttribute("data-more", "end");
+  // Read down to the last entry: it is marked and shown inside the column.
+  const last = rail.getByRole("link").last();
+  const id = decodeURIComponent((await last.getAttribute("href"))?.slice(1) ?? "");
+  // Its heading just below the sticky header, where lib/shell.ts reads.
+  await page.evaluate((heading) => {
+    const top = document.getElementById(heading)?.getBoundingClientRect().top ?? 0;
+    window.scrollTo(0, window.scrollY + top - 80);
+  }, id);
+  await expect(last).toHaveAttribute("aria-current", "location");
+  const [railBox, lastBox] = await Promise.all([rail.boundingBox(), last.boundingBox()]);
+  expect(lastBox && railBox && lastBox.y + lastBox.height <= railBox.y + railBox.height).toBe(true);
+  await expect(rail).toHaveAttribute("data-more", "start");
 });
 
 test("the landing loads no grid runtime, and its social image and version match the files", async ({
@@ -90,6 +118,40 @@ test("the landing loads no grid runtime, and its social image and version match 
   });
   // The benchmark section publishes real generated numbers, never placeholders.
   await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
+});
+
+test("every page starts with a skip link to its main content", async ({ page }) => {
+  for (const path of [
+    "/",
+    "/showcases/",
+    "/showcases/sort/",
+    "/react/",
+    "/docs/start/installation/",
+  ]) {
+    await page.goto(path);
+    await waitForHydration(page);
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: "Skip to content", exact: true });
+    await expect(skip, path).toBeFocused();
+    await expect(skip, path).toBeInViewport();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Tab");
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("#main-content") !== null),
+      path,
+    ).toBe(true);
+  }
+});
+
+test("type links in API signatures are underlined, not marked by colour alone", async ({
+  page,
+}) => {
+  await page.goto("/docs/api/charts/create-chart-renderer/");
+  const link = page.locator(".api-sig__type a").first();
+  await expect(link).toBeVisible();
+  expect(await link.evaluate((element) => getComputedStyle(element).textDecorationLine)).toBe(
+    "underline",
+  );
 });
 
 test("documentation pages render one heading and a canonical URL", async ({ page }) => {
@@ -259,6 +321,30 @@ test("a search with no match says so", async ({ page }) => {
     timeout: 15_000,
   });
   await expect(dialog.getByRole("option")).toHaveCount(0);
+});
+
+test("everyday words and questions find their guide among the first three pages", async ({
+  page,
+}) => {
+  for (const [query, guide] of [
+    ["charts", "/docs/features/analysis/charts/"],
+    ["import xlsx", "/docs/import-export/xlsx-import/"],
+    ["datasource", "/docs/features/data/datasources/"],
+    ["autofilter", "/docs/features/data/autofilter/"],
+    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
+  ] as const) {
+    const { dialog, input } = await openSearch(page);
+    await input.fill(query);
+    const results = dialog.getByRole("option");
+    await expect(results.first()).toBeVisible({ timeout: 15_000 });
+    const pages = new Set<string>();
+    for (const href of await results.evaluateAll((options) =>
+      options.map((option) => option.getAttribute("href") ?? ""),
+    )) {
+      pages.add(href.split("#")[0] ?? href);
+    }
+    expect([...pages].slice(0, 3), query).toContain(guide);
+  }
 });
 
 test.describe(() => {

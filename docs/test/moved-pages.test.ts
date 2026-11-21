@@ -8,6 +8,7 @@ const moved = {
     to: "/docs/features/grid/options-and-presentation/",
     anchors: {
       gridoptions: "/docs/features/grid/options-and-presentation/#gridoptions",
+      revisions: "/docs/features/grid/options-and-presentation/#restoring-versions",
       "datasource-pages": "/docs/features/data/datasources/#requests-and-pages",
       search: "/docs/features/grid/search/",
     },
@@ -36,6 +37,10 @@ describe("moved pages", () => {
     expect(forwardedHeading(target, "#search", moved)).toBe("/docs/features/grid/search/");
     // A heading that stayed on the target page needs no second navigation.
     expect(forwardedHeading(target, "#gridoptions", moved)).toBeUndefined();
+    // A heading renamed on the target page moves to its new id there.
+    expect(forwardedHeading(target, "#revisions", moved)).toBe(
+      "/docs/features/grid/options-and-presentation/#restoring-versions",
+    );
     expect(forwardedHeading(target, "", moved)).toBeUndefined();
     expect(
       forwardedHeading("/docs/features/grid/search/", "#datasource-pages", moved),

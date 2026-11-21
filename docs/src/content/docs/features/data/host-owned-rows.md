@@ -8,17 +8,18 @@ Use the row bridge when your app owns the row objects and Sheetwrite owns editin
 ```ts prelude="core" partial="requires the entities map, nextId, and adapter mount from Full setup" title="Bridge the host entity store"
 import { createRowBridge } from "@sheetwrite/core";
 
-interface InvoiceRow { id: string; customer: string; total: number }
+type InvoiceRow = { id: string; customer: string; total: number };
 declare const entities: Map<string, InvoiceRow>;
 declare let nextId: number;
 
-const bridge = createRowBridge({
+const bridge = createRowBridge<InvoiceRow, string>({
   columns: [{ key: "customer" }, { key: "total" }],
   defaultRows: [...entities.values()],
-  getRowId: (row: InvoiceRow) => row.id,
+  getRowId: (row) => row.id,
   createRowId: () => `invoice-${nextId++}`,
 });
-// Mount: <SheetwriteGrid defaultRows={rows} rowBridge={bridge} onRowDelta={applyProjection} />
+// Pass it to an adapter: <SheetwriteGrid workbook={workbook} data={data} rowBridge={bridge} onRowDelta={applyProjection} />
+// (workbook and data hold the same rows as the bridge.)
 ```
 
 <div class="sw-grid-result" data-row-ids="invoice-1 invoice-2">
@@ -39,11 +40,11 @@ const bridge = createRowBridge({
 ```ts prelude="core" partial="requires surrounding host state" title="Host entity store"
 import { createRowBridge, type RowBridgeProjection } from "@sheetwrite/core";
 
-interface InvoiceRow {
+type InvoiceRow = {
   id: string;
   customer: string;
   total: number;
-}
+};
 
 const entities = new Map<string, InvoiceRow>([
   ["invoice-1", { id: "invoice-1", customer: "Ada", total: 120 }],
@@ -52,7 +53,7 @@ const entities = new Map<string, InvoiceRow>([
 const rows = [...entities.values()];
 let nextId = 3;
 
-const bridge = createRowBridge({
+const bridge = createRowBridge<InvoiceRow, string>({
   columns: [{ key: "customer" }, { key: "total" }],
   defaultRows: rows,
   getRowId: (row) => row.id,
@@ -80,30 +81,26 @@ function applyProjection(projection: RowBridgeProjection<string>) {
 }
 ```
 
-Attach the same bridge and callback in any adapter:
+In a framework adapter, the `Sheetwrite` component makes the same bridge from `getRowId` and `createRowId`. Pass the same callback:
 
 ```tsx prelude="react" partial="requires surrounding component state" title="React adapter"
-import {
-  SheetwriteGrid,
-  type RowBridge,
-  type RowBridgeProjection,
-  type SimpleColumn,
-} from "@sheetwrite/react";
+import { Sheetwrite, type RowBridgeProjection, type SimpleColumn } from "@sheetwrite/react";
 
-interface InvoiceRow {
+type InvoiceRow = {
   id: string;
   customer: string;
   total: number;
-}
+};
 
 declare const columns: readonly SimpleColumn<InvoiceRow>[];
 declare const rows: readonly InvoiceRow[];
-declare const bridge: RowBridge<string>;
+declare let nextId: number;
 declare const applyProjection: (projection: RowBridgeProjection<string>) => void;
-<SheetwriteGrid
+<Sheetwrite
   columns={columns}
   defaultRows={rows}
-  rowBridge={bridge}
+  getRowId={(row) => row.id}
+  createRowId={() => `invoice-${nextId++}`}
   onRowDelta={applyProjection}
   height={420}
 />
@@ -111,13 +108,13 @@ declare const applyProjection: (projection: RowBridgeProjection<string>) => void
 
 </details>
 
-Vue emits `row-delta`; Svelte and the imperative controller use `onRowDelta`. All adapters call the same core bridge. Sorts, filters, and hidden rows only change the visible order, so emitted row IDs still refer to data-space rows.
+Vue emits `row-delta`; Svelte and the imperative controller use `onRowDelta`. All adapters call the same core bridge. View sorts, filters and hidden rows change only the displayed order, so emitted row IDs still refer to data rows. An in-place sort (`sortBy`, `sortRange`) moves the cells between rows.
 
 Remote changes should enter through `grid.applyRemoteOperations(...)`. Their projections have `status: "remote"` and `source: "remote"`. An echoed local transaction is returned as `duplicate` with no deltas. For a server rejection or transformed acceptance, call `bridge.reconcile(...)` with the server result and the canonical applied operations. The bridge does not update your store automatically; your callback remains the only place that changes host rows.
 
 By default, the bridge retains at most 8,192 recent transaction IDs and 8,192 recent local operation fingerprints. If your host applies its own echoes directly through `applyRemoteOperations`, deliver each echo before its identity leaves this window. An echo outside this window is no longer recognized and projects as a remote change. `SyncCoordinator` removes acknowledged local echoes before they become Grid change events, so its separate 4,096 acknowledgement window does not set the bridge limit.
 
-Set `maxRecentTransactions` in `createRowBridge` to change the limit for each identity window. The value must be a positive safe integer; invalid values throw a `RangeError`. Raise the limit if your host can project more than 8,192 transactions before an echo arrives. A larger limit retains more identity strings and uses more memory.
+Set `maxRecentTransactions` in `createRowBridge` to change the limit for each identity window. The value must be a positive safe integer; other values throw a `SheetwriteError` with code `invalid-argument`. Raise the limit if your host can project more than 8,192 transactions before an echo arrives. A larger limit retains more identity strings and uses more memory.
 
 ```ts compile prelude="core" title="Allow more delayed direct echoes"
 import { createRowBridge } from "@sheetwrite/core";

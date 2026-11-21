@@ -81,6 +81,33 @@ function installNavigationMenu(): void {
   });
 }
 
+/** Room kept around the current outline entry when the rail scrolls to it. */
+const RAIL_ENTRY_MARGIN_PX = 24;
+
+/** Scrolls the outline rail, never the page, so `link` is in view with some room around it. */
+function scrollRailTo(rail: HTMLElement, link: HTMLElement): void {
+  const railBox = rail.getBoundingClientRect();
+  const linkBox = link.getBoundingClientRect();
+  if (linkBox.top < railBox.top + RAIL_ENTRY_MARGIN_PX) {
+    rail.scrollTop -= railBox.top + RAIL_ENTRY_MARGIN_PX - linkBox.top;
+  } else if (linkBox.bottom > railBox.bottom - RAIL_ENTRY_MARGIN_PX) {
+    rail.scrollTop += linkBox.bottom - railBox.bottom + RAIL_ENTRY_MARGIN_PX;
+  }
+}
+
+/**
+ * Marks which ends of the rail hide entries (`data-more="start end"`), so the
+ * stylesheet fades that edge: overlay scroll bars show no sign of the rest.
+ */
+function markRailEdges(rail: HTMLElement): void {
+  const hidden = [
+    rail.scrollTop > 1 ? "start" : "",
+    rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1 ? "end" : "",
+  ].filter(Boolean);
+  if (hidden.length === 0) delete rail.dataset.more;
+  else rail.dataset.more = hidden.join(" ");
+}
+
 /**
  * The outline marks the section being read (the last heading above the
  * reading line, or at the page's end the last on screen), and lists only
@@ -112,13 +139,14 @@ function installOutline(): void {
     }
   };
 
+  const rail = outlines.find((outline) => outline.matches(".sw-toc"));
   let frame = 0;
+  let shownCurrent: HTMLAnchorElement | undefined;
   const markCurrent = (): void => {
     frame = 0;
     const { scrollHeight } = document.documentElement;
     const atEnd = window.scrollY + window.innerHeight >= scrollHeight - PAGE_END_SLACK_PX;
     const line = atEnd ? window.innerHeight : READING_LINE_PX;
-    const rail = outlines.find((outline) => outline.matches(".sw-toc"));
     const railLinks = Array.from(rail?.querySelectorAll<HTMLAnchorElement>("li a") ?? []);
     let current = railLinks[0];
     for (const link of railLinks) {
@@ -130,6 +158,13 @@ function installOutline(): void {
       if (link === current) link.setAttribute("aria-current", "location");
       else link.removeAttribute("aria-current");
     }
+    // A long outline scrolls inside its sticky column: the entry being read
+    // stays in view there. Only a change of entry moves the rail, so a reader
+    // who scrolls the rail to look ahead keeps their place.
+    if (rail !== undefined && current !== undefined && current !== shownCurrent) {
+      shownCurrent = current;
+      scrollRailTo(rail, current);
+    }
   };
   const schedule = (): void => {
     if (frame === 0) frame = requestAnimationFrame(markCurrent);
@@ -138,6 +173,16 @@ function installOutline(): void {
   showVisibleEntries();
   markCurrent();
   window.addEventListener("scroll", schedule, { passive: true });
+  if (rail !== undefined) {
+    const markEdges = (): void => markRailEdges(rail);
+    markEdges();
+    rail.addEventListener("scroll", markEdges, { passive: true });
+    // The rail's height (viewport) and its list's height (filtered entries) both move the edges.
+    const edges = new ResizeObserver(markEdges);
+    edges.observe(rail);
+    const railList = rail.querySelector("ul");
+    if (railList !== null) edges.observe(railList);
+  }
   const article = document.querySelector("#main-content article.sw-prose");
   if (article !== null) {
     new MutationObserver(() => {
