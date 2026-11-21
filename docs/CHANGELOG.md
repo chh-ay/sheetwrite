@@ -63,6 +63,7 @@
 - Add a filter for large API indexes; start API members collapsed, preserve deep-link expansion, remove signature copy controls, and link source locations.
 - Publish generated `/llms.txt` and `/llms-full.txt` endpoints with stale-output checks for AI-assisted development.
 - Run the production Vite build under Node to avoid a Bun server-compilation crash.
+- A sidebar link whose label wraps keeps its icon beside the label's first line. The icon sat between the two lines, 10 px below the first ("Spreadsheet app with the ribbon", "Validation, protection and notes"). One-line rows look as before.
 - The landing footer links the API reference under Explore, so every API page is at most three links from the home page (82 were four).
 
 ## 0.0.2
