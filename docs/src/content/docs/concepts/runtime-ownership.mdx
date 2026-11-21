@@ -66,13 +66,13 @@ next position lookup merges the queue in one `O(k + m log m)` pass for `m`
 queued rows. A sheet with no resized rows keeps no arrays, whatever its row
 count.
 
-Browsers clamp an element's height at an engine-specific ceiling — Chromium sits
-near 33.5 million CSS pixels at 100% zoom, and the ceiling **shrinks with browser
-zoom and `devicePixelRatio`**. At the default 28px row height that can be barely
-~1M rows, so Sheetwrite never trusts a constant: it measures the real clamp with
-a probe element (re-measuring on zoom changes), pins the DOM sizer to that cap,
-and `ScaledScroll` maps the capped scrollbar position linearly onto the real
-virtual range:
+Browsers limit the height of an element. In Chromium the limit is near 33.5
+million CSS pixels at 100% zoom, and it **gets smaller with browser zoom and
+`devicePixelRatio`**. At the default row height of 28 px, that can be only about
+1M rows. So Sheetwrite does not use a fixed limit. It measures the real limit
+with a probe element, and measures again when the zoom changes. It sets the DOM
+sizer to that limit, and `ScaledScroll` maps the scrollbar position linearly
+onto the full row range:
 
 ```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 // DOM scrollTop -> content-space offset (identity below the cap)

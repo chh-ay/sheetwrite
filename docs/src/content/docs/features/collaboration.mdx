@@ -4,7 +4,7 @@ description: Let several people edit one workbook, online or offline, without lo
 ---
 import CollaborationFlow from "../../../components/CollaborationFlow";
 
-Sheetwrite queues each edit until your server accepts it, sends the queue in order and applies the edits of others. Your server puts the edits in order and stores the document. You also own user identity, permissions and the connection. Sheetwrite works with any transport, database and sign-in.
+Several people can edit one workbook at the same time (real-time collaboration) or offline. Sheetwrite queues each edit until your server accepts it, sends the queue in order and applies the edits of others. Your server puts the edits in order and stores the document. You also own user identity, permissions and the connection. Sheetwrite works with any transport, database and sign-in.
 
 <CollaborationFlow />
 
@@ -307,9 +307,9 @@ declare function reloadSession(
 
 sync.on((event) => {
   if (event.type !== "conflict") return;
-  void sync.recoverConflict().then((result) => {
-    if (result.status === "recovered") return sync.flush();
-    if (result.status === "reload-required") return reloadSession(event.response, result.reason);
+  void sync.recoverConflict().then(async (result) => {
+    if (result.status === "recovered") await sync.flush();
+    else if (result.status === "reload-required") await reloadSession(event.response, result.reason);
   });
 });
 ```
@@ -434,29 +434,17 @@ Presence is advisory UI state. Do not use it for authorization, locking, or conf
 
 Restore is strict about concurrency. It needs an online coordinator with no pending or conflicted commits, and it is rejected with `conflict` if the grid changes while the version is read. The pending commit carries `PendingCommit.restore` and is never rebased: if two people restore against the same server version, the first commit wins and `recoverConflict()` returns `reload-required` with reason `restore` for the other, who reloads, previews and restores again. See [Restore a version](/docs/features/data/persistence/#restore-a-version) for what each scope covers.
 
-### Migrating from `RevisionCoordinator`
-
-`RevisionCoordinator` and `RevisionAdapter` are removed. Replace them as follows:
-
-| Removed | Use instead |
-| --- | --- |
-| `RevisionAdapter.listRevisions` | `HistoryStorageAdapter` (`list`) behind `HistoryArchive.listVersions` |
-| `RevisionAdapter.loadRevision`, `RevisionCoordinator.preview` | `HistoryArchive.readVersion`, then `createGridFromSnapshot(host, snapshot, { readOnly: true })` |
-| `RevisionAdapter.restoreRevision`, `RevisionCoordinator.restore` | `HistoryArchive.restoreVersion`; the restore is an ordinary commit through `PersistenceAdapter.commit` or `commitBatch` |
-| `RevisionSummary` | `HistoryVersion` |
-| `revision-failed` errors | `HistoryError` codes |
-
-A server that kept revisions as full snapshots can serve them through a `HistoryStorageAdapter`, or start a history archive from its current snapshot with `HistoryArchive.initialize` and record commits with `CommitJournal`.
+To move from the revisions of 0.6, see [Revisions move to version history](/docs/start/upgrade-to-0-7-0/#revisions-move-to-version-history) in the upgrade guide.
 
 ## Comments
 
-Comments are document-adjacent server entities, not fields on every cell. `CommentCoordinator` stores stable thread/message IDs and range or cell anchors, while adapters supply authenticated author references and server timestamps. Create, reply, and resolve requests contain no client-authored identity or time fields. Authorization remains entirely host/server-owned.
+The server stores comments apart from the cells; they are not fields on every cell. `CommentCoordinator` stores stable thread/message IDs and range or cell anchors, while adapters supply authenticated author references and server timestamps. Create, reply, and resolve requests contain no client-authored identity or time fields. Authorization remains entirely host/server-owned.
 
 Comment streams are versioned independently. Out-of-order events emit a gap rather than being applied speculatively.
 
 ## Concurrent structural editing decision
 
-Sheetwrite uses deterministic server ordering plus conservative rebase, not a CRDT or general OT layer.
+Sheetwrite uses deterministic server ordering plus conservative rebase. It is not a CRDT (conflict-free replicated data type) or a general OT (operational transformation) layer.
 
 `rebaseDocumentOperations` safely shifts non-overlapping literal edits and references across server-ordered row/column insertions and deletions. It reports explicit conflicts for:
 
@@ -472,4 +460,4 @@ edit and a `setNamedRange` operation that holds a formula report a conflict.
 The client must reload the document and keep the pending edit for host recovery.
 The client does not rewrite that formula across the remote structural edit.
 
-This choice preserves stable sheet IDs and authoritative formula source without lossy adapters. A CRDT/OT dependency is not justified by current scenarios: short-lived offline and online collaboration converge under server sequencing, while long-lived offline concurrent structural edits require product-level conflict UX and spreadsheet-specific formula/range semantics that generic sequence CRDTs do not supply. Revisit only if requirements demand automatic preservation of those ambiguous edits and scenario tests define the intended result for every structural/formula case.
+This choice preserves stable sheet IDs and authoritative formula source without lossy adapters. Current scenarios do not need a CRDT or OT. Server ordering makes short offline and online sessions converge. Long offline sessions with concurrent structural edits need product-level conflict UI and spreadsheet rules for formulas and ranges, which generic sequence CRDTs do not give. Revisit this only if requirements demand automatic preservation of those ambiguous edits, and scenario tests define the intended result for every structural and formula case.

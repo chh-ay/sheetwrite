@@ -33,15 +33,15 @@ Install the optional package on the path that needs XLSX:
 npm install @sheetwrite/xlsx
 ```
 
-Use the workbook API to save an existing store without adding a header row:
+Use the workbook API to save every sheet of a grid without adding a header row:
 
-```ts prelude="core" partial="requires an initialized store" title="Save all sheets and observe warnings"
+```ts prelude="core" partial="requires an initialized grid" title="Save all sheets and observe warnings"
 import { downloadBytes, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
 await initSheetwrite({ addons: [xlsxAddon()] });
 
-const bytes = await toXlsxWorkbook(store.exportSnapshot(), {
+const bytes = await toXlsxWorkbook(grid.exportSnapshot(), {
   maxCells: 250_000,
   onWarning: (warning) => console.warn(warning.code, warning.message),
 });
@@ -94,7 +94,7 @@ Every dropped native feature is reported through `onWarning` (`XlsxWorkbookWarni
 
 ## Errors and built-in actions
 
-`grid.exportXlsx(...)` rejects on missing registration or encoding failure and preserves the backend error. The four buffered table/workbook import/export functions are asynchronous. Missing registration and codec failures reject with `SheetwriteError`; inspect `code`, not the installation message. Resource failures remain `XlsxResourceError` instances and satisfy `isSheetwriteError`.
+`grid.exportXlsx(...)` rejects when the XLSX add-on is not installed or encoding fails, and preserves the codec error. The four buffered table/workbook import/export functions are asynchronous. A missing add-on and codec failures reject with `SheetwriteError`; inspect `code`, not the installation message. Resource failures remain `XlsxResourceError` instances and satisfy `isSheetwriteError`.
 
 Built-in toolbar and context-menu actions show an alert and emit one `export-error` event with `{ format: "csv" | "xlsx", error }`:
 

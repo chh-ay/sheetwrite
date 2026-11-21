@@ -138,8 +138,8 @@ Sheet edits change the span as in Excel:
 
 - A sheet that you insert or move between the endpoints joins the span.
 - A sheet that you move out of the span leaves it.
-- A deleted sheet leaves the span. If it is an endpoint, the endpoint moves to its inner neighbour and the formula text changes.
-- If you move an endpoint past the other endpoint, that sheet leaves the span and its inner neighbour becomes the endpoint. For example, `Sheet2:Sheet6` becomes `Sheet3:Sheet6` when `Sheet2` moves after `Sheet6`.
+- A deleted sheet leaves the span. If it is an endpoint, the endpoint moves to its inner neighbor and the formula text changes.
+- If you move an endpoint past the other endpoint, that sheet leaves the span and its inner neighbor becomes the endpoint. For example, `Sheet2:Sheet6` becomes `Sheet3:Sheet6` when `Sheet2` moves after `Sheet6`.
 - If you rename an endpoint, the formula text changes.
 - If you delete all sheets of the span, the reference returns `#REF!`.
 
