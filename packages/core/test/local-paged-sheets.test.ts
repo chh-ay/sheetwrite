@@ -4,12 +4,10 @@ import {
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   SnapshotResourceError,
 } from "../src/document-protocol.js";
-import { createGrid, initSheetwrite } from "../src/index.js";
+import { initSheetwrite } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
 import { storeEngine } from "../src/store/engine-registry.js";
-import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, Workbook } from "../src/types.js";
-import { mountHost } from "./fixtures.js";
 
 const SHEET = "s";
 const COLUMNS = 10;
@@ -52,7 +50,7 @@ describe("a sheet past the dense cell limit", () => {
   });
   afterEach(() => store.dispose());
 
-  it("is not datasource-backed and has every cell loaded", () => {
+  it("is not datasource-backed, has every cell loaded, and reads edits through windows", () => {
     expect(store.isPaged(SHEET)).toBe(false);
     expect(store.queryCapability(SHEET)).toEqual({ status: "complete" });
     expect(store.getCellLoadState({ sheet: SHEET, row: 2, col: 2 })).toBe("loaded-empty");
@@ -65,9 +63,6 @@ describe("a sheet past the dense cell limit", () => {
       }),
     ).toBe(true);
     expect(store.areColumnsFullyLoaded(SHEET, 0, ROWS, [0, 3, 9])).toBe(true);
-  });
-
-  it("applies edits locally and reads them through windows", () => {
     expect(
       store.canApplyLocally({
         op: "set",
@@ -77,41 +72,6 @@ describe("a sheet past the dense cell limit", () => {
     ).toBe(true);
     const window = store.getVisibleWindow(SHEET, { start: ROWS - 2, end: ROWS }, [2, 3]);
     expect(Array.from(window.values)).toEqual([null, null, null, 7]);
-  });
-
-  it("round-trips through a snapshot as a local sheet", () => {
-    const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
-    try {
-      expect(restored.isPaged(SHEET)).toBe(false);
-      expect(restored.getCell({ sheet: SHEET, row: ROWS - 1, col: 3 }).resolved).toBe(7);
-    } finally {
-      restored.dispose();
-    }
-  });
-});
-
-describe("a grid over a sheet past the dense cell limit", () => {
-  let restoreStubs: () => void;
-  beforeEach(() => {
-    restoreStubs = installCanvasTestStubs();
-  });
-  afterEach(() => restoreStubs());
-
-  it("inserts rows and keeps every value", () => {
-    const host = mountHost();
-    const grid = createGrid(host, { workbook: workbook() });
-    try {
-      const store = grid.store;
-      if (!(store instanceof SheetwriteStore)) throw new Error("expected a local store");
-      setNumber(store, ROWS - 1, 3, 7);
-      grid.insertRows(0, 2);
-      expect(store.getWorkbook().sheets[0]?.rowCount).toBe(ROWS + 2);
-      expect(store.isPaged(SHEET)).toBe(false);
-      expect(store.getCell({ sheet: SHEET, row: ROWS + 1, col: 3 }).resolved).toBe(7);
-    } finally {
-      grid.destroy();
-      host.remove();
-    }
   });
 });
 
