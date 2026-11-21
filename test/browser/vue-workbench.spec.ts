@@ -176,7 +176,7 @@ test("mutation policy is reset-bound, and read-only is a live option", async ({ 
   const readOnly = page.getByTestId("readonly");
   await readOnly.click();
   await expect(readOnly).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(GRID)).toHaveAttribute("aria-readonly", "true");
+  await expect(page.locator(`${GRID} [role="grid"]`)).toHaveAttribute("aria-readonly", "true");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
   await page.evaluate(() => {
     const grid = window.__sheetwriteVueWorkbench?.grid;

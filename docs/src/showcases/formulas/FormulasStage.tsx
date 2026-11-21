@@ -220,7 +220,7 @@ export function FormulasStage(props: FormulasStageProps) {
           ref={(element) => {
             host = element;
           }}
-          role="grid"
+          role="group"
         />
       }
       demoActions={

@@ -1,4 +1,5 @@
 import {
+  DOCS_TABS,
   type DocumentNeighbours,
   documentNeighbours,
   nearestNavigationItem,
@@ -6,11 +7,11 @@ import {
 } from "@docs/lib/navigation.js";
 import type { OutlineItem } from "@docs/lib/outline.js";
 import { editUrl, reportProblemUrl } from "@docs/lib/page-links.js";
-import { type JSX, Show } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 
 import { DOCS_CARD_ART } from "../art/docs-art.js";
-import { SECTION_HEADER_ART, SECTION_MARKS } from "../art/docs-pictures.js";
-import { SectionMark } from "../art/section-marks.js";
+import { SECTION_HEADER_ART } from "../art/docs-pictures.js";
+import type { IconName } from "../icons/icon-names.js";
 import { Island } from "../islands/Island.js";
 import { revealCurrentNavigation } from "../lib/shell-ids.js";
 import { ApiSymbolFilter, MINIMUM_FILTERABLE_CARDS } from "./ApiSymbolFilter.js";
@@ -92,25 +93,37 @@ function DocumentPager(props: DocumentNeighbours) {
   );
 }
 
+/** The eyebrow's label, and the icon its sidebar entry shows, when it has one. */
+interface Eyebrow {
+  readonly label: string;
+  readonly icon?: IconName;
+}
+
 /**
  * The page's eyebrow: the group it sits in (the nearest group, else its
- * section), or the package of a generated symbol page. None where it would
- * repeat the title: on a tab's landing page, whose section mark and title
- * already name the section, or when it reads the same as the title.
+ * section), or the package of a generated symbol page, each with its sidebar
+ * icon. None where it would repeat the title: on a tab's landing page, whose
+ * title names the section, or when it reads the same as the title.
  */
 function eyebrowFor(
   activeHref: string | undefined,
   title: string,
   titlePackage: string | undefined,
-): string | undefined {
-  if (titlePackage !== undefined) return titlePackage;
-  if (activeHref !== undefined && activeHref in SECTION_MARKS) return undefined;
+): Eyebrow | undefined {
   const location = nearestNavigationItem(activeHref);
-  if (location === undefined) return "Documentation";
+  if (titlePackage !== undefined) {
+    const pkg = location?.ancestors.find((item) => item.label === titlePackage);
+    return { label: titlePackage, icon: pkg?.icon };
+  }
+  if (DOCS_TABS.some((tab) => tab.href === activeHref)) return undefined;
+  if (location === undefined) return { label: "Documentation" };
   const group = location.ancestors.at(-1);
   // A group's own page is the group: the section names its place.
-  const eyebrow = group === undefined || group.href === activeHref ? location.section : group.label;
-  return eyebrow.toLowerCase() === title.toLowerCase() ? undefined : eyebrow;
+  const eyebrow =
+    group === undefined || group.href === activeHref
+      ? { label: location.section, icon: location.sectionIcon }
+      : { label: group.label, icon: group.icon };
+  return eyebrow.label.toLowerCase() === title.toLowerCase() ? undefined : eyebrow;
 }
 
 /** A section page's illustration beside its title (art/docs-pictures.ts); nothing elsewhere. */
@@ -120,6 +133,27 @@ function SectionArt(props: { readonly href: string | undefined }) {
     <div class="sw-section-art">
       <Art />
     </div>
+  );
+}
+
+/**
+ * A title that is one code name (`IndexedDbPendingCommitStorageErrorCode`,
+ * `@sheetwrite/react/styles/dashboard.css`) gets places to wrap: after each
+ * `/` and `.`, and where a lower-case letter meets a capital. Without them a
+ * name too long for the line broke at any letter, leaving "d.css" or "de"
+ * alone on a line. A title with spaces wraps at its spaces.
+ */
+function WrappableTitle(props: { readonly title: string }): JSX.Element {
+  if (/\s/.test(props.title)) return props.title;
+  return (
+    <For each={props.title.split(/(?<=[/.])|(?<=[a-z])(?=[A-Z])/)}>
+      {(part, index) => (
+        <>
+          {index() > 0 ? <wbr /> : null}
+          {part}
+        </>
+      )}
+    </For>
   );
 }
 
@@ -155,19 +189,19 @@ export function DocsShell(props: DocsShellProps) {
         id="main-content"
       >
         <header class="sw-document__header">
-          <Show when={SECTION_MARKS[props.activeHref ?? ""]}>
-            {(mark) => <SectionMark name={mark()} />}
-          </Show>
           <Show when={eyebrowFor(props.activeHref, titleMain, titlePackage)}>
             {(eyebrow) => (
               <p class="sw-document__eyebrow" data-pagefind-ignore>
-                {eyebrow()}
+                <Show when={eyebrow().icon}>{(icon) => <Icon name={icon()} />}</Show>
+                {eyebrow().label}
               </p>
             )}
           </Show>
           <SectionArt href={props.activeHref} />
           <h1>
-            <span data-pagefind-meta="title">{titleMain}</span>
+            <span data-pagefind-meta="title">
+              <WrappableTitle title={titleMain} />
+            </span>
             <Show when={props.kind}>
               {(kind) => (
                 <span class="api-status" data-kind={kind()} data-pagefind-ignore>

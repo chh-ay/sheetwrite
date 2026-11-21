@@ -234,4 +234,34 @@ describe("ContextMenu", () => {
     menu.destroy();
     grid.destroy();
   });
+
+  it("closes on the user's scroll, not on the page's own", () => {
+    const { host, grid, menu } = liveMenu();
+    const open = (): void => menu.open({ cell: null, clientX: 10, clientY: 10 });
+
+    // Focusing the grid scrolls it into view, and the browser sends that scroll
+    // event at its next frame, which can come after a right-click opened the menu.
+    open();
+    document.dispatchEvent(new Event("scroll"));
+    expect(openMenus(host)).toHaveLength(1);
+
+    // A wheel turn over the menu does not scroll the page.
+    openMenu(host).dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    expect(openMenus(host)).toHaveLength(1);
+
+    document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    expect(openMenus(host)).toHaveLength(0);
+
+    open();
+    document.body.dispatchEvent(new Event("touchmove", { bubbles: true }));
+    expect(openMenus(host)).toHaveLength(0);
+
+    // Page Down is not a menu key, so it scrolls the page.
+    open();
+    key(document.activeElement, "PageDown");
+    expect(openMenus(host)).toHaveLength(0);
+
+    menu.destroy();
+    grid.destroy();
+  });
 });

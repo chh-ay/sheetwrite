@@ -159,7 +159,7 @@ class KeyboardSettingsPanel {
       "sheetwrite-keys-hint",
       this.fixed
         ? "Your app handles the keys itself, so they can't be changed here."
-        : "Type a name or keys, or press keys to find the command that uses them. Excel's keys are the defaults.",
+        : "Type a name or keys, or press keys to find the command that uses them. Excel's keys are the defaults. F6 and Shift+F6 always move to the next or previous part of the window, and out of the grid.",
     );
     hint.id = `${id}-hint`;
 

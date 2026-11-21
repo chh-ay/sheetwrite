@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Time charts, PivotCharts, pivots, measures and dashboards in Chromium (`bench:analytics`): a source edit under a line and a column chart over 20,000 rows, a filter under a chart, scrolling a sheet with 10 charts, the dashboards showcase start, and a dashboard over 100,000 orders (first render, an edit and a slicer click).
 - Compare published releases with one workload script (`bench:version-comparison`): formula recalculation, retained and peak memory of 100,000 formulas, engine download size and XLSX import and export, for both engines, with interleaved rounds and an A/A spread.
 - Separate formula fixture construction and artifact checks from the command runner. Keep one ordered gate row table shared by capture and validation; preserve CLI modes, allocation checks and baseline policy.
 - Capture live chart tracking at 200, 2,000, and 20,000 charts, with exact notification checks and separate conservative formula-source evidence. Include chart tracking and the 100,000-row pivot matrix in the stamped release capture.

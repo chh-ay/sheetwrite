@@ -554,6 +554,22 @@ a {
   }
 }
 
+/* Every copy button draws the site's copy icon at the icon size, in a square
+   with the small radius, like the package command's (content-blocks.css).
+   `.frame` outranks Expressive Code's own `.expressive-code .copy` rules. */
+.expressive-code .frame .copy button {
+  border-radius: var(--sw-radius-sm);
+}
+
+.expressive-code .frame .copy button::after {
+  inset: calc(50% - var(--sw-icon-sm) / 2);
+  margin: 0;
+  -webkit-mask-image: var(--sw-icon-mask-copy);
+  mask-image: var(--sw-icon-mask-copy);
+  -webkit-mask-size: 100%;
+  mask-size: 100%;
+}
+
 .sw-tabs {
   margin: var(--sw-space-6) 0 var(--sw-space-10);
   border: var(--sw-border-width) solid var(--sw-border);
@@ -640,6 +656,33 @@ a {
   background: var(--sw-surface-0);
   font-size: var(--sw-text-caption);
   line-height: 1.7;
+}
+
+/* Below 48rem a wrapped line would break inside a name ("querySelecto" over
+   "r("), so each code line stays whole and the code panel scrolls. As on the
+   table frame, an edge shadow shows only while more code sits out of view on
+   that side: the covers scroll with the code, the shadows stay with the panel.
+   The copy button sits outside the panel, so it does not scroll. */
+@media (max-width: 48rem) {
+  .sw-prose .expressive-code .frame pre {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--sw-surface-0) 40%, transparent) left / 2rem 100% no-repeat
+        local,
+      linear-gradient(to left, var(--sw-surface-0) 40%, transparent) right / 2rem 100% no-repeat
+        local,
+      radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
+        no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
+        100% no-repeat scroll,
+      var(--sw-surface-0);
+    --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
+  }
+
+  .sw-prose .expressive-code .frame pre.wrap .ec-line .code {
+    white-space: pre;
+    overflow-wrap: normal;
+  }
 }
 
 @media (max-width: 48rem) {

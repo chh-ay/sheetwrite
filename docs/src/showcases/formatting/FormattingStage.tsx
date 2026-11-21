@@ -226,6 +226,7 @@ export function FormattingStage(props: FormattingStageProps) {
             ref={(element) => {
               host = element;
             }}
+            role="group"
           />
           <p class="sw-formatting-caption">
             Negative variance is highlighted by a live conditional rule. Edit the actuals to change

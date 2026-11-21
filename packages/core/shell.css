@@ -65,7 +65,11 @@
 .sheetwrite-shell-fx {
   flex: none;
   font-style: italic;
-  opacity: 0.6;
+  /* A colour, not opacity: it reaches 4.5:1 on the bar in both themes. */
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   padding: 0 2px;
 }
 
@@ -111,7 +115,10 @@
 .sheetwrite-shell-status {
   flex: none;
   white-space: nowrap;
-  opacity: 0.72;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
   padding-left: 12px;
 }
 

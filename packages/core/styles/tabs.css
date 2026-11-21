@@ -160,6 +160,12 @@
   font-size: 1.05em;
   font-weight: 650;
   line-height: 1;
+  /* When the tabs overflow the strip, the strip scrolls and + stays in view
+     at its right edge, over the tabs scrolled under it. */
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
 }
 
 .sheetwrite-tab-options-button:hover,
