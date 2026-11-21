@@ -115,7 +115,16 @@
 }
 
 .sheetwrite-shell-status {
-  flex: none;
+  /* The status gives up its width before the sheet tabs do, down to the cell
+     mode and no further: its parts drop out whole instead (Sum first), and
+     only then does the tab strip narrow and scroll. It never runs under the
+     tabs. */
+  position: relative;
+  display: flex;
+  flex: 0 1000 auto;
+  /* selection-status.ts sets the least width: its cell mode. */
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   color: var(
     --sheetwrite-widget-muted,
@@ -125,5 +134,37 @@
 }
 
 .sheetwrite-shell-mode {
+  flex: none;
   margin-right: 12px;
+}
+
+.sheetwrite-shell-status-parts {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sheetwrite-shell-status-part {
+  flex: none;
+}
+
+.sheetwrite-shell-status-parts[hidden],
+.sheetwrite-shell-status-part[hidden],
+.sheetwrite-shell-status-dropped {
+  display: none;
+}
+
+.sheetwrite-shell-status-part:not([hidden], .sheetwrite-shell-status-dropped)
+  ~ .sheetwrite-shell-status-part:not([hidden], .sheetwrite-shell-status-dropped)::before {
+  content: " · ";
+  white-space: pre;
+}
+
+/* The whole line, for screen readers, which skip the drawn parts. */
+.sheetwrite-shell-status-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }

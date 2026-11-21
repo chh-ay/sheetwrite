@@ -1490,11 +1490,9 @@
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-add {
-  display: grid;
   min-width: 1.875rem;
   height: 1.625rem;
   align-self: center;
-  place-items: center;
   margin-inline-start: 0;
   padding: 0 var(--sw-space-2);
   border-left: 1px solid var(--sw-border-strong);

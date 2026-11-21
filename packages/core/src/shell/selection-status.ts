@@ -51,20 +51,29 @@ export function describeSelection(
   return `${selection.ranges.length} ranges`;
 }
 
+/** The status line's totals; each is empty when Excel would not show it. */
+interface Totals {
+  readonly average: string;
+  readonly count: string;
+  readonly sum: string;
+}
+
+const NO_TOTALS: Totals = { average: "", count: "", sum: "" };
+
 /**
  * Excel's rule: totals appear once two or more cells hold values, and
  * Average and Sum only when at least one of them is a number.
  */
-function describeSummary(summary: SelectionSummary | null): string {
-  if (summary === null || summary.count < 2) return "";
-  const parts: string[] = [];
-  if (summary.average !== null) parts.push(`Average: ${formatNumber(summary.average)}`);
-  parts.push(`Count: ${summary.count}`);
-  if (summary.numericCount > 0) parts.push(`Sum: ${formatNumber(summary.sum)}`);
-  return parts.join(STATUS_SEPARATOR);
+function describeSummary(summary: SelectionSummary | null): Totals {
+  if (summary === null || summary.count < 2) return NO_TOTALS;
+  return {
+    average: summary.average === null ? "" : `Average: ${formatNumber(summary.average)}`,
+    count: `Count: ${summary.count}`,
+    sum: summary.numericCount > 0 ? `Sum: ${formatNumber(summary.sum)}` : "",
+  };
 }
 
-/** Runs of spaces collapse in HTML, so parts need a visible separator. */
+/** Runs of spaces collapse in HTML, so parts need a visible separator. shell.css draws it between shown parts. */
 const STATUS_SEPARATOR = " · ";
 
 /** `B2:D9`, or `C5` for one cell, with the sheet's row numbers. */
@@ -115,6 +124,11 @@ function describeRecords(grid: Grid): string {
  * polite live region, so screen readers announce changes without
  * interrupting.
  *
+ * When the line is narrower than its text, it drops whole parts as Excel's
+ * status bar does: Sum, then Average, then Count, then the selection size,
+ * the records found and the undo step. The cell mode always stays. Screen
+ * readers still hear every part.
+ *
  * @param host - Element the status is appended to.
  * @param grid - The grid whose selection and mode the status follows.
  */
@@ -126,24 +140,85 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   // Excel names the cell mode first, so the user knows what an arrow key does.
   const mode = document.createElement("span");
   mode.className = "sheetwrite-shell-mode";
-  const summary = document.createElement("span");
-  output.append(mode, summary);
+  // The parts as drawn, which drop out when the line is too narrow. Screen
+  // readers read the whole line from `text` instead.
+  const parts = document.createElement("span");
+  parts.className = "sheetwrite-shell-status-parts";
+  parts.setAttribute("aria-hidden", "true");
+  const part = (): HTMLSpanElement => {
+    const element = document.createElement("span");
+    element.className = "sheetwrite-shell-status-part";
+    parts.append(element);
+    return element;
+  };
+  const historyPart = part();
+  const recordsPart = part();
+  const averagePart = part();
+  const countPart = part();
+  const sumPart = part();
+  const geometryPart = part();
+  // Excel's status bar drops its totals first when it narrows.
+  const dropOrder = [sumPart, averagePart, countPart, geometryPart, recordsPart, historyPart];
+  const text = document.createElement("span");
+  text.className = "sheetwrite-shell-status-text";
+  output.append(mode, parts, text);
 
   let records = "";
   let geometry = "";
-  let totals = "";
+  let totals = NO_TOTALS;
   // The last undo or redo, shown until the selection changes again.
   let historyStep = "";
   const lifetime = new Scope();
   const summaries = new ScopeSlot(lifetime);
 
+  // Show every part, then drop parts until the rest fit. It reads layout, so it
+  // runs once a frame at most, after a change of text or of the host's size.
+  let fitFrame = 0;
+  const fit = (): void => {
+    fitFrame = 0;
+    // The line may narrow to its cell mode and no further, so the tab strip
+    // beside it narrows and scrolls before the mode is cut.
+    const modeRight = mode.getBoundingClientRect().right;
+    output.style.minWidth = `${Math.ceil(modeRight - output.getBoundingClientRect().left)}px`;
+    for (const element of dropOrder) element.classList.remove("sheetwrite-shell-status-dropped");
+    for (const element of dropOrder) {
+      if (parts.scrollWidth <= parts.clientWidth) break;
+      if (!element.hidden) element.classList.add("sheetwrite-shell-status-dropped");
+    }
+  };
+  const scheduleFit = (): void => {
+    if (fitFrame === 0) fitFrame = requestAnimationFrame(fit);
+  };
+  lifetime.add(() => {
+    if (fitFrame !== 0) cancelAnimationFrame(fitFrame);
+  });
+  if (typeof ResizeObserver !== "undefined") {
+    const resized = new ResizeObserver(scheduleFit);
+    resized.observe(host);
+    lifetime.add(() => resized.disconnect());
+  }
+
   const showMode = (cellMode: CellMode): void => {
     mode.textContent = MODE_LABELS[cellMode];
+    scheduleFit();
+  };
+  const setPart = (element: HTMLSpanElement, value: string): void => {
+    element.textContent = value;
+    element.hidden = value === "";
   };
   const show = (): void => {
-    const text = [historyStep, records, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
-    summary.textContent = text;
-    summary.hidden = text === "";
+    const values = [historyStep, records, totals.average, totals.count, totals.sum, geometry];
+    setPart(historyPart, historyStep);
+    setPart(recordsPart, records);
+    setPart(averagePart, totals.average);
+    setPart(countPart, totals.count);
+    setPart(sumPart, totals.sum);
+    setPart(geometryPart, geometry);
+    const line = values.filter(Boolean).join(STATUS_SEPARATOR);
+    text.textContent = line;
+    parts.hidden = line === "";
+    text.hidden = line === "";
+    if (line !== "") scheduleFit();
   };
 
   // A newer selection or edit makes an unfinished summary stale: the next
