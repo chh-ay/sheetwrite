@@ -257,7 +257,9 @@ function stylesByCell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
     for (const block of sheet.cells) {
       for (const entry of block.cells) {
         const col = block.startCol + entry.colOffset;
+        const column = sheet.columns[col];
         const style = entry.style ?? {};
+        // A `text` column is Excel's Text format, `@`, in XLSX.
         result.set(`${sheet.name}!${block.startRow + entry.rowOffset}:${col}`, {
           bold: false,
           italic: false,
@@ -266,7 +268,10 @@ function stylesByCell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
           // Native center imports unset because the grid's default is middle.
           verticalAlign: "middle",
           ...style,
-          numberFormat: style.numberFormat ?? sheet.columns[col]?.numberFormat ?? "General",
+          numberFormat:
+            style.numberFormat ??
+            column?.numberFormat ??
+            (column?.type === "text" ? "@" : "General"),
         });
       }
     }
