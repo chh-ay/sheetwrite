@@ -13,7 +13,7 @@ import {
   toXlsxWorkbookStream,
   type Workbook,
 } from "@sheetwrite/core";
-import { deflateSync, strToU8, unzipSync, Zip, type ZipInputFile } from "fflate";
+import { deflateSync, strToU8, unzipSync, Zip, ZipDeflate, type ZipInputFile } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
@@ -296,7 +296,7 @@ const LOCAL_UNCOMPRESSED_SIZE = 22;
 const ZIP64_SENTINEL = 0xffffffff;
 
 describe("ZIP raw entries", () => {
-  it("rejects forged retained metadata before emitting archive bytes", () => {
+  it("rejects forged retained metadata before emitting archive bytes", async () => {
     const context = createCodecContext("export");
     const data = deflateSync(strToU8("hello"));
     const forged = {
@@ -307,9 +307,9 @@ describe("ZIP raw entries", () => {
       data,
     };
     expect(() => validateStoredEntry(forged, context)).toThrow(/CRC/);
-    expect(() =>
+    await expect(
       writeZip([{ name: "x.bin", stored: { ...forged, uncompressedSize: 4 } }], context),
-    ).toThrow(/size/);
+    ).rejects.toThrow(/size/);
   });
 
   it("reports ZIP64 size sentinels as unsupported and checks declared ratios before any local header", async () => {
@@ -402,6 +402,89 @@ describe("ZIP inflate", () => {
       expect(storedEntryFromBytes(bytes).crc32).toBe(Bun.hash.crc32(bytes));
     }
     expect(storedEntryFromBytes(content).crc32).toBe(Bun.hash.crc32(content));
+  });
+});
+
+/** The archive that fflate's own ZIP deflate writes for `parts`, in the order given. */
+function fflateArchive(parts: Readonly<Record<string, Uint8Array>>): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const archive = new Zip((error, chunk) => {
+    if (error) throw error;
+    chunks.push(chunk);
+  });
+  for (const [name, data] of Object.entries(parts)) {
+    const file = new ZipDeflate(name, { level: 6 });
+    file.mtime = FIXED_ZIP_TIME;
+    archive.add(file);
+    file.push(data, true);
+  }
+  archive.end();
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+/**
+ * Each entry's local header and central record, with the two fields that depend on the deflate
+ * codec cleared: the compressed size and the local header offset.
+ */
+function entryHeaders(bytes: Uint8Array): Uint8Array[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = bytes.length - 22;
+  const headers: Uint8Array[] = [];
+  let offset = view.getUint32(eocd + 16, true);
+  for (let index = 0; index < view.getUint16(eocd + 10, true); index++) {
+    const nameLength = view.getUint16(offset + 28, true);
+    const end =
+      offset +
+      46 +
+      nameLength +
+      view.getUint16(offset + 30, true) +
+      view.getUint16(offset + 32, true);
+    const central = bytes.slice(offset, end);
+    const local = view.getUint32(offset + 42, true);
+    new DataView(central.buffer).setUint32(20, 0, true);
+    new DataView(central.buffer).setUint32(42, 0, true);
+    headers.push(bytes.slice(local, local + 30 + nameLength), central);
+    offset = end;
+  }
+  return headers;
+}
+
+describe("ZIP deflate", () => {
+  const parts: Record<string, Uint8Array> = {
+    "[Content_Types].xml": strToU8('<?xml version="1.0"?><Types/>'),
+    "docProps/empty.xml": new Uint8Array(0),
+    "xl/worksheets/sheet1.xml": strToU8(letters(300_000)),
+  };
+  // writeZip sorts the parts by name, so it gets them in another order.
+  const unsorted = Object.entries(parts)
+    .reverse()
+    .map(([name, data]) => ({ name, data }));
+
+  it("deflates parts with the runtime CompressionStream", async () => {
+    const runtime = globalThis.CompressionStream;
+    const formats: string[] = [];
+    globalThis.CompressionStream = class extends runtime {
+      constructor(format: CompressionFormat) {
+        formats.push(format);
+        super(format);
+      }
+    };
+    try {
+      await writeZip(unsorted, createCodecContext("export"));
+    } finally {
+      globalThis.CompressionStream = runtime;
+    }
+    expect(formats).toContain("deflate-raw");
+  });
+
+  it("writes the parts and ZIP headers of the fflate archive", async () => {
+    const written = await writeZip(unsorted, createCodecContext("export"));
+    const reference = fflateArchive(parts);
+    expect(entryHeaders(written)).toEqual(entryHeaders(reference));
+    // fflate reads every part of both archives, and so does this package's reader.
+    expect(unzipSync(written)).toEqual(unzipSync(reference));
+    const reader = await ZipReader.open(written, createCodecContext("import"));
+    for (const [name, data] of Object.entries(parts)) expect(await reader.read(name)).toEqual(data);
   });
 });
 
