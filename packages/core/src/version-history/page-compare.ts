@@ -23,9 +23,11 @@ import {
 
 /**
  * Operations a log tail may hold for a compare by page. Each one changes the
- * sources and styles of the cells in its rectangle only, or no cell at all.
- * Every other operation (structure, moves, sorts, renames, tables, names,
- * sheets) can shift pages or rewrite sources outside its rectangle.
+ * sources and styles of the cells in its rectangle only, or no cell at all:
+ * sheet settings (`setSheetMeta`, which a restore always writes) and sheet
+ * order keep every cell. Every other operation (structure, moves, sorts,
+ * renames, merges, tables, names, adding or removing sheets) can shift pages
+ * or rewrite sources outside its rectangle.
  */
 const PAGE_SAFE_OPERATIONS: Readonly<Partial<Record<DocumentOp["op"], true>>> = {
   set: true,
@@ -36,6 +38,8 @@ const PAGE_SAFE_OPERATIONS: Readonly<Partial<Record<DocumentOp["op"], true>>> = 
   clearRange: true,
   setNote: true,
   setRowMeta: true,
+  setSheetMeta: true,
+  moveSheet: true,
 };
 
 /**
