@@ -147,6 +147,11 @@ it("blocks the decision on any failed gate or an unclassified compile probe fail
   for (const [edit, failure] of [
     [
       (evidence: Fixture) =>
+        Object.assign(variant(evidence, 2).formulaGate, { status: "failed", exitCode: 1 }),
+      "-Oz formula gate failed",
+    ],
+    [
+      (evidence: Fixture) =>
         Object.assign(variant(evidence, 1).renderGate, { status: "failed", exitCode: 1 }),
       "-Os render gate failed",
     ],

@@ -2,24 +2,19 @@ import { describe, expect, it } from "bun:test";
 
 import { changesetComparisonFromBaseRef, unpublishedChangesetPackages } from "./changeset-ci.js";
 
-const CASES = [
-  { githubBaseRef: "0.4.0", expectedBaseRef: "origin/0.4.0" },
-  { githubBaseRef: "develop", expectedBaseRef: "origin/develop" },
-  { githubBaseRef: "release/next", expectedBaseRef: "origin/release/next" },
-  { githubBaseRef: "", expectedBaseRef: "origin/develop" },
-  { githubBaseRef: undefined, expectedBaseRef: "origin/develop" },
-] as const;
-
 describe("changeset comparison base", () => {
-  for (const { githubBaseRef, expectedBaseRef } of CASES) {
-    it(`uses ${expectedBaseRef} for ${githubBaseRef ?? "an absent GITHUB_BASE_REF"}`, () => {
-      expect(changesetComparisonFromBaseRef(githubBaseRef)).toEqual({
-        baseRef: expectedBaseRef,
-        diffRange: `${expectedBaseRef}...HEAD`,
-        sinceArgument: `--since=${expectedBaseRef}`,
-      });
+  it.each([
+    ["0.4.0", "origin/0.4.0"],
+    ["release/next", "origin/release/next"],
+    ["", "origin/develop"],
+    [undefined, "origin/develop"],
+  ])("compares GITHUB_BASE_REF %p against %s", (githubBaseRef, baseRef) => {
+    expect(changesetComparisonFromBaseRef(githubBaseRef)).toEqual({
+      baseRef,
+      diffRange: `${baseRef}...HEAD`,
+      sinceArgument: `--since=${baseRef}`,
     });
-  }
+  });
 });
 
 describe("changeset packages", () => {

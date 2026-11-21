@@ -4,6 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellStyle, Workbook } from "../src/types.js";
+import { mountHost } from "./fixtures.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -46,10 +47,7 @@ function setup(columnStyle?: CellStyle) {
       c2: [null, null, null, null, null],
     },
   });
-  const host = document.createElement("div");
-  Object.defineProperties(host, { clientWidth: { value: 800 }, clientHeight: { value: 400 } });
-  document.body.appendChild(host);
-  const grid = new GridImpl(host, { workbook }, store);
+  const grid = new GridImpl(mountHost(), { workbook }, store);
   grids.push(grid);
   const select = (row: number, col: number, endRow = row, endCol = col) =>
     grid.setSelection({

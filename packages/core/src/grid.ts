@@ -1356,6 +1356,14 @@ export class GridImpl implements Grid {
         const { autoFilter, filters } = this.sheet();
         return autoFilter && (filters?.length ?? 0) > 0 ? autoFilterBody(autoFilter) : undefined;
       },
+      // Header text ends before the filter buttons, as in Excel.
+      filterHeader: () => {
+        const range = this.sheet().autoFilter?.range;
+        const row = range ? this.toViewRow(range.start.row) : null;
+        return range && row !== null
+          ? { row, start: range.start.col, end: range.end.col }
+          : undefined;
+      },
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,

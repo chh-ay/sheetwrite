@@ -103,3 +103,29 @@ fn hidden_rows_move_with_inserted_and_deleted_rows() {
     store.commit_sources();
     assert_eq!(store.get_cell(sheet, 1, FORMULA_COLUMN).num(), 293.0);
 }
+
+/// AGGREGATE's odd options skip rows hidden by hand or by a filter; option 4
+/// and option 6 do not.
+#[cfg(feature = "analysis")]
+#[test]
+fn aggregate_odd_options_skip_rows_hidden_by_hand_or_by_a_filter() {
+    let formulas = [
+        "=AGGREGATE(9,1,A1:A4)",
+        "=AGGREGATE(9,3,A1:A5)",
+        "=AGGREGATE(9,5,A1:A5)",
+        "=AGGREGATE(9,7,A1:A5)",
+        "=AGGREGATE(9,6,A1:A5)",
+        "=AGGREGATE(9,4,A1:A4)",
+        "=AGGREGATE(14,5,A1:A5,1)",
+    ];
+    let (mut store, sheet) = microsoft_example(&formulas);
+    store.set_formula(sheet, 4, DATA_COLUMN, "=1/0", 0);
+    // Row 2 is hidden by hand, rows 3 and 5 by a filter.
+    assert!(store.set_hidden_rows(sheet, &[1, 1], &[2, 2, 4, 4]));
+    store.commit_sources();
+
+    assert_eq!(
+        results(&store, sheet, formulas.len()),
+        ["143", "143", "143", "143", "303", "303", "120"]
+    );
+}

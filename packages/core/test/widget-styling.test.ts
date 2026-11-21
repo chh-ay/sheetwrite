@@ -4,13 +4,10 @@ import { readFileSync } from "node:fs";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { GridConfig, Theme } from "../src/types.js";
+import type { Theme } from "../src/types.js";
 import { coreStyles, elementAdded, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
-// A full, deliberately un-themey palette. Passing every Theme field avoids
-// Partial-merge ambiguity, and the distinctive hex values make the seeded
-// custom properties (and their var() resolution) unmistakable regardless of
-// stylesheet load order — opts.theme wins last over DEFAULT_THEME and CSS.
+// Distinctive colors, so a seeded custom property is unmistakable.
 const THEME: Theme = {
   font: "20px monospace",
   bg: "#010203",
@@ -28,11 +25,7 @@ const THEME: Theme = {
   highlight: "#1d1e1f",
 };
 
-const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
-
-// Grids/hosts and stylesheets created per test, torn down in afterEach so no
-// listeners, DOM, or CSS leak across tests (full-suite isolation).
 const mounted: Array<{ host: HTMLElement; grid: GridImpl }> = [];
 const injectedStyles: HTMLStyleElement[] = [];
 
@@ -42,13 +35,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
-
-  // Make scheduled renders run synchronously so a resize's repaint is observable
-  // without racing a real animation-frame timer.
-  globalThis.requestAnimationFrame = ((cb: FrameRequestCallback): number => {
-    cb(0);
-    return 0;
-  }) as typeof globalThis.requestAnimationFrame;
 });
 
 afterEach(() => {
@@ -58,44 +44,30 @@ afterEach(() => {
   }
   for (const style of injectedStyles.splice(0)) style.remove();
   restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
 });
 
-// `config: {}` is truthy with no flag disabled, so the grid mounts the default
-// toolbar; the context menu and find bar are on by default. A caller-supplied
-// store keeps this WASM-light. The toolbar loads lazily: awaiting its module
+// The grid mounts the default toolbar, which loads lazily: awaiting its module
 // runs the grid's mount callback first.
-async function makeGrid(
-  config: GridConfig = {},
-): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
+async function makeGrid(): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
   const workbook = makeWorkbook();
   const store = new SheetwriteStore(workbook, makeColumnarData(50));
   const host = mountHost();
-  const grid = new GridImpl(host, { workbook, config, theme: THEME }, store);
+  const grid = new GridImpl(host, { workbook, config: {}, theme: THEME }, store);
   mounted.push({ host, grid });
   await import("../src/ribbon/command-toolbar.js");
   return { host, grid };
 }
 
-function injectStyle(css: string): HTMLStyleElement {
+function injectStyle(css: string): void {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
   injectedStyles.push(style);
-  return style;
-}
-
-function mustFind<T extends Element = HTMLElement>(host: HTMLElement, selector: string): T {
-  const node = host.querySelector(selector);
-  if (!node) throw new Error(`expected ${selector} to be mounted`);
-  return node as unknown as T;
 }
 
 describe("built-in widget styling", () => {
-  // Contract: every widget token the stylesheets read either is seeded or
-  // falls back to a value derived from seeded tokens, so no widget paints a
-  // light-theme colour under a dark theme. The menu shadow and the disabled
-  // row opacity are the same in every theme and fall back to plain values.
+  // No widget paints a light-theme colour under a dark theme. The menu shadow
+  // and the disabled row opacity are the same in every theme.
   it("derives every unseeded widget custom property from seeded ones", async () => {
     const { host } = await makeGrid();
     const seeded = (name: string) => host.style.getPropertyValue(name) !== "";
@@ -133,47 +105,19 @@ describe("built-in widget styling", () => {
     expect(problems).toEqual([]);
   });
 
-  // ── Computed-style parity + host override (the core restyling proof) ───────
-  // Contract: with the real stylesheet loaded the seeded tokens flow through
-  // var() to the exact themed colors, AND a host rule setting the token on the
-  // widget element wins over the ancestor-inherited value WITHOUT !important —
-  // which is the whole point of seeding on the root, not the widget.
+  // A host rule on the widget wins over the value the root seeds, without !important.
   it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
     injectStyle(coreStyles());
-
     const { host } = await makeGrid();
-
     // Ctrl+F on the host loads the find bar's chunk and shows the bar.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
     const findEl = await elementAdded(host, ".sheetwrite-find", HTMLDivElement);
-    const toolbarEl = mustFind<HTMLElement>(host, ".sheetwrite-toolbar");
+    const toolbarEl = host.querySelector(".sheetwrite-toolbar")!;
 
-    // Capability probe: does this happy-dom resolve var() in getComputedStyle?
-    // If a future version regresses, we degrade to the seeding/structure proof
-    // above rather than emit a false failure on an engine limitation.
-    const probe = document.createElement("div");
-    probe.className = "__probe";
-    probe.style.setProperty("--x", "#020202");
-    document.body.appendChild(probe);
-    injectStyle(".__probe { background: var(--x); }");
-    const varSupported = getComputedStyle(probe).background === "#020202";
-    probe.remove();
-
-    if (varSupported) {
-      // Default parity: seeded tokens resolve through var() to the themed values.
-      expect(getComputedStyle(findEl).background).toBe(THEME.bg);
-      expect(getComputedStyle(toolbarEl).background).toBe(THEME.headerBg);
-
-      // Host override wins without !important: a rule matching the widget
-      // directly beats the value inherited from the ancestor host root.
-      injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
-      const overridden = getComputedStyle(findEl).background;
-      expect(overridden).toBe("#abcabc");
-    } else {
-      // Fallback: the seeding + structure contract still holds.
-      expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);
-      expect(getComputedStyle(findEl).display).toBe("flex");
-    }
+    expect(getComputedStyle(findEl).background).toBe(THEME.bg);
+    expect(getComputedStyle(toolbarEl).background).toBe(THEME.headerBg);
+    injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
+    expect(getComputedStyle(findEl).background).toBe("#abcabc");
   });
 });
 

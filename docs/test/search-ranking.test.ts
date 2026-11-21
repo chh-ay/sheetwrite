@@ -48,6 +48,14 @@ describe("docs search ranking", () => {
     expect(pageUrls(pages, "import xlsx")[0]).toBe("/docs/import-export/xlsx-import/");
   });
 
+  it("keeps the API page first for a query that names code", () => {
+    const pages = [
+      page("/docs/start/first-grid/", "First grid", "createGrid mounts a grid"),
+      page("/docs/api/core/create-grid/", "createGrid", "createGrid"),
+    ];
+    expect(pageUrls(pages, "createGrid")[0]).toBe("/docs/api/core/create-grid/");
+  });
+
   it("does not lift an API page whose one-word title a question holds", () => {
     const pages = [
       page("/docs/api/core/theme/", "Theme", "dark theme tokens"),

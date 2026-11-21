@@ -12,6 +12,10 @@ it("publishes every captured artifact on the evidence pages", async () => {
   }
 });
 
+it("captures each artifact exactly once", () => {
+  expect(new Set(RELEASE_ARTIFACTS).size).toBe(RELEASE_ARTIFACTS.length);
+});
+
 it("rehearses every capture that has a smoke matrix without touching tracked evidence", () => {
   expect(RELEASE_SMOKE_COMMANDS.length).toBeGreaterThan(0);
   for (const command of RELEASE_SMOKE_COMMANDS) {

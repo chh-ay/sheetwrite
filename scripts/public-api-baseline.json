@@ -399,7 +399,7 @@
     "@sheetwrite/core#.#XlsxUnsupportedQuery": "aa0b134bd977",
     "@sheetwrite/core#.#XlsxWorkbookBackend": "0b77e2267d94",
     "@sheetwrite/core#.#XlsxWorkbookExportContext": "0e019ce8c2e2",
-    "@sheetwrite/core#.#XlsxWorkbookOptions": "a3ee5494053a",
+    "@sheetwrite/core#.#XlsxWorkbookOptions": "697f03788eea",
     "@sheetwrite/core#.#XlsxWorkbookWarning": "e90f221bbe3f",
     "@sheetwrite/core#.#assertRuntimeResourceSnapshot": "b95c32ede314",
     "@sheetwrite/core#.#assertWorkbookTables": "4f595ce923eb",

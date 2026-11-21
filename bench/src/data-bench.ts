@@ -1828,7 +1828,7 @@ function endEngineRun(): void {
   recordHeap(ENGINE_BOUNDARY, 0);
 }
 
-async function runSheetwriteDataBench(
+export async function runSheetwriteDataBench(
   rowsList: readonly number[] = SHEETWRITE_ROWS,
   mode: BenchmarkMode = "full",
 ): Promise<Map<number, TimedEngineResult>> {

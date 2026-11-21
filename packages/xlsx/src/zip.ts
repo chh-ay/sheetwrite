@@ -1,4 +1,4 @@
-import { Inflate, Zip, ZipDeflate, type ZipInputFile } from "fflate";
+import { Deflate, Inflate, Zip, type ZipInputFile } from "fflate";
 
 import {
   assertResource,
@@ -391,12 +391,23 @@ function hasNativeInflate(): boolean {
   return nativeInflate;
 }
 
+/** The runtime's raw deflate stream, or undefined where the runtime has none. */
+function nativeDeflate(): CompressionStream | undefined {
+  try {
+    return new CompressionStream("deflate-raw");
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Inflate with the runtime's zlib. The stream pulls the next input slice only after its output
- * is read, so one slice bounds the output that the caller has not checked yet.
+ * Run `input` through the runtime's zlib. The stream pulls the next input chunk only after its
+ * output is read, so one chunk bounds the output that the caller has not checked yet.
  */
-async function* inflateNative(input: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
-  const stream = new DecompressionStream("deflate-raw");
+async function* pipeNative(
+  stream: CompressionStream | DecompressionStream,
+  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
+): AsyncGenerator<Uint8Array<ArrayBuffer>> {
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
   void (async () => {
@@ -412,7 +423,7 @@ async function* inflateNative(input: AsyncIterable<Uint8Array>): AsyncGenerator<
       }
       await writer.close();
     } catch (error) {
-      // An input failure (an abort or a read error) reaches the reader through the abort.
+      // An input failure (an abort, a limit or a read error) reaches the reader through the abort.
       await writer.abort(error).catch(() => undefined);
     }
   })();
@@ -423,6 +434,24 @@ async function* inflateNative(input: AsyncIterable<Uint8Array>): AsyncGenerator<
   } finally {
     await reader.cancel().catch(() => undefined);
   }
+}
+
+/**
+ * Deflate at fflate level 6: the default, and the `native` compression where the runtime has no
+ * `CompressionStream`.
+ */
+function* deflateFflate(input: Iterable<Uint8Array>): Generator<Uint8Array<ArrayBuffer>> {
+  const pending: Uint8Array<ArrayBuffer>[] = [];
+  const deflater = new Deflate({ level: 6 }, (chunk) => {
+    pending.push(chunk);
+  });
+  for (const piece of input) {
+    deflater.push(piece);
+    yield* pending;
+    pending.length = 0;
+  }
+  deflater.push(new Uint8Array(0), true);
+  yield* pending;
 }
 
 /** Seekable ZIP reader: only the directory and one requested part are resident. */
@@ -541,7 +570,10 @@ export class ZipReader {
     let produced = 0;
     if (hasNativeInflate()) {
       try {
-        for await (const chunk of inflateNative(this.#payload(entry))) {
+        for await (const chunk of pipeNative(
+          new DecompressionStream("deflate-raw"),
+          this.#payload(entry),
+        )) {
           produced += chunk.length;
           yield chunk;
         }
@@ -599,10 +631,10 @@ const ZIP_OUTPUT_CHUNK_BYTES = 64 * 1024;
 const ENTRY_OVERHEAD_BYTES = 256;
 
 /** Pull-driven ZIP encoding; pending codec output is drained after each bounded push. */
-export function* zipChunks(
+export async function* zipChunks(
   parts: Iterable<ZipPart>,
   context: XlsxCodecContext,
-): Generator<Uint8Array> {
+): AsyncGenerator<Uint8Array> {
   const pending: Uint8Array[] = [];
   let outputBytes = 0;
   let totalBytes = 0;
@@ -669,31 +701,50 @@ export function* zipChunks(
         }
         file.ondata(null, new Uint8Array(0), true);
       } else {
-        const file = new ZipDeflate(name, { level: 6 });
-        file.mtime = DOS_EPOCH;
+        const file: ZipInputFile = {
+          filename: name,
+          compression: 8,
+          size: 0,
+          crc: 0,
+          mtime: DOS_EPOCH,
+        };
         archive.add(file);
         yield* drain();
+        if (!file.ondata) throw new Error(`Sheetwrite: ZIP output handler missing for ${name}`);
         let entryBytes = 0;
+        let checksum = 0xffffffff;
         const chunks = part.data instanceof Uint8Array ? [part.data] : part.data;
-        for (const chunk of chunks) {
-          // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
-          for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
-            checkAbort(context);
-            const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
-            entryBytes += piece.length;
-            totalBytes += piece.length;
-            assertResource(context, "maxEntryUncompressedBytes", entryBytes);
-            assertResource(context, "maxTotalUncompressedBytes", totalBytes);
-            assertResource(
-              context,
-              "maxOutputBytes",
-              totalBytes + names.size * ENTRY_OVERHEAD_BYTES,
-            );
-            file.push(piece);
-            yield* drain();
+        // The codec pulls each piece only after the limits allow it.
+        const pieces = function* (): Generator<Uint8Array> {
+          for (const chunk of chunks) {
+            // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
+            for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
+              checkAbort(context);
+              const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
+              entryBytes += piece.length;
+              totalBytes += piece.length;
+              assertResource(context, "maxEntryUncompressedBytes", entryBytes);
+              assertResource(context, "maxTotalUncompressedBytes", totalBytes);
+              assertResource(
+                context,
+                "maxOutputBytes",
+                totalBytes + names.size * ENTRY_OVERHEAD_BYTES,
+              );
+              checksum = updateCrc32(checksum, piece);
+              yield piece;
+            }
           }
+        };
+        // fflate is the default: its bytes are the same in every runtime.
+        const native = context.options?.compression === "native" ? nativeDeflate() : undefined;
+        const compressed = native ? pipeNative(native, pieces()) : deflateFflate(pieces());
+        for await (const chunk of compressed) {
+          file.ondata(null, chunk, false);
+          yield* drain();
         }
-        file.push(new Uint8Array(0), true);
+        file.crc = (checksum ^ 0xffffffff) >>> 0;
+        file.size = entryBytes;
+        file.ondata(null, new Uint8Array(0), true);
       }
       yield* drain();
     }
@@ -708,7 +759,10 @@ export function* zipChunks(
  * Buffered API: parts are materialized and sorted by name for canonical archives.
  * Streams cannot sort because styles and content types depend on every worksheet.
  */
-export function writeZip(parts: Iterable<ZipPart>, context: XlsxCodecContext): Uint8Array {
+export async function writeZip(
+  parts: Iterable<ZipPart>,
+  context: XlsxCodecContext,
+): Promise<Uint8Array> {
   const materialized: ZipPart[] = [];
   for (const part of parts) {
     if ("stored" in part || part.data instanceof Uint8Array) {
@@ -726,7 +780,8 @@ export function writeZip(parts: Iterable<ZipPart>, context: XlsxCodecContext): U
   }
   materialized.sort((left, right) => left.name.localeCompare(right.name));
   const sources: Iterable<ZipPart> = materialized;
-  const chunks = [...zipChunks(sources, context)];
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of zipChunks(sources, context)) chunks.push(chunk);
   const size = chunks.reduce((total, chunk) => total + chunk.length, 0);
   const output = new Uint8Array(size);
   let offset = 0;

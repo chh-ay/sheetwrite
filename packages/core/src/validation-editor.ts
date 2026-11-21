@@ -35,7 +35,10 @@ let listCount = 0;
  * Accessible DOM overlay for list and checkbox validation rules. A list is a
  * combobox: a text box over the cell and the rule's items below it, as
  * Excel's dropdown. Typing in the box keeps only the items that contain the
- * text, as Excel's AutoComplete for dropdown lists does.
+ * text, as Excel's AutoComplete for dropdown lists does. A list opened
+ * without typing (Alt+Down, the arrow) leaves the cell showing its value, as
+ * in Excel: its box stays out of sight until the first typed text, which
+ * then replaces the value in the cell and filters the list.
  */
 export class ValidationEditor {
   private readonly host: HTMLElement;
@@ -49,6 +52,10 @@ export class ValidationEditor {
   /** Position in `shown` of the highlighted item; -1 while none is. */
   private activeIndex = -1;
   private checkboxValue: CellScalar = false;
+  /** The cell the editor sits on, kept so the list's box can move over it once typing starts. */
+  private rect: EditRect | null = null;
+  /** A list opened without typing: its box stays hidden, so the cell keeps showing its value. */
+  private idle = false;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -75,11 +82,13 @@ export class ValidationEditor {
   position(rect: EditRect): void {
     const root = this.root;
     if (!root) return;
+    this.rect = rect;
     root.style.left = `${rect.x}px`;
-    if (this.input) {
+    if (this.input && !this.idle) {
       root.style.top = `${rect.y}px`;
       this.input.style.height = `${rect.h}px`;
     } else {
+      // A checkbox, or a list whose box is out of sight: below the cell.
       root.style.top = `${rect.y + rect.h}px`;
     }
     root.style.minWidth = `${Math.max(120, rect.w)}px`;
@@ -95,6 +104,8 @@ export class ValidationEditor {
     this.values = [];
     this.shown = [];
     this.activeIndex = -1;
+    this.rect = null;
+    this.idle = false;
     root?.remove();
     if (notify) options?.onCancel();
   }
@@ -137,6 +148,11 @@ export class ValidationEditor {
     this.input = input;
     this.listbox = listbox;
     this.values = options.values;
+    // Without typed text, the box would cover the cell's value with an empty field.
+    if (options.filter === "") {
+      this.idle = true;
+      input.classList.add("sheetwrite-validation-input-idle");
+    }
     this.renderList();
     // Opened without typing, the list starts on the cell's own value, as in Excel.
     if (options.filter === "") {
@@ -205,6 +221,12 @@ export class ValidationEditor {
   }
 
   private readonly onListInput = (): void => {
+    // The first typed text replaces the cell's value: the box moves over the cell.
+    if (this.idle) {
+      this.idle = false;
+      this.input?.classList.remove("sheetwrite-validation-input-idle");
+      if (this.rect !== null) this.position(this.rect);
+    }
     this.renderList();
   };
 
