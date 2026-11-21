@@ -51,7 +51,11 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
-import { installExternalLinks, removeExternalLinks } from "../external-link.js";
+import {
+  installExternalLinks,
+  removeExternalLinks,
+  replaceExternalLinks,
+} from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -2890,6 +2894,10 @@ export class StoreDataEngine {
     const numbers = new Float64Array(cellCount);
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
+    // Interning builds a key from every style field, so each table entry is
+    // interned once, on first use, instead of once per cell. First use keeps
+    // the order in which the dictionary assigns ids.
+    const tableIds: Array<number | undefined> = new Array(styleTable.length);
 
     const texts: string[] = [];
     for (let offset = 0; offset < cellCount; offset++) {
@@ -2897,10 +2905,14 @@ export class StoreDataEngine {
       writeScalarWire(kinds, numbers, offset, value);
       if (typeof value === "string") texts.push(value);
 
-      const styleId = styleIds === undefined ? undefined : styleIds[offset];
-      wasmStyles[offset] = this.styles.intern(
-        styleId === undefined ? undefined : styleTable[styleId],
-      );
+      const styleId = styleIds?.[offset];
+      if (styleId === undefined) continue;
+      let id = tableIds[styleId];
+      if (id === undefined) {
+        id = this.styles.intern(styleTable[styleId]);
+        tableIds[styleId] = id;
+      }
+      wasmStyles[offset] = id;
     }
 
     const formulas = block.formulas ?? [];
@@ -4049,10 +4061,11 @@ export class StoreDataEngine {
       case "setExternalLinks": {
         // The engine turns references to a removed link sheet back into
         // unresolved references and re-resolves them when it is added, so
-        // replacing the links never changes formula text.
+        // replacing the links never changes formula text. A link that keeps
+        // its sheets and their extents keeps its engine sheets, and only its
+        // changed values are written.
         const previous = this.workbook.externalLinks ?? [];
-        removeExternalLinks(this.wasm, previous);
-        if (!installExternalLinks(this.wasm, patch.links)) {
+        if (!replaceExternalLinks(this.wasm, previous, patch.links)) {
           removeExternalLinks(this.wasm, patch.links);
           installExternalLinks(this.wasm, previous);
           return false;

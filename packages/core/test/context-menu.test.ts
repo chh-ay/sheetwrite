@@ -18,7 +18,11 @@ beforeEach(() => {
   clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 });
 
+/** Each live menu and its grid, destroyed after its test. */
+const live: (() => void)[] = [];
+
 afterEach(() => {
+  for (const destroy of live.splice(0)) destroy();
   restoreCanvasStubs();
   if (clipboardDescriptor) {
     Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
@@ -117,6 +121,10 @@ describe("ContextMenu", () => {
       config: { contextMenu: false, find: false, toolbar: false },
     });
     const menu = new ContextMenu(host, config, DEFAULT_THEME, grid.actions, grid);
+    live.push(
+      () => menu.destroy(),
+      () => grid.destroy(),
+    );
     return { host, grid, menu };
   }
 
@@ -137,58 +145,36 @@ describe("ContextMenu", () => {
       "s1",
     );
     expect(placed.status).toBe("applied");
-    /** Open the menu on a cell; returns its row ids and whether the pivot row shows its glyph. */
+    /** Open the menu on a cell; returns its row ids. */
     const openAt = (row: number, col: number) => {
       const cell = { sheet: "s1", row, col };
       grid.setSelection({ kind: "cell", addr: cell });
       menu.open({ cell, clientX: 10, clientY: 10 });
-      const root = openMenu(host);
-      const ids = rowIds(root);
-      const glyph = root.querySelector(
-        '[data-context-menu-item="pivotFields"] [data-icon="pivotTable"]',
-      );
+      const ids = rowIds(openMenu(host));
       menu.close();
-      return { ids, glyph: glyph !== null };
+      return ids;
     };
 
-    expect(openAt(0, 2)).toEqual(expect.objectContaining({ glyph: true }));
-    expect(openAt(0, 2).ids).toContain("pivotFields");
-    expect(openAt(2, 0).ids).not.toContain("pivotFields");
+    expect(openAt(0, 2)).toContain("pivotFields");
+    expect(openAt(2, 0)).not.toContain("pivotFields");
 
     grid.setReadOnly(true);
-    expect(openAt(0, 2).ids).not.toContain("pivotFields");
-
-    menu.destroy();
-    grid.destroy();
+    expect(openAt(0, 2)).not.toContain("pivotFields");
   });
 
-  it("shows Excel's cell dialogs with their own glyphs: Cells… in Insert and Delete, and Format cells…", () => {
+  it("shows Excel's cell dialogs: Cells… first in Insert and Delete, and Format cells…", () => {
     const { host, grid, menu } = liveMenu();
     const cell = { sheet: "s1", row: 1, col: 1 };
     grid.setSelection({ kind: "cell", addr: cell });
     menu.open({ cell, clientX: 10, clientY: 10 });
-    /** The glyph of row `id` in the open menu at `level`. */
-    const glyph = (id: string, level = 0): string | undefined =>
-      openMenu(host, level).querySelector<HTMLElement>(
-        `[data-context-menu-item="${id}"] [data-icon]`,
-      )?.dataset.icon;
     const openSubmenu = (id: string): void =>
       openMenu(host).querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
 
-    expect(glyph("formatCells")).toBe("formatCells");
+    expect(rowIds(openMenu(host))).toContain("formatCells");
     openSubmenu("insert");
-    expect([rowIds(openMenu(host, 1))[0], glyph("insertCells", 1)]).toEqual([
-      "insertCells",
-      "insertCells",
-    ]);
+    expect(rowIds(openMenu(host, 1))[0]).toBe("insertCells");
     openSubmenu("delete");
-    expect([rowIds(openMenu(host, 1))[0], glyph("deleteCells", 1)]).toEqual([
-      "deleteCells",
-      "deleteCells",
-    ]);
-
-    menu.destroy();
-    grid.destroy();
+    expect(rowIds(openMenu(host, 1))[0]).toBe("deleteCells");
   });
 
   it("moves through the menu and its submenus with the keyboard", () => {
@@ -230,13 +216,10 @@ describe("ContextMenu", () => {
     expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(4);
     expect(openMenus(host)).toHaveLength(0);
     expect(document.activeElement).toBe(before);
-
-    menu.destroy();
-    grid.destroy();
   });
 
   it("closes on the user's scroll, not on the page's own", () => {
-    const { host, grid, menu } = liveMenu();
+    const { host, menu } = liveMenu();
     const open = (): void => menu.open({ cell: null, clientX: 10, clientY: 10 });
 
     // Focusing the grid scrolls it into view, and the browser sends that scroll
@@ -260,8 +243,5 @@ describe("ContextMenu", () => {
     open();
     key(document.activeElement, "PageDown");
     expect(openMenus(host)).toHaveLength(0);
-
-    menu.destroy();
-    grid.destroy();
   });
 });

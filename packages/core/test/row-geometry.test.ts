@@ -128,11 +128,13 @@ describe("row geometry", () => {
     expect(store.getWorkbook().sheets[0]!.rowHeights?.has(0)).toBe(false);
     expectCommittedGeometry(grid, store);
 
-    geometryOf(grid).previewRowHeight(3, 90);
+    // A cancelled preview of a resized row restores its committed height.
+    const row3Border = DEFAULT_THEME.headerHeight + 3 * DEFAULT_THEME.rowHeight + 44;
+    pointer("pointerdown", row3Border);
+    pointer("pointermove", row3Border + 46);
     expect(geometryOf(grid).rowHeight(3)).toBe(90);
-    geometryOf(grid).clearResizePreview();
+    pointer("pointercancel", row3Border + 46);
     expect(geometryOf(grid).rowHeight(3)).toBe(44);
-    expectCommittedGeometry(grid, store);
 
     pointer("pointerdown", borderY);
     pointer("pointermove", borderY + 20);

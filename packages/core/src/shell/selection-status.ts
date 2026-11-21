@@ -62,14 +62,17 @@ const NO_TOTALS: Totals = { average: "", count: "", sum: "" };
 
 /**
  * Excel's rule: totals appear once two or more cells hold values, and
- * Average and Sum only when at least one of them is a number.
+ * Average and Sum only when at least one of them is a number. Average and
+ * Sum show in the active cell's number format, as Excel's status bar does
+ * (General when it has none); Count is a plain count.
  */
-function describeSummary(summary: SelectionSummary | null): Totals {
+function describeSummary(summary: SelectionSummary | null, numberFormat?: string): Totals {
   if (summary === null || summary.count < 2) return NO_TOTALS;
   return {
-    average: summary.average === null ? "" : `Average: ${formatNumber(summary.average)}`,
+    average:
+      summary.average === null ? "" : `Average: ${formatNumber(summary.average, numberFormat)}`,
     count: `Count: ${summary.count}`,
-    sum: summary.numericCount > 0 ? `Sum: ${formatNumber(summary.sum)}` : "",
+    sum: summary.numericCount > 0 ? `Sum: ${formatNumber(summary.sum, numberFormat)}` : "",
   };
 }
 
@@ -230,7 +233,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
       (summary) => {
         if (run.closed) return;
         run.close();
-        totals = describeSummary(summary);
+        totals = describeSummary(summary, grid.getFocusCellStyle().numberFormat);
         show();
       },
       (error: unknown) => {

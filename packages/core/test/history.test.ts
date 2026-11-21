@@ -34,25 +34,7 @@ describe("UndoManager rejection recovery", () => {
     let disposals = 0;
     const history = new UndoManager();
     history.push(
-      [
-        {
-          kind: "rangeSnapshot",
-          range: {
-            sheet: "sheet",
-            start: { row: 0, col: 0 },
-            end: { row: 0, col: 0 },
-          },
-          byteLength: 13,
-          toPatch: (range) => ({
-            op: "setBlock",
-            range,
-            block: { rowCount: 1, colCount: 1, values: ["before"] },
-          }),
-          dispose: () => {
-            disposals += 1;
-          },
-        },
-      ],
+      snapshotAction(13, () => (disposals += 1)),
       [setOperation],
       "Typing",
     );
@@ -108,7 +90,8 @@ describe("UndoManager rejection recovery", () => {
 
 describe("history restore measurement", () => {
   it("reports the exact JSON size that a full walk measures for every scalar kind", () => {
-    const operation: DocumentOp = {
+    const integers = [0, 7, -42, 123_456, -(2 ** 53), 2 ** 53, 1e20, 1e21, -1e21, 1e300, 0.1];
+    const mixed: DocumentOp = {
       op: "setBlock",
       range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 1, col: 3 } },
       block: {
@@ -121,17 +104,28 @@ describe("history restore measurement", () => {
         styleIds: [0, 1, 1, 0, 0, 0, 1, 1],
       },
     };
-    const exact = validateTransactionResources([operation]);
-    if (!exact.ok) throw new Error("Expected a measurable operation");
-    const preparation = new TransactionPreparation();
-    try {
-      preparation.seedHistory(operation, () => true);
-      expect(preparation.measure([operation])).toBe(exact.encodedBytes);
-      expect(measureOperationBytes([operation], Number.MAX_SAFE_INTEGER)).toEqual(
-        measureOperationBytes([structuredClone(operation)], Number.MAX_SAFE_INTEGER),
-      );
-    } finally {
-      preparation.dispose();
+    const scalars: DocumentOp = {
+      op: "setBlock",
+      range: {
+        sheet: "sheet",
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: integers.length - 1 },
+      },
+      block: { rowCount: 1, colCount: integers.length, values: integers },
+    };
+    for (const operation of [mixed, scalars]) {
+      const exact = validateTransactionResources([operation]);
+      if (!exact.ok) throw new Error("Expected a measurable operation");
+      const preparation = new TransactionPreparation();
+      try {
+        preparation.seedHistory(operation, () => true);
+        expect(preparation.measure([operation])).toBe(exact.encodedBytes);
+        expect(measureOperationBytes([operation], Number.MAX_SAFE_INTEGER)).toEqual(
+          measureOperationBytes([structuredClone(operation)], Number.MAX_SAFE_INTEGER),
+        );
+      } finally {
+        preparation.dispose();
+      }
     }
   });
 
@@ -145,24 +139,6 @@ describe("history restore measurement", () => {
     try {
       preparation.seedHistory(operation, () => true);
       expect(() => preparation.measure([operation])).toThrow("finite");
-    } finally {
-      preparation.dispose();
-    }
-  });
-
-  it("sizes integers of every length exactly", () => {
-    const values = [0, 7, -42, 123_456, -(2 ** 53), 2 ** 53, 1e20, 1e21, -1e21, 1e300, 0.1];
-    const operation: DocumentOp = {
-      op: "setBlock",
-      range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: values.length - 1 } },
-      block: { rowCount: 1, colCount: values.length, values },
-    };
-    const exact = validateTransactionResources([operation]);
-    if (!exact.ok) throw new Error("Expected a measurable operation");
-    const preparation = new TransactionPreparation();
-    try {
-      preparation.seedHistory(operation, () => true);
-      expect(preparation.measure([operation])).toBe(exact.encodedBytes);
     } finally {
       preparation.dispose();
     }

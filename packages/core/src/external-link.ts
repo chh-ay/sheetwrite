@@ -1,5 +1,10 @@
 import { isPlainRecord, ownValue } from "./plain-data.js";
-import type { ExternalLink } from "./types/external-link.js";
+import type {
+  ExternalLink,
+  ExternalLinkCell,
+  ExternalLinkSheet,
+  ExternalLinkValue,
+} from "./types/external-link.js";
 
 /** Most linked workbooks in one workbook; Excel files rarely hold more than a few. */
 const MAX_EXTERNAL_LINKS = 1_024;
@@ -106,6 +111,7 @@ export interface ExternalLinkEngine {
   setString(sheet: number, row: number, col: number, value: string, style: number): void;
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   setFormula(sheet: number, row: number, col: number, source: string, style: number): void;
+  clearCell(sheet: number, row: number, col: number, style: number): void;
   recompute(sheet: number): void;
   removeExternalSheet(book: string, sheet: string): boolean;
   setNamedFormula(name: string, scope: number, source: string): boolean;
@@ -124,6 +130,138 @@ export function removeExternalLinks(
   }
 }
 
+/** Rows and columns from A1 to the last saved cell of a linked sheet. */
+interface SheetExtent {
+  rows: number;
+  columns: number;
+}
+
+/** The extent of `sheet`'s saved cells, or `null` at the first cell outside the sheet limits or with a value formulas cannot hold. */
+function sheetExtent(sheet: ExternalLinkSheet): SheetExtent | null {
+  let rows = 1;
+  let columns = 1;
+  for (const cell of sheet.cells) {
+    const value: unknown = cell.value;
+    const valid =
+      isIndex(cell.row, MAX_ROWS) &&
+      isIndex(cell.col, MAX_COLUMNS) &&
+      (typeof value === "number"
+        ? Number.isFinite(value)
+        : typeof value === "string" ||
+          typeof value === "boolean" ||
+          (isPlainRecord(value) && ERROR_VALUE.test(String(ownValue(value, "error")))));
+    if (!valid) return null;
+    rows = Math.max(rows, cell.row + 1);
+    columns = Math.max(columns, cell.col + 1);
+  }
+  return { rows, columns };
+}
+
+function writeCell(engine: ExternalLinkEngine, handle: number, cell: ExternalLinkCell): void {
+  const { row, col, value } = cell;
+  if (typeof value === "number") engine.setNumber(handle, row, col, value, 0);
+  else if (typeof value === "string") engine.setString(handle, row, col, value, 0);
+  else if (typeof value === "boolean") engine.setBool(handle, row, col, value, 0);
+  // An error has no setter. A one-value array constant holds it, because
+  // the formula parser accepts error values only there.
+  else engine.setFormula(handle, row, col, `={${value.error}}`, 0);
+}
+
+function sameValue(left: ExternalLinkValue, right: ExternalLinkValue): boolean {
+  if (typeof left === "object" || typeof right === "object") {
+    return typeof left === "object" && typeof right === "object" && left.error === right.error;
+  }
+  return Object.is(left, right);
+}
+
+/**
+ * Rewrite the cells of a linked sheet the engine already holds from
+ * `previous` to `next`: only cells whose value changes are written, and
+ * cells that `next` leaves out are cleared, so only the formulas that read
+ * them recalculate.
+ */
+function rewriteCells(
+  engine: ExternalLinkEngine,
+  handle: number,
+  previous: readonly ExternalLinkCell[],
+  next: readonly ExternalLinkCell[],
+): void {
+  const position = (cell: ExternalLinkCell) => cell.row * MAX_COLUMNS + cell.col;
+  const old = new Map<number, ExternalLinkValue>();
+  for (const cell of previous) old.set(position(cell), cell.value);
+  for (const cell of next) {
+    const key = position(cell);
+    const value = old.get(key);
+    old.delete(key);
+    if (value === undefined || !sameValue(value, cell.value)) writeCell(engine, handle, cell);
+  }
+  for (const key of old.keys()) {
+    engine.clearCell(handle, Math.floor(key / MAX_COLUMNS), key % MAX_COLUMNS, 0);
+  }
+}
+
+/**
+ * Give the engine the names of `link`. A name is a defined name of this
+ * workbook named as formulas write it, `'[Budget.xlsx]'!Total` or
+ * `'[Budget.xlsx]Annual'!Total`, whose sheet references name the link's
+ * sheets. A reference to a sheet the link does not hold reads `#REF!`, as
+ * in Excel.
+ */
+function installNames(engine: ExternalLinkEngine, link: ExternalLink): void {
+  for (const { name, refersTo, sheet } of link.names ?? []) {
+    const qualified = `${linkSheet(link.book, sheet ?? "")}!${name}`;
+    const source = refersTo.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>
+      linkSheet(link.book, quoted?.replaceAll("''", "'") ?? plain ?? ""),
+    );
+    engine.setNamedFormula(
+      qualified,
+      WORKBOOK_SCOPE,
+      source.startsWith("=") ? source : `=${source}`,
+    );
+  }
+}
+
+/**
+ * Write `links` to the engine, and return false at the first cell outside
+ * the sheet limits, a value that formulas cannot hold, or a linked sheet
+ * past the cell or area limits. A link with an entry in `kept` keeps the
+ * sheets the engine holds for that previous link, which have the same
+ * extents: only its changed cells are written. Every other link is added.
+ */
+function writeLinks(
+  engine: ExternalLinkEngine,
+  links: readonly ExternalLink[],
+  kept: ReadonlyMap<ExternalLink, ExternalLink>,
+): boolean {
+  let total = 0;
+  for (const link of links) {
+    const previous = kept.get(link);
+    for (const [index, sheet] of link.sheets.entries()) {
+      const extent = sheetExtent(sheet);
+      total += sheet.cells.length;
+      if (
+        extent === null ||
+        total > MAX_EXTERNAL_CELLS ||
+        extent.rows * extent.columns > MAX_EXTERNAL_SHEET_AREA
+      ) {
+        return false;
+      }
+
+      const handle = engine.addExternalSheet(link.book, sheet.name, extent.columns, extent.rows);
+      const previousCells = previous?.sheets[index]?.cells;
+      if (previousCells) {
+        rewriteCells(engine, handle, previousCells, sheet.cells);
+      } else {
+        for (const cell of sheet.cells) writeCell(engine, handle, cell);
+        engine.recompute(handle);
+      }
+    }
+
+    if (!previous) installNames(engine, link);
+  }
+  return true;
+}
+
 /**
  * Give the engine the saved values of every link, and return false at the
  * first cell outside the sheet limits, a value that formulas cannot hold, or
@@ -134,55 +272,54 @@ export function installExternalLinks(
   engine: ExternalLinkEngine,
   links: readonly ExternalLink[],
 ): boolean {
-  let total = 0;
-  for (const link of links) {
-    for (const sheet of link.sheets) {
-      let rows = 1;
-      let columns = 1;
-      for (const cell of sheet.cells) {
-        const value: unknown = cell.value;
-        const valid =
-          isIndex(cell.row, MAX_ROWS) &&
-          isIndex(cell.col, MAX_COLUMNS) &&
-          (typeof value === "number"
-            ? Number.isFinite(value)
-            : typeof value === "string" ||
-              typeof value === "boolean" ||
-              (isPlainRecord(value) && ERROR_VALUE.test(String(ownValue(value, "error")))));
-        if (!valid) return false;
-        rows = Math.max(rows, cell.row + 1);
-        columns = Math.max(columns, cell.col + 1);
-      }
-      total += sheet.cells.length;
-      if (total > MAX_EXTERNAL_CELLS || rows * columns > MAX_EXTERNAL_SHEET_AREA) return false;
+  return writeLinks(engine, links, new Map());
+}
 
-      const handle = engine.addExternalSheet(link.book, sheet.name, columns, rows);
-      for (const { row, col, value } of sheet.cells) {
-        if (typeof value === "number") engine.setNumber(handle, row, col, value, 0);
-        else if (typeof value === "string") engine.setString(handle, row, col, value, 0);
-        else if (typeof value === "boolean") engine.setBool(handle, row, col, value, 0);
-        // An error has no setter. A one-value array constant holds it,
-        // because the formula parser accepts error values only there.
-        else engine.setFormula(handle, row, col, `={${value.error}}`, 0);
-      }
-      engine.recompute(handle);
-    }
+/** Whether `next` names the same sheets, with the same extents, and the same names as `previous`. */
+function keepsSheets(previous: ExternalLink, next: ExternalLink): boolean {
+  return (
+    previous.book === next.book &&
+    previous.sheets.length === next.sheets.length &&
+    previous.sheets.every((sheet, index) => {
+      const other = next.sheets[index];
+      if (other === undefined || other.name !== sheet.name) return false;
+      const before = sheetExtent(sheet);
+      const after = sheetExtent(other);
+      return (
+        before !== null &&
+        after !== null &&
+        before.rows === after.rows &&
+        before.columns === after.columns
+      );
+    }) &&
+    JSON.stringify(previous.names ?? []) === JSON.stringify(next.names ?? [])
+  );
+}
 
-    // A name is a defined name of this workbook named as formulas write it,
-    // `'[Budget.xlsx]'!Total` or `'[Budget.xlsx]Annual'!Total`, whose sheet
-    // references name the link's sheets. A reference to a sheet the link
-    // does not hold reads `#REF!`, as in Excel.
-    for (const { name, refersTo, sheet } of link.names ?? []) {
-      const qualified = `${linkSheet(link.book, sheet ?? "")}!${name}`;
-      const source = refersTo.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>
-        linkSheet(link.book, quoted?.replaceAll("''", "'") ?? plain ?? ""),
-      );
-      engine.setNamedFormula(
-        qualified,
-        WORKBOOK_SCOPE,
-        source.startsWith("=") ? source : `=${source}`,
-      );
-    }
+/**
+ * Replace the links `previous` in the engine with `next`, and return false
+ * as `installExternalLinks` does. A link that keeps its sheets, their
+ * extents and its names keeps its engine sheets, and only its changed cells
+ * are written, so only the formulas that read them recalculate. Every other
+ * link is removed and installed again, which relinks and recalculates every
+ * formula that names it.
+ */
+export function replaceExternalLinks(
+  engine: ExternalLinkEngine,
+  previous: readonly ExternalLink[],
+  next: readonly ExternalLink[],
+): boolean {
+  const byBook = new Map(previous.map((link) => [link.book, link]));
+  const kept = new Map<ExternalLink, ExternalLink>();
+  for (const link of next) {
+    const old = byBook.get(link.book);
+    if (old !== undefined && keepsSheets(old, link)) kept.set(link, old);
   }
-  return true;
+
+  const keptPrevious = new Set(kept.values());
+  removeExternalLinks(
+    engine,
+    previous.filter((link) => !keptPrevious.has(link)),
+  );
+  return writeLinks(engine, next, kept);
 }

@@ -62,6 +62,8 @@ export interface ReadWindowControllerOptions {
   rowNumbers: (rows: { start: number; end: number }) => Uint32Array | undefined;
   /** The sheet rows whose numbers show a filtered list, or undefined without a filter. */
   filteredRows: () => { start: number; end: number } | undefined;
+  /** The AutoFilter header cells in view, or undefined without an AutoFilter. */
+  filterHeader: () => { row: number; start: number; end: number } | undefined;
   domOverlay: DomOverlay;
   overlayPainter: OverlayPainter;
   ariaMirror: AriaMirror;
@@ -395,6 +397,8 @@ export class ReadWindowController {
     if (rowNumbers) viewport.rowNumbers = rowNumbers;
     const filteredRows = this.options.filteredRows();
     if (filteredRows) viewport.filteredRows = filteredRows;
+    const filterHeader = this.options.filterHeader();
+    if (filterHeader) viewport.filterHeader = filterHeader;
 
     this.options.renderer().setViewport(viewport);
 
@@ -536,6 +540,7 @@ export class ReadWindowController {
     const frozenNumbers = frozenRows > 0 ? this.options.rowNumbers(frozenRowWindow) : undefined;
     const bodyNumbers = this.options.rowNumbers(bodyRows);
     const filteredRows = this.options.filteredRows();
+    const filterHeader = this.options.filterHeader();
 
     const paneView = (
       rows: { start: number; end: number },
@@ -566,6 +571,7 @@ export class ReadWindowController {
         rowHeights: frozenGeometry?.rowHeights,
         rowNumbers: frozenNumbers,
         filteredRows,
+        filterHeader,
       });
     }
 
@@ -579,6 +585,7 @@ export class ReadWindowController {
         rowHeights: frozenGeometry?.rowHeights,
         rowNumbers: frozenNumbers,
         filteredRows,
+        filterHeader,
       });
     }
 
@@ -592,6 +599,7 @@ export class ReadWindowController {
         rowHeights: bodyGeometry?.rowHeights,
         rowNumbers: bodyNumbers,
         filteredRows,
+        filterHeader,
       });
     }
 
@@ -610,6 +618,7 @@ export class ReadWindowController {
       rowHeights: bodyGeometry?.rowHeights,
       rowNumbers: bodyNumbers,
       filteredRows,
+      filterHeader,
     });
     this.cachedPaneViews.length = panes.length;
 

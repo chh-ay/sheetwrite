@@ -32,11 +32,9 @@ afterEach(() => {
 
 function fixture(): { workbook: Workbook; data: ColumnarData } {
   const hits: string[] = new Array(ROW_COUNT);
-  const bucket: string[] = new Array(ROW_COUNT);
   const rank = new Float64Array(ROW_COUNT);
   for (let row = 0; row < ROW_COUNT; row++) {
     hits[row] = row % 2 === 1 ? `hit-${row}` : `miss-${row}`;
-    bucket[row] = row % 4 === 0 ? "keep" : "drop";
     rank[row] = ROW_COUNT - row;
   }
   return {
@@ -49,50 +47,22 @@ function fixture(): { workbook: Workbook; data: ColumnarData } {
           rowCount: ROW_COUNT,
           columns: [
             { key: "hits", header: "Hits", width: COL_WIDTH, type: "text" },
-            { key: "bucket", header: "Bucket", width: 90, type: "text" },
             { key: "rank", header: "Rank", width: 80, type: "number" },
           ],
         },
       ],
     },
-    data: { rowCount: ROW_COUNT, columns: { hits, bucket, rank } },
+    data: { rowCount: ROW_COUNT, columns: { hits, rank } },
   };
 }
 
-interface PaintedRect {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-  readonly background: string;
-  readonly outlineColor: string;
-  readonly clipPath: string;
-}
-
-function stylePx(value: string): number {
-  return value === "" ? 0 : Number.parseFloat(value);
-}
-
-/** The overlay rects a viewer can actually see, in paint order. */
-function paintedRects(host: HTMLElement): PaintedRect[] {
+/** The tops of the overlay rects a viewer can actually see, in paint order. */
+function topsOf(host: HTMLElement): number[] {
   const overlay = host.querySelector(".sheetwrite-overlay");
   if (!(overlay instanceof HTMLElement)) throw new Error("expected grid overlay");
-  const rects: PaintedRect[] = [];
-  for (const child of overlay.children) {
-    if (!(child instanceof HTMLElement)) continue;
-    const style = child.style;
-    if (style.display === "none") continue;
-    rects.push({
-      left: stylePx(style.left),
-      top: stylePx(style.top),
-      width: stylePx(style.width),
-      height: stylePx(style.height),
-      background: style.background,
-      outlineColor: style.outlineColor,
-      clipPath: style.clipPath,
-    });
-  }
-  return rects;
+  return [...overlay.children]
+    .filter((child) => child instanceof HTMLElement && child.style.display !== "none")
+    .map((child) => Number.parseFloat((child as HTMLElement).style.top || "0"));
 }
 
 /** Screen top of data row `row` for a uniform 28px row grid. */
@@ -117,10 +87,6 @@ function mountGrid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivE
   return { grid, host, scroller };
 }
 
-function topsOf(host: HTMLElement): number[] {
-  return paintedRects(host).map((rect) => rect.top);
-}
-
 describe("search highlights follow the active view", () => {
   it("re-maps every highlight when a sort reverses the view", () => {
     const { grid, host } = mountGrid();
@@ -130,12 +96,12 @@ describe("search highlights follow the active view", () => {
     // rank is ROW_COUNT - row, so ascending view order starts at data row 39:
     // view row v holds data row 39 - v, and every even view row is a match.
     // Match order is data-row order, which the reversed view paints last-first.
-    grid.setViewSort([{ col: 2, ascending: true }]);
+    grid.setViewSort([{ col: 1, ascending: true }]);
     grid.refresh();
     expect(topsOf(host)).toEqual([368, 312, 256, 200, 144, 88, 32]);
 
     // A second sort of the same length restores the identity view.
-    grid.setViewSort([{ col: 2, ascending: false }]);
+    grid.setViewSort([{ col: 1, ascending: false }]);
     grid.refresh();
     expect(topsOf(host)).toEqual(TOP_MATCH_TOPS);
     grid.destroy();

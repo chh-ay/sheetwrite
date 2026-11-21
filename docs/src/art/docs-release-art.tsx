@@ -1,6 +1,7 @@
 // The visual summary of each release post: one tile per highlight, led by its
-// number or its one-word change. Every number and claim comes from that
-// release's Highlights and Changes sections.
+// number or its one-word change, and for the Releases index one tile per
+// release with its headline, worded to read without the lead. Every number and
+// claim comes from that release's Highlights and Changes sections.
 import type { JSX } from "solid-js";
 
 import { TileFigure } from "./blueprint-layouts.js";
@@ -8,9 +9,13 @@ import { TileFigure } from "./blueprint-layouts.js";
 /** One highlight: its number or one-word change, its title and up to two short lines. */
 type Highlight = readonly [lead: string, title: string, lines: readonly string[]];
 
+/** A release's tile on the Releases index: a title and a line that read on their own. */
+type Headline = readonly [title: string, lines: readonly string[]];
+
 interface Release {
   readonly version: string;
   readonly highlights: readonly Highlight[];
+  readonly headline: Headline;
 }
 
 /** A release's highlights as blueprint tiles: the change as the title, under what it is about. */
@@ -37,6 +42,10 @@ function ReleaseSummary(props: Readonly<{ release: Release }>) {
 const RELEASES: readonly Release[] = [
   {
     version: "0.5.0",
+    headline: [
+      "Full formula engine",
+      ["Grouping, pivots, stats, finance,", "regex and reshaping functions"],
+    ],
     highlights: [
       [
         "LAMBDA",
@@ -56,6 +65,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.5.1",
+    headline: ["Typed shortcuts", ["Platform-aware labels", "in menus and toolbars"]],
     highlights: [
       ["⌘⇧K", "Typed shortcuts", ["Platform-aware labels", "in menus and toolbars"]],
       ["Busy", "Command feedback", ["Busy states and visible errors", "on built-in buttons"]],
@@ -65,6 +75,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.5.2",
+    headline: ["Smaller packages", ["Downloads 4.5% smaller,", "installs 13.2% smaller"]],
     highlights: [
       ["4.5%", "Smaller downloads", ["Installs are 13.2% smaller too"]],
       ["21 MiB", "Less CSV memory", ["Peak for a 1,000,000-row import,", "9.6% lower"]],
@@ -74,6 +85,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.5.3",
+    headline: ["Readable package code", ["Stack traces point", "to real lines"]],
     highlights: [
       ["Readable", "Package code", ["Stack traces point", "to real lines"]],
       ["4", "Install commands", ["npm, pnpm, Yarn and Bun on", "every package README"]],
@@ -81,6 +93,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.5.4",
+    headline: ["Source maps", ["No references to source map", "files the packages don't ship"]],
     highlights: [
       ["0", "Missing source maps", ["No .map references to files", "the packages don't ship"]],
       ["Bars", "Size charts", ["Before and after bars", "for each package"]],
@@ -88,6 +101,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.6.0",
+    headline: ["Charts", ["Column, bar, line, area, pie,", "doughnut and scatter"]],
     highlights: [
       ["7", "Chart types", ["Column, bar, line, area, pie,", "doughnut and scatter"]],
       ["Pivots", "Pivot tables", ["Insert and edit from the ribbon;", "kept in XLSX files"]],
@@ -99,6 +113,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.6.1",
+    headline: ["Data-grid edits", ["As fast as 0.5.4 again"]],
     highlights: [
       ["0.79×", "Data-grid edits", ["The time of 0.6.0,", "the same as 0.5.4"]],
       ["0.60×", "Paged scrolling", ["Back to evicted pages,", "the time of 0.6.0"]],
@@ -112,6 +127,7 @@ const RELEASES: readonly Release[] = [
   },
   {
     version: "0.7.0",
+    headline: ["Dashboards", ["Pivots, slicers, PivotCharts and", "KPI cards on one sheet"]],
     highlights: [
       ["12 columns", "Dashboards", ["Pivots, slicers, PivotCharts and", "KPI cards on one sheet"]],
       ["CALCULATE", "Data model", ["Related tables, and", "measures in pivots"]],
@@ -123,10 +139,37 @@ const RELEASES: readonly Release[] = [
   },
 ];
 
-/** Release summaries by the name a placement uses: `release-<version>`. */
-export const RELEASE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = Object.fromEntries(
-  RELEASES.map((release) => [
-    `release-${release.version}`,
-    () => <ReleaseSummary release={release} />,
-  ]),
-);
+/** The Releases index: one tile per release, newest first, with its headline. */
+function ReleaseHeadlines() {
+  const newestFirst = [...RELEASES].reverse();
+  return (
+    <TileFigure
+      columns={4}
+      narrowColumns={2}
+      text={{
+        title: "The headline of each release",
+        description: newestFirst
+          .map(
+            ({ version, headline: [title, lines] }) => `${version}: ${title}. ${lines.join(" ")}`,
+          )
+          .join(" "),
+      }}
+      tiles={newestFirst.map(({ version, headline: [title, lines] }) => ({
+        eyebrow: version,
+        title,
+        lines,
+      }))}
+    />
+  );
+}
+
+/** Release summaries by the name a placement uses: `release-<version>`, and `releases` for the index. */
+export const RELEASE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
+  ...Object.fromEntries(
+    RELEASES.map((release) => [
+      `release-${release.version}`,
+      () => <ReleaseSummary release={release} />,
+    ]),
+  ),
+  releases: ReleaseHeadlines,
+};

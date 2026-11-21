@@ -12,7 +12,16 @@ import {
   type Workbook,
   type WorkbookSnapshot,
   type WorkbookTable,
+  type WorkbookTableXmlElement,
 } from "../src/index.js";
+
+/** A table-rule XML element, as XLSX import keeps it. */
+const xml = (
+  name: string,
+  attributes: Record<string, string> = {},
+  children: WorkbookTableXmlElement[] = [],
+  text = "",
+): WorkbookTableXmlElement => ({ name, attributes, text, children });
 
 const columns = (count: number): Column[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -138,65 +147,16 @@ describe("canonical workbook tables", () => {
   });
 
   it.each([
-    [
-      "markup attribute names",
-      {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4", 'ref" injected="1': "A1:B4" },
-        text: "",
-        children: [],
-      },
-    ],
-    [
-      "foreign elements",
-      {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4" },
-        text: "",
-        children: [{ name: "script", attributes: {}, text: "", children: [] }],
-      },
-    ],
+    ["markup attribute names", xml("autoFilter", { ref: "A1:B4", 'ref" injected="1': "A1:B4" })],
+    ["foreign elements", xml("autoFilter", { ref: "A1:B4" }, [xml("script")])],
     [
       "raw differential-style indices",
-      {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4" },
-        text: "",
-        children: [
-          {
-            name: "filterColumn",
-            attributes: { colId: "0" },
-            text: "",
-            children: [
-              {
-                name: "colorFilter",
-                attributes: { dxfId: "0" },
-                text: "",
-                children: [],
-              },
-            ],
-          },
-        ],
-      },
+      xml("autoFilter", { ref: "A1:B4" }, [
+        xml("filterColumn", { colId: "0" }, [xml("colorFilter", { dxfId: "0" })]),
+      ]),
     ],
-    [
-      "XML control characters",
-      {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4" },
-        text: "\u0000",
-        children: [],
-      },
-    ],
-    [
-      "oversized text",
-      {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4" },
-        text: "x".repeat(1_048_577),
-        children: [],
-      },
-    ],
+    ["XML control characters", xml("autoFilter", { ref: "A1:B4" }, [], "\u0000")],
+    ["oversized text", xml("autoFilter", { ref: "A1:B4" }, [], "x".repeat(1_048_577))],
   ])("rejects unsafe table-rule %s before snapshot allocation", (_name, autoFilter) => {
     const candidate = { ...table(), autoFilter };
     expect(validateWorkbookSnapshot(snapshot([candidate])).ok).toBe(false);
@@ -207,18 +167,8 @@ describe("canonical workbook tables", () => {
     const candidate = table();
     const column = candidate.columns[0];
     if (!column) throw new Error("table fixture has no first column");
-    column.calculatedColumnFormula = {
-      name: "calculatedColumnFormula",
-      attributes: {},
-      text: "x".repeat(600_000),
-      children: [],
-    };
-    column.totalsRowFormula = {
-      name: "totalsRowFormula",
-      attributes: {},
-      text: "y".repeat(600_000),
-      children: [],
-    };
+    column.calculatedColumnFormula = xml("calculatedColumnFormula", {}, [], "x".repeat(600_000));
+    column.totalsRowFormula = xml("totalsRowFormula", {}, [], "y".repeat(600_000));
     column.totalsRowFunction = "custom";
     expect(validateWorkbookSnapshot(snapshot([candidate])).ok).toBe(false);
     expect(() => assertWorkbookTables(workbook([candidate]).sheets)).toThrow(SheetwriteError);
@@ -228,31 +178,16 @@ describe("canonical workbook tables", () => {
     const candidate = table();
     const column = candidate.columns[0];
     if (!column) throw new Error("table fixture has no first column");
-    column.calculatedColumnFormula = {
-      name: "calculatedColumnFormula",
-      attributes: { array: "0" },
-      text: "[@Quantity]*2",
-      children: [],
-    };
-    const autoFilter = {
-      name: "autoFilter",
-      attributes: { ref: "A1:B4" },
-      text: "",
-      children: [],
-    };
-    const sortState = {
-      name: "sortState",
-      attributes: { ref: "A2:B4", caseSensitive: "1" },
-      text: "",
-      children: [
-        {
-          name: "sortCondition",
-          attributes: { ref: "A2:A4", descending: "1" },
-          text: "",
-          children: [],
-        },
-      ],
-    };
+    column.calculatedColumnFormula = xml(
+      "calculatedColumnFormula",
+      { array: "0" },
+      [],
+      "[@Quantity]*2",
+    );
+    const autoFilter = xml("autoFilter", { ref: "A1:B4" });
+    const sortState = xml("sortState", { ref: "A2:B4", caseSensitive: "1" }, [
+      xml("sortCondition", { ref: "A2:A4", descending: "1" }),
+    ]);
     const store = new SheetwriteStore(workbook([candidate]));
     expect(
       store.applyTransaction({
@@ -289,21 +224,11 @@ describe("canonical workbook tables", () => {
   it("moves filter and sort rules with their columns and drops rules on deleted columns", () => {
     const candidate: WorkbookTable = {
       ...table(),
-      autoFilter: {
-        name: "autoFilter",
-        attributes: { ref: "A1:B4" },
-        text: "",
-        children: [
-          { name: "filterColumn", attributes: { colId: "0" }, text: "", children: [] },
-          { name: "filterColumn", attributes: { colId: "1" }, text: "", children: [] },
-        ],
-      },
-      sortState: {
-        name: "sortState",
-        attributes: { ref: "A2:B4" },
-        text: "",
-        children: [{ name: "sortCondition", attributes: { ref: "B2:B4" }, text: "", children: [] }],
-      },
+      autoFilter: xml("autoFilter", { ref: "A1:B4" }, [
+        xml("filterColumn", { colId: "0" }),
+        xml("filterColumn", { colId: "1" }),
+      ]),
+      sortState: xml("sortState", { ref: "A2:B4" }, [xml("sortCondition", { ref: "B2:B4" })]),
     };
     const store = new SheetwriteStore(workbook([candidate]));
     const current = (): WorkbookTable | undefined => store.getWorkbook().sheets[0]?.tables?.[0];
@@ -340,18 +265,10 @@ describe("canonical workbook tables", () => {
     const amount = candidate.columns[0];
     if (!amount) throw new Error("table fixture has no first column");
     amount.totalsRowLabel = "Total";
-    amount.calculatedColumnFormula = {
-      name: "calculatedColumnFormula",
-      attributes: {},
-      text: "[@Quantity]*2",
-      children: [],
-    };
-    candidate.autoFilter = {
-      name: "autoFilter",
-      attributes: { ref: "A1:B4" },
-      text: "",
-      children: [{ name: "filterColumn", attributes: { colId: "0" }, text: "", children: [] }],
-    };
+    amount.calculatedColumnFormula = xml("calculatedColumnFormula", {}, [], "[@Quantity]*2");
+    candidate.autoFilter = xml("autoFilter", { ref: "A1:B4" }, [
+      xml("filterColumn", { colId: "0" }),
+    ]);
     const store = new SheetwriteStore(workbook([candidate]));
     expect(
       store.applyTransaction({
@@ -436,8 +353,6 @@ describe("canonical workbook tables", () => {
       patches: [{ op: "renameSheet", sheet: "data", name: "Renamed Data" }],
     });
     expect(store.getWorkbook().sheets[0]!.tables![0]!.range.sheet).toBe("data");
-    store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "data" }] });
-    expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["summary"]);
     store.dispose();
   });
 

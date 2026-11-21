@@ -388,7 +388,7 @@ export function normalizeRustCoverage(
   return result;
 }
 
-export function isCoverageContamination(path: string): boolean {
+function isCoverageContamination(path: string): boolean {
   const segments = path.split("/");
   return (
     segments.some((segment) => CONTAMINATED_SEGMENTS.has(segment)) ||

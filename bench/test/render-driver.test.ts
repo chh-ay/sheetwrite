@@ -58,6 +58,7 @@ test("completes a capture with only the known comparison overflow and fails any 
     { timeout: true },
     { crash: true },
     { consoleErrors: ["unexpected console failure"] },
+    { pageErrors: ["unexpected page failure"] },
   ]) {
     expect(renderCaptureExitCode([...known, { ...failure, ...changed }])).toBe(1);
   }
