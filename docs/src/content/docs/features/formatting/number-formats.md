@@ -133,6 +133,7 @@ A column's `type` decides how a typed entry is read. The columns Sheetwrite make
 | `1/15/2026`, `2026-01-15` | the date serial 46037 | `m/d/yyyy` |
 | `15-Jan-2026`, `Jan 15, 2026` | 46037 | `d-mmm-yy` |
 | `9:30`, `9:30 PM` | 0.3958…, 0.8958… | `h:mm`, `h:mm AM/PM` |
+| `25:00`, `36:15:30` | 1.0416…, 1.5107… days | `[h]:mm:ss` |
 | `'007` | the text `007` | none |
 
 The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
@@ -205,13 +206,13 @@ The Text format `@` shows a number as General would. What you type into a cell f
 
 ### Date and time codes
 
-Date and time formats support numeric and named month and day fields, 12-hour and 24-hour time, minutes, seconds, and AM/PM. Neighboring time tokens decide whether `m` means month or minute.
+Date and time formats support numeric and named month and day fields, 12-hour and 24-hour time, minutes, seconds, and AM/PM. Neighboring time tokens decide whether `m` means month or minute. Elapsed time in brackets counts past one day or one hour, as in Excel: `[h]:mm:ss` shows 1.5 days as `36:00:00`, `[mm]:ss` shows 1.5 hours as `90:00`, and `[ss]` shows 1.5 minutes as `90`.
 
 UTC fields make date rendering the same in every host timezone. Locale-specific separators come from `numberLocale`, not from the browser's locale.
 
 ## Edge cases and limits
 
-- Elapsed-time bracket tokens and fractional seconds are not supported.
+- Fractional seconds, such as `ss.00`, are not supported.
 - Formula errors are explicit values such as `#DIV/0!` and `#CYCLE!`. They are not non-finite numbers that the formatter hides. See [Formulas](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
 - Native boolean values use the normal cell style model and render as uppercase `TRUE` or `FALSE`. They are centered unless `CellStyle.align` overrides it.
 

@@ -185,6 +185,18 @@ describe("formatNumber", () => {
     expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
   });
 
+  // `[h]`, `[m]` and `[s]` show elapsed time, past one day or one hour.
+  // https://support.microsoft.com/en-us/excel/review-guidelines-for-customizing-a-number-format
+  it("shows elapsed hours, minutes and seconds", () => {
+    expect(formatNumber(25 / 24, "[h]:mm:ss")).toBe("25:00:00");
+    expect(formatNumber((36 * 3600 + 15 * 60 + 30) / 86_400, "[h]:mm:ss")).toBe("36:15:30");
+    expect(formatNumber(0.25, "[h]:mm")).toBe("6:00");
+    expect(formatNumber(1.5, "[mm]:ss")).toBe("2160:00");
+    expect(formatNumber(5 / 1440, "[mm]:ss")).toBe("05:00");
+    expect(formatNumber(90 / 86_400, "[ss]")).toBe("90");
+    expect(formatNumber(25 / 24, "[Red][h]:mm")).toBe("25:00");
+  });
+
   it("returns exact text for fixed values on repeated calls", () => {
     resetNumberFormatResourcesForTest();
     const cases: ReadonlyArray<[number, string | undefined, string | undefined, string]> = [
