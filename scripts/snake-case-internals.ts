@@ -42,6 +42,7 @@
  * then `tsconfig.verification.json`, `bench/tsconfig.json` and `docs/tsconfig.json`. A
  * file below a nested `tsconfig.json` (a fixture or consumer project) belongs to that
  * project and is skipped.
+ * Generated `*.gen.ts` files are skipped too: their generator rewrites them.
  * `check` lists every pending rename and conflict and exits 1 when any exist; `apply`
  * rewrites the files. Conflicts need a hand-picked name in the names file.
  */
@@ -448,6 +449,7 @@ function member_names(declaration: Node): Set<string> {
 
 function is_target(file_name: string, include: readonly string[]): boolean {
   if (file_name.endsWith(".d.ts") || file_name.includes(`${sep}node_modules${sep}`)) return false;
+  if (file_name.endsWith(".gen.ts")) return false;
   return include.some(
     (directory) => file_name === directory || file_name.startsWith(directory + sep),
   );
