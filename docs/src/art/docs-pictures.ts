@@ -123,7 +123,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "context-menu",
         size: "panel",
-        alt: "The right-click menu open over a Region cell of the Orders sheet: Cut, Copy and Paste, Insert, Delete and Clear contents, the Row, Column and Merge submenus, and New note.",
+        alt: "The right-click menu open over a Region cell of the Orders sheet: Cut and Copy, the Paste Options and Paste Special, Insert, Delete and Clear contents, the Row, Column, Filter and Merge submenus, Format cells, Pick from drop-down list, and New note.",
         caption: "Right-clicking a cell opens the bundled menu at the pointer.",
       },
     },
@@ -325,7 +325,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "number-formats",
         size: "panel",
-        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage and Scientific.",
+        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage, Fraction, Scientific and Text.",
         caption: "Numbers in dollars and percentages, and the ribbon's list of number formats.",
       },
     },

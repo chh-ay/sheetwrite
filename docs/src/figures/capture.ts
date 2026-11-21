@@ -390,13 +390,20 @@ const PAGE_SHOTS: readonly Shot[] = [
     query: { sheet: "report", ribbon: "compact" },
     steps: async (page) => {
       await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
-      // Enter on a list cell opens its list; the grid host needs the keyboard focus first.
+      // Alt+Down on a list cell opens its list, as in Excel; the grid host needs the keyboard focus first.
       await page.locator(".sheetwrite-shell-grid").focus();
-      await page.keyboard.press("Enter");
+      await page.keyboard.press("Alt+ArrowDown");
       await settle(page);
     },
   },
-  { name: "pivot-chart", size: "app", query: { sheet: "pivot" } },
+  // A1, the pivot's first cell, is active by default, which opens the PivotTable
+  // Fields pane over the chart; a cell below the pivot leaves the chart whole.
+  {
+    name: "pivot-chart",
+    size: "app",
+    query: { sheet: "pivot" },
+    steps: (page) => select(page, { kind: "cell", addr: { sheet: "pivot", row: 17, col: 0 } }),
+  },
   {
     name: "pivot",
     size: "panel",
