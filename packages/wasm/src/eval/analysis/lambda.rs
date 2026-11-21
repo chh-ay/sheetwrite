@@ -239,7 +239,7 @@ pub(crate) struct ShapeScope<'a> {
     /// The LAMBDA called.
     callee: &'a LambdaDefinition,
     /// The call whose body holds this call, while its shape is decided.
-    caller: Option<&'a ShapeScope<'a>>,
+    caller: Option<&'a Self>,
 }
 
 #[derive(Clone, Copy)]
