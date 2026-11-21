@@ -102,21 +102,23 @@ function SvelteRoute() {
         prompt="Go offline, edit the next ticket, then review the outbox beside the board. Reconnect to send the queued edit."
         proof={[
           {
-            title: "Offline ticket edits",
-            detail: "The live Grid remains editable while the connection is down.",
+            title: "Edit while offline",
+            detail: "The grid stays editable while the connection is down.",
           },
           {
-            title: "Durable outbox",
-            detail: "IndexedDB owns each edit before reconnect drains it in order.",
-          },
-          {
-            title: "Causal collaboration",
+            title: "Edits saved on the device",
             detail:
-              "Presence stays on the board. Queue state and server versions appear beside it.",
+              "Each edit is stored in IndexedDB first, and is sent in order when the connection returns.",
           },
           {
-            title: "Explicit recovery",
-            detail: "Version conflicts and remount restoration remain inspectable on demand.",
+            title: "Who is where, and what waits",
+            detail:
+              "Other people's cursors stay on the board. The queue and the server's version show beside it.",
+          },
+          {
+            title: "Recovery you can check",
+            detail:
+              "A version conflict, and the state restored after a remount, can be opened at any time.",
           },
         ]}
         sourcePath="docs/src/showcases/SvelteShowcase.svelte"
