@@ -15,31 +15,65 @@ import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
 
-/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels. */
 const FILTER_BUTTON_SIZE = 16;
 
 /**
- * Where an AutoFilter header cell's filter button sits: a square at the
- * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
+ * Room between an AutoFilter header cell's filter button and the cell's
+ * right gridline: the text's left padding, so the header has the same room on
+ * both sides. In CSS pixels.
  */
-export function filterButtonRect(cell: { x: number; y: number; w: number; h: number }): {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-} {
-  const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
-  return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+const FILTER_BUTTON_INSET = CELL_PAD;
+
+/** Room between the end of a header cell's text and its filter button: the text's left padding again. */
+const FILTER_TEXT_GAP = CELL_PAD;
+
+/** The least width of the area a pointer opens the filter dropdown in, for touch. */
+const FILTER_BUTTON_HIT_WIDTH = 24;
+
+type CellBox = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+
+/**
+ * Where an AutoFilter header cell's filter button sits: a square
+ * `FILTER_BUTTON_INSET` from the cell's right gridline, centred in the row, as
+ * in Excel. `cell` and the result share a coordinate space.
+ */
+export function filterButtonRect(cell: CellBox): CellBox {
+  const size = Math.max(
+    0,
+    Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 2 * FILTER_BUTTON_INSET),
+  );
+  return {
+    x: cell.x + cell.w - FILTER_BUTTON_INSET - size,
+    y: cell.y + (cell.h - size) / 2,
+    w: size,
+    h: size,
+  };
 }
 
 /**
- * The width of an AutoFilter header cell's text box, which starts at the
- * cell's left edge and ends where the filter button starts, as in Excel. Text
- * of every alignment lays out, clips and is edited in this box, so the button
- * never covers it.
+ * Where a pointer opens the filter dropdown: the button, widened to
+ * `FILTER_BUTTON_HIT_WIDTH` towards the text and over the inset, and as tall,
+ * within the cell.
  */
-export function filterTextWidth(cell: { x: number; y: number; w: number; h: number }): number {
-  return filterButtonRect(cell).x - cell.x;
+export function filterButtonHitRect(cell: CellBox): CellBox {
+  const button = filterButtonRect(cell);
+  const right = cell.x + cell.w;
+  const left = Math.max(cell.x, Math.min(button.x, right - FILTER_BUTTON_HIT_WIDTH));
+  const middle = button.y + button.h / 2;
+  const top = Math.max(cell.y, middle - FILTER_BUTTON_HIT_WIDTH / 2);
+  const bottom = Math.min(cell.y + cell.h, middle + FILTER_BUTTON_HIT_WIDTH / 2);
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/**
+ * Where an AutoFilter header cell's text box ends: `FILTER_TEXT_GAP` before
+ * the filter button, as Excel keeps header text clear of the button. Text of
+ * every alignment lays out and clips in the box from the cell's left edge to
+ * here, and the cell editor ends here too.
+ */
+export function filterTextRight(cell: CellBox): number {
+  return filterButtonRect(cell).x - FILTER_TEXT_GAP;
 }
 
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
@@ -838,15 +872,15 @@ export function paintFrame(
       const styleId = view.styleIds[i]!;
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
-      // An AutoFilter header cell lays out its text in a box that ends before
-      // its filter button, for every alignment, as in Excel.
-      const textW =
+      // An AutoFilter header cell lays out its text in a box that ends a gap
+      // before its filter button, for every alignment, as in Excel.
+      const textRight =
         filterHeader !== undefined &&
         row === filterHeader.row &&
         col >= filterHeader.start &&
         col <= filterHeader.end
-          ? filterTextWidth({ x, y, w: cw, h: ch })
-          : cw;
+          ? filterTextRight({ x, y, w: cw, h: ch })
+          : undefined;
 
       // Sheets lets text spill through adjacent empty cells, but never through
       // occupied cells. Compute the contiguous empty run around this cell; the
@@ -854,8 +888,8 @@ export function paintFrame(
       // and custom renderers deliberately keep their own cell bounds, and a
       // filter header cell keeps its text in its box.
       let spillX = x;
-      let spillRight = x + textW;
-      if (!merge && textW === cw && typeof value === "string" && value !== "") {
+      let spillRight = x + cw;
+      if (!merge && textRight === undefined && typeof value === "string" && value !== "") {
         for (let k = cj - 1; k >= 0; k--) {
           const adjacent = view.cols[k]! + 1 === view.cols[k + 1]!;
           const neighbour = view.values[ri * nCols + k];
@@ -885,7 +919,7 @@ export function paintFrame(
         y,
         cw,
         ch,
-        textW,
+        textRight,
         spillX,
         spillRight - spillX,
         renderers,
@@ -1093,8 +1127,8 @@ function paintCell(
   y: number,
   w: number,
   h: number,
-  /** Width of the box the text lays out and clips in: `w`, or less before a filter button. */
-  textW: number,
+  /** Where a filter header's text box ends, before its button; undefined for other cells. */
+  textRight: number | undefined,
   spillX: number,
   spillW: number,
   renderers: ReadonlyMap<string, CellRenderer>,
@@ -1166,6 +1200,8 @@ function paintCell(
 
   const align = cellAlign(effective, value, column?.type);
   let text = cellDisplayText(value, numberFormat, column?.numberLocale);
+  // A filter header's text pads on the left as usual and ends at its text box.
+  const textW = textRight === undefined ? w : textRight + CELL_PAD - x;
   const availableTextWidth = Math.max(0, textW - CELL_PAD * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
@@ -1195,7 +1231,7 @@ function paintCell(
 
   ctx.save();
   if (effective.wrap && !numeric) {
-    clipCell(ctx, x, y, textW, h);
+    clipCell(ctx, x, y, (textRight ?? x + w) - x, h);
 
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
@@ -1235,6 +1271,8 @@ function paintCell(
       effective.verticalAlign === undefined || effective.verticalAlign === "middle"
         ? y + h / 2
         : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
+    // A filter header's text clips at its text box, the gap before the button.
+    if (textRight !== undefined) textClipW = Math.min(textClipW, textRight - textClipX);
     clipCell(ctx, textClipX, y, textClipW, h);
     fillAlignedText(ctx, text, align, x, textW, cy);
     if (effective.underline || effective.strikethrough) {

@@ -48,6 +48,23 @@ pub(crate) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) ->
     store.get_cell(sheet, row, col).string()
 }
 
+/// The formula text of a cell, empty when it holds no formula.
+pub(crate) fn formula_text(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
+    store.formula_source(sheet, row, col).unwrap_or_default()
+}
+
+/// Marsaglia's xorshift32 shift triple.
+const XORSHIFT_SHIFTS: (u32, u32, u32) = (13, 17, 5);
+
+/// The next xorshift32 draw below `bound`, shared by the random model tests.
+pub(crate) const fn xorshift(seed: &mut u32, bound: usize) -> usize {
+    let (left, right, last) = XORSHIFT_SHIFTS;
+    *seed ^= *seed << left;
+    *seed ^= *seed >> right;
+    *seed ^= *seed << last;
+    *seed as usize % bound
+}
+
 /// What a cell shows: its text or error code, `TRUE` or `FALSE`, its number
 /// in Rust's shortest form, or "" when it is blank.
 pub(crate) fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {

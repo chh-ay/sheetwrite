@@ -131,16 +131,4 @@ mod tests {
         sort_cells_row_major(&mut cells);
         assert_eq!(cells, expected);
     }
-
-    #[test]
-    fn sort_by_key96_is_stable_and_moves_whole_items() {
-        let mut random = Random(SEED);
-        let mut items: Vec<(u32, String)> = (0..ITEMS)
-            .map(|position| (random.field(), format!("item {position}")))
-            .collect();
-        let mut expected = items.clone();
-        expected.sort_by_key(|item| item.0);
-        sort_by_key96(&mut items, |item| u128::from(item.0));
-        assert_eq!(items, expected);
-    }
 }

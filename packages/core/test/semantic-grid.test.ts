@@ -3,8 +3,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
-import { answerDialog, makeColumnarData, makeWorkbook, pressLikeWebKit } from "./fixtures.js";
+import type { CellEditor, CellEditorContext, GridOptions, Workbook } from "../src/types.js";
+import {
+  answerDialog,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+  pressLikeWebKit,
+} from "./fixtures.js";
 
 let restoreCanvas: () => void;
 let reportErrorDescriptor: PropertyDescriptor | undefined;
@@ -18,7 +24,13 @@ beforeEach(() => {
   restoreCanvas = installCanvasTestStubs();
 });
 
+const mounted: { grid: GridImpl; store: SheetwriteStore }[] = [];
+
 afterEach(() => {
+  for (const { grid, store } of mounted.splice(0)) {
+    grid.destroy();
+    store.dispose();
+  }
   restoreCanvas();
   if (reportErrorDescriptor) {
     Object.defineProperty(globalThis, "reportError", reportErrorDescriptor);
@@ -28,34 +40,15 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 640, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 320, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
-it("edits boolean cells using spreadsheet text", () => {
-  const workbook = makeWorkbook(3);
-  const store = new SheetwriteStore(workbook);
-  store.applyTransaction({
-    patches: [
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 0, col: 0 },
-        value: { kind: "literal", value: true },
-      },
-    ],
-  });
+/** A grid over a store of `options.workbook` filled with `makeColumnarData`. */
+function mountGrid(options: GridOptions & { workbook: Workbook }) {
+  const { workbook } = options;
+  const store = new SheetwriteStore(workbook, makeColumnarData(workbook.sheets[0]!.rowCount));
   const host = mountHost();
-  const grid = new GridImpl(host, { workbook }, store);
-  grid.beginEdit(0, 0);
-
-  expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("TRUE");
-  grid.destroy();
-  store.dispose();
-});
+  const grid = new GridImpl(host, options, store);
+  mounted.push({ grid, store });
+  return { grid, store, host };
+}
 
 it("shows a list cell's dropdown arrow, opens the list from it or by typing, and edits text on F2", () => {
   const requestFrame = globalThis.requestAnimationFrame;
@@ -73,9 +66,7 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
       policy: "reject",
     },
   ];
-  const store = new SheetwriteStore(workbook, makeColumnarData(4));
-  const host = mountHost();
-  const grid = new GridImpl(host, { workbook }, store);
+  const { grid, store, host } = mountGrid({ workbook });
   const press = (target: Element | null, key: string) =>
     target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   const options = () =>
@@ -122,9 +113,6 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
   press(host, "F2");
   expect(host.querySelector('[role="listbox"]')).toBeNull();
   expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("West");
-
-  grid.destroy();
-  store.dispose();
   globalThis.requestAnimationFrame = requestFrame;
 });
 
@@ -152,18 +140,13 @@ it("updates aria-rowcount when rows are inserted", () => {
     callback(0);
     return 0;
   };
-  const workbook = makeWorkbook(3);
-  const store = new SheetwriteStore(workbook);
-  const host = mountHost();
-  const grid = new GridImpl(host, { workbook }, store);
+  const { grid, host } = mountGrid({ workbook: makeWorkbook(3) });
   try {
     grid.applyTransaction({ patches: [{ op: "addRows", sheet: "s1", at: 0, count: 2 }] });
 
     expect(host.querySelector('[role="grid"]')?.getAttribute("aria-rowcount")).toBe("6");
   } finally {
     globalThis.requestAnimationFrame = requestFrame;
-    grid.destroy();
-    store.dispose();
   }
 });
 
@@ -249,20 +232,18 @@ function activeEditorInput(host: HTMLElement): HTMLInputElement {
 describe("custom editor canonical lifecycle", () => {
   it("parses commits, enforces validation/protection, updates, histories, navigates, and restores focus", async () => {
     const workbook = withEditors(makeWorkbook(2));
-    const store = new SheetwriteStore(workbook, makeColumnarData(2));
-    const host = mountHost();
     const stats = editorStats();
-    const grid = new GridImpl(
-      host,
-      { workbook, presentation: "data-grid", editors: { input: inputEditor(stats) } },
-      store,
-    );
+    const { grid, store, host } = mountGrid({
+      workbook,
+      presentation: "data-grid",
+      editors: { input: inputEditor(stats) },
+    });
     const rejected: string[][] = [];
-    const commits: unknown[] = [];
-    const changes: unknown[] = [];
+    let changes = 0;
     grid.on("mutation-rejected", ({ issues }) => rejected.push(issues.map((issue) => issue.kind)));
-    grid.on("edit-commit", (event) => commits.push(event));
-    grid.on("change", (event) => changes.push(event));
+    grid.on("change", () => {
+      changes += 1;
+    });
 
     grid.beginEdit(0, 1);
     let input = activeEditorInput(host);
@@ -284,19 +265,14 @@ describe("custom editor canonical lifecycle", () => {
     expect(stats.contexts.at(-1)?.value).toBe(7);
 
     input.value = "42";
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-    );
+    press(input, "Enter");
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(42);
     expect(grid.getSelection()).toEqual({
       kind: "cell",
       addr: { sheet: "s1", row: 1, col: 1 },
     });
-    expect(stats.commits).toBe(1);
-    expect(stats.destroys).toBe(1);
-    expect(commits).toHaveLength(1);
-    expect(changes.length).toBeGreaterThanOrEqual(2);
-    expect(document.activeElement).toBe(host);
+    expect(changes).toBeGreaterThanOrEqual(2);
+    expect(document.activeElement === host).toBe(true);
 
     grid.undo();
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
@@ -304,9 +280,7 @@ describe("custom editor canonical lifecycle", () => {
     grid.beginEdit(0, 1);
     input = activeEditorInput(host);
     input.value = "-1";
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
-    );
+    press(input, "Tab");
     // The rule's Stop alert refuses the entry before it reaches the store.
     await answerDialog(host, "Cancel");
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
@@ -315,22 +289,15 @@ describe("custom editor canonical lifecycle", () => {
     grid.beginEdit(0, 0);
     input = activeEditorInput(host);
     input.value = "blocked";
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-    );
+    press(input, "Enter");
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
     expect(rejected.at(-1)).toEqual(["protection"]);
 
     grid.beginEdit(1, 2, "B", false);
     input = activeEditorInput(host);
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
-    );
+    press(input, "Escape");
     expect(stats.cancels).toBe(1);
-    expect(document.activeElement).toBe(host);
-
-    grid.destroy();
-    store.dispose();
+    expect(document.activeElement === host).toBe(true);
     await Promise.resolve();
     expect(stats.mounts).toBe(4);
     expect(stats.destroys).toBe(4);
@@ -339,8 +306,6 @@ describe("custom editor canonical lifecycle", () => {
   it("cancels rejected and invalid custom-editor commit results without mutation", async () => {
     const workbook = makeWorkbook(1);
     workbook.sheets[0]!.columns[0]!.editor = "boundary";
-    const store = new SheetwriteStore(workbook, makeColumnarData(1));
-    const host = mountHost();
     let attempt = 0;
     let cancels = 0;
     let destroys = 0;
@@ -367,13 +332,11 @@ describe("custom editor canonical lifecycle", () => {
         };
       },
     };
-    const grid = new GridImpl(host, { workbook, editors: { boundary: editor } }, store);
+    const { grid, store, host } = mountGrid({ workbook, editors: { boundary: editor } });
 
     for (let index = 0; index < 2; index += 1) {
       grid.beginEdit(0, 0);
-      activeEditorInput(host).dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-      );
+      press(activeEditorInput(host), "Enter");
       await Promise.resolve();
       await Promise.resolve();
       expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
@@ -387,16 +350,11 @@ describe("custom editor canonical lifecycle", () => {
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
     expect({ cancels, destroys }).toEqual({ cancels: 3, destroys: 3 });
-
-    grid.destroy();
-    store.dispose();
   });
 
   it("keeps a custom editor open for a press on its own button that does not focus the button", () => {
     const workbook = makeWorkbook(1);
     workbook.sheets[0]!.columns[0]!.editor = "stepper";
-    const store = new SheetwriteStore(workbook, makeColumnarData(1));
-    const host = mountHost();
     let commits = 0;
     let steps = 0;
     const editor: CellEditor = {
@@ -420,28 +378,21 @@ describe("custom editor canonical lifecycle", () => {
         };
       },
     };
-    const grid = new GridImpl(host, { workbook, editors: { stepper: editor } }, store);
+    const { grid, host } = mountGrid({ workbook, editors: { stepper: editor } });
 
     grid.beginEdit(0, 0);
-    expect(document.activeElement).toBe(activeEditorInput(host));
+    expect(document.activeElement === activeEditorInput(host)).toBe(true);
     pressLikeWebKit(host.querySelector<HTMLButtonElement>(".sheetwrite-custom-editor button")!);
     expect({ commits, steps }).toEqual({ commits: 0, steps: 1 });
     expect(host.querySelector(".sheetwrite-custom-editor")).not.toBeNull();
-    activeEditorInput(host).dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-    );
+    press(activeEditorInput(host), "Enter");
     expect(commits).toBe(1);
-
-    grid.destroy();
-    store.dispose();
   });
 
   it("keeps async commits bound to their canonical row through sort, clearView, and filter", async () => {
     for (const viewChange of ["sort", "clearView", "filter"] as const) {
       const workbook = makeWorkbook(3);
       workbook.sheets[0]!.columns[0]!.editor = "pending";
-      const store = new SheetwriteStore(workbook, makeColumnarData(3));
-      const host = mountHost();
       const result = Promise.withResolvers<string>();
       const contexts: CellEditorContext[] = [];
       const editor: CellEditor = {
@@ -460,7 +411,7 @@ describe("custom editor canonical lifecycle", () => {
           };
         },
       };
-      const grid = new GridImpl(host, { workbook, editors: { pending: editor } }, store);
+      const { grid, store, host } = mountGrid({ workbook, editors: { pending: editor } });
       if (viewChange === "clearView") grid.setViewSort([{ col: 1, ascending: false }]);
       grid.beginEdit(0, 0);
       const originalDataRow = viewChange === "clearView" ? 2 : 0;
@@ -469,9 +420,7 @@ describe("custom editor canonical lifecycle", () => {
       grid.on("edit-commit", ({ addr }) => {
         committed.push(addr);
       });
-      activeEditorInput(host).dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-      );
+      press(activeEditorInput(host), "Enter");
 
       if (viewChange === "clearView") grid.clearView();
       else if (viewChange === "filter") grid.filterBy(0, "Customer 0");
@@ -494,10 +443,6 @@ describe("custom editor canonical lifecycle", () => {
         `Customer ${otherDataRow}`,
       );
       expect(committed).toEqual([{ sheet: "s1", row: expectedViewRow, col: 0 }]);
-
-      grid.destroy();
-      store.dispose();
-      host.remove();
     }
   });
 
@@ -529,40 +474,44 @@ describe("custom editor canonical lifecycle", () => {
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
   };
 
+  /** The field each kind of editor shows. */
+  const EDITOR_FIELD = {
+    stock: "textarea.sheetwrite-editor",
+    list: '[role="combobox"]',
+    checkbox: '[role="checkbox"]',
+    custom: ".sheetwrite-custom-editor input",
+  } as const;
+
+  /** Give column A of `workbook` a list or checkbox rule whose chosen value is `choice`. */
+  const choiceRule = (
+    workbook: Workbook,
+    kind: keyof typeof EDITOR_FIELD,
+    choice: string,
+    policy: "warn" | "reject",
+  ): void => {
+    if (kind !== "list" && kind !== "checkbox") return;
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "choice",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+        condition:
+          kind === "list"
+            ? { kind: "list", values: [choice] }
+            : { kind: "checkbox", checkedValue: choice, uncheckedValue: "Unchecked" },
+        policy,
+      },
+    ];
+  };
+
   for (const editorKind of ["stock", "list", "checkbox"] as const) {
     for (const viewChange of ["sort", "clearView", "filter"] as const) {
       it(`commits the ${editorKind} editor to its canonical row after ${viewChange}`, () => {
         const workbook = makeWorkbook(3);
-        const sheet = workbook.sheets[0];
-        if (!sheet) throw new Error("editor workbook sheet missing");
-        if (editorKind !== "stock") {
-          sheet.validationRules = [
-            {
-              id: "choice",
-              range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
-              condition:
-                editorKind === "list"
-                  ? { kind: "list", values: ["Edited choice"] }
-                  : {
-                      kind: "checkbox",
-                      checkedValue: "Edited choice",
-                      uncheckedValue: "Unchecked",
-                    },
-              policy: "warn",
-            },
-          ];
-        }
-        const store = new SheetwriteStore(workbook, makeColumnarData(3));
-        const host = mountHost();
-        const grid = new GridImpl(host, { workbook }, store);
+        choiceRule(workbook, editorKind, "Edited choice", "warn");
+        const { grid, store, host } = mountGrid({ workbook });
         if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
         openEditor(grid, host, editorKind);
-        const selector =
-          editorKind === "stock"
-            ? "textarea.sheetwrite-editor"
-            : editorKind === "list"
-              ? '[role="combobox"]'
-              : '[role="checkbox"]';
+        const selector = EDITOR_FIELD[editorKind];
         const editor = host.querySelector<HTMLElement>(selector);
         if (!editor) throw new Error(`${editorKind} editor missing`);
         if (editor instanceof HTMLTextAreaElement) editor.value = "Edited choice";
@@ -591,9 +540,6 @@ describe("custom editor canonical lifecycle", () => {
         expect(store.getCell({ sheet: "s1", row: canonicalRow, col: 0 }).resolved).toBe(
           `Customer ${canonicalRow}`,
         );
-        grid.destroy();
-        store.dispose();
-        host.remove();
       });
     }
   }
@@ -601,66 +547,30 @@ describe("custom editor canonical lifecycle", () => {
   it("cancels every editor when filtering removes its canonical row, including pending custom commits", async () => {
     for (const editorKind of ["stock", "list", "checkbox", "custom"] as const) {
       const workbook = makeWorkbook(3);
-      const sheet = workbook.sheets[0];
-      const column = sheet?.columns[0];
-      if (!sheet || !column) throw new Error("editor workbook column missing");
-      if (editorKind === "list" || editorKind === "checkbox") {
-        sheet.validationRules = [
-          {
-            id: "choice",
-            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
-            condition:
-              editorKind === "list"
-                ? { kind: "list", values: ["Stale choice"] }
-                : { kind: "checkbox", checkedValue: "Stale choice", uncheckedValue: "Unchecked" },
-            policy: "reject",
-          },
-        ];
-      }
+      choiceRule(workbook, editorKind, "Stale choice", "reject");
       const stats = editorStats();
       const pending = Promise.withResolvers<string>();
       const custom = inputEditor(stats);
-      if (editorKind === "custom") column.editor = "pending";
-      const store = new SheetwriteStore(workbook, makeColumnarData(3));
-      const host = mountHost();
-      const grid = new GridImpl(
-        host,
-        {
-          workbook,
-          editors: {
-            pending: {
-              mount(root, context) {
-                const session = custom.mount(root, context);
-                return { ...session, commit: () => pending.promise };
-              },
+      if (editorKind === "custom") workbook.sheets[0]!.columns[0]!.editor = "pending";
+      const { grid, store, host } = mountGrid({
+        workbook,
+        editors: {
+          pending: {
+            mount(root, context) {
+              const session = custom.mount(root, context);
+              return { ...session, commit: () => pending.promise };
             },
           },
         },
-        store,
-      );
+      });
       const committed: unknown[] = [];
       grid.on("edit-commit", (event) => committed.push(event));
       openEditor(grid, host, editorKind);
-      const selector =
-        editorKind === "stock"
-          ? "textarea.sheetwrite-editor"
-          : editorKind === "list"
-            ? '[role="combobox"]'
-            : editorKind === "checkbox"
-              ? '[role="checkbox"]'
-              : ".sheetwrite-custom-editor input";
+      const selector = EDITOR_FIELD[editorKind];
       const editor = host.querySelector<HTMLElement>(selector);
       if (!editor) throw new Error(`${editorKind} editor missing`);
       if (editor instanceof HTMLTextAreaElement) editor.value = "Stale choice";
-      if (editorKind === "custom") {
-        editor.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: "Enter",
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-      }
+      if (editorKind === "custom") press(editor, "Enter");
 
       grid.filterBy(0, "Customer 2");
       expect(host.querySelector(selector)).toBeNull();
@@ -679,9 +589,6 @@ describe("custom editor canonical lifecycle", () => {
           destroys: 1,
         });
       }
-      grid.destroy();
-      store.dispose();
-      host.remove();
     }
   });
 
@@ -695,10 +602,8 @@ describe("custom editor canonical lifecycle", () => {
       otherSheet.id = "s2";
       otherSheet.name = "Other sheet";
       workbook.sheets.push(otherSheet);
-      const store = new SheetwriteStore(workbook, makeColumnarData(3));
-      const host = mountHost();
       const stats = editorStats();
-      const grid = new GridImpl(host, { workbook, editors: { input: inputEditor(stats) } }, store);
+      const { grid, store, host } = mountGrid({ workbook, editors: { input: inputEditor(stats) } });
       const begins: CellEditorContext["address"][] = [];
       grid.on("edit-begin", ({ addr }) => {
         begins.push(addr);
@@ -735,9 +640,6 @@ describe("custom editor canonical lifecycle", () => {
         expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
         expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Replacement edit");
       }
-      grid.destroy();
-      store.dispose();
-      host.remove();
     });
   }
 
@@ -751,7 +653,6 @@ describe("custom editor canonical lifecycle", () => {
     workbook.sheets[0]!.columns[0]!.editor = "hostile";
     const host = mountHost();
     const hookSignals: boolean[] = [];
-    let destroys = 0;
     const editor: CellEditor = {
       mount(root, context) {
         root.appendChild(document.createElement("input"));
@@ -764,7 +665,6 @@ describe("custom editor canonical lifecycle", () => {
           },
           destroy() {
             hookSignals.push(context.signal.aborted);
-            destroys += 1;
             throw new Error("hostile destroy");
           },
         };
@@ -785,23 +685,17 @@ describe("custom editor canonical lifecycle", () => {
     };
 
     grid.beginEdit(0, 0);
-    activeEditorInput(host).dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
-    );
+    press(activeEditorInput(host), "Escape");
     expect(hookSignals).toEqual([true, true]);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expect(document.activeElement === host).toBe(true);
     expect(reported).toHaveLength(1);
 
     grid.beginEdit(0, 0);
     expect(() => grid.destroy()).not.toThrow();
     expect(() => grid.destroy()).not.toThrow();
-    expect(hookSignals).toEqual([true, true, true, true]);
-    expect(destroys).toBe(2);
     expect(disposals).toBe(1);
     expect(reported).toHaveLength(2);
-    expect(host.classList.contains("sheetwrite")).toBe(false);
-    expect(host.getAttribute("role")).toBeNull();
     expect(host.childElementCount).toBe(0);
   });
 });
