@@ -153,12 +153,23 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
     }
 
     let number = &src[start..*index];
+    if number.len() <= EXACT_INTEGER_DIGITS && number.bytes().all(|byte| byte.is_ascii_digit()) {
+        let integer = number
+            .bytes()
+            .fold(0u64, |value, digit| value * 10 + u64::from(digit - b'0'));
+        return Ok(integer as f64);
+    }
     number
         .parse::<f64>()
         .ok()
         .filter(|value| value.is_finite())
         .ok_or_else(|| format!("{number} is not a valid number."))
 }
+
+/// Most digits of a whole number that reads as an exact `f64` (below 2^53),
+/// the same value the decimal parser gives. Most numbers in formulas are
+/// short whole numbers, and the decimal parser costs several times more.
+const EXACT_INTEGER_DIGITS: usize = 15;
 
 /// The token of one ASCII punctuation byte, or `None` for any other byte.
 const fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
