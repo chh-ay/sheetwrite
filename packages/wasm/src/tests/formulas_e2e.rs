@@ -70,45 +70,14 @@ fn deep_formula_evaluation_returns_num_error() {
     );
 }
 
+/// Control, lookup, reference and aggregate formulas end to end, with the
+/// edge rules the conformance corpus does not reach: the formula's own
+/// position, LET scopes and unused bindings, lazy CHOOSE, shape mismatches,
+/// an empty argument and XMATCH's search and wildcard modes.
 #[test]
-fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
+fn formula_edge_rules_give_the_excel_result() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(6, 10);
-    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
-        store.set_number(sheet, row, 0, value, 0);
-        store.set_number(sheet, row, 1, value * 10.0, 0);
-    }
-    store.set_formula(sheet, 0, 3, "=LET(x,2,LET(x,3,x)+x)", 0);
-    store.set_formula(sheet, 0, 2, "=SUM(LET(x,SEQUENCE(2),1),2)", 0);
-    store.set_formula(sheet, 0, 4, "=XMATCH(2,A1:A3,0)", 0);
-    store.set_formula(sheet, 0, 5, "=MAXIFS(A1:B1,A1:A2,\">0\")", 0);
-    store.set_formula(
-        sheet,
-        1,
-        3,
-        "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")",
-        0,
-    );
-    store.set_formula(
-        sheet,
-        1,
-        4,
-        "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")",
-        0,
-    );
-    store.recompute(sheet);
-    assert_close(number(&store, sheet, 0, 3), 5.0);
-    assert_close(number(&store, sheet, 0, 2), 3.0);
-    assert_close(number(&store, sheet, 0, 4), 2.0);
-    assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("#VALUE!"));
-    assert_close(number(&store, sheet, 1, 3), 30.0);
-    assert_eq!(string(&store, sheet, 1, 4).as_deref(), Some("#VALUE!"));
-}
-
-#[test]
-fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(20, 20);
+    let sheet = store.add_sheet(6, 32);
     for (row, (left, right)) in [(1.0, 10.0), (2.0, 20.0), (3.0, 30.0)]
         .into_iter()
         .enumerate()
@@ -116,67 +85,49 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
         store.set_number(sheet, row, 0, left, 0);
         store.set_number(sheet, row, 1, right, 0);
     }
-    store.set_number(sheet, 0, 3, 1.0, 0);
-    store.set_number(sheet, 1, 3, 2.0, 0);
-    store.set_number(sheet, 2, 3, 2.0, 0);
-    store.set_string(sheet, 0, 4, "alpha", 0);
-    store.set_string(sheet, 1, 4, "a*", 0);
-    store.set_string(sheet, 2, 4, ">abc", 0);
-    let formulas = [
-        (10, 0, "=ROW()"),
-        (10, 1, "=COLUMN()"),
-        (10, 2, "=ROWS(CHOOSE(1,A1:B2))"),
-        (10, 3, "=COLUMNS(CHOOSE(1,A1:B2))"),
-        (10, 4, "=ADDRESS(3,4)"),
-        (10, 5, "=COUNTBLANK(C1:C3)"),
-        (10, 6, "=SUBTOTAL(9,A1:A3)"),
-        (10, 7, "=SUMPRODUCT(A1:A3,B1:B3)"),
-        (10, 8, "=MAXIFS(B1:B3,A1:A3,\">1\")"),
-        (10, 9, "=MINIFS(B1:B3,A1:A3,\">1\")"),
-        (10, 10, "=XMATCH(2,D1:D3,0,-1)"),
-        (10, 11, "=XMATCH(2.5,A1:A3,-1)"),
-        (10, 12, "=CHOOSE(2,1/0,7)"),
-        (10, 13, "=LET(x,1/0,7)"),
-        (10, 14, "=LET(x,A1,x+1)"),
-        (10, 15, "=SUMPRODUCT(A1:B1,A1:A2)"),
-        (10, 16, "=LOG(100,)"),
-        (10, 17, "=XMATCH(\"a*\",E1:E3,2)"),
-        (10, 18, "=XMATCH(\"a~*\",E1:E3,2)"),
-        (10, 19, "=XMATCH(\">*\",E1:E3,2)"),
+    for (row, text) in ["alpha", "a*", ">abc"].into_iter().enumerate() {
+        store.set_string(sheet, row, 2, text, 0);
+    }
+    let cases = [
+        ("=ROW()*100+COLUMN()", "104"),
+        ("=ADDRESS(3,4)", "$D$3"),
+        ("=COUNTBLANK(E1:E3)", "3"),
+        ("=SUBTOTAL(9,A1:A3)", "6"),
+        ("=SUMPRODUCT(A1:A3,B1:B3)", "140"),
+        ("=MAXIFS(B1:B3,A1:A3,\">1\")", "30"),
+        ("=MINIFS(B1:B3,A1:A3,\">1\")", "20"),
+        ("=XMATCH(2,A1:A3,0)", "2"),
+        ("=XMATCH(2,{1;2;2},0,-1)", "3"),
+        ("=XMATCH(\"a*\",C1:C3,2)", "1"),
+        ("=LET(x,2,LET(x,3,x)+x)", "5"),
+        ("=SUM(LET(x,SEQUENCE(2),1),2)", "3"),
+        ("=LET(x,1/0,7)", "7"),
+        ("=CHOOSE(2,1/0,7)", "7"),
+        ("=ROWS(CHOOSE(1,A1:B2))", "2"),
+        ("=COLUMNS(CHOOSE(1,A1:B2))", "2"),
+        ("=MAXIFS(A1:B1,A1:A2,\">0\")", "#VALUE!"),
+        ("=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")", "30"),
+        ("=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")", "#VALUE!"),
+        ("=SUMPRODUCT(A1:B1,A1:A2)", "#VALUE!"),
+        ("=LOG(100,)", "2"),
+        ("=XMATCH(2.5,A1:A3,-1)", "2"),
+        ("=XMATCH(\"a~*\",C1:C3,2)", "2"),
+        ("=XMATCH(\">*\",C1:C3,2)", "3"),
+        ("=LET(x,A1,x+1)", "2"),
     ];
-    for (row, col, source) in formulas {
-        store.set_formula(sheet, row, col, source, 0);
+    for (row, (source, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, row, 3, source, 0);
     }
     store.recompute(sheet);
-
-    for (col, expected) in [
-        (0, 11.0),
-        (1, 2.0),
-        (2, 2.0),
-        (3, 2.0),
-        (5, 3.0),
-        (6, 6.0),
-        (7, 140.0),
-        (8, 30.0),
-        (9, 20.0),
-        (10, 3.0),
-        (11, 2.0),
-        (12, 7.0),
-        (13, 7.0),
-        (14, 2.0),
-        (16, 2.0),
-        (17, 1.0),
-        (18, 2.0),
-        (19, 3.0),
-    ] {
-        assert_close(number(&store, sheet, 10, col), expected);
+    for (row, (source, expected)) in cases.iter().enumerate() {
+        let shown = string(&store, sheet, row, 3)
+            .unwrap_or_else(|| number(&store, sheet, row, 3).to_string());
+        assert_eq!(shown, *expected, "{source}");
     }
-    assert_eq!(string(&store, sheet, 10, 4).as_deref(), Some("$D$3"));
-    assert_eq!(string(&store, sheet, 10, 15).as_deref(), Some("#VALUE!"));
 
     store.set_number(sheet, 0, 0, 5.0, 0);
     store.recompute(sheet);
-    assert_close(number(&store, sheet, 10, 14), 6.0);
+    assert_close(number(&store, sheet, cases.len() - 1, 3), 6.0);
 }
 
 #[test]
@@ -230,6 +181,15 @@ fn array_operators_broadcast_each_axis_and_keep_element_errors() {
         ("={2,0,3}^{3,-1,2}", 3, &["8", "#DIV/0!", "9"]),
         ("={\"a\",\"b\"}&{1;2}", 2, &["a1", "b1", "a2", "b2"]),
         ("=-{1,-2,3}%", 3, &["-0.01", "0.02", "-0.03"]),
+        // Array constant text: spacing, signs, a doubled quote, and logical
+        // values and errors in any case.
+        ("={ -1.5 , +2 }*1", 2, &["-1.5", "2"]),
+        ("={\"a\"\"b\";#n/a}&\"\"", 1, &["a\"b", "#N/A"]),
+        (
+            "={true,False;#DIV/0!,#REF!}*1",
+            2,
+            &["1", "0", "#DIV/0!", "#REF!"],
+        ),
         ("=+{1,\"2\",TRUE}", 3, &["1", "2", "1"]),
         ("={1,#N/A,\"bad\",4}+1", 4, &["2", "#N/A", "#VALUE!", "5"]),
         ("=SEQUENCE(2,2)*2", 2, &["2", "4", "6", "8"]),

@@ -1889,6 +1889,7 @@ pub(super) fn circular_components(
 mod tests {
     use super::*;
     use crate::store::CellStore;
+    use crate::tests::support::evaluations;
     use crate::types::Value;
 
     type IntervalRow = (u32, u32, usize, u32);
@@ -2008,12 +2009,7 @@ mod tests {
 
         // B1 no longer reads A10, so an edit of A10 recalculates nothing.
         store.set_number(sheet, 9, 0, 6.0, 0);
-        super::super::FORMULA_EVALUATIONS.with(|count| count.set(0));
-        store.recompute(sheet);
-        assert_eq!(
-            super::super::FORMULA_EVALUATIONS.with(std::cell::Cell::get),
-            0
-        );
+        assert_eq!(evaluations(|| store.recompute(sheet)), 0);
     }
 
     #[test]
