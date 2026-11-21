@@ -124,6 +124,41 @@ describe("snake-case-internals", () => {
     }
   });
 
+  test("a key in a double cast's type follows a private member of another project", async () => {
+    const directory = copyInput();
+
+    try {
+      writeFileSync(
+        join(directory, "view.ts"),
+        [
+          "export function peekView(target: object): number {",
+          "  const view = target as unknown as { remoteMember: { size: number }; otherKey: number };",
+          "  return view.remoteMember.size + view.otherKey;",
+          "}",
+          "",
+        ].join("\n"),
+      );
+      const other_members = new Map([["remoteMember", new Set(["remote_member"])]]);
+      const plan = await planRenames(
+        join(directory, "tsconfig.json"),
+        [],
+        new Map(),
+        other_members,
+      );
+      applyPlan(plan);
+
+      const view = readFileSync(join(directory, "view.ts"), "utf8");
+      expect(view).toContain("{ remote_member: { size: number }; otherKey: number }");
+      expect(view).toContain("view.remote_member.size + view.otherKey");
+      const names_only = plan.mentions.filter((mention) => mention.source === "name only");
+      expect(names_only.map((mention) => `${mention.line} ${mention.oldName}`)).toContain(
+        "2 remoteMember",
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test("a second run finds nothing to rename and changes no file", async () => {
     const directory = copyInput();
 

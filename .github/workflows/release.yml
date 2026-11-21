@@ -42,6 +42,10 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: bun scripts/release-preflight.ts
+      # npm trusted publishing cannot publish the first version of a package.
+      # Stop here, before any publication, instead of partway through the list.
+      - name: Require every package on npm
+        run: bun scripts/release-registry-check.ts
 
   publish:
     needs: identity
