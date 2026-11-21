@@ -145,7 +145,8 @@ pub struct CellStore {
     /// and put it back.
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
-    loading_page: usize,
+    /// Open page loads; `u16` keeps `remote_load` in the word it used alone.
+    loading_page: u16,
     /// Set while a page load applies edits another client committed, which
     /// recalculate only the formulas that read them.
     remote_load: bool,
