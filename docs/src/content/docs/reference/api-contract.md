@@ -11,7 +11,7 @@ Every exported subpath has one explicit classification:
 
 | Classification | Contract |
 | --- | --- |
-| `supported` | Public application API. Semver and the generated reference apply. |
+| `supported` | Public application API. The generated reference describes it. Before 1.0, a minor release can change it; see [Deprecations and removals](#deprecations-and-removals). |
 | `internal` | Required runtime plumbing, such as the WASM loader. Published intentionally but not a general extension surface. |
 | `testing-only` | Deterministic harnesses for consumers' tests; never production code. |
 | `asset` | CSS, Worker, or WASM bytes rather than a TypeScript symbol surface. |
@@ -38,7 +38,13 @@ The API manifest describes type compatibility. Runtime behavior remains protecte
 
 ## Deprecations and removals
 
-`supported` entry points get a deprecation period, marked with `@deprecated`, before removal. `internal` entry points, such as the WASM engine, may change in a minor release with a changelog entry.
+Sheetwrite is before 1.0. A minor release, such as 0.7.0, can remove or change a `supported` API without a deprecation period first.
+
+Each removal and each change is listed in the release notes and in the upgrade guide for that release, with its replacement. For 0.7.0, see [Upgrade to 0.7.0](/docs/start/upgrade-to-0-7-0/).
+
+Deprecation periods start at 1.0. From 1.0, a `supported` API is marked `@deprecated` before it is removed.
+
+`internal` entry points, such as the WASM engine, can change in any minor release. The changelog lists each change. The table below lists the removals and changes of the engine bindings.
 
 | Package | Removed or deprecated | Replacement | Release |
 | --- | --- | --- | --- |
