@@ -55,4 +55,8 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   expect((await shownOwners()).length).toBeGreaterThan(0);
   await allFilter.click();
   await expect(shownLaunchers).toHaveCount(owners.length);
+  // Every owning showcase URL resolves.
+  for (const owner of CAPABILITY_OWNERS) {
+    expect((await page.request.get(owner.href)).ok(), owner.href).toBe(true);
+  }
 });

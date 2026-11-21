@@ -1,10 +1,11 @@
-import { expect, siteUrl, test } from "./fixtures.js";
+import { expect, test } from "@playwright/test";
 
-// An interaction island hydrates on first use. Its first input must act once
-// the code has loaded: a key the browser turns into a click (Enter or Space on
-// a button, Enter on a link, Space on a checkbox) and text typed into a field.
-// Each test's input is the first its island receives, on a fresh page.
-// Tagged @portability: the activation each browser performs is what is under test.
+import { siteUrl } from "./fixtures.js";
+
+// An island hydrates on first use; its first input, on a fresh page, must act once:
+// a key the browser turns into a click, or text typed into a field. @portability:
+// each browser performs its own activation. Only page errors fail a run (WebKit
+// logs a console error for prefetches over HTTP).
 
 const FIXTURES = siteUrl("/test/islands/");
 
@@ -18,6 +19,8 @@ for (const { name, role, label, keys, shown } of [
   test(`@portability ${keys} on the ${name} fixture is the island's first input and acts once`, async ({
     page,
   }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(FIXTURES);
     const control = page
       .locator(".sw-activation-fixture", { has: page.getByTestId(`activation-${name}`) })
@@ -29,5 +32,6 @@ for (const { name, role, label, keys, shown } of [
     if (role === "link") await expect(page).toHaveURL(/#followed$/u);
     if (role === "checkbox") await expect(control).toBeChecked();
     if (role === "textbox") await expect(control).toHaveValue(keys);
+    expect(errors).toEqual([]);
   });
 }

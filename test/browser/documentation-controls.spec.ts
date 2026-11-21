@@ -2,9 +2,8 @@ import type { Locator, Page } from "@playwright/test";
 
 import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
-// Shared documentation controls in a real browser: framework tabs, the package
-// command, reader preferences, focus in forced-colors mode and code popovers.
-// code-enhancements and code-popover-placement unit tests own their logic.
+// Shared docs controls in a real browser; code-enhancements and
+// code-popover-placement unit tests own their logic.
 
 const INSTALLATION_URL = siteUrl("/docs/start/installation/");
 const FIRST_GRID_URL = siteUrl("/docs/start/first-grid/");

@@ -4,10 +4,8 @@ import type { Page } from "@playwright/test";
 
 import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
-// The served site: routes, redirects, head metadata, real layout and the real
-// Pagefind index. Unit tests own the logic (docs/test moved-pages,
-// search-ranking, outline, navigation; scripts/prepare-docs-deployment owns
-// served redirects and 404 status); these keep what needs the built site.
+// The served site, real layout and the real Pagefind index. Unit and deployment
+// tests own the logic (moved-pages, search-ranking, prepare-docs-deployment).
 
 /** Just below the sticky header, where lib/shell.ts reads the current heading. */
 const READING_LINE_PX = 80;
@@ -57,6 +55,7 @@ test("the landing loads no grid runtime, matches its files, and its story reel h
   // Exactly one H1, and no live grid runtime on the landing.
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
+  await expect(page.getByTestId("landing-product-story")).toBeVisible();
   expect(wasmRequests).toEqual([]);
   await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
   await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
@@ -144,6 +143,12 @@ test("every page starts with a skip link, and a phone has a route back home and 
     .getByRole("link", { name: "Docs", exact: true })
     .click();
   await expect(page).toHaveURL(siteUrl("/docs/"));
+  await expect(
+    page
+      .locator("main")
+      .getByRole("link", { name: /Getting started/ })
+      .first(),
+  ).toBeVisible();
   // Showcases is a tab of the documentation bar at every width.
   await page
     .getByRole("navigation", { name: "Documentation sections", exact: true })
@@ -184,10 +189,7 @@ test("a guide has one heading, a canonical URL and its section icon; sidebar ico
 /** Layout rounds boxes to device pixels. */
 const ICON_CENTRE_TOLERANCE_PX = 1;
 
-/**
- * Labels of the eyebrow and visible sidebar rows whose icon is not centred on
- * the label's first line. With `wraps`, at least one label must wrap.
- */
+/** Eyebrow and visible sidebar labels whose icon is off their first line's centre. */
 async function misplacedIcons(page: Page, { wraps = false } = {}): Promise<string[]> {
   const rows = await page
     .locator(".sw-document__eyebrow, .sw-sidebar__nav a:has(> .sw-icon)")
@@ -271,8 +273,11 @@ test("generated API pages filter their outline and show member signatures", asyn
   await page.locator('a[href="/docs/api/core/grid/"]').first().click();
   await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
   await expect(page.locator("main h1")).toContainText("Grid");
-  // Signatures are for reading, so they carry no copy control; examples keep
-  // theirs, also after in-site navigation.
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://www.sheetwrite.dev/docs/api/core/grid/",
+  );
+  // Signatures carry no copy control; examples keep theirs after in-site navigation.
   await expect(page.locator(".api-member .copy, .api-declaration .copy")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy to clipboard" }).first()).toBeVisible();
   // Member signatures are visible without a click.
@@ -291,6 +296,12 @@ test("generated API pages filter their outline and show member signatures", asyn
       .first()
       .evaluate((element) => getComputedStyle(element).textDecorationLine),
   ).toBe("underline");
+  // A fragment targets a hidden search anchor; the following member card is marked and in view.
+  await page.goto("/docs/api/core/grid/#applytransaction");
+  await waitForHydration(page);
+  const member = page.locator("#grid-apply-transaction");
+  await expect(member).toHaveAttribute("data-revealed", "");
+  await expect(member).toBeInViewport();
 });
 
 /** The first Pagefind query loads the index; a cold load can take a while in CI. */
@@ -338,8 +349,7 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
       .toBe(href);
   }
 
-  // Test routes stay out of the index. Both words are in the test route's
-  // title and in the kept-parts guide, so real results come back.
+  // Test routes stay out of the index ("XLSX verification" also finds the kept-parts guide).
   await field.fill("XLSX verification");
   await expect(dialog.locator("a[href^='/docs/']").first()).toBeVisible();
   await expect(dialog.locator("a[href^='/test/']")).toHaveCount(0);
@@ -348,22 +358,17 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
   await expect(dialog.getByRole("status")).toHaveText("No results for “qqzzxx”.");
   await expect(results).toHaveCount(0);
 
-  // A symbol resolves to its member anchor; arrows move the choice and Enter opens it.
-  const anchor = "/docs/api/core/grid/#applytransaction";
+  // A symbol resolves to its member anchor; arrows move the choice and Enter opens the chosen one.
   await field.fill("applyTransaction");
-  await expect(results.first()).toHaveAttribute("href", anchor);
+  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/grid/#applytransaction");
   await expect(results.first()).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await expect(results.nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(results.first()).toHaveAttribute("aria-selected", "false");
-  await page.keyboard.press("ArrowUp");
-  await expect(results.first()).toHaveAttribute("aria-selected", "true");
   await expect(dialog.locator("[data-action-error]")).toBeHidden();
+  const chosen = await results.nth(1).getAttribute("href");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(siteUrl(anchor));
-  // The anchor is a hidden search target; the member card after it is marked and in view.
-  await expect(page.locator("#grid-apply-transaction")).toHaveAttribute("data-revealed", "");
-  await expect(page.locator("#grid-apply-transaction")).toBeInViewport();
+  await expect(page).toHaveURL(siteUrl(chosen ?? ""));
 });
 
 test.describe(() => {

@@ -1,10 +1,10 @@
-import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
+import { expect, test } from "@playwright/test";
 
-// The docs site's select (docs/src/components/Select.tsx) through the formula
-// reference's engine filter. Its code loads on first use (or ahead, at low
-// priority, when the page is idle); a press or click made before it arrives
-// must act once. islands/client.tsx holds and replays it; Enter and Space also
-// reach the check that leaves a native element's activation keys to the browser.
+import { siteUrl, waitForHydration } from "./fixtures.js";
+
+// The formula reference's engine filter (Select.tsx) loads its code on first use;
+// a press or click made before it arrives must act once (islands/client.tsx).
+// Base test: each reload aborts lazy imports, which Firefox reports as page errors.
 
 const FORMULA_PAGE = siteUrl("/docs/reference/formula-functions/math/");
 /** Longer than a replayed event's second toggle would take to close the list. */
