@@ -198,7 +198,9 @@ These examples use `"en-US"`, the formatter's default locale. Set `numberLocale`
 
 Numeric formats support fixed decimals, optional grouping, percent scaling, scientific exponents with an explicit width, quoted and escaped literals, and currency prefixes and suffixes.
 
-Up to four semicolon sections select the positive, negative, zero and text output. Sheetwrite accepts color directives such as `[Red]` as formatting metadata, but they do not change the canvas text color.
+Up to four semicolon sections select the positive, negative, zero and text output. A section's color paints the number in that color, as in Excel, and it takes priority over the cell's font color: one of the eight names `[Black]`, `[Blue]`, `[Cyan]`, `[Green]`, `[Magenta]`, `[Red]`, `[White]` and `[Yellow]`, or `[Color1]` to `[Color56]` from Excel's default palette. So `#,##0;[Red]-#,##0` shows -1200 as a red `-1,200`.
+
+A condition in brackets chooses a section instead of the sign: `[Red][<=100]0;[Blue][>100]0` shows 50 in red and 150 in blue. A number goes to the first section whose condition it meets. When the first two sections both have conditions, the third section takes the other numbers. When only the first section has one, the second section takes the other numbers. A section that only negative numbers meet, such as `[<0]`, shows the number without its minus sign, as the negative section does.
 
 ### Fractions and Text
 
@@ -215,6 +217,7 @@ UTC fields make date rendering the same in every host timezone. Locale-specific 
 ## Edge cases and limits
 
 - Fractional seconds, such as `ss.00`, are not supported.
+- A color in the text section, such as `[Red]@`, does not color text.
 - Formula errors are explicit values such as `#DIV/0!` and `#CYCLE!`. They are not non-finite numbers that the formatter hides. See [Formulas](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
 - Native boolean values use the normal cell style model and render as uppercase `TRUE` or `FALSE`. They are centered unless `CellStyle.align` overrides it.
 

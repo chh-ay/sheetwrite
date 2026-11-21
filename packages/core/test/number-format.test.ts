@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
 import { formatGeneral } from "../src/general-format.js";
-import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
+import {
+  formatNumber,
+  numberFormatColor,
+  resetNumberFormatResourcesForTest,
+} from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it.each([
@@ -195,6 +199,39 @@ describe("formatNumber", () => {
     expect(formatNumber(5 / 1440, "[mm]:ss")).toBe("05:00");
     expect(formatNumber(90 / 86_400, "[ss]")).toBe("90");
     expect(formatNumber(25 / 24, "[Red][h]:mm")).toBe("25:00");
+  });
+
+  // A section's color names Excel's eight colors or `[Color1]` to `[Color56]`
+  // of its default palette, and a condition chooses the section.
+  // https://support.microsoft.com/en-us/excel/review-guidelines-for-customizing-a-number-format
+  it("gives the color of the section a number takes", () => {
+    const code = "#,##0;[Red]-#,##0";
+    expect(formatNumber(-1200, code)).toBe("-1,200");
+    expect(numberFormatColor(-1200, code)).toBe("#ff0000");
+    expect(numberFormatColor(1200, code)).toBeUndefined();
+    expect(numberFormatColor(7, "[BLUE]0")).toBe("#0000ff");
+    expect(numberFormatColor(7, "[Green]0")).toBe("#00ff00");
+    expect(numberFormatColor(7, "[Color10]0")).toBe("#008000");
+    expect(numberFormatColor(7, "[Color56]0")).toBe("#333333");
+    expect(numberFormatColor(7, "[Color57]0")).toBeUndefined();
+    expect(numberFormatColor(45_000, "[Magenta]yyyy-mm-dd")).toBe("#ff00ff");
+    expect(numberFormatColor(7, "0")).toBeUndefined();
+    expect(numberFormatColor(7, undefined)).toBeUndefined();
+  });
+
+  it("chooses a section by its condition", () => {
+    const code = "[Red][<=100]0;[Blue][>100]0";
+    expect([formatNumber(50, code), numberFormatColor(50, code)]).toEqual(["50", "#ff0000"]);
+    expect([formatNumber(150, code), numberFormatColor(150, code)]).toEqual(["150", "#0000ff"]);
+    expect(formatNumber(1, '[=1]0" day";0" days"')).toBe("1 day");
+    expect(formatNumber(3, '[=1]0" day";0" days"')).toBe("3 days");
+    // A section that only negative numbers meet drops the sign, as Excel's
+    // negative section does; the third section takes the rest with its sign.
+    const bands = "[Red][<-25]0;[Blue][>25]0;[Green]0";
+    expect([formatNumber(-26, bands), numberFormatColor(-26, bands)]).toEqual(["26", "#ff0000"]);
+    expect([formatNumber(26, bands), numberFormatColor(26, bands)]).toEqual(["26", "#0000ff"]);
+    expect([formatNumber(-1, bands), numberFormatColor(-1, bands)]).toEqual(["-1", "#00ff00"]);
+    expect(formatNumber(0, bands)).toBe("0");
   });
 
   it("returns exact text for fixed values on repeated calls", () => {

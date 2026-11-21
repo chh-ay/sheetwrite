@@ -1,7 +1,7 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { automaticTextColor } from "./color-contrast.js";
 import { formatGeneral, GENERAL_WIDTH, isGeneralCode } from "./general-format.js";
-import { formatNumber } from "./number-format.js";
+import { formatNumber, numberFormatColor } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
@@ -965,10 +965,16 @@ function paintCell(
 
   const effectiveFont = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
   applyFont(ctx, state, effectiveFont);
+  const numeric = typeof value === "number";
+  const numberFormat = effective.numberFormat ?? column?.numberFormat;
+  // Excel paints a number in its format section's color, such as `[Red]`, over the font color.
+  const formatColor =
+    numeric && numberFormat !== undefined ? numberFormatColor(value, numberFormat) : undefined;
   applyFill(
     ctx,
     state,
-    effective.color ??
+    formatColor ??
+      effective.color ??
       (effective.backgroundColor
         ? textOnFill(
             ctx,
@@ -990,8 +996,6 @@ function paintCell(
           (column?.type === "general" && typeof value === "number")
         ? "right"
         : "left");
-  const numeric = typeof value === "number";
-  const numberFormat = effective.numberFormat ?? column?.numberFormat;
   let text =
     typeof value === "boolean"
       ? value
