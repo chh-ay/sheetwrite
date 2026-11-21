@@ -53,6 +53,8 @@ fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
     store.set_number(other, 0, 0, 7.0, 0);
     store.set_formula(summary, 0, 0, "='Source Data'!$A$2", 0);
     store.set_formula(summary, 1, 0, "=Other!A1", 0);
+    // A reference without a sheet name on another sheet does not move.
+    store.set_formula(summary, 2, 0, "=A2+B2*2", 0);
     store.recompute(summary);
 
     store.add_rows(source, 1, 1);
@@ -68,6 +70,7 @@ fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
         store.formula_source(summary, 1, 0).as_deref(),
         Some("=Other!A1")
     );
+    assert_eq!(formula_text(&store, summary, 2, 0), "=A2+B2*2");
 
     store.remove_rows(source, 2, 1);
     store.recompute(source);
