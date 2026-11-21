@@ -229,6 +229,8 @@ export {
 } from "./sheet-name.js";
 
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
+export type { CompactRangeHistory, RangeMutationAllocationStats } from "./store/data-engine.js";
+export type { CellRef } from "./selection.js";
 export { isDynamicDateFilter } from "./store/autofilter.js";
 
 export {
@@ -255,9 +257,11 @@ export {
 } from "./sync-protocol.js";
 
 export type {
+  AddSheetInput,
   AggregateOp,
   ApplyTransactionResult,
   AutoFilter,
+  BorderPreset,
   CalculationSettings,
   CellAddress,
   CellAlign,
@@ -298,6 +302,8 @@ export type {
   ChartView,
   ChartViewProvider,
   ChartViewProviderFactory,
+  ClipboardOutcome,
+  ClipboardWindowView,
   Column,
   ColumnarData,
   ColumnFilter,
@@ -373,6 +379,7 @@ export type {
   OperationSource,
   PackedCellBlock,
   PagedStoreStats,
+  PasteSpecialOptions,
   PendingCommit,
   PersistenceAdapter,
   PersistenceBatchCommitRequest,
@@ -414,6 +421,7 @@ export type {
   ReplaceResult,
   ResolvedCell,
   ResourceOwnerBytes,
+  RestoreProvenance,
   RibbonConfig,
   RibbonMode,
   RowData,
@@ -425,6 +433,7 @@ export type {
   SearchOptions,
   SearchResult,
   Selection,
+  SelectionSummary,
   Sheet,
   SheetId,
   SheetLifecycleIssueCode,
@@ -479,6 +488,7 @@ export type {
   XlsxTableExportBackend,
   XlsxTableImportBackend,
   XlsxWorkbookBackend,
+  XlsxWorkbookExportContext,
   XlsxWorkbookOptions,
   XlsxWorkbookWarning,
 } from "./types.js";

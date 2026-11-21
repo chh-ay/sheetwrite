@@ -81,6 +81,7 @@ export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-histo
 export { historyAddon } from "./version-history/history-ui.js";
 export type { HistoryAddonOptions, HistoryPanelArchive } from "./version-history/panel-contract.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
+export type { AtomicHistoryStorage, HistoryStorageTransaction } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
   HistoryGetRequest,

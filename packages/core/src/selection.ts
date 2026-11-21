@@ -34,6 +34,7 @@ function rangeTopLeft(range: Range): CellAddress {
   };
 }
 
+/** A cell by zero-based row and column, on no particular sheet. */
 export interface CellRef {
   row: number;
   col: number;

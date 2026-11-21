@@ -340,6 +340,7 @@ export interface PreparedEngineMemoryRelease {
   abort(): void;
 }
 
+/** Allocation counters of a store's range edits, for tests and benchmarks; `getRangeMutationAllocationStats` returns them. */
 export interface RangeMutationAllocationStats {
   readonly documentOperations: number;
   readonly jsPatchObjects: number;
