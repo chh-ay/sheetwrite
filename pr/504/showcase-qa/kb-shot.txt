@@ -1,0 +1,3 @@
+ribbon tabs at load: File,Home*,Insert,Formulas,Data,View
+panel rows: Paste Special	
+console: none
