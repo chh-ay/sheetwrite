@@ -12,7 +12,8 @@
 //!
 //! The kept formulas are parse scratch, like the parser's argument stack:
 //! a kept tree depends on text alone, so every store on the thread shares
-//! them, and a recalculation, which ends a load or an edit, drops them.
+//! them. Dropping a store drops them, so a store's formulas leave nothing
+//! behind on the thread.
 
 use super::*;
 
@@ -76,10 +77,14 @@ thread_local! {
     };
 }
 
-/// Drops the kept formulas and their buffers. A recalculation calls it: the
-/// formulas of a load or an edit have arrived by then.
-pub(crate) fn release_formula_templates() {
-    TEMPLATES.take();
+/// A store's hold on the kept formulas: dropping it drops them and their
+/// buffers. It has no size, so the store does not grow.
+pub(crate) struct FormulaTemplatesHold;
+
+impl Drop for FormulaTemplatesHold {
+    fn drop(&mut self) {
+        TEMPLATES.take();
+    }
 }
 
 /// What a lookup found for a formula.
