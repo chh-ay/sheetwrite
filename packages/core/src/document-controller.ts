@@ -470,6 +470,27 @@ export class DocumentController {
   }
 
   private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
+    // A transaction that adds rows can also write them, as a paste past the
+    // sheet's end does. Those rows need no restore, because undoing the added
+    // rows removes them, and they cannot be read before the transaction.
+    if (
+      patch.op === "setRange" ||
+      patch.op === "setBlock" ||
+      patch.op === "restoreBlock" ||
+      patch.op === "setRangeStyle" ||
+      patch.op === "clearRange"
+    ) {
+      const range = this.existingRows(patch.range);
+      if (range === null) return [];
+      if (range !== patch.range) {
+        const last = range.end.row - range.start.row;
+        return this.inversePatch(
+          patch.op === "setRange"
+            ? { ...patch, range, cells: patch.cells.filter((cell) => cell.rowOffset <= last) }
+            : { ...patch, range },
+        );
+      }
+    }
     switch (patch.op) {
       case "set":
         return [this.snapshotCell(patch.addr)];
@@ -1696,6 +1717,19 @@ export class DocumentController {
 
   private sheetById(id: SheetId): Sheet | null {
     return this.options.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
+  }
+
+  /**
+   * `range` cut to the rows its sheet has now, or null when it starts past
+   * them. A range written upward (end above start) is kept as it is.
+   */
+  private existingRows(range: Range): Range | null {
+    const rowCount = this.sheetById(range.sheet)?.rowCount;
+    if (rowCount === undefined || range.start.row > range.end.row || range.end.row < rowCount) {
+      return range;
+    }
+    if (range.start.row >= rowCount) return null;
+    return { ...range, end: { row: rowCount - 1, col: range.end.col } };
   }
 }
 
