@@ -70,7 +70,7 @@ const HELD_OUT_WHOLE_SEED = 805;
 const DEV_LARGE_SHA256 = "7d8c865d88238fe5495f881d6b950b8ab2a7edb0a8ebca12d192c320d2a4ad20";
 /** SHA-256 of dev-large-whole.json and heldout-whole.json as the draws write them. */
 const DEV_LARGE_WHOLE_SHA256 = "86cacd713713ca22871558d84c31a9d64a08b7533fcb6c53da3438ea230b3b84";
-const HELD_OUT_WHOLE_SHA256 = "";
+const HELD_OUT_WHOLE_SHA256 = "266b79ed7a3a17313c164d85b9dfc34c0130d718ba19f03f02cb82091d75f132";
 /** A workbook needs this many formulas to be sampled. */
 const MIN_FORMULAS = 10;
 /** Formulas typed per workbook, at most. */

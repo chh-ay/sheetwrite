@@ -83,10 +83,9 @@ function gridSuggester(store: Store): { suggester: FormulaSuggester; dispose(): 
  * caret: Tab takes all of it, Ctrl+→ one word, and Esc hides it. It predicts
  * from the workbook itself, without network or AI: a formula that the cells
  * above and below, or left and right, agree on; the formula a run of cells in
- * the column repeats; the workbook's most common formulas; the formula of
- * the same cell on other sheets; and the formula's syntax. It shows a
- * suggestion only when it is confident, and nothing otherwise. It reads
- * visible sheets only and keeps what it counts in memory only.
+ * the column repeats; the workbook's most common formulas; and the formula's
+ * syntax. It shows a suggestion only when it is confident, and nothing
+ * otherwise. It reads visible sheets only and keeps what it counts in memory only.
  *
  * @example
  * ```ts

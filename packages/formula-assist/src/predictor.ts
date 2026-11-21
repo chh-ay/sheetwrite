@@ -21,7 +21,6 @@ import {
 } from "./candidates.js";
 import { openColumn } from "./signals/column.js";
 import { openNeighbours } from "./signals/neighbours.js";
-import { openSheets } from "./signals/sheets.js";
 import { openSyntax } from "./signals/syntax.js";
 import { openWorkbookFormulas } from "./signals/workbook.js";
 import { type BuildMode, WorkbookPatterns } from "./workbook-patterns.js";
@@ -53,7 +52,6 @@ const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   syntax: openSyntax,
   column: openColumn,
   workbook: openWorkbookFormulas,
-  sheets: openSheets,
 };
 
 /** The signals named in `signals`, opened for one edit. */

@@ -10,10 +10,11 @@ import type { WorkbookPatterns } from "./workbook-patterns.js";
 
 /**
  * The signals that earn their keep on the benchmark. #801 also listed
- * argument roles, repeats within a formula and the ranges AutoSum picks, and
- * the formulas typed in the session were tried too; none paid on the benchmark.
+ * argument roles, repeats within a formula and the ranges AutoSum picks; the
+ * formulas typed in the session and the same cell on other sheets were tried
+ * too. None of those paid on the benchmark.
  */
-export const SIGNALS = ["neighbours", "syntax", "column", "workbook", "sheets"] as const;
+export const SIGNALS = ["neighbours", "syntax", "column", "workbook"] as const;
 
 /** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];
@@ -71,17 +72,16 @@ export function bucket(value: number, steps: readonly number[]): string {
 
 /**
  * A suggestion shows only when one of its proposals reaches the bar of its
- * signal. The signals that read past the neighbouring cells decide alone
- * where the neighbours have nothing to say, and there they were wrong more
- * often than their confidence over all keys says; on the development sets,
- * any bar from 97% to 99% gives them the same savings without more wrong suggestions.
+ * signal. The column and workbook signals decide alone where the neighbours
+ * have nothing to say, and there they were wrong more often than their
+ * confidence over all keys says; on the development sets, any bar from 97%
+ * to 99% gives them the same savings without more wrong suggestions.
  */
 const SHOW_AT: Readonly<Record<SignalName, number>> = {
   neighbours: 0.9,
   syntax: 0.9,
   column: 0.98,
   workbook: 0.98,
-  sheets: 0.98,
 };
 /** The bar for the shared start of two candidates, which together are this likely. */
 const SHARED_AT = 0.9;
