@@ -137,8 +137,8 @@ Export also takes `compression`, which import ignores:
 
 | `compression` | Result |
 | --- | --- |
-| `"deterministic"` (default) | The bundled `fflate` codec compresses the file. One workbook gives the same bytes in every runtime and every release of it. |
-| `"native"` | The runtime's `CompressionStream` compresses the file where it has one, `fflate` elsewhere. Export is faster: in our measurement, 17% faster in Bun and 25% faster in Node. The compressed bytes differ between runtimes and can change when the runtime is updated. |
+| `"deterministic"` (default) | The bundled `fflate` codec compresses the file. One workbook gives the same bytes in every runtime. |
+| `"native"` | The runtime's `CompressionStream` compresses the file where it has one, `fflate` elsewhere. Export is faster: a 50,000-row workbook took 12% less time in Bun and 29% less in Node. The compressed bytes differ between runtimes and can change when the runtime is updated. |
 
 With either value the file holds the same parts, and Excel reads the same workbook from it. Use `"native"` when export speed matters more than identical bytes, for example for downloads; keep the default when you compare or hash saved files. `toXlsxWorkbook`, `toXlsxWorkbookStream`, `toXlsxTable` and `toXlsxTableStream` all take it.
 
