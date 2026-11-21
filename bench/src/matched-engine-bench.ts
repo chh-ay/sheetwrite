@@ -24,7 +24,7 @@ import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.j
 import { resultsDirectory } from "./results-dir.js";
 import { quantile, type Stat, summarize } from "./stats.js";
 
-export const MATCHED_ENGINE_WORKLOADS = [
+const MATCHED_ENGINE_WORKLOADS = [
   { id: "independent-parse-load", size: 1_000 },
   { id: "independent-first-recompute", size: 1_000 },
   { id: "independent-parse-load", size: 10_000 },
@@ -38,10 +38,10 @@ const DEFAULT_ROUNDS = 25;
 const MINIMUM_ROUNDS = 2;
 const ENGINES = ["default", "full"] as const;
 type EngineId = (typeof ENGINES)[number];
-export const MATCHED_MINIMUM_SAMPLE_MS = SAMPLE_AGGREGATE_MS;
-export const MATCHED_WARMUP_FIXTURES = SAMPLE_WARMUP_FIXTURES;
+const MATCHED_MINIMUM_SAMPLE_MS = SAMPLE_AGGREGATE_MS;
+const MATCHED_WARMUP_FIXTURES = SAMPLE_WARMUP_FIXTURES;
 /** Protocol description of one capture; the round count is part of the protocol. */
-export function matchedMethod(rounds: number): string {
+function matchedMethod(rounds: number): string {
   return `${rounds} ABAB paired rounds per workload; each timed sample uses a fresh Bun process, runs ${MATCHED_WARMUP_FIXTURES} untimed warm-up fixtures, then repeats the fixture until at least ${MATCHED_MINIMUM_SAMPLE_MS} ms of measured time and records the per-iteration mean`;
 }
 const SOURCE_PATHS = [

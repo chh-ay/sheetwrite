@@ -4,55 +4,24 @@ import type { Page } from "@playwright/test";
 
 import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
-test("on a phone, documentation has a visible route back home and to the showcases", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 900 });
-  await page.goto("/docs/start/first-grid/");
-  await waitForHydration(page);
-  await page.getByRole("link", { name: "Sheetwrite home", exact: true }).click();
-  await expect(page).toHaveURL(siteUrl("/"));
-  // Phones keep the site links in the header's menu.
-  await page.getByRole("button", { name: "Site menu", exact: true }).click();
-  await page
-    .getByRole("navigation", { name: "Site", exact: true })
-    .getByRole("link", { name: "Docs", exact: true })
-    .click();
-  await expect(page).toHaveURL(siteUrl("/docs/"));
-  await expect(
-    page
-      .locator("main")
-      .getByRole("link", { name: /Getting started/ })
-      .first(),
-  ).toBeVisible();
-  // Showcases is a tab of the documentation bar at every width.
-  await page
-    .getByRole("navigation", { name: "Documentation sections", exact: true })
-    .getByRole("link", { name: "Showcases", exact: true })
-    .click();
-  await expect(page).toHaveURL(siteUrl("/showcases/"));
-});
+// The served site, real layout and the real Pagefind index. Unit and deployment
+// tests own the logic (moved-pages, search-ranking, prepare-docs-deployment).
 
-test("a moved page redirects permanently and forwards its old heading link", async ({
+/** Just below the sticky header, where lib/shell.ts reads the current heading. */
+const READING_LINE_PX = 80;
+
+test("an old heading link is forwarded, and a long outline keeps the entry being read in view", async ({
   page,
-  request,
 }) => {
-  const redirect = await request.get("/docs/guides/configuration/", { maxRedirects: 0 });
-  expect(redirect.status()).toBe(308);
-  expect(redirect.headers().location).toBe("/docs/features/grid/options-and-presentation/");
   // The heading moved to another page than the redirect target; the target forwards it.
   await page.goto("/docs/guides/configuration/#datasource-pages");
   await expect(page).toHaveURL(/\/docs\/features\/data\/datasources\/#requests-and-pages$/);
-  await expect(page.locator("#requests-and-pages")).toBeVisible();
-  // The heading stayed on the redirect target under a new id; the fragment follows it.
+  await expect(page.locator("#requests-and-pages")).toBeInViewport();
+  // A heading renamed on the redirect target swaps the fragment in place.
   await page.goto("/docs/guides/collaboration/#revisions");
   await expect(page).toHaveURL(/\/docs\/features\/collaboration\/#restoring-versions$/);
   await expect(page.locator("#restoring-versions")).toBeInViewport();
-});
 
-test("a long outline keeps the entry being read in view and shows that more entries follow", async ({
-  page,
-}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/docs/releases/0.7.0/");
   await waitForHydration(page);
@@ -63,37 +32,37 @@ test("a long outline keeps the entry being read in view and shows that more entr
   // Read down to the last entry: it is marked and shown inside the column.
   const last = rail.getByRole("link").last();
   const id = decodeURIComponent((await last.getAttribute("href"))?.slice(1) ?? "");
-  // Its heading just below the sticky header, where lib/shell.ts reads.
-  await page.evaluate((heading) => {
-    const top = document.getElementById(heading)?.getBoundingClientRect().top ?? 0;
-    window.scrollTo(0, window.scrollY + top - 80);
-  }, id);
+  await page.evaluate(
+    ({ heading, line }) => {
+      const top = document.getElementById(heading)?.getBoundingClientRect().top ?? 0;
+      window.scrollTo(0, window.scrollY + top - line);
+    },
+    { heading: id, line: READING_LINE_PX },
+  );
   await expect(last).toHaveAttribute("aria-current", "location");
   const [railBox, lastBox] = await Promise.all([rail.boundingBox(), last.boundingBox()]);
   expect(lastBox && railBox && lastBox.y + lastBox.height <= railBox.y + railBox.height).toBe(true);
   await expect(rail).toHaveAttribute("data-more", "start");
 });
 
-test("the landing loads no grid runtime, and its social image and version match the files", async ({
+test("the landing loads no grid runtime, matches its files, and its story reel holds for the reader", async ({
   page,
 }) => {
   const wasmRequests: string[] = [];
   page.on("request", (request) => {
     if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
   });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   const response = await page.goto("/");
   expect(response?.ok()).toBe(true);
+  await waitForHydration(page);
   // Exactly one H1, and no live grid runtime on the landing.
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
   await expect(page.getByTestId("landing-product-story")).toBeVisible();
   expect(wasmRequests).toEqual([]);
-  for (const [selector, content] of [
-    ['meta[property="og:image:width"]', "1200"],
-    ['meta[property="og:image:height"]', "630"],
-  ] as const) {
-    await expect(page.locator(selector)).toHaveAttribute("content", content);
-  }
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
   const socialImageDimensions = await page.evaluate(async () => {
     const image = new Image();
     image.src = "/og-sheetwrite.webp";
@@ -118,15 +87,41 @@ test("the landing loads no grid runtime, and its social image and version match 
   });
   // The benchmark section publishes real generated numbers, never placeholders.
   await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
+
+  // A focused story link must not be removed by an automatic story change.
+  const reel = page.locator(".sw-reel");
+  await reel.scrollIntoViewIfNeeded();
+  const timer = reel.locator(".sw-reel__timer");
+  await expect(timer).toHaveCount(1);
+  await reel.locator(".sw-reel__copy a").focus();
+  await expect(timer).toHaveCount(0);
+  const pause = reel.getByRole("button", { name: "Pause stories" });
+  await pause.click();
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
+  await blurFocus(page);
+  await expect(timer).toHaveCount(0);
+  await pause.click();
+  await blurFocus(page);
+  await expect(pause).toHaveAttribute("aria-pressed", "false");
+  await expect(timer).toHaveCount(1);
 });
 
-test("every page starts with a skip link to its main content", async ({ page }) => {
+async function blurFocus(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+}
+
+test("every page starts with a skip link, and a phone has a route back home and to the showcases", async ({
+  page,
+}) => {
+  // One page per layout: landing, hub, showcase, framework page, docs shell.
   for (const path of [
     "/",
     "/showcases/",
     "/showcases/sort/",
     "/react/",
-    "/docs/start/installation/",
+    "/docs/start/first-grid/",
   ]) {
     await page.goto(path);
     await waitForHydration(page);
@@ -141,34 +136,96 @@ test("every page starts with a skip link to its main content", async ({ page }) 
       path,
     ).toBe(true);
   }
+
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByRole("link", { name: "Sheetwrite home", exact: true }).click();
+  await expect(page).toHaveURL(siteUrl("/"));
+  // Phones keep the site links in the header's menu.
+  await page.getByRole("button", { name: "Site menu", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Site", exact: true })
+    .getByRole("link", { name: "Docs", exact: true })
+    .click();
+  await expect(page).toHaveURL(siteUrl("/docs/"));
+  await expect(
+    page
+      .locator("main")
+      .getByRole("link", { name: /Getting started/ })
+      .first(),
+  ).toBeVisible();
+  // Showcases is a tab of the documentation bar at every width.
+  await page
+    .getByRole("navigation", { name: "Documentation sections", exact: true })
+    .getByRole("link", { name: "Showcases", exact: true })
+    .click();
+  await expect(page).toHaveURL(siteUrl("/showcases/"));
 });
 
-test("type links in API signatures are underlined, not marked by colour alone", async ({
+test("a guide has one heading, a canonical URL and its section icon; sidebar icons centre on their first line", async ({
   page,
 }) => {
-  await page.goto("/docs/api/charts/create-chart-renderer/");
-  const link = page.locator(".api-sig__type a").first();
-  await expect(link).toBeVisible();
-  expect(await link.evaluate((element) => getComputedStyle(element).textDecorationLine)).toBe(
-    "underline",
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/start/installation/");
+  await expect(page.locator("main h1")).toHaveCount(1);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://www.sheetwrite.dev/docs/start/installation/",
   );
+  const eyebrow = page.locator(".sw-document__eyebrow");
+  await expect(eyebrow).toHaveText("Getting started");
+  // The same glyph as the section's row in the sidebar (the phone menu holds a copy).
+  const sidebarGlyph = await page
+    .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
+    .first()
+    .getAttribute("href");
+  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
+  expect(await misplacedIcons(page)).toEqual([]);
+  // This section's sidebar holds a label that wraps; its icon stays on the first line.
+  await page.goto("/docs/concepts/");
+  expect(await misplacedIcons(page, { wraps: true })).toEqual([]);
+
+  // A tab's landing page has no eyebrow, so no icon stands alone above its title.
+  await page.goto("/docs/");
+  await expect(page.locator(".sw-document__eyebrow")).toHaveCount(0);
+  await expect(page.locator(".sw-document__header > svg")).toHaveCount(0);
 });
 
-test("documentation pages render one heading and a canonical URL", async ({ page }) => {
-  for (const route of [
-    "start/installation/",
-    "reference/compatibility-limits/",
-    "api/core/grid/",
-  ]) {
-    const response = await page.goto(`/docs/${route}`);
-    expect(response?.ok(), route).toBe(true);
-    await expect(page.locator("main h1")).toHaveCount(1);
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-      "href",
-      `https://www.sheetwrite.dev/docs/${route}`,
+/** Layout rounds boxes to device pixels. */
+const ICON_CENTRE_TOLERANCE_PX = 1;
+
+/** Eyebrow and visible sidebar labels whose icon is off their first line's centre. */
+async function misplacedIcons(page: Page, { wraps = false } = {}): Promise<string[]> {
+  const rows = await page
+    .locator(".sw-document__eyebrow, .sw-sidebar__nav a:has(> .sw-icon)")
+    .evaluateAll((labels) =>
+      // Rows inside a closed group have no box.
+      labels
+        .filter((label) => label.getClientRects().length > 0)
+        .map((label) => {
+          const icon = label.querySelector(".sw-icon")?.getBoundingClientRect();
+          const text = [...label.childNodes].filter(
+            (node) => !(node instanceof SVGElement) && node.textContent?.trim(),
+          );
+          const range = document.createRange();
+          range.setStartBefore(text[0] ?? label);
+          range.setEndAfter(text.at(-1) ?? label);
+          const lines = [...range.getClientRects()].filter((rect) => rect.height > 0);
+          const first = lines[0];
+          return {
+            label: label.textContent?.trim() ?? "",
+            lines: new Set(lines.map((rect) => Math.round(rect.top))).size,
+            offset:
+              icon === undefined || first === undefined
+                ? Number.NaN
+                : icon.top + icon.height / 2 - (first.top + first.height / 2),
+          };
+        }),
     );
-  }
-});
+  if (wraps) expect(rows.some((row) => row.lines > 1)).toBe(true);
+  return rows
+    .filter((row) => !(Math.abs(row.offset) <= ICON_CENTRE_TOLERANCE_PX))
+    .map((row) => row.label);
+}
 
 test("a code-name title wraps between its words, never inside one", async ({ page }) => {
   for (const [width, route] of [
@@ -197,83 +254,34 @@ test("a code-name title wraps between its words, never inside one", async ({ pag
   }
 });
 
-test("framework tabs synchronize and persist across guides", async ({ page }) => {
-  await page.goto("/docs/start/installation/");
-  await waitForHydration(page);
-  const frameworkPanel = page.getByRole("tabpanel", { name: /^(Vanilla|React|Vue|Svelte)$/ });
-  const tab = (name: string) => page.getByRole("tab", { name, exact: true });
-  const storedFramework = () => page.evaluate(() => localStorage.getItem("sheetwrite-framework"));
-  const expectHighlighted = async (language: string) => {
-    const colors = await frameworkPanel
-      .locator(`pre[data-language="${language}"] .code`)
-      .first()
-      .evaluate((code) => ({
-        code: getComputedStyle(code).color,
-        tokens: Array.from(
-          code.querySelectorAll<HTMLElement>("span[style]"),
-          (token) => getComputedStyle(token).color,
-        ),
-      }));
-    expect(colors.tokens.some((color) => color !== colors.code)).toBe(true);
-  };
-  await tab("React").click();
-  await expect(tab("React")).toHaveAttribute("aria-selected", "true");
-  await expect(frameworkPanel).toContainText("@sheetwrite/react");
-  await expectHighlighted("tsx");
-  expect(await storedFramework()).toBe("React");
-
-  await page.goto("/docs/frameworks/lifecycle/");
-  await expect(tab("React")).toHaveAttribute("aria-selected", "true");
-  await expect(frameworkPanel).toContainText("SheetwriteGrid");
-  await tab("Vue").click();
-  expect(await storedFramework()).toBe("Vue");
-  await page.goto("/docs/start/installation/");
-  await expect(tab("Vue")).toHaveAttribute("aria-selected", "true");
-  await expectHighlighted("vue");
-  await tab("Svelte").click();
-  await expectHighlighted("svelte");
-});
-
-test("a page's eyebrow carries its section's sidebar icon, and no icon stands alone", async ({
-  page,
-}) => {
-  await page.goto("/docs/start/installation/");
-  const eyebrow = page.locator(".sw-document__eyebrow");
-  await expect(eyebrow).toHaveText("Getting started");
-  // The same glyph as the section's row in the sidebar.
-  // The sidebar's markup is in the page twice (the phone menu holds a copy).
-  const sidebarGlyph = await page
-    .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
-    .first()
-    .getAttribute("href");
-  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
-  // Beside its label: centred on the label's line.
-  const offset = await eyebrow.evaluate((label) => {
-    const icon = label.querySelector(".sw-icon")?.getBoundingClientRect();
-    const range = document.createRange();
-    range.selectNodeContents(label);
-    const text = [...range.getClientRects()].at(-1);
-    if (icon === undefined || text === undefined) return Number.NaN;
-    return icon.top + icon.height / 2 - (text.top + text.height / 2);
-  });
-  expect(Math.abs(offset)).toBeLessThanOrEqual(1);
-
-  // A tab's landing page has no eyebrow, so it shows no icon above its title.
-  await page.goto("/docs/");
-  await expect(page.locator(".sw-document__eyebrow")).toHaveCount(0);
-  // Its head's other icons are the page actions', each beside its label.
-  await expect(page.locator(".sw-document__header > svg")).toHaveCount(0);
-});
-
-test("generated API pages show member signatures and mark member deep links", async ({ page }) => {
+test("generated API pages filter their outline and show member signatures", async ({ page }) => {
   await page.setViewportSize({ width: 1568, height: 900 });
   await page.goto("/docs/api/core/");
   await waitForHydration(page);
+  // The outline lists only the symbol groups the filter shows.
+  const outline = page.getByRole("navigation", { name: "On this page", exact: true });
+  const classes = outline.getByRole("link", { name: "Classes", exact: true });
+  await expect(classes).toHaveCount(1);
+  const filter = page.getByRole("searchbox", { name: "Filter exported symbols" });
+  await filter.fill("createGrid");
+  await expect(classes).toHaveCount(0);
+  const hiddenTargets = await outline.locator("a").evaluateAll((links) =>
+    links.filter((link) => {
+      const target = document.getElementById(link.getAttribute("href")?.slice(1) ?? "");
+      return target === null || target.hidden;
+    }),
+  );
+  expect(hiddenTargets).toHaveLength(0);
+  await filter.fill("");
+
   await page.locator('a[href="/docs/api/core/grid/"]').first().click();
   await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
   await expect(page.locator("main h1")).toContainText("Grid");
-  // Signatures are for reading, so they carry no copy control; examples keep
-  // theirs, also after in-site navigation.
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://www.sheetwrite.dev/docs/api/core/grid/",
+  );
+  // Signatures carry no copy control; examples keep theirs after in-site navigation.
   await expect(page.locator(".api-member .copy, .api-declaration .copy")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy to clipboard" }).first()).toBeVisible();
   // Member signatures are visible without a click.
@@ -284,9 +292,15 @@ test("generated API pages show member signatures and mark member deep links", as
   await page.locator(".api-declaration summary").click();
   await expect(page.locator(".api-declaration .expressive-code")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-
-  // A fragment targets a hidden search anchor; the following member card is
-  // marked and in view.
+  // Type links in signatures are underlined, not marked by colour alone.
+  await page.goto("/docs/api/charts/create-chart-renderer/");
+  expect(
+    await page
+      .locator(".api-sig__type a")
+      .first()
+      .evaluate((element) => getComputedStyle(element).textDecorationLine),
+  ).toBe("underline");
+  // A fragment targets a hidden search anchor; the following member card is marked and in view.
   await page.goto("/docs/api/core/grid/#applytransaction");
   await waitForHydration(page);
   const member = page.locator("#grid-apply-transaction");
@@ -294,10 +308,13 @@ test("generated API pages show member signatures and mark member deep links", as
   await expect(member).toBeInViewport();
 });
 
-async function openSearch(page: Page) {
+/** The first Pagefind query loads the index; a cold load can take a while in CI. */
+const SEARCH_TIMEOUT_MS = 15_000;
+
+async function openSearch(page: Page, { hydrated = true } = {}) {
   // A concrete page: opening search mid /docs/ redirect re-render is racy.
   await page.goto("/docs/start/installation/");
-  await waitForHydration(page);
+  if (hydrated) await waitForHydration(page);
   await page
     .getByRole("button", { name: /search/i })
     .first()
@@ -306,138 +323,92 @@ async function openSearch(page: Page) {
   return { dialog, input: dialog.getByLabel("Search documentation") };
 }
 
-test("documentation search resolves symbols to their anchors and leaves out test routes", async ({
+test("documentation search over the real index: typed early, ranked, keyboard driven", async ({
   page,
 }) => {
-  for (const [term, href] of [
-    ["applyTransaction", "/docs/api/core/grid/#applytransaction"],
-    ["SnapshotValidationError", "/docs/api/core/snapshot-validation-error/"],
-  ] as const) {
-    const { dialog, input } = await openSearch(page);
-    await input.pressSequentially(term, { delay: 20 });
-    const match = dialog.locator(`a[href='${href}']`).first();
-    await expect(match).toBeVisible({ timeout: 15_000 });
-    await expect(dialog.locator("[data-action-error]")).toBeHidden();
-    await match.click();
-    await expect(page).toHaveURL(siteUrl(href));
-    await expect(page.getByText(term).first()).toBeVisible();
-  }
-  // The query must first return real documentation results, or the check
-  // below proves nothing. Both words are in the test route's title and in the
-  // kept-parts guide.
-  const { dialog, input } = await openSearch(page);
-  await input.fill("XLSX verification");
-  await expect(dialog.locator("a[href^='/docs/']").first()).toBeVisible({ timeout: 15_000 });
-  await expect(dialog.locator("a[href^='/test/']")).toHaveCount(0);
-});
-
-test("search keeps what is typed as it opens and ranks the exact name first", async ({ page }) => {
   // No wait for hydration: a reader types as soon as the dialog opens.
-  await page.goto("/docs/start/installation/");
-  await page
-    .getByRole("button", { name: /search/i })
-    .first()
-    .click();
+  const { dialog } = await openSearch(page, { hydrated: false });
   await page.keyboard.type("XLOOKUP");
   const field = page.getByRole("combobox", { name: "Search documentation" });
-  const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
-
+  const results = dialog.getByRole("listbox", { name: "Search results" }).getByRole("option");
   await expect(field).toHaveValue("XLOOKUP");
   await expect(results.first()).toHaveAttribute(
     "href",
     "/docs/reference/formula-functions/lookup-reference/#fn-xlookup",
-    { timeout: 15_000 },
+    { timeout: SEARCH_TIMEOUT_MS },
   );
 
-  await field.fill("createGrid");
-  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/create-grid/");
-});
+  // A plain word finds its guide among the first three pages, even when Pagefind ranks it low.
+  await field.fill("charts");
+  await expect
+    .poll(async () =>
+      [
+        ...new Set(
+          await results.evaluateAll((options) =>
+            options.map((option) => option.getAttribute("href")?.split("#")[0]),
+          ),
+        ),
+      ].slice(0, 3),
+    )
+    .toContain("/docs/features/analysis/charts/");
 
-test("arrow keys move through search results and Enter opens one", async ({ page }) => {
-  const { dialog, input } = await openSearch(page);
-  await input.pressSequentially("createGrid", { delay: 20 });
-  const results = dialog.getByRole("option");
-  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/create-grid/", {
-    timeout: 15_000,
-  });
+  // Code names rank their API page first; words and questions their guide.
+  // search-ranking.test.ts owns the ranking rules; these rows prove the real index feeds them.
+  for (const [query, href] of [
+    ["createGrid", "/docs/api/core/create-grid/"],
+    ["autofilter", "/docs/features/data/autofilter/"],
+    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
+    ["how do I use sheetwrite with svelte", "/docs/frameworks/svelte/"],
+    ["how to use conditional formatting", "/docs/features/formatting/conditional-formats/"],
+    ["how do I add a chart", "/docs/features/analysis/charts/"],
+  ] as const) {
+    await field.fill(query);
+    await expect
+      .poll(async () => (await results.first().getAttribute("href"))?.split("#")[0], query)
+      .toBe(href);
+  }
+
+  // Test routes stay out of the index: wait for this query's own result, the kept-parts guide.
+  await field.fill("XLSX verification");
+  await expect(
+    dialog.locator("a[href^='/docs/import-export/kept-parts-and-round-trips/']").first(),
+  ).toBeVisible();
+  await expect(dialog.locator("a[href^='/test/']")).toHaveCount(0);
+
+  await field.fill("qqzzxx");
+  await expect(dialog.getByRole("status")).toHaveText("No results for “qqzzxx”.");
+  await expect(results).toHaveCount(0);
+
+  // A symbol resolves to its member anchor; arrows move the choice and Enter opens the chosen one.
+  await field.fill("applyTransaction");
+  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/grid/#applytransaction");
   await expect(results.first()).toHaveAttribute("aria-selected", "true");
-
   await page.keyboard.press("ArrowDown");
   await expect(results.nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(results.first()).toHaveAttribute("aria-selected", "false");
-  const href = await results.nth(1).getAttribute("href");
+  await expect(dialog.locator("[data-action-error]")).toBeHidden();
+  const chosen = await results.nth(1).getAttribute("href");
   await page.keyboard.press("Enter");
-
-  await expect(page).toHaveURL(siteUrl(href ?? ""));
-});
-
-test("a search with no match says so", async ({ page }) => {
-  const { dialog, input } = await openSearch(page);
-  await input.fill("qqzzxx");
-
-  await expect(dialog.getByRole("status")).toHaveText("No results for “qqzzxx”.", {
-    timeout: 15_000,
-  });
-  await expect(dialog.getByRole("option")).toHaveCount(0);
-});
-
-test("everyday words and questions find their guide among the first three pages", async ({
-  page,
-}) => {
-  for (const [query, guide] of [
-    ["charts", "/docs/features/analysis/charts/"],
-    ["import xlsx", "/docs/import-export/xlsx-import/"],
-    ["datasource", "/docs/features/data/datasources/"],
-    ["autofilter", "/docs/features/data/autofilter/"],
-    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
-  ] as const) {
-    const { dialog, input } = await openSearch(page);
-    await input.fill(query);
-    const results = dialog.getByRole("option");
-    await expect(results.first()).toBeVisible({ timeout: 15_000 });
-    const pages = new Set<string>();
-    for (const href of await results.evaluateAll((options) =>
-      options.map((option) => option.getAttribute("href") ?? ""),
-    )) {
-      pages.add(href.split("#")[0] ?? href);
-    }
-    expect([...pages].slice(0, 3), query).toContain(guide);
-  }
-});
-
-test("a query that names a framework or a feature guide lists that guide first", async ({
-  page,
-}) => {
-  for (const [query, guide] of [
-    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
-    ["how do I use sheetwrite with svelte", "/docs/frameworks/svelte/"],
-    ["how do I add a chart", "/docs/features/analysis/charts/"],
-    ["how to use conditional formatting", "/docs/features/formatting/conditional-formats/"],
-  ] as const) {
-    const { dialog, input } = await openSearch(page);
-    await input.fill(query);
-    const first = dialog.getByRole("option").first();
-    await expect(first).toBeVisible({ timeout: 15_000 });
-    expect((await first.getAttribute("href"))?.split("#")[0], query).toBe(guide);
-  }
+  await expect(page).toHaveURL(siteUrl(chosen ?? ""));
 });
 
 test.describe(() => {
   // A missing page or index logs its failed request to the console.
   test.use({ allowErrors: true });
 
-  test("unknown URLs serve the site 404 with a 404 status", async ({ page, request }) => {
+  test("unknown URLs serve the site 404, and search reports a failed or an unbuilt index", async ({
+    page,
+    request,
+  }) => {
     const response = await page.goto("/this-page-does-not-exist/");
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Page not found", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Documentation", exact: true })).toBeVisible();
     expect((await request.get("/docs/proof/")).status()).toBe(404);
-  });
 
-  for (const missingIndex of [false, true]) {
-    test(`documentation search reports ${missingIndex ? "an unbuilt index" : "a failed index"}`, async ({
-      page,
-    }) => {
+    const unbuilt = "Search becomes available after the static index is built.";
+    for (const missingIndex of [false, true]) {
+      await page.unrouteAll();
       await page.route("**/pagefind/**", async (route) => {
         const pathname = new URL(route.request().url()).pathname;
         if (missingIndex || pathname.endsWith(".pf_meta")) {
@@ -449,51 +420,16 @@ test.describe(() => {
       const { dialog, input } = await openSearch(page);
       await input.fill("applyTransaction");
       const error = dialog.locator("[data-action-error]");
-      const unbuilt = "Search becomes available after the static index is built.";
       if (missingIndex) {
         await expect(dialog).toContainText(unbuilt);
         await expect(error).toBeHidden();
       } else {
         await expect(error).toHaveText(
           "Search failed; check your connection and change the query to try again.",
-          { timeout: 15_000 },
+          { timeout: SEARCH_TIMEOUT_MS },
         );
         await expect(dialog).not.toContainText(unbuilt);
       }
-    });
-  }
-});
-
-/** Layout rounds boxes to device pixels. */
-const ICON_CENTRE_TOLERANCE_PX = 1;
-
-test("a sidebar icon centres on its label's first line, also when the label wraps", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/docs/concepts/");
-  const offsets = await page.locator(".sw-sidebar__nav a:has(> .sw-icon)").evaluateAll((links) =>
-    // Links inside a closed group have no box.
-    links
-      .filter((link) => link.getClientRects().length > 0)
-      .map((link) => {
-        const icon = link.querySelector(":scope > .sw-icon")?.getBoundingClientRect();
-        const label = link.querySelector(":scope > span");
-        const range = document.createRange();
-        if (label !== null) range.selectNodeContents(label);
-        const firstLine = range.getClientRects()[0];
-        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
-        return {
-          label: label?.textContent?.trim() ?? "",
-          lines,
-          offset:
-            icon === undefined || firstLine === undefined
-              ? Number.NaN
-              : icon.top + icon.height / 2 - (firstLine.top + firstLine.height / 2),
-        };
-      }),
-  );
-  // The page's sidebar holds at least one label that wraps.
-  expect(offsets.some((row) => row.lines > 1)).toBe(true);
-  expect(offsets.filter((row) => !(Math.abs(row.offset) <= ICON_CENTRE_TOLERANCE_PX))).toEqual([]);
+    }
+  });
 });

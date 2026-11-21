@@ -31,8 +31,8 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, "IDBKeyRange");
 });
 
-describe("persistence conformance", () => {
-  it("passes against the IndexedDB showcase adapter with bounded tails and reopen", async () => {
+describe("IndexedDB showcase adapter", () => {
+  it("passes persistence conformance with bounded tails and reopen", async () => {
     const options = {
       databaseName: "sheetwrite-conformance",
       compaction: { maxTailRecords: 4 },
@@ -58,10 +58,8 @@ describe("persistence conformance", () => {
     });
     // The eight shared checks, then the bounded-tail and reopen checks.
     expect(report.checks).toHaveLength(12);
-    // Eight fill commits over a four-record ceiling must have compacted: the
-    // snapshot record advances while the surviving tail stays bounded. Write
-    // gauges belong to the instance that performed the commits; the reopened
-    // instance proves reads and durable state.
+    // Eight fill commits over a four-record ceiling compacted; the writer's
+    // gauges belong to the instance that made the commits.
     const stats = adapter.stats();
     expect(report.headVersion).toBe(10);
     expect(stats.currentVersion).toBe(10);
@@ -91,6 +89,36 @@ describe("persistence conformance", () => {
     expect(stats.snapshotVersion).toBe(1);
     expect(stats.currentVersion).toBe(1);
     expect(stats.tailLength).toBe(0);
+    adapter.close();
+  });
+
+  it("applies an atomic batch whole or not at all, and answers its replay with the last version", async () => {
+    const adapter = await ShowcaseIndexedDbAdapter.open(makePersistenceConformanceSnapshot(), {
+      databaseName: "showcase-batch",
+    });
+    const request = {
+      documentId: "persistence-conformance",
+      baseVersion: 0,
+      clientMutationId: "batch-m1",
+      operations: [0, 1].map((row) => ({
+        op: "set" as const,
+        addr: { sheet: "s1", row, col: 1 },
+        value: { kind: "literal" as const, value: row },
+      })),
+      versionOperationCounts: [1, 1],
+    };
+
+    expect(await adapter.commitBatch(request)).toMatchObject({ status: "applied", version: 2 });
+    expect(await adapter.commitBatch(request)).toMatchObject({ status: "duplicate", version: 2 });
+    const conflict = await adapter.commitBatch({ ...request, clientMutationId: "batch-m2" });
+    expect(conflict).toMatchObject({ status: "conflict", currentVersion: 2 });
+    if (conflict.status === "conflict") {
+      const since = conflict.operationsSinceBase?.map((entry) => entry.clientMutationId);
+      expect(since).toEqual(["batch-m1", "batch-m1"]);
+    }
+    // The stale batch stored nothing.
+    expect(adapter.stats()).toMatchObject({ currentVersion: 2, tailLength: 2 });
+    expect((await adapter.load("persistence-conformance")).version).toBe(2);
     adapter.close();
   });
 });

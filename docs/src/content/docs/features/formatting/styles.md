@@ -253,6 +253,7 @@ The built-in widgets (toolbar, find bar, menus, panels and the dashboard) read w
 | `--sheetwrite-toolbar-bg` | Toolbar background | theme `headerBg` |
 | `--sheetwrite-toolbar-fg` | Toolbar text | theme `headerFg` |
 | `--sheetwrite-menu-hover` | Context-menu item hover background | theme `gridLine` |
+| `--sheetwrite-tab-font` | Sheet tabs, their menu, and the shell's status text | theme `font`, one step up the type scale (13 px gives 14 px) |
 | `--sheetwrite-widget-muted` | Secondary text | `--sheetwrite-widget-fg` mixed 62% with `--sheetwrite-widget-bg` |
 | `--sheetwrite-widget-muted-bg` | Dashboard background under its cards | `--sheetwrite-widget-fg` mixed 4% with `--sheetwrite-widget-bg` |
 | `--sheetwrite-widget-error` | Error text and outlines | red mixed 80% with `--sheetwrite-widget-fg` |

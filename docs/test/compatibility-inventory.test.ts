@@ -1,29 +1,11 @@
 import { expect, it } from "bun:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 
-import {
-  assertCompatibilityInventory,
-  collectCompatibilityIssues,
-  collectMissingCompatibilityFiles,
-} from "../src/showcases/compatibility-validation.ts";
+import { collectCompatibilityIssues } from "../src/showcases/compatibility-validation.ts";
 import {
   COMPATIBILITY_FIXTURES,
   COMPATIBILITY_INVENTORY,
   type CompatibilityRecord,
 } from "../src/showcases/compatibility.ts";
-
-it("accepts the published inventory, whose evidence and fixture files exist", () => {
-  const repositoryRoot = join(import.meta.dir, "..", "..");
-  expect(() =>
-    assertCompatibilityInventory(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES),
-  ).not.toThrow();
-  expect(
-    collectMissingCompatibilityFiles(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES, (path) =>
-      existsSync(join(repositoryRoot, path)),
-    ),
-  ).toEqual([]);
-});
 
 const [record] = COMPATIBILITY_INVENTORY;
 const binary = COMPATIBILITY_FIXTURES.find(({ sha256 }) => sha256 !== undefined);

@@ -28,13 +28,25 @@ beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
 });
 
+const disposers: (() => void)[] = [];
+
 afterEach(() => {
+  for (const dispose of disposers.splice(0)) dispose();
   restoreStubs();
   document.body.replaceChildren();
 });
 
 function range(r0: number, c0: number, r1: number, c1: number): Range {
   return { sheet: "s1", start: { row: r0, col: c0 }, end: { row: r1, col: c1 } };
+}
+
+function mount(): ReturnType<typeof mountGridWithData> {
+  const mounted = mountGridWithData(10);
+  disposers.push(
+    () => mounted.grid.destroy(),
+    () => mounted.store.dispose(),
+  );
+  return mounted;
 }
 
 /** Type `text` into the cell at view `row`, `col` and press Enter. */
@@ -54,7 +66,7 @@ async function settle(): Promise<void> {
 
 describe("data validation rules with formulas", () => {
   it("takes a list's items from a range and follows edits to it", async () => {
-    const { grid, host, store } = mountGridWithData(10);
+    const { grid, host, store } = mount();
     grid.setValidationRule({
       id: "city",
       range: range(0, 0, 9, 0),
@@ -75,12 +87,10 @@ describe("data validation rules with formulas", () => {
     enter(host, grid, 1, 0, "Paris");
     await settle();
     expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Paris");
-    grid.destroy();
-    store.dispose();
   });
 
   it("takes a list from a defined name", () => {
-    const { grid, store } = mountGridWithData(10);
+    const { grid, store } = mount();
     store.applyTransaction({
       patches: [{ op: "setNamedRange", namedRange: { name: "Cities", range: range(0, 2, 2, 2) } }],
     });
@@ -98,12 +108,10 @@ describe("data validation rules with formulas", () => {
       }).status;
     expect(set("Berlin")).toBe("applied");
     expect(set("Paris")).toBe("rejected");
-    grid.destroy();
-    store.dispose();
   });
 
   it("checks formula bounds and a custom formula in each cell", async () => {
-    const { grid, host, store } = mountGridWithData(10);
+    const { grid, host, store } = mount();
     // B holds 0.5, 10.5, 20.5…: each value must stay below the cell above it plus 100.
     grid.setValidationRule({
       id: "bound",
@@ -131,12 +139,10 @@ describe("data validation rules with formulas", () => {
     enter(host, grid, 3, 0, "Someone new");
     await settle();
     expect(store.getCell({ sheet: "s1", row: 3, col: 0 }).resolved).toBe("Someone new");
-    grid.destroy();
-    store.dispose();
   });
 
   it("moves a rule's formulas with inserted rows", () => {
-    const { grid, store } = mountGridWithData(10);
+    const { grid, store } = mount();
     grid.setValidationRule({
       id: "city",
       range: range(0, 0, 3, 0),
@@ -147,8 +153,6 @@ describe("data validation rules with formulas", () => {
     const rule = store.getWorkbook().sheets[0]?.validationRules?.[0];
     expect(rule?.range).toEqual(range(2, 0, 5, 0));
     expect(rule?.condition).toEqual({ kind: "list", source: "=$C$7:$C$9" });
-    grid.destroy();
-    store.dispose();
   });
 });
 
@@ -197,7 +201,7 @@ describe("Data Validation command", () => {
   });
 
   it("creates a list rule from the dialog and edits it again", async () => {
-    const { grid, host, store } = mountGridWithData(10);
+    const { grid, host, store } = mount();
     grid.setSelection({ kind: "range", range: range(0, 2, 4, 2) });
     grid.actions.dataValidation();
     const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
@@ -233,12 +237,10 @@ describe("Data Validation command", () => {
     expect(store.getWorkbook().sheets[0]?.validationRules?.map((rule) => rule.range)).toEqual([
       range(0, 2, 4, 2),
     ]);
-    grid.destroy();
-    store.dispose();
   });
 
   it("asks before it erases several kinds of rule", async () => {
-    const { grid, host, store } = mountGridWithData(10);
+    const { grid, host, store } = mount();
     grid.setValidationRule({ id: "a", range: range(0, 0, 0, 0), ...settings });
     grid.setValidationRule({
       id: "b",
@@ -253,8 +255,6 @@ describe("Data Validation command", () => {
     await answerDialog(host, "No");
     expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
     expect(store.getWorkbook().sheets[0]?.validationRules).toHaveLength(2);
-    grid.destroy();
-    store.dispose();
   });
 });
 
@@ -271,6 +271,19 @@ describe("the work a data validation check does", () => {
         policy,
       },
     }));
+  }
+
+  /** A fill of A1:A`rows`, Berlin in every other row and Paris between. */
+  function berlinOrParis(rows: number): DocumentOp {
+    return {
+      op: "setRange",
+      range: range(0, 0, rows - 1, 0),
+      cells: Array.from({ length: rows }, (_, row) => ({
+        rowOffset: row,
+        colOffset: 0,
+        value: { kind: "literal" as const, value: row % 2 === 0 ? "Berlin" : "Paris" },
+      })),
+    };
   }
 
   /** Count the reads of the source column C, rows 1 to `rows`, in `store`. */
@@ -311,19 +324,7 @@ describe("the work a data validation check does", () => {
     store.applyTransaction({ patches: listRules(1, rows) });
     const sourceReads = countSourceReads(store, rows);
 
-    const result = store.applyTransaction({
-      patches: [
-        {
-          op: "setRange",
-          range: range(0, 0, rows - 1, 0),
-          cells: Array.from({ length: rows }, (_, row) => ({
-            rowOffset: row,
-            colOffset: 0,
-            value: { kind: "literal" as const, value: row % 2 === 0 ? "Berlin" : "Paris" },
-          })),
-        },
-      ],
-    });
+    const result = store.applyTransaction({ patches: [berlinOrParis(rows)] });
     expect(result.status).toBe("applied");
     expect(result.status === "applied" ? result.warnings : []).toHaveLength(rows / 2);
     expect(sourceReads()).toBe(1);
@@ -335,19 +336,7 @@ describe("the work a data validation check does", () => {
     const store = new SheetwriteStore(makeWorkbook(rows), makeColumnarData(rows));
     store.applyTransaction({ patches: listRules(300, rows) });
 
-    const result = store.applyTransaction({
-      patches: [
-        {
-          op: "setRange",
-          range: range(0, 0, rows - 1, 0),
-          cells: Array.from({ length: rows }, (_, row) => ({
-            rowOffset: row,
-            colOffset: 0,
-            value: { kind: "literal" as const, value: row % 2 === 0 ? "Berlin" : "Paris" },
-          })),
-        },
-      ],
-    });
+    const result = store.applyTransaction({ patches: [berlinOrParis(rows)] });
     // 300 warnings for each of the 2,000 cells outside the list.
     expect(result.status).toBe("applied");
     expect(result.status === "applied" ? (result.warnings ?? []).length : 0).toBe(600_000);

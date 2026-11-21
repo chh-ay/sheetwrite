@@ -161,8 +161,9 @@ describe("prebuilt docs deployment", () => {
     },
   );
 
-  it("serves directory indexes and assets with the site fallback for unknown URLs", async () => {
+  it("serves pages, assets and the RSS feed with cache headers, redirects and a 404 fallback", async () => {
     const root = await fixture();
+    await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
     await prepareDocsDeployment(root);
     for (const [url, contents] of [
       ["/", builtFiles["index.html"]],
@@ -173,100 +174,49 @@ describe("prebuilt docs deployment", () => {
       ["/sitemap.xml", builtFiles["sitemap.xml"]],
       ["/pagefind/pagefind-entry.json", builtFiles["pagefind/pagefind-entry.json"]],
     ] as const) {
-      expect((await requestPackagedFile(root, url))?.body).toEqual(Buffer.from(contents));
+      const response = await requestPackagedFile(root, url);
+      expect(response?.body).toEqual(Buffer.from(contents));
+      // Stable URLs must revalidate, or a deployment would serve stale pages and search entries.
+      const hashed = url === "/assets/client.wasm";
+      expect(response?.headers["cache-control"]).toBe(
+        hashed ? "public, max-age=31536000, immutable" : undefined,
+      );
+      expect(response?.headers["content-type"]).toBeUndefined();
+    }
+    for (const url of [
+      "/pagefind/fragment/en_020da39.pf_fragment",
+      "/pagefind/pagefind.en_6e131784e9.pf_meta",
+    ]) {
+      expect((await requestPackagedFile(root, url))?.headers["cache-control"]).toBe(
+        "public, max-age=31536000, immutable",
+      );
+    }
+    const feed = await requestPackagedFile(root, "/changelog/rss.xml");
+    expect(feed?.body).toEqual(Buffer.from('<rss version="2.0" />'));
+    expect(feed?.headers["content-type"]).toBe("application/rss+xml; charset=utf-8");
+    for (const url of ["/docs", "/docs/start/installation"]) {
+      const response = await requestPackagedFile(root, url);
+      expect(response?.status).toBe(308);
+      expect(response?.headers.Location).toBe(`${url}/`);
     }
     for (const url of ["/missing", "/docs/missing/", "/assets/missing.js"]) {
       const response = await requestPackagedFile(root, url);
       expect(response?.body).toEqual(Buffer.from(builtFiles["404.html"]));
       expect(response?.status).toBe(404);
     }
-  });
-
-  it("redirects each page's address without its trailing slash to the address with it", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const url of ["/docs", "/docs/start/installation"]) {
-      const response = await requestPackagedFile(root, url);
-      expect(response?.status).toBe(308);
-      expect(response?.headers.Location).toBe(`${url}/`);
-    }
-  });
-
-  it("caches only content-hashed files as immutable", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    const cacheControl = async (url: string) =>
-      (await requestPackagedFile(root, url))?.headers["cache-control"];
-    for (const url of [
-      "/assets/client.wasm",
-      "/pagefind/fragment/en_020da39.pf_fragment",
-      "/pagefind/pagefind.en_6e131784e9.pf_meta",
+    // Every old page, merged showcase and removed API page, with or without its trailing slash.
+    for (const redirects of [
+      Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
+      Object.entries(MOVED_SHOWCASES),
+      Object.entries(REMOVED_API_PAGES),
     ]) {
-      expect(await cacheControl(url)).toBe("public, max-age=31536000, immutable");
-    }
-    // Stable URLs must revalidate, or a deployment would serve stale pages and search entries.
-    for (const url of [
-      "/",
-      "/docs/",
-      "/docs/start/installation/",
-      "/sitemap.xml",
-      "/pagefind/pagefind-entry.json",
-    ]) {
-      expect(await requestPackagedFile(root, url)).not.toBeNull();
-      expect(await cacheControl(url)).toBeUndefined();
-    }
-  });
-});
-
-describe("feed type", () => {
-  it("serves the changelog feed as RSS", async () => {
-    const root = await fixture();
-    await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
-    await prepareDocsDeployment(root);
-    const response = await requestPackagedFile(root, "/changelog/rss.xml");
-    expect(response?.body).toEqual(Buffer.from('<rss version="2.0" />'));
-    expect(response?.headers["content-type"]).toBe("application/rss+xml; charset=utf-8");
-    expect(
-      (await requestPackagedFile(root, "/sitemap.xml"))?.headers["content-type"],
-    ).toBeUndefined();
-  });
-});
-
-describe("moved docs pages", () => {
-  it("redirects every old address, with or without its trailing slash, to its new page", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    const moved = Object.entries(MOVED_PAGES);
-    expect(moved.length).toBeGreaterThan(0);
-    for (const [from, page] of moved) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(page.to);
-      }
-    }
-  });
-
-  it("redirects every merged showcase to the showcase that holds its story now", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(to);
-      }
-    }
-  });
-
-  it("redirects each API page of a removed export to the page of what replaces it", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const [from, to] of Object.entries(REMOVED_API_PAGES)) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(to);
+      expect(redirects.length).toBeGreaterThan(0);
+      for (const [from, to] of redirects) {
+        for (const pathname of [from, from.slice(0, -1)]) {
+          const response = await requestPackagedFile(root, pathname);
+          expect(response?.status).toBe(308);
+          expect(response?.headers.Location).toBe(to);
+        }
       }
     }
   });

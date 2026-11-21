@@ -9,3 +9,5 @@ export const FILL_HANDLE_HIT_RADIUS = 5;
 export const DEFAULT_SHEET_ID = "sheet1";
 /** Default maximum number of distinct values read for filters and pivots. */
 export const DEFAULT_DISTINCT_VALUES_LIMIT = 1000;
+/** Height of the sheet-tab bar, in CSS pixels; `shell.css` gives the shell's bottom row the same. */
+export const TAB_BAR_HEIGHT = 30;

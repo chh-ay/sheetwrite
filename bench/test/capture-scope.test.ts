@@ -34,7 +34,7 @@ it("binds a scope receipt to the exact artifact bytes of a declared release suit
   }
 });
 
-it("matches effective affinity per suite, including legacy single-slot receipts", () => {
+it("matches effective affinity per suite, legacy receipts included, and fails closed otherwise", () => {
   const formula = { label: "formula", metadata: { cpuSlot: 4, effectiveCpuAffinity: "4,6" } };
   const baseline = [{ label: "data", metadata: { cpuSlot: 4 } }, formula];
   const candidate = [
@@ -47,9 +47,6 @@ it("matches effective affinity per suite, including legacy single-slot receipts"
     formula: "4,6",
     "chart-tracking": "4",
   });
-});
-
-it("rejects a mask mismatch and an overridden capture without its effective affinity", () => {
   const narrow = [{ label: "formula", metadata: { cpuSlot: 4, effectiveCpuAffinity: "4" } }];
   const wide = [{ label: "formula", metadata: { cpuSlot: 4, effectiveCpuAffinity: "4,6" } }];
   expect(() => matchingCaptureAffinities(narrow, wide)).toThrow(

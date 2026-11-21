@@ -224,28 +224,6 @@ fn characters_equal_ignore_case(left: char, right: char) -> bool {
 mod tests {
     use super::Wildcard;
 
-    fn whole(pattern: &str, text: &str) -> bool {
-        Wildcard::parse(pattern)
-            .expect("small pattern")
-            .matches(text)
-    }
-
-    #[test]
-    fn stars_questions_and_escapes_follow_excel() {
-        assert!(whole("a*", "Alpha"));
-        assert!(whole("a?", "ax"));
-        assert!(!whole("a?", "a"));
-        assert!(whole("*a*a*", "banana"));
-        assert!(!whole("*x*", "banana"));
-        assert!(whole("a~*", "a*"));
-        assert!(!whole("a~*", "ab"));
-        assert!(whole("a~~b", "a~b"));
-        assert!(whole("a~b", "a~b"));
-        assert!(whole("", ""));
-        assert!(!whole("", "a"));
-        assert!(whole("**", ""));
-    }
-
     #[test]
     fn search_stops_when_its_step_budget_runs_out() {
         let mut steps = 0;

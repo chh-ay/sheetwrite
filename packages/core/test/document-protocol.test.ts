@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { deflateSync } from "fflate";
 
 import {
+  CheckedSnapshot,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
@@ -10,6 +11,7 @@ import {
   documentOpTarget,
   type MergeScanStats,
   overlappingMergeIndices,
+  recheckSnapshotResources,
   resolveTransactionResourceLimits,
   validateDocumentOperationShape,
   validateTransactionResources,
@@ -293,60 +295,46 @@ describe("workbook document protocol", () => {
       when: { kind: "greaterThan", value: 0 },
       style: { bold: true },
     };
+    const cellPath = "sheets[0].cells[0].cells[0]";
+    const outsideRange = (sheet: string, endRow: number) => ({
+      sheet,
+      start: { row: 0, col: 0 },
+      end: { row: endRow, col: 0 },
+    });
     const cases: Array<{ value: unknown; path: string; code?: DocumentValidationError["code"] }> = [
-      {
-        value: withFirstBlock({ startRow: 0.5 }),
-        path: "sheets[0].cells[0].startRow",
-      },
-      {
-        value: withFirstBlock({ rowCount: 0 }),
-        path: "sheets[0].cells[0].rowCount",
-      },
-      {
-        value: withFirstCell({ rowOffset: "0" }),
-        path: "sheets[0].cells[0].cells[0].rowOffset",
-      },
-      {
-        value: withFirstCell({ value: { kind: "unknown" } }),
-        path: "sheets[0].cells[0].cells[0].value.kind",
-      },
+      { value: withFirstBlock({ startRow: 0.5 }), path: "sheets[0].cells[0].startRow" },
+      { value: withFirstBlock({ rowCount: 0 }), path: "sheets[0].cells[0].rowCount" },
+      { value: withFirstCell({ rowOffset: "0" }), path: `${cellPath}.rowOffset` },
+      { value: withFirstCell({ value: { kind: "unknown" } }), path: `${cellPath}.value.kind` },
       {
         value: withFirstCell({ value: { kind: "formula", src: 1 } }),
-        path: "sheets[0].cells[0].cells[0].value.src",
+        path: `${cellPath}.value.src`,
       },
       {
         value: withFirstCell({ value: { kind: "ref", target: null } }),
-        path: "sheets[0].cells[0].cells[0].value.target",
+        path: `${cellPath}.value.target`,
       },
-      {
-        value: withFirstCell({ style: null }),
-        path: "sheets[0].cells[0].cells[0].style",
-      },
-      {
-        value: withFirstCell({ style: { bold: "yes" } }),
-        path: "sheets[0].cells[0].cells[0].style.bold",
-      },
+      { value: withFirstCell({ style: null }), path: `${cellPath}.style` },
+      { value: withFirstCell({ style: { bold: "yes" } }), path: `${cellPath}.style.bold` },
       {
         // Families land inside a canvas font string; quotes and separators would inject.
         value: withFirstCell({ style: { fontFamily: 'Arial"; color: red' } }),
-        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+        path: `${cellPath}.style.fontFamily`,
       },
       {
         value: withFirstCell({ style: { fontFamily: "Arial, serif" } }),
-        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+        path: `${cellPath}.style.fontFamily`,
       },
       {
         value: withFirstCell({ style: { verticalAlign: "center" } }),
-        path: "sheets[0].cells[0].cells[0].style.verticalAlign",
+        path: `${cellPath}.style.verticalAlign`,
       },
       {
         value: withFirstCell({ style: { numberFormat: "0".repeat(256) } }),
-        path: "sheets[0].cells[0].cells[0].style.numberFormat",
+        path: `${cellPath}.style.numberFormat`,
       },
       {
-        value: withFirstSheet({
-          conditionalFormats: [{ ...conditionalFormat, range: null }],
-        }),
+        value: withFirstSheet({ conditionalFormats: [{ ...conditionalFormat, range: null }] }),
         path: "sheets[0].conditionalFormats[0].range",
       },
       {
@@ -354,10 +342,7 @@ describe("workbook document protocol", () => {
           conditionalFormats: [
             {
               ...conditionalFormat,
-              range: {
-                ...conditionalFormat.range,
-                start: { row: 0.25, col: 0 },
-              },
+              range: { ...conditionalFormat.range, start: { row: 0.25, col: 0 } },
             },
           ],
         }),
@@ -368,7 +353,7 @@ describe("workbook document protocol", () => {
           ...cell,
           value: { kind: "ref", target: { sheet: "missing", row: 0, col: 0 } },
         }),
-        path: "sheets[0].cells[0].cells[0].value.target",
+        path: `${cellPath}.value.target`,
         code: "missing-reference",
       },
       {
@@ -376,29 +361,19 @@ describe("workbook document protocol", () => {
           ...cell,
           value: { kind: "ref", target: { sheet: "sheet-b", row: 99, col: 0 } },
         }),
-        path: "sheets[0].cells[0].cells[0].value.target",
+        path: `${cellPath}.value.target`,
         code: "out-of-bounds",
       },
       {
         value: withWorkbook({
-          namedRanges: [
-            {
-              name: "Missing",
-              range: { sheet: "missing", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-            },
-          ],
+          namedRanges: [{ name: "Missing", range: outsideRange("missing", 0) }],
         }),
         path: "workbook.namedRanges[0].range",
         code: "missing-reference",
       },
       {
         value: withWorkbook({
-          namedRanges: [
-            {
-              name: "Outside",
-              range: { sheet: "sheet-b", start: { row: 0, col: 0 }, end: { row: 9, col: 0 } },
-            },
-          ],
+          namedRanges: [{ name: "Outside", range: outsideRange("sheet-b", 9) }],
         }),
         path: "workbook.namedRanges[0].range",
         code: "out-of-bounds",
@@ -426,17 +401,18 @@ describe("workbook document protocol", () => {
     const nestedPrototype = Object.create({ inherited: true }) as Record<string, unknown>;
     nestedPrototype.value = "unsafe";
 
+    const valuePath = "sheets[0].cells[0].cells[0].value.value";
     const values: Array<{ value: unknown; path: string }> = [
-      { value: Number.NaN, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: Number.POSITIVE_INFINITY, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: Number.NEGATIVE_INFINITY, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: undefined, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: new Date(0), path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: Symbol("unsafe"), path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: 1n, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: accessor, path: "sheets[0].cells[0].cells[0].value.value.value" },
-      { value: nestedPrototype, path: "sheets[0].cells[0].cells[0].value.value" },
-      { value: sparse, path: "sheets[0].cells[0].cells[0].value.value[0]" },
+      { value: Number.NaN, path: `${valuePath}` },
+      { value: Number.POSITIVE_INFINITY, path: `${valuePath}` },
+      { value: Number.NEGATIVE_INFINITY, path: `${valuePath}` },
+      { value: undefined, path: `${valuePath}` },
+      { value: new Date(0), path: `${valuePath}` },
+      { value: Symbol("unsafe"), path: `${valuePath}` },
+      { value: 1n, path: `${valuePath}` },
+      { value: accessor, path: `${valuePath}.value` },
+      { value: nestedPrototype, path: `${valuePath}` },
+      { value: sparse, path: `${valuePath}[0]` },
     ];
 
     for (const testCase of values) {
@@ -758,6 +734,36 @@ describe("workbook document protocol", () => {
       path: "sheets[0].rowCount",
       code: "resource-limit",
     });
+  });
+
+  it("rechecks a checked snapshot against every limit as a second validation would", () => {
+    const accepted = validateWorkbookSnapshot(richSnapshot());
+    if (!accepted.ok) throw new Error("the rich snapshot is invalid");
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(accepted.value)).byteLength;
+    const checked = new CheckedSnapshot(accepted.value, serializedBytes);
+    const limits = [
+      { maxSheets: 2 },
+      { maxRowsPerSheet: 4 },
+      { maxColumnsPerSheet: 2 },
+      { maxMetadataEntries: 8 },
+      { maxSerializedBytes: serializedBytes },
+      { maxLogicalCellsPerSheet: 8 },
+      { maxDenseCells: 10, maxLocalPagedCells: 0 },
+      { maxLocalPagedCells: 10, maxDenseCells: 0 },
+    ] as const;
+    for (const resourceLimits of limits) {
+      const [resource, limit] = Object.entries(resourceLimits)[0]!;
+      for (const options of [
+        { resourceLimits },
+        { resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
+        { storage: "paged" as const, resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
+      ]) {
+        const expected = validateWorkbookSnapshot(accepted.value, options);
+        const rechecked = recheckSnapshotResources(checked, options);
+        expect(rechecked.ok).toBe(expected.ok);
+        if (!rechecked.ok && !expected.ok) expect(rechecked.errors).toEqual(expected.errors);
+      }
+    }
   });
 
   it("validates typed validation comparisons without weakening legacy bounds", () => {

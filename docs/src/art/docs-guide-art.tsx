@@ -1,7 +1,8 @@
-// Diagrams for the framework pages, the tutorials and the upgrade guides: who
-// owns the grid in each framework, the path a workbook takes in each tutorial,
-// and which old APIs map to which new ones. Every label comes from the page the
-// diagram sits on.
+// Diagrams for the framework pages, the tutorials, the upgrade guides and the
+// performance guides: who owns the grid in each framework, the path a workbook
+// takes in each tutorial, which old APIs map to which new ones, how an engine
+// releases its memory and how a change is checked for a slowdown. Every label
+// comes from the page the diagram sits on.
 import type { JSX } from "solid-js";
 
 import {
@@ -54,8 +55,8 @@ export function ReactAdapterDiagram() {
     <AdapterDiagram
       adapter={{
         title: "Who owns what with the React adapter",
-        app: { title: "Your component", lines: ["Owns columns, rows", "and saving"] },
-        component: { title: "<Sheetwrite>", code: ["columns", "defaultRows", "height"] },
+        app: { title: "Your component", lines: ["Owns columns, rows and saving"] },
+        component: { title: "<Sheetwrite>", code: ["columns · defaultRows", "height"] },
         props: "props",
         events: "onGridChange",
         creates: "creates",
@@ -72,8 +73,8 @@ export function VueAdapterDiagram() {
     <AdapterDiagram
       adapter={{
         title: "Who owns what with the Vue adapter",
-        app: { title: "Your component", lines: ["Owns columns, rows", "and saving"] },
-        component: { title: "<Sheetwrite>", code: [":columns", ":default-rows", ":height"] },
+        app: { title: "Your component", lines: ["Owns columns, rows and saving"] },
+        component: { title: "<Sheetwrite>", code: [":columns · :default-rows", ":height"] },
         props: "props",
         events: "@grid-change",
         creates: "creates",
@@ -90,8 +91,8 @@ export function SvelteAdapterDiagram() {
     <AdapterDiagram
       adapter={{
         title: "Who owns what with the Svelte adapter",
-        app: { title: "Your component", lines: ["Owns columns, rows", "and saving"] },
-        component: { title: "<Sheetwrite>", code: ["{columns}", "defaultRows", "height"] },
+        app: { title: "Your component", lines: ["Owns columns, rows and saving"] },
+        component: { title: "<Sheetwrite>", code: ["{columns} · defaultRows", "height"] },
         props: "props",
         events: "onGridChange",
         creates: "creates",
@@ -111,7 +112,8 @@ export function VanillaLifecycleDiagram() {
         app: { title: "Your code", lines: ["Owns the host element", "and the Grid's lifetime"] },
         component: {
           title: "initSheetwrite()",
-          code: ["then createGrid(", "  host,", "  { workbook, data })"],
+          code: ["createGrid(host, options)"],
+          lines: ["Called after it resolves"],
         },
         props: "await",
         events: "the Grid",
@@ -132,9 +134,9 @@ function TutorialFlow(
     <FlowFigure
       note="The first sheet's first row becomes the column keys; formulas and formatting aren't kept."
       steps={[
-        { title: "An .xlsx file", code: ["fromXlsxTable(", "  bytes, options)"] },
+        { title: "An .xlsx file", code: ["fromXlsxTable(bytes, options)"] },
         { ...props.host, tone: "accent" },
-        { title: "Save", code: ["toXlsxWorkbook(", "  grid)", "downloadBytes(…)"] },
+        { title: "Save", code: ["toXlsxWorkbook(grid)", "downloadBytes(…)"] },
       ]}
       text={{
         title: `From an XLSX file to a downloaded workbook in ${props.framework}`,
@@ -156,7 +158,7 @@ export function JavaScriptTutorialDiagram() {
       framework="JavaScript"
       host={{
         title: "Edit in a Grid",
-        code: ["grid.destroy()", "createGrid(host,", "  { workbook, data })"],
+        code: ["grid.destroy()", "createGrid(host, { … })"],
       }}
     />
   );
@@ -171,7 +173,7 @@ export function ReactTutorialDiagram() {
       framework="React"
       host={{
         title: "Edit in React",
-        code: ["<SheetwriteGrid", "  {...input}", "  onReady={…} />"],
+        code: ["<SheetwriteGrid>", "{...input} onReady={…}"],
       }}
     />
   );
@@ -184,7 +186,7 @@ export function VueTutorialDiagram() {
         "The imported workbook and data go to <SheetwriteGrid> together, which creates a new Grid generation published by @ready; the user edits it.",
       )}
       framework="Vue"
-      host={{ title: "Edit in Vue", code: ["<SheetwriteGrid", "  :workbook :data", "  @ready />"] }}
+      host={{ title: "Edit in Vue", code: ["<SheetwriteGrid>", ":workbook :data @ready"] }}
     />
   );
 }
@@ -198,7 +200,7 @@ export function SvelteTutorialDiagram() {
       framework="Svelte"
       host={{
         title: "Edit in Svelte",
-        code: ["<SheetwriteGrid", "  bind:grid={…}", "  onReady={…} />"],
+        code: ["<SheetwriteGrid>", "bind:grid onReady={…}"],
       }}
     />
   );
@@ -210,7 +212,7 @@ export function NodeTutorialDiagram() {
       note="No Grid, no formula engine and no DOM: formula source is kept, not recalculated."
       steps={[
         { title: "Input file", code: ["readFile(input)"], lines: ["Size checked first"] },
-        { title: "Snapshot", code: ["fromXlsxWorkbook(", "  bytes, options)"], tone: "accent" },
+        { title: "Snapshot", code: ["fromXlsxWorkbook(bytes, …)"], tone: "accent" },
         { title: "Output file", code: ["toXlsxWorkbook(…)", 'writeFile(out, { flag: "wx" })'] },
       ]}
       text={{
@@ -227,7 +229,7 @@ export function ShellTutorialDiagram() {
     <FanFigure
       source={{
         title: "createSpreadsheetShell(host, { grid, ribbon })",
-        lines: ["One shell owns one Grid and its chrome;", "shell.destroy() removes them all"],
+        lines: ["Owns one Grid and its chrome;", "shell.destroy() removes them all"],
       }}
       text={{
         title: "What the spreadsheet shell owns",
@@ -237,11 +239,11 @@ export function ShellTutorialDiagram() {
       tiles={[
         {
           title: "Ribbon",
-          lines: ["Home, Insert, Data,", "View; compact below", "768 px in auto mode"],
+          lines: ["Home, Insert, Data, View;", "compact below 768 px in auto mode"],
         },
-        { title: "Formula row", lines: ["Name box and", "formula bar"] },
-        { title: "Grid", lines: ["The one Grid,", "shell.grid"], tone: "muted" },
-        { title: "Bottom row", lines: ["Sheet tabs and", "selection status"] },
+        { title: "Formula row", lines: ["Name box and formula bar"] },
+        { title: "Grid", lines: ["The one Grid, shell.grid"], tone: "muted" },
+        { title: "Bottom row", lines: ["Sheet tabs and selection status"] },
       ]}
     />
   );
@@ -277,10 +279,10 @@ export function Upgrade070Diagram() {
     <MigrationDiagram
       changes={[
         ["grid.setSort(keys)", "grid.setViewSort(keys)"],
-        ["grid.sortBy(col) sorted the view", "grid.sortBy(col) sorts the cells"],
-        ["new RevisionCoordinator(…)", "HistoryArchive.open(\n  { documentId, storage })"],
-        ['import "@sheetwrite/xlsx/register"', "initSheetwrite({ addons: [xlsxAddon()] })"],
-        ["initSheetwrite(source, engine)", "initSheetwrite({ source, engine })"],
+        ["grid.sortBy(col)\n// sorted the view", "grid.sortBy(col)\n// sorts the cells"],
+        ["new RevisionCoordinator(…)", "HistoryArchive.open({ … })"],
+        ['import "…/xlsx/register"', "initSheetwrite({ addons })\n// addons: [xlsxAddon()]"],
+        ["initSheetwrite(source, engine)", "initSheetwrite(options)\n// { source, engine }"],
       ]}
       text={{
         title: "The main API changes in 0.7.0",
@@ -296,7 +298,7 @@ export function Upgrade060Diagram() {
     <FanFigure
       source={{
         title: "Before you upgrade to 0.6.0, review",
-        lines: ["Update every Sheetwrite package to the same release first"],
+        lines: ["Update all Sheetwrite packages", "to the same release first"],
       }}
       text={{
         title: "What to review when upgrading to 0.6.0",
@@ -306,13 +308,85 @@ export function Upgrade060Diagram() {
       tiles={[
         {
           title: "Formula results",
-          lines: ["Volatile recalculation,", "OFFSET, INDIRECT,", "reference operators"],
+          lines: ["Volatile recalculation, OFFSET,", "INDIRECT, reference operators"],
           tone: "muted",
         },
         { title: "Documents", code: ["setCalculation", "xlsxSource"] },
-        { title: "Imported looks", lines: ["Bottom alignment,", "OOXML widths"] },
-        { title: "UI additions", lines: ["Opt in when", "you want them"] },
+        { title: "Imported looks", lines: ["Bottom alignment, OOXML widths"] },
+        { title: "UI additions", lines: ["Opt in when you want them"] },
       ]}
+    />
+  );
+}
+
+/** The Memory page: what `releaseEngineMemory` moves, and what stays when it can't. */
+export function EngineMemoryReleaseDiagram() {
+  return (
+    <FlowFigure
+      note="The report gives committed linear-memory bytes before and after; a release does not always lower them."
+      outcome={{
+        from: 1,
+        kind: "fail",
+        step: {
+          title: "Preparation fails",
+          lines: ["Every live store stays", "on the original instance"],
+          tone: "danger",
+        },
+      }}
+      steps={[
+        { title: "An idle point", lines: ["After a large import, clear", "or workbook disposal"] },
+        {
+          title: "Release",
+          code: ["await releaseEngineMemory()"],
+          lines: ["Waits for transactions, page loads"],
+        },
+        {
+          title: "A fresh engine instance",
+          lines: ["Every live store moves in:", "cells, styles, results, history"],
+          tone: "accent",
+        },
+      ]}
+      text={{
+        title: "What releaseEngineMemory does",
+        description:
+          "At an idle point, such as after a large import, clear or workbook disposal, releaseEngineMemory waits for synchronous transactions and active datasource page loads, then moves all live stores together into a fresh instance of the engine: cell sources, styles, cached formula results, resident pages, unsaved edits and undo history survive. If preparation fails, every live store stays on the original instance. The report gives committed linear-memory bytes before and after, and a release does not always lower them.",
+      }}
+    />
+  );
+}
+
+/** The Benchmark protocol page: the matched local regression check, from capture to verdict. */
+export function RegressionCheckDiagram() {
+  return (
+    <FlowFigure
+      outcome={{
+        from: 2,
+        kind: "fail",
+        step: {
+          title: "An unapproved slowdown",
+          lines: ["Fails the local command"],
+          tone: "danger",
+        },
+      }}
+      steps={[
+        { title: "Prepare", code: ["bench:render:prepare"] },
+        {
+          title: "Ten fresh rounds",
+          code: ["render-driver.ts --rounds 10"],
+          lines: ["Every raw sample kept"],
+        },
+        {
+          title: "Compare",
+          code: ["check.ts"],
+          lines: ["Against the committed baseline"],
+          tone: "accent",
+        },
+      ]}
+      text={{
+        title: "The matched local regression check",
+        description:
+          "On a controlled local machine, prepare the render benchmark, capture ten fresh matched rounds with render-driver.ts and keep every raw sample, then compare the fresh artifact with the committed baseline using check.ts. Any unapproved slowdown fails the local command.",
+      }}
     />
   );
 }
@@ -331,4 +405,6 @@ export const GUIDE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "tutorial-shell": ShellTutorialDiagram,
   "upgrade-0-7-0": Upgrade070Diagram,
   "upgrade-0-6-0": Upgrade060Diagram,
+  "engine-memory-release": EngineMemoryReleaseDiagram,
+  "regression-check": RegressionCheckDiagram,
 };

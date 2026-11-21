@@ -170,17 +170,17 @@ impl<'a> Parser<'a, '_> {
     fn postfix_at(&mut self, depth: usize) -> Result<Ast, String> {
         let mut value = self.unary_at(depth)?;
         #[cfg(feature = "analysis")]
-        while self.peek() == Some(&Tok::LParen) {
+        while matches!(self.peek(), Some(Tok::LParen)) {
             let _ = self.next();
             let mut args = vec![value];
-            if self.peek() != Some(&Tok::RParen) {
+            if !matches!(self.peek(), Some(Tok::RParen)) {
                 loop {
                     args.push(if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
                         Ast::Missing
                     } else {
                         self.expr_at(depth + 1)?
                     });
-                    if self.peek() != Some(&Tok::Comma) {
+                    if !matches!(self.peek(), Some(Tok::Comma)) {
                         break;
                     }
                     let _ = self.next();
@@ -193,7 +193,7 @@ impl<'a> Parser<'a, '_> {
                 args: args.into(),
             }));
         }
-        while self.peek() == Some(&Tok::Op('%')) {
+        while matches!(self.peek(), Some(Tok::Op('%'))) {
             let _ = self.next();
             value = Ast::Percent(Box::new(value));
         }
@@ -215,7 +215,7 @@ impl<'a> Parser<'a, '_> {
         }
         // Intersection binds tighter than every operator except `:`.
         let value = self.primary_at(depth)?;
-        if self.peek() == Some(&Tok::Intersect) {
+        if matches!(self.peek(), Some(Tok::Intersect)) {
             return self.intersection_at(value, depth);
         }
         Ok(value)
@@ -227,7 +227,7 @@ impl<'a> Parser<'a, '_> {
     #[cold]
     fn intersection_at(&mut self, first: Ast, depth: usize) -> Result<Ast, String> {
         let mut operands = vec![first];
-        while self.peek() == Some(&Tok::Intersect) {
+        while matches!(self.peek(), Some(Tok::Intersect)) {
             let _ = self.next();
             operands.push(self.primary_at(depth)?);
         }
@@ -236,7 +236,7 @@ impl<'a> Parser<'a, '_> {
 
     /// A number, or the first row of a whole-row range such as `1:3`.
     fn number_or_rows_at(&mut self, number: f64) -> Result<Ast, String> {
-        if self.peek() == Some(&Tok::Colon) {
+        if matches!(self.peek(), Some(Tok::Colon)) {
             if let Some(start) = AreaEnd::of(&Tok::Num(number)) {
                 let _ = self.next();
                 let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
@@ -254,9 +254,9 @@ impl<'a> Parser<'a, '_> {
             Some(Tok::Str(value)) => Ok(Ast::Str(value.into())),
             Some(Tok::LParen) => {
                 let first = self.expr_at(depth + 1)?;
-                let value = if self.peek() == Some(&Tok::Comma) {
+                let value = if matches!(self.peek(), Some(Tok::Comma)) {
                     let mut areas = vec![first];
-                    while self.peek() == Some(&Tok::Comma) {
+                    while matches!(self.peek(), Some(Tok::Comma)) {
                         let _ = self.next();
                         areas.push(self.expr_at(depth + 1)?);
                     }
@@ -293,7 +293,7 @@ impl<'a> Parser<'a, '_> {
                             "All rows of an array constant must have the same length.".into()
                         );
                     }
-                    if separator == Tok::RBrace {
+                    if matches!(separator, Tok::RBrace) {
                         break;
                     }
                     row_len = 0;
@@ -427,7 +427,7 @@ impl<'a> Parser<'a, '_> {
             return Ok(Ast::Bool(false));
         }
 
-        if self.peek() == Some(&Tok::Colon) {
+        if matches!(self.peek(), Some(Tok::Colon)) {
             if let Some(start) = AreaEnd::of_name(name.as_ref()) {
                 let _ = self.next();
                 let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
@@ -450,7 +450,7 @@ impl<'a> Parser<'a, '_> {
             self.features.lambdas = true;
         }
         let first = self.args.len();
-        if self.peek() != Some(&Tok::RParen) {
+        if !matches!(self.peek(), Some(Tok::RParen)) {
             loop {
                 let arg = if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
                     Ast::Missing
@@ -486,7 +486,7 @@ impl<'a> Parser<'a, '_> {
             }
         }
         let names_name = matches!(self.peek(), Some(Tok::Ident(name, false)) if parse_a1(name).is_none())
-            && self.cursor.peek_at(1) != Some(&Tok::Colon)
+            && !matches!(self.cursor.peek_at(1), Some(Tok::Colon))
             && names_workbook(&sheet_name);
         if names_name {
             let qualifier = if quoted {
@@ -551,7 +551,7 @@ impl<'a> Parser<'a, '_> {
         self.features.sheet_refs = true;
         let start = self.area_end("!")?;
         let (cell, (row_start, col_start, row_end, col_end, range_flags)) =
-            if self.peek() == Some(&Tok::Colon) {
+            if matches!(self.peek(), Some(Tok::Colon)) {
                 let _ = self.next();
                 (false, self.area_after_colon(start)?)
             } else if let AreaEnd::Cell(row, col, flags) = start {
@@ -607,7 +607,7 @@ impl<'a> Parser<'a, '_> {
     /// `A1#` refers to the whole spill of the formula in A1. It is stored as
     /// `ANCHORARRAY(A1)`, the form that XLSX files use.
     fn spill_suffix(&mut self, anchor: Ast) -> Ast {
-        if self.peek() == Some(&Tok::Hash) {
+        if matches!(self.peek(), Some(Tok::Hash)) {
             let _ = self.next();
             Ast::Func(Func::AnchorArray, (vec![anchor]).into())
         } else {
@@ -620,7 +620,7 @@ impl<'a> Parser<'a, '_> {
     fn sheet_range_end(&mut self, sheet_name: &str) -> Result<(String, AreaEnd), String> {
         let first = self.next();
         if let Some(Tok::Ident(end_sheet, _)) = &first {
-            if self.peek() == Some(&Tok::Bang) {
+            if matches!(self.peek(), Some(Tok::Bang)) {
                 let end_sheet_name = end_sheet.to_string();
                 let _ = self.next();
                 return Ok((end_sheet_name, self.area_end("!")?));
@@ -713,7 +713,7 @@ pub(crate) fn is_external_sheet(name: &str) -> bool {
 
 /// The error for a token after a complete formula.
 fn trailing_token_error(tok: &Tok<'_>) -> String {
-    if *tok == Tok::RParen {
+    if matches!(tok, Tok::RParen) {
         "This ) has no matching (.".into()
     } else {
         NOT_EXPECTED.into()
@@ -748,9 +748,10 @@ pub(crate) fn parse_bound_with_features(
 }
 
 fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
-    let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
+    let trimmed = src.trim();
+    let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
     let mut parser = Parser {
-        cursor: Cursor::over_text(trimmed),
+        cursor: Cursor::over_text(body),
         features: ParseFeatures::default(),
         sheets,
         args: PARSE_ARGS.take(),

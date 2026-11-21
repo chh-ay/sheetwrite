@@ -1,8 +1,12 @@
-import { describe, expect, it, jest } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, jest } from "bun:test";
 
-import type { PanePaint, RenderLayout, Theme, VisibleWindowView } from "../src/types.js";
+import type { SheetwriteError } from "../src/errors.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { installCanvasTestStubs } from "../src/testing.js";
+import type { GridEvents, PanePaint, RenderLayout, VisibleWindowView } from "../src/types.js";
 import { WorkerRenderer } from "../src/worker-renderer.js";
-import { createWorkerMessageHandler } from "../src/worker.js";
+import { createWorkerMessageHandler, type WorkerAcknowledgement } from "../src/worker.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let latestConstructedWorker: RecordingWorker | null = null;
 
@@ -26,52 +30,50 @@ class RecordingWorker extends EventTarget {
   terminate(): void {
     this.terminations += 1;
   }
+
+  fail(error: Error): void {
+    const event = new Event("error", { cancelable: true });
+    Object.defineProperties(event, { error: { value: error }, message: { value: error.message } });
+    this.dispatchEvent(event);
+  }
 }
+
+const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+const transferDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLCanvasElement.prototype,
+  "transferControlToOffscreen",
+);
+
+function restore(target: object, key: string, descriptor: PropertyDescriptor | undefined): void {
+  if (descriptor) Object.defineProperty(target, key, descriptor);
+  else Reflect.deleteProperty(target, key);
+}
+
+beforeEach(() => {
+  latestConstructedWorker = null;
+  const offscreen = new EventTarget();
+  Object.defineProperties(offscreen, {
+    width: { value: 0, writable: true },
+    height: { value: 0, writable: true },
+    getContext: { value: () => ({}) },
+  });
+  Object.defineProperty(globalThis, "Worker", { configurable: true, value: RecordingWorker });
+  Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
+    configurable: true,
+    value: () => offscreen,
+  });
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+  restore(globalThis, "Worker", workerDescriptor);
+  restore(HTMLCanvasElement.prototype, "transferControlToOffscreen", transferDescriptor);
+});
 
 function latestWorker(): RecordingWorker {
   const worker = latestConstructedWorker;
   if (!worker) throw new Error("worker was not constructed");
   return worker;
-}
-
-const TEST_THEME: Theme = {
-  font: "12px sans-serif",
-  bg: "#fff",
-  fg: "#111",
-  gridLine: "#ddd",
-  headerBg: "#eee",
-  headerFg: "#222",
-  selection: "#def",
-  selectionBorder: "#08f",
-  rowHeight: 20,
-  headerHeight: 24,
-  rowHeaderWidth: 40,
-  searchMatch: "#ff0",
-  searchActiveMatch: "#fa0",
-  highlight: "#cfc",
-};
-
-interface SharedPaintPost {
-  type: "paintPackedShared";
-  shared: {
-    buffer: SharedArrayBuffer;
-    offsets: {
-      valueKinds: number;
-      numberValues: number;
-      stringPoolIds: number;
-      stringLocalIds: number;
-      styleIds: number;
-      stringPoolUpdateIds: number;
-    };
-    lengths: {
-      valueKinds: number;
-      numberValues: number;
-      stringPoolIds: number;
-      stringLocalIds: number;
-      styleIds: number;
-      stringPoolUpdateIds: number;
-    };
-  };
 }
 
 interface TransferablePackedArrays {
@@ -81,52 +83,6 @@ interface TransferablePackedArrays {
   stringLocalIds: Int32Array;
   styleIds: Uint32Array;
   stringPoolUpdateIds?: Uint32Array;
-}
-
-interface PanePaintPost {
-  type: "paintPanes";
-  panes: unknown[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object";
-}
-
-function isTransferablePackedArrays(value: unknown): value is TransferablePackedArrays {
-  return (
-    isRecord(value) &&
-    value.valueKinds instanceof Uint8Array &&
-    value.numberValues instanceof Float64Array &&
-    value.stringPoolIds instanceof Uint32Array &&
-    value.stringLocalIds instanceof Int32Array &&
-    value.styleIds instanceof Uint32Array &&
-    (value.stringPoolUpdateIds === undefined || value.stringPoolUpdateIds instanceof Uint32Array)
-  );
-}
-
-function isPanePaintPost(value: unknown): value is PanePaintPost {
-  return isRecord(value) && value.type === "paintPanes" && Array.isArray(value.panes);
-}
-
-function firstPackedPane(value: unknown): TransferablePackedArrays {
-  if (!isPanePaintPost(value)) throw new Error("expected pane paint message");
-  const first = value.panes[0];
-  if (!isRecord(first) || !isTransferablePackedArrays(first.packed)) {
-    throw new Error("expected packed first pane");
-  }
-  return first.packed;
-}
-
-function isSharedPaintPost(value: unknown): value is SharedPaintPost {
-  if (!isRecord(value) || value.type !== "paintPackedShared" || !isRecord(value.shared)) {
-    return false;
-  }
-  const shared = value.shared;
-  return (
-    shared.buffer instanceof SharedArrayBuffer &&
-    isRecord(shared.offsets) &&
-    isRecord(shared.lengths)
-  );
 }
 
 function makePackedView(): VisibleWindowView {
@@ -169,7 +125,7 @@ function textDrawingWorker() {
     getContext: { value: () => context },
   });
   const handler = createWorkerMessageHandler(() => undefined);
-  handler({ type: "init", canvas, theme: TEST_THEME });
+  handler({ type: "init", canvas, theme: DEFAULT_THEME });
   handler({
     type: "layout",
     layout: {
@@ -211,8 +167,16 @@ describe("WorkerRenderer", () => {
     renderer.paint(makePackedView());
 
     expect(worker.messages).toHaveLength(3);
-    expect(isSharedPaintPost(worker.messages[0]!.message)).toBe(true);
-    expect(isSharedPaintPost(worker.messages[1]!.message)).toBe(true);
+    for (const { message } of worker.messages.slice(0, 2)) {
+      expect(message).toMatchObject({
+        type: "paintPackedShared",
+        shared: {
+          buffer: expect.any(SharedArrayBuffer),
+          offsets: expect.any(Object),
+          lengths: expect.any(Object),
+        },
+      });
+    }
 
     const fallback = worker.messages[2]!;
     expect(fallback.message).toMatchObject({
@@ -222,7 +186,7 @@ describe("WorkerRenderer", () => {
     });
     expect(fallback.transfer?.length).toBe(6);
   });
-  it("serializes packed and generic frozen panes with the exact transferable buffers", () => {
+  it("posts a generic frozen pane as is and transfers copies of a packed one", () => {
     const renderer = new WorkerRenderer();
     const worker = new RecordingWorker();
     Reflect.set(renderer, "worker", worker);
@@ -236,21 +200,10 @@ describe("WorkerRenderer", () => {
       styleIds: new Uint32Array([0]),
       styles: [{}],
     };
+    const clip = { x: 0, y: 0, w: 100, h: 40 };
     const panes: PanePaint[] = [
-      {
-        view: packed,
-        clip: { x: 0, y: 0, w: 100, h: 40 },
-        scrollTop: 0,
-        scrollLeft: 0,
-        rowTops: new Float64Array([0]),
-        rowHeights: new Float64Array([24]),
-      },
-      {
-        view: generic,
-        clip: { x: 100, y: 0, w: 200, h: 40 },
-        scrollTop: 20,
-        scrollLeft: 10,
-      },
+      { view: packed, clip, scrollTop: 0, scrollLeft: 0 },
+      { view: generic, clip, scrollTop: 20, scrollLeft: 10 },
     ];
 
     renderer.paintPanes(panes, { x: 100, y: null });
@@ -260,24 +213,16 @@ describe("WorkerRenderer", () => {
       type: "paintPanes",
       divider: { x: 100, y: null },
       panes: [
-        {
-          packed: { sheet: "s1", stringPoolEpoch: 17 },
-          view: undefined,
-          clip: panes[0]!.clip,
-          scrollTop: 0,
-          scrollLeft: 0,
-        },
-        {
-          packed: undefined,
-          view: generic,
-          clip: panes[1]!.clip,
-          scrollTop: 20,
-          scrollLeft: 10,
-        },
+        { packed: { sheet: "s1", stringPoolEpoch: 17 }, clip, scrollTop: 0, scrollLeft: 0 },
+        { packed: undefined, clip, scrollTop: 20, scrollLeft: 10 },
       ],
     });
     const posted = worker.messages[0]!;
-    const postedPacked = firstPackedPane(posted.message);
+    const message = posted.message as {
+      panes: Array<{ packed?: TransferablePackedArrays; view?: VisibleWindowView }>;
+    };
+    expect(message.panes.map((pane) => pane.view)).toEqual([undefined, generic]);
+    const postedPacked = message.panes[0]!.packed!;
     expect(posted.transfer).toEqual([
       postedPacked.valueKinds.buffer,
       postedPacked.numberValues.buffer,
@@ -314,26 +259,6 @@ describe("WorkerRenderer", () => {
 
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {
     jest.useFakeTimers();
-    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
-    const transferDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLCanvasElement.prototype,
-      "transferControlToOffscreen",
-    );
-    const offscreen = new EventTarget();
-    Object.defineProperties(offscreen, {
-      width: { value: 0, writable: true },
-      height: { value: 0, writable: true },
-      getContext: { value: () => ({}) },
-    });
-    Object.defineProperty(globalThis, "Worker", {
-      configurable: true,
-      value: RecordingWorker,
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
-      configurable: true,
-      value: () => offscreen,
-    });
-
     const failures: unknown[] = [];
     const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
     try {
@@ -344,9 +269,8 @@ describe("WorkerRenderer", () => {
         headerHeight: 24,
         totalRows: 0,
       };
-      const theme = TEST_THEME;
+      const theme = DEFAULT_THEME;
 
-      latestConstructedWorker = null;
       renderer.mount(host, theme);
       const worker = latestWorker();
       const canvas = host.querySelector("canvas");
@@ -391,18 +315,68 @@ describe("WorkerRenderer", () => {
       expect(host.querySelector("canvas")).toBeNull();
     } finally {
       renderer.destroy();
-      jest.useRealTimers();
-      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
-      else Reflect.deleteProperty(globalThis, "Worker");
-      if (transferDescriptor) {
-        Object.defineProperty(
-          HTMLCanvasElement.prototype,
-          "transferControlToOffscreen",
-          transferDescriptor,
-        );
-      } else {
-        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
-      }
+    }
+  });
+
+  it("keeps a fatal reason within the error text budget", () => {
+    const failures: SheetwriteError[] = [];
+    const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
+    renderer.mount(document.createElement("div"), DEFAULT_THEME);
+    latestWorker().emitMessage({ type: "fatal", reason: "x".repeat(100_000) });
+
+    expect(failures.map((error) => error.context?.failure)).toEqual(["fatal"]);
+    expect(failures[0]?.message.length).toBe(256);
+    renderer.destroy();
+  });
+
+  it("reports an unknown or unreadable request as fatal once", () => {
+    const replies: WorkerAcknowledgement[] = [];
+    const handle = createWorkerMessageHandler((reply) => replies.push(reply));
+
+    handle({ type: "repaint" });
+    handle(null);
+
+    expect(replies).toEqual([{ type: "fatal", reason: expect.any(String) }]);
+  });
+
+  it("falls back to the canvas exactly once when a constructed worker fails asynchronously", async () => {
+    await initSheetwrite();
+    const restoreStubs = installCanvasTestStubs();
+    try {
+      const host = mountHost();
+      const events: Array<GridEvents["renderer-fallback"]> = [];
+      const grid = new GridImpl(host, {
+        workbook: makeWorkbook(5),
+        data: makeColumnarData(5),
+        renderer: "worker",
+        workerUrl: "/worker-that-fails-after-construction.js",
+      });
+      grid.on("renderer-fallback", (event) => events.push(event));
+      expect(grid.rendererKind()).toBe("worker");
+      expect(host.querySelectorAll("canvas")).toHaveLength(1);
+      const worker = latestWorker();
+
+      const failure = new Error("module load failed");
+      worker.fail(failure);
+      await Promise.resolve();
+      worker.fail(new Error("duplicate failure"));
+      await Promise.resolve();
+
+      expect(grid.rendererKind()).toBe("canvas");
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        requested: "worker",
+        error: {
+          code: "renderer-fallback",
+          operation: "renderer-worker",
+          message: failure.message,
+        },
+      });
+      expect(worker.terminations).toBe(1);
+      grid.destroy();
+      expect(host.querySelectorAll("canvas")).toHaveLength(0);
+    } finally {
+      restoreStubs();
     }
   });
 });

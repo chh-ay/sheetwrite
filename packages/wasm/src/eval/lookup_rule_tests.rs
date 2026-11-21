@@ -4,14 +4,15 @@
 //! range with many readers give the listed result.
 
 use crate::store::CellStore;
-use crate::tests::support::{assert_close, number};
+use crate::tests::support::shown;
 
 /// Copies of a formula that make its ranges shared by several readers.
 const SHARED_COPIES: usize = 4;
 
 /// Columns: A mixed list, B ascending numbers with duplicates, C ascending
 /// text, D a list with an error, E results, F a list with formula cells, G
-/// descending numbers, H numbers around an infinity. Rows 1-10.
+/// descending numbers, H numbers around an infinity, I non-ASCII and mixed
+/// case text. Rows 1-10.
 fn store() -> (CellStore, usize) {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(12, 20);
@@ -59,6 +60,9 @@ fn store() -> (CellStore, usize) {
     store.set_number(sheet, 0, 7, 1.0, 0);
     store.set_number(sheet, 1, 7, f64::INFINITY, 0);
     store.set_number(sheet, 2, 7, 2.0, 0);
+
+    store.set_string(sheet, 0, 8, "café", 0);
+    store.set_string(sheet, 1, 8, "Key", 0);
     (store, sheet)
 }
 
@@ -70,10 +74,7 @@ fn result(source: &str, copies: usize) -> String {
     }
     store.recompute(sheet);
     let results: Vec<String> = (0..copies)
-        .map(|copy| {
-            let cell = store.get_cell(sheet, copy, 10);
-            cell.string().unwrap_or_else(|| cell.num().to_string())
-        })
+        .map(|copy| shown(&store, sheet, copy, 10))
         .collect();
     assert!(
         results.iter().all(|value| value == &results[0]),
@@ -97,6 +98,8 @@ const CASES: &[(&str, &str)] = &[
     ("=MATCH(\"BANANA\",C1:C6,0)", "2"),
     ("=XMATCH(\"banana\",C1:C6,0,-1)", "3"),
     ("=VLOOKUP(\"Cherry\",C1:E6,3,FALSE)", "40"),
+    ("=MATCH(\"CAFÉ\",I1:I2,0)", "1"),
+    ("=XMATCH(\"k*\",I1:I2,2)", "2"),
     // Blank, 0, "" and FALSE.
     ("=MATCH(0,A1:A10,0)", "4"),
     ("=MATCH(FALSE,A1:A10,0)", "4"),
@@ -180,34 +183,4 @@ fn lookup_results_match_the_recorded_rules() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-}
-
-/// Lookup results through the public formula surface: duplicates, sorted-mode
-/// validation, the blank/zero/empty/`FALSE` equivalences, case folding and
-/// error precedence.
-#[test]
-fn keys_compare_like_the_engine_for_blank_zero_empty_and_case() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(4, 8);
-    store.set_number(sheet, 0, 0, 0.0, 0);
-    store.set_string(sheet, 2, 0, "", 0);
-    store.set_bool(sheet, 3, 0, false, 0);
-    store.set_string(sheet, 4, 0, "café", 0);
-    store.set_string(sheet, 5, 0, "Key", 0);
-    for row in 0..6 {
-        store.set_number(sheet, row, 1, (row + 1) as f64, 0);
-    }
-    store.set_formula(sheet, 0, 2, "=VLOOKUP(0,A1:B6,2,FALSE)", 0);
-    store.set_formula(sheet, 1, 2, "=VLOOKUP(\"\",A1:B6,2,FALSE)", 0);
-    store.set_formula(sheet, 2, 2, "=VLOOKUP(FALSE,A1:B6,2,FALSE)", 0);
-    store.set_formula(sheet, 3, 2, "=VLOOKUP(\"CAFÉ\",A1:B6,2,FALSE)", 0);
-    store.set_formula(sheet, 4, 2, "=VLOOKUP(\"key\",A1:B6,2,FALSE)", 0);
-    store.set_formula(sheet, 5, 2, "=XMATCH(\"k*\",A1:A6,2)", 0);
-    store.recompute(sheet);
-    assert_close(number(&store, sheet, 0, 2), 1.0);
-    assert_close(number(&store, sheet, 1, 2), 2.0);
-    assert_close(number(&store, sheet, 2, 2), 2.0);
-    assert_close(number(&store, sheet, 3, 2), 5.0);
-    assert_close(number(&store, sheet, 4, 2), 6.0);
-    assert_close(number(&store, sheet, 5, 2), 6.0);
 }

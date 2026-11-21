@@ -14,10 +14,11 @@ import { scalarLabel } from "../panels/pivot-model.js";
 import { Scope } from "../scope.js";
 import { checkStylePart } from "../style-parts.js";
 import type { CellScalar } from "../types/cell.js";
-import type { ChartRenderer, MountedChart } from "../types/chart.js";
+import type { ChartDefinition, ChartRenderer, MountedChart } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
 import type {
   DashboardBox,
+  DashboardChartItem,
   DashboardItem,
   DashboardKpiItem,
   DashboardPivotItem,
@@ -81,6 +82,35 @@ interface Drag {
   readonly startY: number;
   box: DashboardBox;
 }
+
+/**
+ * An item with what it shows, read from the engine once per refresh: the
+ * refresh compares it with the last one and builds the item from it.
+ */
+type ItemView =
+  | {
+      readonly kind: "pivot";
+      readonly item: DashboardPivotItem;
+      readonly result: PivotResultView | null;
+    }
+  | {
+      readonly kind: "chart";
+      readonly item: DashboardChartItem;
+      readonly chart: ChartDefinition | undefined;
+      readonly output: PivotOutputRead | null;
+    }
+  | {
+      readonly kind: "kpi";
+      readonly item: DashboardKpiItem;
+      readonly output: PivotOutputRead | null;
+    }
+  | {
+      readonly kind: "slicer";
+      readonly item: DashboardSlicerItem;
+      /** The slicer column's distinct values; null when the column is missing. */
+      readonly values: CellScalar[] | null;
+      readonly output: PivotOutputRead | null;
+    };
 
 /** Mount the view into `viewport`, hidden until `show` names a dashboard. */
 export function mountDashboardView(grid: Grid, viewport: HTMLElement): DashboardView {
@@ -171,8 +201,11 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   const commit = (item: DashboardItem): boolean => {
     if (sheet === null) return false;
     const result = grid.applyTransaction({ patches: [{ op: "setDashboardItem", sheet, item }] });
+    const shown = message;
     message = result.status === "applied" ? null : TAKEN;
-    refresh(true);
+    // An applied change refreshed the view in its change event, so only a new
+    // message needs another build.
+    if (message !== shown) refresh(true);
     return result.status === "applied";
   };
 
@@ -299,7 +332,8 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       lifetime.signal,
     );
 
-  const renderItem = (item: DashboardItem): HTMLElement => {
+  const renderItem = (view: ItemView): HTMLElement => {
+    const { item } = view;
     const element = document.createElement("section");
     element.className = "sheetwrite-dashboard-item";
     element.tabIndex = 0;
@@ -320,21 +354,18 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const body = document.createElement("div");
     body.className = "sheetwrite-dashboard-item-body";
     const owner = sheet ?? grid.getActiveSheet();
-    if (item.kind === "pivot") renderPivot(body, grid, owner, item);
-    else if (item.kind === "chart") {
+    if (view.kind === "pivot") renderPivot(body, grid, owner, view);
+    else if (view.kind === "chart") {
       // The chart renderer draws into this box once the build is in the page.
-      body.dataset.chartId = item.chart;
+      body.dataset.chartId = view.item.chart;
       body.classList.add("sheetwrite-dashboard-chart");
-    } else if (item.kind === "kpi") {
-      const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
-      body.appendChild(output === null ? note(NEEDS_FULL_ENGINE) : kpiValue(item, output));
-    } else {
-      const kept = readOnly ? slicerSelection(item, overrides) : item.selected;
-      const withData = slicerValuesWithData(
-        item,
-        pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id)),
+    } else if (view.kind === "kpi") {
+      body.appendChild(
+        view.output === null ? note(NEEDS_FULL_ENGINE) : kpiValue(view.item, view.output),
       );
-      renderSlicer(body, grid, item, kept, withData, (next) => chooseSlicer(item, next));
+    } else {
+      const kept = readOnly ? slicerSelection(view.item, overrides) : view.item.selected;
+      renderSlicer(body, grid, view, kept, (next) => chooseSlicer(view.item, next));
     }
     element.appendChild(body);
 
@@ -353,7 +384,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     return element;
   };
 
-  const build = (): void => {
+  const build = (views: readonly ItemView[]): void => {
     root.replaceChildren();
     const status = document.createElement("p");
     status.className = "sheetwrite-dashboard-status";
@@ -364,36 +395,41 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     const container = document.createElement("div");
     container.className = "sheetwrite-dashboard-grid";
     container.style.gridAutoRows = `${DASHBOARD_ROW_HEIGHT}px`;
-    const list = items();
-    if (list.length === 0) {
+    if (views.length === 0) {
       const empty = document.createElement("p");
       empty.className = "sheetwrite-dashboard-empty";
       empty.textContent = "This dashboard is empty. Use Insert › PivotTable to add a pivot.";
       root.appendChild(empty);
     }
-    for (const item of list) container.appendChild(renderItem(item));
+    for (const view of views) container.appendChild(renderItem(view));
     root.appendChild(container);
+  };
+
+  /** The item with what it shows now; each item reads its pivot output once. */
+  const viewOf = (owner: SheetId, item: DashboardItem): ItemView => {
+    if (item.kind === "pivot") {
+      return { kind: "pivot", item, result: dashboardPivotResult(grid, owner, item.pivot) };
+    }
+    const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
+    if (item.kind === "chart") {
+      return { kind: "chart", item, chart: chartOf(grid.store, owner, item.chart), output };
+    }
+    if (item.kind === "kpi") return { kind: "kpi", item, output };
+    return { kind: "slicer", item, values: slicerValuesOf(grid.store, item), output };
   };
 
   /** Rebuild when the items, their results, editability or the message changed. */
   const refresh = (force = false): void => {
     const owner = sheet;
     if (owner === null) return;
-    const list = items();
-    const results = list.map((item) => {
-      if (item.kind === "pivot") return dashboardPivotResult(grid, owner, item.pivot);
-      const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
-      if (item.kind === "chart") return [chartOf(grid.store, owner, item.chart), output];
-      if (item.kind === "kpi") return output;
-      return [slicerValuesOf(grid.store, item), output];
-    });
-    const signature = JSON.stringify([list, results, readOnly, mode, message, [...overrides]]);
+    const views = items().map((item) => viewOf(owner, item));
+    const signature = JSON.stringify([views, readOnly, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
     rendered = signature;
 
     // Keep the focus on the same item through the rebuild.
     const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
-    build();
+    build(views);
     mountCharts();
     if (focused !== undefined && root.contains(document.activeElement) === false)
       focusItem(focused);
@@ -443,14 +479,13 @@ function renderPivot(
   body: HTMLElement,
   grid: Grid,
   sheet: SheetId,
-  item: DashboardPivotItem,
+  { item, result }: ItemView & { kind: "pivot" },
 ): void {
   if (!pivotsAvailable(grid)) {
     body.appendChild(note(NEEDS_FULL_ENGINE));
     return;
   }
 
-  const result = dashboardPivotResult(grid, sheet, item.pivot);
   if (result === null || result.status !== "ok") {
     body.appendChild(note(result?.error ?? "#REF!"));
     return;
@@ -530,16 +565,15 @@ function kpiValue(item: DashboardKpiItem, output: PivotOutputRead): HTMLElement 
 function renderSlicer(
   body: HTMLElement,
   grid: Grid,
-  item: DashboardSlicerItem,
+  { item, values, output }: ItemView & { kind: "slicer" },
   kept: readonly CellScalar[] | undefined,
-  withData: readonly CellScalar[] | null,
   choose: (next: CellScalar[] | undefined) => void,
 ): void {
-  const values = slicerValuesOf(grid.store, item);
   if (values === null) {
     body.appendChild(note("#REF!"));
     return;
   }
+  const withData = slicerValuesWithData(item, output);
 
   // Every value kept is no selection; a slicer always keeps at least one value, as in Excel.
   const select = (next: CellScalar[] | undefined): void => {

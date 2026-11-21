@@ -1,11 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { validateRenderGateArtifact } from "../src/render-gate.js";
-import {
-  parseRenderArtifact,
-  type RenderBenchmarkArtifact,
-  summarizeCompleteness,
-} from "../src/render-protocol.js";
+import { type RenderBenchmarkArtifact, summarizeCompleteness } from "../src/render-protocol.js";
 import {
   type DeepMutable,
   expectRejections,
@@ -39,9 +35,8 @@ test("accepts the exact full and smoke matrices and keeps them distinct", () => 
   );
 });
 
-test("keeps typed crash evidence but fails the gate closed", () => {
+test("fails the gate closed on typed crash evidence", () => {
   const failed = withFailedFirstCell(makeSmokeRenderArtifact(), { stage: "launch" });
-  expect(parseRenderArtifact(failed).completeness.failedKeys).toHaveLength(1);
   expect(() => validateRenderGateArtifact(failed, "smoke")).toThrow("contains failed cells");
 });
 

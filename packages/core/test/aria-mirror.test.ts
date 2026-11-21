@@ -2,12 +2,17 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
+import type { Column, Grid, GridOptions } from "../src/types.js";
+import { scrollerOf } from "./fixtures.js";
 
 const ROW_COUNT = 1_000;
 const HOST_WIDTH = 400;
 const HOST_HEIGHT = 240;
 const SCROLLED_ROWS = 100;
+/** Alternating wide and narrow columns: a sideways scroll changes how many fit the host. */
+const WIDE_SHEET_WIDTHS = Array.from({ length: 40 }, (_, col) => (col % 3 === 0 ? 150 : 60));
+/** Scrolled part of the first, 150 px column: one more column comes into the window. */
+const SCROLLED_LEFT_PX = 60;
 let restoreCanvas: () => void;
 let originalFrame: typeof requestAnimationFrame;
 let originalCancelFrame: typeof cancelAnimationFrame;
@@ -27,9 +32,7 @@ beforeEach(() => {
     frames.set(nextFrame, callback);
     return nextFrame;
   };
-  globalThis.cancelAnimationFrame = (id) => {
-    frames.delete(id);
-  };
+  globalThis.cancelAnimationFrame = (id) => frames.delete(id);
 });
 afterEach(() => {
   mounted?.grid.destroy();
@@ -49,36 +52,38 @@ function flushFrames(): void {
   }
 }
 
-function mount({ runFrames = true }: { runFrames?: boolean } = {}): {
-  grid: Grid;
-  host: HTMLElement;
-} {
+interface SheetSpec {
+  rowCount: number;
+  columns: Column[];
+  data?: GridOptions["data"];
+}
+
+const PRODUCTS: SheetSpec = {
+  rowCount: ROW_COUNT,
+  columns: [
+    { key: "product", header: "Product", type: "text", width: 140 },
+    { key: "qty", header: "Qty", type: "number", width: 100 },
+  ],
+  data: {
+    rowCount: ROW_COUNT,
+    columns: {
+      product: Array.from({ length: ROW_COUNT }, (_, row) => `Item ${row}`),
+      qty: Float64Array.from({ length: ROW_COUNT }, (_, row) => row * 2),
+    },
+  },
+};
+
+function mount(
+  { rowCount, columns, data }: SheetSpec = PRODUCTS,
+  { runFrames = true }: { runFrames?: boolean } = {},
+): { grid: Grid; host: HTMLElement } {
   const host = document.createElement("div");
   Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
   Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
   document.body.appendChild(host);
   const grid = createGrid(host, {
-    workbook: {
-      activeSheet: "s1",
-      sheets: [
-        {
-          id: "s1",
-          name: "One",
-          rowCount: ROW_COUNT,
-          columns: [
-            { key: "product", header: "Product", type: "text", width: 140 },
-            { key: "qty", header: "Qty", type: "number", width: 100 },
-          ],
-        },
-      ],
-    },
-    data: {
-      rowCount: ROW_COUNT,
-      columns: {
-        product: Array.from({ length: ROW_COUNT }, (_, row) => `Item ${row}`),
-        qty: Float64Array.from({ length: ROW_COUNT }, (_, row) => row * 2),
-      },
-    },
+    workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "One", rowCount, columns }] },
+    data,
     config: { toolbar: false, find: false, contextMenu: false },
   });
   mounted = { grid, host };
@@ -96,17 +101,23 @@ function gridCell(host: HTMLElement, row: number, col: number): HTMLElement | nu
   return mirror(host).querySelector<HTMLElement>(`[role="gridcell"][id$="-${row}-${col}"]`);
 }
 
-function rowIndices(host: HTMLElement): string[] {
-  return [...mirror(host).querySelectorAll('[role="row"]')].map(
-    (row) => row.getAttribute("aria-rowindex") ?? "",
-  );
+function scrollTo(host: HTMLElement, row: number, left = 0): void {
+  const scroller = scrollerOf(host);
+  scroller.scrollTop = row * DEFAULT_THEME.rowHeight;
+  scroller.scrollLeft = left;
+  scroller.dispatchEvent(new Event("scroll"));
 }
 
-function scrollTo(host: HTMLElement, row: number): void {
-  const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
-  if (!scroller) throw new Error("The grid scroller is missing");
-  scroller.scrollTop = row * DEFAULT_THEME.rowHeight;
-  scroller.dispatchEvent(new Event("scroll"));
+function rows(host: HTMLElement): Element[] {
+  return [...mirror(host).querySelectorAll('[role="row"]')];
+}
+
+function headers(host: HTMLElement): Element[] {
+  return [...mirror(host).querySelectorAll('[role="columnheader"]')];
+}
+
+function attrs(nodes: Element[], name: string): (string | null)[] {
+  return nodes.map((node) => node.getAttribute(name));
 }
 
 it("mirrors the painted window with its header, rows, values, notes and focus", () => {
@@ -118,13 +129,17 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   const id = mirror(host).id;
   expect(mirror(host).getAttribute("role")).toBe("grid");
   expect(host.getAttribute("role")).toBe("group");
+  // The grid role owns only rows, not the host's chrome.
+  expect(host.querySelector('[role="grid"]') === mirror(host)).toBe(true);
+  const owned = [...mirror(host).children].map((child) => child.getAttribute("role"));
+  expect(new Set(owned)).toEqual(new Set(["row"]));
   expect(mirror(host).getAttribute("aria-rowcount")).toBe(String(ROW_COUNT + 1));
   expect(host.getAttribute("aria-activedescendant")).toBe(`${id}-0-0`);
   // A spreadsheet shows blank columns after the sheet's own.
-  const headers = [...mirror(host).querySelectorAll('[role="columnheader"]')].slice(0, 3);
-  expect(headers.map((header) => header.textContent)).toEqual(["A", "B", "C"]);
-  expect(headers.map((header) => header.getAttribute("aria-colindex"))).toEqual(["1", "2", "3"]);
-  expect(rowIndices(host).slice(0, 3)).toEqual(["1", "2", "3"]);
+  const shown = headers(host).slice(0, 3);
+  expect(shown.map((header) => header.textContent)).toEqual(["A", "B", "C"]);
+  expect(attrs(shown, "aria-colindex")).toEqual(["1", "2", "3"]);
+  expect(attrs(rows(host), "aria-rowindex").slice(0, 3)).toEqual(["1", "2", "3"]);
   const focused = gridCell(host, 0, 0);
   expect(focused?.textContent).toBe("Item 0");
   expect(focused?.getAttribute("aria-selected")).toBe("true");
@@ -161,72 +176,15 @@ it("marks a selected column's header and a selected row", () => {
   const { grid, host } = mount();
   grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
   flushFrames();
-  const headers = [...mirror(host).querySelectorAll('[role="columnheader"]')].slice(0, 3);
-  expect(headers.map((header) => header.getAttribute("aria-selected"))).toEqual([
-    null,
-    "true",
-    null,
-  ]);
+  expect(attrs(headers(host), "aria-selected").slice(0, 3)).toEqual([null, "true", null]);
 
   grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
   flushFrames();
-  const rows = [...mirror(host).querySelectorAll('[role="row"]')];
-  expect(rows.map((row) => row.getAttribute("aria-selected")).slice(0, 4)).toEqual([
-    null,
-    null,
-    null,
-    "true",
-  ]);
-  expect(
-    [...mirror(host).querySelectorAll('[role="columnheader"]')].some((header) =>
-      header.hasAttribute("aria-selected"),
-    ),
-  ).toBe(false);
+  expect(attrs(rows(host), "aria-selected").slice(0, 4)).toEqual([null, null, null, "true"]);
+  expect(headers(host).some((header) => header.hasAttribute("aria-selected"))).toBe(false);
 });
 
-it("follows a scrolled window once the frame paints", () => {
-  const { host } = mount();
-
-  scrollTo(host, SCROLLED_ROWS);
-  flushFrames();
-
-  expect(rowIndices(host)[0]).toBe("1");
-  expect(rowIndices(host)).toContain(String(SCROLLED_ROWS + 2));
-  expect(rowIndices(host)).not.toContain("2");
-  expect(gridCell(host, SCROLLED_ROWS, 0)?.textContent).toBe(`Item ${SCROLLED_ROWS}`);
-  expect(gridCell(host, 0, 0)).toBeNull();
-});
-
-it("writes the mirror when the grid mounts, before any frame", () => {
-  const { host } = mount({ runFrames: false });
-
-  const headers = [...mirror(host).querySelectorAll('[role="columnheader"]')].slice(0, 2);
-  expect(headers.map((header) => header.textContent)).toEqual(["A", "B"]);
-  expect(gridCell(host, 0, 0)?.textContent).toBe("Item 0");
-});
-
-it("writes the mirror and aria-activedescendant of a synchronous paint in the same task", () => {
-  const { grid, host } = mount();
-  const id = mirror(host).id;
-
-  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-  grid.refresh();
-
-  expect(host.getAttribute("aria-activedescendant")).toBe(`${id}-2-1`);
-  expect(gridCell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
-  expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
-});
-
-it("owns only rows in the grid role, and not the host's chrome", () => {
-  const { host } = mount();
-  const grid = host.querySelector('[role="grid"]');
-
-  expect(grid === mirror(host)).toBe(true);
-  const owned = [...mirror(host).children].map((child) => child.getAttribute("role"));
-  expect(new Set(owned)).toEqual(new Set(["row"]));
-});
-
-it("names no missing element when the active cell is outside the mirrored window", () => {
+it("follows a scrolled window, naming no active cell outside it", () => {
   const { grid, host } = mount();
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
   flushFrames();
@@ -234,44 +192,81 @@ it("names no missing element when the active cell is outside the mirrored window
   scrollTo(host, SCROLLED_ROWS);
   flushFrames();
 
+  const indices = attrs(rows(host), "aria-rowindex");
+  expect(indices[0]).toBe("1");
+  expect(indices).toContain(String(SCROLLED_ROWS + 2));
+  expect(indices).not.toContain("2");
+  expect(gridCell(host, SCROLLED_ROWS, 0)?.textContent).toBe(`Item ${SCROLLED_ROWS}`);
+  expect(gridCell(host, 0, 0)).toBeNull();
   expect(host.hasAttribute("aria-activedescendant")).toBe(false);
   scrollTo(host, 0);
   flushFrames();
   expect(host.getAttribute("aria-activedescendant")).toBe(`${mirror(host).id}-0-0`);
 });
 
-it("reads each cell as the canvas shows it, in the cell's number format", () => {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
-  Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
-  document.body.appendChild(host);
-  const grid = createGrid(host, {
-    workbook: {
-      activeSheet: "s1",
-      sheets: [
-        {
-          id: "s1",
-          name: "One",
-          rowCount: 1,
-          columns: [
-            { key: "due", header: "Due", type: "number", width: 100, numberFormat: "yyyy-mm-dd" },
-            {
-              key: "rate",
-              header: "Rate",
-              type: "number",
-              width: 80,
-              cellStyle: { numberFormat: "0.0%" },
-            },
-            { key: "share", header: "Share", type: "general", width: 120 },
-          ],
-        },
-      ],
-    },
-    data: { rowCount: 1, columns: { due: [45351], rate: [0.125], share: [1 / 3] } },
-    config: { toolbar: false, find: false, contextMenu: false },
+it("keeps its cells when a sideways scroll changes how many columns show", () => {
+  const { host } = mount({
+    rowCount: ROW_COUNT,
+    columns: WIDE_SHEET_WIDTHS.map((width, col) => ({
+      key: `c${col}`,
+      header: `C${col}`,
+      type: "text",
+      width,
+    })),
   });
-  mounted = { grid, host };
+  const columnsBefore = headers(host).length;
+  const firstRow = rows(host)[1];
+  const firstCell = firstRow?.querySelector('[role="gridcell"]');
+
+  scrollTo(host, 0, SCROLLED_LEFT_PX);
   flushFrames();
+
+  const shown = headers(host);
+  expect(shown.length).toBe(columnsBefore + 1);
+  // The nodes stay; the new column's cells are added to them.
+  expect(rows(host)[1] === firstRow).toBe(true);
+  expect(firstRow?.querySelector('[role="gridcell"]') === firstCell).toBe(true);
+  const lastColumn = Number(shown.at(-1)?.getAttribute("aria-colindex")) - 1;
+  const lastCell = firstRow?.querySelectorAll('[role="gridcell"]')[shown.length - 1];
+  expect(lastCell?.id).toBe(`${mirror(host).id}-0-${lastColumn}`);
+  expect(lastCell?.getAttribute("aria-colindex")).toBe(String(lastColumn + 1));
+  for (const row of rows(host).slice(1)) {
+    expect(row.querySelectorAll('[role="gridcell"]').length).toBe(shown.length);
+  }
+});
+
+it("writes the mirror on mount and on a synchronous paint, before any frame", () => {
+  const { grid, host } = mount(PRODUCTS, { runFrames: false });
+  expect(
+    headers(host)
+      .slice(0, 2)
+      .map((header) => header.textContent),
+  ).toEqual(["A", "B"]);
+  expect(gridCell(host, 0, 0)?.textContent).toBe("Item 0");
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+  grid.refresh();
+  expect(host.getAttribute("aria-activedescendant")).toBe(`${mirror(host).id}-2-1`);
+  expect(gridCell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
+  expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
+});
+
+it("reads each cell as the canvas shows it, in the cell's number format", () => {
+  const { host } = mount({
+    rowCount: 1,
+    columns: [
+      { key: "due", header: "Due", type: "number", width: 100, numberFormat: "yyyy-mm-dd" },
+      {
+        key: "rate",
+        header: "Rate",
+        type: "number",
+        width: 80,
+        cellStyle: { numberFormat: "0.0%" },
+      },
+      { key: "share", header: "Share", type: "general", width: 120 },
+    ],
+    data: { rowCount: 1, columns: { due: [45351], rate: [0.125], share: [1 / 3] } },
+  });
 
   expect([0, 1, 2].map((col) => gridCell(host, 0, col)?.textContent)).toEqual([
     "2024-02-29",

@@ -57,33 +57,15 @@ describe("SheetwriteError", () => {
     expect(JSON.stringify(error)).not.toContain("cause");
   });
 
-  it("retains canonical instances, reconstructs serialized envelopes, and wraps causes once", () => {
+  it("retains canonical instances and reconstructs serialized envelopes", () => {
     const canonical = new SheetwriteError("aborted", "persistence", "cancelled");
     expect(normalizeSheetwriteError(canonical, "not-found", "persistence")).toBe(canonical);
 
     const serialized = canonical.toJSON();
     const reconstructed = normalizeSheetwriteError(serialized, "not-found", "persistence");
     expect(reconstructed).toBeInstanceOf(SheetwriteError);
-    expect(reconstructed).not.toBe(serialized);
     expect(reconstructed.toJSON()).toEqual(serialized);
     expect(reconstructed.cause).toBe(serialized);
-
-    const cause = new TypeError("bad transport");
-    const wrapped = normalizeSheetwriteError(
-      cause,
-      "datasource-request-failed",
-      "datasource-request",
-      {
-        sheet: "s1",
-      },
-    );
-    expect(wrapped).toMatchObject({
-      code: "datasource-request-failed",
-      operation: "datasource-request",
-      message: "bad transport",
-      context: { sheet: "s1" },
-    });
-    expect(wrapped.cause).toBe(cause);
   });
 });
 

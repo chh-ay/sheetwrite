@@ -245,7 +245,7 @@ function unitOf(text: string): string {
 }
 
 /** "1.23 ms (1.16–1.51)": the median, then its lowest and highest round, with the unit once when they share it. */
-export function timeWithSpread(median: number, low: number, high: number): string {
+function timeWithSpread(median: number, low: number, high: number): string {
   const [medianText, lowText, highText] = [median, low, high].map(formatTime) as [
     string,
     string,
@@ -263,7 +263,7 @@ export function timeWithSpread(median: number, low: number, high: number): strin
  * One machine's numbers as a plain table, grouped by kind. The cells carry
  * their column name, so a phone shows each row as a card.
  */
-export function numbersTable(machine: StoryMachine, baseName: string): string {
+function numbersTable(machine: StoryMachine, baseName: string): string {
   const columns = ["Interaction", "Sheetwrite", baseName, "Speedup"];
   const head = columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("");
   // The value sits in a span so a phone card lays it out beside its column name.

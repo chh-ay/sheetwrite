@@ -5,8 +5,8 @@ import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
   loadFormulaReferenceEntries,
-  syntaxLiterals,
   renderFormulaFunctionPages,
+  syntaxLiterals,
 } from "../../scripts/formula-docs.ts";
 import { FORMULA_FAMILY_CARDS, UNSUPPORTED_FORMULA_GROUPS } from "../src/lib/formula-overview.ts";
 
@@ -82,8 +82,15 @@ describe("generated formula documentation contract", () => {
     for (const [family, card] of Object.entries(FORMULA_FAMILY_CARDS)) {
       const members = inventory.functions.filter((formula) => formula.family === family);
       const href = `/docs/reference/formula-functions/${family}/`;
+      const inDefault = members.filter((formula) => formula.builds.includes("@sheetwrite/wasm"));
+      const builds =
+        inDefault.length === 0
+          ? "full build only"
+          : inDefault.length === members.length
+            ? "all in the default build"
+            : `${inDefault.length} in the default build`;
       expect(overview.content).toContain(
-        `<p class="sw-function-family__count">${members.length} functions · `,
+        `<p class="sw-function-family__count">${members.length} functions · ${builds}</p>`,
       );
       expect(overview.content).toContain(
         `<a class="sw-function-family__more" href="${href}">See all ${members.length}`,
@@ -94,7 +101,6 @@ describe("generated formula documentation contract", () => {
         );
       }
     }
-    expect(overview.content).toContain("142 functions · 34 in the default build");
   });
 
   it("indexes every function from A to Z, each linking to its row on its family page", async () => {

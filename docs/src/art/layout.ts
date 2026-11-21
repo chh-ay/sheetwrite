@@ -68,38 +68,70 @@ export function arrowHead(tip: Point, side: BoxSide): string {
 
 /** Corner radius of a route's bends. */
 const BEND = 6;
+/** How far a bracket route runs out past the farther of its two boxes. */
+export const BRACKET = 24;
 
 /**
- * A route from `from`, leaving through `side`, to `to`, entering through
- * `toSide`: straight when the points line up; one rounded bend when the two
- * sides are perpendicular; otherwise out, across and in again.
+ * The points a route passes through, from `from`, leaving through `side`, to
+ * `to`, entering through `toSide`: straight when the points line up; one
+ * bend when the two sides are perpendicular; a bracket out and back in when
+ * both are the same side; otherwise out, across halfway, and in again.
  */
+export function routePoints(
+  from: Point,
+  side: BoxSide,
+  to: Point,
+  toSide: BoxSide = opposite(side),
+): Point[] {
+  const vertical = side === "top" || side === "bottom";
+  const entersVertically = toSide === "top" || toSide === "bottom";
+  if (vertical !== entersVertically) {
+    return [from, vertical ? { x: from.x, y: to.y } : { x: to.x, y: from.y }, to];
+  }
+  if (side === toSide) {
+    const out = OUTWARD[side];
+    if (vertical) {
+      const y = (out.y > 0 ? Math.max(from.y, to.y) : Math.min(from.y, to.y)) + out.y * BRACKET;
+      return [from, { x: from.x, y }, { x: to.x, y }, to];
+    }
+    const x = (out.x > 0 ? Math.max(from.x, to.x) : Math.min(from.x, to.x)) + out.x * BRACKET;
+    return [from, { x, y: from.y }, { x, y: to.y }, to];
+  }
+  if (vertical ? Math.abs(from.x - to.x) < 0.5 : Math.abs(from.y - to.y) < 0.5) return [from, to];
+  if (vertical) {
+    const mid = (from.y + to.y) / 2;
+    return [from, { x: from.x, y: mid }, { x: to.x, y: mid }, to];
+  }
+  const mid = (from.x + to.x) / 2;
+  return [from, { x: mid, y: from.y }, { x: mid, y: to.y }, to];
+}
+
+/** The path of `routePoints`, its corners rounded. */
 export function route(
   from: Point,
   side: BoxSide,
   to: Point,
   toSide: BoxSide = opposite(side),
 ): string {
-  const vertical = side === "top" || side === "bottom";
-  const entersVertically = toSide === "top" || toSide === "bottom";
-  const dx = Math.sign(to.x - from.x);
-  const dy = Math.sign(to.y - from.y);
-  if (vertical !== entersVertically) {
-    // One bend: along the leaving axis to the target's line, then across into it.
-    const r = Math.min(BEND, Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-    return vertical
-      ? `M${from.x} ${from.y}V${to.y - dy * r}Q${from.x} ${to.y} ${from.x + dx * r} ${to.y}H${to.x}`
-      : `M${from.x} ${from.y}H${to.x - dx * r}Q${to.x} ${from.y} ${to.x} ${from.y + dy * r}V${to.y}`;
-  }
-  if (vertical ? Math.abs(from.x - to.x) < 0.5 : Math.abs(from.y - to.y) < 0.5) {
-    return `M${from.x} ${from.y}L${to.x} ${to.y}`;
-  }
-  if (vertical) {
-    const mid = (from.y + to.y) / 2;
-    const r = Math.min(BEND, Math.abs(to.x - from.x) / 2, Math.abs(mid - from.y));
-    return `M${from.x} ${from.y}V${mid - dy * r}Q${from.x} ${mid} ${from.x + dx * r} ${mid}H${to.x - dx * r}Q${to.x} ${mid} ${to.x} ${mid + dy * r}V${to.y}`;
-  }
-  const mid = (from.x + to.x) / 2;
-  const r = Math.min(BEND, Math.abs(to.y - from.y) / 2, Math.abs(mid - from.x));
-  return `M${from.x} ${from.y}H${mid - dx * r}Q${mid} ${from.y} ${mid} ${from.y + dy * r}V${to.y - dy * r}Q${mid} ${to.y} ${mid + dx * r} ${to.y}H${to.x}`;
+  const points = routePoints(from, side, to, toSide);
+  const r = (value: number) => Math.round(value * 100) / 100;
+  let d = `M${r(from.x)} ${r(from.y)}`;
+  points.slice(1, -1).forEach((corner, index) => {
+    const before = points[index] ?? from;
+    const after = points[index + 2] ?? to;
+    const inLength = Math.hypot(corner.x - before.x, corner.y - before.y);
+    const outLength = Math.hypot(after.x - corner.x, after.y - corner.y);
+    const radius = Math.min(BEND, inLength / 2, outLength / 2);
+    if (radius < 0.01) return;
+    const enter = {
+      x: corner.x - ((corner.x - before.x) / inLength) * radius,
+      y: corner.y - ((corner.y - before.y) / inLength) * radius,
+    };
+    const leave = {
+      x: corner.x + ((after.x - corner.x) / outLength) * radius,
+      y: corner.y + ((after.y - corner.y) / outLength) * radius,
+    };
+    d += `L${r(enter.x)} ${r(enter.y)}Q${r(corner.x)} ${r(corner.y)} ${r(leave.x)} ${r(leave.y)}`;
+  });
+  return `${d}L${r(to.x)} ${r(to.y)}`;
 }
