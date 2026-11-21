@@ -5,6 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, WorkbookSnapshot } from "../src/types.js";
+import { expectSameNode } from "./fixtures.js";
 
 const ACTIONS_MODULE = "../src/autofilter-actions.js";
 let restoreStubs: () => void;
@@ -32,8 +33,8 @@ const ROWS: (readonly CellScalar[])[] = [
 ];
 
 /**
- * A grid of `rows` on sheet s1. `formats` gives the number format of each
- * column's cells below the header, on the cells, as XLSX import puts it.
+ * A grid of `rows` on sheet s1. `formats` gives the number format of column
+ * A's cell in each row, on the cell, as XLSX import puts it.
  */
 function mount(
   rows: readonly (readonly CellScalar[])[] = ROWS,
@@ -60,7 +61,7 @@ function mount(
             colCount: 2,
             cells: rows.flatMap((row, rowOffset) =>
               row.map((value, colOffset) => {
-                const numberFormat = rowOffset > 0 ? formats[colOffset] : undefined;
+                const numberFormat = colOffset === 0 ? formats[rowOffset] : undefined;
                 return {
                   rowOffset,
                   colOffset,
@@ -86,6 +87,8 @@ function mount(
   );
   return { grid, host, store };
 }
+
+const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
 const press = (target: HTMLElement, key: string, init: KeyboardEventInit = {}) =>
   target.dispatchEvent(
@@ -135,23 +138,22 @@ function stubClipboard(): () => Promise<string | undefined> {
   return async () => (await items[0]?.getType("text/plain"))?.text();
 }
 
-/** A browser clipboard of plain text only. Returns a setter of its text. */
-function textClipboard(text = ""): (next: string) => void {
-  let current = text;
+/** A browser clipboard of plain `text` only. */
+function textClipboard(text: string): void {
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
-    value: { read: () => Promise.resolve([]), readText: () => Promise.resolve(current) },
+    value: { read: () => Promise.resolve([]), readText: () => Promise.resolve(text) },
   });
-  return (next) => {
-    current = next;
-  };
 }
 
 describe("AutoFilter in the grid", () => {
-  it("turns on for the current region with Ctrl+Shift+L and off again", () => {
-    const { grid, host } = mount();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+  it("turns on with Ctrl+Shift+L, opens a header's dropdown with Alt+Down right after it, keeps the header selected after filtering, and turns off", async () => {
+    const { grid, host, store } = mount();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    // Ctrl+Shift+L acts at once and ArrowUp reaches B1; Alt+Down loads the dropdown.
     press(host, "L", { ctrlKey: true, shiftKey: true });
+    press(host, "ArrowUp");
+    press(host, "ArrowDown", { altKey: true });
     expect(grid.getAutoFilter()?.range).toEqual({
       sheet: "s1",
       start: { row: 0, col: 0 },
@@ -159,30 +161,26 @@ describe("AutoFilter in the grid", () => {
     });
     expect(grid.getCommandState("filter").activity).toBe("active");
 
-    press(host, "L", { ctrlKey: true, shiftKey: true });
-    expect(grid.getAutoFilter()).toBeNull();
-  });
-
-  it("opens a header's dropdown with Alt+Down and keeps the header selected after filtering", async () => {
-    const { grid, host, store } = mount();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
-    grid.actions.toggleAutoFilter();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    press(host, "ArrowDown", { altKey: true });
-
+    // Alt+Down on B1 opens the Qty header's dropdown.
+    for (let tick = 0; tick < 10 && !document.querySelector('[role="dialog"]'); tick++) {
+      await loaded();
+    }
     const dialog = await dropdown();
-    expect(dialog.getAttribute("aria-label")).toBe("Filter Item");
+    expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
     const list = dialog.querySelector<HTMLElement>('[role="listbox"]');
     if (!list) throw new Error("no value list");
     list.focus();
     press(list, "ArrowDown");
     press(list, " ");
     press(list, "Enter");
-
-    expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: ["banana", "fig"] });
+    expect(grid.getColumnFilters().get(1)).toEqual({ kind: "values", values: [7, 12] });
     expect(store.viewRowCount("s1")).toBe(9);
-    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    expect(document.activeElement).toBe(host);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    expectSameNode(document.activeElement, host);
+
+    press(host, "L", { ctrlKey: true, shiftKey: true });
+    expect(grid.getAutoFilter()).toBeNull();
   });
 
   it("filters by the selected cell's value, turning the AutoFilter on", () => {
@@ -195,22 +193,14 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getAutoFilter()).toBeNull();
   });
 
-  it("opens the dropdown for Alt+Down pressed right after Ctrl+Shift+L and ArrowUp", async () => {
+  it("edits a header cell in its text box, which ends before the filter button, as Excel does", () => {
     const { grid, host } = mount();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-    // Ctrl+Shift+L acts at once and ArrowUp reaches B1; Alt+Down loads the dropdown.
-    press(host, "L", { ctrlKey: true, shiftKey: true });
-    press(host, "ArrowUp");
-    press(host, "ArrowDown", { altKey: true });
-
-    // Alt+Down on B1 opens the Qty header's dropdown.
-    for (let tick = 0; tick < 10 && !document.querySelector('[role="dialog"]'); tick++) {
-      await loaded();
-    }
-    expect(grid.getAutoFilter()?.range.start).toEqual({ row: 0, col: 0 });
-    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    const dialog = await dropdown();
-    expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    press(host, "F2");
+    // B1 is 100 px wide: its 16 px button sits 6 px from the right edge, and the
+    // text box ends 6 px before the button.
+    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("72px");
   });
 
   it("groups only the numbers that show as dates in a mostly-date column, as Excel does", async () => {
@@ -225,30 +215,8 @@ describe("AutoFilter in the grid", () => {
       [46027, 6],
       ["N", 7],
     ];
-    const formats: (string | undefined)[] = [
-      undefined,
-      "m/d/yyyy",
-      "m/d/yyyy",
-      "0%",
-      "$#,##0.00",
-      undefined,
-      "m/d/yyyy",
-    ];
-    const { grid, host } = mount(rows);
-    grid.applyTransaction({
-      patches: formats.flatMap((numberFormat, row) =>
-        numberFormat
-          ? [
-              {
-                op: "set" as const,
-                addr: { sheet: "s1", row, col: 0 },
-                value: { kind: "literal" as const, value: rows[row]?.[0] ?? null },
-                style: { numberFormat },
-              },
-            ]
-          : [],
-      ),
-    });
+    const formats = [undefined, "m/d/yyyy", "m/d/yyyy", "0%", "$#,##0.00", undefined, "m/d/yyyy"];
+    const { grid, host } = mount(rows, formats);
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 7, col: 1 } });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     press(host, "ArrowDown", { altKey: true });
@@ -259,7 +227,7 @@ describe("AutoFilter in the grid", () => {
     expect(labels).toEqual(["(Select All)", "2026", "15%", "$4.50", "7", "N"]);
   });
 
-  it("lists a date column by year, month and day with Date Filters, and prices as their cells show", async () => {
+  it("lists a date column by year, month and day with Date Filters", async () => {
     // 2 January 2026, 2 February 2026 and 1 January 2025, in the cells' own formats.
     const rows = [
       ["Date", "Price"],
@@ -267,7 +235,7 @@ describe("AutoFilter in the grid", () => {
       [46055, 64.25],
       [45658, 39.5],
     ];
-    const { grid, host, store } = mount(rows, ["m/d/yyyy", "$#,##0.00"]);
+    const { grid, host, store } = mount(rows, [undefined, "m/d/yyyy", "m/d/yyyy", "m/d/yyyy"]);
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     const open = async (col: number) => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col } });
@@ -302,10 +270,6 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: [46024, 46055] });
     expect(store.viewRowCount("s1")).toBe(9);
 
-    const prices = await open(1);
-    expect(prices.labels()).toEqual(["(Select All)", "$39.50", "$64.25"]);
-    press(prices.list, "Escape");
-
     // All Dates in the Period › February keeps the February date of any year.
     grid.setColumnFilter(0, { kind: "dynamic", type: "M2" });
     expect(store.viewRowCount("s1")).toBe(8);
@@ -339,7 +303,6 @@ describe("AutoFilter in the grid", () => {
     });
     expect(await grid.actions.cut()).toBe("done");
     // Excel moves the hidden rows silently; the grid says so (#843).
-    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
     expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
     // Paste on A7: view row 5 is sheet row 7 below the filtered range.
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
@@ -367,82 +330,64 @@ describe("AutoFilter in the grid", () => {
     expect(notice()?.hidden).toBe(true);
   });
 
-  it("pastes a block over a filtered range into the hidden rows too, as Excel does, and says so", async () => {
-    const setClipboard = textClipboard();
-    const { grid, store } = mount();
-    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
-    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
-    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
-    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+  it.each([
+    [
+      "a filter",
+      (grid: GridImpl) => {
+        grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+        grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+      },
+    ],
+    ["Hide Rows", (grid: GridImpl) => grid.hideRows([2])],
+  ])(
+    "pastes a block over rows %s hid into them too, then into the shown rows only (#937)",
+    async (_, hide) => {
+      textClipboard("10\n20\n30");
+      const { grid, store } = mount();
+      hide(grid);
+      const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
 
-    // Three copied rows on B2 land on sheet rows 2 to 4, the hidden B3 included.
-    setClipboard("10\n20\n30");
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-    expect(await grid.actions.paste()).toBe("done");
-    expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
-    expect(notice()?.textContent).toBe(
-      "This paste wrote into 1 hidden row. Paste Options › Paste into visible rows only skips them. Show them",
-    );
+      // Three copied rows on B2 land on sheet rows 2 to 4, the hidden B3 included.
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+      expect(await grid.actions.paste()).toBe("done");
+      expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
+      expect(notice()?.textContent).toBe(
+        "This paste wrote into 1 hidden row. Paste Options › Paste into visible rows only skips them. Show them",
+      );
 
-    // Paste into visible rows only: the same paste on the shown rows B2, B4
-    // and B5, as one undo step.
-    expect(grid.canPasteVisibleRows()).toBe(true);
-    grid.actions.pasteVisibleRows();
-    expect([1, 2, 3, 4].map(qty)).toEqual([10, 12, 20, 30]);
-    expect(grid.canPasteVisibleRows()).toBe(false);
-    grid.undo();
-    expect([1, 2, 3, 4].map(qty)).toEqual([3, 12, 7, null]);
+      // Paste into visible rows only: the same paste on the shown rows B2, B4
+      // and B5, as one undo step.
+      expect(grid.canPasteVisibleRows()).toBe(true);
+      grid.actions.pasteVisibleRows();
+      expect([1, 2, 3, 4].map(qty)).toEqual([10, 12, 20, 30]);
+      expect(grid.canPasteVisibleRows()).toBe(false);
+      grid.undo();
+      expect([1, 2, 3, 4].map(qty)).toEqual([3, 12, 7, null]);
 
-    // One copied value over a filtered selection fills its shown cells only, as in Excel.
-    setClipboard("5");
-    grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
-    });
-    expect(await grid.actions.paste()).toBe("done");
-    expect([1, 2, 3].map(qty)).toEqual([5, 12, 5]);
-    expect(grid.canPasteVisibleRows()).toBe(false);
-  });
-
-  it("pastes a block over rows Hide Rows hid as Excel does, then into the shown rows only", async () => {
-    const setClipboard = textClipboard();
-    const { grid, store } = mount();
-    grid.hideRows([2]);
-    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
-    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
-
-    setClipboard("10\n20\n30");
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-    expect(await grid.actions.paste()).toBe("done");
-    expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
-    expect(notice()?.textContent).toBe(
-      "This paste wrote into 1 hidden row. Paste Options › Paste into visible rows only skips them. Show them",
-    );
-
-    grid.actions.pasteVisibleRows();
-    expect([1, 2, 3, 4].map(qty)).toEqual([10, 12, 20, 30]);
-    // Another change ends the offer.
-    grid.undo();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-    expect(await grid.actions.paste()).toBe("done");
-    expect(grid.canPasteVisibleRows()).toBe(true);
-    grid.applyTransaction({
-      patches: [
-        { op: "set", addr: { sheet: "s1", row: 8, col: 1 }, value: { kind: "literal", value: 1 } },
-      ],
-    });
-    expect(grid.canPasteVisibleRows()).toBe(false);
-  });
+      // Another change ends the offer.
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+      expect(await grid.actions.paste()).toBe("done");
+      expect(grid.canPasteVisibleRows()).toBe(true);
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 8, col: 1 },
+            value: { kind: "literal", value: 1 },
+          },
+        ],
+      });
+      expect(grid.canPasteVisibleRows()).toBe(false);
+    },
+  );
 
   it("refuses Paste into visible rows only when the shown rows below are too few, and keeps the paste", async () => {
-    const setClipboard = textClipboard();
+    textClipboard("10\n20\n30");
     const { grid, store } = mount();
     grid.hideRows([8]);
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
-    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
     // Three rows on B8 of a 10-row sheet land on rows 8 to 10, the hidden B9 included.
-    setClipboard("10\n20\n30");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 7, col: 1 } });
     expect(await grid.actions.paste()).toBe("done");
     expect([7, 8, 9].map(qty)).toEqual([10, 20, 30]);
@@ -458,16 +403,14 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("refuses a paste under a view sort that runs past the view's last row", async () => {
-    const setClipboard = textClipboard();
+    textClipboard("1\n2\n3");
     const { grid, store } = mount();
     grid.setViewSort([{ col: 1, ascending: false }]);
     const qty = () =>
       Array.from({ length: 10 }, (_, row) => store.getCell({ sheet: "s1", row, col: 1 }).resolved);
     const before = qty();
-    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
     // The second-last row of the sorted view has one row below it.
-    setClipboard("1\n2\n3");
     const row = grid.sheetRowOf(8)!;
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row, col: 1 } });
     expect(await grid.actions.paste()).toBe("rejected");
@@ -536,13 +479,12 @@ describe("AutoFilter in the grid", () => {
       range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 2, col: 1 } },
     });
     grid.setProtectionResolver(() => "deny");
-    const notice = () => document.querySelector(".sheetwrite-action-status")?.textContent;
     const refused = 'Nothing was pasted: Protected range "locked" denied this mutation.';
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
 
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
     expect(await grid.actions.paste()).toBe("rejected");
-    expect(notice()).toBe(refused);
+    expect(notice()?.textContent).toBe(refused);
     expect([1, 2].map(qty)).toEqual([3, 12]);
 
     stubClipboard();
@@ -550,7 +492,7 @@ describe("AutoFilter in the grid", () => {
     expect(await grid.actions.cut()).toBe("done");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
     expect(await grid.actions.paste()).toBe("rejected");
-    expect(notice()).toBe(refused);
+    expect(notice()?.textContent).toBe(refused);
     expect([1, 2].map(qty)).toEqual([3, 12]);
   });
 
@@ -564,12 +506,10 @@ describe("AutoFilter in the grid", () => {
       range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
     });
     expect(await grid.actions.cut()).toBe("done");
-    const notice = document.querySelector<HTMLElement>(".sheetwrite-action-status");
-    expect(notice?.textContent).toBe("This cut includes 1 hidden row. Show them");
-    notice?.querySelector("button")?.click();
-    // The grid keeps the keys, so Ctrl+Z can undo it. A boolean: on a failure, bun's
-    // diff of two DOM elements walks the whole document and never ends.
-    expect(document.activeElement === host).toBe(true);
+    expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
+    notice()?.querySelector("button")?.click();
+    // The grid keeps the keys, so Ctrl+Z can undo it.
+    expectSameNode(document.activeElement, host);
     expect(grid.hiddenRows()).toEqual([]);
     grid.undo();
     expect(grid.hiddenRows()).toEqual([2]);

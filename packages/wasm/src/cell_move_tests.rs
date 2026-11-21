@@ -3,7 +3,8 @@
 //! (<https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e>).
 
 use crate::permute::PERMUTE_PARTIAL_SPILL;
-use crate::store::{CellStore, BLOCK_OK};
+use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK};
+use crate::tests::support::{formula_text as text, number};
 use crate::types::KIND_EMPTY;
 
 const ROWS: usize = 30;
@@ -17,14 +18,6 @@ fn store() -> (CellStore, usize, usize) {
     store.set_sheet_name(data, "data", "Data");
     store.set_sheet_name(summary, "summary", "Summary");
     (store, data, summary)
-}
-
-fn text(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
-    store.formula_source(sheet, row, col).unwrap_or_default()
-}
-
-fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
-    store.get_cell(sheet, row, col).num()
 }
 
 fn is_empty(store: &CellStore, sheet: usize, row: usize, col: usize) -> bool {
@@ -43,88 +36,6 @@ fn after_move(formula: &str, from: [usize; 4], to: (usize, usize)) -> String {
         "the move succeeds"
     );
     text(&store, summary, 0, 0)
-}
-
-#[test]
-fn moved_cells_leave_the_source_and_references_follow_them() {
-    // The steps of #756.
-    let (mut store, data, _) = store();
-    store.set_number(data, 0, 0, 1.0, 0);
-    store.set_number(data, 1, 0, 2.0, 0);
-    store.set_formula(data, 0, 1, "=A1*10", 0);
-    store.set_formula(data, 5, 5, "=A1+A2", 0);
-
-    assert_eq!(
-        store.move_cells(data, 0, 0, 2, 1, data, 19, 0, false),
-        BLOCK_OK
-    );
-    store.recompute(data);
-
-    assert_eq!(number(&store, data, 19, 0), 1.0);
-    assert_eq!(number(&store, data, 20, 0), 2.0);
-    assert!(is_empty(&store, data, 0, 0), "A1 is empty");
-    assert!(is_empty(&store, data, 1, 0), "A2 is empty");
-    assert_eq!(text(&store, data, 0, 1), "=A20*10");
-    assert_eq!(text(&store, data, 5, 5), "=A20+A21");
-    assert_eq!(number(&store, data, 0, 1), 10.0);
-    assert_eq!(number(&store, data, 5, 5), 3.0);
-}
-
-#[test]
-fn a_moved_formula_keeps_pointing_at_the_same_cells() {
-    let (mut store, data, _) = store();
-    store.set_number(data, 0, 0, 4.0, 0);
-    store.set_number(data, 0, 2, 5.0, 0);
-    store.set_formula(data, 0, 1, "=A1+C1", 0);
-
-    // A1:B1 lands on D10:E10; C1 stays.
-    assert_eq!(
-        store.move_cells(data, 0, 0, 1, 2, data, 9, 3, false),
-        BLOCK_OK
-    );
-    store.recompute(data);
-
-    assert_eq!(text(&store, data, 9, 4), "=D10+C1");
-    assert_eq!(number(&store, data, 9, 4), 9.0);
-}
-
-#[test]
-fn a_reference_to_a_cell_the_block_lands_on_becomes_ref() {
-    let (mut store, data, _) = store();
-    store.set_number(data, 0, 0, 1.0, 0);
-    store.set_number(data, 4, 2, 7.0, 0);
-    store.set_formula(data, 0, 6, "=C5", 0);
-    store.set_formula(data, 1, 6, "=SUM(C5:C5)+1", 0);
-
-    assert_eq!(
-        store.move_cells(data, 0, 0, 1, 1, data, 4, 2, false),
-        BLOCK_OK
-    );
-
-    assert_eq!(number(&store, data, 4, 2), 1.0);
-    assert_eq!(text(&store, data, 0, 6), "=#REF!");
-    assert_eq!(text(&store, data, 1, 6), "=SUM(#REF!)+1");
-}
-
-#[test]
-fn a_block_moves_onto_part_of_itself() {
-    let (mut store, data, summary) = store();
-    for row in 0..3 {
-        store.set_number(data, row, 0, (row + 1) as f64, 0);
-    }
-    store.set_formula(summary, 0, 0, "=SUM(Data!A1:A3)", 0);
-
-    assert_eq!(
-        store.move_cells(data, 0, 0, 3, 1, data, 1, 0, false),
-        BLOCK_OK
-    );
-    store.recompute(summary);
-
-    assert!(is_empty(&store, data, 0, 0), "A1 is empty");
-    let column: Vec<f64> = (1..4).map(|row| number(&store, data, row, 0)).collect();
-    assert_eq!(column, [1.0, 2.0, 3.0]);
-    assert_eq!(text(&store, summary, 0, 0), "=SUM(Data!A2:A4)");
-    assert_eq!(number(&store, summary, 0, 0), 6.0);
 }
 
 #[test]
@@ -159,6 +70,17 @@ fn a_range_moves_an_edge_only_when_the_block_holds_it_and_moves_along_it() {
         after_move("=SUM(Data!A:A)", [0, 0, 1, 1], (5, 0)),
         "=SUM(Data!A:A)"
     );
+    // Only `A:A`, which runs to the sheet edge at row 1,048,576, keeps
+    // spanning it; a range down to the last row of a short sheet does not.
+    assert_eq!(
+        after_move("=SUM(Data!A1:A30)", [29, 0, 1, 1], (24, 0)),
+        "=SUM(Data!A1:A25)"
+    );
+    // A reference to a cell the block lands on becomes `#REF!`.
+    assert_eq!(
+        after_move("=Data!C5+SUM(Data!C5:C5)", [0, 0, 1, 1], (4, 2)),
+        "=#REF!+SUM(#REF!)"
+    );
 }
 
 #[test]
@@ -167,7 +89,6 @@ fn a_block_moves_to_another_sheet() {
     store.set_number(data, 0, 0, 3.0, 0);
     store.set_number(data, 4, 1, 5.0, 0);
     store.set_formula(data, 1, 0, "=A1+B5", 0);
-    store.set_formula(data, 0, 3, "=A1*2", 0);
     store.set_formula(summary, 0, 0, "=Data!A2", 0);
 
     // Data!A1:A2 lands on Summary!C3:C4.
@@ -181,8 +102,6 @@ fn a_block_moves_to_another_sheet() {
     assert!(is_empty(&store, data, 0, 0), "Data!A1 is empty");
     assert_eq!(text(&store, summary, 3, 2), "=C3+Data!B5");
     assert_eq!(number(&store, summary, 3, 2), 8.0);
-    assert_eq!(text(&store, data, 0, 3), "=Summary!C3*2");
-    assert_eq!(number(&store, data, 0, 3), 6.0);
     // A reference that names its sheet keeps naming one.
     assert_eq!(text(&store, summary, 0, 0), "=Summary!C4");
     assert_eq!(number(&store, summary, 0, 0), 8.0);
@@ -240,14 +159,12 @@ fn a_spill_moves_with_its_formula_and_a_move_that_does_not_fit_changes_nothing()
         store.move_cells(data, 1, 0, 2, 1, data, 0, 4, false),
         PERMUTE_PARTIAL_SPILL
     );
-    assert_ne!(
-        store.move_cells(data, 0, 0, 1, 1, data, ROWS, 0, false),
-        BLOCK_OK
-    );
-    assert_ne!(
-        store.move_cells(data, 0, 0, 0, 1, data, 5, 0, false),
-        BLOCK_OK
-    );
+    for (rows, to_row) in [(1, ROWS), (0, 5)] {
+        assert_eq!(
+            store.move_cells(data, 0, 0, rows, 1, data, to_row, 0, false),
+            BLOCK_INVALID
+        );
+    }
     assert_eq!(text(&store, data, 0, 0), "=SEQUENCE(3)");
 
     // The formula moves and spills again where it lands.
@@ -259,15 +176,6 @@ fn a_spill_moves_with_its_formula_and_a_move_that_does_not_fit_changes_nothing()
     assert_eq!(text(&store, data, 0, 4), "=SEQUENCE(3)");
     assert_eq!(number(&store, data, 2, 4), 3.0);
     assert!(is_empty(&store, data, 2, 0), "the old spill is gone");
-}
-
-#[test]
-fn a_range_down_to_the_last_row_of_a_short_sheet_is_not_a_whole_column() {
-    // Only `A:A`, which runs to the sheet edge at row 1,048,576, keeps spanning it.
-    assert_eq!(
-        after_move("=SUM(Data!A1:A30)", [29, 0, 1, 1], (24, 0)),
-        "=SUM(Data!A1:A25)"
-    );
 }
 
 #[test]

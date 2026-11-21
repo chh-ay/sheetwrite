@@ -65,13 +65,16 @@ describe("Excel function coverage", () => {
 
   test("publishes every catalog name once and explains every partly supported row", async () => {
     const inventory = await loadFormulaContractInventory(ROOT);
-    const source: unknown = JSON.parse(
+    const source = JSON.parse(
       await readFile(resolve(ROOT, "scripts/excel-functions.json"), "utf8"),
-    );
+    ) as { families: { functions: { name: string }[] }[] };
     const page = renderExcelCoveragePage(inventory, source);
     const rows = page.content.split("\n").filter((line) => line.startsWith("| [`"));
 
-    expect(rows).toHaveLength(520);
+    const catalogNames = source.families.flatMap((family) => family.functions.map((f) => f.name));
+    expect(rows.map((row) => /^\| \[`([^`]+)`\]/.exec(row)?.[1]).sort()).toEqual(
+      catalogNames.sort(),
+    );
     for (const row of rows.filter((line) => line.includes("| Partly supported |"))) {
       const notes = row.split(" | ").at(-1) ?? "";
       expect(notes.replace(/\[Reference\]\([^)]+\)/u, "").trim().length).toBeGreaterThan(20);

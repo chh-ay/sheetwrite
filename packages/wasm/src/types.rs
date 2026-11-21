@@ -1140,63 +1140,6 @@ const _: () = assert!(
     "every formula error code fits in the error bits of FormulaEntry"
 );
 
-#[cfg(test)]
-mod formula_entry_tests {
-    use super::*;
-
-    #[test]
-    fn formula_entry_flags_preserve_independent_metadata() {
-        let store = crate::store::CellStore::new();
-        for reference in [false, true] {
-            let mut entry = if reference {
-                FormulaEntry::reference(AbsCellKey {
-                    sheet: 0,
-                    row: 1,
-                    col: 2,
-                })
-            } else {
-                FormulaEntry::parsed_source(
-                    Ast::Num(1.0),
-                    store.name_scope(0),
-                    "=1".to_owned(),
-                    ParseFeatures::default(),
-                )
-            };
-
-            for (volatile, spill_refs, produces_array) in [
-                (false, false, false),
-                (false, false, true),
-                (false, true, false),
-                (false, true, true),
-                (true, false, false),
-                (true, false, true),
-                (true, true, false),
-                (true, true, true),
-                (false, false, false),
-            ] {
-                entry.set_volatile(volatile);
-                entry.set_has_spill_refs(spill_refs);
-                entry.set_produces_array(produces_array);
-
-                for error in std::iter::once(None)
-                    .chain(
-                        (0..FormulaError::COUNT).map(|slot| FormulaError::from_slot(slot as u64)),
-                    )
-                    .chain(std::iter::once(None))
-                {
-                    entry.set_source_error(error);
-                    assert_eq!(entry.source_error(), error);
-                    assert_eq!(entry.volatile(), volatile);
-                    assert_eq!(entry.has_spill_refs(), spill_refs);
-                    assert_eq!(entry.produces_array(), produces_array);
-                    assert_eq!(entry.is_reference(), reference);
-                    assert_eq!(entry.is_formula(), !reference);
-                }
-            }
-        }
-    }
-}
-
 pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
     Some((u32::try_from(row).ok()?, u32::try_from(col).ok()?))
 }

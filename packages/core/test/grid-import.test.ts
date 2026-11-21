@@ -7,7 +7,13 @@ import { SyncCoordinator } from "../src/sync.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, WorkbookSnapshot } from "../src/types.js";
 import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
-import { elementAdded, keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  elementAdded,
+  expectSameNode,
+  keepXlsxSlots,
+  makeColumnarData,
+  makeWorkbook,
+} from "./fixtures.js";
 
 const IMPORTED: WorkbookSnapshot = {
   schemaVersion: 1,
@@ -79,7 +85,7 @@ it.each(["new", "s1"])(
     expect(grid.store.getCell({ sheet: id, row: 0, col: 0 }).resolved).toBe(42);
     expect(grid.exportSnapshot().sheets.map((sheet) => sheet.id)).toEqual([id]);
     expect(grid.getCellInput(1, 0)).toBeNull();
-    expect(host.querySelector(".sheetwrite-viewport")).toBe(viewport);
+    expectSameNode(host.querySelector(".sheetwrite-viewport"), viewport);
     expect(grid.getCommandState("undo").disabled).toBe(true);
     expect(grid.getCommandState("redo").disabled).toBe(true);
   },
@@ -101,25 +107,11 @@ it("keeps the old document and history when parsing or validation fails", async 
       throw new Error("broken ZIP");
     }),
   ).rejects.toThrow("broken ZIP");
-  await expect(grid.importWorkbook({ ...IMPORTED, sheets: [] })).rejects.toThrow();
+  await expect(grid.importWorkbook({ ...IMPORTED, sheets: [] })).rejects.toMatchObject({
+    code: "invalid-snapshot",
+  });
   expect(grid.exportSnapshot()).toEqual(before);
   expect(grid.getCommandState("undo").disabled).toBe(false);
-});
-
-it("aborts the previous loader and ignores its late result", async () => {
-  const loaded = Promise.withResolvers<WorkbookSnapshot>();
-  const started = Promise.withResolvers<AbortSignal>();
-  const first = grid.importWorkbook((signal) => {
-    started.resolve(signal);
-    return loaded.promise;
-  });
-  const rejected = first.catch((error: unknown) => error);
-  const signal = await started.promise;
-  await grid.importWorkbook(IMPORTED);
-  expect(signal.aborted).toBe(true);
-  loaded.resolve({ ...IMPORTED, workbook: { activeSheet: "s1" } });
-  expect(await rejected).toBe(signal.reason);
-  expect(grid.getActiveSheet()).toBe("new");
 });
 
 it("releases the old engine storage after replacement", async () => {
@@ -153,26 +145,34 @@ it.each(["online", "offline"] as const)(
   },
 );
 
-it.each(["host signal", "destroy"])("aborts a pending loader on %s", async (cause) => {
-  const started = Promise.withResolvers<AbortSignal>();
-  const loaded = Promise.withResolvers<WorkbookSnapshot>();
-  const controller = new AbortController();
-  const before = grid.exportSnapshot();
-  const pending = grid.importWorkbook(
-    (signal) => {
-      started.resolve(signal);
-      return loaded.promise;
-    },
-    { signal: controller.signal },
-  );
-  const rejected = pending.catch((error: unknown) => error);
-  const signal = await started.promise;
-  if (cause === "destroy") grid.destroy();
-  else controller.abort();
-  expect(signal.aborted).toBe(true);
-  expect(await rejected).toBe(signal.reason);
-  if (cause === "host signal") expect(grid.exportSnapshot()).toEqual(before);
-});
+it.each(["host signal", "destroy", "a newer import"])(
+  "aborts a pending loader on %s",
+  async (cause) => {
+    const started = Promise.withResolvers<AbortSignal>();
+    const loaded = Promise.withResolvers<WorkbookSnapshot>();
+    const controller = new AbortController();
+    const before = grid.exportSnapshot();
+    const pending = grid.importWorkbook(
+      (signal) => {
+        started.resolve(signal);
+        return loaded.promise;
+      },
+      { signal: controller.signal },
+    );
+    const rejected = pending.catch((error: unknown) => error);
+    const signal = await started.promise;
+    if (cause === "destroy") grid.destroy();
+    else if (cause === "a newer import") await grid.importWorkbook(IMPORTED);
+    else controller.abort();
+    expect(signal.aborted).toBe(true);
+    // The import rejects before its loader settles.
+    expect(await rejected).toBe(signal.reason);
+    loaded.resolve({ ...IMPORTED, workbook: { activeSheet: "s1" } });
+    if (cause === "host signal") expect(grid.exportSnapshot()).toEqual(before);
+    // A newer import wins over the late result of the aborted one.
+    if (cause === "a newer import") expect(grid.getActiveSheet()).toBe("new");
+  },
+);
 
 it("stops an old-document summary before it can read the replacement", async () => {
   const rows = 100_000;

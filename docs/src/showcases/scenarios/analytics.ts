@@ -49,13 +49,13 @@ export const ANALYTICS_THEME: Partial<Theme> = { ...SCENARIO_THEME };
  * Deterministic integer ARR per row. Integer dollars keep aggregate
  * expectations exact (no float drift) across engine and test recomputation.
  */
-export function analyticsArr(row: number): number {
+function analyticsArr(row: number): number {
   const annualSeatPrice = ANNUAL_SEAT_PRICES[(row * 3) % ANALYTICS_SEGMENTS.length] ?? 240;
   return analyticsSeats(row) * annualSeatPrice;
 }
 
 /** Seat bands follow the customer segment; prices and totals use whole dollars. */
-export function analyticsSeats(row: number): number {
+function analyticsSeats(row: number): number {
   const segment = (row * 3) % ANALYTICS_SEGMENTS.length;
   const base = SEAT_BASES[segment] ?? 220;
   const spread = SEAT_SPREADS[segment] ?? 1280;

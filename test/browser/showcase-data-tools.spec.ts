@@ -1,8 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-import { siteUrl } from "./playwright.config.js";
-
-const ROUTE = siteUrl("/showcases/data-tools/");
+import { expect, test } from "./fixtures.js";
 
 /** Region is a semantic combobox: open it, then pick the option. */
 async function pickRegion(page: Page, region: string) {
@@ -25,9 +23,7 @@ async function expectProbe(page: Page, key: string, outcome: string, stored: str
 }
 
 test("dispatch controls compose a view and report real policy outcomes", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(ROUTE);
+  await page.goto("/showcases/data-tools/");
   await expect(page.getByRole("button", { name: "Clear view", exact: true })).toBeEnabled();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await pickRegion(page, "EMEA");
@@ -37,7 +33,7 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   await page.getByRole("button", { name: "Clear view", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await expect(page.getByRole("combobox", { name: "Region" })).toHaveText("All regions");
-  // docs/test/data-tools.test.ts holds each probe's outcome and the hidden-row state.
+  // A rejected and a host-authorized write: this test owns each probe's outcome.
   await page.getByRole("button", { name: "Try units −5" }).click();
   await expectProbe(page, "units", "rejected", "1");
   await expectLatestEvent(page, "reject", "applyTransaction");
@@ -49,5 +45,4 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   await expectLatestEvent(page, "info", "Host role state");
   await page.getByRole("button", { name: "Try a new order ID" }).click();
   await expectProbe(page, "order", "saved", "MANAGER-REVIEW");
-  expect(errors).toEqual([]);
 });

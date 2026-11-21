@@ -1,5 +1,6 @@
 import { MAX_ATOMIC_BATCH_VERSIONS } from "./atomic-batch.js";
 import {
+  type CheckedSnapshot,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   validateDocumentOperationShape,
@@ -17,9 +18,12 @@ import type {
 } from "./types/transaction.js";
 import {
   type CheckpointLog,
+  type CheckpointManifest,
   type HistoryRecordReader,
   readCheckpoint,
+  readCheckpointCells,
   readCheckpointLog,
+  readCheckpointManifest,
   writeCheckpoint,
 } from "./version-history/checkpoint.js";
 import {
@@ -37,11 +41,28 @@ import {
   strings,
 } from "./version-history/codec.js";
 import {
+  cellIn,
   diffPageSize,
   diffStores,
+  diffTracked,
   type HistoryDiffPage,
   type HistoryDiffRequest,
+  trackLog,
+  type Tracking,
 } from "./version-history/diff.js";
+import {
+  addTailWrites,
+  calculatedDetails,
+  manifestShapes,
+  selectedPages,
+  selectPages,
+  type TailWrites,
+} from "./version-history/page-compare.js";
+import {
+  type RebuiltVersion,
+  RebuiltVersionCache,
+  rebuiltKey,
+} from "./version-history/rebuilt-cache.js";
 import {
   assertIdle,
   type HistoryRestoreOptions,
@@ -375,31 +396,30 @@ function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
 }
 
 /**
- * Build a replay store in its own engine instance, apply `tail`, and pass the
- * store and its revision to `use`. The private instance holds all replay
- * memory, so the document engine keeps its size; the store and the instance
- * are freed on every exit, so `use` must not keep the store.
+ * Build a replay store in its own engine instance and apply `tail`. The
+ * private instance holds all replay memory, so the document engine keeps its
+ * size; `free` on the result releases both, and a failure releases them before
+ * it rejects.
  *
  * Consecutive transactions are applied as one store transaction of at most
  * `REPLAY_BATCH_BYTES`: operations apply in order inside a transaction, so the
  * result is the same, and the store recalculates once per batch instead of
  * once per archived transaction.
  */
-async function withReplayStore<T>(
-  snapshot: WorkbookSnapshot,
+async function rebuildVersion(
+  checkpoint: CheckedSnapshot,
   tail: readonly string[],
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
   signal: AbortSignal | undefined,
-  use: (store: SheetwriteStore, revision: number) => T | Promise<T>,
-): Promise<T> {
+): Promise<RebuiltVersion> {
   const instance = await prepareEngineInstance();
 
   let store: SheetwriteStore;
   try {
     store = buildOnEngineInstance(instance, () =>
-      SheetwriteStore.fromSnapshot(snapshot, {
-        storage: replayStorage(snapshot),
+      SheetwriteStore.fromSnapshot(checkpoint, {
+        storage: replayStorage(checkpoint.snapshot),
         cacheBytes: REPLAY_WINDOW_BYTES,
         transactionResourceLimits: {
           maxOperations: MAX_OPERATIONS,
@@ -415,9 +435,14 @@ async function withReplayStore<T>(
   // Engine memory release moves live stores into a new document instance; the
   // replay store stays in its private instance.
   forgetLiveStoreEngine(store);
+  const free = () => {
+    store.dispose();
+    instance.retire();
+  };
 
+  let replayed = false;
   try {
-    let revision = snapshot.version ?? 0;
+    let revision = checkpoint.snapshot.version ?? 0;
     let batch: DocumentOp[] = [];
     let batchBytes = 0;
 
@@ -445,12 +470,13 @@ async function withReplayStore<T>(
     }
 
     applyBatch(store, batch);
+    replayed = true;
 
-    // Awaited here, so an asynchronous `use` finishes before the store is freed.
-    return await use(store, revision);
+    return { store, revision, free };
   } finally {
-    store.dispose();
-    instance.retire();
+    if (!replayed) {
+      free();
+    }
   }
 }
 
@@ -506,6 +532,20 @@ async function* commitsAfter(
   }
 }
 
+/** A leased version and the record reader of its lease. */
+interface LeasedVersion {
+  version: HistoryVersion;
+  read: HistoryRecordReader;
+}
+
+/** What a compare by page reads before any cell page: checkpoint manifests and tail writes. */
+interface PageInputs {
+  earlier: CheckpointManifest;
+  later: CheckpointManifest;
+  earlierWrites: TailWrites;
+  laterWrites: TailWrites;
+}
+
 /**
  * Opt-in archive of named and automatic versions for one document. It stores
  * content-addressed checkpoints plus the committed transactions since each
@@ -521,6 +561,7 @@ export class HistoryArchive {
   private readonly limits: Readonly<HistoryLimits>;
   private manifest: HistoryManifest;
   private lock = Promise.resolve();
+  private readonly rebuilt = new RebuiltVersionCache();
 
   /** Private: use `HistoryArchive.open`. */
   private constructor(
@@ -582,6 +623,10 @@ export class HistoryArchive {
       head,
       version,
     });
+
+    if (head) {
+      this.rebuilt.releaseHead();
+    }
   }
 
   /** Store the first checkpoint: a complete, committed snapshot of the document at `time`. */
@@ -767,20 +812,18 @@ export class HistoryArchive {
   /**
    * Rebuild the document of one version. A reader lease keeps its records
    * alive while a concurrent prune runs; the lease is released on every exit.
+   * The archive keeps the rebuilt version for the calls that follow, until
+   * `releaseMemory`.
    */
   async readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
-    return this.withPinnedVersion(id, signal, async (checkpoint, version, read) => {
+    return this.withPinnedVersion(id, signal, async (version, read) => {
       const rebuilt =
         version.tail.length === 0
-          ? checkpoint
-          : await withReplayStore(
-              checkpoint,
-              version.tail,
-              read,
-              this.limits,
-              signal,
-              (store, revision) => ({ ...store.exportSnapshot(), version: revision }),
-            );
+          ? (await this.checkpointOf(version, read)).snapshot
+          : await this.withRebuiltVersion(version, read, signal, true, ({ store, revision }) => ({
+              ...store.exportSnapshot(),
+              version: revision,
+            }));
 
       if (rebuilt.version !== version.revision) {
         throw new HistoryError("integrity", "History log does not reach its version marker");
@@ -792,10 +835,10 @@ export class HistoryArchive {
 
   /**
    * Restore one version, or one sheet or range of it, on `grid` as one undoable
-   * transaction. The version is rebuilt in a private engine instance and
-   * compared with the grid's current document; the difference is committed as
-   * one atomic restore, which `SyncCoordinator` sends as one transaction that
-   * is never rebased.
+   * transaction. The version is rebuilt in a private engine instance, or taken
+   * from the last `readVersion` or restore, and compared with the grid's
+   * current document; the difference is committed as one atomic restore, which
+   * `SyncCoordinator` sends as one transaction that is never rebased.
    *
    * With `options.sync`, the coordinator must be online with no pending or
    * conflicted commits. A change to the grid while the version is read, or a
@@ -816,41 +859,34 @@ export class HistoryArchive {
     });
 
     try {
-      return await this.withPinnedVersion(id, options.signal, (checkpoint, version, read) =>
-        withReplayStore(
-          checkpoint,
-          version.tail,
-          read,
-          this.limits,
-          options.signal,
-          (store, revision) => {
-            if (revision !== version.revision) {
-              throw new HistoryError("integrity", "History log does not reach its version marker");
-            }
+      return await this.withPinnedVersion(id, options.signal, (version, read) =>
+        this.withRebuiltVersion(version, read, options.signal, true, ({ store, revision }) => {
+          if (revision !== version.revision) {
+            throw new HistoryError("integrity", "History log does not reach its version marker");
+          }
 
-            if (changed) {
-              throw new HistoryError("conflict", "The document changed while the version was read");
-            }
+          if (changed) {
+            throw new HistoryError("conflict", "The document changed while the version was read");
+          }
 
-            assertIdle(options.sync);
+          assertIdle(options.sync);
 
-            const plan = planRestore(grid.store, store, scope);
+          const plan = planRestore(grid.store, store, scope);
 
-            const outcome = commitRestore(grid, plan.operations, plan.guards, {
-              versionId: id,
-              scope: scope.kind,
-            });
+          const outcome = commitRestore(grid, plan.operations, plan.guards, {
+            versionId: id,
+            scope: scope.kind,
+          });
 
-            if (!outcome) {
-              throw new HistoryError(
-                "capacity",
-                "A restored cell block does not fit one server version",
-              );
-            }
+          if (!outcome) {
+            throw new HistoryError(
+              "capacity",
+              "A restored cell block does not fit one server version",
+            );
+          }
 
-            return outcome;
-          },
-        ),
+          return outcome;
+        }),
       );
     } finally {
       stop();
@@ -862,50 +898,250 @@ export class HistoryArchive {
    * changed, with before and after and who wrote them; sheets added, removed
    * or changed outside their cells; and workbook fields that changed.
    *
-   * Both versions are rebuilt in private engine instances and compared in
-   * bounded windows by the history diff kernel, a separate WASM module that
-   * loads on the first diff. Rows and columns are aligned through the
-   * structural operations of the log, so an inserted row does not make the
-   * rows below it changed. Nothing is kept between pages: pass `cursor` to
-   * continue, and each page rebuilds the versions again.
+   * Both versions are rebuilt in private engine instances, or taken from the
+   * last `readVersion` or restore, and compared in bounded windows by the
+   * history diff kernel, a separate WASM module that loads on the first diff.
+   * Rows and columns are aligned through the structural operations of the log,
+   * so an inserted row does not make the rows below it changed. Only the
+   * checkpoint pages that can differ are read and rebuilt (see
+   * `selectPages`); the result is the same as rebuilding both versions whole.
+   * A diff keeps nothing between pages: pass `cursor` to continue, and each
+   * page rebuilds what it needs again.
    */
   async diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage> {
     diffPageSize(request);
     const { signal } = request;
 
-    return this.withPinnedVersion(request.from, signal, (earlierCheckpoint, earlier, readEarlier) =>
-      this.withPinnedVersion(request.to, signal, async (laterCheckpoint, later, read) => {
+    return this.withPinnedVersion(request.from, signal, (earlier, readEarlier) =>
+      this.withPinnedVersion(request.to, signal, async (later, read) => {
         if (later.revision < earlier.revision) {
           throw new HistoryError("invalid-scope", "The later version precedes the earlier one");
         }
 
         const log = await intervalLog(later, earlier.revision, read, this.limits);
         const commits = commitsAfter(log.transactions, earlier.revision, read, this.limits);
+        const tracked = { logComplete: log.complete, request };
 
-        return withReplayStore(
-          earlierCheckpoint,
-          earlier.tail,
-          readEarlier,
-          this.limits,
-          signal,
-          (before) =>
-            withReplayStore(laterCheckpoint, later.tail, read, this.limits, signal, (after) =>
-              diffStores({ before, after, commits, logComplete: log.complete, request }),
+        const byPage = await this.pageInputs(earlier, readEarlier, later, read);
+        if (!byPage) {
+          return this.withRebuiltVersion(earlier, readEarlier, signal, false, (before) =>
+            this.withRebuiltVersion(later, read, signal, false, (after) =>
+              diffStores({ ...tracked, before: before.store, after: after.store, commits }),
             ),
+          );
+        }
+
+        const state = await trackLog(
+          manifestShapes(byPage.earlier),
+          manifestShapes(byPage.later),
+          commits,
+          request,
         );
+        try {
+          return await this.diffByPage(
+            state,
+            byPage,
+            { version: earlier, read: readEarlier },
+            { version: later, read },
+            tracked,
+          );
+        } finally {
+          state.kernel.free();
+        }
       }),
     );
   }
 
-  /** Lease one version and pass its checkpoint and a leased record reader to `use`. */
+  /**
+   * Compare two versions under a tracked log by rebuilding only the cell pages
+   * that can differ; see `selectPages`. When too many pages differ, the whole
+   * versions are compared under the same log.
+   */
+  private async diffByPage(
+    state: Tracking,
+    inputs: PageInputs,
+    earlier: LeasedVersion,
+    later: LeasedVersion,
+    tracked: { logComplete: boolean; request: HistoryDiffRequest },
+  ): Promise<HistoryDiffPage> {
+    const { signal } = tracked.request;
+    const selection = selectPages(
+      state,
+      inputs.earlier,
+      inputs.later,
+      inputs.earlierWrites,
+      inputs.laterWrites,
+    );
+
+    if (!selection) {
+      return this.withRebuiltVersion(earlier.version, earlier.read, signal, false, (before) =>
+        this.withRebuiltVersion(later.version, later.read, signal, false, (after) =>
+          diffTracked(state, { ...tracked, before: before.store, after: after.store }),
+        ),
+      );
+    }
+
+    const before = await this.sparseVersion(inputs.earlier, selection.earlier, earlier, signal);
+    try {
+      const after = await this.sparseVersion(inputs.later, selection.later, later, signal);
+      try {
+        const page = diffTracked(state, { ...tracked, before: before.store, after: after.store });
+        await this.calculate(page, "before", before.store, earlier, signal);
+        await this.calculate(page, "after", after.store, later, signal);
+        return page;
+      } finally {
+        after.free();
+      }
+    } finally {
+      before.free();
+    }
+  }
+
+  /**
+   * What a compare by page needs from two leased versions: their checkpoint
+   * manifests and the cells their log tails write. `undefined` when a tail
+   * holds an operation that a compare by page cannot follow; the versions are
+   * then compared whole.
+   */
+  private async pageInputs(
+    earlier: HistoryVersion,
+    readEarlier: HistoryRecordReader,
+    later: HistoryVersion,
+    read: HistoryRecordReader,
+  ): Promise<PageInputs | undefined> {
+    const earlierWrites = await this.tailWrites(earlier.tail, readEarlier);
+    const laterWrites = earlierWrites && (await this.tailWrites(later.tail, read));
+    if (!earlierWrites || !laterWrites) {
+      return undefined;
+    }
+
+    return {
+      earlier: await this.manifestOf(earlier, readEarlier),
+      later: await this.manifestOf(later, read),
+      earlierWrites,
+      laterWrites,
+    };
+  }
+
+  /** The cells a log tail writes, or `undefined` when it holds an operation a compare by page cannot follow. */
+  private async tailWrites(
+    tail: readonly string[],
+    read: HistoryRecordReader,
+  ): Promise<TailWrites | undefined> {
+    const writes: TailWrites = new Map();
+    for (const id of tail) {
+      const commit = await readCommit(id, read, this.limits);
+      if (!addTailWrites(writes, commit.operations)) {
+        return undefined;
+      }
+    }
+
+    return writes;
+  }
+
+  /** Read a leased version's checkpoint manifest and check that it belongs to this document. */
+  private async manifestOf(
+    version: HistoryVersion,
+    read: HistoryRecordReader,
+  ): Promise<CheckpointManifest> {
+    const manifest = await readCheckpointManifest(version.checkpoint, read, this.limits);
+    if (manifest.documentId !== this.documentId) {
+      throw new HistoryError("integrity", "History checkpoint belongs to another document");
+    }
+
+    return manifest;
+  }
+
+  /** Rebuild a version from only the cell pages in `pages`; other cells are empty. */
+  private async sparseVersion(
+    manifest: CheckpointManifest,
+    pages: ReadonlyArray<ReadonlySet<string>>,
+    { version, read }: LeasedVersion,
+    signal: AbortSignal | undefined,
+  ): Promise<RebuiltVersion> {
+    const checkpoint = await readCheckpointCells(manifest, read, this.limits, selectedPages(pages));
+
+    return rebuildVersion(checkpoint, version.tail, read, this.limits, signal);
+  }
+
+  /**
+   * A sparse version holds the right sources and styles, but a formula or a
+   * reference needs the whole version for its calculated value. Take those
+   * values of the page's `side` from the whole version, kept or rebuilt.
+   */
+  private async calculate(
+    page: HistoryDiffPage,
+    side: "before" | "after",
+    sparse: SheetwriteStore,
+    { version, read }: LeasedVersion,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    const cells = calculatedDetails(page, side, sparse);
+    if (cells.length === 0) {
+      return;
+    }
+
+    await this.withRebuiltVersion(version, read, signal, false, ({ store }) => {
+      for (const { detail, sheet, row, col } of cells) {
+        detail[side] = cellIn(store, sheet, row, col);
+      }
+    });
+  }
+
+  /**
+   * Free the version that the archive keeps rebuilt between calls. The
+   * version history panel calls it when it closes and when its grid trims
+   * memory. A call that still uses the version frees it when it returns.
+   */
+  releaseMemory(): void {
+    this.rebuilt.release();
+  }
+
+  /**
+   * Run `action` on the rebuilt document of a leased version: the kept one
+   * when it matches, else a new rebuild. With `keep`, a new rebuild replaces
+   * the kept version.
+   */
+  private withRebuiltVersion<T>(
+    version: HistoryVersion,
+    read: HistoryRecordReader,
+    signal: AbortSignal | undefined,
+    keep: boolean,
+    action: (rebuilt: RebuiltVersion) => T | Promise<T>,
+  ): Promise<T> {
+    return this.rebuilt.use(
+      rebuiltKey(version.id, version.revision, version.checkpoint),
+      keep,
+      async () =>
+        rebuildVersion(
+          await this.checkpointOf(version, read),
+          version.tail,
+          read,
+          this.limits,
+          signal,
+        ),
+      action,
+    );
+  }
+
+  /** Read a leased version's checkpoint and check that it belongs to this document. */
+  private async checkpointOf(
+    version: HistoryVersion,
+    read: HistoryRecordReader,
+  ): Promise<CheckedSnapshot> {
+    const checkpoint = await readCheckpoint(version.checkpoint, read, this.limits);
+    if (checkpoint.snapshot.documentId !== this.documentId) {
+      throw new HistoryError("integrity", "History checkpoint belongs to another document");
+    }
+
+    return checkpoint;
+  }
+
+  /** Lease one version and pass it and a leased record reader to `use`. */
   private async withPinnedVersion<T>(
     id: string,
     signal: AbortSignal | undefined,
-    use: (
-      checkpoint: WorkbookSnapshot,
-      version: HistoryVersion,
-      read: HistoryRecordReader,
-    ) => Promise<T>,
+    use: (version: HistoryVersion, read: HistoryRecordReader) => Promise<T>,
   ): Promise<T> {
     checkAbort(signal);
 
@@ -950,12 +1186,7 @@ export class HistoryArchive {
         return stored;
       };
 
-      const checkpoint = await readCheckpoint(version.checkpoint, read, this.limits);
-      if (checkpoint.documentId !== this.documentId) {
-        throw new HistoryError("integrity", "History checkpoint belongs to another document");
-      }
-
-      return await use(checkpoint, version, read);
+      return await use(version, read);
     } finally {
       await this.storage.put({ ...this.request(), kind: "release", token, versionId: id });
     }
@@ -989,6 +1220,8 @@ export class HistoryArchive {
         beforeTime: options.beforeTime ?? ageCeiling,
         targetBytes: options.targetBytes,
       });
+      // A removed version can no longer be leased, so its rebuild would never be used.
+      this.rebuilt.release();
     });
   }
 
@@ -1001,6 +1234,7 @@ export class HistoryArchive {
         beforeTime: -1,
         deleteVersionId: id,
       });
+      this.rebuilt.release();
     });
   }
 }

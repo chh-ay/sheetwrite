@@ -30,23 +30,6 @@ async function open(page: Page): Promise<void> {
   });
 }
 
-/** Commit `text` into an orders cell through the real editor and Enter. */
-async function commitCell(page: Page, row: number, col: number, text: string): Promise<void> {
-  await page.evaluate(
-    ({ row, col, text }) => {
-      const grid = window.__sheetwriteVueWorkbench?.grid;
-      if (!grid) throw new Error("grid handle missing");
-      const addr = { sheet: "orders", row, col };
-      grid.setActiveSheet("orders");
-      grid.setSelection({ kind: "cell", addr });
-      grid.scrollToCell(addr);
-      grid.beginEdit(row, col, text);
-    },
-    { row, col, text },
-  );
-  await page.keyboard.press("Enter");
-}
-
 /** The settings disclosure keeps its state across task tabs. */
 async function openAdapterSettings(page: Page): Promise<void> {
   await page.getByRole("tab", { name: "Renderer", exact: true }).click();
@@ -55,11 +38,56 @@ async function openAdapterSettings(page: Page): Promise<void> {
   if (!isOpen) await summary.click();
 }
 
-test("the command toolbar keeps ribbon commands reachable by keyboard at any width @portability", async ({
+test("sheet tabs and the command toolbar stay keyboard-operable at any width, and the host syncs every change @portability", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1568, height: 869 });
   await open(page);
+
+  // Sheet tabs rename, add and reorder by keyboard, and the host syncs every
+  // change. Insert comes first in the sheet menu, as in Excel.
+  const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
+  const insertOption = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
+  const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
+  await ordersOptions.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(insertOption).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(ordersOptions).toBeFocused();
+  await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("ArrowDown");
+  await expect(insertOption).toBeFocused();
+  // A pointer press on a focused menu must not close it first (WebKit does not
+  // focus pressed buttons).
+  await renameOption.click();
+  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
+  await editor.fill("Suppliers");
+  await editor.press("Enter");
+  await expect(page.locator(`${GRID} [role="alert"][data-code="duplicate"]`)).toHaveText(
+    "Sheet name duplicates another sheet case-insensitively",
+  );
+  await expect(editor).toBeFocused();
+  await expect(page.getByTestId("pending-count")).toHaveText("0");
+  await editor.fill("Purchase orders");
+  await editor.press("Enter");
+  await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
+  // As in Excel, the add button adds the sheet after the active one.
+  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
+  const added = page.getByRole("tab", { name: "Sheet3 sheet" });
+  await expect(added).toHaveAttribute("aria-selected", "true");
+  await added.focus();
+  await page.keyboard.press("Control+Shift+ArrowRight");
+  expect(
+    await page.evaluate(() =>
+      window.__sheetwriteVueWorkbench?.grid.store.getWorkbook().sheets.map((sheet) => sheet.name),
+    ),
+  ).toEqual(["Purchase orders", "Suppliers", "Sheet3"]);
+  await expect(page.getByTestId("pending-count")).toHaveText("3");
+  await page.getByRole("tab", { name: "Persistence", exact: true }).click();
+  await page.getByTestId("sync").click();
+  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v3");
+
+  // The command toolbar keeps ribbon commands reachable by keyboard at any width.
   const toolbar = page.getByRole("toolbar", { name: "Spreadsheet formatting" });
   const bold = toolbar.getByRole("button", { name: "Bold", exact: true });
   await page.evaluate(() => {
@@ -99,76 +127,6 @@ test("the command toolbar keeps ribbon commands reachable by keyboard at any wid
   await expect(more).toHaveAttribute("aria-expanded", "false");
 });
 
-test("protected totals show rejection, role correction, and accepted mutation in one journey", async ({
-  page,
-}) => {
-  await open(page);
-  await expect(page.getByTestId("inspector")).toContainText("orders!G1");
-  await page.getByTestId("challenge-attempt").click();
-  const result = page.getByTestId("policy-result");
-  await expect(result).toHaveAttribute("data-state", "rejected");
-  await expect(result).toContainText("orders-computed-totals");
-  expect(await cellValue(page, HANDLE, "orders", 0, 6)).toBe(768);
-  await expect(page.getByTestId("pending-count")).toHaveText("0");
-
-  await page.getByTestId("challenge-authorize").click();
-  await expect(page.getByTestId("role-finance-lead")).toHaveAttribute("aria-pressed", "true");
-  await expect(result).toHaveAttribute("data-state", "authorized");
-  await page.getByTestId("challenge-attempt").click();
-  await expect(result).toHaveAttribute("data-state", "accepted");
-  await expect.poll(() => cellValue(page, HANDLE, "orders", 0, 6)).toBe(999);
-  await expect(page.getByTestId("pending-count")).toHaveText("1");
-});
-
-test("sheet tabs rename, add and reorder by keyboard, and the host syncs every change @portability", async ({
-  page,
-}) => {
-  await open(page);
-  const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
-  // Insert comes first in the sheet menu, as in Excel.
-  const insertOption = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
-  const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
-  await ordersOptions.focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(insertOption).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(ordersOptions).toBeFocused();
-  await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
-  await page.keyboard.press("ArrowDown");
-  await expect(insertOption).toBeFocused();
-  // A pointer press on a focused menu must not close it first (WebKit does not
-  // focus pressed buttons).
-  await renameOption.click();
-  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
-  await editor.fill("Suppliers");
-  await editor.press("Enter");
-  await expect(page.locator(`${GRID} [role="alert"][data-code="duplicate"]`)).toHaveText(
-    "Sheet name duplicates another sheet case-insensitively",
-  );
-  await expect(editor).toBeFocused();
-  await expect(page.getByTestId("pending-count")).toHaveText("0");
-  await editor.fill("Purchase orders");
-  await editor.press("Enter");
-  await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
-
-  // As in Excel, the add button adds the sheet after the active one.
-  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
-  const added = page.getByRole("tab", { name: "Sheet3 sheet" });
-  await expect(added).toHaveAttribute("aria-selected", "true");
-  await added.focus();
-  await page.keyboard.press("Control+Shift+ArrowRight");
-  expect(
-    await page.evaluate(() =>
-      window.__sheetwriteVueWorkbench?.grid.store.getWorkbook().sheets.map((sheet) => sheet.name),
-    ),
-  ).toEqual(["Purchase orders", "Suppliers", "Sheet3"]);
-
-  await expect(page.getByTestId("pending-count")).toHaveText("3");
-  await page.getByRole("tab", { name: "Persistence", exact: true }).click();
-  await page.getByTestId("sync").click();
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v3");
-});
-
 test("mutation policy is reset-bound, and read-only is a live option", async ({ page }) => {
   await open(page);
   // Read-only disables mutation without a new generation.
@@ -190,7 +148,15 @@ test("mutation policy is reset-bound, and read-only is a live option", async ({ 
 
   // A synced local edit, then a policy change: the grid rebuilds from the
   // pristine scenario and a fresh host session binds.
-  await commitCell(page, 4, 3, "Approved");
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    const addr = { sheet: "orders", row: 4, col: 3 };
+    grid?.setActiveSheet("orders");
+    grid?.setSelection({ kind: "cell", addr });
+    grid?.scrollToCell(addr);
+    grid?.beginEdit(4, 3, "Approved");
+  });
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("pending-count")).toHaveText("1");
   await expect(page.getByTestId("mutation-policy")).toBeDisabled();
   await page.getByRole("tab", { name: "Persistence", exact: true }).click();

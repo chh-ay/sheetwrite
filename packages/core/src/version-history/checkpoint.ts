@@ -1,4 +1,4 @@
-import { validateWorkbookSnapshot } from "../document-protocol.js";
+import { CheckedSnapshot, validateWorkbookSnapshot } from "../document-protocol.js";
 import type { SheetSnapshot, SnapshotCell, WorkbookSnapshot } from "../types/document.js";
 import {
   decodeRecord,
@@ -17,8 +17,8 @@ import type { HistoryLimits, HistoryStoredRecord } from "./types.js";
  * cells keep the per-page overhead (ID, header, index entry) under the page
  * payload for typical sheets.
  */
-const PAGE_ROWS = 16;
-const PAGE_COLS = 4;
+export const PAGE_ROWS = 16;
+export const PAGE_COLS = 4;
 
 /** Large metadata arrays (names, notes, rules) split into blocks, so one change stores one block. */
 const METADATA_ENTRIES_PER_BLOCK = 128;
@@ -61,12 +61,15 @@ export interface CheckpointWrite {
 /** Fetch one verified record by ID. */
 export type HistoryRecordReader = (id: string) => Promise<HistoryStoredRecord>;
 
-function reserveSnapshot(input: unknown, limits: Readonly<HistoryLimits>): void {
+/** Check the working-set reservation of `input`; returns its JSON size in bytes. */
+function reserveSnapshot(input: unknown, limits: Readonly<HistoryLimits>): number {
   const encoded = historyJsonSize(input, limits.maxSnapshotBytes);
 
   if (encoded * SNAPSHOT_RESERVATION_MULTIPLIER > limits.maxWorkingBytes) {
     throw new HistoryError("capacity", "History snapshot exceeds its working-set reservation");
   }
+
+  return encoded;
 }
 
 /** Store one metadata value; a large array becomes a list of block records. */
@@ -340,17 +343,44 @@ async function readWorkbook(
   return workbook;
 }
 
-/** Running count of decoded cell-page bytes, checked against the reconstruction reservation. */
-interface DecodedBudget {
-  bytes: number;
+/** One cell page of a sheet: its top-left cell and its record ID. */
+export type CheckpointPage = readonly [row: number, col: number, id: string];
+
+/** A checkpoint sheet whose fields are read and whose cell pages are not. */
+export interface CheckpointSheet {
+  /** The sheet's fields other than `cells`, as stored. */
+  fields: Record<string, unknown>;
+  rowCount: number;
+  colCount: number;
+  pages: readonly CheckpointPage[];
+}
+
+/** A checkpoint whose root, workbook and sheet records are read and checked; no cell page is. */
+export interface CheckpointManifest {
+  documentId: string;
+  revision: number;
+  workbook: Record<string, unknown>;
+  sheets: CheckpointSheet[];
+  /** Decoded bytes that count against the reconstruction reservation before any page. */
+  decodedBytes: number;
+}
+
+function validPage(page: unknown, owned: ReadonlySet<string>): page is CheckpointPage {
+  return (
+    Array.isArray(page) &&
+    page.length === 3 &&
+    integer(page[0]) &&
+    integer(page[1]) &&
+    typeof page[2] === "string" &&
+    owned.has(page[2])
+  );
 }
 
 async function readSheet(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-  budget: DecodedBudget,
-): Promise<Record<string, unknown>> {
+): Promise<CheckpointSheet> {
   const record = await read(id);
   const source = await decodeRecord(record, limits);
   if (record.kind !== "sheet" || !object(source)) {
@@ -363,80 +393,42 @@ async function readSheet(
     throw new HistoryError("integrity", "Invalid history sheet manifest");
   }
 
-  const sheet: Record<string, unknown> = {};
+  const fields: Record<string, unknown> = {};
   for (const field of metadataFields) {
     if (!fieldReference(field, record) || FORBIDDEN_SHEET_FIELDS.includes(field[0])) {
       throw new HistoryError("integrity", "Invalid history sheet metadata reference");
     }
 
-    sheet[field[0]] = await readMetadata(field[1], read, limits);
+    fields[field[0]] = await readMetadata(field[1], read, limits);
   }
 
-  const rowCount = sheet.rowCount;
-  const columns = sheet.columns;
+  const { rowCount, columns } = fields;
   if (!integer(rowCount) || !Array.isArray(columns)) {
     throw new HistoryError("integrity", "Invalid historical sheet dimensions");
   }
 
-  const cells: unknown[] = [];
+  const owned = new Set(record.references);
+  const pages: CheckpointPage[] = [];
   for (const page of pageReferences) {
-    const validPage =
-      Array.isArray(page) &&
-      page.length === 3 &&
-      integer(page[0]) &&
-      integer(page[1]) &&
-      typeof page[2] === "string" &&
-      record.references.includes(page[2]);
-
-    if (!validPage) {
+    if (!validPage(page, owned)) {
       throw new HistoryError("integrity", "Invalid history cell page reference");
     }
 
-    const pageRecord = await read(page[2]);
-    budget.bytes += pageRecord.decodedBytes;
-
-    const overBudget =
-      budget.bytes * SNAPSHOT_RESERVATION_MULTIPLIER > limits.maxWorkingBytes ||
-      budget.bytes > limits.maxSnapshotBytes;
-
-    if (overBudget) {
-      throw new HistoryError("capacity", "Historical cells exceed the reconstruction reservation");
-    }
-
-    const values = await decodeRecord(pageRecord, limits);
-    if (
-      pageRecord.kind !== "cells" ||
-      !Array.isArray(values) ||
-      values.length > PAGE_ROWS * PAGE_COLS
-    ) {
-      throw new HistoryError("integrity", "Invalid history cell page");
-    }
-
-    // Page bounds outside the sheet fail the snapshot validation below.
-    cells.push({
-      startRow: page[0],
-      startCol: page[1],
-      rowCount: Math.min(PAGE_ROWS, rowCount - page[0]),
-      colCount: Math.min(PAGE_COLS, columns.length - page[1]),
-      cells: values,
-    });
+    pages.push(page);
   }
 
-  sheet.cells = cells;
-
-  return sheet;
+  return { fields, rowCount, colCount: columns.length, pages };
 }
 
 /**
- * Rebuild a checkpoint into a validated snapshot. Every reference is checked
- * against its owner, and decoded bytes are counted against the working-set
- * reservation before the next page is read.
+ * Read a checkpoint's root, workbook metadata and sheet records, with every
+ * reference checked against its owner. Cell pages are listed, not read.
  */
-export async function readCheckpoint(
+export async function readCheckpointManifest(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-): Promise<WorkbookSnapshot> {
+): Promise<CheckpointManifest> {
   const record = await read(id);
   const root = await decodeRecord(record, limits);
   if (record.kind !== "checkpoint" || !object(root)) {
@@ -465,25 +457,87 @@ export async function readCheckpoint(
 
   const workbook = await readWorkbook(workbookId, read, limits);
 
-  const budget: DecodedBudget = { bytes: record.decodedBytes };
-  const sheets: unknown[] = [];
+  const sheets: CheckpointSheet[] = [];
   for (const sheetId of sheetIds) {
     if (!record.references.includes(sheetId)) {
       throw new HistoryError("integrity", "Unowned history sheet");
     }
 
-    sheets.push(await readSheet(sheetId, read, limits, budget));
+    sheets.push(await readSheet(sheetId, read, limits));
+  }
+
+  return { documentId, revision, workbook, sheets, decodedBytes: record.decodedBytes };
+}
+
+/**
+ * Read the cell pages of a manifest that `keep` selects (every page when it
+ * is omitted) into a validated snapshot, which a replay store takes without
+ * validating every cell again. Decoded bytes are counted against the
+ * working-set reservation before the next page is read. Cells of pages that
+ * are not kept are empty in the snapshot.
+ */
+export async function readCheckpointCells(
+  manifest: CheckpointManifest,
+  read: HistoryRecordReader,
+  limits: Readonly<HistoryLimits>,
+  keep?: (sheet: number, page: CheckpointPage) => boolean,
+): Promise<CheckedSnapshot> {
+  let decodedBytes = manifest.decodedBytes;
+  const sheets: unknown[] = [];
+
+  for (const [index, sheet] of manifest.sheets.entries()) {
+    const cells: unknown[] = [];
+    for (const page of sheet.pages) {
+      if (keep && !keep(index, page)) {
+        continue;
+      }
+
+      const [row, col, id] = page;
+      const pageRecord = await read(id);
+      decodedBytes += pageRecord.decodedBytes;
+
+      const overBudget =
+        decodedBytes * SNAPSHOT_RESERVATION_MULTIPLIER > limits.maxWorkingBytes ||
+        decodedBytes > limits.maxSnapshotBytes;
+
+      if (overBudget) {
+        throw new HistoryError(
+          "capacity",
+          "Historical cells exceed the reconstruction reservation",
+        );
+      }
+
+      const values = await decodeRecord(pageRecord, limits);
+      if (
+        pageRecord.kind !== "cells" ||
+        !Array.isArray(values) ||
+        values.length > PAGE_ROWS * PAGE_COLS
+      ) {
+        throw new HistoryError("integrity", "Invalid history cell page");
+      }
+
+      // Page bounds outside the sheet fail the snapshot validation below.
+      cells.push({
+        startRow: row,
+        startCol: col,
+        rowCount: Math.min(PAGE_ROWS, sheet.rowCount - row),
+        colCount: Math.min(PAGE_COLS, sheet.colCount - col),
+        cells: values,
+      });
+    }
+
+    sheets.push({ ...sheet.fields, cells });
   }
 
   const input = {
     schemaVersion: 1,
-    documentId,
-    version: revision,
-    workbook,
+    documentId: manifest.documentId,
+    version: manifest.revision,
+    workbook: manifest.workbook,
     sheets,
   };
 
-  reserveSnapshot(input, limits);
+  const serializedBytes = reserveSnapshot(input, limits);
 
   const checked = validateWorkbookSnapshot(input, {
     storage: "paged",
@@ -494,7 +548,16 @@ export async function readCheckpoint(
     throw new HistoryError("integrity", "Reconstructed history snapshot is invalid");
   }
 
-  return checked.value;
+  return new CheckedSnapshot(checked.value, serializedBytes);
+}
+
+/** Rebuild a whole checkpoint into a validated snapshot; see `readCheckpointCells`. */
+export async function readCheckpoint(
+  id: string,
+  read: HistoryRecordReader,
+  limits: Readonly<HistoryLimits>,
+): Promise<CheckedSnapshot> {
+  return readCheckpointCells(await readCheckpointManifest(id, read, limits), read, limits);
 }
 
 /** Read only the log fields of a checkpoint; its cells are not decoded. */

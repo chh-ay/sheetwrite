@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { type GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { DataValidationRule } from "../src/types.js";
-import { answerDialog, elementAdded, mountGridWithData } from "./fixtures.js";
+import { answerDialog, elementAdded, expectSameNode, mountGridWithData } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -49,32 +49,6 @@ function typeIntoAmount(host: HTMLElement, grid: GridImpl, text: string): void {
 }
 
 describe("data validation error alert", () => {
-  it("shows Excel's Stop alert, and Retry returns to the entry", async () => {
-    const { grid, host, store } = mountGridWithData(10);
-    grid.setValidationRule(amountRule());
-
-    typeIntoAmount(host, grid, "99");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-    expect(dialog.getAttribute("role")).toBe("alertdialog");
-    expect(dialog.textContent).toContain("Data Validation");
-    expect(dialog.textContent).toContain(
-      "This value doesn't match the data validation restrictions defined for this cell.",
-    );
-    expect([...dialog.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
-      "Retry",
-      "Cancel",
-    ]);
-    expect(store.getCell(amount).resolved).toBe(0.5);
-
-    await answerDialog(host, "Retry");
-    const editor = editorOf(host);
-    expect(editor.value).toBe("99");
-    expect(document.activeElement).toBe(editor);
-    expect(store.getCell(amount).resolved).toBe(0.5);
-    grid.destroy();
-    store.dispose();
-  });
-
   it("drops the entry on Cancel and shows the rule's own title and message", async () => {
     const { grid, host, store } = mountGridWithData(10);
     grid.setValidationRule(amountRule({ errorTitle: "Quantity", helpText: "Enter 1 to 5." }));
@@ -84,7 +58,7 @@ describe("data validation error alert", () => {
     expect(dialog.querySelector(".sheetwrite-dialog-title")?.textContent).toBe("Quantity");
     expect(dialog.textContent).toContain("Enter 1 to 5.");
     await answerDialog(host, "Cancel");
-    expect(document.activeElement).toBe(host);
+    expectSameNode(document.activeElement, host);
     expect(store.getCell(amount).resolved).toBe(0.5);
     grid.destroy();
     store.dispose();

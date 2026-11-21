@@ -76,6 +76,8 @@ export interface GridPanel {
    * the cell cursor.
    */
   focus?: boolean;
+  /** Drop what the panel can build again; `Grid.trimMemory` calls it on the open panel. */
+  trimMemory?(): void;
 }
 
 /** Selection movement applied after a successful editor commit. */
@@ -1810,10 +1812,12 @@ export interface Grid {
   /**
    * Drop the memory this grid can build again: decoded cell strings, rendered
    * number text, compiled number formats, text measurement and unused overlay
-   * nodes, in the grid and in its worker renderer. Document data, undo history
-   * and the visible output do not change. The next frame and the next use
-   * build again what they need. Call it on a memory signal or when the page
-   * goes to the background; it does nothing after `destroy()`.
+   * nodes, in the grid and in its worker renderer, and what the open side
+   * panel can build again, such as the version that version history keeps
+   * rebuilt. Document data, undo history and the visible output do not
+   * change. The next frame and the next use build again what they need. Call
+   * it on a memory signal or when the page goes to the background; it does
+   * nothing after `destroy()`.
    *
    * Number format caches are shared by all grids on the page, so a trim also
    * drops them for the other grids. WebAssembly memory does not shrink; call

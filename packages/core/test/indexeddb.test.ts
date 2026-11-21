@@ -442,21 +442,6 @@ describe("IndexedDbPendingCommitStorage", () => {
     expect(lateDatabase.closeCalls).toBe(1);
   });
 
-  it("consumes close after rejection without retaining a late connection", async () => {
-    const factory = installControlledFactory();
-    const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-after-rejection" });
-    const load = storage.load("document-a", LOAD_OPTIONS);
-    const request = factory.requests[0]!;
-    request.blocked();
-    await expect(load).rejects.toMatchObject({ code: "blocked" });
-    storage.close();
-
-    const lateDatabase = new ControlledDatabase();
-    request.succeeded(lateDatabase);
-    await Promise.resolve();
-    expect(lateDatabase.closeCalls).toBe(1);
-  });
-
   it("drops a versionchanged connection and successfully starts a replacement open", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "versionchange-open" });

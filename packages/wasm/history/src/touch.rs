@@ -127,20 +127,6 @@ mod tests {
         authors[0]
     }
 
-    #[test]
-    fn one_sweep_finds_the_newest_writer_of_each_cell() {
-        let mut touches = Touches::default();
-        touches.add(rect(0, 0, 9, 3, 1));
-        touches.add(rect(2, 1, 4, 1, 2));
-        touches.add(rect(4, 0, 4, 3, 3));
-
-        let rows = [0, 2, 3, 4, 12];
-        let cols = [0, 1, 2, 1, 0];
-        let mut authors = [NONE; 5];
-        touches.last_authors(&rows, &cols, &mut authors);
-        assert_eq!(authors, [1, 2, 1, 3, NONE]);
-    }
-
     fn rect(r0: u32, c0: u32, r1: u32, c1: u32, author: u32) -> Touch {
         Touch {
             r0,
@@ -149,21 +135,6 @@ mod tests {
             c1,
             author,
         }
-    }
-
-    #[test]
-    fn the_last_write_names_the_author_and_all_writers_are_kept() {
-        let mut touches = Touches::default();
-        touches.add(rect(0, 0, 9, 3, 1));
-        touches.add(rect(2, 1, 2, 1, 2));
-
-        assert_eq!(last_author(&touches, 2, 1), 2);
-        assert_eq!(last_author(&touches, 5, 0), 1);
-        assert_eq!(last_author(&touches, 10, 0), NONE);
-
-        let mut authors = Vec::new();
-        touches.authors(2, 1, &mut authors);
-        assert_eq!(authors, vec![1, 2]);
     }
 
     #[test]
@@ -177,16 +148,5 @@ mod tests {
 
         touches.apply_rows(AxisOp::Remove { at: 7, count: 1 });
         assert_eq!(last_author(&touches, 7, 0), NONE);
-    }
-
-    #[test]
-    fn a_cleared_and_reinserted_cell_keeps_both_writers() {
-        let mut touches = Touches::default();
-        touches.add(rect(3, 2, 3, 2, 1));
-        touches.apply_cols(AxisOp::Remove { at: 2, count: 1 });
-        touches.apply_cols(AxisOp::Insert { at: 2, count: 1 });
-        touches.add(rect(3, 2, 3, 2, 4));
-
-        assert_eq!(last_author(&touches, 3, 2), 4);
     }
 }

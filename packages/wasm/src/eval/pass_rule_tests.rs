@@ -6,32 +6,17 @@
 //! formula cell's shown value after the first recalculation and after an edit.
 
 use crate::store::CellStore;
-use crate::types::{KIND_BOOL, KIND_EMPTY};
+use crate::tests::support::{evaluations, shown};
 
 /// Columns A-H, rows 1-12 of one sheet.
 const COLS: usize = 8;
 const ROWS: usize = 12;
-
-/// A1-style address of a cell in the first 26 columns.
-fn address(row: usize, col: usize) -> String {
-    format!("{}{}", char::from(b'A' + col as u8), row + 1)
-}
 
 /// `"A1"` → `(row, col)` for the first 26 columns.
 fn cell(name: &str) -> (usize, usize) {
     let col = usize::from(name.as_bytes()[0] - b'A');
     let row: usize = name[1..].parse().expect("row number");
     (row - 1, col)
-}
-
-fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
-    let cell = store.get_cell(sheet, row, col);
-    match cell.string() {
-        Some(text) => text,
-        None if cell.kind() == KIND_EMPTY => String::new(),
-        None if cell.kind() == KIND_BOOL => if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into(),
-        None => cell.num().to_string(),
-    }
 }
 
 /// One workbook: literal numbers, formulas in entry order, then one number
@@ -76,20 +61,11 @@ fn run(scenario: &Scenario) -> String {
     )
 }
 
-/// Formula evaluations that `recalculate` runs: each selected formula once,
-/// even when another formula pulls it before its turn.
-fn evaluations(recalculate: impl FnOnce()) -> usize {
-    super::FORMULA_EVALUATIONS.with(|count| count.set(0));
-    recalculate();
-    super::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
-}
-
 fn snapshot(store: &CellStore, sheet: usize, cells: &[&str]) -> String {
     cells
         .iter()
         .map(|&name| {
             let (row, col) = cell(name);
-            debug_assert_eq!(address(row, col), name);
             format!("{name}={}", shown(store, sheet, row, col))
         })
         .collect::<Vec<_>>()

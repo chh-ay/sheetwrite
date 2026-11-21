@@ -48,8 +48,6 @@ mod statistics;
 mod subtotal;
 #[cfg(test)]
 mod subtotal_tests;
-#[cfg(test)]
-mod test_support;
 mod text;
 mod value;
 mod wildcard;
@@ -2589,6 +2587,12 @@ impl CellStore {
         depth: usize,
     ) -> Option<EvalResult> {
         let mut fold = ReductionFold::new(func)?;
+        #[cfg(feature = "analysis")]
+        if let Some(folded) =
+            analysis::lambda::fold_row_parameters(self, pass.results.call_frame(), args, &mut fold)
+        {
+            return Some(folded.map_or_else(Value::Error, |()| fold.finish()));
+        }
         let mut ranges = Vec::with_capacity(args.len());
         for arg in args {
             ranges.push(range_from_ast(arg, self.name_scope(sheet))?);

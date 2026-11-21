@@ -60,47 +60,69 @@ function dateTimeSerial(micros: bigint): number {
   return dateSerial(days) + (value - days * MICROS_PER_DAY) / MICROS_PER_DAY;
 }
 
-interface Cell {
-  value: CellScalar;
-  style: number;
-  error?: string;
-}
-
-function mixedCell(column: Extract<QueryColumn, { type: "mixed" }>, row: number): Cell {
+/**
+ * Writes the cell at `row` of a mixed column into `values` and `styleIds` at
+ * `offset`, and returns the error code of an error cell.
+ */
+function writeMixedCell(
+  column: Extract<QueryColumn, { type: "mixed" }>,
+  row: number,
+  values: CellScalar[],
+  styleIds: number[],
+  offset: number,
+): string | undefined {
   const index = column.indexes[row] ?? 0;
 
   switch (column.tags[row]) {
     case TAG_NUMBER:
-      return { value: column.numbers[index] ?? null, style: STYLE_PLAIN };
+      values[offset] = column.numbers[index] ?? null;
+      return undefined;
     case TAG_LOGICAL:
-      return { value: bit(column.logical, index), style: STYLE_PLAIN };
+      values[offset] = bit(column.logical, index);
+      return undefined;
     case TAG_TEXT:
-      return { value: text(column.text, column.offsets, index), style: STYLE_PLAIN };
+      values[offset] = text(column.text, column.offsets, index);
+      return undefined;
     case TAG_DATE:
-      return { value: dateSerial(column.dates[index] ?? 0), style: STYLE_DATE };
+      values[offset] = dateSerial(column.dates[index] ?? 0);
+      styleIds[offset] = STYLE_DATE;
+      return undefined;
     case TAG_DATE_TIME:
-      return { value: dateTimeSerial(column.dateTimes[index] ?? 0n), style: STYLE_DATE_TIME };
+      values[offset] = dateTimeSerial(column.dateTimes[index] ?? 0n);
+      styleIds[offset] = STYLE_DATE_TIME;
+      return undefined;
     case TAG_ERROR:
-      return { value: null, style: STYLE_PLAIN, error: column.errorPool[index] ?? "" };
+      return column.errorPool[index] ?? "";
     default:
-      return { value: null, style: STYLE_PLAIN };
+      return undefined;
   }
 }
 
-function typedCell(column: QueryColumn, row: number): Cell {
+/** Writes the valid cell at `row` of a typed column into `values` and `styleIds` at `offset`. */
+function writeTypedCell(
+  column: Exclude<QueryColumn, { type: "mixed" }>,
+  row: number,
+  values: CellScalar[],
+  styleIds: number[],
+  offset: number,
+): void {
   switch (column.type) {
     case "number":
-      return { value: column.values[row] ?? null, style: STYLE_PLAIN };
+      values[offset] = column.values[row] ?? null;
+      return;
     case "logical":
-      return { value: bit(column.values, row), style: STYLE_PLAIN };
+      values[offset] = bit(column.values, row);
+      return;
     case "text":
-      return { value: text(column.bytes, column.offsets, row), style: STYLE_PLAIN };
+      values[offset] = text(column.bytes, column.offsets, row);
+      return;
     case "date":
-      return { value: dateSerial(column.values[row] ?? 0), style: STYLE_DATE };
+      values[offset] = dateSerial(column.values[row] ?? 0);
+      styleIds[offset] = STYLE_DATE;
+      return;
     case "dateTime":
-      return { value: dateTimeSerial(column.values[row] ?? 0n), style: STYLE_DATE_TIME };
-    case "mixed":
-      return mixedCell(column, row);
+      values[offset] = dateTimeSerial(column.values[row] ?? 0n);
+      styleIds[offset] = STYLE_DATE_TIME;
   }
 }
 
@@ -126,27 +148,20 @@ export function packOutput(batch: QueryBatch): PackedCellBlock {
 
     for (let row = 0; row < batch.rowCount; row += 1) {
       const offset = (row + 1) * colCount + col;
-      let cell: Cell | undefined;
+      let error: string | undefined;
 
       if (column.type === "mixed") {
-        cell = mixedCell(column, row);
+        error = writeMixedCell(column, row, values, styleIds, offset);
       } else if (column.errorRows[nextError] === row) {
-        const code = column.errorPool[column.errorCodes[nextError] ?? 0] ?? "";
+        error = column.errorPool[column.errorCodes[nextError] ?? 0] ?? "";
         nextError += 1;
-        cell = { value: null, style: STYLE_PLAIN, error: code };
       } else if (bit(column.validity, row)) {
-        cell = typedCell(column, row);
+        writeTypedCell(column, row, values, styleIds, offset);
       }
 
-      if (cell === undefined) continue;
-
-      if (cell.error !== undefined) {
-        formulas.push([offset, WORKSHEET_ERRORS[cell.error] ?? DEFAULT_WORKSHEET_ERROR]);
-        continue;
+      if (error !== undefined) {
+        formulas.push([offset, WORKSHEET_ERRORS[error] ?? DEFAULT_WORKSHEET_ERROR]);
       }
-
-      values[offset] = cell.value;
-      styleIds[offset] = cell.style;
     }
   });
 

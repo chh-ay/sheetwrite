@@ -188,6 +188,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/formula-docs.test.ts",
   "scripts/coverage-check.test.ts",
   "scripts/normalize-sitemap.test.ts",
+  "scripts/docs-render-errors.test.ts",
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
   "scripts/check-engine-exports.test.ts",

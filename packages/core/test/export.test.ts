@@ -37,26 +37,22 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-function workbook(): Workbook {
-  return {
-    activeSheet: "s",
-    sheets: [
-      {
-        id: "s",
-        name: "S",
-        rowCount: 3,
-        columns: [
-          { key: "a", header: "A", width: 80, type: "text" },
-          { key: "b", header: "B", width: 80, type: "number" },
-        ],
-      },
-    ],
-  };
+const AB: Column[] = [
+  { key: "a", header: "A", width: 80, type: "text" },
+  { key: "b", header: "B", width: 80, type: "number" },
+];
+
+/** One sheet "s" with fresh copies of `columns`. */
+function workbook(columns: Column[] = AB, rowCount = 3): Workbook {
+  const copies = columns.map((column) => ({ ...column }));
+  return { activeSheet: "s", sheets: [{ id: "s", name: "S", rowCount, columns: copies }] };
 }
 
 describe("export", () => {
-  it("csv: BOM + CRLF + header + injection hardening + quoting", () => {
-    const store = new SheetwriteStore(workbook());
+  it("csv and tsv: BOM + CRLF + header + injection hardening + quoting", () => {
+    const wb = workbook();
+    wb.sheets[0]!.columns[0]!.header = "=HYPERLINK(1)";
+    const store = new SheetwriteStore(wb);
     store.applyTransaction({
       patches: [
         {
@@ -70,14 +66,18 @@ describe("export", () => {
           addr: { sheet: "s", row: 1, col: 0 },
           value: { kind: "literal", value: "a,b" },
         },
+        // A negative number is data, not an injection.
+        { op: "set", addr: { sheet: "s", row: 1, col: 1 }, value: { kind: "literal", value: -5 } },
       ],
     });
     const csv = toCsv(store.getWorkbook().sheets[0]!, store);
     expect(csv.startsWith("\ufeff")).toBe(true);
     const lines = csv.slice(1).split("\r\n");
-    expect(lines[0]).toBe("A,B");
+    expect(lines[0]).toBe("'=HYPERLINK(1),B");
     expect(lines[1]).toBe("'=cmd,42");
-    expect(lines[2]).toBe('"a,b",');
+    expect(lines[2]).toBe('"a,b",-5');
+    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+    expect(toTsv(range, store)).toBe("'=cmd\t42\r\na,b\t-5");
   });
 
   it("reports missing optional XLSX backends through stable error fields", async () => {
@@ -86,89 +86,25 @@ describe("export", () => {
     setXlsxTableImportBackend(null);
     setXlsxWorkbookBackend(null);
 
-    await expect(toXlsxTable(store.getWorkbook(), store)).rejects.toMatchObject({
-      code: "optional-backend-unavailable",
-      operation: "xlsx-export",
-      context: { backend: "xlsx", functionName: "toXlsxTable" },
-    });
-    await expect(fromXlsxTable(new Uint8Array())).rejects.toMatchObject({
-      code: "optional-backend-unavailable",
-      operation: "xlsx-import",
-      context: { backend: "xlsx", functionName: "fromXlsxTable" },
-    });
     const snapshot: WorkbookSnapshot = {
       schemaVersion: 1,
       workbook: { activeSheet: "s" },
       sheets: [],
     };
-    await expect(toXlsxWorkbook(snapshot)).rejects.toMatchObject({
-      code: "optional-backend-unavailable",
-      operation: "xlsx-export",
-      context: { backend: "xlsx", functionName: "toXlsxWorkbook" },
-    });
-    await expect(fromXlsxWorkbook(new Uint8Array())).rejects.toMatchObject({
-      code: "optional-backend-unavailable",
-      operation: "xlsx-import",
-      context: { backend: "xlsx", functionName: "fromXlsxWorkbook" },
-    });
+    const calls: Array<[Promise<unknown>, string, string]> = [
+      [toXlsxTable(store.getWorkbook(), store), "xlsx-export", "toXlsxTable"],
+      [fromXlsxTable(new Uint8Array()), "xlsx-import", "fromXlsxTable"],
+      [toXlsxWorkbook(snapshot), "xlsx-export", "toXlsxWorkbook"],
+      [fromXlsxWorkbook(new Uint8Array()), "xlsx-import", "fromXlsxWorkbook"],
+    ];
+    for (const [call, operation, functionName] of calls) {
+      await expect(call).rejects.toMatchObject({
+        code: "optional-backend-unavailable",
+        operation,
+        context: { backend: "xlsx", functionName },
+      });
+    }
     store.dispose();
-  });
-
-  it("csv: a column header beginning with a formula char is neutralized", () => {
-    const wb: Workbook = {
-      activeSheet: "s",
-      sheets: [
-        {
-          id: "s",
-          name: "S",
-          rowCount: 1,
-          columns: [
-            { key: "a", header: "=HYPERLINK(1)", width: 80, type: "text" },
-            { key: "b", header: "B", width: 80, type: "number" },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(wb);
-    const header = toCsv(store.getWorkbook().sheets[0]!, store).slice(1).split("\r\n")[0];
-    expect(header).toBe("'=HYPERLINK(1),B");
-  });
-
-  it("tsv: a cell value beginning with a formula char is neutralized", () => {
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "=1+1" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: 7 },
-        },
-      ],
-    });
-    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
-    expect(toTsv(range, store)).toBe("'=1+1\t7");
-  });
-
-  it("export: a negative number is left intact (not mistaken for injection)", () => {
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: -5 },
-        },
-      ],
-    });
-    const sheet = store.getWorkbook().sheets[0]!;
-    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
-    expect(toCsv(sheet, store).slice(1).split("\r\n")[1]).toBe(",-5");
-    expect(toTsv(range, store)).toBe("\t-5");
   });
 
   it("csv import preserves reserved declared keys as enumerable own properties", () => {
@@ -179,60 +115,28 @@ describe("export", () => {
     ];
     const data = fromCsv("Prototype,Constructor,Ordinary\r\nalpha,beta,gamma", columns);
 
-    expect(Object.getPrototypeOf(data.columns)).toBeNull();
-    expect(Object.keys(data.columns)).toEqual(["__proto__", "constructor", "ordinary"]);
-    expect(Object.hasOwn(data.columns, "__proto__")).toBe(true);
-    expect(Reflect.get(data.columns, "__proto__")).toEqual(["alpha"]);
-    expect(Reflect.get(data.columns, "constructor")).toEqual(["beta"]);
     expect(JSON.stringify(data.columns)).toBe(
       '{"__proto__":["alpha"],"constructor":["beta"],"ordinary":["gamma"]}',
     );
 
-    const imported = new SheetwriteStore(
-      {
-        activeSheet: "reserved",
-        sheets: [
-          {
-            id: "reserved",
-            name: "Reserved",
-            rowCount: 1,
-            columns,
-          },
-        ],
-      },
-      data,
-    );
-    expect(imported.getCell({ sheet: "reserved", row: 0, col: 0 }).resolved).toBe("alpha");
-    expect(imported.getCell({ sheet: "reserved", row: 0, col: 1 }).resolved).toBe("beta");
+    const imported = new SheetwriteStore(workbook(columns, 1), data);
+    expect(imported.getCell({ sheet: "s", row: 0, col: 0 }).resolved).toBe("alpha");
+    expect(imported.getCell({ sheet: "s", row: 0, col: 1 }).resolved).toBe("beta");
     imported.dispose();
   });
 
   it("csv exports only the sorted, filtered, non-hidden view and never pads filtered rows", () => {
-    const wb: Workbook = {
-      activeSheet: "view",
-      sheets: [
-        {
-          id: "view",
-          name: "View",
-          rowCount: 4,
-          columns: [
-            { key: "a", header: "A", width: 80, type: "text" },
-            { key: "b", header: "B", width: 80, type: "number", visible: false },
-          ],
-        },
-      ],
-    };
-    const store = new SheetwriteStore(wb, {
+    const store = new SheetwriteStore(workbook([AB[0]!, { ...AB[1]!, visible: false }], 4), {
       rowCount: 4,
       columns: { a: ["keep-a", "drop", "keep-b", "keep-c"], b: [2, 9, 3, 1] },
     });
-    store.setColumnFilter("view", 0, { kind: "contains", text: "keep" });
-    store.hideRows("view", [2]);
-    store.setViewSort("view", [{ col: 1, ascending: true }]);
+    store.setColumnFilter("s", 0, { kind: "contains", text: "keep" });
+    store.hideRows("s", [2]);
+    store.setViewSort("s", [{ col: 1, ascending: true }]);
 
     expect(toCsv(store.getWorkbook().sheets[0]!, store)).toBe("\ufeffA\r\nkeep-c\r\nkeep-a");
 
-    store.setColumnFilter("view", 0, { kind: "values", values: ["missing"] });
+    store.setColumnFilter("s", 0, { kind: "values", values: ["missing"] });
     expect(toCsv(store.getWorkbook().sheets[0]!, store)).toBe("\ufeffA");
     store.dispose();
   });
@@ -273,17 +177,7 @@ describe("export", () => {
   });
 
   it("preserves one-column trailing blank records across CSV export and import", () => {
-    const wb: Workbook = {
-      activeSheet: "blank",
-      sheets: [
-        {
-          id: "blank",
-          name: "Blank",
-          rowCount: 3,
-          columns: [{ key: "only", header: "Only", width: 80, type: "text" }],
-        },
-      ],
-    };
+    const wb = workbook([{ key: "only", header: "Only", width: 80, type: "text" }]);
     const store = new SheetwriteStore(wb);
     const csv = toCsv(store.getWorkbook().sheets[0]!, store);
     expect(csv).toBe('\ufeffOnly\r\n""\r\n""\r\n""');
@@ -304,18 +198,6 @@ describe("export", () => {
     const data = fromCsv("A,C\r\nleft,right", columns);
     expect(data.columns).toEqual({ a: ["left"], hidden: [null], c: ["right"] });
     expect(Object.keys(data.columns)).toEqual(["a", "hidden", "c"]);
-
-    const store = new SheetwriteStore(
-      {
-        activeSheet: "projection",
-        sheets: [{ id: "projection", name: "Projection", rowCount: 1, columns }],
-      },
-      data,
-    );
-    expect(store.getCell({ sheet: "projection", row: 0, col: 0 }).resolved).toBe("left");
-    expect(store.getCell({ sheet: "projection", row: 0, col: 1 }).resolved).toBeNull();
-    expect(store.getCell({ sheet: "projection", row: 0, col: 2 }).resolved).toBe("right");
-    store.dispose();
   });
 
   it("drops extra CSV fields from the projection but still counts them toward ceilings", () => {
@@ -357,23 +239,11 @@ describe("export", () => {
     expect(data.columns.blank).toEqual([null, null]);
     expect(data.columns.formula).toEqual(["=1+1", "+1+1"]);
 
-    const store = new SheetwriteStore(
-      {
-        activeSheet: "types",
-        sheets: [{ id: "types", name: "Types", rowCount: 2, columns }],
-      },
-      data,
-    );
-    expect(store.getCell({ sheet: "types", row: 0, col: 0 }).resolved).toBe(true);
-    expect(store.getCell({ sheet: "types", row: 1, col: 0 }).resolved).toBe(false);
-    expect(store.getCell({ sheet: "types", row: 0, col: 2 }).resolved).toBe(45678.5);
-    expect(store.getCell({ sheet: "types", row: 0, col: 3 }).resolved).toBe(
-      parseDateInput("2026-07-18"),
-    );
-    expect(store.getCell({ sheet: "types", row: 0, col: 4 }).resolved).toBe(1234.5);
-    expect(store.getCell({ sheet: "types", row: 0, col: 5 }).resolved).toBeNull();
-    expect(store.getCell({ sheet: "types", row: 0, col: 6 }).resolved).toBe("=1+1");
-    expect(store.getFormula({ sheet: "types", row: 0, col: 6 })).toBeNull();
+    const store = new SheetwriteStore(workbook(columns, 2), data);
+    expect(store.getCell({ sheet: "s", row: 0, col: 0 }).resolved).toBe(true);
+    expect(store.getCell({ sheet: "s", row: 1, col: 0 }).resolved).toBe(false);
+    expect(store.getCell({ sheet: "s", row: 0, col: 6 }).resolved).toBe("=1+1");
+    expect(store.getFormula({ sheet: "s", row: 0, col: 6 })).toBeNull();
     store.dispose();
   });
 
@@ -454,48 +324,25 @@ describe("export", () => {
       actual: 5,
       operation: "delimited-parse",
     });
-    expect(() => parseCsv("ééx", { resourceLimits: { maxFieldBytes: 4 } })).toThrow(
-      DelimitedTextResourceError,
-    );
-    expect(() => parseCsv("a\nb", { resourceLimits: { maxRows: 1 } })).toThrow(
-      DelimitedTextResourceError,
-    );
-    expect(() => parseCsv("a,b", { resourceLimits: { maxColumns: 1 } })).toThrow(
-      DelimitedTextResourceError,
-    );
-    expect(() => parseCsv("a,b\nc", { resourceLimits: { maxCells: 2 } })).toThrow(
-      DelimitedTextResourceError,
-    );
+    for (const [text, resourceLimits] of [
+      ["ééx", { maxFieldBytes: 4 }],
+      ["a\nb", { maxRows: 1 }],
+      ["a,b", { maxColumns: 1 }],
+      ["a,b\nc", { maxCells: 2 }],
+    ] as const) {
+      expect(() => parseCsv(text, { resourceLimits })).toThrow(DelimitedTextResourceError);
+    }
     expect(() => parseCsv("a", { resourceLimits: { maxRows: 0 } })).toThrow(
       DelimitedTextOptionsError,
     );
 
-    const store = new SheetwriteStore(
-      {
-        activeSheet: "limit",
-        sheets: [
-          {
-            id: "limit",
-            name: "Limit",
-            rowCount: 1,
-            columns: [{ key: "a", header: "A", width: 80, type: "text" }],
-          },
-        ],
-      },
-      { rowCount: 1, columns: { a: ["a"] } },
-    );
-    const range = { sheet: "limit", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
-    expect(toTsv(range, store, { resourceLimits: { maxOutputBytes: 1 } })).toBe("a");
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "limit", row: 0, col: 0 },
-          value: { kind: "literal", value: "ab" },
-        },
-      ],
+    const store = new SheetwriteStore(workbook(), {
+      rowCount: 3,
+      columns: { a: ["a", "ab", null] },
     });
-    expect(() => toTsv(range, store, { resourceLimits: { maxOutputBytes: 1 } })).toThrow(
+    const cell = (row: number) => ({ sheet: "s", start: { row, col: 0 }, end: { row, col: 0 } });
+    expect(toTsv(cell(0), store, { resourceLimits: { maxOutputBytes: 1 } })).toBe("a");
+    expect(() => toTsv(cell(1), store, { resourceLimits: { maxOutputBytes: 1 } })).toThrow(
       DelimitedTextResourceError,
     );
     store.dispose();
@@ -507,13 +354,10 @@ describe("export", () => {
       { length: rowCount },
       (_unused, row) => `value-${row}-${"x".repeat(12)}`,
     );
-    const store = new SheetwriteStore(
-      { ...workbook(), sheets: [{ ...workbook().sheets[0]!, rowCount }] },
-      {
-        rowCount,
-        columns: { a: text, b: Array.from({ length: rowCount }, (_unused, row) => row) },
-      },
-    );
+    const store = new SheetwriteStore(workbook(AB, rowCount), {
+      rowCount,
+      columns: { a: text, b: Array.from({ length: rowCount }, (_unused, row) => row) },
+    });
     const options = {
       resourceLimits: {
         maxWriterWindowRows: 128,

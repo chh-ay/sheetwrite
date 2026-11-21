@@ -7,14 +7,7 @@ use std::cell::Cell;
 
 use crate::store::names::NAME_READS;
 use crate::store::CellStore;
-
-fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
-    store.get_cell(sheet, row, col).num()
-}
-
-fn text(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<String> {
-    store.get_cell(sheet, row, col).string()
-}
+use crate::tests::support::{number, string as text, tree_address};
 
 /// A store with one sheet, `Data`, holding 1, 2, 3 in A1:A3 and 10, 20, 30
 /// in B1:B3.
@@ -43,21 +36,29 @@ fn a_dynamic_name_reads_the_range_its_formula_returns() {
 }
 
 /// Excel keeps a name's relative references relative to A1 and moves them
-/// to the cell that uses the name, wrapping past the last column, so
-/// `=Data!XFD1` reads the cell to the left of each cell that uses it.
+/// to the cell that uses the name, wrapping past the last column and row, so
+/// `=Data!XFD1` reads the cell to the left of each cell that uses it, and
+/// `$A1048575:$A1` is the two rows above a cell and the cell itself.
 #[test]
 fn relative_references_in_a_name_follow_the_cell_that_uses_it() {
     let (mut store, sheet) = data_store();
     assert!(store.set_named_formula("SameRow", -1, "=Data!$A1"));
     assert!(store.set_named_formula("Left", -1, "=Data!XFD1"));
+    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!$A1048575:$A1)"));
     store.set_formula(sheet, 1, 3, "=SameRow*100", 0);
     store.set_formula(sheet, 2, 3, "=SameRow*100", 0);
     store.set_formula(sheet, 2, 2, "=Left+1", 0);
+    store.set_formula(sheet, 2, 4, "=LastThree", 0);
     store.recompute(sheet);
 
     assert_eq!(number(&store, sheet, 1, 3), 200.0);
     assert_eq!(number(&store, sheet, 2, 3), 300.0);
     assert_eq!(number(&store, sheet, 2, 2), 31.0);
+    assert_eq!(
+        number(&store, sheet, 2, 4),
+        6.0,
+        "LastThree in row 3 is A1:A3"
+    );
 }
 
 /// A relative name is read in place, its references moved by the reading
@@ -84,18 +85,6 @@ fn a_formula_a_relative_name_reads_first_reads_its_own_cells() {
     store.recompute(sheet);
     assert_eq!(number(&store, sheet, 1, 1), 21.0, "B2 reads C2");
     assert_eq!(number(&store, sheet, 2, 0), 42.0, "A3 spills B2*2");
-}
-
-/// `$A1048575:$A1`, relative to A1, is the two rows above a cell and the
-/// cell itself in column A; used in row 3 it wraps to A1:A3.
-#[test]
-fn a_relative_range_in_a_name_wraps_past_the_last_row() {
-    let (mut store, sheet) = data_store();
-    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!$A1048575:$A1)"));
-    store.set_formula(sheet, 2, 3, "=LastThree", 0);
-    store.recompute(sheet);
-
-    assert_eq!(number(&store, sheet, 2, 3), 6.0);
 }
 
 #[test]
@@ -376,20 +365,6 @@ fn recursion_past_the_call_limit_is_a_num_error() {
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
 }
 
-/// The tree of the formula at (`row`, `col`), as an address that changes
-/// when the formula is bound again.
-fn tree_address(
-    store: &CellStore,
-    sheet: usize,
-    row: u32,
-    col: u32,
-) -> Option<*const crate::calc::Ast> {
-    let entry = store.sheets[sheet]
-        .formulas
-        .get((row, col), &store.formula_slots)?;
-    entry.ast.as_ref().map(std::ptr::from_ref)
-}
-
 /// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3 and `=Ratio+1`
 /// in D4, where `Total` is `=Rate*10` and `Ratio` is not defined yet.
 fn name_users() -> (CellStore, usize) {
@@ -422,7 +397,13 @@ fn a_name_change_binds_only_the_formulas_that_use_it() {
     let (mut store, sheet) = name_users();
     let unrelated = tree_address(&store, sheet, 2, 3);
     let waiting = tree_address(&store, sheet, 3, 3);
+    let reader = first_operand_address(&store, sheet, 0, 3);
+    let through_total = first_operand_address(&store, sheet, 1, 3);
     assert!(unrelated.is_some(), "B1*2 has a tree");
+    assert!(
+        reader.is_some() && through_total.is_some(),
+        "SUM(Rate)*A1 and Total*2 have operands"
+    );
 
     // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too.
     assert!(
@@ -438,6 +419,10 @@ fn a_name_change_binds_only_the_formulas_that_use_it() {
         waiting,
         "Ratio+1 is kept"
     );
+    // A formula holds a name's id, so its readers get new reads without
+    // being parsed again.
+    assert_eq!(first_operand_address(&store, sheet, 0, 3), reader);
+    assert_eq!(first_operand_address(&store, sheet, 1, 3), through_total);
 
     store.set_number(sheet, 1, 1, 5.0, 0);
     store.recompute(sheet);
@@ -463,29 +448,6 @@ fn first_operand_address(
         return None;
     };
     Some(std::ptr::from_ref(&**left))
-}
-
-/// A formula holds a name's id, so a change of what the name stands for
-/// gives its readers new reads without parsing them again.
-#[test]
-fn a_name_change_keeps_the_trees_of_the_formulas_that_read_it() {
-    let (mut store, sheet) = name_users();
-    let reader = first_operand_address(&store, sheet, 0, 3);
-    let through_total = first_operand_address(&store, sheet, 1, 3);
-    assert!(
-        reader.is_some() && through_total.is_some(),
-        "both have operands"
-    );
-
-    assert!(
-        store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
-        "Rate is B2"
-    );
-    store.recompute(sheet);
-    assert_eq!(number(&store, sheet, 0, 3), 20.0, "SUM(Rate)*A1 reads B2");
-    assert_eq!(number(&store, sheet, 1, 3), 400.0, "Total*2 reads B2");
-    assert_eq!(first_operand_address(&store, sheet, 0, 3), reader);
-    assert_eq!(first_operand_address(&store, sheet, 1, 3), through_total);
 }
 
 /// A formula holds a named range's id, not a copy of the name or of its
@@ -611,40 +573,46 @@ fn retained_bytes(store: &CellStore) -> f64 {
 
 /// A name edit patches its users' reads in the dependency index, which keeps
 /// some spare capacity that a rebuild would not. That growth comes with the
-/// first edit and stays flat after it: 200 edits that move `Rate` back and
-/// forth over 100,000 formulas that use it retain what the first one did.
+/// first edit and stays flat after it: 50 edits that move `Rate` back and
+/// forth over the formulas that use it retain what the first one did. The
+/// index patches the reads of up to 256 changed formulas in place and
+/// rebuilds past that, so 200 and 300 users take each path.
 #[test]
 fn name_edits_retain_bounded_index_capacity() {
-    const FORMULAS: usize = 100_000;
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(3, FORMULAS);
-    for row in 0..FORMULAS {
-        store.set_number(sheet, row, 0, 1.0, 0);
-        store.set_formula(sheet, row, 1, &format!("=A{}*Rate", row + 1), 0);
-    }
-    store.set_number(sheet, 0, 2, 2.0, 0);
-    store.set_number(sheet, 1, 2, 3.0, 0);
-    store.recompute(sheet);
+    const EDITS: usize = 50;
+    const MEASURED_AFTER: [usize; 4] = [1, 2, 10, EDITS];
 
-    let mut retained = Vec::new();
-    for edit in 1..=200 {
-        let row = edit % 2;
-        assert!(
-            store.set_named_range("Rate", -1, sheet, row, 2, row, 2),
-            "Rate moves"
-        );
-        store.recompute(sheet);
-        if [1, 10, 100, 200].contains(&edit) {
-            retained.push(retained_bytes(&store));
+    for formulas in [200, 300] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, formulas);
+        for row in 0..formulas {
+            store.set_number(sheet, row, 0, 1.0, 0);
+            store.set_formula(sheet, row, 1, &format!("=A{}*Rate", row + 1), 0);
         }
+        store.set_number(sheet, 0, 2, 2.0, 0);
+        store.set_number(sheet, 1, 2, 3.0, 0);
+        store.recompute(sheet);
+
+        let mut retained = Vec::new();
+        for edit in 1..=EDITS {
+            let row = edit % 2;
+            assert!(
+                store.set_named_range("Rate", -1, sheet, row, 2, row, 2),
+                "Rate moves"
+            );
+            store.recompute(sheet);
+            if MEASURED_AFTER.contains(&edit) {
+                retained.push(retained_bytes(&store));
+            }
+        }
+        assert_eq!(
+            number(&store, sheet, formulas - 1, 1),
+            2.0,
+            "the last edit put Rate on C1"
+        );
+        assert!(
+            retained.iter().all(|&bytes| bytes == retained[0]),
+            "{formulas} formulas, retained bytes after edits {MEASURED_AFTER:?}: {retained:?}"
+        );
     }
-    assert_eq!(
-        number(&store, sheet, FORMULAS - 1, 1),
-        2.0,
-        "the last edit put Rate on C1"
-    );
-    assert!(
-        retained.iter().all(|&bytes| bytes == retained[0]),
-        "retained bytes after edits 1, 10, 100 and 200: {retained:?}"
-    );
 }

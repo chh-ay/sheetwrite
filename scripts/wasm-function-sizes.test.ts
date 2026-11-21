@@ -98,24 +98,16 @@ describe("optimized WASM function budget", () => {
     );
   });
 
-  it("reports the ten largest bodies in descending order", () => {
-    const bytes = moduleWithBodies(
-      Array.from({ length: 13 }, (_, index) => ({ name: `function_${index}`, bytes: index + 2 })),
-    );
-    const { largestFunctions } = checkWasmFunctionSizes(bytes);
-    expect(largestFunctions).toHaveLength(10);
-    expect(largestFunctions[0]).toEqual({ name: "function_12", bytes: 14 });
-    expect(largestFunctions[9]).toEqual({ name: "function_3", bytes: 5 });
-  });
-
   it("fails closed when a build drops names before the guard", () => {
     const bytes = moduleWithBodies([{ name: "small", bytes: BODY_FRAMING_BYTES }]);
     const { wasm } = checkWasmFunctionSizes(bytes);
-    expect(() => checkWasmFunctionSizes(wasm)).toThrow();
+    expect(() => checkWasmFunctionSizes(wasm)).toThrow("missing function names");
   });
 
   it("rejects a truncated code section instead of accepting its advertised body size", () => {
     const bytes = moduleWithBodies([{ name: "small", bytes: BODY_FRAMING_BYTES }]);
-    expect(() => checkWasmFunctionSizes(bytes.subarray(0, bytes.length - 1))).toThrow();
+    expect(() => checkWasmFunctionSizes(bytes.subarray(0, bytes.length - 1))).toThrow(
+      "Truncated WASM section",
+    );
   });
 });

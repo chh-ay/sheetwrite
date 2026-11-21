@@ -109,11 +109,12 @@ needs its confirmed persistence revision attached by the host.
 | `record(commit, captureSnapshot?, signal?)` | Append one confirmed transaction; create a checkpoint and automatic marker when due. |
 | `saveVersion(name, authorId, time, signal?)` | Name the durable head without copying the workbook. Flush pending edits before calling it. |
 | `listVersions({ maxEntries?, maxBytes?, cursor?, signal? })` | Read bounded metadata, newest first. A new publication invalidates an old cursor. |
-| `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance that is retired before the call returns or rejects, so the document engine's memory does not grow. Starting that instance reuses the compiled module. |
+| `readVersion(id, signal?)` | Rebuild the document of one version. When the version has log entries after its checkpoint, replay runs in a separate engine instance, so the document engine's memory does not grow. Starting that instance reuses the compiled module. The archive keeps that rebuilt version, so a compare and a restore of the same version that follow do not rebuild it again. |
 | `diffVersions({ from, to, cursor?, maxEntries?, signal?, kernel? })` | One page of the changes between two versions; see [Compare versions](#compare-versions). |
 | `prune({ beforeTime?, targetBytes?, signal? })` | Remove eligible automatic markers and unreachable records. Keep named markers. |
 | `deleteVersion(id, signal?)` | Explicitly remove one marker. Keep chunks another version or reader still needs. |
 | `storageUsage(signal?)` | Read retained encoded bytes and record/marker counts. This is not a JS heap estimate. |
+| `releaseMemory()` | Free the one rebuilt version the archive keeps between `readVersion`, `restoreVersion` and `diffVersions`. The version history panel calls it when it closes and when its grid trims memory. A moved head is never reused. |
 
 ### Chunks and limits
 
@@ -174,7 +175,8 @@ the caller's `signal.reason`. It never publishes a partial marker.
 `archive.restoreVersion(grid, versionId, scope, { sync, signal })` brings back part or
 all of a version on a live grid as **one undoable change**: one undo step, one `change`
 event with `commitReason: "restore"`, and, with `sync`, one synchronized transaction.
-The version is rebuilt in a separate engine instance. Sheet and workbook settings are
+The version is rebuilt in a separate engine instance, or taken from the archive when
+`readVersion` or a restore just rebuilt it. Sheet and workbook settings are
 compared and only the changed ones are written; the cells of the scope are cleared and
 written again from the version. All of it uses ordinary document operations, so the
 undo step and the synchronized transaction grow with the size of the scope.
@@ -207,6 +209,17 @@ loads the first time a diff runs, so a grid that never compares versions downloa
 nothing for it. Pass `kernel` to load its WASM from a URL your bundler emitted for
 `@sheetwrite/wasm/history/wasm`.
 
+Checkpoint cell pages are content-addressed, so the compare reads only the pages
+that can differ. A page of the later version is skipped when all its cells meet,
+through the log's row and column alignment, one page of the earlier version with the
+same content ID, and neither version's log tail writes them. The other pages, and the
+pages their cells meet, are rebuilt; the rest of each version stays empty. The result
+is the same as rebuilding both versions whole. Both versions are rebuilt whole when a
+version's log tail holds an operation other than cell writes, styles, clears, notes
+and row metadata, or when more than a quarter of the pages would be read. A changed
+cell that holds a formula or a reference takes its calculated value from the whole
+version. A small change of a large workbook reads a few pages instead of all of them.
+
 | Page field | Contents |
 | --- | --- |
 | `cells` | Changed cells as typed columns: `sheet` (index into `sheetIds`), `row`, `col`, `beforeRow`, `beforeCol`, `flags` and `author` (index into `authors`). |
@@ -230,9 +243,9 @@ logged write reached the cell; the write follows the cell through inserted and r
 rows. When a change is older than the retained log, or a version between the two was
 deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.
 
-A page holds at most 1,000 changes (`maxEntries`). Nothing is kept between pages: each
-request rebuilds both versions and continues from `cursor`, so a closed or aborted diff
-holds no memory.
+A page holds at most 1,000 changes (`maxEntries`). A diff keeps nothing between pages:
+each request continues from `cursor` and rebuilds the versions that the archive does not
+keep (see `releaseMemory`), so a closed or aborted diff holds no memory of its own.
 
 `diffVersions({ from, to: "head" })` compares a version with the committed head. The
 head is leased for the call, so a concurrent prune cannot remove its records.

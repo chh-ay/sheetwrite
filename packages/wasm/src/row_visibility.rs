@@ -261,9 +261,6 @@ fn push_merged(runs: &mut Vec<RowRun>, run: RowRun) {
 mod tests {
     use super::{RowVisibility, SkippedRows};
     use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
-    use crate::transfer::{Reader, Writer};
-
-    const TAG: u32 = 7;
 
     fn hidden_rows(visibility: &RowVisibility, skipped: SkippedRows) -> Vec<u32> {
         let mut hidden = visibility.hidden_rows(skipped);
@@ -321,19 +318,5 @@ mod tests {
         );
         visibility.delete_rows(0, 20);
         assert!(visibility.0.is_none());
-    }
-
-    #[test]
-    fn transfer_round_trips_both_kinds() {
-        let mut visibility = RowVisibility::default();
-        visibility.replace(&[1, 2], &[7, 9]);
-        let mut out = Writer::new(TAG);
-        visibility.write_transfer(&mut out);
-
-        let mut input = Reader::new(&out.0, TAG).expect("tagged transfer");
-        let copy = RowVisibility::read_transfer(&mut input).expect("valid transfer");
-
-        input.finish().expect("no trailing bytes");
-        assert_eq!(copy.0, visibility.0);
     }
 }

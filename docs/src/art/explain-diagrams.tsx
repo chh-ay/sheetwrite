@@ -8,12 +8,12 @@ export function ChartReadsCellsDiagram() {
   return (
     <MergeFigure
       sources={[
-        { title: "Pivot table", lines: ["Writes its result", "into cells"] },
-        { title: "Your edit", lines: ["Change any cell", "in the range"] },
+        { title: "Pivot table", lines: ["Writes its result into cells"] },
+        { title: "Your edit", lines: ["Change any cell in the range"] },
       ]}
       steps={[
         { title: "The chart's range", lines: ["A range of cells"], tone: "accent" },
-        { title: "Chart", lines: ["Redraws when", "those cells change"] },
+        { title: "Chart", lines: ["Redraws when those cells change"] },
       ]}
       text={{
         title: "The chart reads cells, not the pivot",
@@ -31,7 +31,7 @@ export function DashboardDiagram() {
       note="The pivots compute from the Orders table; the slicer's selection is saved and undone."
       source={{
         title: "Slicer: Region",
-        lines: ["Filters everything whose table reaches its column"],
+        lines: ["Filters each item whose table", "reaches the Region column"],
       }}
       text={{
         title: "How a dashboard filters together",
@@ -40,7 +40,7 @@ export function DashboardDiagram() {
       }}
       tiles={[
         { title: "Pivot", lines: ["Computes from Orders,", "no output cells"], tone: "accent" },
-        { title: "PivotChart", lines: ["Filtered with", "its pivot"], tone: "accent" },
+        { title: "PivotChart", lines: ["Filtered with its pivot"], tone: "accent" },
         {
           title: "KPI card",
           lines: ["A measure in the", "slicers' filter context"],
@@ -68,12 +68,12 @@ export function QueriesRefreshDiagram() {
       steps={[
         {
           title: "Your fetchSource",
-          lines: ["Your credentials", "and network rules"],
+          lines: ["Your credentials and network rules"],
           tone: "muted",
         },
         { title: "Source", lines: ["The CSV feed"] },
-        { title: "Steps", lines: ["Large orders keeps", "1,500 or more"], tone: "accent" },
-        { title: "Table", lines: ["Written on", "the sheet"] },
+        { title: "Steps", lines: ["Large orders: keep 1,500 or more"], tone: "accent" },
+        { title: "Table", lines: ["Written on the sheet"] },
       ]}
       text={{
         title: "What a refresh does",
@@ -97,21 +97,12 @@ export function SortModesDiagram() {
       tiles={[
         {
           title: "Sort the cells",
-          lines: [
-            "Values, formulas, styles and notes",
-            "move with their row; outside",
-            "formulas read the new order.",
-            "One transaction.",
-          ],
+          lines: ["Each row moves with all it holds;", "other formulas read the new order"],
           tone: "accent",
         },
         {
           title: "Sort the view only",
-          lines: [
-            "The cells stay where they are.",
-            "Saved with the sheet; exports",
-            "to Excel as its sort state.",
-          ],
+          lines: ["The cells stay where they are.", "Saved and exported with the sheet"],
         },
       ]}
     />
@@ -138,7 +129,7 @@ export function FunctionEnginesDiagram() {
         {
           eyebrow: "Full engine only",
           title: "@sheetwrite/formulas",
-          lines: ["Engineering, financial,", "Excel 2007 statistics,", "byte text, GETPIVOTDATA"],
+          lines: ["Engineering, finance, Excel 2007", "statistics, byte text, GETPIVOTDATA"],
           tone: "accent",
         },
       ]}
@@ -157,7 +148,7 @@ export function VersionsDiagram() {
         step: { title: "Not committed", lines: ["Never reaches a version"], tone: "muted" },
       }}
       steps={[
-        { title: "Committed edits", lines: ["Each with", "its author"] },
+        { title: "Committed edits", lines: ["Each with its author"] },
         { title: "Authority", lines: ["Journals each change", "in the archive"], tone: "accent" },
         { title: "Chunks", lines: ["Content-addressed;", "unchanged cells shared"] },
         { title: "Restore", lines: ["One undoable change,", "one synced transaction"] },
@@ -188,7 +179,7 @@ export function EngineApiDiagram() {
         },
         {
           title: "Create the grid",
-          code: ["createGrid(host,", "  { workbook })"],
+          code: ["createGrid(host, { workbook })"],
           lines: ["Calculates with that engine"],
         },
       ]}
@@ -208,13 +199,13 @@ export function StorageDiagram() {
       note="Crossing either bound of the operation tail folds it into one compacted snapshot record."
       sources={[
         { eyebrow: "IndexedDB", title: "Snapshot", lines: ["Compacted state"] },
-        { title: "Operation tail", lines: ["Capped by records", "and bytes"] },
-        { title: "Pending queue", lines: ["Unacknowledged", "commits, durable"] },
+        { title: "Operation tail", lines: ["Capped by records and bytes"] },
+        { title: "Pending queue", lines: ["Durable, unacknowledged commits"] },
       ]}
       steps={[
         {
           title: "Reopen or reload",
-          lines: ["Committed state and the", "pending queue come back", "exactly once"],
+          lines: ["Committed state and pending", "queue come back exactly once"],
           tone: "accent",
         },
       ]}
@@ -234,8 +225,8 @@ export function HostImportDiagram() {
       note="One Grid transaction accepts a bounded number of operations."
       steps={[
         { title: "Insert 10,000 rows", lines: ["One commit"], tone: "accent" },
-        { title: "50,000 values", lines: ["In batches of", "1,800 rows"] },
-        { title: "Six batches", lines: ["Five of 1,800 rows,", "then 1,000"] },
+        { title: "50,000 values", lines: ["In batches of 1,800 rows"] },
+        { title: "Six batches", lines: ["Five of 1,800 rows, then 1,000"] },
       ]}
       text={{
         title: "How the 10,000-row import loads",
@@ -260,16 +251,12 @@ export function FormattingDiagram() {
       tiles={[
         {
           title: "Fonts",
-          lines: [
-            "Georgia, Arial and Courier New",
-            "beside the theme font; a family",
-            "the browser lacks falls back to it",
-          ],
+          lines: ["Georgia, Arial and Courier New;", "a missing one uses the theme font"],
         },
         {
           title: "Number formats",
           code: ["stored: 1234.5"],
-          lines: ["Currency column: $1,234.50", "G3, General: 1234.5", "Negative variance: -42.00"],
+          lines: ["Currency: $1,234.50; General: 1234.5"],
           tone: "accent",
         },
       ]}
@@ -281,7 +268,7 @@ export function FormattingDiagram() {
 export function DataGuardsDiagram() {
   return (
     <FanFigure
-      source={{ title: "An edit to a guarded column", lines: ["Checked before", "it is stored"] }}
+      source={{ title: "An edit to a guarded column", lines: ["Checked before it is stored"] }}
       text={{
         title: "What the guarded columns do with an edit",
         description:
@@ -291,14 +278,14 @@ export function DataGuardsDiagram() {
         {
           eyebrow: "Units",
           title: "−5 rejected",
-          lines: ["A whole number", "from 1 to 250"],
+          lines: ["A whole number from 1 to 250"],
           tone: "danger",
         },
-        { eyebrow: "Freight", title: "$350 saved", lines: ["With a warning", "to review it"] },
+        { eyebrow: "Freight", title: "$350 saved", lines: ["With a warning to review it"] },
         {
           eyebrow: "Order ID",
           title: "Locked",
-          lines: ["Only a manager", "can change it"],
+          lines: ["Only a manager can change it"],
           tone: "muted",
         },
       ]}

@@ -52,6 +52,16 @@ The command exits unsuccessfully when any speedup is below the 100× target. It
 needs no core or XLSX build.
 
 
+### Saved-query refresh benchmark
+
+Build the packages, then run `bun run bench:query-refresh` from `bench/` under
+the machine's benchmark runner (`--rows <n>` changes the source size,
+`--output <artifact.json>` keeps the result). A CSV source of 100,000 rows and
+four columns refreshes into its output table, which already holds the previous
+result. Each of nine samples, after two warmups, is one `QuerySession.refresh`:
+fetch, parse, execute, lay out the block and commit it. The run checks the
+table's last row after every refresh.
+
 ### Engine memory-release gate
 
 From the repository root, run `bun bench/src/engine-memory-release-bench.ts --compare <detached-base-worktree> --engine wasm --output <artifact.json>` under the machine's benchmark runner. Repeat with `--engine formulas`, keeping one CPU slot for all rounds. Both worktrees need release-built engines.

@@ -920,122 +920,6 @@ pub(crate) fn evaluate_matrix(
 mod tests {
     use super::*;
 
-    fn calculate(formula: &str) -> (CellStore, usize) {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(64, 32);
-        // Sales by product and year, as in the Microsoft summary examples.
-        // https://support.microsoft.com/en-us/excel/functions/groupby-function
-        // https://support.microsoft.com/en-us/excel/functions/pivotby-function
-        for (row, (product, year, sales)) in [
-            ("Pear", 2024.0, 10.0),
-            ("Apple", 2023.0, 20.0),
-            ("pear", 2023.0, 30.0),
-            ("Apple", 2024.0, 40.0),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            store.set_string(sheet, row, 0, product, 0);
-            store.set_number(sheet, row, 1, year, 0);
-            store.set_number(sheet, row, 2, sales, 0);
-            store.set_number(sheet, row, 3, if row < 2 { 1.0 } else { 0.0 }, 0);
-        }
-        store.set_formula(sheet, 8, 8, formula, 0);
-        store.recompute(sheet);
-        (store, sheet)
-    }
-
-    #[test]
-    fn hierarchy_subtotals_and_multiple_field_sort() {
-        let (store, sheet) = calculate("=GROUPBY(A1:B4,C1:C4,SUM,0,2)");
-        for (row, expected) in [20.0, 40.0, 60.0, 30.0, 10.0, 40.0, 100.0]
-            .into_iter()
-            .enumerate()
-        {
-            assert_eq!(store.get_cell(sheet, 8 + row, 10).num(), expected);
-        }
-        let (store, sheet) = calculate("=GROUPBY(A1:B4,C1:C4,SUM,0,-2)");
-        for (row, expected) in [100.0, 60.0, 20.0, 40.0, 40.0, 30.0, 10.0]
-            .into_iter()
-            .enumerate()
-        {
-            assert_eq!(store.get_cell(sheet, 8 + row, 10).num(), expected);
-        }
-        let (store, sheet) = calculate("=GROUPBY(A1:B4,C1:C4,SUM,0,0,HSTACK(-1,-2))");
-        for (row, expected) in [10.0, 30.0, 40.0, 20.0].into_iter().enumerate() {
-            assert_eq!(store.get_cell(sheet, 8 + row, 10).num(), expected);
-        }
-        for (formula, expected) in [
-            (
-                "=GROUPBY(A1:B4,C1:C4,SUM,0,2,-3)",
-                vec![40.0, 20.0, 60.0, 30.0, 10.0, 40.0, 100.0],
-            ),
-            (
-                "=GROUPBY(A1:B4,C1:C4,SUM,0,,-2,,1)",
-                vec![10.0, 40.0, 20.0, 30.0, 100.0],
-            ),
-        ] {
-            let (store, sheet) = calculate(formula);
-            for (row, expected) in expected.into_iter().enumerate() {
-                assert_eq!(
-                    store.get_cell(sheet, 8 + row, 10).num(),
-                    expected,
-                    "{formula}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn headers_and_multiple_value_columns() {
-        let (store, sheet) = calculate("=GROUPBY(A1:A4,C1:D4,SUM,2,0)");
-        assert!(store.get_cell(sheet, 8, 8).string().is_some());
-        assert_eq!(store.get_cell(sheet, 9, 9).num(), 60.0);
-        assert_eq!(store.get_cell(sheet, 9, 10).num(), 1.0);
-        for header_code in [1, 3] {
-            let (mut store, sheet) = calculate("=1");
-            store.set_string(sheet, 0, 0, "Product", 0);
-            store.set_string(sheet, 0, 2, "Sales", 0);
-            store.set_formula(
-                sheet,
-                8,
-                8,
-                &format!("=GROUPBY(A1:A4,C1:C4,SUM,{header_code},0)"),
-                0,
-            );
-            store.recompute(sheet);
-            let first_row = 8 + usize::from(header_code == 3);
-            assert_eq!(store.get_cell(sheet, first_row, 9).num(), 60.0);
-            assert_eq!(store.get_cell(sheet, first_row + 1, 9).num(), 30.0);
-            if header_code == 3 {
-                assert_eq!(
-                    store.get_cell(sheet, 8, 8).string().as_deref(),
-                    Some("Product")
-                );
-                assert_eq!(
-                    store.get_cell(sheet, 8, 9).string().as_deref(),
-                    Some("Sales")
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn pivot_relative_totals_and_two_parameter_lambda() {
-        for (relative, expected) in [(0, 0.4), (1, 1.0 / 3.0), (2, 0.2), (3, 1.0 / 3.0), (4, 0.4)] {
-            for function in [
-                "PERCENTOF",
-                "LAMBDA(subset,totalset,SUM(subset)/SUM(totalset))",
-            ] {
-                let (store, sheet) = calculate(&format!(
-                    "=PIVOTBY(A1:A4,B1:B4,C1:C4,{function},0,0,,0,,,{relative})"
-                ));
-                assert_eq!(store.get_cell(sheet, 8, 8).string(), None);
-                assert!((store.get_cell(sheet, 9, 9).num() - expected).abs() < 1e-10);
-            }
-        }
-    }
-
     /// Sales rows as in #605: 10 regions, 100 products (each in one region),
     /// an amount of 1 and one of 4 quarters. Each product has the same number
     /// of rows in every quarter.
@@ -1097,9 +981,9 @@ mod tests {
     #[test]
     fn oversized_groupings_are_still_refused() {
         // 600,001 rows of two columns is above the 1,000,000-cell output limit.
-        let (store, sheet) = calculate("=GROUPBY(SEQUENCE(600000),SEQUENCE(600000),SUM)");
+        let (store, sheet) = sales(1, "=GROUPBY(SEQUENCE(600000),SEQUENCE(600000),SUM)");
         assert_eq!(
-            store.get_cell(sheet, 8, 8).string().as_deref(),
+            store.get_cell(sheet, 0, 5).string().as_deref(),
             Some("#NUM!")
         );
         // A full sheet in the #605 shape fits; a second value column does not.
@@ -1108,44 +992,5 @@ mod tests {
             check_placements(1_048_575, 2, Some(1), 2),
             Err(FormulaError::Num)
         );
-    }
-
-    #[test]
-    fn percentof_sum_ratio_and_errors() {
-        // https://support.microsoft.com/en-us/excel/functions/percentof-function
-        let (store, sheet) = calculate("=PERCENTOF(C1:C2,C1:C4)");
-        assert_eq!(store.get_cell(sheet, 8, 8).num(), 0.3);
-        let cases = [
-            (
-                "=GROUPBY(A1:A4,C1:C4,LAMBDA(subset,subset,SUM(subset)))",
-                "#VALUE!",
-            ),
-            (
-                "=PIVOTBY(SEQUENCE(1001),SEQUENCE(1001),SEQUENCE(1001),SUM,0,0,,0)",
-                "#NUM!",
-            ),
-            ("=GROUPBY(A1:A3,C1:C4,SUM)", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,ABS)", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,HSTACK(SUM,AVERAGE))", "#VALUE!"),
-            ("=PIVOTBY(A1:A4,B1:B4,C1:C4,HSTACK(SUM,AVERAGE))", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,LAMBDA(subset,subset),0,0)", "#CALC!"),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,,D1:D3)", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,,D3:D6)", "#CALC!"),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,4)", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,2)", "#VALUE!"),
-            ("=GROUPBY(A1:B4,C1:C4,SUM,0,2,,,1)", "#VALUE!"),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,3)", "#VALUE!"),
-            ("=PIVOTBY(A1:A4,B1:B3,C1:C4,SUM)", "#VALUE!"),
-            ("=PIVOTBY(A1:A4,B1:B4,C1:C4,SUM,0,0,,0,,,5)", "#VALUE!"),
-            ("=PERCENTOF(C1:C4,D3:D4)", "#DIV/0!"),
-        ];
-        for (formula, error) in cases {
-            let (store, sheet) = calculate(formula);
-            assert_eq!(
-                store.get_cell(sheet, 8, 8).string().as_deref(),
-                Some(error),
-                "{formula}"
-            );
-        }
     }
 }

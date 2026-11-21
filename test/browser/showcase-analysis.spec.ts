@@ -80,7 +80,7 @@ test("editing an order moves its pivot total and redraws the chart", async ({ pa
   await expect.poll(() => chartImage(page).innerHTML()).not.toBe(drawnBefore);
 });
 
-test("a selected chart moves with the arrow keys, stays at its cells on focus, and undo works", async ({
+test("a selected chart moves with the arrow keys, deletes from its menu, stays at its cells on focus, and undo works", async ({
   page,
 }) => {
   await open(page);
@@ -91,6 +91,19 @@ test("a selected chart moves with the arrow keys, stays at its cells on focus, a
   await expect.poll(async () => (await anchor())?.offsetX).toBe((start?.offsetX ?? 0) + 1);
   await page.keyboard.press("ControlOrMeta+z");
   await expect.poll(anchor).toEqual(start);
+
+  // The chart's context menu deletes it, focus stays in the grid, and undo
+  // brings it back.
+  await chart(page).click({ button: "right" });
+  const menu = page.locator(".sheetwrite-context-menu");
+  await expect(menu.getByText("Edit chart")).toBeVisible();
+  await menu.getByText("Delete chart").click();
+  await expect(chartObjects(page)).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.closest(".sheetwrite") != null))
+    .toBe(true);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(chartObjects(page)).toHaveCount(1);
 
   // Narrow enough that the chart runs past the grid's right edge. Focus and
   // scrollIntoView, as keyboard users and find-in-page do, must not slide the
@@ -122,7 +135,7 @@ test("the Chart menu inserts the picked kind", async ({ page }) => {
 });
 
 // #700: a wide bar chart drew its value-axis labels into each other.
-test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page }, testInfo) => {
+test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page }) => {
   await page.setViewportSize(WIDE_VIEWPORT);
   await open(page);
   await page.evaluate(
@@ -148,89 +161,74 @@ test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page },
   labels.slice(1).forEach((label, index) => {
     expect(label.left).toBeGreaterThanOrEqual(labels[index]?.right ?? Number.POSITIVE_INFINITY);
   });
-
-  const screenshot = testInfo.outputPath("wide-bar-pivot-chart.png");
-  await image.screenshot({ path: screenshot });
-  await testInfo.attach("wide bar PivotChart", { path: screenshot, contentType: "image/png" });
-});
-
-test("a chart's right-click menu deletes it, and undo brings it back", async ({ page }) => {
-  await open(page);
-  await chart(page).click({ button: "right" });
-  const menu = page.locator(".sheetwrite-context-menu");
-  await expect(menu.getByText("Edit chart")).toBeVisible();
-  await menu.getByText("Delete chart").click();
-  await expect(chartObjects(page)).toHaveCount(0);
-  // Focus stays in the grid, so the undo below reaches it rather than the page.
-  await expect
-    .poll(() => page.evaluate(() => document.activeElement?.closest(".sheetwrite") != null))
-    .toBe(true);
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(chartObjects(page)).toHaveCount(1);
 });
 
 // #727: a chart over the cells painted the stylesheet's background, not the grid's theme.
-for (const scheme of ["light", "dark"] as const) {
-  test(`a chart and a PivotChart sit on the grid's themed background (${scheme})`, async ({
-    page,
-  }) => {
-    await open(page);
-    // The showcase themes its grid from the site's tokens and follows the site's scheme.
-    await page.evaluate(
-      ([colorScheme, sheet, id, pivot]) => {
-        const grid = window.__sheetwriteAnalysisGrid;
-        const current = grid?.getCharts(sheet).find((entry) => entry.id === id);
-        if (!grid || !current) throw new Error(`Chart ${id} is missing`);
-        document.documentElement.dataset.theme = colorScheme;
-        const anchor = { ...current.anchor, row: current.anchor.row + 20 };
-        grid.setChart(
-          { ...current, id: "pivot-chart", kind: "column", pivot, series: [], anchor },
-          sheet,
-        );
-      },
-      [scheme, SUMMARY, CHART, PIVOT] as const,
-    );
-    await expect(chartObjects(page)).toHaveCount(2);
+test("a chart and a PivotChart sit on the grid's themed background", async ({ page }) => {
+  await open(page);
+  await page.evaluate(
+    ([sheet, id, pivot]) => {
+      const grid = window.__sheetwriteAnalysisGrid;
+      const current = grid?.getCharts(sheet).find((entry) => entry.id === id);
+      if (!grid || !current) throw new Error(`Chart ${id} is missing`);
+      const anchor = { ...current.anchor, row: current.anchor.row + 20 };
+      grid.setChart(
+        { ...current, id: "pivot-chart", kind: "column", pivot, series: [], anchor },
+        sheet,
+      );
+    },
+    [SUMMARY, CHART, PIVOT] as const,
+  );
+  await expect(chartObjects(page)).toHaveCount(2);
 
-    /** The grid's effective background and text colour, and what each chart computes. */
-    const colors = () =>
-      page.evaluate(() => {
-        const probe = document.createElement("span");
-        document.body.append(probe);
-        const resolve = (color: string | undefined) => {
-          probe.style.color = color ?? "";
-          return getComputedStyle(probe).color;
-        };
-        const effective = window.__sheetwriteAnalysisGrid?.getEffectiveTheme();
-        const grid = { bg: resolve(effective?.bg), fg: resolve(effective?.fg) };
-        probe.remove();
-        const charts = [...document.querySelectorAll('[aria-roledescription="chart"]')].map(
-          (frame) => {
-            const style = getComputedStyle(frame);
-            return { bg: style.backgroundColor, fg: style.color };
-          },
-        );
-        return { grid, charts };
-      });
+  /** The grid's effective background and text colour, and what each chart computes. */
+  const colors = () =>
+    page.evaluate(() => {
+      const probe = document.createElement("span");
+      document.body.append(probe);
+      const resolve = (color: string | undefined) => {
+        probe.style.color = color ?? "";
+        return getComputedStyle(probe).color;
+      };
+      const effective = window.__sheetwriteAnalysisGrid?.getEffectiveTheme();
+      const grid = { bg: resolve(effective?.bg), fg: resolve(effective?.fg) };
+      probe.remove();
+      const charts = [...document.querySelectorAll('[aria-roledescription="chart"]')].map(
+        (frame) => {
+          const style = getComputedStyle(frame);
+          return { bg: style.backgroundColor, fg: style.color };
+        },
+      );
+      return { grid, charts };
+    });
 
+  // The showcase themes its grid from the site's tokens and follows the site's
+  // scheme. rgb(11, 11, 12) is the stylesheet's dark default, which the charts kept before.
+  let previousBackground = "rgb(11, 11, 12)";
+  for (const scheme of ["light", "dark"]) {
+    await page.evaluate((colorScheme) => {
+      document.documentElement.dataset.theme = colorScheme;
+    }, scheme);
+    await expect.poll(async () => (await colors()).grid.bg).not.toBe(previousBackground);
     const site = await colors();
-    // The stylesheet's dark default, which the charts kept before.
     expect(site.grid.bg).not.toBe("rgb(11, 11, 12)");
     expect(site.charts).toEqual([site.grid, site.grid]);
+    previousBackground = site.grid.bg;
+  }
 
-    await page.evaluate((colorScheme) => {
-      window.__sheetwriteAnalysisGrid?.setTheme(
-        colorScheme === "dark"
-          ? { bg: "#101828", fg: "#e5e7eb" }
-          : { bg: "#fdf6e3", fg: "#1f2937" },
-      );
-    }, scheme);
+  for (const [theme, computed] of [
+    [
+      { bg: "#101828", fg: "#e5e7eb" },
+      { bg: "rgb(16, 24, 40)", fg: "rgb(229, 231, 235)" },
+    ],
+    [
+      { bg: "#fdf6e3", fg: "#1f2937" },
+      { bg: "rgb(253, 246, 227)", fg: "rgb(31, 41, 55)" },
+    ],
+  ] as const) {
+    await page.evaluate((palette) => window.__sheetwriteAnalysisGrid?.setTheme(palette), theme);
     const themed = await colors();
-    expect(themed.grid).toEqual(
-      scheme === "dark"
-        ? { bg: "rgb(16, 24, 40)", fg: "rgb(229, 231, 235)" }
-        : { bg: "rgb(253, 246, 227)", fg: "rgb(31, 41, 55)" },
-    );
+    expect(themed.grid).toEqual(computed);
     expect(themed.charts).toEqual([themed.grid, themed.grid]);
-  });
-}
+  }
+});

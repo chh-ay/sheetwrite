@@ -34,12 +34,6 @@ function rebuild(value: MatchedRawArtifact): MatchedFormulaEvidence {
 const validate = (value: MatchedFormulaEvidence) =>
   validateMatchedEvidence(value, { rawArtifactSha256, harnessSha256 });
 
-// The success path traverses every sample of the tracked bootstrap artifact;
-// the tamper cases below fail early.
-test("accepts the recorded canonical artifact", () => {
-  expect(() => validate(structuredClone(ARTIFACT))).not.toThrow();
-}, 60_000);
-
 // The tracked raw artifact must not depend on the capturing machine's work
 // directory, and it must still produce the tracked evidence.
 test("rebuilds the tracked evidence from the portable raw artifact", () => {

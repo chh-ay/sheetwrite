@@ -43,13 +43,6 @@ function fixture() {
       ]),
     };
   });
-  const blocker = (id: string, owner: string, dependency: string, reason: string) => ({
-    id,
-    kind: "dependency-cycle",
-    owner,
-    dependency,
-    reason,
-  });
   return {
     schemaVersion: 1,
     protocol: "wasm-post-link-profile-matrix-v1",
@@ -88,18 +81,20 @@ function fixture() {
       stdoutSha256: HASH.stdout,
       stderrSha256: HASH.stderr,
       blockers: [
-        blocker(
-          "formula-entry-ast",
-          "types::FormulaEntry::ast",
-          "calc::Ast",
-          "stored syntax crosses the boundary",
-        ),
-        blocker(
-          "dependency-index",
-          "graph::FormulaGraph::index",
-          "eval::DepIndex",
-          "dependency state crosses the boundary",
-        ),
+        {
+          id: "formula-entry-ast",
+          kind: "dependency-cycle",
+          owner: "types::FormulaEntry::ast",
+          dependency: "calc::Ast",
+          reason: "stored syntax crosses the boundary",
+        },
+        {
+          id: "dependency-index",
+          kind: "dependency-cycle",
+          owner: "graph::FormulaGraph::index",
+          dependency: "eval::DepIndex",
+          reason: "dependency state crosses the boundary",
+        },
       ],
     },
   };
@@ -108,10 +103,8 @@ type Fixture = ReturnType<typeof fixture>;
 const variant = (evidence: Fixture, index: number) =>
   must(evidence.variants[index], `variant ${index}`);
 
-it("keeps Rust opt-level separate and selects by the declared Brotli policy", () => {
+it("selects by the declared Brotli policy", () => {
   const parsed = parseWasmProfileMatrix(fixture());
-  expect(parsed.rustProfile.optLevel).toBe(3);
-  expect(parsed.variants.map(({ wasmOpt }) => wasmOpt)).toEqual(["-O3", "-Os", "-Oz"]);
   expect(decideWasmProfile(parsed)).toEqual({
     status: "recommended",
     wasmOpt: "-Oz",

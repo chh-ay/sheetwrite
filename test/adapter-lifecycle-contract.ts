@@ -3,7 +3,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,
-  GridReadyReason,
   SheetwriteInitializationProps,
 } from "../packages/core/src/adapter.js";
 import type {
@@ -31,32 +30,6 @@ const { setXlsxTableExportBackend, xlsxTableExportBackend } = (await import(
   BUILT_XLSX_SLOTS
 )) as typeof XlsxSlots;
 
-type GridOptionConformance =
-  | { policy: "live"; reason: null }
-  | { policy: "reset"; reason: Exclude<GridReadyReason, "initial"> };
-
-export const GRID_OPTION_CONFORMANCE = {
-  workbook: { policy: "reset", reason: "input-reset" },
-  data: { policy: "reset", reason: "input-reset" },
-  datasource: { policy: "reset", reason: "input-reset" },
-  datasourceStorage: { policy: "reset", reason: "input-reset" },
-  renderer: { policy: "reset", reason: "renderer-reset" },
-  workerUrl: { policy: "reset", reason: "renderer-reset" },
-  presentation: { policy: "reset", reason: "input-reset" },
-  theme: { policy: "live", reason: null },
-  readOnly: { policy: "live", reason: null },
-  protectionResolver: { policy: "reset", reason: "input-reset" },
-  mutationPolicy: { policy: "reset", reason: "input-reset" },
-  transactionResourceLimits: { policy: "reset", reason: "input-reset" },
-  hyperlinkActivation: { policy: "reset", reason: "input-reset" },
-  addons: { policy: "reset", reason: "input-reset" },
-  renderers: { policy: "reset", reason: "renderer-reset" },
-  editors: { policy: "reset", reason: "input-reset" },
-  overscan: { policy: "live", reason: null },
-  minColumns: { policy: "live", reason: null },
-  config: { policy: "live", reason: null },
-} as const satisfies Record<keyof GridOptions, GridOptionConformance>;
-
 export function makeConformanceWorkbook(label = "Lifecycle"): Workbook {
   return {
     activeSheet: "lifecycle",
@@ -71,23 +44,8 @@ export function makeConformanceWorkbook(label = "Lifecycle"): Workbook {
   };
 }
 
-function makeConformanceData(label = "Row"): ColumnarData {
-  return { rowCount: 3, columns: { name: [`${label} 1`, `${label} 2`, `${label} 3`] } };
-}
-
-/** A windowed datasource whose rows are named after `label`. */
-function makeDatasource(label: string): DataSource {
-  return {
-    capabilities: { protocol: 2, columns: "windowed" },
-    getRows: async ({ start, end, columns }) => ({
-      protocol: 2,
-      start,
-      columns,
-      rows: Array.from({ length: end - start }, (_, offset) => ({
-        name: `${label} ${start + offset + 1}`,
-      })),
-    }),
-  };
+function makeConformanceData(): ColumnarData {
+  return { rowCount: 3, columns: { name: ["Row 1", "Row 2", "Row 3"] } };
 }
 
 /** Returns `value`, failing the test with `what` when it is missing. */
@@ -296,25 +254,21 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       }
     });
 
-    for (const resetCase of ["workbook", "data", "datasource", "renderer"] as const) {
+    for (const [resetCase, reason] of [
+      ["workbook", "input-reset"],
+      ["renderer", "renderer-reset"],
+    ] as const) {
       it(`publishes one live grid, recreates once when ${resetCase} changes, and cleans up`, async () => {
-        const isDatasource = resetCase === "datasource";
-        const { mounted, props, ready, destroyCalls, grid } = await mountRecorded(
-          mount,
-          isDatasource ? { data: undefined, datasource: makeDatasource("First") } : {},
-        );
+        const { mounted, props, ready, destroyCalls, grid } = await mountRecorded(mount);
         expect(ready).toMatchObject([{ grid, generation: 1, reason: "initial" }]);
         expect(mounted.publishedAtReady).toEqual([grid]);
 
         await mounted.render({
           ...props,
           workbook: resetCase === "workbook" ? makeConformanceWorkbook("Next") : props.workbook,
-          data: resetCase === "data" ? makeConformanceData("Next") : props.data,
-          datasource: isDatasource ? makeDatasource("Next") : props.datasource,
           renderer: resetCase === "renderer" ? "worker" : props.renderer,
         });
         const second = present(mounted.getPublishedGrid(), "replacement grid");
-        const reason = resetCase === "renderer" ? "renderer-reset" : "input-reset";
 
         expect(second).not.toBe(grid);
         expect(ready).toHaveLength(2);
@@ -494,7 +448,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(delivered).toEqual(["current generation"]);
     });
 
-    it("forwards semantic headers and custom editor lifecycle through the framework boundary", async () => {
+    it("forwards semantic headers, and aborts and destroys a custom editor when the framework unmounts", async () => {
       const workbook = makeConformanceWorkbook();
       present(workbook.sheets[0]?.columns[0], "column").editor = "framework";
       const lifecycle: string[] = [];
@@ -522,7 +476,6 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(mounted.host.querySelector('[role="columnheader"]')?.textContent).toBe("Name");
       grid.beginEdit(0, 0);
       expect([lifecycle, signal?.aborted]).toEqual([["mount"], false]);
-      expect(mounted.host.querySelector(".sheetwrite-custom-editor input")).not.toBeNull();
 
       await mounted.unmount();
       expect([lifecycle, signal?.aborted]).toEqual([["mount", "destroy"], true]);

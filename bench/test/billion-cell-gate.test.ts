@@ -26,17 +26,13 @@ const OTHER_MACHINE = {
   architecture: process.arch === "x64" ? "arm64" : "x64",
 };
 
-it("stores every derived ceiling result and rejects tampering with any gate", () => {
-  const derived = deriveBillionCellGateChecks(RECORDED.scales);
-  expect(RECORDED.gate.checks).toEqual(derived);
-  expect(new Set(derived.map(({ id }) => id)).size).toBe(derived.length);
-  expect(derived.every(({ passed }) => passed)).toBe(true);
-  expectRejections(
-    copy,
-    validateBillionCellBenchmark,
-    derived.map((check, index) => [
-      (artifact) => (must(artifact.gate.checks[index], check.id).actual += 1),
-    ]),
+it("stores every derived ceiling result and rejects a tampered gate", () => {
+  expect(RECORDED.gate.checks).toEqual(deriveBillionCellGateChecks(RECORDED.scales));
+  expect(RECORDED.gate.checks.every(({ passed }) => passed)).toBe(true);
+  const tampered = copy();
+  must(tampered.gate.checks.at(-1), "gate check").actual += 1;
+  expect(() => validateBillionCellBenchmark(tampered)).toThrow(
+    "gate checks do not match measured evidence",
   );
 });
 

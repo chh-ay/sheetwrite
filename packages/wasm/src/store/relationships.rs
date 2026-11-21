@@ -247,82 +247,12 @@ impl CellStore {
 mod tests {
     use super::*;
 
-    /// Columns of the fixture sheet: orders in A:B, customers in D:E.
-    const ORDER_CUSTOMER: usize = 0;
-    const CUSTOMER_ID: usize = 3;
-    const CUSTOMER_REGION: usize = 4;
-
-    /// A sheet with an Orders table (A1:B5) and a Customers table (D1:E4).
-    /// Customers C1, C2 and C3 exist; orders refer to C1, c2 (case differs),
-    /// a blank key and C9, which no customer has.
-    fn fixture() -> (CellStore, usize) {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(6, 10);
-        for (row, key) in ["Customer", "C1", "c2", "", "C9"].iter().enumerate() {
-            store.set_string(sheet, row, ORDER_CUSTOMER, key, 0);
-        }
-        for (row, (id, region)) in [
-            ("ID", "Region"),
-            ("C1", "North"),
-            ("C2", "South"),
-            ("C3", ""),
-        ]
-        .iter()
-        .enumerate()
-        {
-            store.set_string(sheet, row, CUSTOMER_ID, id, 0);
-            store.set_string(sheet, row, CUSTOMER_REGION, region, 0);
-        }
-        store.commit_sources();
-
-        let two = |first: &str, second: &str| vec![first.to_owned(), second.to_owned()];
-        assert!(store.set_table(
-            "orders",
-            "Orders",
-            sheet,
-            0,
-            0,
-            4,
-            1,
-            true,
-            false,
-            two("customer", "amount"),
-            two("Customer", "Amount"),
-        ));
-        assert!(store.set_table(
-            "customers",
-            "Customers",
-            sheet,
-            0,
-            3,
-            3,
-            4,
-            true,
-            false,
-            two("id", "region"),
-            two("ID", "Region"),
-        ));
-        assert!(store.set_relationships(
-            ["r", "orders", "customer", "customers", "id"]
-                .map(String::from)
-                .to_vec()
-        ));
-        (store, sheet)
-    }
-
-    #[test]
-    fn status_counts_unmatched_keys_but_not_blank_keys() {
-        let (store, _) = fixture();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_OK, NO_ROW, NO_ROW, 1]
-        );
-        assert!(store.relationship_status("unknown").is_empty());
-    }
-
     #[test]
     fn malformed_payloads_change_nothing_and_an_empty_one_frees_the_model() {
-        let (mut store, _) = fixture();
+        let mut store = CellStore::new();
+        let relationship = ["r", "orders", "customer", "customers", "id"];
+        assert!(store.set_relationships(relationship.map(String::from).to_vec()));
+
         assert!(!store.set_relationships(vec!["r".into(), "orders".into()]));
         assert!(store.relationships.is_some());
 

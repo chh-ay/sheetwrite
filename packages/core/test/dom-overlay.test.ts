@@ -9,6 +9,7 @@ import type {
   PresenceOverlay,
   Workbook,
 } from "../src/types.js";
+import { expectSameNode } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -100,6 +101,23 @@ function fixture(): { workbook: Workbook; data: ColumnarData } {
   };
 }
 
+function mount(
+  workbook: Workbook,
+  data: ColumnarData,
+  renderers?: Record<string, CellRenderer>,
+): { grid: GridImpl; host: HTMLDivElement } {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const grid = new GridImpl(host, {
+    workbook,
+    data,
+    ...(renderers === undefined ? {} : { renderers }),
+    overscan: 0,
+    config: { toolbar: false, contextMenu: false, find: false },
+  });
+  return { grid, host };
+}
+
 function cell(host: HTMLElement, row: number, col: number): HTMLDivElement {
   const element = host.querySelector(`.sheetwrite-dom-cell[data-row="${row}"][data-col="${col}"]`);
   if (!(element instanceof HTMLDivElement)) {
@@ -123,15 +141,7 @@ describe("retained DOM cell renderer overlay", () => {
     const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
     const { workbook, data } = fixture();
     workbook.sheets[0]!.merges = [{ r0: 20, c0: 1, r1: 60, c1: 2 }];
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("tall", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
+    const { grid, host } = mount(workbook, data, { dom: trackedRenderer("tall", stats) });
 
     expect(host.querySelector('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toBeNull();
     scroller(host).scrollTop = 35 * 28;
@@ -153,8 +163,8 @@ describe("retained DOM cell renderer overlay", () => {
         },
       ],
     });
-    expect(cell(host, 20, 1)).toBe(anchor);
-    expect(anchor.querySelector("button")).toBe(node);
+    expectSameNode(cell(host, 20, 1), anchor);
+    expectSameNode(anchor.querySelector("button"), node);
     expect(node?.textContent).toBe("tall:off-window-edit");
     expect(node?.dataset.color).toBe("#123456");
     expect(host.querySelectorAll('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toHaveLength(
@@ -170,15 +180,7 @@ describe("retained DOM cell renderer overlay", () => {
     workbook.sheets[0]!.frozenRows = 0;
     workbook.sheets[0]!.frozenCols = 0;
     workbook.sheets[0]!.merges = [];
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("initial", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
+    const { grid, host } = mount(workbook, data, { dom: trackedRenderer("initial", stats) });
     const shared = document.createElement("button");
     let sharedDestroys = 0;
     const sharedRenderer: CellRenderer = {
@@ -223,15 +225,7 @@ describe("retained DOM cell renderer overlay", () => {
         return element;
       },
     };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: renderer },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
+    const { grid, host } = mount(workbook, data, { dom: renderer });
     const initialCalls = calls;
     const scroll = scroller(host);
     scroll.scrollLeft = 1;
@@ -254,14 +248,7 @@ describe("retained DOM cell renderer overlay", () => {
 
   it("keeps the 32-actor by 8-range limit bounded to rail or range markers", () => {
     const { workbook, data } = fixture();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
+    const { grid, host } = mount(workbook, data);
     const overlays: PresenceOverlay[] = Array.from({ length: 32 }, (_, index) => ({
       actorId: `actor-${index}`,
       displayName: index === 0 ? "  " : `Remote operator with a long identity ${index}`,

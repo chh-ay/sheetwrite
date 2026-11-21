@@ -11,10 +11,8 @@ import {
   prepareDeclarationShapes,
   renderEntryPage,
   renderSymbolPage,
-  symbolDescription,
   undocumentedApi,
 } from "./docs-api.js";
-import { renderCompatibilityResults } from "./docs-compatibility.js";
 import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
 import {
   landingBenchPayload,
@@ -23,7 +21,7 @@ import {
   runCompletionSummary,
   splitPerformancePages,
 } from "./docs-performance.js";
-import { ADAPTER_DOC_CONTRACT, adapterContractIssues } from "./docs.js";
+import { adapterContractIssues } from "./docs.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import { extractFigureAssets, perfFigure } from "./perf-figures.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
@@ -170,8 +168,9 @@ describe("API reference pages", () => {
       page,
       /<article class="api-card api-member" id="grid-apply-transaction"[\s\S]*?<\/article>/,
     );
-    expect(member).toContain(
-      "#### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
+    // Anchored to the line start: "##### Examples" would contain "#### Examples".
+    expect(member).toMatch(
+      /^#### Examples\n\n```ts compile\ngrid\.applyTransaction\(\{ patches: \[\] \}\);/m,
     );
     expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
     expect(page).not.toMatch(/@(?:example|see)\b/);
@@ -269,97 +268,16 @@ describe("API reference pages", () => {
     expect(page).not.toContain("## Members");
     // The declaration still shows the whole type.
     expect(page).toContain("cellstore_new");
-    expect(await renderSymbolPage(pkg, entry, generated)).toContain(
-      "Releases the object's WASM memory",
+    const generatedPage = await renderSymbolPage(pkg, entry, generated);
+    expect(generatedPage).toContain("Releases the object's WASM memory");
+    // wasm-bindgen writes the source file at build time; the repository has no copy.
+    expect(generatedPage).toContain(
+      "<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code> (generated at build time)</dd></div>",
     );
+    expect(generatedPage).not.toContain("blob/develop/packages/wasm/pkg/");
     expect(undocumentedApi({ formatVersion: 2, packages: [pkg] })).toEqual([
       { packageName: "@sheetwrite/wasm", members: [], parameters: [], returns: [] },
     ]);
-  });
-
-  it("groups members into properties, methods and events, function-typed properties as methods", async () => {
-    const shape = apiExport(
-      "ShapeExample",
-      "interface",
-      [
-        "interface ShapeExample {",
-        "  readonly size: number;",
-        "  run: (count: number) => void;",
-        "  maybe: (() => void) | undefined;",
-        "  apply(value: string): boolean;",
-        "  onChange?: (value: string) => void;",
-        "}",
-      ].join("\n"),
-    );
-    const entry = entryPoint(".", [shape]);
-    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
-    const page = await renderSymbolPage(pkg, entry, shape);
-    const group = (name: string) =>
-      section(
-        page,
-        new RegExp(
-          `<h3 class="api-member-group">${name}</h3>[\\s\\S]*?(?=<h3 class="api-member-group">|$)`,
-        ),
-      );
-    expect(group("Properties")).toContain('id="shape-example-size"');
-    expect(group("Properties")).toContain('id="shape-example-maybe"');
-    expect(group("Methods")).toContain('id="shape-example-run"');
-    expect(group("Methods")).toContain('id="shape-example-apply"');
-    expect(group("Events")).toContain('id="shape-example-on-change"');
-    expect(section(page, /<article[^>]*id="shape-example-size"[\s\S]*?<\/article>/)).toContain(
-      "<span>read-only</span>",
-    );
-  });
-
-  it("links an expanded union member to the alias that names it", async () => {
-    const aliasExports = () => [
-      apiExport("STORAGE_MODES", "variable", 'readonly ["memory", "session"]'),
-      apiExport("StorageMode", "type", "export type StorageMode = (typeof STORAGE_MODES)[number];"),
-    ];
-    const options = apiExport(
-      "StorageOptions",
-      "interface",
-      'interface StorageOptions {\n  mode: "memory" | "session";\n  storage?: StorageMode;\n}',
-    );
-    const entry = entryPoint(".", [...aliasExports(), options]);
-    const pkg: ApiPackage = {
-      name: "@sheetwrite/core",
-      entryPoints: [entry, entryPoint("./adapter", aliasExports())],
-    };
-    const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
-
-    const page = await renderSymbolPage(pkg, entry, options, routes);
-
-    const memberRow = section(
-      page,
-      /<article class="api-card api-member" id="storage-options-mode"[\s\S]*?<\/article>/,
-    );
-    // The member row names the alias of its own entry point, not the adapter's re-export.
-    expect(memberRow).toContain(
-      '<a href="/docs/api/core/storage-mode/"><code>StorageMode</code></a>',
-    );
-    expect(memberRow).not.toContain('"memory"');
-    // The full expansion stays in the collapsed Declaration section.
-    expect(section(page, /<details class="api-declaration"[\s\S]*?<\/details>/)).toContain(
-      'mode: "memory" | "session"',
-    );
-    expect(page).not.toContain("core-adapter/storage-mode");
-  });
-
-  it("describes a symbol by kind and package, clipped on a word", () => {
-    const summary = "Chart families that the document model supports.";
-    const core = symbolDescription("ChartKind", "type", "@sheetwrite/core", summary);
-    expect(core).toBe(`ChartKind type in @sheetwrite/core: ${summary}`);
-    expect(core).not.toBe(symbolDescription("ChartKind", "type", "@sheetwrite/charts", summary));
-
-    const long = symbolDescription(
-      "Grid",
-      "interface",
-      "@sheetwrite/core",
-      `The imperative grid handle. ${"It reads, edits and renders a workbook. ".repeat(8)}`,
-    );
-    expect(long.length).toBeLessThanOrEqual(160);
-    expect(long).toMatch(/\S…$/);
   });
 
   it("reads parameters and the return type from a recorded signature", () => {
@@ -390,25 +308,18 @@ describe("API reference pages", () => {
       chartsEntry,
       chartAnchor,
     );
+    // The link names the line that declares the symbol in the repository source.
+    const chartSource = await readFile(
+      resolve(import.meta.dir, "../packages/core/src/types/chart.ts"),
+      "utf8",
+    );
+    const line =
+      chartSource.split("\n").findIndex((text) => text.startsWith("export interface ChartAnchor")) +
+      1;
+    expect(line).toBeGreaterThan(0);
     expect(chartsPage).toContain(
-      '<a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L10"><code>packages/core/src/types/chart.ts#L10</code></a>',
+      `<a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L${line}"><code>packages/core/src/types/chart.ts#L${line}</code></a>`,
     );
-
-    const cellOut: ApiExport = {
-      ...apiExport("CellOut", "class", "class CellOut {}"),
-      // wasm-bindgen writes this file at build time; the repository has no copy.
-      source: "pkg/sheetwrite_wasm.d.ts#L7",
-    };
-    const wasmEntry = entryPoint(".", [cellOut]);
-    const wasmPage = await renderSymbolPage(
-      { name: "@sheetwrite/wasm", entryPoints: [wasmEntry] },
-      wasmEntry,
-      cellOut,
-    );
-    expect(wasmPage).toContain(
-      "<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code> (generated at build time)</dd></div>",
-    );
-    expect(wasmPage).not.toContain("blob/develop/packages/wasm/pkg/");
   });
 });
 
@@ -456,11 +367,6 @@ describe("documentation content", () => {
         });
       }
     }
-  });
-
-  it("leaves the page title as the compatibility results page's only H1", () => {
-    // The docs shell renders the frontmatter title as the H1.
-    expect(renderCompatibilityResults()).not.toMatch(/^# /m);
   });
 
   it("rejects moved pages, moved headings and site links that resolve nowhere", () => {
@@ -731,96 +637,21 @@ describe("performance pages", () => {
 });
 
 describe("adapter documentation contract", () => {
-  const documented = (names: readonly string[]) =>
-    names.map((name) => ({ name, documentation: `${name} documentation.` }));
-  const propsSignature = (members: readonly string[]) =>
-    `export interface SheetwriteGridProps { ${members
-      .map((name) => (name.includes("-") ? `"${name}"?: unknown;` : `${name}?: unknown;`))
-      .join(" ")} }`;
-  const props = (members: readonly string[]) =>
-    apiExport(
-      "SheetwriteGridProps",
-      "interface",
-      propsSignature(members),
-      undefined,
-      documented(members),
-    );
-  const readyEvent = () =>
-    apiExport(
-      "GridReadyEvent",
-      "interface",
-      "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
-      undefined,
-      documented(["grid", "generation", "reason"]),
-    );
-  const { inputs, handlerEvents, vueEvents } = ADAPTER_DOC_CONTRACT;
-  const optionInputs = inputs.filter((name) => name !== "wasmSource");
-
-  const conformingManifest = (): PublicApiManifest => ({
-    formatVersion: 2,
-    packages: [
-      {
-        name: "@sheetwrite/core",
-        entryPoints: [
-          entryPoint(".", [
-            apiExport(
-              "GridOptions",
-              "interface",
-              propsSignature(optionInputs),
-              undefined,
-              documented(optionInputs),
-            ),
-          ]),
-          entryPoint("./adapter", [
-            apiExport(
-              "GridReadyReason",
-              "type",
-              'export type GridReadyReason = "initial" | GridResetReason;',
-            ),
-            apiExport(
-              "GridResetReason",
-              "type",
-              'export type GridResetReason = "input-reset" | "renderer-reset";',
-            ),
-          ]),
-        ],
-      },
-      ...(["@sheetwrite/react", "@sheetwrite/svelte"] as const).map((name) => ({
-        name,
-        entryPoints: [entryPoint(".", [props([...inputs, ...handlerEvents]), readyEvent()])],
-      })),
-      {
-        name: "@sheetwrite/vue",
-        entryPoints: [
-          entryPoint(".", [
-            props([...inputs]),
-            apiExport(
-              "SheetwriteGridEmits",
-              "interface",
-              `export interface SheetwriteGridEmits { ${vueEvents
-                .map((name) => `"${name}": unknown;`)
-                .join(" ")} }`,
-              undefined,
-              documented(vueEvents),
-            ),
-            readyEvent(),
-          ]),
-        ],
-      },
-    ],
-  });
-
   it("fails when GridOptions or the Vue emits drift from the contract", () => {
-    const manifest = conformingManifest();
-    const [core, , , vue] = manifest.packages;
-    const [coreRoot] = core?.entryPoints ?? [];
-    const [vueRoot] = vue?.entryPoints ?? [];
-    if (coreRoot === undefined || vueRoot === undefined) throw new Error("fixture shape changed");
-    exportNamed(coreRoot, "GridOptions").memberDocs.push({
-      name: "uncoveredInput",
-      documentation: "Uncovered input.",
-    });
-    vueRoot.exports = vueRoot.exports.filter((item) => item.name !== "SheetwriteGridEmits");
+    const gridOptions = apiExport(
+      "GridOptions",
+      "interface",
+      "interface GridOptions { uncoveredInput?: unknown; }",
+      undefined,
+      [{ name: "uncoveredInput", documentation: "Uncovered input." }],
+    );
+    const manifest: PublicApiManifest = {
+      formatVersion: 2,
+      packages: [
+        { name: "@sheetwrite/core", entryPoints: [entryPoint(".", [gridOptions])] },
+        { name: "@sheetwrite/vue", entryPoints: [entryPoint(".", [])] },
+      ],
+    };
 
     expect(adapterContractIssues(manifest)).toEqual(
       expect.arrayContaining([

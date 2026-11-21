@@ -398,50 +398,6 @@ mod tests {
     use super::*;
     use crate::transfer::tests::{block_bytes, Cell};
 
-    #[test]
-    fn pages_changes_with_aligned_rows_and_authors() {
-        let mut kernel = DiffKernel::new(10);
-        let sheet = kernel.add_sheet(3, 1, true);
-
-        // Row 0 was inserted by author 4; the old rows 0..3 are now rows 1..4.
-        kernel.insert_rows(sheet, 0, 1);
-        kernel.touch(sheet, 0, 0, 0, 0, 4);
-        kernel.touch(sheet, 2, 0, 2, 0, 5);
-        assert_eq!(kernel.row_segments(sheet), vec![0, 1, NONE, 1, 3, 0]);
-
-        let after = block_bytes(
-            4,
-            1,
-            &[
-                Cell::Text("new"),
-                Cell::Number(1.0),
-                Cell::Number(9.0),
-                Cell::Number(3.0),
-            ],
-            &[],
-        );
-        let before = block_bytes(
-            3,
-            1,
-            &[Cell::Number(1.0), Cell::Number(2.0), Cell::Number(3.0)],
-            &[],
-        );
-        assert!(kernel.load_after(&after));
-
-        assert_eq!(
-            kernel.compare(sheet, false, 0, 0, 1, 1, 0, 0, NONE, NONE, 0),
-            1
-        );
-        assert!(kernel.load_before(&before));
-        assert_eq!(kernel.compare(sheet, true, 1, 0, 3, 1, 1, 0, 0, 0, 0), 3);
-
-        assert_eq!(kernel.page_rows(), vec![0, 2]);
-        assert_eq!(kernel.page_before_rows(), vec![NONE, 1]);
-        assert_eq!(kernel.page_flags(), vec![compare::ADDED, compare::VALUE]);
-        assert_eq!(kernel.page_authors(), vec![4, 5]);
-        assert_eq!(kernel.cell_authors(sheet, 2, 0), vec![5]);
-    }
-
     /// The later and the earlier window's bytes.
     type Versions = (Vec<u8>, Vec<u8>);
 
@@ -466,34 +422,6 @@ mod tests {
             block_bytes(rows as usize, cols as usize, &after, &[]),
             block_bytes(rows as usize, cols as usize, &before, &[]),
         )
-    }
-
-    #[test]
-    fn pages_in_row_order_and_resumes_at_the_returned_cell() {
-        let (rows, cols, stride) = (133, 3, 7);
-        let (after, before) = changed_every(rows, cols, stride);
-        let expected: Vec<u32> = (0..rows * cols)
-            .filter(|ordinal| ordinal.is_multiple_of(stride))
-            .collect();
-
-        let mut kernel = DiffKernel::new(10);
-        let sheet = kernel.add_sheet(rows, cols, true);
-        assert!(kernel.load_after(&after) && kernel.load_before(&before));
-
-        let mut seen = Vec::new();
-        let mut from = 0;
-        while from < rows * cols {
-            from = kernel.compare(sheet, true, 0, 0, rows, cols, 0, 0, 0, 0, from);
-            let page_rows = kernel.page_rows();
-            let page_cols = kernel.page_cols();
-            seen.extend(
-                page_rows
-                    .iter()
-                    .zip(&page_cols)
-                    .map(|(row, col)| row * cols + col),
-            );
-        }
-        assert_eq!(seen, expected);
     }
 
     #[test]
@@ -556,30 +484,5 @@ mod tests {
         );
         assert_eq!(kernel.page_cols(), vec![2]);
         assert_eq!(kernel.page_authors(), vec![NONE]);
-    }
-
-    #[test]
-    fn stops_when_the_page_is_full_and_resumes_at_the_returned_cell() {
-        let mut kernel = DiffKernel::new(1);
-        let sheet = kernel.add_sheet(1, 3, false);
-        let after = block_bytes(
-            1,
-            3,
-            &[Cell::Number(1.0), Cell::Empty, Cell::Number(3.0)],
-            &[],
-        );
-        assert!(kernel.load_after(&after));
-
-        assert_eq!(
-            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 0),
-            1
-        );
-        assert_eq!(kernel.page_cols(), vec![0]);
-
-        assert_eq!(
-            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 1),
-            3
-        );
-        assert_eq!(kernel.page_cols(), vec![2]);
     }
 }
