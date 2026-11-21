@@ -16,9 +16,32 @@ declare global {
 
 async function open(page: Page, browserName: string): Promise<void> {
   // Firefox and WebKit let a page use the clipboard after a key press.
-  if (browserName === "chromium") {
+  try {
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  } catch (error) {
+    console.log(`PROBE ${browserName} grant failed: ${String(error).slice(0, 200)}`);
   }
+  page.on("console", (message) => {
+    if (message.text().startsWith("PROBE")) console.log(`${browserName} ${message.text()}`);
+  });
+  await page.addInitScript(() => {
+    const clipboard = navigator.clipboard as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    for (const name of ["read", "readText", "write", "writeText"]) {
+      const original = clipboard[name]?.bind(clipboard);
+      if (!original) continue;
+      clipboard[name] = async (...args: unknown[]) => {
+        try {
+          const result = await original(...args);
+          const types = name === "read" ? (result as ClipboardItem[]).map((item) => item.types.join(",")).join("|") : "";
+          console.log(`PROBE ${name} ok ${types}`);
+          return result;
+        } catch (error) {
+          console.log(`PROBE ${name} failed ${String(error)}`);
+          throw error;
+        }
+      };
+    }
+  });
   await page.setViewportSize({ width: 1_600, height: 900 });
   await page.goto("/showcases/spreadsheet/");
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
