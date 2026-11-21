@@ -642,6 +642,33 @@ a {
   line-height: 1.7;
 }
 
+/* Below 48rem a wrapped line would break inside a name ("querySelecto" over
+   "r("), so each code line stays whole and the code panel scrolls. As on the
+   table frame, an edge shadow shows only while more code sits out of view on
+   that side: the covers scroll with the code, the shadows stay with the panel.
+   The copy button sits outside the panel, so it does not scroll. */
+@media (max-width: 48rem) {
+  .sw-prose .expressive-code .frame pre {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--sw-surface-0) 40%, transparent) left / 2rem 100% no-repeat
+        local,
+      linear-gradient(to left, var(--sw-surface-0) 40%, transparent) right / 2rem 100% no-repeat
+        local,
+      radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem
+        100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right /
+        0.8rem 100% no-repeat scroll,
+      var(--sw-surface-0);
+    --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
+  }
+
+  .sw-prose .expressive-code .frame pre.wrap .ec-line .code {
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+}
+
 @media (max-width: 48rem) {
   /* Narrow screens scroll wide tables locally instead of stretching the page.
      Markdown tables already scroll inside their frame. */
