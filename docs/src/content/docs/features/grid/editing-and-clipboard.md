@@ -103,7 +103,7 @@ An unknown function name is not a syntax error: `=SUMM(A1:A3)` is stored and the
 
 ### AutoComplete
 
-As in Excel, typing a text entry completes it from the entries in the same column ([Automatically complete or not complete entries in cells](https://support.microsoft.com/en-us/office/turn-automatic-completion-of-cell-entries-on-or-off-0f4aa749-b927-4ff3-a8e0-28d6e2e4d4b4)). The grid reads the distinct text values of the filled cells directly above and below the edited cell, up to the first empty cell each way and at most 100,000 rows each way. The engine reads them once per edit, on the first typed character. When exactly one of them begins with what you typed, ignoring letter case, the editor shows the rest of it selected:
+As in Excel, typing a text entry completes it from the entries in the same column ([Turn automatic completion of cell entries on or off](https://support.microsoft.com/en-us/excel/turn-automatic-completion-of-cell-entries-on-or-off)). The grid reads the distinct text values of the filled cells directly above and below the edited cell, up to the first empty cell each way and at most 100,000 rows each way. The engine reads them once per edit, on the first typed character. When exactly one of them begins with what you typed, ignoring letter case, the editor shows the rest of it selected:
 
 - Enter, Tab, Ctrl/Cmd + Enter, an arrow key in Enter mode or clicking away stores the completed entry, in the entry's own letter case.
 - Backspace or Delete removes the added text; typing on replaces it and completes again.
@@ -270,7 +270,8 @@ grid.on("mutation-rejected", ({ issues }) => {
 - If the edited cell leaves the view, or the sheet structure changes, the grid cancels the editor.
 - Paste does nothing when `readOnly` is on; it resolves `"empty"`.
 - Cut on a read-only grid copies: nothing is marked or moved.
-- A paste that runs past the sheet's last row or column adds the rows and columns it needs, and a moved cut adds the rows it needs, in the same undo step, as Excel's 1,048,576 rows hold them. A sheet holds at most 1,000,000 rows (`maxRowsPerSheet`); a paste that would end past them changes nothing, and the grid says why ("Data cannot grow to 1,000,005 rows: the limit is 1,000,000.").
+- A paste that runs past the sheet's last row or column adds the rows and columns it needs. A moved cut adds the rows it needs. Both happen in the same undo step, as in Excel.
+- A sheet holds at most 1,000,000 rows (`maxRowsPerSheet`). A paste that would end past them changes nothing and resolves `"rejected"`. The grid says why, for example "Nothing was pasted: Data cannot grow to 1,000,005 rows: the limit is 1,000,000."
 - An undo that is too large to send changes nothing and leaves the history; see [Undo a large clear](#undo-a-large-clear).
 
 ## See also

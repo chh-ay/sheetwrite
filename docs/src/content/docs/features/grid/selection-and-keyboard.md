@@ -3,7 +3,7 @@ title: Selection and keyboard
 description: Read and set the selection, navigate with the keyboard, and rebind or add shortcuts.
 ---
 
-The grid selects cells with the mouse, the keyboard, or code, and runs Sheets-style keyboard shortcuts when it has focus.
+The grid selects cells with the mouse, the keyboard, or code, and runs Excel's keyboard shortcuts when it has focus.
 
 ```ts prelude="core" partial="requires the grid from Full setup" title="Select A1 and follow the selection"
 grid.on("selection", (e) => console.log(e.selection));
@@ -111,7 +111,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
 | F2 | Edit the active cell, with the caret at the end. |
 | Alt + Down | Open the filter dropdown of an AutoFilter header cell, the list of a cell with a list validation rule, or else [Pick From Drop-down List](/docs/features/grid/editing-and-clipboard/#pick-from-drop-down-list). |
-| Delete | Clear the selected cells. |
+| Delete | Clear the values of the selected cells. Their formats stay, as in Excel. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
 | A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |

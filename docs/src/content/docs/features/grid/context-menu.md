@@ -78,6 +78,9 @@ On a right-click, Sheetwrite prevents the browser menu, hit-tests the pointer, a
 | `shortcut` | Shortcut hint. |
 | `visible` / `disabled` | A boolean, or a predicate that receives the lean `ContextMenuContext`. |
 | `onClick(grid, cell)` | Host callback. It overrides `action`. |
+| `icon` | Glyph before the label. Built-in actions have one. |
+| `items` | Rows of a submenu. The row opens the submenu and runs nothing itself. |
+| `inline` | Shows `items` as a row of icon buttons inside this row, like Excel's Paste Options row, in place of a submenu. |
 
 The lean `ContextMenuContext` carries only `cell`, `clientX`, and `clientY`.
 
@@ -85,9 +88,21 @@ The built-in action names are:
 
 | Clipboard/content | Cells | Rows | Columns | View/export |
 | --- | --- | --- | --- | --- |
-| `cut`, `copy`, `paste`, `clearContents` | `insertCells`, `deleteCells`, `formatCells` | `insertRowAbove`, `insertRowBelow`, `deleteRow`, `hideRow`, `showAllRows`, `autoFitRow` | `insertColumnLeft`, `insertColumnRight`, `deleteColumn`, `hideColumn`, `showAllColumns`, `autoFitColumn` | `clearFilter`, `filterBySelection`, `reapplyFilter`, `merge`, `unmerge`, `exportCsv`, `exportXlsx` |
+| `cut`, `copy`, `paste`, `pasteValues`, `pasteFormulas`, `pasteFormatting`, `pasteTranspose`, `pasteLink`, `pasteVisibleRows`, `pasteSpecial`, `clearContents`, `pickFromList`, `editNote`, `deleteNote` | `insertCells`, `deleteCells`, `formatCells` | `insertRowAbove`, `insertRowBelow`, `deleteRow`, `hideRow`, `showAllRows`, `autoFitRow` | `insertColumnLeft`, `insertColumnRight`, `deleteColumn`, `hideColumn`, `showAllColumns`, `autoFitColumn`, `sortAscending`, `sortDescending`, `sortViewAscending`, `sortViewDescending` | `clearFilter`, `filterBySelection`, `reapplyFilter`, `merge`, `unmerge`, `pivotFields`, `exportCsv`, `exportXlsx` |
 
-The default menu contains copy, cut, paste, clear contents, Insert and Delete submenus (cells, which open Excel's Insert or Delete dialog, rows and columns), row and column hide/show/auto-fit, a Filter submenu (filter by the selected cell's value, reapply, clear the column's filter), merge, unmerge and Format cells…, with separators between groups. `exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX still requires `xlsxAddon()` from `@sheetwrite/xlsx` in `initSheetwrite({ addons })`.
+`separator` draws a line between groups.
+
+The default menu has these groups, in this order:
+
+- Cut, Copy, the Paste Options row (Paste, Values, Formulas, Transpose, Formatting, Paste Link, and Paste into visible rows only after a paste over hidden rows) and Paste Special….
+- Insert and Delete submenus (Cells…, which opens Excel's Insert or Delete dialog, rows and columns), and Clear contents.
+- Row and Column submenus: hide, show all and auto-fit. The Column submenu also sorts in place and sorts the view.
+- A Filter submenu: filter by the selected cell's value, reapply, and clear the column's filter.
+- A Merge submenu, Format Cells… and Pick From Drop-down List….
+- PivotTable Fields, in a pivot table only.
+- New note, or Edit note and Delete note on a cell that has a note.
+
+`exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX also needs `xlsxAddon()` from `@sheetwrite/xlsx` in `initSheetwrite({ addons })`.
 
 ## Host-owned menu
 
