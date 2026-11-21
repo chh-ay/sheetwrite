@@ -161,6 +161,13 @@ describe("formula benchmark schema", () => {
         (result) => (firstWorkload(result).stat = { ...firstWorkload(result).stat, stddev: 0.1 }),
         "does not match raw samples",
       ],
+      [
+        (result) => {
+          const stat = firstWorkload(result).allocationStat;
+          stat.retainedBytes = { ...stat.retainedBytes, stddev: 0.1 };
+        },
+        "does not match raw samples",
+      ],
       [(result) => (result.meta.commit = "A".repeat(40)), "lowercase Git SHA"],
       [(result) => result.runner.command.push("--invented"), "command does not match"],
       [

@@ -28,6 +28,7 @@ const OTHER_MACHINE = {
 
 it("stores every derived ceiling result and rejects a tampered gate", () => {
   expect(RECORDED.gate.checks).toEqual(deriveBillionCellGateChecks(RECORDED.scales));
+  expect(RECORDED.gate.checks.every(({ passed }) => passed)).toBe(true);
   const tampered = copy();
   must(tampered.gate.checks.at(-1), "gate check").actual += 1;
   expect(() => validateBillionCellBenchmark(tampered)).toThrow(
