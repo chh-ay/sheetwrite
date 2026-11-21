@@ -671,10 +671,10 @@ a {
         local,
       linear-gradient(to left, var(--sw-surface-0) 40%, transparent) right / 2rem 100% no-repeat
         local,
-      radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem
+      radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
+        no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
         100% no-repeat scroll,
-      radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right /
-        0.8rem 100% no-repeat scroll,
       var(--sw-surface-0);
     --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
   }
