@@ -151,10 +151,10 @@ interface Grid {
 | [`scrollToCell(addr)`](/docs/api/core/grid/#grid-scroll-to-cell) | Scroll a cell into view. |
 | [`beginEdit(row, col, initial?, selectAll?)`](/docs/api/core/grid/#grid-begin-edit) | Open the inline editor at a view cell. |
 | [`dataEdge(row, col, dRow, dCol)`](/docs/api/core/grid/#grid-data-edge) | Ctrl+Arrow-style data-run jump target, or `null`; vertical movement is view-aware under sort/filter. |
-| [`search(query, opts?)`](/docs/api/core/grid/#grid-search) | Find matching cells; highlights them, emits `search`, returns a [`SearchResult`](/docs/features/grid/search/#options-and-result). |
-| [`findNext()`](/docs/api/core/grid/#grid-find-next) / `findPrev()` | Step the active match forward / backward and scroll it into view. |
+| [`search(query, opts?)`](/docs/api/core/grid/#grid-search) | Find matching cells, as Excel's Find does: wildcards, formulas searched by default, and only the selection when it has more than one cell. Highlights the matches, selects the active match, emits `search`, and returns a [`SearchResult`](/docs/features/grid/search/#options-and-result). |
+| [`findNext()`](/docs/api/core/grid/#grid-find-next) / `findPrev()` | Step the active match forward / backward, select it, and scroll it into view. |
 | [`clearSearch()`](/docs/api/core/grid/#grid-clear-search) | Drop the current search and clear its highlights. |
-| [`replaceCurrent(replacement)`](/docs/api/core/grid/#grid-replace-current) / `replaceAll(replacement)` | Replace literal text/number matches through undoable transactions. |
+| [`replaceCurrent(replacement)`](/docs/api/core/grid/#grid-replace-current) / `replaceAll(replacement)` | Replace matches through undoable transactions. Formula text is replaced too, unless the search used `lookIn: "values"`. See [Search](/docs/features/grid/search/). |
 | [`highlightCells(ranges, color?)`](/docs/api/core/grid/#grid-highlight-cells) | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
 
 ## Views: sort, filter, hide and group
@@ -163,16 +163,16 @@ interface Grid {
 | --- | --- |
 | [`aggregate(col, op)`](/docs/api/core/grid/#grid-aggregate) | Column aggregate (returns a number); see [Data operations](/docs/features/data/data-operations/#aggregate). |
 | [`sortBy(col, ascending?)`](/docs/api/core/grid/#grid-sort-by) / `sortRange(range, keys, options?)` | Sort cells in place, as Excel does; see [Data operations](/docs/features/data/data-operations/#sort-cells-in-place). |
-| `setViewSort(keys)` | Display-only sort; see [Data operations](/docs/features/data/data-operations/#display-views). |
+| `setViewSort(keys)` | View sort: sorts the displayed rows and does not move cells; see [Data operations](/docs/features/data/data-operations/#display-views). |
 | [`filterBy(col, needle)`](/docs/api/core/grid/#grid-filter-by) / `setColumnFilter(col, filter)` / `getColumnFilters()` | Column filters that compose with sort, hidden rows, and row groups. `setColumnFilter(col, null)` removes one. |
 | [`setAutoFilter(range)`](/docs/api/core/grid/#grid-set-auto-filter) / `getAutoFilter()` / `reapplyFilter()` | Excel's AutoFilter: filter buttons on the first row of a range, whose rows below are the only ones column filters hide. `setAutoFilter(null)` turns it off; `reapplyFilter()` filters again after edits. |
 | [`distinctValues(col, limit?)`](/docs/api/core/grid/#grid-distinct-values) | First-seen distinct values for building filter menus. |
 | [`hideRows(rows)`](/docs/api/core/grid/#grid-hide-rows) / `showRows(rows?)` / `hiddenRows()` | Explicit row visibility separate from sort/filter state. |
-| [`sheetRowOf(viewRow)`](/docs/api/core/grid/#grid-sheet-row-of) / [`viewRowOf(sheetRow)`](/docs/api/core/grid/#grid-view-row-of) | Map between the view rows that selections and `scrollToCell` use and the sheet rows of A1 references and the row headers. They differ under a filter, hidden rows or a view sort. Constant time. |
+| [`sheetRowOf(viewRow)`](/docs/api/core/grid/#grid-sheet-row-of) / [`viewRowOf(sheetRow)`](/docs/api/core/grid/#grid-view-row-of) | Map between displayed rows, which selections and `scrollToCell` use, and data rows, which A1 references and the row headers use. They differ under a filter, hidden rows or a view sort. Constant time. |
 | [`goToCell(addr)`](/docs/api/core/grid/#grid-go-to-cell) / [`getActiveSheetCell()`](/docs/api/core/grid/#grid-get-active-sheet-cell) / [`getActiveCellInput()`](/docs/api/core/grid/#grid-get-active-cell-input) | Make a sheet cell the active cell, as Excel's Name Box and Go To do, also on a row a filter or Hide Rows hides. A hidden active cell shows no selection: `getSelection()` is null and the `selection` event's `sheetFocus` names it. The formula bar shows it; typing or F2 edits it there (a grid without a formula bar does not edit it from the keyboard); Copy, Cut and Delete act on it; Up and Down go to the nearest row that shows, and Left and Right stay on its row. |
 | [`hideColumns(cols?)`](/docs/api/core/grid/#grid-hide-columns) / `showColumns(cols?)` / `hiddenColumns()` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
-| [`groupRows(start, end)`](/docs/api/core/grid/#grid-group-rows) / `ungroupRows(start, end)` / `setGroupCollapsed(start, collapsed)` / `rowGroups()` | Inclusive data-row groups with collapse state. |
-| [`clearView()`](/docs/api/core/grid/#grid-clear-view) | Clears sort/filter state; hidden rows and row groups remain. |
+| [`groupRows(start, end)`](/docs/api/core/grid/#grid-group-rows) / `ungroupRows(start, end)` / `setGroupCollapsed(start, collapsed)` / `rowGroups()` | Row groups over inclusive data rows, with collapse state. |
+| [`clearView()`](/docs/api/core/grid/#grid-clear-view) | Clears the view sort and the filters; hidden rows and row groups remain. It does not undo an in-place sort. |
 
 ## Layout and appearance
 
@@ -180,7 +180,7 @@ interface Grid {
 | --- | --- |
 | [`setFrozen(rows, cols?)`](/docs/api/core/grid/#grid-set-frozen) | Pin leading view rows/columns while the body scrolls. |
 | [`setZoom(z)`](/docs/api/core/grid/#grid-set-zoom) / `getZoom()` | Scale grid content between `0.5` and `2` without mutating workbook base sizes. |
-| [`setRowHeight(row, h)`](/docs/api/core/grid/#grid-set-row-height) / `setColumnWidth(col, w)` | Geometry APIs; row height is view-indexed and persists against the underlying data row. |
+| [`setRowHeight(row, h)`](/docs/api/core/grid/#grid-set-row-height) / `setColumnWidth(col, w)` | Set one row height or column width. `row` is a displayed row; the height is saved on its data row, so it stays with the row when the view changes. |
 | [`autoFitRows(range?)`](/docs/api/core/grid/#grid-auto-fit-rows) / `autoFitColumns(cols?)` | Explicit, undoable geometry fitting from bulk reads; auto-fit never runs during paint. |
 | [`setTheme(partial)`](/docs/api/core/grid/#grid-set-theme) | Merge a partial theme and repaint. |
 | [`defineCellRenderer(name, r)`](/docs/api/core/grid/#grid-define-cell-renderer) | Register a custom renderer after construction. See [Custom cell renderers](/docs/features/grid/options-and-presentation/#custom-cell-renderers). |
@@ -209,7 +209,7 @@ interface Grid {
 - Undo history keeps at most 200 entries. It also drops its oldest entries once retained range snapshots pass 256 MiB, about twenty million-cell clears. The newest entry always stays undoable.
 - The 256 MiB policy counts engine-reported snapshot bytes, not total process memory. Cloned formula ASTs and JavaScript patch/redo payloads are bounded only by the 200-entry limit.
 - Undo of a large clear restores the saved range directly from a packed engine snapshot.
-- Display sorts and filters do not change the document. `clearView()` keeps hidden rows and row groups.
+- View sorts and filters do not change the document; an in-place sort (`sortBy`, `sortRange`) does. `clearView()` keeps hidden rows and row groups.
 
 ## See also
 
