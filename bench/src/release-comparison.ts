@@ -519,10 +519,12 @@ function assertMatchingConditions(
   }
   const before = captureForArtifact(baseline, "data-results.json");
   const after = captureForArtifact(candidate, "data-results.json");
+  // Both data captures run the same harness: the same bench-only patch, or none when the
+  // baseline release's own harness already follows the current data protocol.
+  const patch = before.harnessPatchSha256;
   if (
-    typeof before.harnessPatchSha256 !== "string" ||
-    !/^[a-f0-9]{64}$/.test(before.harnessPatchSha256) ||
-    before.harnessPatchSha256 !== after.harnessPatchSha256
+    patch !== after.harnessPatchSha256 ||
+    (patch !== undefined && (typeof patch !== "string" || !/^[a-f0-9]{64}$/.test(patch)))
   ) {
     throw new Error("Data captures do not record the same harness patch");
   }

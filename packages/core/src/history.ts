@@ -253,6 +253,11 @@ export class UndoManager {
     return this.undoStack.length > 0;
   }
 
+  /** The newest undo entry, by identity: the edit the next {@link undo} reverts. */
+  get lastUndo(): object | null {
+    return this.undoStack.at(-1) ?? null;
+  }
+
   get canRedo(): boolean {
     return this.redoStack.length > 0;
   }

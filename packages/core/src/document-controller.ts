@@ -308,6 +308,11 @@ export class DocumentController {
     return this.history.canUndo;
   }
 
+  /** The newest undo entry, by identity: the edit the next {@link undo} reverts. */
+  get lastUndo(): object | null {
+    return this.history.lastUndo;
+  }
+
   get canRedo(): boolean {
     return this.history.canRedo;
   }

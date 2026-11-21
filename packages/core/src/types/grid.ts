@@ -165,8 +165,11 @@ export interface CellEditor {
  *   a read-only grid on paste), or the action stopped without a change to the
  *   grid because a newer action of the same kind (copy or cut, paste) started
  *   or the grid was destroyed first.
+ * - `"rejected"` — the grid refused the paste's change, so nothing was
+ *   pasted: a protected range, a host's admission, or a document limit. The
+ *   grid says why, beside the `mutation-rejected` event.
  */
-export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "rejected";
 
 /**
  * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s
@@ -421,6 +424,14 @@ export interface GridActions {
    * available while a cut waits, as in Excel. Never rejects.
    */
   pasteSpecial(options?: PasteSpecialOptions): Promise<ClipboardOutcome>;
+  /**
+   * Paste into visible rows only. As in Excel, a pasted block writes into
+   * consecutive sheet rows, the rows a filter or Hide Rows hides included.
+   * When the last change is such a paste, this pastes the same cells again on
+   * the shown rows only, as one undo step; otherwise it does nothing. See
+   * {@link Grid.canPasteVisibleRows}.
+   */
+  pasteVisibleRows(): void;
   /** Clear the selected cells' contents, keeping their formatting; does nothing when read-only. */
   clearContents(): void;
   /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
@@ -615,6 +626,7 @@ export type ContextMenuActionName =
   | "pasteFormatting"
   | "pasteTranspose"
   | "pasteLink"
+  | "pasteVisibleRows"
   | "pasteSpecial"
   | "clearContents"
   | "merge"
@@ -1486,6 +1498,11 @@ export interface Grid {
   showRows(rows?: readonly number[]): void;
   /** Currently hidden data rows on the active sheet. */
   hiddenRows(): readonly number[];
+  /**
+   * Whether the last change is a paste on the active sheet that wrote into
+   * hidden rows, which `actions.pasteVisibleRows()` can paste on the shown rows only.
+   */
+  canPasteVisibleRows(): boolean;
   /**
    * The sheet row, zero-based, that view row `viewRow` shows on the active
    * sheet. Selections, `scrollToCell` and the selection events count rows in

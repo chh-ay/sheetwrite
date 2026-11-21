@@ -2806,6 +2806,8 @@ function historyWindowBytes(
 }
 
 function historyDiffFixture(): TimedFixture {
+  if (historyKernel === undefined) throw new Error("this engine has no version-history kernel");
+  const { DiffKernel } = historyKernel;
   const before = historyVersion([]);
   const after = historyVersion(Array.from({ length: HISTORY_PAGE }, (_, k) => historyChange(k)));
   const windowRows = Math.floor(HISTORY_WINDOW_CELLS / HISTORY_COLS);
@@ -2826,7 +2828,7 @@ function historyDiffFixture(): TimedFixture {
   return {
     store: after.store,
     run: () => {
-      const kernel = new historyKernel.DiffKernel(HISTORY_PAGE);
+      const kernel = new DiffKernel(HISTORY_PAGE);
       try {
         const slot = kernel.addSheet(HISTORY_ROWS, HISTORY_COLS, true);
         for (const write of writes) {

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -32,13 +33,16 @@ const ENGINE_PKG_URL =
 export const WASM_PATH = new URL("sheetwrite_wasm_bg.wasm", ENGINE_PKG_URL);
 export const ENGINE_GLUE_PATH = new URL("sheetwrite_wasm.js", ENGINE_PKG_URL);
 
-/** The version-history diff kernel, from the same checkout as the engine. */
-export const historyKernel: typeof HistoryKernel = await import(
-  pathToFileURL(
-    resolve(
-      ENGINE_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)),
-      "packages/wasm/history-node.mjs",
-    ),
-  ).href
+const HISTORY_KERNEL_PATH = resolve(
+  ENGINE_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)),
+  "packages/wasm/history-node.mjs",
 );
-await historyKernel.loadHistoryKernel();
+/**
+ * The version-history diff kernel, from the same checkout as the engine.
+ * Releases before 0.7.0 ship none, so a capture of their engine has no
+ * history row.
+ */
+export const historyKernel: typeof HistoryKernel | undefined = existsSync(HISTORY_KERNEL_PATH)
+  ? await import(pathToFileURL(HISTORY_KERNEL_PATH).href)
+  : undefined;
+await historyKernel?.loadHistoryKernel();
