@@ -130,7 +130,6 @@ export class AriaMirror {
         deps.presentation === "data-grid" ? "Data grid" : "Spreadsheet grid",
       );
     }
-    aria.setAttribute("aria-label", deps.host.getAttribute("aria-label") ?? "");
     deps.scroller.setAttribute("aria-hidden", "true");
     deps.overlay.setAttribute("aria-hidden", "true");
     deps.viewport.querySelector("canvas")?.setAttribute("aria-hidden", "true");

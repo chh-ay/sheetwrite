@@ -224,7 +224,6 @@ it("owns only rows in the grid role, and not the host's chrome", () => {
   expect(grid === mirror(host)).toBe(true);
   const owned = [...mirror(host).children].map((child) => child.getAttribute("role"));
   expect(new Set(owned)).toEqual(new Set(["row"]));
-  expect(mirror(host).getAttribute("aria-label")).toBe(host.getAttribute("aria-label"));
 });
 
 it("names no missing element when the active cell is outside the mirrored window", () => {

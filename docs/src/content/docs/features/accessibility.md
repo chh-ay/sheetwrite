@@ -23,7 +23,7 @@ requestAnimationFrame(() => {
 | --- | --- | --- | --- |
 | Host `#grid` | `group` | `aria-label="Spreadsheet grid"` `aria-activedescendant="sheetwrite-grid-1-0-0"` | |
 | Canvas, scroller, overlay | | `aria-hidden="true"` | |
-| Mirror `div.sheetwrite-aria#sheetwrite-grid-1` | `grid` | `aria-multiselectable="true"` `aria-rowcount="3"` `aria-colcount="2"` `aria-label="Spreadsheet grid"` | |
+| Mirror `div.sheetwrite-aria#sheetwrite-grid-1` | `grid` | `aria-multiselectable="true"` `aria-rowcount="3"` `aria-colcount="2"` | |
 | Header row | `row` | `aria-rowindex="1"` | |
 | Header cells | `columnheader` | `aria-colindex="1"`, `"2"` | A, B |
 | Data row 1 | `row` | `aria-rowindex="2"` | |
@@ -101,7 +101,6 @@ with a unique id (`sheetwrite-grid-<n>`) and `role="grid"`. It carries the grid'
 | `aria-rowcount` | total rows **+ 1** (the column-letter header counts as a row) |
 | `aria-colcount` | number of visible columns |
 | `aria-readonly` | `"true"` when the grid is `readOnly` (omitted otherwise) |
-| `aria-label` | the host's `aria-label` |
 
 It contains:
 
@@ -130,7 +129,7 @@ Sketch of the emitted structure:
 <div role="group" aria-label="Spreadsheet grid"
      aria-activedescendant="sheetwrite-grid-1-0-0" tabindex="0">
   <!-- canvas / scroller / overlay, all aria-hidden -->
-  <div class="sheetwrite-aria" id="sheetwrite-grid-1" role="grid" aria-label="Spreadsheet grid"
+  <div class="sheetwrite-aria" id="sheetwrite-grid-1" role="grid"
        aria-multiselectable="true" aria-rowcount="100001" aria-colcount="5">
     <div role="row" aria-rowindex="1">
       <div role="columnheader" aria-colindex="1">A</div>
