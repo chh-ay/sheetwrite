@@ -1,0 +1,6 @@
+- Expected  - 2
++ Received  + 2
+(fail) the formula bar's formula help > takes the grid's light theme colours, at 4.5:1 or more [159.56ms]
+- Expected  - 2
++ Received  + 2
+(fail) the formula bar's formula help > takes the grid's dark theme colours, at 4.5:1 or more [49.15ms]
