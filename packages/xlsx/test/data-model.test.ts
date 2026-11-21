@@ -13,6 +13,7 @@ import {
 import { sheetwriteWorkbookBackend, xlsxAddon } from "../src/index.js";
 import {
   book,
+  cellTexts,
   cellsOf,
   collectWarnings,
   editParts,
@@ -150,8 +151,9 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
   );
 
   const xml = partText(saved, "xl/worksheets/sheet1.xml");
-  expect(xml).toMatch(/<c r="A5"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Region<\/t>/u);
-  expect(xml).toMatch(/<c r="A7"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Total<\/t>/u);
+  const texts = cellTexts(saved, "xl/worksheets/sheet1.xml");
+  expect(texts.get("A5")).toBe("Region");
+  expect(texts.get("A7")).toBe("Total");
   // The Sum value keeps its field's number format (0.00 is Excel's built-in 2); the measure is General.
   // Style 1 is the text columns' Text format, so the Sum value's style is 2.
   expect(partText(saved, "xl/styles.xml")).toMatch(/<xf numFmtId="2"/u);

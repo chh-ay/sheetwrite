@@ -4,6 +4,7 @@ import { initSheetwrite, SheetwriteStore, type WorkbookSnapshot } from "@sheetwr
 import { strFromU8, unzipSync } from "fflate";
 
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
+import { cellTexts } from "./workbook-fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -55,8 +56,8 @@ async function worksheetXml(snapshot: WorkbookSnapshot, part = "xl/worksheets/sh
 }
 
 /** The text cells of a worksheet in the order the file stores them. */
-function inlineTexts(xml: string): string[] {
-  return [...xml.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((match) => match[1] ?? "");
+function storedTexts(bytes: Uint8Array): string[] {
+  return [...cellTexts(bytes, "xl/worksheets/sheet1.xml").values()];
 }
 
 describe("sort and XLSX round trips", () => {
@@ -67,8 +68,8 @@ describe("sort and XLSX round trips", () => {
       [{ col: 0, ascending: true }],
       { hasHeader: true },
     );
-    const { xml } = await worksheetXml(store.exportSnapshot());
-    expect(inlineTexts(xml)).toEqual(["Name", "Qty", "apple", "fig", "pear"]);
+    const { bytes, xml } = await worksheetXml(store.exportSnapshot());
+    expect(storedTexts(bytes)).toEqual(["Name", "Qty", "apple", "fig", "pear"]);
     expect(xml).not.toContain("<sortState");
     store.dispose();
   });
@@ -80,7 +81,7 @@ describe("sort and XLSX round trips", () => {
     const { bytes, xml } = await worksheetXml(store.exportSnapshot());
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
 
-    expect(inlineTexts(xml)).toEqual(["Name", "Qty", "pear", "apple", "fig"]);
+    expect(storedTexts(bytes)).toEqual(["Name", "Qty", "pear", "apple", "fig"]);
     expect(xml).toContain('<sortState ref="A1:B4"><sortCondition ref="A1:A4"/></sortState>');
     expect(imported.sheets[0]?.sortKeys).toEqual([{ col: 0, ascending: true }]);
     expect(imported.sheets[0]?.sortState).toBeUndefined();
@@ -137,11 +138,11 @@ describe("sort and XLSX round trips", () => {
     const { bytes } = await worksheetXml(source);
 
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
-    const { xml } = await worksheetXml(imported);
+    const { bytes: written, xml } = await worksheetXml(imported);
 
     expect(imported.sheets[0]?.sortKeys).toBeUndefined();
     expect(imported.sheets[0]?.sortState).toEqual(firstSheet.sortState);
-    expect(inlineTexts(xml)).toEqual(["Name", "Qty", "pear", "apple", "fig"]);
+    expect(storedTexts(written)).toEqual(["Name", "Qty", "pear", "apple", "fig"]);
     expect(xml).toContain(
       '<sortState ref="A2:B4"><sortCondition ref="B2:B4"></sortCondition></sortState>',
     );

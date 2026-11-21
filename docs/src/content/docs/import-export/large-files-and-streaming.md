@@ -26,6 +26,8 @@ await toXlsxWorkbookStream(grid.exportSnapshot(), {
 
 The output contains the same XLSX parts as buffered export. ZIP entry order and container bytes can differ.
 
+Export writes text cells as Excel does, through one shared string table that holds each distinct text once. The table is written after the worksheets, so a stream keeps it in memory until then: its size grows with the number of distinct texts, not with the number of text cells. It holds at most `maxSharedStrings` texts (the import limit, so the file opens again); other distinct texts are written in their cells.
+
 [Try it live: resource-limit failures](/showcases/interoperability/#security). The lab demonstrates typed limits, not a whole-file memory guarantee.
 
 <details>

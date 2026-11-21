@@ -14,6 +14,7 @@ import { xlsxAddon } from "../src/index.js";
 import {
   block,
   book,
+  cellTexts,
   collectWarnings,
   editParts,
   fixture,
@@ -360,9 +361,11 @@ describe("XLSX pivot tables", () => {
     const fresh = { rows: 2, cols: 2, cells: ["Fresh", 1, 2, 3] };
     const refreshed = await toXlsxWorkbook(authored([{ ...pivot, savedOutput: fresh }]));
     const reportPart = "xl/worksheets/sheet2.xml";
-    expect(partText(refreshed, reportPart)).toContain("Fresh");
+    expect([...cellTexts(refreshed, reportPart).values()]).toContain("Fresh");
+    // Excel writes the shared strings again; the Data sheet's strings keep their indices.
     const merged = editParts(blockedBytes, {
       [reportPart]: partText(refreshed, reportPart),
+      "xl/sharedStrings.xml": partText(refreshed, "xl/sharedStrings.xml"),
       [TABLE_ONE]: partText(refreshed, TABLE_ONE),
     });
     const report = sheetNamed(await fromXlsxWorkbook(merged), "Report");

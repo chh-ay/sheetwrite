@@ -432,13 +432,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
     );
     const imported = await backend.fromXlsxWorkbook(
       editParts(await backend.toXlsxWorkbook(source), {
+        "xl/sharedStrings.xml": (xml) => xml.replace(">x</t>", ">native</t>"),
         "xl/worksheets/sheet1.xml": (xml) =>
-          xml
-            .replace(">x</t>", ">native</t>")
-            .replace(
-              '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>',
-              '<pane xSplit="1" topLeftCell="B1" activePane="topRight" state="frozen"/>',
-            ),
+          xml.replace(
+            '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>',
+            '<pane xSplit="1" topLeftCell="B1" activePane="topRight" state="frozen"/>',
+          ),
         "xl/styles.xml": (xml) => xml.replace("<b/>", "<i/>"),
         "xl/workbook.xml": (xml) => xml.replace('name="OldName"', 'name="NewName"'),
         "xl/comments1.xml": (xml) => xml.replace("old note", "new note"),

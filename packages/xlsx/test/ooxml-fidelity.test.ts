@@ -556,7 +556,7 @@ describe("raw spec-authored OOXML fidelity", () => {
   it("escapes SpreadsheetML control tokens without confusing literal escape text", async () => {
     const text = "\u0001_x0041_😀";
     const bytes = await backend.toXlsxWorkbook(book([sheet("s", "Sheet1", [[text]])]));
-    expect(partText(bytes, "xl/worksheets/sheet1.xml")).toContain("_x0001__x005F_x0041_😀");
+    expect(partText(bytes, "xl/sharedStrings.xml")).toContain("_x0001__x005F_x0041_😀");
     expect(valuesOf(await backend.fromXlsxWorkbook(bytes))).toEqual([literal(text)]);
   });
 

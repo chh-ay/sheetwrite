@@ -109,6 +109,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
           { name: "Destination Sheet", xml: worksheet("<sheetData/>") },
         ],
         styles: partText(bytes, "xl/styles.xml"),
+        sharedStrings: partText(bytes, "xl/sharedStrings.xml"),
       }),
     );
     expect(styleAt(imported, 0, 0)).toMatchObject({

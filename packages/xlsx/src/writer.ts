@@ -46,6 +46,7 @@ import {
 import { StylesRegistry } from "./styles.js";
 import { quotedSheet, type SpillOutput } from "./writer-cells.js";
 import { writeSheet, type SheetWriteResult } from "./writer-sheet.js";
+import { SHARED_STRINGS_CONTENT, SHARED_STRINGS_REL, SharedStringTable } from "./writer-strings.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip, zipChunks, type ZipPart } from "./zip.js";
 
@@ -466,6 +467,8 @@ function* writeWorkbookParts(
     hook?.externalBooks ?? [],
   );
   context.externalFormula = (formula) => links.fileFormula(formula);
+  const sharedStrings = new SharedStringTable(context.limits.maxSharedStrings);
+  context.sharedStrings = sharedStrings;
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
   if (ordered.some((sheet) => sheet.kind === "dashboard")) warnStaticDashboards(context);
   const styles = new StylesRegistry(context);
@@ -604,6 +607,16 @@ function* writeWorkbookParts(
       id: `rId${workbookRelationships.length + 1}`,
       type: SHEET_METADATA_REL,
       target: "metadata.xml",
+    });
+  }
+  // The worksheets are written, so the table is complete.
+  if (sharedStrings.size > 0) {
+    yield { name: "xl/sharedStrings.xml", data: sharedStrings.xml(context) };
+    overrides.push({ part: "xl/sharedStrings.xml", contentType: SHARED_STRINGS_CONTENT });
+    workbookRelationships.push({
+      id: `rId${workbookRelationships.length + 1}`,
+      type: SHARED_STRINGS_REL,
+      target: "sharedStrings.xml",
     });
   }
   yield { name: "xl/styles.xml", data: styles.toXml() };

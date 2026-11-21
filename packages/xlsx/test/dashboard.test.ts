@@ -5,6 +5,7 @@ import { type DashboardExport, initSheetwrite, type WorkbookSnapshot } from "@sh
 import { sheetwriteWorkbookBackend as backend } from "../src/index.js";
 import {
   book,
+  cellTexts,
   collectWarnings,
   partNames,
   partText,
@@ -139,6 +140,7 @@ it("writes a dashboard as a worksheet of its values and a chart, and opens it as
   const bytes = await backend.toXlsxWorkbook(snapshot(), { onWarning }, { dashboards: DASHBOARDS });
 
   const xml = partText(bytes, "xl/worksheets/sheet2.xml");
+  const texts = cellTexts(bytes, "xl/worksheets/sheet2.xml");
   // Each item starts at its box: the pivot at A1, the slicer at E1, the KPI card at G1.
   for (const [ref, value] of [
     ["A1", "By region"],
@@ -146,10 +148,8 @@ it("writes a dashboard as a worksheet of its values and a chart, and opens it as
     ["E1", "Region"],
     ["E2", "West"],
     ["G1", "Total"],
-  ]) {
-    expect(xml).toMatch(
-      new RegExp(`<c r="${ref}"[^>]*t="inlineStr"[^>]*><is><t[^>]*>${value}</t></is></c>`, "u"),
-    );
+  ] as const) {
+    expect(texts.get(ref)).toBe(value);
   }
   expect(xml).toMatch(/<c r="B3"[^>]*><v>2<\/v><\/c>/u);
   expect(xml).toMatch(/<c r="G2"[^>]*><v>2<\/v><\/c>/u);

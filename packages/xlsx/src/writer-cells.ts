@@ -126,6 +126,10 @@ export function cellXml(
   }
   if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
   if (typeof value.value === "string") {
+    const index = context.sharedStrings?.index(value.value);
+    if (index !== undefined) {
+      return `<c r="${reference}"${styleAttribute} t="s"><v>${index}</v></c>`;
+    }
     return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(value.value))}</t></is></c>`;
   }
   if (typeof value.value === "boolean") {

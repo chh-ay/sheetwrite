@@ -9,6 +9,8 @@ import {
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 
+import type { SharedStringTable } from "./writer-strings.js";
+
 export interface XlsxCodecContext {
   readonly operation: "import" | "export";
   readonly limits: Readonly<XlsxResourceLimits>;
@@ -25,6 +27,8 @@ export interface XlsxCodecContext {
   dynamicArrayMetadata?: ReadonlySet<string>;
   /** On export, the file spelling of a formula that names linked workbooks (`[1]` for `[Budget.xlsx]`). */
   externalFormula?: (formula: string) => string;
+  /** On export, the table that worksheet text cells refer to. */
+  sharedStrings?: SharedStringTable;
 }
 
 /** Warnings one conversion reports, so a hostile file cannot flood the host callback. */

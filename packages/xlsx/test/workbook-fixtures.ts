@@ -137,6 +137,30 @@ export function partText(bytes: Uint8Array, name: string): string {
   return strFromU8(part);
 }
 
+/**
+ * The text cells of worksheet `part` in file order, by reference, as escaped XML text: shared
+ * strings through `xl/sharedStrings.xml`, inline strings as written.
+ */
+export function cellTexts(bytes: Uint8Array, part: string): Map<string, string> {
+  const files = unzipSync(bytes);
+  const sharedStrings = strFromU8(files["xl/sharedStrings.xml"] ?? new Uint8Array(0));
+  const shared = [...sharedStrings.matchAll(/<si><t[^>]*>(.*?)<\/t><\/si>/gsu)].map(
+    (match) => match[1] ?? "",
+  );
+  const worksheet = strFromU8(files[part] ?? new Uint8Array(0));
+  const texts = new Map<string, string>();
+  for (const [, reference = "", type, body = ""] of worksheet.matchAll(
+    /<c r="([A-Z]+\d+)"[^>]*? t="(s|inlineStr)"[^>]*>(.*?)<\/c>/gsu,
+  )) {
+    const text = /<t[^>]*>(.*?)<\/t>/su.exec(body)?.[1];
+    texts.set(
+      reference,
+      type === "s" ? (shared[Number(/<v>(\d+)<\/v>/u.exec(body)?.[1])] ?? "") : (text ?? ""),
+    );
+  }
+  return texts;
+}
+
 export function partNames(bytes: Uint8Array): string[] {
   return Object.keys(unzipSync(bytes));
 }
