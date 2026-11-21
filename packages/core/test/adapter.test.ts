@@ -92,7 +92,7 @@ describe("shared adapter option policy", () => {
 
     expect(controller.grid).toBe(originalGrid);
     expect(originalGrid.getEffectiveTheme().bg).toBe("#123456");
-    expect(host.getAttribute("aria-readonly")).toBe("true");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-readonly")).toBe("true");
     expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
     originalGrid.applyTransaction({
       patches: [{ op: "set", addr, value: { kind: "literal", value: "blocked" } }],
@@ -103,7 +103,7 @@ describe("shared adapter option policy", () => {
     originalGrid.applyTransaction({
       patches: [{ op: "set", addr, value: { kind: "literal", value: "editable" } }],
     });
-    expect(host.hasAttribute("aria-readonly")).toBe(false);
+    expect(host.querySelector('[role="grid"]')?.hasAttribute("aria-readonly")).toBe(false);
     expect(originalGrid.store.getCell(addr).resolved).toBe("editable");
 
     controller.destroy();

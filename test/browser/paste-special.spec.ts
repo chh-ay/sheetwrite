@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { expect, test } from "./fixtures.js";
+import { expect, nextFrames, test } from "./fixtures.js";
 
 // Excel's Paste Special in a browser build: Ctrl+Alt+V, the dialog's letter
 // keys, the Paste menu and the context menu's Paste Options row.
@@ -38,6 +38,10 @@ async function numbers(page: Page): Promise<void> {
     });
   });
   await page.locator(".sheetwrite").first().focus();
+  // Focus scrolls the page to show the grid, and the browser sends that
+  // scroll event at its next rendering update. A context menu closes on any
+  // scroll, so a right-click before then saw its menu close (#962, #1014).
+  await nextFrames(page);
 }
 
 test("Ctrl+Alt+V opens Paste Special, whose letter keys choose @portability", async ({ page }) => {

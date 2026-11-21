@@ -44,7 +44,6 @@ import {
   FRAMEWORK_PROOF_ART,
   VANILLA_PROOF_ART,
 } from "../proof-art.js";
-import { SectionMark, type SectionMarkName } from "../section-marks.js";
 
 const params = new URLSearchParams(location.search);
 if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
@@ -373,7 +372,6 @@ function Parts() {
 
 /** Every docs picture, each under a `data-part` name, for the docs mockups. */
 function DocParts() {
-  const marks: readonly SectionMarkName[] = ["guides", "api", "formulas", "changelog"];
   const parts: readonly (readonly [string, () => JSX.Element])[] = [
     ...Object.entries(DOCS_CARD_ART).map(([id, Art]) => [`card:${id}`, () => <Art />] as const),
     ...Object.entries(DOCS_DIAGRAMS).map(
@@ -397,7 +395,6 @@ function DocParts() {
     ...Object.entries(RELEASE_DIAGRAMS).map(
       ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
     ),
-    ...marks.map((name) => [`mark:${name}`, () => <SectionMark name={name} />] as const),
   ];
   return (
     <main>

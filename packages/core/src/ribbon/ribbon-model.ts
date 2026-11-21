@@ -500,6 +500,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Home",
+    opensFirst: true,
     reduceOrder: ["editing", "cells", "number", "alignment", "clipboard", "font", "undo"],
     groups: [
       {

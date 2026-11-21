@@ -213,7 +213,7 @@ export class Ribbon {
     this.updateMinimizeButton();
     this.updateLayout();
     this.updateAvailability();
-    this.selectTab(this.firstShownTab(), false);
+    this.selectTab(this.openingTab(), false);
   }
 
   /** Height the owner reserves above the grid. */
@@ -410,7 +410,7 @@ export class Ribbon {
     }
     if (!changed) return;
 
-    if (this.tabs[this.activeTab]?.hidden === true) this.selectTab(this.firstShownTab(), false);
+    if (this.tabs[this.activeTab]?.hidden === true) this.selectTab(this.openingTab(), false);
     this.fittedWidth = -1;
     this.scheduleFit();
   }
@@ -434,7 +434,11 @@ export class Ribbon {
     return changed;
   }
 
-  private firstShownTab(): number {
+  /** Home while it shows, as in Excel, where File comes first but the ribbon opens on Home; else the first tab shown. */
+  private openingTab(): number {
+    const shown = (index: number) => this.tabs[index]?.hidden === false;
+    const home = this.tabSpecs.findIndex((spec, index) => spec.opensFirst === true && shown(index));
+    if (home !== -1) return home;
     return Math.max(
       0,
       this.tabs.findIndex((tab) => !tab.hidden),
