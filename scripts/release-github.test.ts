@@ -59,18 +59,9 @@ const changelogs: Readonly<Record<string, string>> = {
       provenance,
     ],
   }),
-  "@sheetwrite/queries": changelog("@sheetwrite/queries", {
-    "Patch Changes": [provenance, dependencyUpdate],
-  }),
   "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
     "Minor Changes": [dependencyUpdate],
     "Patch Changes": [provenance],
-  }),
-  "@sheetwrite/charts": changelog("@sheetwrite/charts", {
-    "Patch Changes": [provenance, dependencyUpdate],
-  }),
-  "@sheetwrite/formula-assist": changelog("@sheetwrite/formula-assist", {
-    "Patch Changes": [provenance, dependencyUpdate],
   }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
     "Patch Changes": [
@@ -80,18 +71,14 @@ const changelogs: Readonly<Record<string, string>> = {
       dependencyUpdate,
     ],
   }),
-  "@sheetwrite/vue": changelog("@sheetwrite/vue", {
-    "Patch Changes": [provenance, dependencyUpdate],
-  }),
   "@sheetwrite/svelte": changelog("@sheetwrite/svelte", {
     "Patch Changes": [dependencyUpdate, provenance],
   }),
 };
 
+/** Packages without their own fixture got only the shared provenance fix and a dependency update. */
 async function changelogFor(name: string): Promise<string> {
-  const text = changelogs[name];
-  if (text === undefined) throw new Error(`No fixture CHANGELOG for ${name}`);
-  return text;
+  return changelogs[name] ?? changelog(name, { "Patch Changes": [provenance, dependencyUpdate] });
 }
 
 const expectedNotes = `## All packages

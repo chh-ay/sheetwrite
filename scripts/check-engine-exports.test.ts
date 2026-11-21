@@ -92,18 +92,16 @@ test("engine caller audit resolves aliases, getters and structural callers but r
     }
     const audit = await auditEngineExports(root);
     expect(audit.issues).toHaveLength(5);
-    expect(audit.issues.join("\n")).toContain("CellStore.unused has no package/test/bench caller");
-    expect(audit.issues.join("\n")).toContain(
-      "CellStore.missingReason has no package/test/bench caller",
-    );
-    expect(audit.issues.join("\n")).toContain(
-      "UnusedStore.constructor has no package/test/bench caller",
-    );
-    expect(audit.issues.join("\n")).toContain(
-      "packages/wasm/src/lib.rs:5: exported Rust function needs a camelCase js_name",
-    );
-    expect(audit.issues.join("\n")).toContain(
-      "packages/wasm/src/lib.rs:19: exported Rust function needs a camelCase js_name",
+    expect(audit.issues).toEqual(
+      expect.arrayContaining(
+        [
+          "CellStore.unused has no package/test/bench caller",
+          "CellStore.missingReason has no package/test/bench caller",
+          "UnusedStore.constructor has no package/test/bench caller",
+          "packages/wasm/src/lib.rs:5: exported Rust function needs a camelCase js_name",
+          "packages/wasm/src/lib.rs:19: exported Rust function needs a camelCase js_name",
+        ].map((issue) => expect.stringContaining(issue)),
+      ),
     );
     expect(
       audit.exports.find((entry) => entry.name === "CellStore.allocatorStats")?.publicReason,

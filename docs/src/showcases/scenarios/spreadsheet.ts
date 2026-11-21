@@ -17,7 +17,7 @@ import { siteGridTheme } from "../site-grid-theme.js";
 // command has real numbers, dates and text to act on.
 
 export const SALES_SHEET = "sales";
-export const SUMMARY_SHEET = "summary";
+const SUMMARY_SHEET = "summary";
 export const TARGETS_SHEET = "targets";
 export const SALES_ROWS = 48;
 
@@ -131,7 +131,7 @@ const style = (
 });
 
 /** One order per row; deterministic so tests and screenshots are stable. */
-export function salesOrder(index: number) {
+function salesOrder(index: number) {
   const product = PRODUCTS[(index * 3) % PRODUCTS.length] ?? PRODUCTS[0];
   return {
     serial: FIRST_ORDER_SERIAL + index * DAYS_BETWEEN_ORDERS,

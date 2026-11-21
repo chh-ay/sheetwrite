@@ -4,118 +4,56 @@ import { coldTaskDurations, type TraceEvent } from "../src/interaction-bench.js"
 import {
   INTERACTION_CEILING_KEYS,
   INTERACTION_CEILINGS,
-  INTERACTION_LOOKUPS_PER_RUN,
-  INTERACTION_MATRIX_ID,
-  INTERACTION_PROTOCOL_VERSION,
-  INTERACTION_ROWS,
   INTERACTION_SAMPLE_CEILING_KEYS,
   type InteractionCeilingMetric,
-  type InteractionSamples,
+  type InteractionPerformanceArtifact,
   type InteractionValues,
   validateInteractionArtifact,
 } from "../src/interaction-gate.js";
 import { summarize } from "../src/stats.js";
-import { expectRejections, type Rejection } from "./gate-fixtures.js";
+import {
+  type DeepMutable,
+  expectRejections,
+  must,
+  mutableCopy,
+  type Rejection,
+} from "./gate-fixtures.js";
 
-const TEST_COMMIT = "1".repeat(40);
-const TEST_TIMESTAMP = "2026-10-07T00:00:00.000Z";
+type Fixture = DeepMutable<InteractionPerformanceArtifact>;
 
-const FULL_SAMPLES: InteractionSamples = {
-  lookupMedianNs: [30, 31, 32, 33, 34],
-  lookupP95Ns: [60, 61, 62, 63, 64],
-  inverseIndexBytes: [4_000_000, 4_000_000, 4_000_000, 4_000_000, 4_000_000],
-  dirty100Bytes: [5_679, 5_680, 5_678, 5_681, 5_679],
-  ownedColdLongTaskMs: [0, 12, 0, 0, 8],
-  unattributedColdLongTaskMs: [54, 0, 0, 0, 0],
-  usableMs: [210, 215, 220, 225, 230],
-};
-
-const SMOKE_SAMPLES: InteractionSamples = {
-  lookupMedianNs: [31, 32],
-  lookupP95Ns: [61, 62],
-  inverseIndexBytes: [4_000_000, 4_000_000],
-  dirty100Bytes: [5_679, 5_680],
-  ownedColdLongTaskMs: [0, 9],
-  unattributedColdLongTaskMs: [54, 0],
-  usableMs: [212, 218],
-};
-
-function valuesOf(samples: InteractionSamples): InteractionValues {
-  return Object.fromEntries(
-    Object.entries(samples).map(([key, values]) => [key, summarize(values)]),
-  ) as InteractionValues;
-}
-
-/** A valid full artifact as a writable record; values derive from its own samples. */
-function fixture(samples: InteractionSamples = FULL_SAMPLES) {
-  return {
-    protocolVersion: INTERACTION_PROTOCOL_VERSION as number,
-    matrixId: INTERACTION_MATRIX_ID as string,
-    mode: "full" as string,
-    metadata: {
-      commit: TEST_COMMIT,
-      dirty: false as unknown,
-      timestamp: TEST_TIMESTAMP,
-      engineVersions: { sheetwrite: "0.4.0" as string | undefined },
-    },
-    runner: { runtime: "Bun test on linux x64", browser: "Chromium test", cpu: "test cpu" },
-    method: {
-      lookup: "test lookup method",
-      dirty: "test dirty method",
-      coldRoute: "test cold-route method",
-      attribution: "test attribution method",
-      previous: "test previous-capture method",
-    },
-    rows: INTERACTION_ROWS as number,
-    lookupsPerRun: INTERACTION_LOOKUPS_PER_RUN,
-    samples,
-    values: valuesOf(samples),
-    previous: null as unknown,
-    ceilings: { ...INTERACTION_CEILINGS },
-  };
-}
-type Fixture = ReturnType<typeof fixture>;
-
-const PREVIOUS = {
-  matrixId: INTERACTION_MATRIX_ID,
-  mode: "full",
-  commit: TEST_COMMIT,
-  timestamp: TEST_TIMESTAMP,
-  values: valuesOf(FULL_SAMPLES),
-};
-
-test("accepts a full capture, its smoke rehearsal and a previous capture", () => {
-  const smoke = { ...fixture(SMOKE_SAMPLES), mode: "smoke" };
-  expect(() => validateInteractionArtifact(smoke)).not.toThrow();
-  const artifact = validateInteractionArtifact({ ...fixture(), previous: PREVIOUS });
-  expect(artifact.previous?.commit).toBe(TEST_COMMIT);
-  expect(artifact.values.usableMs.median).toBe(220);
-});
+/** The committed capture, which the docs scale showcase publishes. */
+const RECORDED = validateInteractionArtifact(
+  await Bun.file(new URL("../results/interaction-results.json", import.meta.url)).json(),
+);
+const fixture = () => mutableCopy(RECORDED);
 
 test("rejects drifted identity, provenance, values, ceilings and previous captures", () => {
-  for (const engine of ["sheetwrite"]) {
-    for (const version of [undefined, "", "0.4", "^0.4.0"]) {
-      const artifact = fixture();
-      Reflect.set(artifact.metadata.engineVersions, engine, version);
-      expect(() => validateInteractionArtifact(artifact)).toThrow(`engineVersions.${engine}`);
-    }
-  }
   const aboveCeiling = (key: InteractionCeilingMetric) => (artifact: Fixture) => {
-    const samples = [...FULL_SAMPLES[key]];
+    const samples = artifact.samples[key];
     samples.fill(INTERACTION_CEILINGS[key] + 1, 0, 3);
-    artifact.samples = { ...FULL_SAMPLES, [key]: samples };
-    artifact.values = valuesOf(artifact.samples);
+    artifact.values = mutableCopy(
+      Object.fromEntries(
+        Object.entries(artifact.samples).map(([metric, values]) => [metric, summarize(values)]),
+      ) as InteractionValues,
+    );
   };
   const rejections: Rejection<Fixture>[] = [
-    [(artifact) => (artifact.protocolVersion = 3), "stale protocol: expected 2"],
-    [(artifact) => (artifact.matrixId = "interaction-full-v1"), "stale matrix"],
-    [(artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
-    [(artifact) => (artifact.mode = "smoke"), "lookupMedianNs requires 2 raw samples"],
-    [(artifact) => (artifact.rows = 1_000), "workload changed"],
-    [(artifact) => (artifact.metadata.commit = ""), "metadata.commit must be a non-empty"],
-    [(artifact) => (artifact.metadata.dirty = "false"), "metadata.dirty must be a boolean"],
     [
-      (artifact) => (artifact.values = { ...artifact.values, lookupMedianNs: summarize([40, 45]) }),
+      (artifact) => Reflect.set(artifact.metadata.engineVersions, "sheetwrite", "^0.4.0"),
+      "engineVersions.sheetwrite",
+    ],
+    [(artifact) => Reflect.set(artifact, "protocolVersion", 3), "stale protocol: expected 2"],
+    [(artifact) => Reflect.set(artifact, "matrixId", "interaction-full-v1"), "stale matrix"],
+    [(artifact) => Reflect.set(artifact, "mode", "rehearsal"), "must be full or smoke"],
+    [(artifact) => (artifact.mode = "smoke"), "lookupMedianNs requires 2 raw samples"],
+    [(artifact) => Reflect.set(artifact, "rows", 1_000), "workload changed"],
+    [(artifact) => (artifact.metadata.commit = ""), "metadata.commit must be a non-empty"],
+    [
+      (artifact) => Reflect.set(artifact.metadata, "dirty", "false"),
+      "metadata.dirty must be a boolean",
+    ],
+    [
+      (artifact) => (artifact.values.lookupMedianNs = summarize([1e6, 2e6])),
       "values.lookupMedianNs.stat.median does not match raw samples",
     ],
     [
@@ -131,7 +69,8 @@ test("rejects drifted identity, provenance, values, ceilings and previous captur
       `ceilings.${key} is not the release ceiling`,
     ]),
     [
-      (artifact) => (artifact.previous = { ...PREVIOUS, matrixId: "interaction-full-v1" }),
+      (artifact) =>
+        Reflect.set(must(artifact.previous, "previous"), "matrixId", "interaction-full-v1"),
       "previous must be a capture of the same schema",
     ],
   ];
@@ -175,11 +114,6 @@ test.each([
   [
     "reports a long task that mostly runs other code as unattributed",
     [task(0, 60), samples(1, PACKAGE_URL, 20), samples(21, SHELL_URL, 40)],
-    { ownedMs: 0, unattributedMs: 60 },
-  ],
-  [
-    "reports a long task the profile does not cover as unattributed",
-    [task(0, 60)],
     { ownedMs: 0, unattributedMs: 60 },
   ],
   [

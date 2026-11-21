@@ -2,6 +2,117 @@
 
 use super::*;
 
+/// Formula evaluations that `recalculate` runs.
+fn evaluations(recalculate: impl FnOnce()) -> usize {
+    crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+    recalculate();
+    crate::eval::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
+}
+
+/// One sheet of 100 rows whose column B doubles column A.
+fn doubling_sheet() -> (CellStore, usize) {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 100);
+    for row in 0..100 {
+        store.set_number(sheet, row, 0, row as f64, 0);
+        store.set_formula(sheet, row, 1, &format!("=A{}*2", row + 1), 0);
+    }
+    store.commit_sources();
+    (store, sheet)
+}
+
+#[test]
+fn a_remote_number_recalculates_only_its_reader() {
+    let (mut store, sheet) = doubling_sheet();
+    let runs = evaluations(|| {
+        store.begin_remote_load();
+        let status = store.set_sparse_block(
+            sheet,
+            5,
+            0,
+            1,
+            1,
+            &[0],
+            &[KIND_NUMBER],
+            &[50.0],
+            &[],
+            &[0],
+            &[0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        );
+        store.commit_sources();
+        assert_eq!(status, BLOCK_OK);
+    });
+    assert_eq!(runs, 1);
+    assert_eq!(store.get_cell(sheet, 5, 1).num(), 100.0);
+}
+
+#[test]
+fn a_remote_formula_recalculates_only_itself() {
+    let (mut store, sheet) = doubling_sheet();
+    let runs = evaluations(|| {
+        store.begin_remote_load();
+        let status = store.set_sparse_block(
+            sheet,
+            7,
+            1,
+            1,
+            1,
+            &[0],
+            &[KIND_EMPTY],
+            &[0.0],
+            &[],
+            &[0],
+            &[0],
+            &[0],
+            vec!["=A8*3".into()],
+            &[],
+            &[],
+        );
+        store.commit_sources();
+        assert_eq!(status, BLOCK_OK);
+    });
+    assert_eq!(runs, 1);
+    assert_eq!(store.get_cell(sheet, 7, 1).num(), 21.0);
+}
+
+#[test]
+fn a_wide_remote_write_recalculates_each_formula_once() {
+    let (mut store, sheet) = doubling_sheet();
+    // B1 becomes a number, so the 100 cells written below outnumber the
+    // sheet's 99 formulas.
+    store.set_number(sheet, 0, 1, 0.0, 0);
+    store.commit_sources();
+    let offsets: Vec<u32> = (0..100).map(|row| row * 2).collect();
+    let runs = evaluations(|| {
+        store.begin_remote_load();
+        let status = store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            100,
+            2,
+            &offsets,
+            &[KIND_NUMBER; 100],
+            &[1.0; 100],
+            &[],
+            &[0],
+            &[0; 100],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        );
+        store.commit_sources();
+        assert_eq!(status, BLOCK_OK);
+    });
+    assert_eq!(runs, 99);
+    assert_eq!(store.get_cell(sheet, 99, 1).num(), 2.0);
+}
+
 #[test]
 fn sparse_dense_columns_retire_covered_formulas_and_recompute_readers() {
     let mut store = CellStore::new();

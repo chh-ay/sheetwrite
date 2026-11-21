@@ -140,7 +140,7 @@ function nonNegativeIntegerArgument(
 }
 
 /** The Markdown view written beside a JSON artifact: `x.json` → `x.md`, any other name gains `.md`. */
-export function markdownPathFor(jsonPath: string): string {
+function markdownPathFor(jsonPath: string): string {
   return jsonPath.endsWith(".json") ? `${jsonPath.slice(0, -".json".length)}.md` : `${jsonPath}.md`;
 }
 

@@ -127,11 +127,20 @@ const auditedExport: SheetwriteAddon = {
 await initSheetwrite({ addons: [xlsxAddon(), auditedExport] });
 ```
 
-Hosts can implement `XlsxWorkbookBackend`, `XlsxTableExportBackend`, or `XlsxTableImportBackend` to replace a role. `@sheetwrite/xlsx` is the only concrete implementation package. Its bounded OOXML codec owns OPC part resolution, XML tokenization, styles and worksheet mapping over the audited compression primitive `fflate`.
+Hosts can implement `XlsxWorkbookBackend`, `XlsxTableExportBackend`, or `XlsxTableImportBackend` to replace a role. `@sheetwrite/xlsx` is the only concrete implementation package. Its bounded OOXML codec owns OPC part resolution, XML tokenization, styles and worksheet mapping over the audited compression primitive `fflate`. Import inflates ZIP entries with the runtime's `DecompressionStream` when it has one; when that rejects an entry, `fflate` reads the entry again and decides, so the files that import do not depend on the runtime.
 
 ## Options and limits
 
 All XLSX paths share `XlsxWorkbookOptions`: `maxCells`, `resourceLimits`, `signal` and `onWarning`. See [resource limits and streaming](/docs/import-export/large-files-and-streaming/#resource-limits) before increasing a budget. Buffered export holds its output in memory.
+
+Export also takes `compression`, which import ignores:
+
+| `compression` | Result |
+| --- | --- |
+| `"deterministic"` (default) | The bundled `fflate` codec compresses the file. One workbook gives the same bytes in every runtime. |
+| `"native"` | The runtime's `CompressionStream` compresses the file where it has one, `fflate` elsewhere. Export is faster: a 50,000-row workbook took 12% less time in Bun and 29% less in Node. The compressed bytes differ between runtimes and can change when the runtime is updated. |
+
+With either value the file holds the same parts, and Excel reads the same workbook from it. Use `"native"` when export speed matters more than identical bytes, for example for downloads; keep the default when you compare or hash saved files. `toXlsxWorkbook`, `toXlsxWorkbookStream`, `toXlsxTable` and `toXlsxTableStream` all take it.
 
 ## See also
 

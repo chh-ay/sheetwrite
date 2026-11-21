@@ -1,4 +1,4 @@
-import type { CellBorder, CellStyle, CellVerticalAlign } from "@sheetwrite/core";
+import type { CellBorder, CellStyle, CellVerticalAlign, SheetSnapshot } from "@sheetwrite/core";
 import { isCellFontFamily } from "@sheetwrite/core";
 
 import { DRAWINGML_NAMESPACES, MAIN_NAMESPACES, MAIN_NS } from "./format.js";
@@ -483,6 +483,14 @@ function differentialXml(style: CellStyle): string {
   return `${xml}</dxf>`;
 }
 
+type SheetColumn = SheetSnapshot["columns"][number];
+
+/** One column's cell style ids: without a cell style, and by cell style object. */
+interface ColumnStyleIds {
+  plain?: number;
+  readonly styled: WeakMap<CellStyle, number>;
+}
+
 /** Deterministic style table shared by table and workbook writers. */
 export class StylesRegistry {
   readonly #context: XlsxCodecContext;
@@ -492,6 +500,7 @@ export class StylesRegistry {
   readonly #differentialIds = new Map<string, number>();
   readonly #customFormats: string[] = [];
   readonly #customFormatIds = new Map<string, number>();
+  readonly #columnStyleIds = new WeakMap<SheetColumn, ColumnStyleIds>();
 
   constructor(context: XlsxCodecContext) {
     this.#context = context;
@@ -533,6 +542,32 @@ export class StylesRegistry {
     this.#styles.push({ style: cleanedStyle, numberFormat: cleanedFormat });
     this.#styleIds.set(key, id);
     return id;
+  }
+
+  /**
+   * The style id of a cell in `column`: the cell's style over the column's.
+   * Snapshots share style objects between cells, so each pair of column and
+   * style object is registered once.
+   */
+  cellStyleId(column: SheetColumn, style: CellStyle | undefined): number {
+    let ids = this.#columnStyleIds.get(column);
+    if (ids === undefined) {
+      ids = { styled: new WeakMap() };
+      this.#columnStyleIds.set(column, ids);
+    }
+    if (style === undefined) return (ids.plain ??= this.#registerCell(column, undefined));
+    let id = ids.styled.get(style);
+    if (id === undefined) {
+      id = this.#registerCell(column, style);
+      ids.styled.set(style, id);
+    }
+    return id;
+  }
+
+  #registerCell(column: SheetColumn, style: CellStyle | undefined): number {
+    const merged: CellStyle = { ...column.cellStyle, ...style };
+    const hasStyle = Object.keys(merged).length > 0;
+    return this.register(hasStyle ? merged : undefined, merged.numberFormat ?? column.numberFormat);
   }
 
   registerDifferential(style: CellStyle): number {

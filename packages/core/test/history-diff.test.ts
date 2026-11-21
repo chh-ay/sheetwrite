@@ -114,16 +114,16 @@ class Authority {
   }
 }
 
-/** Changes of one page as readable rows. */
+/** Changes of one page as [sheet, row, col, beforeRow, flags, author] rows. */
 function rows(page: HistoryDiffPage) {
-  return Array.from(page.cells.flags, (flags, at) => ({
-    sheet: page.sheetIds[page.cells.sheet[at] ?? 0],
-    row: page.cells.row[at],
-    col: page.cells.col[at],
-    beforeRow: page.cells.beforeRow[at],
+  return Array.from(page.cells.flags, (flags, at) => [
+    page.sheetIds[page.cells.sheet[at] ?? 0],
+    page.cells.row[at],
+    page.cells.col[at],
+    page.cells.beforeRow[at],
     flags,
-    author: page.authors[page.cells.author[at] ?? HISTORY_DIFF_NONE] ?? null,
-  }));
+    page.authors[page.cells.author[at] ?? HISTORY_DIFF_NONE] ?? null,
+  ]);
 }
 
 async function diff(authority: Authority, request: HistoryDiffRequest): Promise<HistoryDiffPage> {
@@ -153,23 +153,9 @@ describe("history diff", () => {
     const page = await diff(authority, { from: start.id, to: end.id });
 
     expect(rows(page)).toEqual([
-      {
-        sheet: "data",
-        row: 0,
-        col: 0,
-        beforeRow: 0,
-        flags: HistoryDiffFlag.value,
-        author: "alice",
-      },
-      {
-        sheet: "data",
-        row: 1,
-        col: 1,
-        beforeRow: 1,
-        flags: HistoryDiffFlag.added | HistoryDiffFlag.formula,
-        author: "bob",
-      },
-      { sheet: "data", row: 2, col: 0, beforeRow: 2, flags: HistoryDiffFlag.style, author: "bob" },
+      ["data", 0, 0, 0, HistoryDiffFlag.value, "alice"],
+      ["data", 1, 1, 1, HistoryDiffFlag.added | HistoryDiffFlag.formula, "bob"],
+      ["data", 2, 0, 2, HistoryDiffFlag.style, "bob"],
     ]);
     expect(page.details[0]).toMatchObject({ before: { value: 1 }, after: { value: 100 } });
     expect(page.details[1]).toMatchObject({ after: { formula: "=A1*2", value: 200 } });
@@ -199,22 +185,8 @@ describe("history diff", () => {
     const page = await diff(authority, { from: start.id, to: end.id });
 
     expect(rows(page)).toEqual([
-      {
-        sheet: "data",
-        row: 0,
-        col: 1,
-        beforeRow: HISTORY_DIFF_NONE,
-        flags: HistoryDiffFlag.added,
-        author: "alice",
-      },
-      {
-        sheet: "data",
-        row: 4,
-        col: 1,
-        beforeRow: 3,
-        flags: HistoryDiffFlag.value,
-        author: "carol",
-      },
+      ["data", 0, 1, HISTORY_DIFF_NONE, HistoryDiffFlag.added, "alice"],
+      ["data", 4, 1, 3, HistoryDiffFlag.value, "carol"],
     ]);
   });
 
@@ -236,15 +208,8 @@ describe("history diff", () => {
     const page = await diff(authority, { from: start.id, to: end.id });
 
     expect(rows(page)).toEqual([
-      { sheet: "data", row: 3, col: 0, beforeRow: 3, flags: HistoryDiffFlag.value, author: "bob" },
-      {
-        sheet: "data",
-        row: 5,
-        col: 0,
-        beforeRow: 5,
-        flags: HistoryDiffFlag.removed,
-        author: "carol",
-      },
+      ["data", 3, 0, 3, HistoryDiffFlag.value, "bob"],
+      ["data", 5, 0, 5, HistoryDiffFlag.removed, "carol"],
     ]);
     expect(page.details[0]?.writers.map((index) => page.authors[index])).toEqual(["alice", "bob"]);
   });
@@ -279,16 +244,7 @@ describe("history diff", () => {
       { sheet: "notes", name: "Notes", change: "removed", fields: [], author: 0 },
     ]);
     expect(page.authors).toEqual(["alice", "bob", "carol"]);
-    expect(rows(page)).toEqual([
-      {
-        sheet: "extra",
-        row: 1,
-        col: 0,
-        beforeRow: HISTORY_DIFF_NONE,
-        flags: HistoryDiffFlag.added,
-        author: "bob",
-      },
-    ]);
+    expect(rows(page)).toEqual([["extra", 1, 0, HISTORY_DIFF_NONE, HistoryDiffFlag.added, "bob"]]);
   });
 
   it("compares styles by content when the versions come from different checkpoints", async () => {
@@ -316,8 +272,8 @@ describe("history diff", () => {
     const page = await diff(authority, { from: start.id, to: end.id });
 
     expect(rows(page)).toEqual([
-      { sheet: "data", row: 0, col: 2, beforeRow: 0, flags: HistoryDiffFlag.style, author: "bob" },
-      { sheet: "data", row: 1, col: 2, beforeRow: 1, flags: HistoryDiffFlag.added, author: "bob" },
+      ["data", 0, 2, 0, HistoryDiffFlag.style, "bob"],
+      ["data", 1, 2, 1, HistoryDiffFlag.added, "bob"],
     ]);
     expect(page.logComplete).toBe(true);
   });
@@ -336,7 +292,7 @@ describe("history diff", () => {
     let pages = 0;
     do {
       const page = await diff(authority, { from: start.id, to: end.id, maxEntries: 5, cursor });
-      seen.push(...rows(page).map((change) => `${change.row}:${change.col}`));
+      seen.push(...rows(page).map(([, row, col]) => `${row}:${col}`));
       cursor = page.cursor;
       pages += 1;
     } while (cursor);
@@ -354,7 +310,7 @@ describe("history diff", () => {
     const end = await authority.save("End");
 
     const first = await diff(authority, { from: start.id, to: end.id, maxEntries: 1 });
-    expect(rows(first).map((change) => [change.row, change.col])).toEqual([[10, 2]]);
+    expect(rows(first).map(([, row, col]) => [row, col])).toEqual([[10, 2]]);
 
     const second = await diff(authority, {
       from: start.id,
@@ -362,7 +318,7 @@ describe("history diff", () => {
       maxEntries: 1,
       cursor: first.cursor,
     });
-    expect(rows(second).map((change) => [change.row, change.col])).toEqual([[39_000, 1]]);
+    expect(rows(second).map(([, row, col]) => [row, col])).toEqual([[39_000, 1]]);
     expect(second.cursor?.row).toBeGreaterThan(0);
   });
 

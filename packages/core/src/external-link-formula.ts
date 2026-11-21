@@ -86,36 +86,33 @@ function isExternalBook(formula: string, open: number, end: number): boolean {
  * @returns `true` when the formula names another workbook or calls a live-data function.
  */
 export function formulaContainsExternalReference(formula: string): boolean {
+  // Quoted text and bracketed names become one space each in `executable`;
+  // the characters between them are copied in runs, not one at a time.
   let executable = "";
+  let copied = 0;
   let index = 0;
   while (index < formula.length) {
     const char = formula.charAt(index);
-    if (char === '"') {
-      executable += " ";
-      index = closingQuote(formula, index, '"');
+    if (char !== '"' && char !== "'" && char !== "[") {
+      index += 1;
       continue;
     }
 
-    if (char === "'") {
+    executable += `${formula.slice(copied, index)} `;
+    if (char === '"') {
+      index = closingQuote(formula, index, '"');
+    } else if (char === "'") {
       const end = closingQuote(formula, index, "'");
       if (quotedNameHasExternalBook(formula.slice(index + 1, end - 1))) return true;
-      executable += " ";
       index = end;
-      continue;
-    }
-
-    if (char === "[") {
+    } else {
       const end = closingBracket(formula, index);
       if (isExternalBook(formula, index, end)) return true;
-      executable += " ";
       index = end;
-      continue;
     }
-
-    executable += char;
-    index += 1;
+    copied = index;
   }
-  return EXTERNAL_DATA_FUNCTION.test(executable);
+  return EXTERNAL_DATA_FUNCTION.test(executable + formula.slice(copied));
 }
 
 /**
