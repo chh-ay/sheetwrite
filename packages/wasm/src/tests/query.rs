@@ -518,7 +518,10 @@ mod value_set_filter {
         let picks = [PICKED_TRUE, PICKED_FALSE, "a", "b", "c", "d", "e", "f", "g"];
         // The text cell in row 7 spells TRUE but is not a boolean.
         assert_eq!(filter_values(&store, sheet, &[], &picks, false), vec![8, 9]);
-        assert_eq!(filter_values(&store, sheet, &[], &picks[..1], false), vec![8]);
+        assert_eq!(
+            filter_values(&store, sheet, &[], &picks[..1], false),
+            vec![8]
+        );
     }
 }
 

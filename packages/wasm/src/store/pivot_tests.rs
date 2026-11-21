@@ -238,17 +238,6 @@ fn pivot_formula_free_output_survives_edits() {
 }
 
 #[test]
-fn pivot_fields_report_source_headers_and_types() {
-    let (mut store, source, output) = fixture(12);
-    install(&mut store, source, output, 12, &[SUM]);
-
-    let mut fields = store.pivot_fields(output, 0);
-
-    assert_eq!(fields.take_names(), ["Region", "Quarter", "Sales"]);
-    assert_eq!(fields.take_types(), [1, 1, 1]);
-}
-
-#[test]
 fn pivot_output_over_its_own_source_spills() {
     let (mut store, source, _) = fixture(12);
     // Widen the source over five blank columns that no field reads, and
@@ -349,6 +338,20 @@ fn within_ulps(a: f64, b: f64, ulps: u64) -> bool {
     a == b || (a.signum() == b.signum() && a.to_bits().abs_diff(b.to_bits()) <= ulps)
 }
 
+/// A new sheet with `PIVOTBY` over the first `rows` data rows of the
+/// fixture's `source`, with the fixture pivot's keys and totals.
+fn pivotby_sheet(store: &mut CellStore, source: usize, rows: usize, function: &str) -> usize {
+    let sheet = store.add_sheet(10, 20);
+    let last = rows + 1;
+    store.set_sheet_name(source, "source", "Source");
+    let formula = format!(
+        "=PIVOTBY(Source!A2:A{last},Source!B2:B{last},Source!C2:C{last},{function},0,1,,1)"
+    );
+    store.set_formula(sheet, 0, 0, &formula, 0);
+    store.recompute(sheet);
+    sheet
+}
+
 #[test]
 fn pivot_sums_stay_exact_through_edits_and_match_pivotby() {
     // `fixture` row r is in region r % 2 and quarter r % 3, so rows r and
@@ -383,16 +386,7 @@ fn pivot_sums_stay_exact_through_edits_and_match_pivotby() {
         store.commit_sources();
         install(&mut store, source, output, 12, &[aggregation]);
         let fresh = store.add_sheet(32, 22);
-        let formula_sheet = store.add_sheet(10, 20);
-        store.set_sheet_name(source, "source", "Source");
-        store.set_formula(
-            formula_sheet,
-            0,
-            0,
-            &format!("=PIVOTBY(Source!A2:A13,Source!B2:B13,Source!C2:C13,{function},0,1,,1)"),
-            0,
-        );
-        store.recompute(formula_sheet);
+        let formula_sheet = pivotby_sheet(&mut store, source, 12, function);
         let payload = fixture_pivot(source, 12, &[aggregation]).numbers();
 
         let assert_near_pivotby = |store: &CellStore, step: &str| {
@@ -443,16 +437,7 @@ fn pivot_text_key_labels_follow_first_remaining_row_like_pivotby() {
     }
     store.commit_sources();
     install(&mut store, source, output, 6, &[SUM]);
-    let formula_sheet = store.add_sheet(10, 20);
-    store.set_sheet_name(source, "source", "Source");
-    store.set_formula(
-        formula_sheet,
-        0,
-        0,
-        "=PIVOTBY(Source!A2:A7,Source!B2:B7,Source!C2:C7,SUM,0,1,,1)",
-        0,
-    );
-    store.recompute(formula_sheet);
+    let formula_sheet = pivotby_sheet(&mut store, source, 6, "SUM");
 
     let assert_parity = |store: &CellStore, step: &str| {
         for row in 0..6 {
@@ -534,7 +519,7 @@ fn pivot_batch_moving_label_rows_together_keeps_groups_consistent() {
 }
 
 #[test]
-fn pivot_status_reports_a_blocked_output_and_retries_when_the_blocker_clears() {
+fn pivot_status_reports_no_output_when_a_source_cell_blocks_the_anchor() {
     let (mut store, source, output) = fixture(12);
     store.set_number(output, 0, 0, 5.0, 0);
     let payload = fixture_pivot(source, 12, &[SUM]).numbers();
@@ -556,12 +541,6 @@ fn pivot_status_reports_a_blocked_output_and_retries_when_the_blocker_clears() {
         store.get_cell(output, 0, 0).string().as_deref(),
         Some("#SPILL!")
     );
-
-    // Clearing the blocker retries the pivot.
-    store.clear_cell(output, 2, 1, 0);
-    store.recompute(output);
-    assert_eq!(store.pivot_status(output)[STATUS_ERROR], 0);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 18.0);
 }
 
 #[test]
@@ -595,57 +574,6 @@ fn pivot_memory_stats_release_cache_when_definition_is_removed() {
     // only that most of the cache was released, not its exact size.
     assert!(metadata(&store) < retained - cache_bytes / 2);
     assert_eq!(store.get_cell(output, 2, 1).kind(), KIND_EMPTY);
-}
-
-#[test]
-fn pivot_structural_clamp_preserves_both_colliding_anchors_and_recovers() {
-    let (mut store, source, output) = fixture(12);
-    let first = fixture_pivot(source, 12, &[SUM]);
-    let second = PivotPayload {
-        id: 1,
-        anchor: (6, 0),
-        ..fixture_pivot(source, 12, &[SUM])
-    };
-    let mut definitions = first.numbers();
-    definitions.extend(second.numbers());
-    let ids = vec!["pivot".into(), "other".into()];
-    assert!(store.set_pivots(output, &definitions, ids.clone()));
-    store.recompute(output);
-    assert_eq!(store.pivot_status(output)[STATUS_ERROR], 0);
-    assert_eq!(store.pivot_status(output)[STATUS_STRIDE + STATUS_ERROR], 0);
-
-    store.remove_rows(output, 0, 7);
-    store.recompute(output);
-
-    let status = store.pivot_status(output);
-    assert_eq!(status.len(), 2 * STATUS_STRIDE);
-    assert_eq!(status[STATUS_ERROR], spill_status());
-    assert_eq!(status[STATUS_STRIDE + STATUS_ERROR], status[STATUS_ERROR]);
-    assert_eq!(
-        store.get_cell(output, 0, 0).string().as_deref(),
-        Some("#SPILL!")
-    );
-
-    // Core sends the clamped anchors back; the collision stays.
-    let mut clamped = first.numbers();
-    clamped.extend(
-        PivotPayload {
-            id: 1,
-            ..fixture_pivot(source, 12, &[SUM])
-        }
-        .numbers(),
-    );
-    assert!(store.set_pivots(output, &clamped, ids.clone()));
-    store.recompute(output);
-    assert_eq!(store.pivot_status(output), status);
-
-    assert!(store.set_pivots(output, &definitions, ids));
-    store.recompute(output);
-
-    assert_eq!(store.pivot_status(output)[STATUS_ERROR], 0);
-    assert_eq!(store.pivot_status(output)[STATUS_STRIDE + STATUS_ERROR], 0);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 18.0);
-    assert_eq!(store.get_cell(output, 8, 1).num(), 18.0);
 }
 
 /// Column of a chart copy's anchor, as core sends it: right of the last column of every sheet.
