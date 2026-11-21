@@ -132,14 +132,16 @@ html[data-nav-reveal="pending"] .sw-sidebar__nav {
 }
 /* Page rows and group rows: icon, label, then a badge or chevron. */
 /* Rows of 34 px; the icon sits in a fixed column so every label starts on
-   the same line. */
+   the same line. Rows align to the top, padded so one line sits in the
+   middle of 34 px, and the icons centre on the first line: a label that
+   wraps keeps its icon beside its first line, not between its lines. */
 .sw-sidebar__nav a,
 .sw-nav-subgroup > summary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--sw-space-3);
   min-height: 2.125rem;
-  padding: var(--sw-space-1) var(--sw-space-3);
+  padding: calc((2.125rem - 1lh) / 2) var(--sw-space-3);
   border-radius: var(--sw-radius-md);
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-small);
@@ -158,6 +160,10 @@ html[data-nav-reveal="pending"] .sw-sidebar__nav {
   width: var(--sw-icon-sm);
   height: var(--sw-icon-sm);
   color: var(--sw-fg-muted);
+}
+.sw-sidebar__nav a > .sw-icon,
+.sw-nav-subgroup > summary > .sw-icon {
+  margin-block: calc((1lh - var(--sw-icon-sm)) / 2);
 }
 .sw-sidebar__nav a:is(:hover, :focus-visible) > .sw-icon,
 .sw-nav-subgroup > summary:is(:hover, :focus-visible) > .sw-icon:first-child {

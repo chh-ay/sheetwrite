@@ -302,3 +302,37 @@ test.describe(() => {
     });
   }
 });
+
+/** Layout rounds boxes to device pixels. */
+const ICON_CENTRE_TOLERANCE_PX = 1;
+
+test("a sidebar icon centres on its label's first line, also when the label wraps", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/concepts/");
+  const offsets = await page.locator(".sw-sidebar__nav a:has(> .sw-icon)").evaluateAll((links) =>
+    // Links inside a closed group have no box.
+    links
+      .filter((link) => link.getClientRects().length > 0)
+      .map((link) => {
+        const icon = link.querySelector(":scope > .sw-icon")?.getBoundingClientRect();
+        const label = link.querySelector(":scope > span");
+        const range = document.createRange();
+        if (label !== null) range.selectNodeContents(label);
+        const firstLine = range.getClientRects()[0];
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+        return {
+          label: label?.textContent?.trim() ?? "",
+          lines,
+          offset:
+            icon === undefined || firstLine === undefined
+              ? Number.NaN
+              : icon.top + icon.height / 2 - (firstLine.top + firstLine.height / 2),
+        };
+      }),
+  );
+  // The page's sidebar holds at least one label that wraps.
+  expect(offsets.some((row) => row.lines > 1)).toBe(true);
+  expect(offsets.filter((row) => !(Math.abs(row.offset) <= ICON_CENTRE_TOLERANCE_PX))).toEqual([]);
+});
