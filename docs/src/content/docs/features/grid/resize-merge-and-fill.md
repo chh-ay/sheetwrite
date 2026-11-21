@@ -83,7 +83,7 @@ As in Excel, when more than one cell of the range holds a value, Merge, Merge & 
 
 ## Drag-to-fill
 
-A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the new region. The dominant axis wins. As in Excel, the fill continues a series along the direction you drag and copies everything else, with each source cell's format:
+A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the new region. The dominant axis wins. As in Excel, the fill continues a series along the direction you drag and copies everything else, with each source cell's format and data validation rules (see [Paste and validation](/docs/features/data/validation-protection-and-notes/#paste-and-validation)):
 
 | Source | Fill |
 | --- | --- |
@@ -111,8 +111,8 @@ After a drag or a double-click on the fill handle, the **Auto Fill Options** but
 | --- | --- |
 | Copy Cells | Copies the source cells, with their formats. |
 | Fill Series | Continues the series; one number counts up by 1. |
-| Fill Formatting Only | Copies only the formats; the cells keep their values. |
-| Fill Without Formatting | Fills the values; the cells keep their formats. |
+| Fill Formatting Only | Copies only the formats and the data validation rules; the cells keep their values. |
+| Fill Without Formatting | Fills the values; the cells keep their formats and their data validation rules. |
 | Fill Days, Fill Weekdays, Fill Months, Fill Years | Offered for dates: steps the first date by a day, a weekday (skipping Saturday and Sunday), a month or a year per cell. |
 
 Any other change, or a switch to another sheet, removes the button, as in Excel. Sheetwrite has no Flash Fill, so the menu does not offer it. A grid with `contextMenu: false` shows no button. See Microsoft's [Fill data automatically in worksheet cells](https://support.microsoft.com/en-us/excel/get-started/fill-data-automatically-in-worksheet-cells).

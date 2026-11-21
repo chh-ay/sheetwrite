@@ -148,6 +148,7 @@ describe("validationPastePatches", () => {
         rule: { condition: { kind: "any" as const }, policy: "reject" as const },
         rows: [0, 0],
         cols: [0, 1],
+        at: [0, 0],
       },
     ] as const;
     const placed = (options?: { transpose?: boolean }) =>
@@ -160,5 +161,53 @@ describe("validationPastePatches", () => {
       ).map((patch) => (patch.op === "setValidationRule" ? patch.rule.range : null));
     expect(placed()).toEqual([range(2, 0, 2, 1), range(3, 0, 3, 1)]);
     expect(placed({ transpose: true })).toEqual([range(2, 0, 3, 0), range(2, 1, 3, 1)]);
+  });
+
+  it("shifts a copied rule's relative references to where it lands, as Excel's copy does", () => {
+    const sheet = { ...makeWorkbook(10).sheets[0]!, validationRules: [] };
+    // `=A1>0` on A1, copied to C5, reads `=C5>0` there.
+    const pieces = [
+      {
+        rule: {
+          condition: { kind: "custom" as const, formula: "=A1>0" },
+          policy: "reject" as const,
+        },
+        rows: [0, 0],
+        cols: [0, 0],
+        at: [0, 0],
+      },
+    ] as const;
+    const [patch] = validationPastePatches(
+      sheet,
+      pieces,
+      { rows: 1, cols: 1 },
+      { row: 4, col: 2, rows: 1, cols: 1 },
+    );
+    expect(patch?.op === "setValidationRule" ? patch.rule.condition : null).toEqual({
+      kind: "custom",
+      formula: "=C5>0",
+    });
+  });
+
+  it("keeps the formulas of a target rule it splits where its cells are", () => {
+    // `=A1>0` on A1:A3 reads `=A2>0` in A2; a paste on A1 leaves A2:A3 to it.
+    const rule = {
+      id: "positive",
+      range: range(0, 0, 2, 0),
+      condition: { kind: "custom" as const, formula: "=A1>0" },
+      policy: "reject" as const,
+    };
+    const sheet = { ...makeWorkbook(10).sheets[0]!, validationRules: [rule] };
+    const [patch] = validationPastePatches(
+      sheet,
+      [],
+      { rows: 1, cols: 1 },
+      { row: 0, col: 0, rows: 1, cols: 1 },
+    );
+    expect(patch).toEqual({
+      op: "setValidationRule",
+      sheet: "s1",
+      rule: { ...rule, range: range(1, 0, 2, 0), condition: { kind: "custom", formula: "=A2>0" } },
+    });
   });
 });

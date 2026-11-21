@@ -24,6 +24,7 @@ For each check, save the result file under the name given and attach it to the i
 | 16 | #799 | `test/fixtures/excel-checks/number-format-unsure.xlsx` | `number-format-unsure-excel.xlsx` |
 | 17 | #821 | none; type the values into a new workbook | none; record what Excel shows |
 | 18 | #827, #824 | none; type the values into a new workbook | none; record what Excel shows |
+| 19 | #926 | none; type the values into a new workbook | none; record what Excel shows |
 
 ## All checks in one workbook
 
@@ -282,3 +283,15 @@ Excel's AutoFill table names `Qtr3`, `1st Period` and `text1, textA`. Sheetwrite
 5. 2026-01-03 (a Saturday) in I1, drag down five rows, **Auto Fill Options › Fill Weekdays**. Sheetwrite: 2026-01-05 to 2026-01-09, Monday to Friday.
 
 Record what Excel fills in each case.
+
+## 19. Data validation that a fill copies (#926)
+
+Excel's pages say a fill copies cells with their formats; they do not say which Auto Fill Options choice keeps a cell's validation. Check in a new workbook:
+
+1. Type `Apple` in A1 and give A1 a list rule (`Apple,Pear`) with **Data › Data Validation**. Give A2 a list rule (`X,Y`).
+2. Drag A1's fill handle down to A3. Sheetwrite: A1:A3 have the `Apple,Pear` rule, and A2 holds `Apple` although its old rule refused it.
+3. Open **Auto Fill Options › Fill Without Formatting**. Sheetwrite: A2 has its `X,Y` rule again, with `Apple` in it.
+4. Open **Auto Fill Options › Fill Formatting Only**. Sheetwrite: A2:A3 have the `Apple,Pear` rule and their old values.
+5. Type `5` in C1 and give C1 a Custom rule `=C1>D1`. Drag C1's fill handle down to C3, then open C3's rule. Sheetwrite: it reads `=C3>D3`.
+
+Record the rule over each cell after each step.

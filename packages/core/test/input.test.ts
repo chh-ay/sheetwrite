@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
+import type { DocumentOp, Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -323,6 +323,104 @@ describe("pointer input: touch policy", () => {
       expect(store.getCell(at(7)).resolved).toBe(70.5);
       grid.destroy();
       store.dispose();
+    });
+
+    describe("data validation, as Excel's fill copies it", () => {
+      const list = (id: string, row: number, col: number, values: string[]): DocumentOp => ({
+        op: "setValidationRule",
+        sheet: "s1",
+        rule: {
+          id,
+          range: { sheet: "s1", start: { row, col }, end: { row, col } },
+          condition: { kind: "list", values },
+          policy: "reject",
+        },
+      });
+      /** The conditions of the rules over a cell. */
+      const rulesAt = (store: SheetwriteStore, row: number, col = 1): unknown[] =>
+        (store.getWorkbook().sheets[0]?.validationRules ?? [])
+          .filter(
+            ({ range }) =>
+              range.start.row <= row &&
+              row <= range.end.row &&
+              range.start.col <= col &&
+              col <= range.end.col,
+          )
+          .map((rule) => rule.condition);
+      const fruit = { kind: "list", values: ["Apple", "Pear"] };
+      const other = { kind: "list", values: ["X", "Y"] };
+      const key = (host: HTMLElement, key: string): void => {
+        host.dispatchEvent(
+          new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true, cancelable: true }),
+        );
+      };
+
+      it("gives the filled cells the source's rule in place of their own, with the fill handle, Ctrl+D and Ctrl+R", () => {
+        const { grid, store, scroller, workbook, host } = makeGrid();
+        store.applyTransaction({
+          patches: [
+            { op: "set", addr: at(1), value: { kind: "literal", value: "Apple" } },
+            list("fruit", 1, 1, ["Apple", "Pear"]),
+            list("other", 2, 1, ["X", "Y"]),
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: at(1) });
+
+        scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointermove", cellPoint(3, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointerup", cellPoint(3, 1, workbook)));
+        // The filled value lands although B3's old rule refused it, as in Excel.
+        expect([2, 3].map((row) => store.getCell(at(row)).resolved)).toEqual(["Apple", "Apple"]);
+        expect([1, 2, 3].map((row) => rulesAt(store, row))).toEqual([[fruit], [fruit], [fruit]]);
+
+        grid.setSelection({
+          kind: "range",
+          range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 5, col: 1 } },
+        });
+        key(host, "d");
+        expect([4, 5].map((row) => rulesAt(store, row))).toEqual([[fruit], [fruit]]);
+
+        grid.setSelection({
+          kind: "range",
+          range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 2 } },
+        });
+        key(host, "r");
+        expect(rulesAt(store, 1, 2)).toEqual([fruit]);
+
+        grid.actions.undo();
+        expect(rulesAt(store, 1, 2)).toEqual([]);
+        grid.destroy();
+        store.dispose();
+      });
+
+      it("keeps the target's rules for Fill Without Formatting only", () => {
+        const { grid, store, scroller, workbook, host } = makeGrid();
+        store.applyTransaction({
+          patches: [
+            { op: "set", addr: at(1), value: { kind: "literal", value: "Apple" } },
+            list("fruit", 1, 1, ["Apple", "Pear"]),
+            list("other", 2, 1, ["X", "Y"]),
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: at(1) });
+        const before = store.getCell(at(2)).resolved;
+        const choose = (label: string): void => {
+          host.querySelector<HTMLElement>(".sheetwrite-auto-fill-options")?.click();
+          const rows = host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu-item");
+          [...rows].find((row) => row.textContent === label)?.click();
+        };
+
+        scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+        choose("Fill Without Formatting");
+        expect([store.getCell(at(2)).resolved, rulesAt(store, 2)]).toEqual(["Apple", [other]]);
+        // Excel counts a cell's validation with its formats.
+        choose("Fill Formatting Only");
+        expect([store.getCell(at(2)).resolved, rulesAt(store, 2)]).toEqual([before, [fruit]]);
+        grid.destroy();
+        store.dispose();
+      });
     });
 
     it("redoes a fill from the Auto Fill Options button as one undo step", () => {
