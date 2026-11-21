@@ -128,9 +128,9 @@ function describeRecords(grid: Grid): string {
  * interrupting.
  *
  * When the line is narrower than its text, it drops whole parts as Excel's
- * status bar does: Sum, then Average, then Count, then the selection size,
- * the records found and the undo step. The cell mode always stays. Screen
- * readers still hear every part.
+ * status bar does: the selection size first, then the records found and the
+ * undo step, then Count, then Average, and Sum, the total people read most,
+ * last. The cell mode always stays. Screen readers still hear every part.
  *
  * @param host - Element the status is appended to.
  * @param grid - The grid whose selection and mode the status follows.
@@ -160,8 +160,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   const countPart = part();
   const sumPart = part();
   const geometryPart = part();
-  // Excel's status bar drops its totals first when it narrows.
-  const dropOrder = [sumPart, averagePart, countPart, geometryPart, recordsPart, historyPart];
+  // Sum, the total people read most, stays longest.
+  const dropOrder = [geometryPart, recordsPart, historyPart, countPart, averagePart, sumPart];
   const text = document.createElement("span");
   text.className = "sheetwrite-shell-status-text";
   output.append(mode, parts, text);
@@ -198,6 +198,9 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   if (typeof ResizeObserver !== "undefined") {
     const resized = new ResizeObserver(scheduleFit);
     resized.observe(host);
+    // The line's own width changes too when the parts beside it change, such
+    // as the sheet tabs when a sheet is added.
+    resized.observe(output);
     lifetime.add(() => resized.disconnect());
   }
 
