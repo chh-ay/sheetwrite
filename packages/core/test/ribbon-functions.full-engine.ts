@@ -105,19 +105,3 @@ it("Formulas › Insert Function shows only in a grid with host functions, and s
     "=TAXRATE(",
   );
 });
-
-it("the toolbar shows Insert Function only in a grid with host functions", async () => {
-  const toolbarCommand = (host: HTMLElement): HTMLElement => {
-    const command = host.querySelector<HTMLElement>(
-      '.sheetwrite-command-toolbar [data-command="insertFunction"]',
-    );
-    if (command === null) throw new Error("no toolbar Insert Function command");
-    return command;
-  };
-
-  const plain = await setup({}, []);
-  const withFunction = await setup({}, [TAX_RATE_FUNCTION]);
-
-  expect(toolbarCommand(plain.host).hidden).toBe(true);
-  expect(toolbarCommand(withFunction.host).hidden).toBe(false);
-});

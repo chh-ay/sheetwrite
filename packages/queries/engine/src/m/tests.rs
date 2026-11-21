@@ -203,13 +203,9 @@ fn exported_sections_import_to_the_same_plans() {
             "{member}"
         );
     }
-}
 
-#[test]
-fn reported_differences_name_their_query_and_step() {
-    let section = emit_section(&fixtures());
+    // Differences the export cannot carry name their query and step.
     let reported = |query, step, code| section.losses.contains(&Loss { query, step, code });
-
     assert!(reported(0, None, "member-name"));
     assert!(reported(0, Some(1), "error-policy-scope"));
     assert!(reported(2, None, "host-source"));
