@@ -133,6 +133,20 @@ it.each(["full", "compact"] as const)(
   },
 );
 
+it("switches layout without losing a value-box draft or the active tab", async () => {
+  const { host, control, openTab, press } = await setup();
+  const size = control<HTMLInputElement>("Font Size");
+  size.value = "14";
+  press(control("Compact ribbon"));
+
+  expect(control<HTMLInputElement>("Font Size").value).toBe("14");
+  expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("true");
+  openTab("View");
+  press(control("Compact ribbon"));
+  expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("View");
+  expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("false");
+});
+
 it("renders the same commands as the toolbar for the same command flags", async () => {
   const flags = { export: true, italic: false, sort: false };
   const { grid, host, openTab } = await setup(false, undefined, { mode: "compact" });
@@ -164,7 +178,7 @@ it("renders the same commands as the toolbar for the same command flags", async 
 });
 
 it("shows the focus cell's size in points and applies typed points as pixels", async () => {
-  const { grid, control, select, cell, key } = await setup();
+  const { grid, host, control, select, cell, key } = await setup();
   grid.styleRange(
     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
     { fontSize: 16 },
@@ -181,6 +195,7 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expect(cell(0, 0).style.fontSize).toBeCloseTo(fourteenPoints);
   expect(cell(1, 0).style.fontSize).toBeCloseTo(fourteenPoints);
   expect(size.value).toBe("14");
+  expect(document.activeElement).toBe(host);
 });
 
 // #731: a cell that takes its format from its column showed "General".
@@ -451,6 +466,68 @@ it("names a folded group on at most two lines, never stranding a one-letter word
   expect(button?.getAttribute("aria-label")).toBe("Clipboard");
 });
 
+it("disables editing controls while read-only but keeps view controls", async () => {
+  const { grid, host, select, key, press } = await setup(true);
+  select(0, 0);
+  const find = (selector: string): HTMLButtonElement => {
+    const element = host.querySelector<HTMLButtonElement>(selector);
+    if (element === null) throw new Error(`nothing matches ${selector}`);
+    return element;
+  };
+  const tab = (label: string): HTMLButtonElement => {
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const match = tabs.find((candidate) => candidate.textContent === label);
+    if (match === undefined) throw new Error(`no ${label} tab`);
+    return match;
+  };
+  // Only the visible tab's panel: Home and View both exist once visited.
+  const control = (label: string) =>
+    find(`.sheetwrite-ribbon-panel:not([hidden]) [aria-label="${label}"]`);
+
+  expect(control("Bold").disabled).toBe(true);
+  expect(control("Paste").disabled).toBe(true);
+  expect(control("Find").disabled).toBe(false);
+
+  grid.setReadOnly(false);
+  expect(control("Bold").disabled).toBe(false);
+
+  key(tab("Home"), "End");
+  expect(tab("View").getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(tab("View"));
+  grid.setReadOnly(true);
+  press(control("Zoom In"));
+  expect(control("Zoom In").disabled).toBe(false);
+  expect(find(".sheetwrite-ribbon-panel:not([hidden]) output").textContent).toBe("110%");
+  expect(grid.getZoom()).toBeCloseTo(1.1);
+});
+
+it("zooms with one readout that resets to 100% and is disabled there", async () => {
+  const { grid, host, control, openTab, press } = await setup();
+  openTab("View");
+
+  const scope = ".sheetwrite-ribbon-panel:not([hidden])";
+  const group = (): HTMLElement => {
+    const element = host.querySelector<HTMLElement>(`${scope} .sheetwrite-ribbon-zoom`);
+    if (element === null) throw new Error("no zoom group");
+
+    return element;
+  };
+
+  // The step buttons show icons only, so the percent is the group's only text.
+  expect(group().textContent).toBe("100%");
+  expect(control("100%, zoom to 100%", scope).disabled).toBe(true);
+
+  press(control("Zoom In", scope));
+  press(control("Zoom In", scope));
+  expect(group().textContent).toBe("120%");
+  expect(control("120%, zoom to 100%", scope).disabled).toBe(false);
+
+  press(control("120%, zoom to 100%", scope));
+  expect(grid.getZoom()).toBe(1);
+  expect(group().textContent).toBe("100%");
+  expect(control("100%, zoom to 100%", scope).disabled).toBe(true);
+});
+
 it("opens on Home when the File tab shows, as Excel does", async () => {
   const { host } = await setup(false, undefined, true, { keyboardSettings: true });
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
@@ -471,7 +548,7 @@ it("opens on Home when the File tab shows, as Excel does", async () => {
 });
 
 it("gives the grid the panel's height back when minimized", async () => {
-  const { host } = await setup();
+  const { host, key } = await setup();
   const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
   const home = host.querySelector<HTMLElement>('[role="tab"]');
   if (viewport === null || home === null) throw new Error("grid not mounted");
@@ -483,6 +560,10 @@ it("gives the grid the panel's height back when minimized", async () => {
 
   home.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
   expect(viewport.style.top).toBe("122px");
+
+  home.focus();
+  key(home, "Escape");
+  expect(document.activeElement).toBe(host);
 });
 
 it("moves the tabs that do not fit into a More tabs menu instead of cutting one off", async () => {
@@ -588,6 +669,20 @@ it("replaces a glyph in every ribbon control that shows it, by glyph name", asyn
   const hideRows = control("Hide Rows");
   expect(hideRows.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
   expect(hideRows.querySelector(".sheetwrite-icon")).toBeNull();
+});
+
+it("offers Excel's cell dialogs in the Cells menus", async () => {
+  const { host, control, select, press } = await setup();
+  select(0, 0);
+  const offered = (["Insert", "Delete", "Format"] as const).map((menu) => {
+    // Home › Cells; the Insert tab shares the name "Insert".
+    press(control(menu, ".sheetwrite-ribbon-group-body"));
+    const label = `${menu} Cells…`;
+    return [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")].some(
+      (candidate) => candidate.textContent?.includes(label),
+    );
+  });
+  expect(offered).toEqual([true, true, true]);
 });
 
 it("shows a failed placement command in its form instead of rejecting", async () => {

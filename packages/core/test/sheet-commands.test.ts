@@ -203,6 +203,7 @@ describe("the sheet menu", () => {
 
   it("colors the tab from Excel's Tab Color palette", async () => {
     const palette = (await choose("Tab color for Sales sheet"))!;
+    expect(palette.querySelectorAll('[role="menuitemradio"]').length).toBe(11);
     palette.querySelector<HTMLButtonElement>('[aria-label="Dark Red"]')!.click();
     expect(sheetById("a")?.tabColor).toBe("#C00000");
     expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();

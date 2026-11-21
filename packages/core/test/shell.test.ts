@@ -477,6 +477,32 @@ describe("createSpreadsheetShell", () => {
     expect(host.contains(root)).toBe(false);
   });
 
+  it("honors live tabs false configuration without creating a second primitive", () => {
+    const host = mountHost();
+    const shell = createSpreadsheetShell(host, {
+      grid: {
+        workbook: makeWorkbook(10),
+        data: makeColumnarData(10),
+        config: { tabs: false },
+      },
+    });
+
+    expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+    shell.setGridConfig({ tabs: true });
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
+    const add = host.querySelector<HTMLButtonElement>(
+      ".sheetwrite-shell-tabs [aria-label='Add sheet']",
+    );
+    if (!add) throw new Error("expected one-sheet Add action");
+    add.click();
+    expect(shell.grid.store.getWorkbook().sheets).toHaveLength(2);
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(2);
+    shell.setGridConfig({ tabs: false });
+    expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+
+    shell.destroy();
+  });
+
   it("keeps an open tab menu when a cell edit does not change the sheet list", () => {
     const host = mountHost();
     const shell = createSpreadsheetShell(host, {
@@ -518,9 +544,7 @@ describe("createSpreadsheetShell", () => {
     expect(formula.readOnly).toBe(true);
     expect(host.querySelector('[role="grid"]')?.getAttribute("aria-readonly")).toBe("true");
 
-    // Tabs follow a live config, and reconfiguring never adds a second toolbar or tab list.
-    shell.setGridConfig({ tabs: false });
-    expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+    // Reconfiguring can never resurrect a second toolbar or tab list.
     shell.setGridConfig({ toolbar: true, tabs: true, find: false });
     await import("../src/shell/toolbar-factory.js");
     for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();

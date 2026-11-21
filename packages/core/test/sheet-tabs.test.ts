@@ -163,6 +163,11 @@ describe("SheetTabs", () => {
 
     tabButtons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    // The editor sits outside the tab list, which keeps the selected tab.
+    expect(input.closest('[role="tablist"]')).toBeNull();
+    expect(
+      host.querySelector('[role="tablist"] [role="tab"][aria-selected="true"]'),
+    ).not.toBeNull();
     inputText(input, "Revenue");
     key(input, "Enter");
     expect(renames).toEqual([["b", "Revenue"]]);
@@ -182,6 +187,35 @@ describe("SheetTabs", () => {
     inputText(input, "Cancelled");
     key(input, "Escape");
     expect(renames).toHaveLength(2);
+    expect(document.activeElement).toBe(tabButtons(host)[1]!);
+
+    key(host, "F2");
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    input.blur();
+    expect(renames).toHaveLength(2);
+  });
+
+  it("does not commit Enter during IME composition", () => {
+    const renames: string[] = [];
+    remount({
+      onActivate: () => {},
+      onRename: (id, name) => {
+        renames.push(`${id}:${name}`);
+        return applied(id);
+      },
+    });
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    input.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    inputText(input, "売上");
+    key(input, "Enter");
+    expect(renames).toEqual([]);
+    expect(host.querySelector(".sheetwrite-tab-input")).toBe(input);
+
+    input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "売上" }));
+    key(input, "Enter");
+    expect(renames).toEqual(["b:売上"]);
   });
 
   it("keeps invalid Enter and blur edits focused with their structured lifecycle error associated", () => {
@@ -252,39 +286,86 @@ describe("SheetTabs", () => {
     ];
     remount(options, workbook);
 
+    let trigger = host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    const tablist = host.querySelector<HTMLElement>('[role="tablist"]')!;
+    expect(tablist.getAttribute("aria-label")).toBeTruthy();
     // Only visible sheets are tabs; hidden and very hidden sheets are not.
-    expect(tabButtons(host)).toHaveLength(3);
-    const optionsButton = () =>
-      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
-    const choose = (label: string) => {
-      optionsButton().click();
-      host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
-    };
-    choose("Hide Sales sheet");
-    choose("Remove Sales sheet");
+    expect(tablist.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(trigger.closest('[role="tablist"]')).toBeNull();
+    trigger.focus();
+    key(trigger, "ArrowDown");
+
+    const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.getAttribute("aria-label")).toBeTruthy();
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    expect(items.length).toBeGreaterThan(1);
+    expect(document.activeElement).toBe(items[0]!);
+    key(items[0]!, "End");
+    expect(document.activeElement).toBe(items.at(-1)!);
+    key(items.at(-1)!, "Home");
+    expect(document.activeElement).toBe(items[0]!);
+    key(items[0]!, "Escape");
+    trigger = host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    trigger.click();
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    tabs.update(workbook, "b");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    host.querySelector<HTMLButtonElement>('[aria-label="Hide Sales sheet"]')!.click();
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    host.querySelector<HTMLButtonElement>('[aria-label="Remove Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Add sheet"]')!.click();
     const unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
     const hiddenChoices = host.querySelector<HTMLElement>(
       '[role="group"][aria-label="Hidden sheets"]',
     )!;
-    // The very hidden sheet is not offered.
     expect(
       [...hiddenChoices.querySelectorAll("button")].map((button) => button.textContent),
     ).toEqual(["Hidden"]);
+    expect(hiddenChoices.hidden).toBe(true);
     unhide.click();
+    expect(unhide.getAttribute("aria-expanded")).toBe("true");
+    expect(hiddenChoices.hidden).toBe(false);
+    key(hiddenChoices.querySelector("button")!, "Escape");
+    expect(unhide.getAttribute("aria-expanded")).toBe("false");
+    expect(hiddenChoices.hidden).toBe(true);
+    expect(document.activeElement).toBe(unhide);
+    unhide.click();
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(unhide.getAttribute("aria-expanded")).toBe("false");
+    expect(hiddenChoices.hidden).toBe(true);
+    expect(document.activeElement).toBe(unhide);
+    unhide.click();
+    expect(host.textContent).not.toContain("Secret");
     hiddenChoices.querySelector("button")!.click();
 
-    for (const [name, init] of [
-      ["ArrowLeft", { ctrlKey: true, shiftKey: true }],
-      ["ArrowRight", { ctrlKey: true, shiftKey: true }],
-      ["h", { ctrlKey: true, shiftKey: true }],
-      ["Delete", {}],
-      ["F11", { shiftKey: true }],
-      ["u", { ctrlKey: true, shiftKey: true }],
-    ] as const) {
-      tabButtons(host)[1]!.focus();
-      key(host, name, init);
-    }
+    let active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "ArrowLeft", { ctrlKey: true, shiftKey: true });
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "ArrowRight", { ctrlKey: true, shiftKey: true });
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "h", { ctrlKey: true, shiftKey: true });
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "Delete");
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "F11", { shiftKey: true });
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "u", { ctrlKey: true, shiftKey: true });
 
     expect(actions).toEqual([
       "hide:b",
@@ -378,6 +459,8 @@ describe("SheetTabs", () => {
     );
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     expect(input.value).toBe("Local draft");
+    expect(input.dataset.sheetId).toBe("b");
+    expect(document.activeElement).toBe(input);
     key(input, "Escape");
     expect(tabButtons(host).map((button) => button.textContent)).toEqual([
       "Summary",
@@ -390,20 +473,41 @@ describe("SheetTabs", () => {
     tabs.update(
       [
         { id: "c", name: "Summary" },
+        { id: "b", name: "Server final" },
+        { id: "a", name: "Sales" },
+      ],
+      "b",
+    );
+    expect(host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")?.value).toBe(
+      "Server final",
+    );
+
+    tabs.update(
+      [
+        { id: "c", name: "Summary" },
         { id: "a", name: "Sales" },
       ],
       "c",
     );
     expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
+    expect(document.activeElement).toBe(tabButtons(host)[1]!);
+    expect(tabButtons(host).map((button) => button.tabIndex)).toEqual([-1, 0]);
   });
 
   it("suppresses mutation affordances in read-only mode while preserving navigation", () => {
+    const actions: string[] = [];
     remount(
       {
         readOnly: true,
         onActivate: () => {},
-        onAdd: () => applied("new"),
-        onRename: (id) => applied(id),
+        onAdd: () => {
+          actions.push("add");
+          return applied("new");
+        },
+        onRename: (id) => {
+          actions.push("rename");
+          return applied(id);
+        },
         onHide: (id) => applied(id),
         onUnhide: (id) => applied(id),
       },
@@ -428,5 +532,6 @@ describe("SheetTabs", () => {
     expect(host.querySelector("input")).not.toBeNull();
     tabs.setReadOnly(true);
     expect(host.querySelector("input")).toBeNull();
+    expect(actions).toEqual([]);
   });
 });

@@ -251,7 +251,25 @@ describe("object layer editing", () => {
     expect(grid.getCharts()).toEqual([chart("c1")]);
   });
 
-  it("opens the chart menu with Shift+F10 or the menu key, and emits chart-activate on Enter", () => {
+  it("opens the chart menu from the keyboard and gives focus back to the chart on Escape", () => {
+    const grid = mountGrid();
+    grid.setChart(chart("c1"), "s1");
+    grid.selectChart("c1", "s1");
+    const frame = frameOf(grid, "c1");
+    frame.focus();
+
+    press(frame, "F10", true);
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
+    focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.activeElement).toBe(frame);
+
+    press(frame, "ContextMenu");
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+  });
+
+  it("emits chart-activate on Enter and returns focus to the grid on Escape", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
     grid.selectChart("c1", "s1");
@@ -259,21 +277,13 @@ describe("object layer editing", () => {
     grid.on("chart-activate", (event) => activated.push(event));
     const frame = frameOf(grid, "c1");
     frame.focus();
-    const escape = () =>
-      document.activeElement?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-      );
-
-    press(frame, "F10", true);
-    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
-    escape();
-    expect(document.activeElement).toBe(frame);
-    press(frame, "ContextMenu");
-    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
-    escape();
 
     press(frame, "Enter");
     expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
+
+    press(frame, "Escape");
+    expect(document.activeElement).toBe(hostOf(grid));
+    expect(frame.classList.contains("sheetwrite-object-selected")).toBe(false);
   });
 });
 
