@@ -730,7 +730,7 @@ impl CellStore {
         (row, col): (u32, u32),
     ) -> Option<FormulaEntry> {
         if let Some(target) = entry.reference_target(edit.from.sheet) {
-            return Some(FormulaEntry::reference(target, edit.to.sheet));
+            return Some(FormulaEntry::reference(target));
         }
         let names = self.written_names();
         let text = if edit.from.sheet == edit.to.sheet {

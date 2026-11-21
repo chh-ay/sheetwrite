@@ -183,7 +183,7 @@ impl CellStore {
     /// The table with stable ID `id`. Tables are kept by slot, so this scans.
     #[inline(never)]
     pub(super) fn table_by_id(&self, id: &str) -> Option<&Table> {
-        self.tables.with_id(id).map(|(_, table)| table)
+        self.bindings.tables.with_id(id).map(|(_, table)| table)
     }
 
     /// The key column `column` names, if its table and column exist.

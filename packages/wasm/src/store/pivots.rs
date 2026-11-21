@@ -1281,7 +1281,8 @@ impl CellStore {
                 // A failed model still reads its tables, so fixing a key or
                 // a missing table must wake it.
                 pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. }).then(|| {
-                    self.tables
+                    self.bindings
+                        .tables
                         .iter()
                         .map(|(_, table)| SourceRect::table(table))
                         .collect()
@@ -1306,6 +1307,7 @@ impl CellStore {
         }) {
             let mut rects = related.to_vec();
             for rect in self
+                .bindings
                 .tables
                 .iter()
                 .map(|(_, table)| SourceRect::table(table))
