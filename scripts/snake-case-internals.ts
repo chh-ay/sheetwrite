@@ -30,6 +30,9 @@
  * `target["name"]` and `target.name` on a value without the member are data keys and
  * stay. Uses through an instantiated type, which the checker gives their own symbol,
  * are matched by the member's declaration.
+ * A key of a type literal reached by a double cast, `value as unknown as { name: … }`,
+ * is how a test reads private state with types; it follows the private members with that
+ * name in the same way, with every use of the key.
  *
  * Every run plans from the type checker's view of the current files, so it can be
  * re-run at any time: output is sorted, and a second `apply` changes nothing.
@@ -39,6 +42,7 @@
  * then `tsconfig.verification.json`, `bench/tsconfig.json` and `docs/tsconfig.json`. A
  * file below a nested `tsconfig.json` (a fixture or consumer project) belongs to that
  * project and is skipped.
+ * Generated `*.gen.ts` files are skipped too: their generator rewrites them.
  * `check` lists every pending rename and conflict and exits 1 when any exist; `apply`
  * rewrites the files. Conflicts need a hand-picked name in the names file.
  */
@@ -49,6 +53,7 @@ import {
   NodeFlags,
   SyntaxKind,
   isArrowFunction,
+  isAsExpression,
   isBindingElement,
   isCallExpression,
   isClassDeclaration,
@@ -59,13 +64,16 @@ import {
   isFunctionDeclaration,
   isFunctionExpression,
   isIdentifier,
+  isMethodSignatureDeclaration,
   isNoSubstitutionTemplateLiteral,
   isObjectBindingPattern,
   isParameterDeclaration,
   isPrivateIdentifier,
   isPropertyAccessExpression,
+  isPropertySignatureDeclaration,
   isShorthandPropertyAssignment,
   isStringLiteral,
+  isTypeLiteralNode,
   isVariableDeclaration,
   isVariableDeclarationList,
   isVariableStatement,
@@ -330,6 +338,16 @@ interface MemberReference {
   readonly target: Node;
 }
 
+/**
+ * A key of a type literal written in a double cast, `value as unknown as { name: … }`, with
+ * every use of it: a test's view of private members the checker cannot match.
+ */
+interface CastView {
+  readonly file: SourceFile;
+  readonly name: Node;
+  readonly occurrences: readonly Occurrence[];
+}
+
 /** Calls whose second argument names a member of their first. */
 const REFLECTIVE_CALLS = new Set([
   "Reflect.defineProperty",
@@ -370,6 +388,29 @@ function string_member_target(literal: Node): Node | undefined {
   return parent.arguments[1] === literal ? parent.arguments[0] : undefined;
 }
 
+/** Whether `name` is a key of a type literal, or of one nested in it, cast to by `as unknown as`. */
+function is_cast_view_key(name: Node): boolean {
+  const member = name.parent;
+  const is_key =
+    (isPropertySignatureDeclaration(member) || isMethodSignatureDeclaration(member)) &&
+    member.name === name;
+  if (!is_key) return false;
+
+  let literal = member.parent;
+  while (isTypeLiteralNode(literal)) {
+    const owner = literal.parent;
+    if (isAsExpression(owner) && owner.type === literal) {
+      return (
+        isAsExpression(owner.expression) && owner.expression.type.kind === SyntaxKind.UnknownKeyword
+      );
+    }
+    if (!isPropertySignatureDeclaration(owner)) return false;
+    literal = owner.parent;
+  }
+
+  return false;
+}
+
 function names_in(
   node: Node,
   collect: (name: Node) => void,
@@ -408,6 +449,7 @@ function member_names(declaration: Node): Set<string> {
 
 function is_target(file_name: string, include: readonly string[]): boolean {
   if (file_name.endsWith(".d.ts") || file_name.includes(`${sep}node_modules${sep}`)) return false;
+  if (file_name.endsWith(".gen.ts")) return false;
   return include.some(
     (directory) => file_name === directory || file_name.startsWith(directory + sep),
   );
@@ -638,7 +680,11 @@ async function collect_candidates(
   project: Project,
   files: readonly SourceFile[],
   picked_names: PickedNames,
-): Promise<{ candidates: Map<number, Candidate>; name_only: MemberReference[] }> {
+): Promise<{
+  candidates: Map<number, Candidate>;
+  name_only: MemberReference[];
+  views: CastView[];
+}> {
   const candidates = new Map<number, Candidate>();
   const exported = new Set<number>();
   const uses = new Map<number, Occurrence[]>();
@@ -648,6 +694,7 @@ async function collect_candidates(
   const unresolved = new Set<string>();
   const private_names = new Map<SourceFile, Node[]>();
   const references: MemberReference[] = [];
+  const view_keys = new Map<number, { file: SourceFile; name: Node }>();
 
   for (const file of files) {
     const names: Node[] = [];
@@ -709,6 +756,8 @@ async function collect_candidates(
 
       const old_name = text_of(name);
       if (!is_camel_case(old_name)) continue;
+
+      if (is_cast_view_key(name)) view_keys.set(symbol.id, { file, name });
 
       const kind = classify(name);
       if (kind === undefined) continue;
@@ -783,7 +832,12 @@ async function collect_candidates(
     references,
   );
 
-  return { candidates, name_only };
+  const views = [...view_keys].map(([symbol_id, key]) => ({
+    ...key,
+    occurrences: uses.get(symbol_id) ?? [],
+  }));
+
+  return { candidates, name_only, views };
 }
 
 /**
@@ -821,7 +875,7 @@ export async function planRenames(
       if (file) files.push(file);
     }
 
-    const { candidates, name_only } = await collect_candidates(project, files, picked_names);
+    const { candidates, name_only, views } = await collect_candidates(project, files, picked_names);
     const symbol_names = new Map<string, string>();
     for (const candidate of candidates.values()) {
       symbol_names.set(`${candidate.file.fileName}\0${candidate.newName}`, candidate.oldName);
@@ -872,30 +926,48 @@ export async function planRenames(
       }
     }
 
-    // A reflective call on a target without the member names it by text only. The string
-    // follows the private members with that name, here and in the other projects, when
-    // they all get one new name.
-    for (const reference of name_only) {
-      const old_name = text_of(reference.name);
+    // A private member named by text only, by a reflective call on a target without the
+    // member or by a key of a double cast's type, follows the private members with that
+    // name, here and in the other projects, when they all get one new name.
+    const follow_private_member = (
+      file: SourceFile,
+      name: Node,
+      what: string,
+    ): string | undefined => {
+      const old_name = text_of(name);
       const names = new Set([
         ...(private_members.get(old_name) ?? []),
         ...(other_members.get(old_name) ?? []),
       ]);
-      if (names.size === 0 || (names.size === 1 && names.has(old_name))) continue;
+      if (names.size === 0 || (names.size === 1 && names.has(old_name))) return undefined;
 
-      const line = line_of(reference.file, reference.name);
+      const line = line_of(file, name);
       const [new_name] = [...names];
       if (names.size > 1 || new_name === undefined) {
         conflicts.push({
-          file: reference.file.fileName,
+          file: file.fileName,
           line,
           oldName: old_name,
           newName: [...names].sort().join(" or "),
-          reason:
-            "a reflective call names a private member by text, and the private members with that name do not all get one new name",
+          reason: `${what} names a private member by text, and the private members with that name do not all get one new name`,
         });
-        continue;
+        return undefined;
       }
+
+      const mention: CommentMention = {
+        file: file.fileName,
+        line,
+        oldName: old_name,
+        newName: new_name,
+        source: "name only",
+      };
+      mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
+      return new_name;
+    };
+
+    for (const reference of name_only) {
+      const new_name = follow_private_member(reference.file, reference.name, "a reflective call");
+      if (new_name === undefined) continue;
 
       const file_edits = edits.get(reference.file.fileName) ?? [];
       file_edits.push({
@@ -904,14 +976,21 @@ export async function planRenames(
         text: new_name,
       });
       edits.set(reference.file.fileName, file_edits);
-      const mention: CommentMention = {
-        file: reference.file.fileName,
-        line,
-        oldName: old_name,
-        newName: new_name,
-        source: "name only",
-      };
-      mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
+    }
+
+    for (const view of views) {
+      const new_name = follow_private_member(view.file, view.name, "a double cast's type");
+      if (new_name === undefined) continue;
+
+      for (const occurrence of view.occurrences) {
+        const file_edits = edits.get(occurrence.file.fileName) ?? [];
+        file_edits.push({
+          start: occurrence.name.getStart(occurrence.file),
+          end: occurrence.name.end,
+          text: new_name,
+        });
+        edits.set(occurrence.file.fileName, file_edits);
+      }
     }
 
     const by_position = (

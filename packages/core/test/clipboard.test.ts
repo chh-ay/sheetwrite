@@ -260,6 +260,13 @@ function makeHarness(
     readOnly: () => readOnly,
     mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
     toDataRow: options.toDataRow ?? ((viewRow) => viewRow),
+    toViewRow: (dataRow) => dataRow,
+    undo: () => {
+      throw new Error("This harness has no undo history");
+    },
+    lastUndo: () => null,
+    // A harness with its own row order stands for a sorted or filtered view.
+    rowSpan: (first, last) => (options.toDataRow ? null : { first, last }),
     commit: (patches, reason) => {
       commitReasons.push(reason);
       store.apply(patches);
@@ -277,6 +284,7 @@ function makeHarness(
           sheet.hyperlinks = sheet.hyperlinks?.filter((candidate) => candidate.id !== patch.id);
         }
       }
+      return { status: "applied", epoch: 0, transaction: { patches } };
     },
     onCutChange: (range) => cutMarks.push(range),
     loadPasteSpecial: () => import("../src/paste-special.js"),
@@ -757,6 +765,46 @@ describe("ClipboardController", () => {
     expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
   });
 
+  it("keeps the cells Excel's HTML marks as text as text in general columns, as Excel does", async () => {
+    for (const column of h.sheet.columns) column.type = "general";
+    // Excel marks a cell in its Text format with mso-number-format:"\@", in a
+    // class of the page's style sheet or in the cell's style, and writes x:str
+    // on a cell whose value is a string.
+    const html =
+      '<html><head><style><!--\n.xl65\n\t{mso-style-parent:style0;\n\tmso-number-format:"\\@";}\n--></style></head><body><table>' +
+      "<tr><td class=xl65>007</td><td style='mso-number-format:\"\\@\"'>1/15/2026</td><td x:str>15%</td></tr>" +
+      "<tr><td>007</td><td>1/15/2026</td><td>15%</td></tr>" +
+      "</table></body></html>";
+    const item = new FakeClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob(["007\t1/15/2026\t15%\r\n007\t1/15/2026\t15%\r\n"], {
+        type: "text/plain",
+      }),
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { read: () => Promise.resolve([item]) },
+    });
+    const cell = (row: number, col: number) => h.store.getCell({ sheet: "s1", row, col });
+
+    h.select(1, 0);
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect([0, 1, 2].map((col) => cell(1, col).resolved)).toEqual(["007", "1/15/2026", "15%"]);
+    expect([0, 1, 2].map((col) => cell(1, col).style.numberFormat)).toEqual(["@", "@", "@"]);
+    // Cells without the mark still read as General reads a typed entry.
+    expect([0, 1, 2].map((col) => cell(2, col).resolved)).toEqual([7, 46037, 0.15]);
+
+    // Paste Values keeps the text and leaves the format.
+    h.select(5, 0);
+    await expect(h.controller.pasteValues()).resolves.toBe("done");
+    expect([0, 1, 2].map((col) => cell(5, col).resolved)).toEqual(["007", "1/15/2026", "15%"]);
+    expect([0, 1, 2].map((col) => cell(5, col).style.numberFormat)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it("parses signed HTML numbers into a number column before guarding formula text", async () => {
     const item = new FakeClipboardItem({
       "text/html": new Blob(["<table><tr><td>-5</td></tr><tr><td>+1</td></tr></table>"], {
@@ -999,8 +1047,14 @@ describe("spill clipboard commands", () => {
       readOnly: () => false,
       mergeAnchorAt: () => null,
       toDataRow: (row) => row,
+      toViewRow: (row) => row,
+      undo: () => {
+        throw new Error("This harness has no undo history");
+      },
+      lastUndo: () => null,
+      rowSpan: (first, last) => ({ first, last }),
       commit: (patches, reason) => {
-        document.commit(patches, reason);
+        return document.commit(patches, reason);
       },
       onCutChange: () => {},
       loadPasteSpecial: () => import("../src/paste-special.js"),

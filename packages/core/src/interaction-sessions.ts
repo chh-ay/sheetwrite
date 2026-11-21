@@ -97,6 +97,12 @@ interface InteractionDependencies {
   highlightCells: (ranges: HighlightRange[] | null) => void;
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
+  /** The active cell on a row the view hides, in sheet coordinates; null otherwise. */
+  hiddenActive: () => CellAddress | null;
+  /** The view row nearest to sheet row `row` in `direction` that shows; null when none. */
+  nearestShownRow: (row: number, direction: 1 | -1) => number | null;
+  /** Hand the edit of the hidden active cell to the formula bar; false without one. */
+  editActiveCell: (initial: string | null) => boolean;
   editListeners: {
     readonly [K in "edit-begin" | "edit-commit" | "cell-mode"]: ReadonlySet<
       (payload: GridEvents[K]) => void
@@ -174,6 +180,8 @@ interface InteractionDependencies {
   ) => { x: number; y: number; w: number; h: number };
   anchorCell: (row: number, col: number) => CellRef;
   toDataRow: (viewRow: number) => number;
+  /** The data rows view rows `first` to `last` span with the rows hidden by hand between them. */
+  rowSpan: (first: number, last: number) => { first: number; last: number } | null;
   clearSelection: () => void;
   emitSelection: () => void;
   scrollToCell: (addr: CellAddress) => void;
@@ -262,6 +270,7 @@ export class InteractionSessions {
       activeSheet: deps.activeSheet,
       sheet: deps.sheet,
       toDataRow: deps.toDataRow,
+      rowSpan: deps.rowSpan,
       readOnly: deps.readOnly,
       commit: deps.commit,
       undo: deps.undo,
@@ -1559,6 +1568,38 @@ export class InteractionSessions {
     }
   }
 
+  /**
+   * A key on the active cell of a row the view hides, as Excel's Go To leaves
+   * it. Up, Down, Enter and Shift+Enter move to the nearest row that shows;
+   * Left, Right and Tab move along the hidden row; F2, Backspace and typing
+   * edit the cell in the formula bar. Returns false for the other keys, which
+   * act as usual.
+   */
+  private hiddenActiveKey(e: KeyboardEvent, cell: CellAddress, mod: boolean): boolean {
+    if (mod || e.altKey) return false;
+    const enter = e.key === "Enter";
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || enter) {
+      const direction = e.key === "ArrowUp" || (enter && e.shiftKey) ? -1 : 1;
+      const row = this.deps.nearestShownRow(cell.row, direction);
+      if (row !== null) {
+        const shown = { sheet: cell.sheet, row, col: cell.col };
+        this.deps.grid.setSelection({ kind: "cell", addr: shown });
+        this.deps.scrollToCell(shown);
+      }
+      return true;
+    }
+    const tab = e.key === "Tab";
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft" || tab) {
+      const direction = e.key === "ArrowLeft" || (tab && e.shiftKey) ? -1 : 1;
+      this.deps.grid.goToCell({ ...cell, col: this.deps.nextVisibleCol(cell.col, direction) });
+      return true;
+    }
+    if (this.deps.readOnly()) return false;
+    if (e.key === "F2") return this.deps.editActiveCell(null);
+    if (e.key === "Backspace") return this.deps.editActiveCell("");
+    return PRINTABLE.test(e.key) && this.deps.editActiveCell(e.key);
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
@@ -1698,6 +1739,12 @@ export class InteractionSessions {
 
     const selection = this.deps.selection();
     const focus = selection.focusCell;
+    // The active cell on a row the view hides, after the Name Box went to it.
+    const hidden = focus ? null : this.deps.hiddenActive();
+    if (hidden && this.hiddenActiveKey(e, hidden, mod)) {
+      e.preventDefault();
+      return;
+    }
     if (focus && key === " " && mod) {
       selection.selectColumn(focus.col, false, focus.row);
       this.deps.emitSelection();
@@ -2248,7 +2295,9 @@ export class InteractionSessions {
         : { ...rect, c0: this.deps.nextVisibleCol(rect.c0, -1) }
       : rect;
     const source = down ? { ...target, r1: target.r0 } : { ...target, c1: target.c0 };
-    this.fills.fill(source, target, { copy: true });
+    // With one cell, Ctrl+D and Ctrl+R copy the cell before it only, as in
+    // Excel; over a range they fill the rows hidden by hand in it too.
+    this.fills.fill(source, target, { copy: true }, false, !single);
     this.deps.scheduleRender();
   }
 

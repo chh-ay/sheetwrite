@@ -2,12 +2,15 @@
 
 use std::cell::Cell;
 use std::cmp::Ordering;
+use std::ops::Range;
 
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
-use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::cells::{
+    dense_resolved, payload_is_str, payload_num, payload_str_id, source_kind, CellRun,
+};
 use crate::eval::{excel_date_parts, Criterion, Wildcard};
 use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
@@ -47,12 +50,12 @@ impl PoolIdStamps {
     }
 
     /// Marks `id`; true when it was not marked yet.
+    #[inline]
     fn insert(&mut self, id: u32) -> bool {
         let index = id as usize;
         let word = index / STAMP_WORD_BITS;
         if word >= self.words.len() {
-            let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
-            self.words.resize(doubled.max(word + 1), 0);
+            self.grow_to(word);
         }
         let Some(bits) = self.words.get_mut(word) else {
             return false;
@@ -61,6 +64,15 @@ impl PoolIdStamps {
         let fresh = *bits & mask == 0;
         *bits |= mask;
         fresh
+    }
+
+    /// Grows the marks to hold `word`. Out of line, so the scan loops that
+    /// call [`Self::insert`] stay small.
+    #[cold]
+    #[inline(never)]
+    fn grow_to(&mut self, word: usize) {
+        let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
+        self.words.resize(doubled.max(word + 1), 0);
     }
 }
 
@@ -83,11 +95,11 @@ impl PoolIdSlots {
     }
 
     /// The slot of `id`. A new id takes `next` unless `full`, when it has none.
+    #[inline]
     fn slot(&mut self, id: u32, next: usize, full: bool) -> Option<usize> {
         let index = id as usize;
         if index >= self.slots.len() {
-            let doubled = self.slots.len().max(SLOTS_INITIAL) * 2;
-            self.slots.resize(doubled.max(index + 1), 0);
+            self.grow_to(index);
         }
         let stored = self.slots.get_mut(index)?;
         if *stored != 0 {
@@ -98,6 +110,15 @@ impl PoolIdSlots {
         }
         *stored = u32::try_from(next + 1).ok()?;
         Some(next)
+    }
+
+    /// Grows the slots to hold `index`. Out of line, so the scan loops that
+    /// call [`Self::slot`] stay small.
+    #[cold]
+    #[inline(never)]
+    fn grow_to(&mut self, index: usize) {
+        let doubled = self.slots.len().max(SLOTS_INITIAL) * 2;
+        self.slots.resize(doubled.max(index + 1), 0);
     }
 }
 
@@ -1036,12 +1057,11 @@ impl CellStore {
         rows: Option<Vec<u32>>,
         counted: bool,
     ) -> DistinctColumn {
-        let out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
-            return out;
+            return DistinctColumn::default();
         };
         if col >= data.cells.n_cols() {
-            return out;
+            return DistinctColumn::default();
         }
         let row_count = data.cells.row_count();
         let range = start_row.min(row_count)..end_row.min(row_count);
@@ -1049,7 +1069,7 @@ impl CellStore {
             values: limit,
             counted,
         };
-        match rows {
+        let out = match rows {
             Some(listed) => {
                 let in_range = listed
                     .iter()
@@ -1057,8 +1077,15 @@ impl CellStore {
                     .filter(|row| range.contains(row));
                 distinct_over(self, data, col, in_range, reach)
             }
-            None => distinct_over(self, data, col, range, reach),
-        }
+            None => distinct_dense(self, data, col, range.clone(), reach)
+                .unwrap_or_else(|| distinct_over(self, data, col, range, reach)),
+        };
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[1] = current[1].saturating_add(out.text_lengths.len() as u64);
+            stats.set(current);
+        });
+        out
     }
 
     /// `dataEdge` in a view order, where `order[i]` is the data row shown at
@@ -1120,13 +1147,190 @@ struct DistinctLimit {
     counted: bool,
 }
 
+/// The values a distinct scan has listed, and the marks that tell it which
+/// values it met before: a slot per pool id when it counts, one bit per pool
+/// id when it only lists, and a slot per key for every other value.
+struct DistinctScan<'a> {
+    store: &'a CellStore,
+    data: &'a SheetData,
+    reach: DistinctLimit,
+    out: DistinctColumn,
+    id_slots: PoolIdSlots,
+    id_stamps: PoolIdStamps,
+    key_slots: FxHashMap<DistinctKey<'a>, usize>,
+}
+
+impl<'a> DistinctScan<'a> {
+    fn new(store: &'a CellStore, data: &'a SheetData, reach: DistinctLimit) -> Self {
+        Self {
+            store,
+            data,
+            reach,
+            out: DistinctColumn::default(),
+            id_slots: PoolIdSlots::new(),
+            id_stamps: PoolIdStamps::new(),
+            key_slots: FxHashMap::default(),
+        }
+    }
+
+    /// Whether a scan that only lists holds `limit` values, so it is done.
+    #[inline]
+    const fn listed_all(&self) -> bool {
+        !self.reach.counted && self.reach.values != 0 && self.out.kinds.len() >= self.reach.values
+    }
+
+    /// Meets the cell at `index`, of resolved `kind`, as `met`; true when it
+    /// lists a new value. A counted scan counts a value it met before once
+    /// more. A new value is listed unless the list is full; a value first met
+    /// once the list is full is not listed.
+    #[inline]
+    fn meet(&mut self, index: usize, kind: u8, met: Met<'a>) -> bool {
+        match met {
+            Met::Id(id) => self.meet_id(index, kind, id),
+            Met::Key(key) => self.meet_key(index, kind, key),
+        }
+    }
+
+    /// [`Self::meet`] for text with the pool id `id`.
+    #[inline]
+    fn meet_id(&mut self, index: usize, kind: u8, id: u32) -> bool {
+        if !self.reach.counted {
+            if !self.id_stamps.insert(id) {
+                return false;
+            }
+            self.list(index, kind);
+            return true;
+        }
+        let next = self.out.kinds.len();
+        let full = self.reach.values != 0 && next >= self.reach.values;
+        match self.id_slots.slot(id, next, full) {
+            Some(slot) if slot < next => {
+                self.count_again(slot);
+                false
+            }
+            Some(_) => {
+                self.list(index, kind);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// [`Self::meet`] for any value but pooled text, by its key.
+    #[inline(never)]
+    fn meet_key(&mut self, index: usize, kind: u8, key: DistinctKey<'a>) -> bool {
+        let next = self.out.kinds.len();
+        let full = self.reach.values != 0 && next >= self.reach.values;
+        let found = if full {
+            self.key_slots.get(&key).copied()
+        } else {
+            Some(*self.key_slots.entry(key).or_insert(next))
+        };
+        match found {
+            Some(slot) if slot < next => {
+                self.count_again(slot);
+                false
+            }
+            Some(_) => {
+                self.list(index, kind);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Whether the scan met the text with the pool id `id` before: a listing
+    /// scan marked it, or a counted scan gave it a slot.
+    #[inline]
+    fn has_met(&self, id: u32) -> bool {
+        if self.reach.counted {
+            self.id_slots
+                .slots
+                .get(id as usize)
+                .is_some_and(|&stored| stored != 0)
+        } else {
+            stamp_marked(&self.id_stamps.words, id)
+        }
+    }
+
+    /// The number of leading rows of `kinds` and `payloads` that hold literal
+    /// text the scan met before. A counted scan counts them as it passes.
+    #[inline]
+    fn pass_met_text(&mut self, kinds: &[u8], payloads: &[u64]) -> usize {
+        if self.reach.counted {
+            count_listed_text_run(kinds, payloads, &self.id_slots.slots, &mut self.out.counts)
+        } else {
+            marked_text_run(kinds, payloads, &self.id_stamps.words)
+        }
+    }
+
+    /// [`Self::meet`] for the cell at `index`, resolved first. `None` for text
+    /// without a pool id, which has to meet pooled text by content.
+    #[inline(never)]
+    fn meet_cell(&mut self, index: usize) -> Option<bool> {
+        let (kind, met) = met_at(self.store, self.data, index, true)?;
+        Some(self.meet(index, kind, met))
+    }
+
+    /// Counts one more row that holds the value listed at `slot`.
+    #[inline]
+    fn count_again(&mut self, slot: usize) {
+        if let Some(rows_holding) = self.out.counts.get_mut(slot) {
+            *rows_holding = rows_holding.saturating_add(1);
+        }
+    }
+
+    /// Lists the value of the cell at `index`, of resolved `kind`; a counted
+    /// scan also keeps its style and a count of one.
+    #[inline(never)]
+    fn list(&mut self, index: usize, kind: u8) {
+        if self.reach.counted {
+            self.out.styles.push(self.data.cells.style_at(index));
+            self.out.counts.push(1);
+        }
+        push_entry(&mut self.out, self.store, self.data, index, kind);
+    }
+}
+
+/// The resolved kind of the cell at `index` and the value it meets a distinct
+/// scan as. While `pooled`, text meets it by pool id; `None` for text without
+/// one, which has to meet pooled text by content.
+#[inline]
+fn met_at<'a>(
+    store: &'a CellStore,
+    data: &SheetData,
+    index: usize,
+    pooled: bool,
+) -> Option<(u8, Met<'a>)> {
+    let slots = &store.formula_slots;
+    let kind = resolved_kind(data, index, slots);
+    let met = match kind {
+        1 => Met::Key(DistinctKey::Number(
+            numeric_cell_value(data, index, slots)
+                .unwrap_or_default()
+                .to_bits(),
+        )),
+        2 if pooled => match data.cells.str_id_at(index) {
+            NO_STRING => return None,
+            id => Met::Id(id),
+        },
+        2 => Met::Key(DistinctKey::Text(
+            resolved_text(data, &store.strings, index, slots).unwrap_or_default(),
+        )),
+        3 => Met::Key(DistinctKey::Bool(
+            boolean_cell_value(data, index, slots).unwrap_or_default(),
+        )),
+        _ => Met::Key(DistinctKey::Blank),
+    };
+    Some((kind, met))
+}
+
 /// The distinct resolved values of `col` over `rows`, in first-seen order. A
 /// `counted` scan also gives the style of each one's first cell and how many
 /// of the rows read hold it, and keeps each pool id's slot to count it. A
 /// scan that only lists stops at `limit` values and marks pool ids with one
-/// bit, so it never zero-fills four bytes per id of the string pool. Both are
-/// one function, so the dropdown's counted scan runs the code that listing
-/// calls (the cell editor's completion, the pivot field list) keep optimized.
+/// bit, so it never zero-fills four bytes per id of the string pool.
+/// [`distinct_dense`] does the same over a row range of a dense column.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,
@@ -1134,14 +1338,6 @@ fn distinct_over(
     rows: impl Iterator<Item = usize> + Clone,
     reach: DistinctLimit,
 ) -> DistinctColumn {
-    let DistinctLimit {
-        values: limit,
-        counted,
-    } = reach;
-    let mut out;
-    let text_at = |index: usize| {
-        resolved_text(data, &store.strings, index, &store.formula_slots).unwrap_or_default()
-    };
     // Stored text carries a pool id that stands for its value, so the scan
     // dedupes it by id instead of hashing the characters.
     // Text without an id — the sentinel a formula error reports reads back as
@@ -1150,72 +1346,131 @@ fn distinct_over(
     // keeps equal text a single entry, in first-seen order, either way.
     let mut pooled = true;
     loop {
-        out = DistinctColumn::default();
-        let mut id_slots = PoolIdSlots::new();
-        let mut id_stamps = PoolIdStamps::new();
-        let mut key_slots: FxHashMap<DistinctKey<'_>, usize> = FxHashMap::default();
+        let mut scan = DistinctScan::new(store, data, reach);
         let mut needs_content = false;
         for row in rows.clone() {
-            let next = out.kinds.len();
-            let full = limit != 0 && next >= limit;
-            if full && !counted {
-                break;
-            }
             let index = col * data.cells.row_count() + row;
-            let kind = resolved_kind(data, index, &store.formula_slots);
-            let met = match kind {
-                1 => Met::Key(DistinctKey::Number(
-                    numeric_cell_value(data, index, &store.formula_slots)
-                        .unwrap_or_default()
-                        .to_bits(),
-                )),
-                2 if pooled => match data.cells.str_id_at(index) {
-                    NO_STRING => {
-                        needs_content = true;
-                        break;
-                    }
-                    id => Met::Id(id),
-                },
-                2 => Met::Key(DistinctKey::Text(text_at(index))),
-                3 => Met::Key(DistinctKey::Bool(
-                    boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
-                )),
-                _ => Met::Key(DistinctKey::Blank),
+            let Some((kind, met)) = met_at(store, data, index, pooled) else {
+                needs_content = true;
+                break;
             };
-            let found = match met {
-                Met::Id(id) if counted => id_slots.slot(id, next, full),
-                Met::Id(id) => id_stamps.insert(id).then_some(next),
-                Met::Key(key) if full => key_slots.get(&key).copied(),
-                Met::Key(key) => Some(*key_slots.entry(key).or_insert(next)),
-            };
-            // A value first met once the list is full is not listed.
-            match found {
-                Some(slot) if slot < next => {
-                    if let Some(count) = out.counts.get_mut(slot) {
-                        *count = count.saturating_add(1);
-                    }
-                }
-                Some(_) => {
-                    if counted {
-                        out.styles.push(data.cells.style_at(index));
-                        out.counts.push(1);
-                    }
-                    push_entry(&mut out, store, data, index, kind);
-                }
-                None => {}
+            if scan.meet(index, kind, met) && scan.listed_all() {
+                break;
             }
         }
         if !needs_content {
-            break;
+            return scan.out;
         }
         pooled = false;
     }
-    QUERY_STATS.with(|stats| {
-        let mut current = stats.get();
-        current[1] = current[1].saturating_add(out.text_lengths.len() as u64);
-        stats.set(current);
-    });
-    out
+}
+
+/// [`distinct_over`] for the row range `rows` of a dense column. It reads the
+/// raw kind and payload slices. Literal text, the common cell, meets the scan
+/// by the pool id in its payload without resolving the cell, and the rows of
+/// text the scan met before go through one small loop that only marks or
+/// counts them ([`marked_text_run`], [`count_listed_text_run`]); every other
+/// row resolves as in [`distinct_over`]. Listing and counting share this
+/// function, so the `AutoFilter` dropdown's counted scan runs the code that
+/// listing calls (the cell editor's completion, the pivot field list) keep
+/// optimized. `None` for a paged column, or when a text cell has no pool id:
+/// [`distinct_over`] then scans on content.
+fn distinct_dense(
+    store: &CellStore,
+    data: &SheetData,
+    col: usize,
+    rows: Range<usize>,
+    reach: DistinctLimit,
+) -> Option<DistinctColumn> {
+    let column = data.cells.dense_column(col)?;
+    let (column_kinds, column_payloads) = column.raw_slices();
+    let kinds = column_kinds.get(rows.clone())?;
+    let payloads = column_payloads.get(rows.clone())?;
+    let first = col * data.cells.row_count() + rows.start;
+    let mut scan = DistinctScan::new(store, data, reach);
+    let mut offset = 0;
+    while let (Some(&kind), Some(&payload)) = (kinds.get(offset), payloads.get(offset)) {
+        let index = first + offset;
+        let listed = if kind == KIND_STRING && payload_is_str(payload) {
+            let id = payload_str_id(payload);
+            if scan.has_met(id) {
+                let passed = scan.pass_met_text(
+                    kinds.get(offset..).unwrap_or_default(),
+                    payloads.get(offset..).unwrap_or_default(),
+                );
+                if passed > 0 {
+                    offset += passed;
+                    continue;
+                }
+            }
+            scan.meet_id(index, KIND_STRING, id)
+        } else {
+            scan.meet_cell(index)?
+        };
+        if listed && scan.listed_all() {
+            break;
+        }
+        offset += 1;
+    }
+    Some(scan.out)
+}
+
+/// The number of leading rows that hold literal text whose pool id `marks`
+/// has marked: the rows a listing scan passes over. It is a small function on
+/// its own, so the WebAssembly engines keep the slices in registers and
+/// optimize it early.
+#[inline(never)]
+fn marked_text_run(kinds: &[u8], payloads: &[u64], marks: &[u64]) -> usize {
+    let unmarked = |(&kind, &payload): (&u8, &u64)| {
+        kind != KIND_STRING
+            || !payload_is_str(payload)
+            || !stamp_marked(marks, payload_str_id(payload))
+    };
+    // Every row is marked text when none stops the run.
+    kinds
+        .iter()
+        .zip(payloads)
+        .position(unmarked)
+        .unwrap_or(kinds.len())
+}
+
+/// Whether the [`PoolIdStamps`] words `marks` hold the mark of `id`.
+#[inline]
+fn stamp_marked(marks: &[u64], id: u32) -> bool {
+    let index = id as usize;
+    marks
+        .get(index / STAMP_WORD_BITS)
+        .is_some_and(|&bits| (bits >> (index % STAMP_WORD_BITS)) & 1 != 0)
+}
+
+/// The number of leading rows that hold literal text a counted scan listed
+/// before, each counted into `counts` at the slot `slots` holds for its pool
+/// id (slot `s` stored as `s + 1`): the rows a counted scan only counts. Small
+/// on its own for the same reason as [`marked_text_run`].
+#[inline(never)]
+fn count_listed_text_run(
+    kinds: &[u8],
+    payloads: &[u64],
+    slots: &[u32],
+    counts: &mut [u32],
+) -> usize {
+    for (offset, (&kind, &payload)) in kinds.iter().zip(payloads).enumerate() {
+        if kind != KIND_STRING || !payload_is_str(payload) {
+            return offset;
+        }
+        let stored = slots
+            .get(payload_str_id(payload) as usize)
+            .copied()
+            .unwrap_or_default();
+        let Some(rows_holding) = (stored as usize)
+            .checked_sub(1)
+            .and_then(|slot| counts.get_mut(slot))
+        else {
+            return offset;
+        };
+        *rows_holding = rows_holding.saturating_add(1);
+    }
+    kinds.len()
 }
 
 /// Lists the value of the cell at `index`, of resolved `kind`, as a new entry.

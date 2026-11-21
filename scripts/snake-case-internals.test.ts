@@ -105,6 +105,23 @@ describe("snake-case-internals", () => {
     }
   });
 
+  test("skips generated .gen.ts files, which their generator rewrites", async () => {
+    const directory = copyInput();
+
+    try {
+      writeFileSync(
+        join(directory, "routeTree.gen.ts"),
+        "const rootChildren = [1];\nexport const routeTree = rootChildren;\n",
+      );
+
+      const plan = await planRenames(join(directory, "tsconfig.json"), []);
+
+      expect(plan.renames.map((rename) => rename.oldName)).not.toContain("rootChildren");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test("a reflective call follows a private member of another project", async () => {
     const directory = copyInput();
 
@@ -118,6 +135,41 @@ describe("snake-case-internals", () => {
 
       expect(readFileSync(join(directory, "probe.ts"), "utf8")).toContain(
         'Reflect.get(target, "remote_member")',
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  test("a key in a double cast's type follows a private member of another project", async () => {
+    const directory = copyInput();
+
+    try {
+      writeFileSync(
+        join(directory, "view.ts"),
+        [
+          "export function peekView(target: object): number {",
+          "  const view = target as unknown as { remoteMember: { size: number }; otherKey: number };",
+          "  return view.remoteMember.size + view.otherKey;",
+          "}",
+          "",
+        ].join("\n"),
+      );
+      const other_members = new Map([["remoteMember", new Set(["remote_member"])]]);
+      const plan = await planRenames(
+        join(directory, "tsconfig.json"),
+        [],
+        new Map(),
+        other_members,
+      );
+      applyPlan(plan);
+
+      const view = readFileSync(join(directory, "view.ts"), "utf8");
+      expect(view).toContain("{ remote_member: { size: number }; otherKey: number }");
+      expect(view).toContain("view.remote_member.size + view.otherKey");
+      const names_only = plan.mentions.filter((mention) => mention.source === "name only");
+      expect(names_only.map((mention) => `${mention.line} ${mention.oldName}`)).toContain(
+        "2 remoteMember",
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });

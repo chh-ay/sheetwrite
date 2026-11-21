@@ -132,6 +132,18 @@ describe("typing into a general column", () => {
     expect(parseCellEntry("007", "general", "@").value).toEqual({ kind: "literal", value: "007" });
   });
 
+  it("reads long text in linear time and keeps it as text", () => {
+    // A pasted or stored cell of a digit, many spaces and a letter once made
+    // the date-and-time form backtrack in quadratic time.
+    const text = `1${" ".repeat(20_000)}x`;
+    const start = performance.now();
+    const { value, numberFormat } = parseCellEntry(text, "general");
+    expect(performance.now() - start).toBeLessThan(50);
+    expect(value).toEqual({ kind: "literal", value: text });
+    expect(numberFormat).toBeUndefined();
+    expect(cellEditText(text, "general")).toBe(text);
+  });
+
   it("reads the separators of the column's number locale", () => {
     expect(entry("1.234,5", "de-DE")).toEqual([1234.5, "#,##0.00"]);
     expect(entry("4,5", "de-DE")).toEqual([4.5, null]);

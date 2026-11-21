@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { changesetComparisonFromBaseRef } from "./changeset-ci.js";
+import { changesetComparisonFromBaseRef, unpublishedChangesetPackages } from "./changeset-ci.js";
 
 const CASES = [
   { githubBaseRef: "0.4.0", expectedBaseRef: "origin/0.4.0" },
@@ -20,4 +20,17 @@ describe("changeset comparison base", () => {
       });
     });
   }
+});
+
+describe("changeset packages", () => {
+  it("names the private packages a changeset would release", () => {
+    const changeset = (lines: string) => `---\n${lines}\n---\n\nSummary.\n`;
+    expect(
+      unpublishedChangesetPackages(
+        changeset(`"@sheetwrite/core": patch\n"@sheetwrite/bench": minor`),
+      ),
+    ).toEqual(["@sheetwrite/bench"]);
+    expect(unpublishedChangesetPackages(changeset(`"@sheetwrite/core": minor`))).toEqual([]);
+    expect(unpublishedChangesetPackages("---\n---\n")).toEqual([]);
+  });
 });

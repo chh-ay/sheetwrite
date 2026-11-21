@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
+import { formatGeneral } from "../src/general-format.js";
 import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
 
 describe("formatNumber", () => {
@@ -37,11 +38,49 @@ describe("formatNumber", () => {
     }
   });
 
-  it("falls back to a locale default without a code, and blanks non-finite", () => {
-    expect(formatNumber(1000)).toBe((1000).toLocaleString());
+  it("blanks non-finite numbers", () => {
     expect(formatNumber(Number.NaN, "0.00")).toBe("");
     expect(formatNumber(Number.POSITIVE_INFINITY, "#,##0.00")).toBe("");
     expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
+  });
+
+  // Excel's General shows up to 11 characters in a standard-width cell, the
+  // minus sign not counted, with no thousands separators.
+  it.each([
+    [2026, "2026"],
+    [2480.155, "2480.155"],
+    [3.14159265, "3.14159265"],
+    [1 / 3, "0.333333333"],
+    [0.1 + 0.2, "0.3"],
+    [0.0001234, "0.0001234"],
+    [0.000123456789, "0.000123457"],
+    [0.00001, "1E-05"],
+    [12345678901, "12345678901"],
+    [123456789012, "1.23457E+11"],
+    [1.23456789e19, "1.23457E+19"],
+    [1e100, "1E+100"],
+    [1.5e-300, "1.5E-300"],
+    [-1234.5, "-1234.5"],
+    [-0, "0"],
+  ] as const)("shows %s with no format as Excel's General: %s", (value, expected) => {
+    expect(formatNumber(value)).toBe(expected);
+    expect(formatNumber(value, "General")).toBe(expected);
+    // The Text format shows a number as General does.
+    expect(formatNumber(value, "@")).toBe(expected);
+  });
+
+  it("writes General with the locale's decimal separator and no grouping", () => {
+    expect(formatNumber(1234.5, undefined, "de-DE")).toBe("1234,5");
+    expect(formatNumber(123456789012, undefined, "de-DE")).toBe("1,23457E+11");
+  });
+
+  it("narrows General to a narrower cell as Excel does, and gives up where Excel shows ####", () => {
+    expect(formatGeneral(1234.5678, 6)).toBe("1234.6");
+    expect(formatGeneral(1234.5678, 4)).toBe("1235");
+    expect(formatGeneral(-1234.5678, 4)).toBe("-1235");
+    expect(formatGeneral(123456789, 6)).toBe("1E+08");
+    expect(formatGeneral(0.001, 3)).toBeNull();
+    expect(formatGeneral(123456789, 4)).toBeNull();
   });
 
   it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {
@@ -163,7 +202,7 @@ describe("formatNumber", () => {
       [-0, "$0.00", "en-US", "$-0.00"],
       [0, "$0.00", "en-US", "$0.00"],
       [-1, "yyyy-mm-dd", "en-US", "1899-12-30"],
-      [-0, undefined, undefined, "-0"],
+      [-0, undefined, undefined, "0"],
       [0, undefined, undefined, "0"],
       [-0, "0.00", undefined, "-0.00"],
       [0, "0.00", undefined, "0.00"],

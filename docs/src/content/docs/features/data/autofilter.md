@@ -28,7 +28,7 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 - A search box narrows the value list and ticks every result. With a search, **OK** keeps only the ticked results. Tick **Add current selection to filter** to add them to the values the filter keeps already: filter Region to North, then search `South` and press **OK** with the box ticked, and both regions show.
 - The value list ticks the values to show, with **(Select All)** and **(Blanks)**. Each value shows as its cell shows it, so prices read `$39.50`. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
 - Each value shows how many of those rows hold it, "North 12", and so do a date column's years, months and days. **OK** counts the rows the choice keeps as you tick: "OK (12 of 48 rows)". Excel shows neither; a value's count helps to spot a typo that one row holds, and OK's count shows the result before it applies.
-- In a date column the list groups the dates by year, month and day. Right Arrow or the arrow before a year or month opens it, and Left Arrow closes it. Ticking a year or month ticks all its dates.
+- In a date column the list groups the dates by year, month and day; numbers that do not show as dates list as they show. Right Arrow or the arrow before a year or month opens it, and Left Arrow closes it. Ticking a year or month ticks all its dates.
 
 A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet, and while a filter is on, the numbers of the filtered list are blue (the theme's `selectionBorder`), as in Excel. After each filter change the spreadsheet shell's status bar says how many rows the filter keeps, for example "12 of 48 records found", until the next edit.
 
@@ -80,7 +80,11 @@ As in Excel, edits don't filter again on their own. A row whose value no longer 
 
 As in Excel, copy, delete, formatting and the fill handle act on the rows the filter shows and skip the rows it hides. Cut is the exception, as in Excel: it moves every row from the first selected row to the last, the hidden ones too, so their data stays with the rows around it.
 
-Beyond Excel, which moves the hidden rows without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", and its paste "This paste moved 12 hidden rows". **Show them** clears the filters and shows the rows Hide Rows hid in the cut and where it landed, as one undo step, so you can check where the rows went. The cut and the paste give Excel's result either way.
+Paste is the other exception, as in Excel: a pasted block lands on the sheet rows from its first cell down, one row of the block per sheet row, so a row the filter or Hide Rows hides in that range is overwritten too. One copied value pasted over a selection fills only the cells the filter shows.
+
+Beyond Excel, which does both without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", its paste "This paste moved 12 hidden rows", and a paste that writes into hidden rows "This paste wrote into 3 hidden rows". **Show them** clears the filters and shows the rows Hide Rows hid in the rows the step covers, as one undo step, so you can check them. The cut and the paste give Excel's result either way.
+
+After a paste that wrote into hidden rows, the context menu's Paste Options row offers **Paste into visible rows only**, and `grid.actions.pasteVisibleRows()` does the same: it pastes the same cells again on the rows the filter and Hide Rows show, skipping the hidden ones, as one undo step. `grid.canPasteVisibleRows()` tells whether the last change is such a paste; any other change ends the offer.
 
 ## Undo, collaboration and XLSX files
 

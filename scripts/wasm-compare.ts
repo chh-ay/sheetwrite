@@ -1,15 +1,23 @@
 import { readFile } from "node:fs/promises";
 
+import { compareRelocations } from "./wasm-relocations.js";
+
 /**
  * Shows whether a Rust change altered the generated code of a packaged engine.
  *
  *   bun scripts/wasm-compare.ts <before.wasm> <after.wasm>
+ *   bun scripts/wasm-compare.ts --relocations [--module <new>=<old>]... <before.wasm> <after.wasm>
  *
  * Prints the size and hash of every section of both files. The change counts
  * as code-neutral (docs/contributing/rust.md) when the code section is
  * byte-identical and the data section has the same length; then the only
  * differing data bytes are the line and column numbers that panic locations
  * store, which move whenever source lines move. Exits 1 otherwise.
+ *
+ * `--relocations` is for a change that only moves Rust items into other
+ * modules or files, which renumbers functions and moves data. It passes when
+ * the builds run the same instructions (scripts/wasm-relocations.ts);
+ * `--module calc::parser=calc` names a module that the move created.
  */
 interface Section {
   name: string;
@@ -83,13 +91,29 @@ function differences(before: Uint8Array, after: Uint8Array): { bytes: number; ru
   return { bytes, runs };
 }
 
-const [beforePath, afterPath] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const isRelocations = args.includes("--relocations");
+const modules = args
+  .filter((_, at) => args[at - 1] === "--module")
+  .map((spec): [string, string] => {
+    const [moved, original] = spec.split("=");
+    if (moved === undefined || original === undefined)
+      throw new Error(`--module ${spec}: expected <new>=<old>`);
+    return [moved, original];
+  });
+const [beforePath, afterPath] = args.filter(
+  (arg, at) => !arg.startsWith("--") && args[at - 1] !== "--module",
+);
 if (beforePath === undefined || afterPath === undefined) {
-  throw new Error("usage: bun scripts/wasm-compare.ts <before.wasm> <after.wasm>");
+  throw new Error(
+    "usage: bun scripts/wasm-compare.ts [--relocations [--module <new>=<old>]...] <before.wasm> <after.wasm>",
+  );
 }
 
-const before = sections(new Uint8Array(await readFile(beforePath)));
-const after = sections(new Uint8Array(await readFile(afterPath)));
+const beforeBytes = new Uint8Array(await readFile(beforePath));
+const afterBytes = new Uint8Array(await readFile(afterPath));
+const before = sections(beforeBytes);
+const after = sections(afterBytes);
 const rows = ["| Section | Before | After |", "|---|---|---|"];
 const names = [...new Set([...before, ...after].map(({ name }) => name))];
 for (const name of names) {
@@ -113,6 +137,10 @@ if (sameDataLength && data[0] !== undefined && data[1] !== undefined) {
 }
 if (sameCode && sameDataLength) {
   process.stdout.write("Code-neutral: identical code section, data section of the same length.\n");
+} else if (isRelocations) {
+  const report = compareRelocations(beforeBytes, afterBytes, modules);
+  process.stdout.write(`${report.lines.join("\n")}\n`);
+  if (!report.isSameCode) process.exitCode = 1;
 } else {
   process.stdout.write("Not code-neutral: run the formula gate on both machines.\n");
   process.exitCode = 1;

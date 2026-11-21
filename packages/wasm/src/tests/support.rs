@@ -33,18 +33,18 @@ pub(crate) fn write_number_column(
     );
 }
 
-pub(super) fn assert_close(actual: f64, expected: f64) {
+pub(crate) fn assert_close(actual: f64, expected: f64) {
     assert!(
         (actual - expected).abs() < 1e-9,
         "expected {expected}, got {actual}"
     );
 }
 
-pub(super) fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
+pub(crate) fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
     store.get_cell(sheet, row, col).num()
 }
 
-pub(super) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<String> {
+pub(crate) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<String> {
     store.get_cell(sheet, row, col).string()
 }
 
