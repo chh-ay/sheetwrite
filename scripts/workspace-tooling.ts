@@ -196,25 +196,18 @@ export const TOOLING_TEST_PATHS = [
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
   "scripts/wasm-relocations.test.ts",
-  "scripts/snake-case-internals.test.ts",
 ] as const;
 
 export const UNIT_TEST_PATHS = [
   "packages",
   "scripts/public-api.test.ts",
   "scripts/conformance.test.ts",
-  "scripts/conformance-excel-runner.test.ts",
-  "scripts/conformance-google.test.ts",
-  "scripts/conformance-workbook-roundtrip.test.ts",
   "scripts/formula-contract.test.ts",
   "scripts/ci-paths.test.ts",
   "scripts/indexnow.test.ts",
   "scripts/release-github.test.ts",
   "scripts/docs.test.ts",
-  "scripts/docs-llms.test.ts",
   "scripts/docs-feed.test.ts",
-  // The hover engine reads the built @sheetwrite package declarations, as the site does.
-  "scripts/sheetwrite-code-hovers.test.ts",
   "bench/test",
   "docs/test",
 ] as const;

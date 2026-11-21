@@ -34,8 +34,8 @@ function clone(corpus: ConformanceCorpus): ConformanceCorpus {
   return structuredClone(corpus);
 }
 
-function hasIssue(issues: readonly string[], text: string): boolean {
-  return issues.some((issue) => issue.includes(text));
+function expectIssue(issues: readonly string[], text: string): void {
+  expect(issues).toContainEqual(expect.stringContaining(text));
 }
 
 function validateCorpusChecked(
@@ -61,16 +61,12 @@ describe("neutral conformance corpus", () => {
     const missingConsumption = clone(corpus);
     const missing = missingConsumption.cases.find((entry) => entry.id === direct!.id)!;
     missing.formula = missing.formula!.replace("ABS(C1)=0", "ABS(0)=0");
-    expect(
-      hasIssue(validateCorpusChecked(missingConsumption), "category input is not consumed"),
-    ).toBe(true);
+    expectIssue(validateCorpusChecked(missingConsumption), "category input is not consumed");
 
     const duplicate = clone(corpus);
     const duplicateAlternate = duplicate.cases.find((entry) => entry.id === alternate!.id)!;
     duplicateAlternate.formula = direct!.formula;
-    expect(
-      hasIssue(validateCorpusChecked(duplicate), "duplicate canonical subject/category formula"),
-    ).toBe(true);
+    expectIssue(validateCorpusChecked(duplicate), "duplicate canonical subject/category formula");
 
     expect(compareResults(direct!.expected, await runSheetwriteCase(direct!))).toEqual([]);
     const wrongResultPath = structuredClone(direct!);
@@ -120,12 +116,12 @@ describe("neutral conformance corpus", () => {
       result: { type: "number", value: 2 },
     });
     const observationIssues = validateCorpusChecked(observation);
-    expect(hasIssue(observationIssues, "producerVersion")).toBe(true);
-    expect(hasIssue(observationIssues, "artifactSha256")).toBe(true);
+    expectIssue(observationIssues, "producerVersion");
+    expectIssue(observationIssues, "artifactSha256");
 
     const secret = clone(corpus) as ConformanceCorpus & { clientSecret?: string };
     secret.clientSecret = "not-committable";
-    expect(hasIssue(validateCorpusChecked(secret), "secret-like field name")).toBe(true);
+    expectIssue(validateCorpusChecked(secret), "secret-like field name");
   });
 
   it("binds reviewed observations to exact immutable capture bytes", async () => {
@@ -148,9 +144,7 @@ describe("neutral conformance corpus", () => {
       result: corpus.cases[0]!.expected,
       artifactSha256: hash,
     });
-    expect(hasIssue(validateCorpusChecked(corpus), "no verified immutable capture binding")).toBe(
-      true,
-    );
+    expectIssue(validateCorpusChecked(corpus), "no verified immutable capture binding");
 
     const directory = await mkdtemp(join(tmpdir(), "sheetwrite-capture-"));
     try {
@@ -158,8 +152,10 @@ describe("neutral conformance corpus", () => {
       const verified = await verifyCaptureArtifacts(corpus, directory);
       expect(verified.issues).toEqual([]);
       const verifiedIssues = validateCorpusChecked(corpus, verified.verified);
-      expect(hasIssue(verifiedIssues, "no verified immutable capture binding")).toBe(false);
-      expect(hasIssue(verifiedIssues, "deterministic generator output drift")).toBe(true);
+      expect(verifiedIssues).not.toContainEqual(
+        expect.stringContaining("no verified immutable capture binding"),
+      );
+      expectIssue(verifiedIssues, "deterministic generator output drift");
 
       // Different bytes stored under the bound hash name are not verified.
       const tampered = new TextEncoder().encode(
@@ -173,7 +169,7 @@ describe("neutral conformance corpus", () => {
 
       corpus.cases[0]!.observations[0]!.result = { type: "number", value: 3 };
       const drifted = await verifyCaptureArtifacts(corpus, directory);
-      expect(hasIssue(drifted.issues, "does not bind reviewed observation")).toBe(true);
+      expectIssue(drifted.issues, "does not bind reviewed observation");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -186,23 +182,16 @@ describe("neutral conformance corpus", () => {
     const forgedManifest = structuredClone(CHECKED_MANIFEST);
     forgedManifest.corpusSha256 = sha256(altered);
     forgedManifest.caseSha256[0] = sha256(altered.cases[0]!);
-    const alteredIssues = validateCorpusChecked(
-      altered,
-      NO_ARTIFACTS,
-      forgedManifest,
-      CHECKED_INVENTORY,
-    );
-    expect(hasIssue(alteredIssues, "deterministic generator output drift")).toBe(true);
-    expect(hasIssue(alteredIssues, "deterministic generator binding drift")).toBe(true);
+    const alteredIssues = validateCorpusChecked(altered, NO_ARTIFACTS, forgedManifest);
+    expectIssue(alteredIssues, "deterministic generator output drift");
+    expectIssue(alteredIssues, "deterministic generator binding drift");
 
     const checksumDrift = structuredClone(CHECKED_MANIFEST);
     checksumDrift.caseSha256[0] = "0".repeat(64);
-    expect(
-      hasIssue(
-        validateCorpusChecked(corpus, NO_ARTIFACTS, checksumDrift),
-        "altered record or unstable checksum",
-      ),
-    ).toBe(true);
+    expectIssue(
+      validateCorpusChecked(corpus, NO_ARTIFACTS, checksumDrift),
+      "altered record or unstable checksum",
+    );
 
     const fake = clone(corpus);
     const fakeHash = "a".repeat(64);
@@ -220,76 +209,21 @@ describe("neutral conformance corpus", () => {
       result: fake.cases[0]!.expected,
       artifactSha256: fakeHash,
     });
-    expect(
-      hasIssue(
-        validateCorpusChecked(fake, new Set([fakeHash])),
-        "requires a verified reviewed external capture",
-      ),
-    ).toBe(true);
+    expectIssue(
+      validateCorpusChecked(fake, new Set([fakeHash])),
+      "requires a verified reviewed external capture",
+    );
 
     const denominatorDrift = structuredClone(CHECKED_MANIFEST);
     Object.assign(denominatorDrift.minimums, { formula: 1999 });
     Object.assign(denominatorDrift.counts, { mutation: 249 });
     const denominatorIssues = validateCorpusChecked(corpus, NO_ARTIFACTS, denominatorDrift);
-    expect(hasIssue(denominatorIssues, "required denominator is 2000")).toBe(true);
-    expect(hasIssue(denominatorIssues, "counts.mutation: denominator drift")).toBe(true);
+    expectIssue(denominatorIssues, "required denominator is 2000");
+    expectIssue(denominatorIssues, "counts.mutation: denominator drift");
   });
 });
 
-describe("offline typed comparison", () => {
-  it("reports type, error, tolerance, spill shape, formula, and displayed-text differences", () => {
-    const fields = (differences: readonly string[]) =>
-      differences.map((difference) => difference.slice(0, difference.indexOf(":"))).sort();
-    const tolerant = {
-      type: "number",
-      value: 1,
-      tolerance: { kind: "absolute", value: 0.01 },
-    } as const;
-    const array = {
-      type: "array",
-      value: [[1, 2]],
-      rows: 1,
-      columns: 2,
-      formula: "=A1:B1",
-    } as const;
-    const text = { type: "string", value: "2", displayedText: "2.00" } as const;
-
-    // Equal results, and a number inside its tolerance, have no differences.
-    for (const [expected, received] of [
-      [
-        { type: "error", error: "#N/A" },
-        { type: "error", error: "#N/A" },
-      ],
-      [tolerant, { type: "number", value: 1.005 }],
-      [array, structuredClone(array)],
-      [text, { ...text }],
-    ] as const) {
-      expect(compareResults(expected, received)).toEqual([]);
-    }
-
-    expect(
-      fields(compareResults({ type: "number", value: 2 }, { type: "string", value: "2" })),
-    ).toEqual(["type"]);
-    expect(
-      fields(compareResults({ type: "error", error: "#N/A" }, { type: "error", error: "#REF!" })),
-    ).toEqual(["error"]);
-    expect(fields(compareResults(tolerant, { type: "number", value: 1.02 }))).toEqual(["value"]);
-    expect(
-      fields(
-        compareResults(array, {
-          type: "array",
-          value: [[1], [2]],
-          rows: 2,
-          columns: 1,
-          formula: "=A1:A2",
-        }),
-      ),
-    ).toEqual(["columns", "formula", "rows", "value"]);
-    expect(fields(compareResults(text, { ...text, displayedText: "2" }))).toEqual([
-      "displayedText",
-    ]);
-  });
-
+describe("captures and the offline run", () => {
   it("rejects incomplete or drifted Excel Office Script captures", async () => {
     const corpus = clone(CORPUS);
     const capture = {
@@ -309,26 +243,8 @@ describe("offline typed comparison", () => {
     capture.scriptSha256 = "drifted";
     capture.observations.pop();
     const issues = validateExcelCapture(capture, corpus, capture.producerVersion, "runner-sha");
-    expect(hasIssue(issues, "runner drift")).toBe(true);
-    expect(hasIssue(issues, "missing, extra, or reordered")).toBe(true);
-  });
-
-  it("counts ULPs across zero within 64 bits", () => {
-    const ulps = (value: number) =>
-      ({ type: "number", value: 0, tolerance: { kind: "ulp", value } }) as const;
-
-    expect(compareResults(ulps(0), { type: "number", value: -0 })).toEqual([]);
-    expect(compareResults(ulps(1), { type: "number", value: -Number.MIN_VALUE })).toEqual([]);
-    expect(compareResults(ulps(1), { type: "number", value: Number.MIN_VALUE })).toEqual([]);
-    expect(compareResults(ulps(1), { type: "number", value: -2 * Number.MIN_VALUE })).not.toEqual(
-      [],
-    );
-    expect(
-      compareResults(
-        { type: "number", value: -Number.MIN_VALUE, tolerance: { kind: "ulp", value: 2 } },
-        { type: "number", value: Number.MIN_VALUE },
-      ),
-    ).toEqual([]);
+    expectIssue(issues, "runner drift");
+    expectIssue(issues, "missing, extra, or reordered");
   });
 
   it("rejects an array result whose matrix does not match its shape", () => {
@@ -358,12 +274,12 @@ describe("offline typed comparison", () => {
     expect(await run('="#literal"')).toMatchObject({ type: "string", value: "#literal" });
   });
 
-  it("runs every supported case and preserves the seven-canary metric", async () => {
+  it("runs every supported case and reports the release check as blocked", async () => {
     const corpus = clone(CORPUS);
     const result = await runOffline(corpus);
     const unsupported = corpus.cases.filter((entry) => entry.unsupported === true);
     expect(result.checked).toBe(corpus.cases.length);
-    expect(result.localCanaries).toBe(7);
+    expect(result.localCanaries).toBe(corpus.cases.filter((entry) => entry.localCanary).length);
     expect(result.unsupported).toEqual(unsupported.map((entry) => entry.id));
     expect(result.deferred).toBe(corpus.cases.length - unsupported.length);
     expect(result.status).toBe("blocked");

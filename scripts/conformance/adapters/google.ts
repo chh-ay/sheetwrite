@@ -26,7 +26,7 @@ export interface GoogleWorkbookManifest {
   timeZone?: string;
 }
 
-export interface GoogleCaptureDependencies {
+interface GoogleCaptureDependencies {
   producerVersion: string;
   request: (url: string, init?: RequestInit) => Promise<Response>;
   persist: (artifact: CaptureArtifact) => Promise<string>;
@@ -202,7 +202,7 @@ function assertArrayEnvelope(sheet: unknown, entry: ConformanceCase, batchIndex:
   }
 }
 
-export async function captureGoogleWithDependencies(
+async function captureGoogleWithDependencies(
   corpus: ConformanceCorpus,
   dependencies: GoogleCaptureDependencies,
 ): Promise<string> {
@@ -357,97 +357,6 @@ export async function captureGoogleWithDependencies(
     }),
   };
   return dependencies.persist(artifact);
-}
-
-export function validateGoogleCaptureArtifact(
-  value: unknown,
-  corpus: ConformanceCorpus,
-  producerVersion: string,
-): string[] {
-  const issues: string[] = [];
-  if (!isObject(value)) return ["google capture: expected object"];
-  if (value.producer !== "google-sheets") issues.push("google capture.producer: invalid");
-  if (value.producerVersion !== producerVersion) {
-    issues.push("google capture.producerVersion: exact producer version required");
-  }
-  if (value.batchSize !== MAX_GOOGLE_CASES_PER_WORKBOOK) {
-    issues.push("google capture.batchSize: quota drift");
-  }
-  const formulaCases = corpus.cases.filter((entry) => entry.kind === "formula");
-  const observations = Array.isArray(value.observations) ? value.observations : [];
-  if (observations.length !== formulaCases.length) {
-    issues.push("google capture.observations: missing, extra, or reordered");
-  }
-  formulaCases.forEach((entry, index) => {
-    const observation = observations[index];
-    if (!isObject(observation) || observation.caseId !== entry.id) {
-      issues.push(`google capture.observations[${index}]: missing, extra, or reordered`);
-    }
-  });
-  const workbooks = Array.isArray(value.workbooks) ? value.workbooks : [];
-  const requiredWorkbooks = Math.ceil(formulaCases.length / MAX_GOOGLE_CASES_PER_WORKBOOK);
-  if (workbooks.length !== requiredWorkbooks) {
-    issues.push("google capture.workbooks: batch denominator drift");
-  }
-  workbooks.forEach((workbook, batchIndex) => {
-    const path = `google capture.workbooks[${batchIndex}]`;
-    if (!isObject(workbook)) {
-      issues.push(`${path}: expected manifest`);
-      return;
-    }
-    const observationStart = batchIndex * MAX_GOOGLE_CASES_PER_WORKBOOK;
-    const batchCases = formulaCases.slice(
-      observationStart,
-      observationStart + MAX_GOOGLE_CASES_PER_WORKBOOK,
-    );
-    const batchObservations = observations.slice(
-      observationStart,
-      observationStart + batchCases.length,
-    );
-    const caseIds = batchCases.map((entry) => entry.id);
-    if (
-      workbook.batchIndex !== batchIndex ||
-      workbook.observationStart !== observationStart ||
-      workbook.caseCount !== batchCases.length ||
-      workbook.caseCount > MAX_GOOGLE_CASES_PER_WORKBOOK
-    ) {
-      issues.push(`${path}: invalid bounded batch ordering`);
-    }
-    if (
-      workbook.firstCaseId !== caseIds[0] ||
-      workbook.lastCaseId !== caseIds.at(-1) ||
-      workbook.caseIdsSha256 !== sha256(caseIds) ||
-      workbook.observationsSha256 !== sha256(batchObservations)
-    ) {
-      issues.push(`${path}: case/observation binding drift`);
-    }
-    const binding = {
-      batchIndex,
-      observationStart,
-      caseIds,
-      observationsSha256: workbook.observationsSha256,
-      workbookSha256: workbook.workbookSha256,
-      workbookBytes: workbook.workbookBytes,
-    };
-    if (workbook.bindingSha256 !== sha256(binding)) {
-      issues.push(`${path}.bindingSha256: tampered workbook binding`);
-    }
-  });
-  if (typeof value.capturedAt !== "string") {
-    issues.push("google capture.capturedAt: required");
-  } else {
-    const expectedBinding = sha256({
-      producer: "google-sheets",
-      producerVersion,
-      capturedAt: value.capturedAt,
-      observationsSha256: sha256(observations),
-      workbooks,
-    });
-    if (value.bindingSha256 !== expectedBinding) {
-      issues.push("google capture.bindingSha256: tampered aggregate binding");
-    }
-  }
-  return issues;
 }
 
 export async function captureGoogle(corpus: ConformanceCorpus): Promise<string> {

@@ -7,15 +7,10 @@ import { captureLibreOfficeWorkbookRoundtrips } from "./conformance/roundtrip.js
 import type { OfflineConformanceResult } from "./conformance/types.js";
 
 export { validateExcelCapture } from "./conformance/adapters/excel.js";
-export type {
-  GoogleCaptureDependencies,
-  GoogleWorkbookManifest,
-} from "./conformance/adapters/google.js";
+export type { GoogleWorkbookManifest } from "./conformance/adapters/google.js";
 export {
-  captureGoogleWithDependencies,
   MAX_GOOGLE_ARRAY_ENVELOPE_CELLS,
   MAX_GOOGLE_CASES_PER_WORKBOOK,
-  validateGoogleCaptureArtifact,
 } from "./conformance/adapters/google.js";
 export { runSheetwriteCase } from "./conformance/adapters/sheetwrite.js";
 export { verifyCaptureArtifacts } from "./conformance/capture.js";

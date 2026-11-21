@@ -33,7 +33,7 @@ import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./
  */
 export const LLMS_SITE_BASE = SITE_URL;
 export const LLMS_INDEX_PATH = "docs/public/llms.txt";
-export const LLMS_FULL_PATH = "docs/public/llms-full.txt";
+const LLMS_FULL_PATH = "docs/public/llms-full.txt";
 
 const contentRoot = "docs/src/content/docs";
 

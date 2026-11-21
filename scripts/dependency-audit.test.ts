@@ -114,32 +114,24 @@ describe("JavaScript dependency audit policy", () => {
     }
   });
 
-  it("rejects stale allowances as soon as the dependency or advisory disappears", () => {
-    expect(() =>
-      evaluateAuditPolicy({ exitCode: 0, stdout: "{}", stderr: "" }, [REVIEWED_ALLOWANCE], TODAY),
-    ).toThrow("Stale dependency audit allowances: vulnerable:GHSA-AAAA-BBBB-CCCC");
-  });
-
-  it("fails closed on malformed audit output", () => {
-    expect(() =>
-      evaluateAuditPolicy({ exitCode: 1, stdout: "not-json", stderr: "" }, [], TODAY),
-    ).toThrow("malformed JSON");
-    expect(() =>
-      evaluateAuditPolicy(
-        { exitCode: 1, stdout: JSON.stringify({ vulnerable: [{ severity: "high" }] }), stderr: "" },
-        [],
-        TODAY,
-      ),
-    ).toThrow("invalid schema");
-  });
-
-  it("fails closed when the audit service is unavailable", () => {
-    expect(() =>
-      evaluateAuditPolicy(
-        { exitCode: 1, stdout: "", stderr: "registry request timed out" },
-        [],
-        TODAY,
-      ),
-    ).toThrow("produced no JSON: registry request timed out");
+  it.each([
+    [
+      "a stale allowance",
+      { exitCode: 0, stdout: "{}", stderr: "" },
+      "Stale dependency audit allowances: vulnerable:GHSA-AAAA-BBBB-CCCC",
+    ],
+    ["malformed output", { exitCode: 1, stdout: "not-json", stderr: "" }, "malformed JSON"],
+    [
+      "a finding of an unknown shape",
+      { exitCode: 1, stdout: JSON.stringify({ vulnerable: [{ severity: "high" }] }), stderr: "" },
+      "invalid schema",
+    ],
+    [
+      "an unavailable audit service",
+      { exitCode: 1, stdout: "", stderr: "registry request timed out" },
+      "produced no JSON: registry request timed out",
+    ],
+  ])("fails closed on %s", (_label, result, message) => {
+    expect(() => evaluateAuditPolicy(result, [REVIEWED_ALLOWANCE], TODAY)).toThrow(message);
   });
 });

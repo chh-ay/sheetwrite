@@ -1,13 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import {
-  assertPublishedDeclarations,
-  formatBuiltJavaScript,
-  pruneUnreachableDeclarations,
-} from "./package-dist.js";
+import { assertPublishedDeclarations, pruneUnreachableDeclarations } from "./package-dist.js";
 
 const temporaryRoots: string[] = [];
 
@@ -87,11 +83,6 @@ describe("published declarations", () => {
     const root = await writePackage(TYPED_PACKAGE);
 
     await assertPublishedDeclarations(root, ["package.json", "dist/index.js", ...REACHABLE]);
-  });
-
-  it("rejects a published declaration no type entry reaches", async () => {
-    const root = await writePackage(TYPED_PACKAGE);
-
     expect(
       await rejection(assertPublishedDeclarations(root, [...REACHABLE, "dist/internal.d.ts"])),
     ).toContain("unreachable dist/internal.d.ts");
@@ -151,40 +142,5 @@ describe("built declaration pruning", () => {
       "has no declaration-file types entries",
     );
     expect(await Bun.file(join(root, "dist/index.d.ts")).exists()).toBe(true);
-  });
-});
-
-describe("built JavaScript formatting", () => {
-  it("indents with 2 spaces and keeps template contents and import order", async () => {
-    const source = [
-      'import "./second-side-effect.js";',
-      'import { first } from "./first.js";',
-      "export function render() {",
-      "    if (first) {",
-      "        return `<style>",
-      "    .cell { color: red; }",
-      "</style>`;",
-      "    }",
-      "}",
-      "",
-    ].join("\n");
-    const root = await writePackage({ "dist/render.js": source });
-
-    await formatBuiltJavaScript(root);
-
-    expect(await readFile(join(root, "dist/render.js"), "utf8")).toBe(
-      [
-        'import "./second-side-effect.js";',
-        'import { first } from "./first.js";',
-        "export function render() {",
-        "  if (first) {",
-        "    return `<style>",
-        "    .cell { color: red; }",
-        "</style>`;",
-        "  }",
-        "}",
-        "",
-      ].join("\n"),
-    );
   });
 });

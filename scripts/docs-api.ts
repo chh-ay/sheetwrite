@@ -424,7 +424,7 @@ const SEARCH_DESCRIPTION_MAX = 160;
  * two packages re-export from sharing one description. A long result is
  * clipped on a word; a short one stays short, as its JSDoc is.
  */
-export function symbolDescription(
+function symbolDescription(
   name: string,
   kind: string,
   packageLabel: string,
@@ -838,7 +838,7 @@ function closingIndex(text: string, open: number): number {
  * as the manifest records it (`<T>(a: A, b?: B): R`) or as a declaration
  * (`function name(…): R`); undefined when neither shape matches.
  */
-export function functionFields(signature: string, name: string): FunctionFields | undefined {
+function functionFields(signature: string, name: string): FunctionFields | undefined {
   const declared = signature.indexOf(`function ${name}`);
   let open = declared === -1 ? 0 : declared + `function ${name}`.length;
   if (signature[open] === "<") open = closingIndex(signature, open) + 1;

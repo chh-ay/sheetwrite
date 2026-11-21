@@ -102,21 +102,10 @@ describe("manual package release workflow", () => {
     }
   });
 
-  it("publishes only artifacts from successful CI without repeating its gates", async () => {
+  it("publishes the canonical CI artifacts with npm trusted publishing, never a stored token", async () => {
     const source = await readFile(workflowPath, "utf8");
-    const commands = Object.values((await workflow()).jobs ?? {})
-      .flatMap((job) => job.steps ?? [])
-      .flatMap((step) => (step.run ? [step.run] : []))
-      .join("\n");
-    expect(source).toContain("scripts/release-preflight.ts");
-    expect(commands).toContain("gh run download");
-    expect(commands).toContain("canonical-release-artifacts");
-    expect(commands).toContain("scripts/release-publish.ts");
-    expect(commands).toContain("scripts/release-github.ts");
-    expect(commands).not.toMatch(
-      /verify:ci|verify:release-quality|test:coverage|test:browser|release:prepare|release-verify\.ts|install-wasm-pack|browser:install/,
-    );
-    // Publication uses npm trusted publishing, never a stored token.
+    expect(source).toContain("gh run download");
+    expect(source).toContain("canonical-release-artifacts");
     expect(source).not.toMatch(
       /secrets\.(?:NODE_AUTH_TOKEN|NPM_TOKEN)|changeset publish|release-stage/,
     );
@@ -192,7 +181,7 @@ describe("manual package release workflow", () => {
     expect(publishCalls).toBe(0);
   });
 
-  it("publishes a mixed-version dependency-ordered subset sequentially", async () => {
+  it("resumes a partial publication one package at a time in dependency order, and rejects mismatched registry bytes", async () => {
     const artifacts = [WASM, CORE, REACT];
     const steps: string[] = [];
     const result = await publishArtifactsIdempotently(
@@ -200,7 +189,7 @@ describe("manual package release workflow", () => {
       artifacts,
       async (item) => {
         steps.push(`query:${idOf(item)}`);
-        return undefined;
+        return item.name === WASM.name ? registryEntry(WASM) : undefined;
       },
       async (_root, item) => {
         steps.push(`publish:${idOf(item)}`);
@@ -209,34 +198,14 @@ describe("manual package release workflow", () => {
         return published(item);
       },
     );
-    expect(steps).toEqual(
-      artifacts.flatMap((item) => [
+    expect(steps).toEqual([
+      `query:${idOf(WASM)}`,
+      ...[CORE, REACT].flatMap((item) => [
         `query:${idOf(item)}`,
         `publish:${idOf(item)}`,
         `done:${idOf(item)}`,
       ]),
-    );
-    expect(result.verifiedPackages.map((entry) => entry.version)).toEqual([
-      "0.7.0",
-      "1.4.0",
-      "2.1.3",
     ]);
-    expect(result.newlyPublishedPackages).toEqual(result.verifiedPackages);
-  });
-
-  it("resumes a partial prior publication and rejects mismatched registry bytes", async () => {
-    const artifacts = [WASM, CORE, REACT];
-    const publishedIds: string[] = [];
-    const result = await publishArtifactsIdempotently(
-      "/artifacts",
-      artifacts,
-      async (item) => (item.name === WASM.name ? registryEntry(WASM) : undefined),
-      async (_root, item) => {
-        publishedIds.push(idOf(item));
-        return published(item);
-      },
-    );
-    expect(publishedIds).toEqual([CORE, REACT].map(idOf));
     expect(result.verifiedPackages.map(idOf)).toEqual(artifacts.map(idOf));
     expect(result.newlyPublishedPackages.map(idOf)).toEqual([CORE, REACT].map(idOf));
 

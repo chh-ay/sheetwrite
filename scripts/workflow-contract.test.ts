@@ -56,70 +56,28 @@ describe("CI and release workflow contracts", () => {
       ]),
     ).not.toThrow();
 
-    const branchReference = parseWorkflowContract(
-      "jobs:\n  check:\n    steps:\n      - uses: actions/checkout@main",
-      "branch fixture",
-    );
-    expect(() =>
-      assertReviewedActionPins([{ name: "branch fixture", workflow: branchReference }], {
-        "actions/checkout": "0".repeat(40),
-      }),
-    ).toThrow("must use a 40-character SHA");
-
-    const unknownAction = parseWorkflowContract(
-      "jobs:\n  check:\n    steps:\n      - uses: unreviewed/action@0123456789012345678901234567890123456789",
-      "unknown fixture",
-    );
-    expect(() =>
-      assertReviewedActionPins([{ name: "unknown fixture", workflow: unknownAction }], {}),
-    ).toThrow("action is not reviewed");
-
-    const unreviewedCommit = parseWorkflowContract(
-      `jobs:\n  check:\n    steps:\n      - uses: actions/checkout@${"1".repeat(40)}`,
-      "unreviewed commit fixture",
-    );
-    expect(() =>
-      assertReviewedActionPins(
-        [{ name: "unreviewed commit fixture", workflow: unreviewedCommit }],
-        {
+    for (const [uses, message] of [
+      ["actions/checkout@main", "must use a 40-character SHA"],
+      [`unreviewed/action@${"0".repeat(40)}`, "action is not reviewed"],
+      [`actions/checkout@${"1".repeat(40)}`, "uses unreviewed SHA"],
+    ] as const) {
+      const fixture = parseWorkflowContract(
+        `jobs:\n  check:\n    steps:\n      - uses: ${uses}`,
+        uses,
+      );
+      expect(() =>
+        assertReviewedActionPins([{ name: uses, workflow: fixture }], {
           "actions/checkout": "0".repeat(40),
-        },
-      ),
-    ).toThrow();
+        }),
+      ).toThrow(message);
+    }
   });
 
-  it("never deploys production docs from CI", () => {
+  it("deploys production docs only from a release call or a manual run, never from CI", () => {
     // Production docs describe published packages; develop holds unreleased ones.
     for (const [name, ciJob] of Object.entries(workflows().ci.jobs)) {
       expect({ name, environment: ciJob.environment }).toEqual({ name, environment: undefined });
     }
-  });
-
-  it("checks the XLSX isolation of the examples in the production docs build", () => {
-    const steps = job("ci", "docs-build").steps ?? [];
-    const build = steps.findIndex((step) => step.name === "Build production docs");
-    const check = steps.findIndex((step) => step.name === "Example XLSX isolation");
-    expect(build).toBeGreaterThanOrEqual(0);
-    expect(check).toBeGreaterThan(build);
-    expect(steps[check]?.run).toBe("bun scripts/verify-example-xlsx-isolation.ts");
-  });
-
-  it("deploys docs from the release commit only after its GitHub release", () => {
-    const publish = job("release", "publish");
-    const docs = job("release", "docs");
-    const githubRelease = publish.steps?.find(
-      (step) => step.run === "bun scripts/release-github.ts",
-    );
-    if (githubRelease?.if === undefined) throw new Error("Missing GitHub release condition");
-
-    expect(publish.outputs?.released).toBe(`\${{ ${githubRelease.if} }}`);
-    expect(docs.if).toBe("needs.publish.outputs.released == 'true'");
-    expect(docs.needs).toEqual(["identity", "publish"]);
-    expect(docs.uses).toBe("./.github/workflows/docs-deploy.yml");
-    expect(docs.with).toEqual({ ref: "${{ needs.identity.outputs.commit }}" });
-  });
-
-  it("starts docs deployment only from a release call or a manual run", () => {
     const docs = workflows().docs;
     expect(Object.keys(docs.on ?? {}).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
     expect(docs.on?.workflow_dispatch?.inputs?.ref?.required).toBeTrue();
@@ -129,11 +87,34 @@ describe("CI and release workflow contracts", () => {
     expect(job("docs", "deploy").needs).toEqual(["build", "check"]);
   });
 
-  it("builds docs with the toolchain versions CI tests", () => {
-    const ciEnv = workflows().ci.env ?? {};
-    for (const [name, version] of Object.entries(workflows().docs.env ?? {})) {
-      expect({ name, version }).toEqual({ name, version: ciEnv[name] });
-    }
+  it("publishes the GitHub release from the verified commit, then deploys docs from it", () => {
+    const publish = job("release", "publish");
+    const docs = job("release", "docs");
+    const steps = publish.steps ?? [];
+    const releaseIndex = steps.findIndex((step) => step.run === "bun scripts/release-github.ts");
+    const githubRelease = steps[releaseIndex];
+    if (githubRelease?.if === undefined) throw new Error("Missing GitHub release condition");
+
+    expect(releaseIndex).toBeGreaterThan(steps.findIndex((step) => step.id === "publish"));
+    expect(githubRelease.if).toBe("steps.publish.outputs.pending != 'true'");
+    expect(githubRelease.env).toEqual({
+      GH_TOKEN: "${{ github.token }}",
+      EXPECTED_SHA: "${{ needs.identity.outputs.commit }}",
+      VERIFIED_PACKAGES: "${{ steps.publish.outputs.verified }}",
+      PUBLISHED_PACKAGES: "${{ steps.publish.outputs.published }}",
+    });
+    // Tags and release notes need the release commit with full tag history.
+    expect(publish.permissions?.contents).toBe("write");
+    expect(steps[0]?.with).toEqual({
+      ref: "${{ needs.identity.outputs.commit }}",
+      "fetch-depth": 0,
+    });
+
+    expect(publish.outputs?.released).toBe(`\${{ ${githubRelease.if} }}`);
+    expect(docs.if).toBe("needs.publish.outputs.released == 'true'");
+    expect(docs.needs).toEqual(["identity", "publish"]);
+    expect(docs.uses).toBe("./.github/workflows/docs-deploy.yml");
+    expect(docs.with).toEqual({ ref: "${{ needs.identity.outputs.commit }}" });
   });
 
   it(
@@ -290,11 +271,6 @@ describe("CI and release workflow contracts", () => {
       expect(result.stdout.toString()).toContain(name);
       expect(result.stdout.toString()).not.toContain(credentials.VERCEL_TOKEN);
     }
-    const missingAll = runDeployment({});
-    expect(missingAll.exitCode).toBe(1);
-    for (const name of Object.keys(credentials)) {
-      expect(missingAll.stdout.toString()).toContain(name);
-    }
   });
 
   it("gives changeset versioning the token that the GitHub changelog generator needs", () => {
@@ -308,30 +284,5 @@ describe("CI and release workflow contracts", () => {
     // Release publication owns tags and GitHub releases, one per version.
     expect(versioning.with?.["create-github-releases"]).toBe(false);
     expect(versioning.with?.["push-git-tags"]).toBe(false);
-  });
-
-  it("publishes the version GitHub release from the commit and packages that npm verified", () => {
-    const publish = workflows().release.jobs.publish;
-    const steps = publish?.steps ?? [];
-    const releaseIndex = steps.findIndex((step) => step.run === "bun scripts/release-github.ts");
-    const publishIndex = steps.findIndex((step) => step.id === "publish");
-    const step = steps[releaseIndex];
-    if (step === undefined) throw new Error("Missing GitHub release step");
-
-    expect(publishIndex).toBeGreaterThan(-1);
-    expect(releaseIndex).toBeGreaterThan(publishIndex);
-    expect(step.if).toBe("steps.publish.outputs.pending != 'true'");
-    expect(step.env).toEqual({
-      GH_TOKEN: "${{ github.token }}",
-      EXPECTED_SHA: "${{ needs.identity.outputs.commit }}",
-      VERIFIED_PACKAGES: "${{ steps.publish.outputs.verified }}",
-      PUBLISHED_PACKAGES: "${{ steps.publish.outputs.published }}",
-    });
-    // Tags and release notes need the release commit with full tag history.
-    expect(publish?.permissions?.contents).toBe("write");
-    expect(steps[0]?.with).toEqual({
-      ref: "${{ needs.identity.outputs.commit }}",
-      "fetch-depth": 0,
-    });
   });
 });

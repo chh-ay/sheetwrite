@@ -219,7 +219,7 @@ const semanticPrinter = new Bun.Transpiler({
 });
 
 /** Re-indent built JavaScript with 2 spaces, proving each file still means the same program. */
-export async function formatBuiltJavaScript(packageRoot: string): Promise<void> {
+async function formatBuiltJavaScript(packageRoot: string): Promise<void> {
   const files = await Array.fromAsync(new Bun.Glob(BUILT_JAVASCRIPT).scan({ cwd: packageRoot }));
   await Promise.all(
     files.map(async (file) => {

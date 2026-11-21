@@ -180,7 +180,7 @@ export async function unresolvedCssTokens(root: string): Promise<string[]> {
     .sort();
 }
 
-export function parseFences(content: string): Fence[] {
+function parseFences(content: string): Fence[] {
   const lines = content.split("\n");
   return fenceBlocks(lines).map((block) => {
     if (!block.closed) throw new Error(`Unclosed code fence at line ${block.start + 1}`);
