@@ -333,8 +333,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "fonts",
         size: "panel",
-        alt: "The Home ribbon's Font and Alignment groups above the Report sheet, with a wrapped, top-aligned comment cell selected, so Wrap Text and Top Align show as on.",
-        caption: "The Font and Alignment groups show the selected cell's settings.",
+        alt: "The Home ribbon's Font group and its open Alignment menu above the Report sheet, with a wrapped, top-aligned comment cell selected, so Wrap Text and Top Align show as on.",
+        caption: "The Font group and the Alignment menu show the selected cell's settings.",
       },
     },
   ],
