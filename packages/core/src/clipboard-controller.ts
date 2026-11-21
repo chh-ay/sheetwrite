@@ -57,6 +57,11 @@ export interface ClipboardControllerDeps {
   lifetime: Scope;
   store: Store;
   selection: () => SelectionModel;
+  /**
+   * The active cell on a row the view hides (`Grid.goToCell`), which Copy and
+   * Cut take alone, as Excel does; null without one.
+   */
+  hiddenActive?: () => CellAddress | null;
   activeSheet: () => SheetId;
   sheet: () => Sheet;
   colIndices: () => number[];
@@ -1687,9 +1692,61 @@ export class ClipboardController {
    * the rectangle in data rows when they are one block. Returns `null` when
    * there is no focused rectangle.
    */
+  /**
+   * The active cell on a row the view hides, copied or cut alone, as Excel's
+   * Copy and Cut take the active cell that Go To left on a hidden row. A cut
+   * of a spill's child cell is refused, as in a selection.
+   */
+  private captureHiddenCell(cut: boolean, addr: CellAddress): CapturedClipboard | null {
+    const { store } = this.deps;
+    const owner = store.getSpillAnchor(addr);
+    const child = owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
+    if (cut && child) return null;
+
+    const cell = store.getCell(addr);
+    const formula = store.getFormula(addr);
+    const ref = store.getRefTarget(addr);
+    const value: CellValue =
+      formula !== null
+        ? { kind: "formula", src: formula }
+        : child
+          ? { kind: "literal", value: null }
+          : ref !== null
+            ? { kind: "ref", target: ref }
+            : { kind: "literal", value: cell.resolved };
+    const at = { row: addr.row, col: addr.col };
+    const source: Range = { sheet: addr.sheet, start: at, end: at };
+    const sheet = this.deps.sheet();
+    const hyperlinks = (sheet.hyperlinks ?? [])
+      .filter(
+        ({ range }) =>
+          range.sheet === addr.sheet &&
+          range.start.row === addr.row &&
+          range.end.row === addr.row &&
+          range.start.col === addr.col &&
+          range.end.col === addr.col,
+      )
+      .map(cloneCellHyperlink);
+    return {
+      anchor: at,
+      cells: [[{ value, resolved: cell.resolved, style: cell.style }]],
+      hyperlinks,
+      tsv: rowsToTsv([[cell.resolved]]),
+      cut,
+      source,
+      notes: copyNotes(sheet, source),
+      conditionalFormats: copyConditionalFormats(sheet, source),
+      validation: copiedValidation(sheet.validationRules ?? [], source),
+      columnWidths: [sheet.columns[addr.col]?.width ?? 0],
+    };
+  }
+
   private capture(cut: boolean): CapturedClipboard | null {
     const focus = this.deps.selection().focusCell;
-    if (!focus) return null;
+    if (!focus) {
+      const hidden = this.deps.hiddenActive?.();
+      return hidden ? this.captureHiddenCell(cut, hidden) : null;
+    }
     const rects: SelRect[] = [];
     this.deps.selection().forEachRect((r) => rects.push(r));
     const selected = rects.find(

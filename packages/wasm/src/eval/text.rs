@@ -720,7 +720,9 @@ pub(super) fn parse_number(
 mod tests {
     use super::{apply, clean_text, literal_find, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES};
     use crate::calc::Func;
-    use crate::types::{FormulaError, Value};
+    use crate::store::CellStore;
+    use crate::tests::support::{assert_close, number, string};
+    use crate::types::{FormulaError, Value, KIND_BOOL, KIND_FORMULA, KIND_STRING};
 
     use super::super::test_support::mixed_arguments;
 
@@ -1080,5 +1082,50 @@ mod tests {
             evaluate(Func::Lower, vec![Value::text("İ")]),
             Value::text("i\u{307}")
         );
+    }
+
+    #[test]
+    fn text_functions_surface_string_and_boolean_values() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 16);
+        let formulas = [
+            (0, r#"="Hello ""Q""""#),
+            (1, r#"=LEN("Hello")"#),
+            (2, r#"=LEFT("abcdef",3)"#),
+            (3, r#"=RIGHT("abcdef",3)"#),
+            (4, r#"=MID("abcdef",2,3)"#),
+            (5, r#"=CONCAT("A",1,TRUE)"#),
+            (6, r#"=CONCATENATE("x","y")"#),
+            (7, r#"=UPPER("MiX")"#),
+            (8, r#"=LOWER("MiX")"#),
+            (9, r#"=TRIM("  a   b  ")"#),
+            (10, r#"=TEXT(12.345,"0.00")"#),
+            (11, r#"=EXACT("Hi","Hi")"#),
+            (12, r#"=EXACT("Hi","hi")"#),
+        ];
+        for (row, src) in formulas {
+            store.set_formula(sheet, row, 0, src, 0);
+        }
+        store.recompute(sheet);
+
+        assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_STRING);
+        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("Hello \"Q\""));
+
+        let length = store.get_cell(sheet, 1, 0);
+        assert_eq!((length.kind(), length.num()), (KIND_FORMULA, 5.0));
+
+        assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("abc"));
+        assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("def"));
+        assert_eq!(string(&store, sheet, 4, 0).as_deref(), Some("bcd"));
+        assert_eq!(string(&store, sheet, 5, 0).as_deref(), Some("A1TRUE"));
+        assert_eq!(string(&store, sheet, 6, 0).as_deref(), Some("xy"));
+        assert_eq!(string(&store, sheet, 7, 0).as_deref(), Some("MIX"));
+        assert_eq!(string(&store, sheet, 8, 0).as_deref(), Some("mix"));
+        assert_eq!(string(&store, sheet, 9, 0).as_deref(), Some("a b"));
+        assert_eq!(string(&store, sheet, 10, 0).as_deref(), Some("12.35"));
+        assert_eq!(store.get_cell(sheet, 11, 0).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, 11, 0), 1.0);
+        assert_eq!(store.get_cell(sheet, 12, 0).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, 12, 0), 0.0);
     }
 }
