@@ -171,6 +171,8 @@ export type RibbonGroupSpec =
 
 export interface RibbonTabSpec {
   readonly label: string;
+  /** The tab the ribbon opens on while it shows, as Excel opens on Home; else the first tab shown. */
+  readonly opensFirst?: true;
   readonly groups: readonly RibbonGroupSpec[];
   /**
    * Group ids in the order they give up space as the ribbon narrows. Excel
