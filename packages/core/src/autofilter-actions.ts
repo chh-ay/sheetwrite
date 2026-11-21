@@ -103,16 +103,18 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
     AUTO_FILTER_VALUE_LIMIT,
   );
   const kind = autoFilterColumnKind(column, values, formats);
-  // Each value shows as its first cell shows it, else in the column's format.
-  // Typed numbers and dates take the format of the first listed date.
+  // Each listed value shows as its first cell shows it, else in the column's
+  // format. Typed condition values take the format of the first listed date.
   const formatOf = new Map<CellScalar, string | undefined>();
   for (const [index, value] of values.entries()) formatOf.set(value, formats[index]);
   const typedFormat =
     (kind === "date" ? formats.find((code) => DATE_FORMAT.test(code ?? "")) : undefined) ??
     column?.numberFormat;
+  const shownFormat = (value: number): string | undefined =>
+    formatOf.has(value) ? (formatOf.get(value) ?? column?.numberFormat) : typedFormat;
   const format = (value: CellScalar): string =>
     typeof value === "number"
-      ? formatNumber(value, formatOf.get(value) ?? typedFormat, column?.numberLocale)
+      ? formatNumber(value, shownFormat(value), column?.numberLocale)
       : typeof value === "boolean"
         ? value
           ? "TRUE"
@@ -124,6 +126,10 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
     header:
       headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
     kind,
+    // As in Excel, only numbers that show as dates group by year, month and day.
+    isDate: (value) =>
+      column?.type === "date" ||
+      DATE_FORMAT.test(formatOf.get(value) ?? column?.numberFormat ?? ""),
     values,
     counts,
     kept,
