@@ -1,0 +1,718 @@
+PASS [click-showcases_spreadsheet-chromium-1440] load settled 1511 ms 
+controls (3): Wide | Narrow | Fold the ribbon
+PASS [click-showcases_spreadsheet-chromium-1440] #0 Wide  
+PASS [click-showcases_spreadsheet-chromium-1440] #1 Narrow  
+PASS [click-showcases_spreadsheet-chromium-1440] #2 Fold the ribbon  
+PASS [click-showcases_formula-assist-chromium-1440] load controls still disabled after 15 s; settled 15651 ms 
+controls (6): Finance's total | Finance's share | March's total | People's total | People's share | Reset
+PASS [click-showcases_formula-assist-chromium-1440] #0 Finance's total  
+PASS [click-showcases_formula-assist-chromium-1440] #1 Finance's share  
+PASS [click-showcases_formula-assist-chromium-1440] #2 March's total  
+PASS [click-showcases_formula-assist-chromium-1440] #3 People's total  
+PASS [click-showcases_formula-assist-chromium-1440] #4 People's share  
+PASS [click-showcases_formula-assist-chromium-1440] #5 Reset  
+PASS [click-showcases_sort-chromium-1440] load controls still disabled after 15 s; settled 15564 ms 
+controls (7): Revenue, largest first | Region A–Z, then revenue | Custom Sort… | Revenue, largest first | Region A–Z, then revenue | Clear view sort | Undo
+PASS [click-showcases_sort-chromium-1440] #0 Revenue, largest first  
+PASS [click-showcases_sort-chromium-1440] #1 Region A–Z, then revenue  
+PASS [click-showcases_sort-chromium-1440] #2 Custom Sort…  
+PASS [click-showcases_sort-chromium-1440] #3 Revenue, largest first  
+PASS [click-showcases_sort-chromium-1440] #4 Region A–Z, then revenue  
+PASS [click-showcases_sort-chromium-1440] #5 Clear view sort  
+PASS [click-showcases_sort-chromium-1440] #6 Undo  
+PASS [click-showcases_data-tools-chromium-1440] load settled 487 ms 
+controls (9): Clear view | Collapse batch | Hide rows 25–27 | Hide freight & owner | Try units −5 | Try freight $350 | Try a new order ID | Operator | Manager
+PASS [click-showcases_data-tools-chromium-1440] #0 Clear view  
+PASS [click-showcases_data-tools-chromium-1440] #1 Collapse batch  
+PASS [click-showcases_data-tools-chromium-1440] #2 Hide rows 25–27  
+PASS [click-showcases_data-tools-chromium-1440] #3 Hide freight & owner  
+PASS [click-showcases_data-tools-chromium-1440] #4 Try units −5  
+PASS [click-showcases_data-tools-chromium-1440] #5 Try freight $350  
+PASS [click-showcases_data-tools-chromium-1440] #6 Try a new order ID  
+PASS [click-showcases_data-tools-chromium-1440] #7 Operator  
+PASS [click-showcases_data-tools-chromium-1440] #8 Manager  
+PASS [click-showcases_performance-chromium-1440] load settled 840 ms 
+controls (13): Zoom out | Zoom in | Reset | Dive to row 1,000,000Every order of magnitude, top | Cross to cell ALL1000000Rows and columns together, | Teleport 12 timesRandom cells anywhere in the bill | Jump to cell | 0% | 25% | 50% | 75% | 100% | Random
+PASS [click-showcases_performance-chromium-1440] #0 Zoom out  
+PASS [click-showcases_performance-chromium-1440] #1 Zoom in  
+PASS [click-showcases_performance-chromium-1440] #2 Reset disabled 
+PASS [click-showcases_performance-chromium-1440] #3 Dive to row 1,000,000Every order of magnitude, top  
+PASS [click-showcases_performance-chromium-1440] #4 Cross to cell ALL1000000Rows and columns together,  
+PASS [click-showcases_performance-chromium-1440] #5 Teleport 12 timesRandom cells anywhere in the bill  
+PASS [click-showcases_performance-chromium-1440] #6 Jump to cell  
+PASS [click-showcases_performance-chromium-1440] #7 0%  
+PASS [click-showcases_performance-chromium-1440] #8 25%  
+PASS [click-showcases_performance-chromium-1440] #9 50%  
+PASS [click-showcases_performance-chromium-1440] #10 75%  
+PASS [click-showcases_performance-chromium-1440] #11 100%  
+PASS [click-showcases_performance-chromium-1440] #12 Random  
+PASS [click-showcases_formulas-chromium-1440] load settled 926 ms 
+controls (17): Analysis | Orders · 20,000 rows | Run an APAC promotion: +20% units | A2Revenue by region | D2Region × channel | J2Share of revenue | A11Top 5 products | L2Order revenue statistics | D11Largest orders | G11Best product | L11Price elasticity | A19Monthly revenue and running total | D19Region from order code | A33Units to stock per order | D33Value of the year | G33Query the ledger | Calculate
+PASS [click-showcases_formulas-chromium-1440] #0 Analysis  
+PASS [click-showcases_formulas-chromium-1440] #1 Orders · 20,000 rows  
+PASS [click-showcases_formulas-chromium-1440] #2 Run an APAC promotion: +20% units  
+PASS [click-showcases_formulas-chromium-1440] #3 A2Revenue by region  
+PASS [click-showcases_formulas-chromium-1440] #4 D2Region × channel  
+PASS [click-showcases_formulas-chromium-1440] #5 J2Share of revenue  
+PASS [click-showcases_formulas-chromium-1440] #6 A11Top 5 products  
+PASS [click-showcases_formulas-chromium-1440] #7 L2Order revenue statistics  
+PASS [click-showcases_formulas-chromium-1440] #8 D11Largest orders  
+PASS [click-showcases_formulas-chromium-1440] #9 G11Best product  
+PASS [click-showcases_formulas-chromium-1440] #10 L11Price elasticity  
+PASS [click-showcases_formulas-chromium-1440] #11 A19Monthly revenue and running total  
+PASS [click-showcases_formulas-chromium-1440] #12 D19Region from order code  
+PASS [click-showcases_formulas-chromium-1440] #13 A33Units to stock per order  
+PASS [click-showcases_formulas-chromium-1440] #14 D33Value of the year  
+PASS [click-showcases_formulas-chromium-1440] #15 G33Query the ledger  
+PASS [click-showcases_formulas-chromium-1440] #16 Calculate  
+PASS [click-showcases_formatting-chromium-1440] load settled 837 ms 
+controls (26): Bold | Italic | Underline | Strike | Highlight | Outline | General | Number | Currency | Accounting | Percentage | Date | Scientific | Arial | Georgia | Courier New | Theme fallback | Align left | Align center | Align right | top | middle | bottom | 18 px | Wrap | Export, then re-import XLSX
+PASS [click-showcases_formatting-chromium-1440] #0 Bold  
+PASS [click-showcases_formatting-chromium-1440] #1 Italic  
+PASS [click-showcases_formatting-chromium-1440] #2 Underline  
+PASS [click-showcases_formatting-chromium-1440] #3 Strike  
+PASS [click-showcases_formatting-chromium-1440] #4 Highlight  
+PASS [click-showcases_formatting-chromium-1440] #5 Outline  
+PASS [click-showcases_formatting-chromium-1440] #6 General  
+PASS [click-showcases_formatting-chromium-1440] #7 Number  
+PASS [click-showcases_formatting-chromium-1440] #8 Currency  
+PASS [click-showcases_formatting-chromium-1440] #9 Accounting  
+PASS [click-showcases_formatting-chromium-1440] #10 Percentage  
+PASS [click-showcases_formatting-chromium-1440] #11 Date  
+PASS [click-showcases_formatting-chromium-1440] #12 Scientific  
+PASS [click-showcases_formatting-chromium-1440] #13 Arial  
+PASS [click-showcases_formatting-chromium-1440] #14 Georgia  
+PASS [click-showcases_formatting-chromium-1440] #15 Courier New  
+PASS [click-showcases_formatting-chromium-1440] #16 Theme fallback  
+PASS [click-showcases_formatting-chromium-1440] #17 Align left  
+PASS [click-showcases_formatting-chromium-1440] #18 Align center  
+PASS [click-showcases_formatting-chromium-1440] #19 Align right  
+PASS [click-showcases_formatting-chromium-1440] #20 top  
+PASS [click-showcases_formatting-chromium-1440] #21 middle  
+PASS [click-showcases_formatting-chromium-1440] #22 bottom  
+PASS [click-showcases_formatting-chromium-1440] #23 18 px  
+PASS [click-showcases_formatting-chromium-1440] #24 Wrap  
+PASS [click-showcases_formatting-chromium-1440] #25 Export, then re-import XLSX  
+PASS [click-showcases_analysis-chromium-1440] load settled 814 ms 
+controls (1): Go to the order
+PASS [click-showcases_analysis-chromium-1440] #0 Go to the order  
+PASS [click-showcases_host-rows-chromium-1440] load controls still disabled after 15 s; settled 15820 ms 
+controls (9): Import 10,000 leads | Remote update | Insert row | Delete row | Sort view by amount | Filter North | Clear filter | Reject next edit | Transformed accept
+PASS [click-showcases_host-rows-chromium-1440] #0 Import 10,000 leads  
+PASS [click-showcases_host-rows-chromium-1440] #1 Remote update  
+PASS [click-showcases_host-rows-chromium-1440] #2 Insert row  
+PASS [click-showcases_host-rows-chromium-1440] #3 Delete row  
+PASS [click-showcases_host-rows-chromium-1440] #4 Sort view by amount  
+PASS [click-showcases_host-rows-chromium-1440] #5 Filter North  
+PASS [click-showcases_host-rows-chromium-1440] #6 Clear filter  
+PASS [click-showcases_host-rows-chromium-1440] #7 Reject next edit  
+PASS [click-showcases_host-rows-chromium-1440] #8 Transformed accept  
+PASS [click-showcases_database-chromium-1440] load controls still disabled after 15 s; settled 15475 ms 
+controls (5): Reload with unsaved edits | Clear 100,000 cells, then undo | Add one subscriber seat — Commit sample edit | Save pending now | Close and reopen session
+PASS [click-showcases_database-chromium-1440] #0 Reload with unsaved edits  
+PASS [click-showcases_database-chromium-1440] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_database-chromium-1440] #2 Add one subscriber seat — Commit sample edit disabled 
+PASS [click-showcases_database-chromium-1440] #3 Save pending now disabled 
+PASS [click-showcases_database-chromium-1440] #4 Close and reopen session  
+PASS [click-showcases_collaboration-chromium-1440] load controls still disabled after 15 s; settled 15572 ms 
+controls (5): Run a chaos test | Clear 100,000 cells, then undo | Take Bram offline | Queue one Grid edit | Reconnect
+PASS [click-showcases_collaboration-chromium-1440] #0 Run a chaos test  
+PASS [click-showcases_collaboration-chromium-1440] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_collaboration-chromium-1440] #2 Take Bram offline disabled 
+PASS [click-showcases_collaboration-chromium-1440] #3 Queue one Grid edit  
+PASS [click-showcases_collaboration-chromium-1440] #4 Reconnect  
+PASS [click-showcases_interoperability-chromium-1440] load settled 706 ms 
+controls (5): Export, re-import & compare | Download .xlsx | Reset workbench | Generate & import 200,000 rows | Run the round trip
+PASS [click-showcases_interoperability-chromium-1440] #0 Export, re-import & compare  
+PASS [click-showcases_interoperability-chromium-1440] #1 Download .xlsx  
+PASS [click-showcases_interoperability-chromium-1440] #2 Reset workbench  
+PASS [click-showcases_interoperability-chromium-1440] #3 Generate & import 200,000 rows  
+PASS [click-showcases_interoperability-chromium-1440] #4 Run the round trip hidden 
+PASS [click-showcases_functions-chromium-1440] load settled 634 ms 
+controls (1): Set number
+PASS [click-showcases_functions-chromium-1440] #0 Set number disabled 
+PASS [click-showcases_recalculation-chromium-1440] load controls still disabled after 15 s; settled 15381 ms 
+controls (3): Change the price | Run 10 changes | Move the lookups
+PASS [click-showcases_recalculation-chromium-1440] #0 Change the price  
+PASS [click-showcases_recalculation-chromium-1440] #1 Run 10 changes  
+PASS [click-showcases_recalculation-chromium-1440] #2 Move the lookups  
+PASS [click-showcases_data-model-chromium-1440] load settled 586 ms 
+controls (8): Repeat a product ID | Order product P-999 | Relationships… | Category | Region | Manager | PivotTable Fields… | Undo
+PASS [click-showcases_data-model-chromium-1440] #0 Repeat a product ID  
+PASS [click-showcases_data-model-chromium-1440] #1 Order product P-999  
+PASS [click-showcases_data-model-chromium-1440] #2 Relationships…  
+PASS [click-showcases_data-model-chromium-1440] #3 Category  
+PASS [click-showcases_data-model-chromium-1440] #4 Region  
+PASS [click-showcases_data-model-chromium-1440] #5 Manager  
+PASS [click-showcases_data-model-chromium-1440] #6 PivotTable Fields…  
+PASS [click-showcases_data-model-chromium-1440] #7 Undo  
+PASS [click-showcases_dashboards-chromium-1440] load settled 614 ms 
+controls (4): Keep Americas in the Region slicer | Add a product pivot | Swap the chart and the pivot | Undo
+PASS [click-showcases_dashboards-chromium-1440] #0 Keep Americas in the Region slicer  
+PASS [click-showcases_dashboards-chromium-1440] #1 Add a product pivot  
+PASS [click-showcases_dashboards-chromium-1440] #2 Swap the chart and the pivot  
+PASS [click-showcases_dashboards-chromium-1440] #3 Undo  
+PASS [click-showcases_queries-chromium-1440] load controls still disabled after 15 s; settled 15510 ms 
+controls (6): Refresh All | 250 new orders arrive | Shipped only | All statuses | Queries & Connections… | Undo
+PASS [click-showcases_queries-chromium-1440] #0 Refresh All  
+PASS [click-showcases_queries-chromium-1440] #1 250 new orders arrive  
+PASS [click-showcases_queries-chromium-1440] #2 Shipped only  
+PASS [click-showcases_queries-chromium-1440] #3 All statuses  
+PASS [click-showcases_queries-chromium-1440] #4 Queries & Connections…  
+PASS [click-showcases_queries-chromium-1440] #5 Undo  
+PASS [click-showcases_version-history-chromium-1440] load controls still disabled after 15 s; settled 15529 ms 
+controls (7): Raise Marketing by 15% | Sam Lee cuts Travel in Q3–Q4 | Save version | Version History… | Compare with now | Restore Q3 and Q4 | Restore the whole sheet
+PASS [click-showcases_version-history-chromium-1440] #0 Raise Marketing by 15%  
+PASS [click-showcases_version-history-chromium-1440] #1 Sam Lee cuts Travel in Q3–Q4  
+PASS [click-showcases_version-history-chromium-1440] #2 Save version  
+PASS [click-showcases_version-history-chromium-1440] #3 Version History…  
+PASS [click-showcases_version-history-chromium-1440] #4 Compare with now  
+PASS [click-showcases_version-history-chromium-1440] #5 Restore Q3 and Q4  
+PASS [click-showcases_version-history-chromium-1440] #6 Restore the whole sheet  
+PASS [click-vanilla-chromium-1440] load controls still disabled after 15 s; settled 15576 ms 
+controls (0): 
+PASS [click-react-chromium-1440] load controls still disabled after 15 s; settled 16502 ms 
+controls (0): 
+PASS [click-vue-chromium-1440] load settled 919 ms 
+controls (0): 
+PASS [click-svelte-chromium-1440] load controls still disabled after 15 s; settled 15720 ms 
+controls (0): 
+PASS [click-showcases_spreadsheet-chromium-390] load settled 817 ms 
+controls (3): Wide | Narrow | Fold the ribbon
+PASS [click-showcases_spreadsheet-chromium-390] #0 Wide  
+PASS [click-showcases_spreadsheet-chromium-390] #1 Narrow  
+PASS [click-showcases_spreadsheet-chromium-390] #2 Fold the ribbon  
+PASS [click-showcases_formula-assist-chromium-390] load settled 739 ms 
+controls (6): Finance's total | Finance's share | March's total | People's total | People's share | Reset
+PASS [click-showcases_formula-assist-chromium-390] #0 Finance's total  
+PASS [click-showcases_formula-assist-chromium-390] #1 Finance's share  
+PASS [click-showcases_formula-assist-chromium-390] #2 March's total  
+PASS [click-showcases_formula-assist-chromium-390] #3 People's total  
+PASS [click-showcases_formula-assist-chromium-390] #4 People's share  
+PASS [click-showcases_formula-assist-chromium-390] #5 Reset  
+PASS [click-showcases_sort-chromium-390] load settled 544 ms 
+controls (7): Revenue, largest first | Region A–Z, then revenue | Custom Sort… | Revenue, largest first | Region A–Z, then revenue | Clear view sort | Undo
+PASS [click-showcases_sort-chromium-390] #0 Revenue, largest first  
+PASS [click-showcases_sort-chromium-390] #1 Region A–Z, then revenue  
+PASS [click-showcases_sort-chromium-390] #2 Custom Sort…  
+PASS [click-showcases_sort-chromium-390] #3 Revenue, largest first  
+PASS [click-showcases_sort-chromium-390] #4 Region A–Z, then revenue  
+PASS [click-showcases_sort-chromium-390] #5 Clear view sort  
+PASS [click-showcases_sort-chromium-390] #6 Undo  
+PASS [click-showcases_data-tools-chromium-390] load settled 451 ms 
+controls (9): Clear view | Collapse batch | Hide rows 25–27 | Hide freight & owner | Try units −5 | Try freight $350 | Try a new order ID | Operator | Manager
+PASS [click-showcases_data-tools-chromium-390] #0 Clear view  
+PASS [click-showcases_data-tools-chromium-390] #1 Collapse batch  
+PASS [click-showcases_data-tools-chromium-390] #2 Hide rows 25–27  
+PASS [click-showcases_data-tools-chromium-390] #3 Hide freight & owner  
+PASS [click-showcases_data-tools-chromium-390] #4 Try units −5  
+PASS [click-showcases_data-tools-chromium-390] #5 Try freight $350  
+PASS [click-showcases_data-tools-chromium-390] #6 Try a new order ID  
+PASS [click-showcases_data-tools-chromium-390] #7 Operator  
+PASS [click-showcases_data-tools-chromium-390] #8 Manager  
+PASS [click-showcases_performance-chromium-390] load settled 679 ms 
+controls (13): Zoom out | Zoom in | Reset | Dive to row 1,000,000Every order of magnitude, top | Cross to cell ALL1000000Rows and columns together, | Teleport 12 timesRandom cells anywhere in the bill | Jump to cell | 0% | 25% | 50% | 75% | 100% | Random
+PASS [click-showcases_performance-chromium-390] #0 Zoom out  
+PASS [click-showcases_performance-chromium-390] #1 Zoom in  
+PASS [click-showcases_performance-chromium-390] #2 Reset disabled 
+PASS [click-showcases_performance-chromium-390] #3 Dive to row 1,000,000Every order of magnitude, top  
+PASS [click-showcases_performance-chromium-390] #4 Cross to cell ALL1000000Rows and columns together,  
+PASS [click-showcases_performance-chromium-390] #5 Teleport 12 timesRandom cells anywhere in the bill  
+PASS [click-showcases_performance-chromium-390] #6 Jump to cell  
+PASS [click-showcases_performance-chromium-390] #7 0%  
+PASS [click-showcases_performance-chromium-390] #8 25%  
+PASS [click-showcases_performance-chromium-390] #9 50%  
+PASS [click-showcases_performance-chromium-390] #10 75%  
+PASS [click-showcases_performance-chromium-390] #11 100%  
+PASS [click-showcases_performance-chromium-390] #12 Random  
+PASS [click-showcases_formulas-chromium-390] load settled 640 ms 
+controls (17): Analysis | Orders · 20,000 rows | Run an APAC promotion: +20% units | A2Revenue by region | D2Region × channel | J2Share of revenue | A11Top 5 products | L2Order revenue statistics | D11Largest orders | G11Best product | L11Price elasticity | A19Monthly revenue and running total | D19Region from order code | A33Units to stock per order | D33Value of the year | G33Query the ledger | Calculate
+PASS [click-showcases_formulas-chromium-390] #0 Analysis  
+PASS [click-showcases_formulas-chromium-390] #1 Orders · 20,000 rows  
+PASS [click-showcases_formulas-chromium-390] #2 Run an APAC promotion: +20% units  
+PASS [click-showcases_formulas-chromium-390] #3 A2Revenue by region  
+PASS [click-showcases_formulas-chromium-390] #4 D2Region × channel  
+PASS [click-showcases_formulas-chromium-390] #5 J2Share of revenue  
+PASS [click-showcases_formulas-chromium-390] #6 A11Top 5 products  
+PASS [click-showcases_formulas-chromium-390] #7 L2Order revenue statistics  
+PASS [click-showcases_formulas-chromium-390] #8 D11Largest orders  
+PASS [click-showcases_formulas-chromium-390] #9 G11Best product  
+PASS [click-showcases_formulas-chromium-390] #10 L11Price elasticity  
+PASS [click-showcases_formulas-chromium-390] #11 A19Monthly revenue and running total  
+PASS [click-showcases_formulas-chromium-390] #12 D19Region from order code  
+PASS [click-showcases_formulas-chromium-390] #13 A33Units to stock per order  
+PASS [click-showcases_formulas-chromium-390] #14 D33Value of the year  
+PASS [click-showcases_formulas-chromium-390] #15 G33Query the ledger  
+PASS [click-showcases_formulas-chromium-390] #16 Calculate  
+PASS [click-showcases_formatting-chromium-390] load settled 601 ms 
+controls (26): Bold | Italic | Underline | Strike | Highlight | Outline | General | Number | Currency | Accounting | Percentage | Date | Scientific | Arial | Georgia | Courier New | Theme fallback | Align left | Align center | Align right | top | middle | bottom | 18 px | Wrap | Export, then re-import XLSX
+PASS [click-showcases_formatting-chromium-390] #0 Bold  
+PASS [click-showcases_formatting-chromium-390] #1 Italic  
+PASS [click-showcases_formatting-chromium-390] #2 Underline  
+PASS [click-showcases_formatting-chromium-390] #3 Strike  
+PASS [click-showcases_formatting-chromium-390] #4 Highlight  
+PASS [click-showcases_formatting-chromium-390] #5 Outline  
+PASS [click-showcases_formatting-chromium-390] #6 General  
+PASS [click-showcases_formatting-chromium-390] #7 Number  
+PASS [click-showcases_formatting-chromium-390] #8 Currency  
+PASS [click-showcases_formatting-chromium-390] #9 Accounting  
+PASS [click-showcases_formatting-chromium-390] #10 Percentage  
+PASS [click-showcases_formatting-chromium-390] #11 Date  
+PASS [click-showcases_formatting-chromium-390] #12 Scientific  
+PASS [click-showcases_formatting-chromium-390] #13 Arial  
+PASS [click-showcases_formatting-chromium-390] #14 Georgia  
+PASS [click-showcases_formatting-chromium-390] #15 Courier New  
+PASS [click-showcases_formatting-chromium-390] #16 Theme fallback  
+PASS [click-showcases_formatting-chromium-390] #17 Align left  
+PASS [click-showcases_formatting-chromium-390] #18 Align center  
+PASS [click-showcases_formatting-chromium-390] #19 Align right  
+PASS [click-showcases_formatting-chromium-390] #20 top  
+PASS [click-showcases_formatting-chromium-390] #21 middle  
+PASS [click-showcases_formatting-chromium-390] #22 bottom  
+PASS [click-showcases_formatting-chromium-390] #23 18 px  
+PASS [click-showcases_formatting-chromium-390] #24 Wrap  
+PASS [click-showcases_formatting-chromium-390] #25 Export, then re-import XLSX  
+PASS [click-showcases_analysis-chromium-390] load settled 635 ms 
+controls (1): Go to the order
+PASS [click-showcases_analysis-chromium-390] #0 Go to the order  
+PASS [click-showcases_host-rows-chromium-390] load settled 1677 ms 
+controls (9): Import 10,000 leads | Remote update | Insert row | Delete row | Sort view by amount | Filter North | Clear filter | Reject next edit | Transformed accept
+PASS [click-showcases_host-rows-chromium-390] #0 Import 10,000 leads  
+PASS [click-showcases_host-rows-chromium-390] #1 Remote update  
+PASS [click-showcases_host-rows-chromium-390] #2 Insert row  
+PASS [click-showcases_host-rows-chromium-390] #3 Delete row  
+PASS [click-showcases_host-rows-chromium-390] #4 Sort view by amount  
+PASS [click-showcases_host-rows-chromium-390] #5 Filter North  
+PASS [click-showcases_host-rows-chromium-390] #6 Clear filter  
+PASS [click-showcases_host-rows-chromium-390] #7 Reject next edit  
+PASS [click-showcases_host-rows-chromium-390] #8 Transformed accept  
+PASS [click-showcases_database-chromium-390] load controls still disabled after 15 s; settled 15454 ms 
+controls (5): Reload with unsaved edits | Clear 100,000 cells, then undo | Add one subscriber seat — Commit sample edit | Save pending now | Close and reopen session
+PASS [click-showcases_database-chromium-390] #0 Reload with unsaved edits  
+PASS [click-showcases_database-chromium-390] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_database-chromium-390] #2 Add one subscriber seat — Commit sample edit  
+PASS [click-showcases_database-chromium-390] #3 Save pending now  
+PASS [click-showcases_database-chromium-390] #4 Close and reopen session  
+PASS [click-showcases_collaboration-chromium-390] load controls still disabled after 15 s; settled 15444 ms 
+controls (5): Run a chaos test | Clear 100,000 cells, then undo | Take Bram offline | Queue one Grid edit | Reconnect
+PASS [click-showcases_collaboration-chromium-390] #0 Run a chaos test  
+PASS [click-showcases_collaboration-chromium-390] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_collaboration-chromium-390] #2 Take Bram offline disabled 
+PASS [click-showcases_collaboration-chromium-390] #3 Queue one Grid edit  
+FAIL [click-showcases_collaboration-chromium-390] #4 Reconnect  locator.tap: Timeout 5000ms exceeded. | Call log: |   - waiting for locator('.sw-showcase__controls button, .sw-showcase__demo-bar button, .sw-showcase__controls select, .sw-showcase__controls input[type=radio], .sw-showcase__controls [role=radio], main .sw-proof button:not(.sw-copy), [data-testid] > button').nth(4) |     - locator resolved to <button type="button" class="sw-button " data-variant=
+PASS [click-showcases_interoperability-chromium-390] load settled 562 ms 
+controls (5): Export, re-import & compare | Download .xlsx | Reset workbench | Generate & import 200,000 rows | Run the round trip
+PASS [click-showcases_interoperability-chromium-390] #0 Export, re-import & compare  
+PASS [click-showcases_interoperability-chromium-390] #1 Download .xlsx  
+PASS [click-showcases_interoperability-chromium-390] #2 Reset workbench  
+PASS [click-showcases_interoperability-chromium-390] #3 Generate & import 200,000 rows  
+PASS [click-showcases_interoperability-chromium-390] #4 Run the round trip hidden 
+PASS [click-showcases_functions-chromium-390] load controls still disabled after 15 s; settled 15584 ms 
+controls (1): Set number
+PASS [click-showcases_functions-chromium-390] #0 Set number disabled 
+PASS [click-showcases_recalculation-chromium-390] load controls still disabled after 15 s; settled 15560 ms 
+controls (3): Change the price | Run 10 changes | Move the lookups
+PASS [click-showcases_recalculation-chromium-390] #0 Change the price  
+PASS [click-showcases_recalculation-chromium-390] #1 Run 10 changes  
+PASS [click-showcases_recalculation-chromium-390] #2 Move the lookups  
+PASS [click-showcases_data-model-chromium-390] load controls still disabled after 15 s; settled 15522 ms 
+controls (8): Repeat a product ID | Order product P-999 | Relationships… | Category | Region | Manager | PivotTable Fields… | Undo
+PASS [click-showcases_data-model-chromium-390] #0 Repeat a product ID  
+PASS [click-showcases_data-model-chromium-390] #1 Order product P-999  
+PASS [click-showcases_data-model-chromium-390] #2 Relationships…  
+PASS [click-showcases_data-model-chromium-390] #3 Category  
+PASS [click-showcases_data-model-chromium-390] #4 Region  
+PASS [click-showcases_data-model-chromium-390] #5 Manager  
+PASS [click-showcases_data-model-chromium-390] #6 PivotTable Fields…  
+PASS [click-showcases_data-model-chromium-390] #7 Undo  
+PASS [click-showcases_dashboards-chromium-390] load settled 599 ms 
+controls (4): Keep Americas in the Region slicer | Add a product pivot | Swap the chart and the pivot | Undo
+PASS [click-showcases_dashboards-chromium-390] #0 Keep Americas in the Region slicer  
+PASS [click-showcases_dashboards-chromium-390] #1 Add a product pivot  
+PASS [click-showcases_dashboards-chromium-390] #2 Swap the chart and the pivot  
+PASS [click-showcases_dashboards-chromium-390] #3 Undo  
+PASS [click-showcases_queries-chromium-390] load controls still disabled after 15 s; settled 15528 ms 
+controls (6): Refresh All | 250 new orders arrive | Shipped only | All statuses | Queries & Connections… | Undo
+PASS [click-showcases_queries-chromium-390] #0 Refresh All  
+PASS [click-showcases_queries-chromium-390] #1 250 new orders arrive  
+PASS [click-showcases_queries-chromium-390] #2 Shipped only  
+PASS [click-showcases_queries-chromium-390] #3 All statuses  
+PASS [click-showcases_queries-chromium-390] #4 Queries & Connections…  
+PASS [click-showcases_queries-chromium-390] #5 Undo  
+PASS [click-showcases_version-history-chromium-390] load settled 715 ms 
+controls (7): Raise Marketing by 15% | Sam Lee cuts Travel in Q3–Q4 | Save version | Version History… | Compare with now | Restore Q3 and Q4 | Restore the whole sheet
+PASS [click-showcases_version-history-chromium-390] #0 Raise Marketing by 15%  
+PASS [click-showcases_version-history-chromium-390] #1 Sam Lee cuts Travel in Q3–Q4  
+PASS [click-showcases_version-history-chromium-390] #2 Save version  
+PASS [click-showcases_version-history-chromium-390] #3 Version History…  
+PASS [click-showcases_version-history-chromium-390] #4 Compare with now  
+PASS [click-showcases_version-history-chromium-390] #5 Restore Q3 and Q4  
+PASS [click-showcases_version-history-chromium-390] #6 Restore the whole sheet  
+PASS [click-vanilla-chromium-390] load controls still disabled after 15 s; settled 15308 ms 
+controls (0): 
+PASS [click-react-chromium-390] load controls still disabled after 15 s; settled 16254 ms 
+controls (0): 
+PASS [click-vue-chromium-390] load controls still disabled after 15 s; settled 15677 ms 
+controls (0): 
+PASS [click-svelte-chromium-390] load controls still disabled after 15 s; settled 15834 ms 
+controls (0): 
+PASS [click-showcases_spreadsheet-firefox-1440] load settled 1114 ms 
+controls (3): Wide | Narrow | Fold the ribbon
+PASS [click-showcases_spreadsheet-firefox-1440] #0 Wide  
+PASS [click-showcases_spreadsheet-firefox-1440] #1 Narrow  
+PASS [click-showcases_spreadsheet-firefox-1440] #2 Fold the ribbon  
+PASS [click-showcases_formula-assist-firefox-1440] load controls still disabled after 15 s; settled 16129 ms 
+controls (6): Finance's total | Finance's share | March's total | People's total | People's share | Reset
+PASS [click-showcases_formula-assist-firefox-1440] #0 Finance's total  
+PASS [click-showcases_formula-assist-firefox-1440] #1 Finance's share  
+PASS [click-showcases_formula-assist-firefox-1440] #2 March's total  
+PASS [click-showcases_formula-assist-firefox-1440] #3 People's total  
+PASS [click-showcases_formula-assist-firefox-1440] #4 People's share  
+PASS [click-showcases_formula-assist-firefox-1440] #5 Reset  
+PASS [click-showcases_sort-firefox-1440] load controls still disabled after 15 s; settled 16163 ms 
+controls (7): Revenue, largest first | Region A–Z, then revenue | Custom Sort… | Revenue, largest first | Region A–Z, then revenue | Clear view sort | Undo
+PASS [click-showcases_sort-firefox-1440] #0 Revenue, largest first  
+PASS [click-showcases_sort-firefox-1440] #1 Region A–Z, then revenue  
+PASS [click-showcases_sort-firefox-1440] #2 Custom Sort…  
+PASS [click-showcases_sort-firefox-1440] #3 Revenue, largest first  
+PASS [click-showcases_sort-firefox-1440] #4 Region A–Z, then revenue  
+PASS [click-showcases_sort-firefox-1440] #5 Clear view sort  
+PASS [click-showcases_sort-firefox-1440] #6 Undo  
+PASS [click-showcases_data-tools-firefox-1440] load settled 1096 ms 
+controls (9): Clear view | Collapse batch | Hide rows 25–27 | Hide freight & owner | Try units −5 | Try freight $350 | Try a new order ID | Operator | Manager
+PASS [click-showcases_data-tools-firefox-1440] #0 Clear view  
+PASS [click-showcases_data-tools-firefox-1440] #1 Collapse batch  
+PASS [click-showcases_data-tools-firefox-1440] #2 Hide rows 25–27  
+PASS [click-showcases_data-tools-firefox-1440] #3 Hide freight & owner  
+PASS [click-showcases_data-tools-firefox-1440] #4 Try units −5  
+PASS [click-showcases_data-tools-firefox-1440] #5 Try freight $350  
+PASS [click-showcases_data-tools-firefox-1440] #6 Try a new order ID  
+PASS [click-showcases_data-tools-firefox-1440] #7 Operator  
+PASS [click-showcases_data-tools-firefox-1440] #8 Manager  
+PASS [click-showcases_performance-firefox-1440] load settled 1169 ms 
+controls (13): Zoom out | Zoom in | Reset | Dive to row 1,000,000Every order of magnitude, top | Cross to cell ALL1000000Rows and columns together, | Teleport 12 timesRandom cells anywhere in the bill | Jump to cell | 0% | 25% | 50% | 75% | 100% | Random
+PASS [click-showcases_performance-firefox-1440] #0 Zoom out  
+PASS [click-showcases_performance-firefox-1440] #1 Zoom in  
+PASS [click-showcases_performance-firefox-1440] #2 Reset disabled 
+PASS [click-showcases_performance-firefox-1440] #3 Dive to row 1,000,000Every order of magnitude, top  
+PASS [click-showcases_performance-firefox-1440] #4 Cross to cell ALL1000000Rows and columns together,  
+PASS [click-showcases_performance-firefox-1440] #5 Teleport 12 timesRandom cells anywhere in the bill  
+PASS [click-showcases_performance-firefox-1440] #6 Jump to cell  
+PASS [click-showcases_performance-firefox-1440] #7 0%  
+PASS [click-showcases_performance-firefox-1440] #8 25%  
+PASS [click-showcases_performance-firefox-1440] #9 50%  
+PASS [click-showcases_performance-firefox-1440] #10 75%  
+PASS [click-showcases_performance-firefox-1440] #11 100%  
+PASS [click-showcases_performance-firefox-1440] #12 Random  
+PASS [click-showcases_formulas-firefox-1440] load settled 1121 ms 
+controls (17): Analysis | Orders · 20,000 rows | Run an APAC promotion: +20% units | A2Revenue by region | D2Region × channel | J2Share of revenue | A11Top 5 products | L2Order revenue statistics | D11Largest orders | G11Best product | L11Price elasticity | A19Monthly revenue and running total | D19Region from order code | A33Units to stock per order | D33Value of the year | G33Query the ledger | Calculate
+PASS [click-showcases_formulas-firefox-1440] #0 Analysis  
+PASS [click-showcases_formulas-firefox-1440] #1 Orders · 20,000 rows  
+PASS [click-showcases_formulas-firefox-1440] #2 Run an APAC promotion: +20% units  
+PASS [click-showcases_formulas-firefox-1440] #3 A2Revenue by region  
+PASS [click-showcases_formulas-firefox-1440] #4 D2Region × channel  
+PASS [click-showcases_formulas-firefox-1440] #5 J2Share of revenue  
+PASS [click-showcases_formulas-firefox-1440] #6 A11Top 5 products  
+PASS [click-showcases_formulas-firefox-1440] #7 L2Order revenue statistics  
+PASS [click-showcases_formulas-firefox-1440] #8 D11Largest orders  
+PASS [click-showcases_formulas-firefox-1440] #9 G11Best product  
+PASS [click-showcases_formulas-firefox-1440] #10 L11Price elasticity  
+PASS [click-showcases_formulas-firefox-1440] #11 A19Monthly revenue and running total  
+PASS [click-showcases_formulas-firefox-1440] #12 D19Region from order code  
+PASS [click-showcases_formulas-firefox-1440] #13 A33Units to stock per order  
+PASS [click-showcases_formulas-firefox-1440] #14 D33Value of the year  
+PASS [click-showcases_formulas-firefox-1440] #15 G33Query the ledger  
+PASS [click-showcases_formulas-firefox-1440] #16 Calculate  
+PASS [click-showcases_formatting-firefox-1440] load settled 980 ms 
+controls (26): Bold | Italic | Underline | Strike | Highlight | Outline | General | Number | Currency | Accounting | Percentage | Date | Scientific | Arial | Georgia | Courier New | Theme fallback | Align left | Align center | Align right | top | middle | bottom | 18 px | Wrap | Export, then re-import XLSX
+PASS [click-showcases_formatting-firefox-1440] #0 Bold  
+PASS [click-showcases_formatting-firefox-1440] #1 Italic  
+PASS [click-showcases_formatting-firefox-1440] #2 Underline  
+PASS [click-showcases_formatting-firefox-1440] #3 Strike  
+PASS [click-showcases_formatting-firefox-1440] #4 Highlight  
+PASS [click-showcases_formatting-firefox-1440] #5 Outline  
+PASS [click-showcases_formatting-firefox-1440] #6 General  
+PASS [click-showcases_formatting-firefox-1440] #7 Number  
+PASS [click-showcases_formatting-firefox-1440] #8 Currency  
+PASS [click-showcases_formatting-firefox-1440] #9 Accounting  
+PASS [click-showcases_formatting-firefox-1440] #10 Percentage  
+PASS [click-showcases_formatting-firefox-1440] #11 Date  
+PASS [click-showcases_formatting-firefox-1440] #12 Scientific  
+PASS [click-showcases_formatting-firefox-1440] #13 Arial  
+PASS [click-showcases_formatting-firefox-1440] #14 Georgia  
+PASS [click-showcases_formatting-firefox-1440] #15 Courier New  
+PASS [click-showcases_formatting-firefox-1440] #16 Theme fallback  
+PASS [click-showcases_formatting-firefox-1440] #17 Align left  
+PASS [click-showcases_formatting-firefox-1440] #18 Align center  
+PASS [click-showcases_formatting-firefox-1440] #19 Align right  
+PASS [click-showcases_formatting-firefox-1440] #20 top  
+PASS [click-showcases_formatting-firefox-1440] #21 middle  
+PASS [click-showcases_formatting-firefox-1440] #22 bottom  
+PASS [click-showcases_formatting-firefox-1440] #23 18 px  
+PASS [click-showcases_formatting-firefox-1440] #24 Wrap  
+PASS [click-showcases_formatting-firefox-1440] #25 Export, then re-import XLSX  
+PASS [click-showcases_analysis-firefox-1440] load settled 994 ms 
+controls (1): Go to the order
+PASS [click-showcases_analysis-firefox-1440] #0 Go to the order  
+PASS [click-showcases_host-rows-firefox-1440] load controls still disabled after 15 s; settled 16136 ms 
+controls (9): Import 10,000 leads | Remote update | Insert row | Delete row | Sort view by amount | Filter North | Clear filter | Reject next edit | Transformed accept
+PASS [click-showcases_host-rows-firefox-1440] #0 Import 10,000 leads  
+PASS [click-showcases_host-rows-firefox-1440] #1 Remote update  
+PASS [click-showcases_host-rows-firefox-1440] #2 Insert row  
+PASS [click-showcases_host-rows-firefox-1440] #3 Delete row  
+PASS [click-showcases_host-rows-firefox-1440] #4 Sort view by amount  
+PASS [click-showcases_host-rows-firefox-1440] #5 Filter North  
+PASS [click-showcases_host-rows-firefox-1440] #6 Clear filter  
+PASS [click-showcases_host-rows-firefox-1440] #7 Reject next edit  
+PASS [click-showcases_host-rows-firefox-1440] #8 Transformed accept  
+PASS [click-showcases_database-firefox-1440] load controls still disabled after 15 s; settled 16848 ms 
+controls (5): Reload with unsaved edits | Clear 100,000 cells, then undo | Add one subscriber seat — Commit sample edit | Save pending now | Close and reopen session
+PASS [click-showcases_database-firefox-1440] #0 Reload with unsaved edits  
+PASS [click-showcases_database-firefox-1440] #1 Clear 100,000 cells, then undo  
+PASS [click-showcases_database-firefox-1440] #2 Add one subscriber seat — Commit sample edit  
+PASS [click-showcases_database-firefox-1440] #3 Save pending now  
+PASS [click-showcases_database-firefox-1440] #4 Close and reopen session  
+PASS [click-showcases_collaboration-firefox-1440] load controls still disabled after 15 s; settled 16539 ms 
+controls (5): Run a chaos test | Clear 100,000 cells, then undo | Take Bram offline | Queue one Grid edit | Reconnect
+PASS [click-showcases_collaboration-firefox-1440] #0 Run a chaos test  
+PASS [click-showcases_collaboration-firefox-1440] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_collaboration-firefox-1440] #2 Take Bram offline disabled 
+PASS [click-showcases_collaboration-firefox-1440] #3 Queue one Grid edit  
+PASS [click-showcases_collaboration-firefox-1440] #4 Reconnect disabled 
+PASS [click-showcases_interoperability-firefox-1440] load settled 811 ms 
+controls (5): Export, re-import & compare | Download .xlsx | Reset workbench | Generate & import 200,000 rows | Run the round trip
+PASS [click-showcases_interoperability-firefox-1440] #0 Export, re-import & compare  
+PASS [click-showcases_interoperability-firefox-1440] #1 Download .xlsx  
+PASS [click-showcases_interoperability-firefox-1440] #2 Reset workbench  
+PASS [click-showcases_interoperability-firefox-1440] #3 Generate & import 200,000 rows  
+PASS [click-showcases_interoperability-firefox-1440] #4 Run the round trip hidden 
+PASS [click-showcases_functions-firefox-1440] load controls still disabled after 15 s; settled 16286 ms 
+controls (1): Set number
+PASS [click-showcases_functions-firefox-1440] #0 Set number disabled 
+PASS [click-showcases_recalculation-firefox-1440] load controls still disabled after 15 s; settled 16269 ms 
+controls (3): Change the price | Run 10 changes | Move the lookups
+PASS [click-showcases_recalculation-firefox-1440] #0 Change the price  
+PASS [click-showcases_recalculation-firefox-1440] #1 Run 10 changes  
+PASS [click-showcases_recalculation-firefox-1440] #2 Move the lookups  
+PASS [click-showcases_data-model-firefox-1440] load controls still disabled after 15 s; settled 16057 ms 
+controls (8): Repeat a product ID | Order product P-999 | Relationships… | Category | Region | Manager | PivotTable Fields… | Undo
+PASS [click-showcases_data-model-firefox-1440] #0 Repeat a product ID  
+PASS [click-showcases_data-model-firefox-1440] #1 Order product P-999  
+PASS [click-showcases_data-model-firefox-1440] #2 Relationships…  
+PASS [click-showcases_data-model-firefox-1440] #3 Category  
+PASS [click-showcases_data-model-firefox-1440] #4 Region  
+PASS [click-showcases_data-model-firefox-1440] #5 Manager  
+PASS [click-showcases_data-model-firefox-1440] #6 PivotTable Fields…  
+PASS [click-showcases_data-model-firefox-1440] #7 Undo  
+PASS [click-showcases_dashboards-firefox-1440] load controls still disabled after 15 s; settled 16232 ms 
+controls (4): Keep Americas in the Region slicer | Add a product pivot | Swap the chart and the pivot | Undo
+PASS [click-showcases_dashboards-firefox-1440] #0 Keep Americas in the Region slicer  
+PASS [click-showcases_dashboards-firefox-1440] #1 Add a product pivot  
+PASS [click-showcases_dashboards-firefox-1440] #2 Swap the chart and the pivot  
+PASS [click-showcases_dashboards-firefox-1440] #3 Undo  
+PASS [click-showcases_queries-firefox-1440] load controls still disabled after 15 s; settled 16152 ms 
+controls (6): Refresh All | 250 new orders arrive | Shipped only | All statuses | Queries & Connections… | Undo
+PASS [click-showcases_queries-firefox-1440] #0 Refresh All  
+PASS [click-showcases_queries-firefox-1440] #1 250 new orders arrive  
+PASS [click-showcases_queries-firefox-1440] #2 Shipped only  
+PASS [click-showcases_queries-firefox-1440] #3 All statuses  
+PASS [click-showcases_queries-firefox-1440] #4 Queries & Connections…  
+PASS [click-showcases_queries-firefox-1440] #5 Undo  
+PASS [click-showcases_version-history-firefox-1440] load controls still disabled after 15 s; settled 15993 ms 
+controls (7): Raise Marketing by 15% | Sam Lee cuts Travel in Q3–Q4 | Save version | Version History… | Compare with now | Restore Q3 and Q4 | Restore the whole sheet
+PASS [click-showcases_version-history-firefox-1440] #0 Raise Marketing by 15%  
+PASS [click-showcases_version-history-firefox-1440] #1 Sam Lee cuts Travel in Q3–Q4  
+PASS [click-showcases_version-history-firefox-1440] #2 Save version  
+PASS [click-showcases_version-history-firefox-1440] #3 Version History…  
+PASS [click-showcases_version-history-firefox-1440] #4 Compare with now  
+PASS [click-showcases_version-history-firefox-1440] #5 Restore Q3 and Q4  
+PASS [click-showcases_version-history-firefox-1440] #6 Restore the whole sheet  
+PASS [click-vanilla-firefox-1440] load controls still disabled after 15 s; settled 16856 ms 
+controls (0): 
+PASS [click-react-firefox-1440] load controls still disabled after 15 s; settled 16454 ms 
+controls (0): 
+PASS [click-vue-firefox-1440] load controls still disabled after 15 s; settled 16051 ms 
+controls (0): 
+PASS [click-svelte-firefox-1440] load controls still disabled after 15 s; settled 16004 ms 
+controls (0): 
+PASS [click-showcases_spreadsheet-firefox-390] load settled 1200 ms 
+controls (3): Wide | Narrow | Fold the ribbon
+PASS [click-showcases_spreadsheet-firefox-390] #0 Wide  
+PASS [click-showcases_spreadsheet-firefox-390] #1 Narrow  
+PASS [click-showcases_spreadsheet-firefox-390] #2 Fold the ribbon  
+PASS [click-showcases_formula-assist-firefox-390] load controls still disabled after 15 s; settled 16153 ms 
+controls (6): Finance's total | Finance's share | March's total | People's total | People's share | Reset
+PASS [click-showcases_formula-assist-firefox-390] #0 Finance's total  
+PASS [click-showcases_formula-assist-firefox-390] #1 Finance's share  
+PASS [click-showcases_formula-assist-firefox-390] #2 March's total  
+PASS [click-showcases_formula-assist-firefox-390] #3 People's total  
+PASS [click-showcases_formula-assist-firefox-390] #4 People's share  
+PASS [click-showcases_formula-assist-firefox-390] #5 Reset  
+PASS [click-showcases_sort-firefox-390] load controls still disabled after 15 s; settled 16194 ms 
+controls (7): Revenue, largest first | Region A–Z, then revenue | Custom Sort… | Revenue, largest first | Region A–Z, then revenue | Clear view sort | Undo
+PASS [click-showcases_sort-firefox-390] #0 Revenue, largest first  
+PASS [click-showcases_sort-firefox-390] #1 Region A–Z, then revenue  
+PASS [click-showcases_sort-firefox-390] #2 Custom Sort…  
+PASS [click-showcases_sort-firefox-390] #3 Revenue, largest first  
+PASS [click-showcases_sort-firefox-390] #4 Region A–Z, then revenue  
+PASS [click-showcases_sort-firefox-390] #5 Clear view sort  
+PASS [click-showcases_sort-firefox-390] #6 Undo  
+PASS [click-showcases_data-tools-firefox-390] load settled 866 ms 
+controls (9): Clear view | Collapse batch | Hide rows 25–27 | Hide freight & owner | Try units −5 | Try freight $350 | Try a new order ID | Operator | Manager
+PASS [click-showcases_data-tools-firefox-390] #0 Clear view  
+PASS [click-showcases_data-tools-firefox-390] #1 Collapse batch  
+PASS [click-showcases_data-tools-firefox-390] #2 Hide rows 25–27  
+PASS [click-showcases_data-tools-firefox-390] #3 Hide freight & owner  
+PASS [click-showcases_data-tools-firefox-390] #4 Try units −5  
+PASS [click-showcases_data-tools-firefox-390] #5 Try freight $350  
+PASS [click-showcases_data-tools-firefox-390] #6 Try a new order ID  
+PASS [click-showcases_data-tools-firefox-390] #7 Operator  
+PASS [click-showcases_data-tools-firefox-390] #8 Manager  
+PASS [click-showcases_performance-firefox-390] load settled 873 ms 
+controls (13): Zoom out | Zoom in | Reset | Dive to row 1,000,000Every order of magnitude, top | Cross to cell ALL1000000Rows and columns together, | Teleport 12 timesRandom cells anywhere in the bill | Jump to cell | 0% | 25% | 50% | 75% | 100% | Random
+PASS [click-showcases_performance-firefox-390] #0 Zoom out  
+PASS [click-showcases_performance-firefox-390] #1 Zoom in  
+PASS [click-showcases_performance-firefox-390] #2 Reset disabled 
+PASS [click-showcases_performance-firefox-390] #3 Dive to row 1,000,000Every order of magnitude, top  
+PASS [click-showcases_performance-firefox-390] #4 Cross to cell ALL1000000Rows and columns together,  
+PASS [click-showcases_performance-firefox-390] #5 Teleport 12 timesRandom cells anywhere in the bill  
+PASS [click-showcases_performance-firefox-390] #6 Jump to cell  
+PASS [click-showcases_performance-firefox-390] #7 0%  
+PASS [click-showcases_performance-firefox-390] #8 25%  
+PASS [click-showcases_performance-firefox-390] #9 50%  
+PASS [click-showcases_performance-firefox-390] #10 75%  
+PASS [click-showcases_performance-firefox-390] #11 100%  
+PASS [click-showcases_performance-firefox-390] #12 Random  
+PASS [click-showcases_formulas-firefox-390] load settled 1950 ms 
+controls (17): Analysis | Orders · 20,000 rows | Run an APAC promotion: +20% units | A2Revenue by region | D2Region × channel | J2Share of revenue | A11Top 5 products | L2Order revenue statistics | D11Largest orders | G11Best product | L11Price elasticity | A19Monthly revenue and running total | D19Region from order code | A33Units to stock per order | D33Value of the year | G33Query the ledger | Calculate
+PASS [click-showcases_formulas-firefox-390] #0 Analysis  
+PASS [click-showcases_formulas-firefox-390] #1 Orders · 20,000 rows  
+PASS [click-showcases_formulas-firefox-390] #2 Run an APAC promotion: +20% units  
+PASS [click-showcases_formulas-firefox-390] #3 A2Revenue by region  
+PASS [click-showcases_formulas-firefox-390] #4 D2Region × channel  
+PASS [click-showcases_formulas-firefox-390] #5 J2Share of revenue  
+PASS [click-showcases_formulas-firefox-390] #6 A11Top 5 products  
+PASS [click-showcases_formulas-firefox-390] #7 L2Order revenue statistics  
+PASS [click-showcases_formulas-firefox-390] #8 D11Largest orders  
+PASS [click-showcases_formulas-firefox-390] #9 G11Best product  
+PASS [click-showcases_formulas-firefox-390] #10 L11Price elasticity  
+PASS [click-showcases_formulas-firefox-390] #11 A19Monthly revenue and running total  
+PASS [click-showcases_formulas-firefox-390] #12 D19Region from order code  
+PASS [click-showcases_formulas-firefox-390] #13 A33Units to stock per order  
+PASS [click-showcases_formulas-firefox-390] #14 D33Value of the year  
+PASS [click-showcases_formulas-firefox-390] #15 G33Query the ledger  
+PASS [click-showcases_formulas-firefox-390] #16 Calculate  
+PASS [click-showcases_formatting-firefox-390] load settled 926 ms 
+controls (26): Bold | Italic | Underline | Strike | Highlight | Outline | General | Number | Currency | Accounting | Percentage | Date | Scientific | Arial | Georgia | Courier New | Theme fallback | Align left | Align center | Align right | top | middle | bottom | 18 px | Wrap | Export, then re-import XLSX
+PASS [click-showcases_formatting-firefox-390] #0 Bold  
+PASS [click-showcases_formatting-firefox-390] #1 Italic  
+PASS [click-showcases_formatting-firefox-390] #2 Underline  
+PASS [click-showcases_formatting-firefox-390] #3 Strike  
+PASS [click-showcases_formatting-firefox-390] #4 Highlight  
+PASS [click-showcases_formatting-firefox-390] #5 Outline  
+PASS [click-showcases_formatting-firefox-390] #6 General  
+PASS [click-showcases_formatting-firefox-390] #7 Number  
+PASS [click-showcases_formatting-firefox-390] #8 Currency  
+PASS [click-showcases_formatting-firefox-390] #9 Accounting  
+PASS [click-showcases_formatting-firefox-390] #10 Percentage  
+PASS [click-showcases_formatting-firefox-390] #11 Date  
+PASS [click-showcases_formatting-firefox-390] #12 Scientific  
+PASS [click-showcases_formatting-firefox-390] #13 Arial  
+PASS [click-showcases_formatting-firefox-390] #14 Georgia  
+PASS [click-showcases_formatting-firefox-390] #15 Courier New  
+PASS [click-showcases_formatting-firefox-390] #16 Theme fallback  
+PASS [click-showcases_formatting-firefox-390] #17 Align left  
+PASS [click-showcases_formatting-firefox-390] #18 Align center  
+PASS [click-showcases_formatting-firefox-390] #19 Align right  
+PASS [click-showcases_formatting-firefox-390] #20 top  
+PASS [click-showcases_formatting-firefox-390] #21 middle  
+PASS [click-showcases_formatting-firefox-390] #22 bottom  
+PASS [click-showcases_formatting-firefox-390] #23 18 px  
+PASS [click-showcases_formatting-firefox-390] #24 Wrap  
+PASS [click-showcases_formatting-firefox-390] #25 Export, then re-import XLSX  
+PASS [click-showcases_analysis-firefox-390] load settled 1137 ms 
+controls (1): Go to the order
+PASS [click-showcases_analysis-firefox-390] #0 Go to the order  
+PASS [click-showcases_host-rows-firefox-390] load controls still disabled after 15 s; settled 16430 ms 
+controls (9): Import 10,000 leads | Remote update | Insert row | Delete row | Sort view by amount | Filter North | Clear filter | Reject next edit | Transformed accept
+PASS [click-showcases_host-rows-firefox-390] #0 Import 10,000 leads  
+PASS [click-showcases_host-rows-firefox-390] #1 Remote update  
+PASS [click-showcases_host-rows-firefox-390] #2 Insert row  
+PASS [click-showcases_host-rows-firefox-390] #3 Delete row  
+PASS [click-showcases_host-rows-firefox-390] #4 Sort view by amount  
+PASS [click-showcases_host-rows-firefox-390] #5 Filter North  
+PASS [click-showcases_host-rows-firefox-390] #6 Clear filter  
+PASS [click-showcases_host-rows-firefox-390] #7 Reject next edit  
+PASS [click-showcases_host-rows-firefox-390] #8 Transformed accept  
+PASS [click-showcases_database-firefox-390] load controls still disabled after 15 s; settled 17163 ms 
+controls (5): Reload with unsaved edits | Clear 100,000 cells, then undo | Add one subscriber seat — Commit sample edit | Save pending now | Close and reopen session
+PASS [click-showcases_database-firefox-390] #0 Reload with unsaved edits  
+PASS [click-showcases_database-firefox-390] #1 Clear 100,000 cells, then undo  
+PASS [click-showcases_database-firefox-390] #2 Add one subscriber seat — Commit sample edit  
+PASS [click-showcases_database-firefox-390] #3 Save pending now  
+PASS [click-showcases_database-firefox-390] #4 Close and reopen session  
+CONSOLE [click-showcases_database-firefox-390] (#4 Close and reopen session) warning: [JavaScript Warning: "The resource at “http://127.0.0.1:4871/assets/bricolage-grotesque-latin-650-opsz-BcVar4kf.woff2” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly." {file: "http://127.0.0.1:4871/showcases/database/" line: 0}]
+CONSOLE [click-showcases_database-firefox-390] (#4 Close and reopen session) warning: [JavaScript Warning: "The resource at “http://127.0.0.1:4871/assets/instrument-sans-latin-wght-normal-BbzFLZTg.woff2” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly." {file: "http://127.0.0.1:4871/showcases/database/" line: 0}]
+PASS [click-showcases_collaboration-firefox-390] load controls still disabled after 15 s; settled 16778 ms 
+controls (5): Run a chaos test | Clear 100,000 cells, then undo | Take Bram offline | Queue one Grid edit | Reconnect
+PASS [click-showcases_collaboration-firefox-390] #0 Run a chaos test  
+PASS [click-showcases_collaboration-firefox-390] #1 Clear 100,000 cells, then undo disabled 
+PASS [click-showcases_collaboration-firefox-390] #2 Take Bram offline disabled 
+PASS [click-showcases_collaboration-firefox-390] #3 Queue one Grid edit  
+PASS [click-showcases_collaboration-firefox-390] #4 Reconnect disabled 
+PASS [click-showcases_interoperability-firefox-390] load settled 1193 ms 
+controls (5): Export, re-import & compare | Download .xlsx | Reset workbench | Generate & import 200,000 rows | Run the round trip
+PASS [click-showcases_interoperability-firefox-390] #0 Export, re-import & compare  
+PASS [click-showcases_interoperability-firefox-390] #1 Download .xlsx  
+PASS [click-showcases_interoperability-firefox-390] #2 Reset workbench  
+PASS [click-showcases_interoperability-firefox-390] #3 Generate & import 200,000 rows  
+PASS [click-showcases_interoperability-firefox-390] #4 Run the round trip hidden 
+PASS [click-showcases_functions-firefox-390] load controls still disabled after 15 s; settled 15942 ms 
+controls (1): Set number
+PASS [click-showcases_functions-firefox-390] #0 Set number disabled 
+PASS [click-showcases_recalculation-firefox-390] load controls still disabled after 15 s; settled 16948 ms 
+controls (3): Change the price | Run 10 changes | Move the lookups
+PASS [click-showcases_recalculation-firefox-390] #0 Change the price  
+PASS [click-showcases_recalculation-firefox-390] #1 Run 10 changes  
+PASS [click-showcases_recalculation-firefox-390] #2 Move the lookups  
+PASS [click-showcases_data-model-firefox-390] load controls still disabled after 15 s; settled 16139 ms 
+controls (8): Repeat a product ID | Order product P-999 | Relationships… | Category | Region | Manager | PivotTable Fields… | Undo
+PASS [click-showcases_data-model-firefox-390] #0 Repeat a product ID  
+PASS [click-showcases_data-model-firefox-390] #1 Order product P-999  
+PASS [click-showcases_data-model-firefox-390] #2 Relationships…  
+PASS [click-showcases_data-model-firefox-390] #3 Category  
+PASS [click-showcases_data-model-firefox-390] #4 Region  
+PASS [click-showcases_data-model-firefox-390] #5 Manager  
+PASS [click-showcases_data-model-firefox-390] #6 PivotTable Fields…  
+PASS [click-showcases_data-model-firefox-390] #7 Undo  
+PASS [click-showcases_dashboards-firefox-390] load controls still disabled after 15 s; settled 16177 ms 
+controls (4): Keep Americas in the Region slicer | Add a product pivot | Swap the chart and the pivot | Undo
+PASS [click-showcases_dashboards-firefox-390] #0 Keep Americas in the Region slicer  
+PASS [click-showcases_dashboards-firefox-390] #1 Add a product pivot  
+PASS [click-showcases_dashboards-firefox-390] #2 Swap the chart and the pivot  
+PASS [click-showcases_dashboards-firefox-390] #3 Undo  
+PASS [click-showcases_queries-firefox-390] load controls still disabled after 15 s; settled 16268 ms 
+controls (6): Refresh All | 250 new orders arrive | Shipped only | All statuses | Queries & Connections… | Undo
+PASS [click-showcases_queries-firefox-390] #0 Refresh All  
+PASS [click-showcases_queries-firefox-390] #1 250 new orders arrive  
+PASS [click-showcases_queries-firefox-390] #2 Shipped only  
+PASS [click-showcases_queries-firefox-390] #3 All statuses  
+PASS [click-showcases_queries-firefox-390] #4 Queries & Connections…  
+PASS [click-showcases_queries-firefox-390] #5 Undo  
+PASS [click-showcases_version-history-firefox-390] load controls still disabled after 15 s; settled 15932 ms 
+controls (7): Raise Marketing by 15% | Sam Lee cuts Travel in Q3–Q4 | Save version | Version History… | Compare with now | Restore Q3 and Q4 | Restore the whole sheet
+PASS [click-showcases_version-history-firefox-390] #0 Raise Marketing by 15%  
+PASS [click-showcases_version-history-firefox-390] #1 Sam Lee cuts Travel in Q3–Q4  
+PASS [click-showcases_version-history-firefox-390] #2 Save version  
+PASS [click-showcases_version-history-firefox-390] #3 Version History…  
+PASS [click-showcases_version-history-firefox-390] #4 Compare with now  
+PASS [click-showcases_version-history-firefox-390] #5 Restore Q3 and Q4  
+PASS [click-showcases_version-history-firefox-390] #6 Restore the whole sheet  
+PASS [click-vanilla-firefox-390] load controls still disabled after 15 s; settled 16446 ms 
+controls (0): 
+PASS [click-react-firefox-390] load controls still disabled after 15 s; settled 16522 ms 
+controls (0): 
+PASS [click-vue-firefox-390] load controls still disabled after 15 s; settled 16246 ms 
+controls (0): 
+PASS [click-svelte-firefox-390] load controls still disabled after 15 s; settled 16202 ms 
+controls (0): 
