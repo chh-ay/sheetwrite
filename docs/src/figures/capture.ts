@@ -57,6 +57,8 @@ interface Shot {
   /** With `crop: "items"`, the titles of the items to keep; every item by default. */
   cropItems?: readonly string[];
   query: Record<string, string>;
+  /** The stage page, beside index.html; the docs' own stage by default. */
+  stagePage?: "assist.html";
   steps?: (page: Page) => Promise<void>;
 }
 
@@ -472,6 +474,28 @@ const PAGE_SHOTS: readonly Shot[] = [
       await settle(page);
     },
   },
+  // The formula assist demo's stage and budget: March's total in D13, whose
+  // neighbours left and right agree, so `=` in the formula bar shows the rest.
+  {
+    name: "formula-assist",
+    size: "app",
+    query: {},
+    stagePage: "assist.html",
+    steps: async (page) => {
+      await page.evaluate(() => {
+        const grid = window.__sheetwriteAssistGrid;
+        if (grid === undefined) throw new Error("The assist stage has no grid");
+        grid.setSelection({
+          kind: "cell",
+          addr: { sheet: grid.getActiveSheet(), row: 12, col: 3 },
+        });
+      });
+      await page.getByRole("textbox", { name: "Formula bar" }).focus();
+      await page.keyboard.type("=");
+      await page.locator(".sheetwrite-formula-ghost").waitFor();
+      await settle(page);
+    },
+  },
 ];
 
 /**
@@ -522,6 +546,8 @@ const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
   "keyboard-shortcuts": { dialog: { x: 12, y: 44 } },
   // The cell editor and the AutoComplete list of the entries it matches.
   autocomplete: { x: 40, y: 140 },
+  // The formula bar's ghost text over the March column it sums, faintly filled.
+  "formula-assist": { x: 40, y: 64 },
 };
 
 const SHOTS: readonly Shot[] = [
@@ -668,7 +694,7 @@ async function capture(shot: Shot, origin: string, scratch: string) {
 
         const failed = new Promise<never>((_, reject) => page.once("pageerror", reject));
 
-        await page.goto(`${origin}/?${query}`);
+        await page.goto(`${origin}/${shot.stagePage ?? ""}?${query}`);
 
         await Promise.race([
           page.waitForSelector("html[data-figure-ready]", {
