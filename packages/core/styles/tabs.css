@@ -20,7 +20,9 @@
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  /* One step above the cell font on the type scale: grid.ts and the shell
+     seed it from the theme (13 px cells, a 14 px bar). */
+  font: var(--sheetwrite-tab-font, 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
   border-top: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
 }
@@ -103,7 +105,7 @@
 }
 
 .sheetwrite-tab-item-with-options > .sheetwrite-tab-active {
-  padding-right: 36px;
+  padding-right: 40px;
 }
 
 .sheetwrite-tab-options {
@@ -135,15 +137,15 @@
 
 .sheetwrite-tab-icon {
   display: block;
-  width: 16px;
-  height: 16px;
+  /* 16 px at a 13 px font: the + and ⋯ icons grow with the bar's text. */
+  width: calc(16em / 13);
+  height: calc(16em / 13);
   pointer-events: none;
 }
 
 .sheetwrite-tab-options-button {
-  min-width: 28px;
+  min-width: 30px;
   padding: 0 6px 2px;
-  font-size: 1.15em;
   line-height: 1;
 }
 
@@ -155,11 +157,16 @@
 }
 
 .sheetwrite-tab-add {
-  width: 30px;
+  width: 32px;
   padding: 0;
-  font-size: 1.05em;
   font-weight: 650;
   line-height: 1;
+  /* When the tabs overflow the strip, the strip scrolls and + stays in view
+     at its right edge, over the tabs scrolled under it. */
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
 }
 
 .sheetwrite-tab-options-button:hover,
@@ -181,7 +188,7 @@
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
   box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
   color: var(--sheetwrite-tab-fg, var(--sheetwrite-fg, #111111));
-  font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  font: var(--sheetwrite-tab-font, 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
 }
 
 .sheetwrite-tab-menu-item {
@@ -381,8 +388,8 @@
 }
 
 /* Touch screens get targets of at least 24 px (WCAG 2.2 target size); mouse
-   layouts keep their density. The bar keeps its 28 px: thinner padding gives
-   the tabs 25 px, and the buttons beside them take the tabs' full height. */
+   layouts keep their density. The bar keeps its 30 px: thinner padding gives
+   the tabs 27 px, and the buttons beside them take the tabs' full height. */
 @media (pointer: coarse) {
   .sheetwrite-tabbar {
     padding-block: 1px;

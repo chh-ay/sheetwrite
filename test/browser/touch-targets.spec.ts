@@ -113,7 +113,18 @@ test.describe("on a touch screen", () => {
     const active = await targets(page, ".sheetwrite-tab-active");
     expect(sheetTabs.map((target) => target.name)).toContain("Add sheet");
     expect(tooSmall([...sheetTabs, ...active])).toEqual([]);
-    expect(overlapping(sheetTabs)).toEqual([]);
+    // When the tabs don't fit, the strip scrolls and Add sheet stays at its
+    // right edge, over the tab scrolled under it: a tap there reaches Add sheet.
+    expect(overlapping(sheetTabs.filter((target) => target.name !== "Add sheet"))).toEqual([]);
+    await page.keyboard.press("Escape");
+    await page.locator(".sheetwrite-tab-add").scrollIntoViewIfNeeded();
+    const addOnTop = await page.evaluate(() => {
+      const add = document.querySelector(".sheetwrite-tab-add");
+      const box = add?.getBoundingClientRect();
+      const hit = box && document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return add !== null && hit !== null && hit !== undefined && add.contains(hit);
+    });
+    expect(addOnTop).toBe(true);
   });
 
   test("dashboard slicer buttons are at least 24 px and do not overlap", async ({ page }) => {

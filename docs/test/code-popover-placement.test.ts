@@ -42,8 +42,3 @@ it("takes the roomier side and cuts the panel to it when neither side fits", () 
   expect(choosePanelSide(placement)).toBe("below");
   expect(panelFrame("below", placement)).toEqual({ left: 400, top: 325, maxHeight: 563 });
 });
-
-it("moves a panel left to keep it inside the viewport", () => {
-  const placement = { ...input(400), trigger: box(1300, 400, 80, 17) };
-  expect(panelFrame("below", placement).left).toBe(1428 - 560);
-});

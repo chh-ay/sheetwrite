@@ -346,62 +346,10 @@ mod tests {
     const TTEST_SECOND: &[f64] = &[6.0, 19.0, 3.0, 2.0, 14.0, 4.0, 5.0, 17.0, 1.0];
     const ZTEST_DATA: &[f64] = &[3.0, 6.0, 7.0, 8.0, 6.0, 5.0, 4.0, 2.0, 1.0, 9.0];
 
+    /// The CHISQ.TEST, F.TEST, T.TEST and Z.TEST pages publish the same
+    /// examples as the Excel 2007 names, so each example checks both names.
     #[test]
     fn microsoft_published_examples_give_the_excel_results() {
-        assert_published(
-            Function::CHITEST,
-            call(
-                Function::CHITEST,
-                &[
-                    Argument::Table(ACTUAL, 3, 2),
-                    Argument::Table(EXPECTED, 3, 2),
-                ],
-            ),
-            "0.0003082",
-        );
-        assert_published(
-            Function::FTEST,
-            call(
-                Function::FTEST,
-                &[Argument::List(FTEST_FIRST), Argument::List(FTEST_SECOND)],
-            ),
-            "0.64831785",
-        );
-        assert_published(
-            Function::TTEST,
-            call(
-                Function::TTEST,
-                &[
-                    Argument::List(TTEST_FIRST),
-                    Argument::List(TTEST_SECOND),
-                    Argument::Number(2.0),
-                    Argument::Number(1.0),
-                ],
-            ),
-            "0.196016",
-        );
-        assert_published(
-            Function::ZTEST,
-            call(
-                Function::ZTEST,
-                &[Argument::List(ZTEST_DATA), Argument::Number(4.0)],
-            ),
-            "0.090574",
-        );
-        assert_published(
-            Function::ZTEST,
-            call(
-                Function::ZTEST,
-                &[Argument::List(ZTEST_DATA), Argument::Number(6.0)],
-            ),
-            "0.863043",
-        );
-    }
-
-    /// The CHISQ.TEST, F.TEST, T.TEST and Z.TEST pages publish the same
-    /// examples as the Excel 2007 names.
-    #[test]
-    fn current_names_match_their_microsoft_examples() {
         let tables = [
             Argument::Table(ACTUAL, 3, 2),
             Argument::Table(EXPECTED, 3, 2),
@@ -413,28 +361,27 @@ mod tests {
             Argument::Number(2.0),
             Argument::Number(1.0),
         ];
-        let sample = [Argument::List(ZTEST_DATA), Argument::Number(6.0)];
+        let below = [Argument::List(ZTEST_DATA), Argument::Number(4.0)];
+        let above = [Argument::List(ZTEST_DATA), Argument::Number(6.0)];
+        // (both names of a test, its arguments, the published result)
+        type Example<'a> = ([Function; 2], &'a [Argument<'a>], &'a str);
+        let examples: [Example<'_>; 5] = [
+            (
+                [Function::CHITEST, Function::CHISQ_TEST],
+                &tables,
+                "0.0003082",
+            ),
+            ([Function::FTEST, Function::F_TEST], &pairs, "0.64831785"),
+            ([Function::TTEST, Function::T_TEST], &paired, "0.196016"),
+            ([Function::ZTEST, Function::Z_TEST], &below, "0.090574"),
+            ([Function::ZTEST, Function::Z_TEST], &above, "0.863043"),
+        ];
 
-        assert_published(
-            Function::CHISQ_TEST,
-            call(Function::CHISQ_TEST, &tables),
-            "0.0003082",
-        );
-        assert_published(
-            Function::F_TEST,
-            call(Function::F_TEST, &pairs),
-            "0.64831785",
-        );
-        assert_published(
-            Function::T_TEST,
-            call(Function::T_TEST, &paired),
-            "0.196016",
-        );
-        assert_published(
-            Function::Z_TEST,
-            call(Function::Z_TEST, &sample),
-            "0.863043",
-        );
+        for (names, arguments, published) in examples {
+            for function in names {
+                assert_published(function, call(function, arguments), published);
+            }
+        }
     }
 
     #[test]

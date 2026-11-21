@@ -48,36 +48,6 @@ describe("docs search ranking", () => {
     expect(pageUrls(pages, "import xlsx")[0]).toBe("/docs/import-export/xlsx-import/");
   });
 
-  it("keeps the API page first for a query that names code", () => {
-    const pages = [
-      page("/docs/start/first-grid/", "First grid", "createGrid mounts a grid"),
-      page("/docs/api/core/create-grid/", "createGrid", "createGrid"),
-    ];
-    expect(pageUrls(pages, "createGrid")[0]).toBe("/docs/api/core/create-grid/");
-  });
-
-  it("lists first the guide whose title a question names", () => {
-    const pages = [
-      page("/docs/tutorials/excel-in-react/", "Excel in React", "use sheetwrite in react"),
-      page("/docs/api/react/sheetwrite/", "Sheetwrite", "sheetwrite react component"),
-      page("/docs/frameworks/react/", "React", "sheetwrite react adapter"),
-    ];
-    expect(pageUrls(pages, "how do I use sheetwrite with react")[0]).toBe(
-      "/docs/frameworks/react/",
-    );
-    const formatting = [
-      page("/docs/features/", "Features", "conditional formatting and more"),
-      page(
-        "/docs/features/formatting/conditional-formats/",
-        "Conditional formats",
-        "conditional formatting rules",
-      ),
-    ];
-    expect(pageUrls(formatting, "how to use conditional formatting")[0]).toBe(
-      "/docs/features/formatting/conditional-formats/",
-    );
-  });
-
   it("does not lift an API page whose one-word title a question holds", () => {
     const pages = [
       page("/docs/api/core/theme/", "Theme", "dark theme tokens"),

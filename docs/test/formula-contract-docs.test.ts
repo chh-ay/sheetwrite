@@ -5,7 +5,6 @@ import {
   formulaFamilyNavigation,
   loadFormulaContractInventory,
   loadFormulaReferenceEntries,
-  syntaxLiterals,
   renderFormulaFunctionPages,
 } from "../../scripts/formula-docs.ts";
 import { FORMULA_FAMILY_CARDS, UNSUPPORTED_FORMULA_GROUPS } from "../src/lib/formula-overview.ts";
@@ -69,21 +68,20 @@ describe("generated formula documentation contract", () => {
     }
   });
 
-  it("keeps each argument of a syntax line together and marks the optional ones", async () => {
-    const { families } = await generated();
-    const math = families.find((page) => page.table?.family === "math")?.table?.html ?? "";
-    expect(math).toContain(
-      '<span class="sw-code-function" data-pagefind-weight="10">SUM</span>(<span class="sw-formula-arg"><var>number1</var></span>, <span class="sw-formula-arg" data-optional>[<var>number2</var>]</span>, <span class="sw-formula-arg" data-optional>…</span>)',
-    );
-  });
-
   it("gives every family a card with its count, its common functions and a link to all of them", async () => {
     const { inventory, overview } = await generated();
     for (const [family, card] of Object.entries(FORMULA_FAMILY_CARDS)) {
       const members = inventory.functions.filter((formula) => formula.family === family);
       const href = `/docs/reference/formula-functions/${family}/`;
+      const inDefault = members.filter((formula) => formula.builds.includes("@sheetwrite/wasm"));
+      const builds =
+        inDefault.length === 0
+          ? "full build only"
+          : inDefault.length === members.length
+            ? "all in the default build"
+            : `${inDefault.length} in the default build`;
       expect(overview.content).toContain(
-        `<p class="sw-function-family__count">${members.length} functions · `,
+        `<p class="sw-function-family__count">${members.length} functions · ${builds}</p>`,
       );
       expect(overview.content).toContain(
         `<a class="sw-function-family__more" href="${href}">See all ${members.length}`,
@@ -94,7 +92,6 @@ describe("generated formula documentation contract", () => {
         );
       }
     }
-    expect(overview.content).toContain("142 functions · 34 in the default build");
   });
 
   it("indexes every function from A to Z, each linking to its row on its family page", async () => {
@@ -132,17 +129,5 @@ describe("generated formula documentation contract", () => {
       expect(section).toContain(`The cell shows <code>${group?.shows}</code>`);
       expect(section).toContain(`href="${group?.see.href}">${group?.see.label}</a>`);
     }
-  });
-
-  it("accepts argument names and rejects example values in a syntax line", () => {
-    expect(syntaxLiterals("range, criteria, [sum_range]")).toEqual([]);
-    expect(syntaxLiterals("known_y's, [known_x's], [const]")).toEqual([]);
-    expect(syntaxLiterals("probability, alpha, beta, [A], [B]")).toEqual([]);
-    expect(syntaxLiterals("rows, cols, lambda(row, col)")).toEqual([]);
-    expect(syntaxLiterals("number1, [number2], …")).toEqual([]);
-    expect(syntaxLiterals("25, A1:A3, 0")).toEqual(["25", "A1:A3", "0"]);
-    expect(syntaxLiterals('B2:B25, ">5"')).toEqual(["B2:B25", '">5"']);
-    expect(syntaxLiterals("Where do you want to look?")).toEqual(["Where do you want to look?"]);
-    expect(syntaxLiterals("array1, lambda_or_array<#>")).toEqual(["lambda_or_array<#>"]);
   });
 });

@@ -401,10 +401,11 @@ function markLinkRows() {
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   // One frame style for every fence: shell commands use the same code frame as
-  // other languages. Long lines wrap, so no line is cut at the frame edge on
-  // any width; codeHangingIndent hangs each continuation under its own line's
-  // indent with a class, where `preserveIndent` would add an inline style to
-  // every line of the page JavaScript.
+  // other languages. Long lines wrap on wide screens, so no line is cut at the
+  // frame edge; below 48rem the code panel scrolls instead (base.css), so no
+  // name breaks across lines. codeHangingIndent hangs each continuation under
+  // its own line's indent with a class, where `preserveIndent` would add an
+  // inline style to every line of the page JavaScript.
   defaultProps: { wrap: true, preserveIndent: false, frame: "code" },
   themes: siteCodeThemes(),
   // The token colours are measured against AA in tokens.css; keep them exact.

@@ -5,15 +5,21 @@ import type { JSX } from "solid-js";
 import { ExchangeFigure, FanFigure, FlowFigure } from "./blueprint-layouts.js";
 import {
   BlueprintDiagram,
+  type BlueprintEdge,
   type BlueprintLayout,
   type BlueprintNode,
+  labelWidth,
+  linkGap,
   nodeHeight,
+  nodeWidth,
+  ROOM,
+  SPACING,
 } from "./blueprint.js";
-import { spread } from "./layout.js";
+import { BRACKET, spread } from "./layout.js";
 
-/** Wide drawings span the reading column; narrow ones a phone's width. */
-export const WIDE = 720;
-export const NARROW = 360;
+/** The width a wide drawing fills in the reading column, and a narrow one on a phone. */
+export const WIDE = ROOM.wide;
+export const NARROW = ROOM.narrow;
 
 /** A node sized to its text at the given position and width. */
 export function node(
@@ -39,187 +45,118 @@ const ARCHITECTURE_TEXT = {
     "The host owns the lifecycle, persistence, collaboration and product UI. It drives the TypeScript core through createGrid and applyTransaction, and the core sends change and selection events back. The core owns the Grid API, transactions, virtualization and interaction; it asks the Rust/WASM engine for store operations and recalculation, and the engine returns packed resolved windows. The renderer paints one resolved window per pane, on the main thread or in a worker, and never owns cells.",
 };
 
-function architectureWide(): BlueprintLayout {
-  const host = node({
-    id: "host",
-    x: 120,
-    y: 8,
-    w: 320,
-    eyebrow: "Your app",
-    title: "Host",
-    lines: ["Lifecycle, persistence, product UI"],
-  });
-  const core = node({
-    id: "core",
-    x: 120,
-    y: 152,
-    w: 320,
-    eyebrow: "@sheetwrite/core",
-    title: "TypeScript core",
-    lines: ["Grid API, transactions, virtualization"],
-    tone: "accent",
-  });
-  const renderer = node({
-    id: "renderer",
-    x: 580,
-    y: 152,
-    w: 132,
-    eyebrow: "Canvas",
-    title: "Renderer",
-    lines: ["Main thread", "or worker"],
-  });
-  const wasm = node({
-    id: "wasm",
-    x: 120,
-    y: 296,
-    w: 320,
-    eyebrow: "@sheetwrite/wasm",
-    title: "Rust / WASM engine",
-    lines: ["Cells, formulas, snapshots"],
-  });
+const HOST = {
+  id: "host",
+  eyebrow: "Your app",
+  title: "Host",
+  lines: ["Lifecycle, persistence, product UI"],
+} as const;
+const CORE = {
+  id: "core",
+  eyebrow: "@sheetwrite/core",
+  title: "TypeScript core",
+  lines: ["Grid API, transactions,", "virtualization"],
+  tone: "accent",
+} as const;
+const RENDERER = {
+  id: "renderer",
+  eyebrow: "Canvas",
+  title: "Renderer",
+  lines: ["Main thread", "or worker"],
+} as const;
+const WASM = {
+  id: "wasm",
+  eyebrow: "@sheetwrite/wasm",
+  title: "Rust / WASM engine",
+  lines: ["Cells, formulas, snapshots"],
+} as const;
+
+/** The two connectors between neighbouring layers run this far either side of the column's centre. */
+const PAIR_OFFSET = 12;
+
+/**
+ * Host, core and engine in one column, joined both ways. The connectors
+ * between two layers run as a pair about the column's centre, each label on
+ * its outer side, and the column is wide enough that the labels stay over
+ * it. Wide, the renderer sits beside the core, in its row, at its height; on
+ * phones it sits under the engine, its connector running down beside it.
+ */
+function architectureLayout(
+  least: number,
+  labels: {
+    readonly down: readonly [string, string];
+    readonly up: readonly [string, string];
+    readonly side?: string;
+  },
+  isStacked: boolean,
+): BlueprintLayout {
+  const widestLabel = Math.max(...[...labels.down, ...labels.up].map(labelWidth));
+  const column = Math.max(
+    least,
+    nodeWidth(HOST),
+    nodeWidth(CORE),
+    nodeWidth(WASM),
+    2 * (PAIR_OFFSET + SPACING.label + widestLabel),
+  );
+  const rowHeight = Math.max(nodeHeight(CORE), nodeHeight(RENDERER));
+  const host = node({ ...HOST, x: 0, y: 0, w: column });
+  const core = node({ ...CORE, x: 0, y: host.rect.h + SPACING.row, w: column, h: rowHeight });
+  const wasm = node({ ...WASM, x: 0, y: core.rect.y + rowHeight + SPACING.row, w: column });
+  const renderer = isStacked
+    ? node({ ...RENDERER, x: 0, y: wasm.rect.y + wasm.rect.h + SPACING.tile, w: column })
+    : node({
+        ...RENDERER,
+        x: column + linkGap(labels.side === undefined ? [] : [labels.side]),
+        y: core.rect.y,
+        w: nodeWidth(RENDERER),
+        h: rowHeight,
+      });
+  const down = 0.5 - PAIR_OFFSET / column;
+  const up = 0.5 + PAIR_OFFSET / column;
+  const pair = (
+    upper: BlueprintNode,
+    lower: BlueprintNode,
+    [downLabel, upLabel]: readonly [string, string],
+  ): BlueprintEdge[] => [
+    { from: upper.id, fromSide: "bottom", to: lower.id, t: down, kind: "main", label: downLabel },
+    { from: lower.id, fromSide: "top", to: upper.id, t: up, kind: "back", label: upLabel },
+  ];
   return {
-    width: WIDE,
-    height: wasm.rect.y + wasm.rect.h + 8,
     nodes: [host, core, renderer, wasm],
     edges: [
-      {
-        from: "host",
-        fromSide: "bottom",
-        to: "core",
-        t: spread(0, 2, 0.3),
-        kind: "main",
-        label: "createGrid · applyTransaction",
-        labelSide: "left",
-      },
-      {
-        from: "core",
-        fromSide: "top",
-        to: "host",
-        t: spread(1, 2, 0.3),
-        kind: "back",
-        label: "change · selection",
-        labelSide: "right",
-      },
-      {
-        from: "core",
-        fromSide: "bottom",
-        to: "wasm",
-        t: spread(0, 2, 0.3),
-        kind: "main",
-        label: "store ops · recalculation",
-        labelSide: "left",
-      },
-      {
-        from: "wasm",
-        fromSide: "top",
-        to: "core",
-        t: spread(1, 2, 0.3),
-        kind: "back",
-        label: "packed windows",
-        labelSide: "right",
-      },
+      ...pair(host, core, [labels.down[0], labels.up[0]]),
+      ...pair(core, wasm, [labels.down[1], labels.up[1]]),
       {
         from: "core",
         fromSide: "right",
         to: "renderer",
+        ...(isStacked ? { toSide: "right" as const } : {}),
         kind: "side",
-        label: "a window per pane",
-        labelSide: "below",
+        ...(labels.side === undefined ? {} : { label: labels.side }),
       },
     ],
   };
 }
 
+function architectureWide(): BlueprintLayout {
+  return architectureLayout(
+    320,
+    {
+      down: ["createGrid · applyTransaction", "store ops · recalculation"],
+      up: ["change · selection", "packed windows"],
+      side: "a window per pane",
+    },
+    false,
+  );
+}
+
+/** On phones the labels are one word each, and the renderer stacks under the engine. */
 function architectureNarrow(): BlueprintLayout {
-  const host = node({
-    id: "host",
-    x: 8,
-    y: 8,
-    w: 344,
-    eyebrow: "Your app",
-    title: "Host",
-    lines: ["Lifecycle, persistence, product UI"],
-  });
-  const core = node({
-    id: "core",
-    x: 8,
-    y: 152,
-    w: 216,
-    eyebrow: "@sheetwrite/core",
-    title: "TypeScript core",
-    lines: ["Grid API, transactions,", "virtualization"],
-    tone: "accent",
-  });
-  const renderer = node({
-    id: "renderer",
-    x: 252,
-    y: 152,
-    w: 100,
-    h: core.rect.h,
-    eyebrow: "Canvas",
-    title: "Renderer",
-    lines: ["Main thread", "or worker"],
-  });
-  const wasm = node({
-    id: "wasm",
-    x: 8,
-    y: 152 + core.rect.h + 72,
-    w: 344,
-    eyebrow: "@sheetwrite/wasm",
-    title: "Rust / WASM engine",
-    lines: ["Cells, formulas, snapshots"],
-  });
-  // The tall boxes' connectors leave the core at a quarter and three quarters of its width, straight.
-  const down = core.rect.x + core.rect.w * 0.25;
-  const up = core.rect.x + core.rect.w * 0.75;
-  return {
-    width: NARROW,
-    height: wasm.rect.y + wasm.rect.h + 8,
-    nodes: [host, core, renderer, wasm],
-    edges: [
-      {
-        from: "host",
-        fromSide: "bottom",
-        to: "core",
-        t: along(host, down),
-        toT: 0.25,
-        kind: "main",
-        label: "createGrid",
-        labelSide: "right",
-      },
-      {
-        from: "core",
-        fromSide: "top",
-        to: "host",
-        t: 0.75,
-        toT: along(host, up),
-        kind: "back",
-        label: "events",
-        labelSide: "right",
-      },
-      {
-        from: "core",
-        fromSide: "bottom",
-        to: "wasm",
-        t: 0.25,
-        toT: along(wasm, down),
-        kind: "main",
-        label: "store ops",
-        labelSide: "right",
-      },
-      {
-        from: "wasm",
-        fromSide: "top",
-        to: "core",
-        t: along(wasm, up),
-        toT: 0.75,
-        kind: "back",
-        label: "windows",
-        labelSide: "right",
-      },
-      { from: "core", fromSide: "right", to: "renderer", kind: "side" },
-    ],
-  };
+  return architectureLayout(
+    NARROW - BRACKET,
+    { down: ["createGrid", "store ops"], up: ["events", "windows"] },
+    true,
+  );
 }
 
 /** Runtime ownership › Architecture at a glance. */
@@ -241,141 +178,137 @@ const XLSX_TEXT = {
     "Import: XLSX bytes are unzipped with size and ratio limits, the XML is parsed without DTDs or entities, and the result is a workbook that the grid recalculates and paints. A hostile or oversized file leaves at unzip or parsing with a typed error, xlsx-import-failed or xlsx-resource-limit, and nothing is imported. Export writes the grid's workbook as XLSX, CSV or TSV. Import and export both report anything they don't keep as warnings, by code and cell.",
 };
 
+/**
+ * A side box sized to its text, centred level with the middle of the steps
+ * whose arrows enter it. Its arrows enter its side spread apart, so the
+ * box stays its own size however far apart those steps are.
+ */
+function besideSteps(
+  spec: Omit<BlueprintNode, "rect">,
+  x: number,
+  w: number,
+  steps: readonly BlueprintNode[],
+): BlueprintNode {
+  const centres = steps.map((step) => step.rect.y + step.rect.h / 2);
+  const h = nodeHeight(spec);
+  return node({ ...spec, x, y: (Math.min(...centres) + Math.max(...centres)) / 2 - h / 2, w, h });
+}
+
+/**
+ * Import down the left, export down the right, and between them the typed
+ * error beside the steps that can fail and the warnings level with the two
+ * steps that report them.
+ */
 function xlsxWide(): BlueprintLayout {
-  const w = 120;
-  const gap = 26;
-  const x = (index: number) => 8 + index * (w + gap);
-  const row = (y: number, h: number) => ({ y, h });
-  const top = row(8, 62);
-  const middle = row(108, 62);
-  const bottom = row(216, 62);
-  const nodes: BlueprintNode[] = [
-    node({
-      id: "bytes",
-      x: x(0),
-      ...top,
-      w,
-      eyebrow: "Import",
-      title: "XLSX bytes",
-      lines: ["File or fetch"],
-    }),
-    node({ id: "unzip", x: x(1), ...top, w, title: "Unzip", lines: ["Sizes, ratio", "capped"] }),
-    node({
-      id: "parse",
-      x: x(2),
-      ...top,
-      w,
-      title: "Parse XML",
-      lines: ["No DTDs or", "entities"],
-    }),
-    node({
+  const importSteps = [
+    { id: "bytes", eyebrow: "Import", title: "XLSX bytes", lines: ["File or fetch"] },
+    { id: "unzip", title: "Unzip", lines: ["Sizes, ratio", "capped"] },
+    { id: "parse", title: "Parse XML", lines: ["No DTDs or", "entities"] },
+    {
       id: "workbook",
-      x: x(3),
-      ...top,
-      w,
       title: "Workbook",
       lines: ["Sheets, cells,", "styles, names"],
       tone: "accent",
-    }),
-    node({ id: "grid", x: x(4), ...top, w, title: "Grid", lines: ["Recalculated", "and painted"] }),
-    node({
-      id: "error",
-      x: x(1),
-      ...middle,
-      w: 2 * w + gap,
-      title: "Typed error",
-      code: ["xlsx-import-failed", "xlsx-resource-limit"],
-      tone: "danger",
-    }),
-    node({
-      id: "warnings",
-      x: x(3),
-      ...middle,
-      w: 2 * w + gap,
-      title: "Warnings",
-      lines: ["Anything not kept,", "by code and cell"],
-      tone: "muted",
-    }),
-    node({
-      id: "source",
-      x: x(2),
-      ...bottom,
-      w,
-      eyebrow: "Export",
-      title: "Workbook",
-      lines: ["From the grid"],
-    }),
-    node({ id: "write", x: x(3), ...bottom, w, title: "Write", lines: ["XLSX, CSV", "or TSV"] }),
-    node({ id: "file", x: x(4), ...bottom, w, title: "File", lines: ["Download", "or bytes"] }),
+    },
+    { id: "grid", title: "Grid", lines: ["Recalculated", "and painted"] },
+  ] as const;
+  const exportSteps = [
+    { id: "source", eyebrow: "Export", title: "Workbook", lines: ["From the grid"] },
+    { id: "write", title: "Write", lines: ["XLSX, CSV", "or TSV"] },
+    { id: "file", title: "File", lines: ["Download", "or bytes"] },
+  ] as const;
+  const error = {
+    id: "error",
+    title: "Typed error",
+    code: ["xlsx-import-failed", "xlsx-resource-limit"],
+    tone: "danger",
+  } as const;
+  const warnings = {
+    id: "warnings",
+    title: "Warnings",
+    lines: ["Anything not kept,", "by code and cell"],
+    tone: "muted",
+  } as const;
+  const h = Math.max(
+    ...[...importSteps, ...exportSteps, error, warnings].map((step) => nodeHeight(step)),
+  );
+  const rowY = (row: number) => row * (h + SPACING.row);
+  const columns = [
+    Math.max(...importSteps.map(nodeWidth)),
+    Math.max(nodeWidth(error), nodeWidth(warnings)),
+    Math.max(...exportSteps.map(nodeWidth)),
+  ] as const;
+  const columnX = [
+    0,
+    columns[0] + SPACING.link,
+    columns[0] + columns[1] + 2 * SPACING.link,
+  ] as const;
+  // The export column starts level with Parse XML, so Write sits level with Workbook.
+  const exportFirstRow = 2;
+  const nodes: BlueprintNode[] = [
+    ...importSteps.map((step, row) => node({ ...step, x: 0, y: rowY(row), w: columns[0], h })),
+    node({ ...warnings, x: columnX[1], y: rowY(3), w: columns[1], h }),
+    ...exportSteps.map((step, row) =>
+      node({ ...step, x: columnX[2], y: rowY(exportFirstRow + row), w: columns[2], h }),
+    ),
   ];
+  const [, unzip, parse] = nodes;
+  if (unzip === undefined || parse === undefined) throw new Error("The XLSX steps are missing");
+  nodes.push(besideSteps(error, columnX[1], columns[1], [unzip, parse]));
   return {
-    width: WIDE,
-    height: bottom.y + bottom.h + 8,
     nodes,
     edges: [
-      { from: "bytes", fromSide: "right", to: "unzip", kind: "main" },
-      { from: "unzip", fromSide: "right", to: "parse", kind: "main" },
-      { from: "parse", fromSide: "right", to: "workbook", kind: "main" },
-      { from: "workbook", fromSide: "right", to: "grid", kind: "main" },
-      { from: "unzip", fromSide: "bottom", to: "error", t: 0.5, toT: 0.25, kind: "fail" },
-      { from: "parse", fromSide: "bottom", to: "error", t: 0.5, toT: 0.75, kind: "fail" },
-      { from: "workbook", fromSide: "bottom", to: "warnings", t: 0.5, toT: 0.25, kind: "back" },
-      { from: "write", fromSide: "top", to: "warnings", t: 0.5, toT: 0.25, kind: "back" },
-      { from: "source", fromSide: "right", to: "write", kind: "main" },
-      { from: "write", fromSide: "right", to: "file", kind: "main" },
+      { from: "bytes", fromSide: "bottom", to: "unzip", kind: "main" },
+      { from: "unzip", fromSide: "bottom", to: "parse", kind: "main" },
+      { from: "parse", fromSide: "bottom", to: "workbook", kind: "main" },
+      { from: "workbook", fromSide: "bottom", to: "grid", kind: "main" },
+      { from: "unzip", fromSide: "right", to: "error", toT: spread(0, 2), kind: "fail" },
+      { from: "parse", fromSide: "right", to: "error", toT: spread(1, 2), kind: "fail" },
+      { from: "workbook", fromSide: "right", to: "warnings", kind: "back" },
+      { from: "write", fromSide: "left", to: "warnings", kind: "back" },
+      { from: "source", fromSide: "bottom", to: "write", kind: "main" },
+      { from: "write", fromSide: "bottom", to: "file", kind: "main" },
     ],
   };
 }
 
+/** The import and export paths stacked, with the error and the warnings in a column beside them. */
 function xlsxNarrow(): BlueprintLayout {
-  const w = 216;
-  const step = (index: number) => 8 + index * 80;
-  const box = (
-    id: string,
-    index: number,
-    title: string,
-    lines: string[],
-    extra: Partial<BlueprintNode> & { readonly h?: number; readonly y?: number } = {},
-  ) => node({ id, x: 8, y: step(index), w, h: 56, title, lines, ...extra });
-  const nodes: BlueprintNode[] = [
-    box("bytes", 0, "XLSX bytes", ["File or fetch"], { eyebrow: "Import", h: 62 }),
-    box("unzip", 1, "Unzip", ["Sizes, ratio capped"]),
-    box("parse", 2, "Parse XML", ["No DTDs or entities"]),
-    box("workbook", 3, "Workbook", ["Sheets, cells, names"], { tone: "accent" }),
-    box("grid", 4, "Grid", ["Recalculated, painted"]),
-    box("source", 5, "Workbook", ["From the grid"], { eyebrow: "Export", h: 62, y: step(5) + 24 }),
-    box("write", 6, "Write", ["XLSX, CSV or TSV"], { y: step(6) + 24 }),
-  ];
-  const right = { x: 244, w: 108 };
-  const unzip = nodes[1];
-  const parse = nodes[2];
-  const workbook = nodes[3];
-  const write = nodes[6];
+  const steps = [
+    { id: "bytes", eyebrow: "Import", title: "XLSX bytes", lines: ["File or fetch"] },
+    { id: "unzip", title: "Unzip", lines: ["Sizes, ratio", "capped"] },
+    { id: "parse", title: "Parse XML", lines: ["No DTDs or", "entities"] },
+    { id: "workbook", title: "Workbook", lines: ["Sheets, cells,", "names"], tone: "accent" },
+    { id: "grid", title: "Grid", lines: ["Recalculated,", "painted"] },
+    { id: "source", eyebrow: "Export", title: "Workbook", lines: ["From the grid"] },
+    { id: "write", title: "Write", lines: ["XLSX, CSV", "or TSV"] },
+  ] as const;
+  const errorText = { title: "Typed error", lines: ["Nothing", "imported"] } as const;
+  const warningsText = { title: "Warnings", lines: ["Anything", "not kept"] } as const;
+  const right = { w: Math.max(nodeWidth(errorText), nodeWidth(warningsText)) };
+  const w = Math.max(...steps.map(nodeWidth));
+  // The export path starts a new group, a tile's space further down.
+  let y = 0;
+  const nodes: BlueprintNode[] = steps.map((step) => {
+    if (step.id === "source") y += SPACING.tile;
+    const placed = node({ ...step, x: 0, y, w });
+    y += placed.rect.h + SPACING.row;
+    return placed;
+  });
+  const rightAt = { x: w + SPACING.link, w: right.w };
+  const [, unzip, parse, workbook, , , write] = nodes;
   if (!unzip || !parse || !workbook || !write) throw new Error("The XLSX steps are missing");
-  const error = node({
-    id: "error",
-    ...right,
-    y: unzip.rect.y,
-    h: parse.rect.y + parse.rect.h - unzip.rect.y,
-    title: "Typed error",
-    lines: ["Nothing", "imported"],
-    tone: "danger",
-  });
-  const warnings = node({
-    id: "warnings",
-    ...right,
-    y: workbook.rect.y,
-    h: write.rect.y + write.rect.h - workbook.rect.y,
-    title: "Warnings",
-    lines: ["Anything not", "kept, by code", "and cell"],
-    tone: "muted",
-  });
-  // Side connectors enter the tall boxes level with the step they leave.
-  const level = (from: BlueprintNode, to: BlueprintNode) =>
-    (from.rect.y + from.rect.h / 2 - to.rect.y) / to.rect.h;
+  const error = besideSteps({ id: "error", ...errorText, tone: "danger" }, rightAt.x, rightAt.w, [
+    unzip,
+    parse,
+  ]);
+  const warnings = besideSteps(
+    { id: "warnings", ...warningsText, tone: "muted" },
+    rightAt.x,
+    rightAt.w,
+    [workbook, write],
+  );
   return {
-    width: NARROW,
-    height: write.rect.y + write.rect.h + 8,
     nodes: [...nodes, error, warnings],
     edges: [
       { from: "bytes", fromSide: "bottom", to: "unzip", kind: "main" },
@@ -383,22 +316,10 @@ function xlsxNarrow(): BlueprintLayout {
       { from: "parse", fromSide: "bottom", to: "workbook", kind: "main" },
       { from: "workbook", fromSide: "bottom", to: "grid", kind: "main" },
       { from: "source", fromSide: "bottom", to: "write", kind: "main" },
-      { from: "unzip", fromSide: "right", to: "error", toT: level(unzip, error), kind: "fail" },
-      { from: "parse", fromSide: "right", to: "error", toT: level(parse, error), kind: "fail" },
-      {
-        from: "workbook",
-        fromSide: "right",
-        to: "warnings",
-        toT: level(workbook, warnings),
-        kind: "back",
-      },
-      {
-        from: "write",
-        fromSide: "right",
-        to: "warnings",
-        toT: level(write, warnings),
-        kind: "back",
-      },
+      { from: "unzip", fromSide: "right", to: "error", toT: spread(0, 2), kind: "fail" },
+      { from: "parse", fromSide: "right", to: "error", toT: spread(1, 2), kind: "fail" },
+      { from: "workbook", fromSide: "right", to: "warnings", toT: spread(0, 2), kind: "back" },
+      { from: "write", fromSide: "right", to: "warnings", toT: spread(1, 2), kind: "back" },
     ],
   };
 }
@@ -427,59 +348,60 @@ const SOURCES = [
 ] as const;
 
 function documentOpsWide(): BlueprintLayout {
-  const sources = SOURCES.map((source, index) =>
-    node({ ...source, x: 8, y: 8 + index * 76, w: 232 }),
-  );
-  const last = sources.at(-1);
-  if (last === undefined) throw new Error("No operation sources");
-  const height = last.rect.y + last.rect.h;
+  const w = Math.max(...SOURCES.map(nodeWidth));
+  let y = 0;
+  const sources = SOURCES.map((source) => {
+    const placed = node({ ...source, x: 0, y, w });
+    y += placed.rect.h + SPACING.tile;
+    return placed;
+  });
+  const height = y - SPACING.tile;
+  const storeText = {
+    title: "Store",
+    code: ["DocumentOp[]"],
+    lines: ["One reducer, one change event"],
+  } as const;
+  const snapshotText = {
+    title: "Load a snapshot",
+    code: ["WorkbookSnapshot"],
+    lines: ["Validated; no event or undo"],
+  } as const;
+  // The store stands as tall as the sources, so each arrow runs straight
+  // across; the snapshot sits under the store and hydrates it from below.
+  const column = Math.max(nodeWidth(storeText), nodeWidth(snapshotText));
   const store = node({
     id: "store",
-    x: 290,
+    ...storeText,
+    x: w + SPACING.link,
     y: 0,
-    w: 160,
-    title: "Store",
-    lines: ["One reducer,", "one change event"],
-    code: ["DocumentOp[]"],
+    w: column,
+    h: height,
     tone: "accent",
   });
-  const storeAt = { ...store, rect: { ...store.rect, y: (8 + height - store.rect.h) / 2 } };
   const snapshot = node({
     id: "snapshot",
-    x: 540,
-    y: 0,
-    w: 172,
-    title: "Load a snapshot",
-    lines: ["Validated, recalculated", "once; no event or undo"],
-    code: ["WorkbookSnapshot"],
+    ...snapshotText,
+    x: store.rect.x,
+    y: height + SPACING.row,
+    w: column,
   });
-  const snapshotAt = {
-    ...snapshot,
-    rect: { ...snapshot.rect, y: storeAt.rect.y + (storeAt.rect.h - snapshot.rect.h) / 2 },
-  };
   return {
-    width: WIDE,
-    height: height + 8,
-    nodes: [...sources, storeAt, snapshotAt],
+    nodes: [...sources, store, snapshot],
     edges: [
-      ...sources.map((source, index) => ({
+      ...sources.map((source) => ({
         from: source.id,
         fromSide: "right" as const,
         to: "store",
-        toT: spread(index, sources.length),
+        toT: (source.rect.y + source.rect.h / 2) / height,
         kind: "main" as const,
       })),
-      {
-        from: "snapshot",
-        fromSide: "left",
-        to: "store",
-        kind: "side",
-        label: "hydrates",
-        labelSide: "above",
-      },
+      { from: "snapshot", fromSide: "top", to: "store", kind: "side", label: "hydrates" },
     ],
   };
 }
+
+/** The gutter left of stacked sources, where their connectors drop to the box below. */
+const GUTTER = 40;
 
 function documentOpsNarrow(): BlueprintLayout {
   // Phones show each source's short name; the wide drawing and the description say the rest.
@@ -488,38 +410,42 @@ function documentOpsNarrow(): BlueprintLayout {
     { id: "direct", title: "Direct calls", lines: ["No history"] },
     { id: "remote", title: "Remote ops", lines: ["Not resent"] },
   ];
-  const sources = short.map((source, index) =>
-    node({ ...source, x: 8 + index * 116, y: 8, w: 112 }),
-  );
+  let y = 0;
+  const sources = short.map((source) => {
+    const placed = node({ ...source, x: GUTTER, y, w: NARROW - GUTTER });
+    y += placed.rect.h + SPACING.tile;
+    return placed;
+  });
   const store = node({
     id: "store",
-    x: 8,
-    y: 112,
-    w: 344,
+    x: 0,
+    y: y - SPACING.tile + SPACING.row,
+    w: NARROW,
     title: "Store",
-    lines: ["One reducer, one change event"],
     code: ["DocumentOp[]"],
+    lines: ["One reducer, one change event"],
     tone: "accent",
   });
   const snapshot = node({
     id: "snapshot",
-    x: 8,
-    y: store.rect.y + store.rect.h + 48,
-    w: 344,
+    x: 0,
+    y: store.rect.y + store.rect.h + SPACING.row,
+    w: NARROW,
     title: "Load a snapshot",
-    lines: ["Validated, recalculated once;", "no event or undo"],
     code: ["WorkbookSnapshot"],
+    lines: ["Validated; no event or undo"],
   });
+  // Each source drops down the gutter into the store, the upper ones farther out, so none cross.
+  const lane = (index: number) => 8 + (index * (GUTTER - 16)) / Math.max(1, sources.length - 1);
   return {
-    width: NARROW,
-    height: snapshot.rect.y + snapshot.rect.h + 8,
     nodes: [...sources, store, snapshot],
     edges: [
       ...sources.map((source, index) => ({
         from: source.id,
-        fromSide: "bottom" as const,
+        fromSide: "left" as const,
         to: "store",
-        toT: spread(index, sources.length, 0.16),
+        toSide: "top" as const,
+        toT: lane(index) / NARROW,
         kind: "main" as const,
       })),
       {
@@ -528,7 +454,6 @@ function documentOpsNarrow(): BlueprintLayout {
         to: "store",
         kind: "side",
         label: "hydrates",
-        labelSide: "right",
       },
     ],
   };
@@ -552,15 +477,15 @@ export function FirstGridFigure(): JSX.Element {
   return (
     <FlowFigure
       steps={[
-        { title: "1 · Install", code: ["npm install", "@sheetwrite/core"] },
-        { title: "2 · Create", code: ["createGrid(host,", "  { workbook })"] },
+        { title: "1 · Install", code: ["npm install @sheetwrite/core"] },
+        { title: "2 · Create", code: ["createGrid(host, { workbook })"] },
         {
           title: "3 · Formula",
           code: ["=SUM(B2:B4)"],
           lines: ["A total that updates"],
           tone: "accent",
         },
-        { title: "4 · Save, open", code: ["exportSnapshot()", "createGridFromSnapshot"] },
+        { title: "4 · Save, open", code: ["exportSnapshot()", "createGridFromSnapshot(…)"] },
       ]}
       text={{
         title: "The four steps of a first grid",
@@ -594,11 +519,7 @@ export function EngineBuildsFigure(): JSX.Element {
         {
           eyebrow: "@sheetwrite/formulas",
           title: "Full",
-          lines: [
-            "Every default function, plus",
-            "statistics, finance, regex,",
-            "LAMBDA, GROUPBY, PIVOTBY",
-          ],
+          lines: ["Every default function, plus", "statistics, finance, regex, LAMBDA"],
           tone: "accent",
         },
       ]}
@@ -610,21 +531,20 @@ export function EngineBuildsFigure(): JSX.Element {
 export function LoadOrderFigure(): JSX.Element {
   return (
     <FlowFigure
-      note="Worker rendering and XLSX stay explicit: the worker entry is @sheetwrite/core/worker, and XLSX is the xlsxAddon() passed to initSheetwrite."
+      note="@sheetwrite/formulas is optional: it adds the full engine. Framework adapters call initSheetwrite() on mount. Worker rendering and XLSX stay explicit: the worker entry is @sheetwrite/core/worker, and XLSX is the xlsxAddon() passed to initSheetwrite."
       steps={[
         {
           title: "Install",
-          code: ["@sheetwrite/core"],
-          lines: ["Add @sheetwrite/formulas", "for the full engine"],
+          code: ["@sheetwrite/core", "@sheetwrite/formulas"],
         },
         {
           title: "initSheetwrite()",
-          lines: ["Loads the engine once,", "before the first grid;", "adapters call it on mount"],
+          lines: ["Loads the engine once", "before the first grid"],
           tone: "accent",
         },
         {
           title: "createGrid",
-          code: ["createGrid(host,", "  options)"],
+          code: ["createGrid(host, options)"],
           lines: ["Mounts the grid"],
         },
       ]}
@@ -693,66 +613,77 @@ const RELATIONSHIP_TEXT = {
     "A relationship links two tables by one key column each. The from side, Orders[Customer], is the many side: many orders share a key. The to side, Customers[Customer], is the one side: each non-blank key is unique. A pivot over the model groups Orders by Customers › Region. A matching key reads that row's cell; no match or a blank key reads blank; a duplicate one-side key shows #VALUE! at the pivot's anchor.",
 };
 
-function relationshipLayout(width: number, narrow: boolean): BlueprintLayout {
-  const half = (width - 16 - (narrow ? 24 : 96)) / 2;
-  const orders = node({
-    id: "orders",
-    x: 8,
-    y: 8,
-    w: half,
-    eyebrow: "Many side",
-    title: "Orders",
-    code: ["Orders[Customer]"],
-    lines: ["Keys repeat"],
-  });
-  const customers = node({
-    id: "customers",
-    x: width - 8 - half,
-    y: 8,
-    w: half,
-    eyebrow: "One side",
-    title: "Customers",
-    code: ["Customers[Customer]"],
-    lines: ["Each key once"],
-  });
-  const top = Math.max(orders.rect.h, customers.rect.h);
-  const pivot = node({
-    id: "pivot",
-    x: 8,
-    y: 8 + top + 56,
-    w: width - 16,
-    title: "Pivot over the model",
-    lines: ["Orders grouped by Customers › Region"],
-    tone: "accent",
-  });
-  const sized = [orders, customers].map((each) => ({ ...each, rect: { ...each.rect, h: top } }));
+const ORDERS = {
+  id: "orders",
+  eyebrow: "Many side",
+  title: "Orders",
+  code: ["Orders[Customer]"],
+  lines: ["Keys repeat"],
+} as const;
+const CUSTOMERS = {
+  id: "customers",
+  eyebrow: "One side",
+  title: "Customers",
+  code: ["Customers[Customer]"],
+  lines: ["Each key once"],
+} as const;
+const PIVOT = {
+  id: "pivot",
+  title: "Pivot over the model",
+  lines: ["Orders grouped by Customers › Region"],
+  tone: "accent",
+} as const;
+const MANY_TO_ONE = "many → one";
+
+/** Orders beside Customers, joined many to one, and the pivot under both. */
+function relationshipWide(): BlueprintLayout {
+  const gap = linkGap([MANY_TO_ONE]);
+  const half = Math.max((WIDE - gap) / 2, nodeWidth(ORDERS), nodeWidth(CUSTOMERS));
+  const top = Math.max(nodeHeight(ORDERS), nodeHeight(CUSTOMERS));
+  const pivot = node({ ...PIVOT, x: 0, y: top + SPACING.row, w: 2 * half + gap });
   return {
-    width,
-    height: pivot.rect.y + pivot.rect.h + 8,
-    nodes: [...sized, pivot],
+    nodes: [
+      node({ ...ORDERS, x: 0, y: 0, w: half, h: top }),
+      node({ ...CUSTOMERS, x: half + gap, y: 0, w: half, h: top }),
+      pivot,
+    ],
     edges: [
-      {
-        from: "orders",
-        fromSide: "right",
-        to: "customers",
-        kind: "side",
-        label: narrow ? "" : "many → one",
-        labelSide: "above",
-      },
+      { from: "orders", fromSide: "right", to: "customers", kind: "side", label: MANY_TO_ONE },
       {
         from: "orders",
         fromSide: "bottom",
         to: "pivot",
-        toT: along(pivot, 8 + half / 2),
+        toT: along(pivot, half / 2),
         kind: "main",
       },
       {
         from: "customers",
         fromSide: "bottom",
         to: "pivot",
-        toT: along(pivot, width - 8 - half / 2),
+        toT: along(pivot, half + gap + half / 2),
         kind: "main",
       },
+    ],
+  };
+}
+
+/** On phones the three stack; Orders reaches the pivot down its left side. */
+function relationshipNarrow(): BlueprintLayout {
+  const w = NARROW - BRACKET;
+  const orders = node({ ...ORDERS, x: BRACKET, y: 0, w });
+  const customers = node({ ...CUSTOMERS, x: BRACKET, y: orders.rect.h + SPACING.row, w });
+  const pivot = node({
+    ...PIVOT,
+    x: BRACKET,
+    y: customers.rect.y + customers.rect.h + SPACING.row,
+    w,
+  });
+  return {
+    nodes: [orders, customers, pivot],
+    edges: [
+      { from: "orders", fromSide: "bottom", to: "customers", kind: "side", label: MANY_TO_ONE },
+      { from: "orders", fromSide: "left", toSide: "left", to: "pivot", kind: "main" },
+      { from: "customers", fromSide: "bottom", to: "pivot", kind: "main" },
     ],
   };
 }
@@ -761,10 +692,10 @@ function relationshipLayout(width: number, narrow: boolean): BlueprintLayout {
 export function RelationshipFigure(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={relationshipLayout(NARROW, true)}
+      narrow={relationshipNarrow()}
       note="No match or a blank key reads blank; a duplicate key on the one side shows #VALUE! at the pivot."
       text={RELATIONSHIP_TEXT}
-      wide={relationshipLayout(WIDE, false)}
+      wide={relationshipWide()}
     />
   );
 }
@@ -781,12 +712,12 @@ export function DashboardSlicerFigure(): JSX.Element {
           "A slicer on a column of a table filters every pivot whose table is that table or reaches it through many-to-one relationships; the filter goes from the one side to the many side, never back. Here a Region slicer on Regions filters the pivot over Orders, which reaches Regions, the PivotChart over that pivot, and a KPI card whose measure's home table is Orders. A pivot over Targets, which doesn't reach Regions, is not filtered.",
       }}
       tiles={[
-        { title: "Pivot", lines: ["Over Orders, which", "reaches Regions"], tone: "accent" },
+        { title: "Pivot", lines: ["Over Orders, which reaches Regions"], tone: "accent" },
         { title: "PivotChart", lines: ["Follows its pivot"], tone: "accent" },
         { title: "KPI card", lines: ["Measure on Orders"], tone: "accent" },
         {
           title: "Pivot",
-          lines: ["Over Targets:", "not filtered"],
+          lines: ["Over Targets: not filtered"],
           tone: "muted",
           unreached: true,
         },
@@ -803,15 +734,15 @@ export function VersionArchiveFigure(): JSX.Element {
       steps={[
         {
           title: "Committed",
-          lines: ["Confirmed with revision", "and author; optimistic", "edits aren't recorded"],
+          lines: ["With revision and author;", "optimistic edits aren't recorded"],
         },
-        { title: "Log", lines: ["Each transaction", "appended"] },
+        { title: "Log", lines: ["Each transaction appended"] },
         {
           title: "Checkpoint",
-          lines: ["After 30 active minutes,", "1,000 transactions", "or 2 MiB of log"],
+          lines: ["After 30 active minutes,", "1,000 transactions or 2 MiB of log"],
           tone: "accent",
         },
-        { title: "Pages", lines: ["16 rows × 4 columns;", "unchanged pages", "are shared"] },
+        { title: "Pages", lines: ["16 rows × 4 columns;", "unchanged pages are shared"] },
       ]}
       text={{
         title: "How the version archive records a document",

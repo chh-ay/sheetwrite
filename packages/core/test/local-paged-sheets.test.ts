@@ -151,6 +151,7 @@ describe("the host's dense and local limits", () => {
       expect(refused.status).toBe("rejected");
       if (refused.status !== "rejected") throw new Error("expected a rejected transaction");
       expect(refused.issues[0]).toMatchObject({ resource: "local-paged-cells", max: 150 });
+      expect(store.getWorkbook().sheets.find((sheet) => sheet.id === "s1")?.rowCount).toBe(15);
     } finally {
       store.dispose();
     }

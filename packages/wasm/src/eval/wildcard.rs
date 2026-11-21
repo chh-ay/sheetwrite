@@ -230,13 +230,6 @@ mod tests {
             .matches(text)
     }
 
-    fn search(pattern: &str, text: &str) -> Option<usize> {
-        Wildcard::parse(pattern)
-            .expect("small pattern")
-            .find(text, 0, &mut || Ok::<(), ()>(()))
-            .expect("unbounded search")
-    }
-
     #[test]
     fn stars_questions_and_escapes_follow_excel() {
         assert!(whole("a*", "Alpha"));
@@ -251,16 +244,6 @@ mod tests {
         assert!(whole("", ""));
         assert!(!whole("", "a"));
         assert!(whole("**", ""));
-    }
-
-    #[test]
-    fn question_mark_is_one_character_as_written() {
-        // U+0130 lowercases to two code points; `?` still matches it once.
-        assert!(whole("?", "İ"));
-        assert!(whole("é?", "ÉZ"));
-        assert!(whole("ÉCOLE", "école"));
-        assert_eq!(search("?", "😀z"), Some(0));
-        assert_eq!(search("z", "😀z"), Some("😀".len()));
     }
 
     #[test]

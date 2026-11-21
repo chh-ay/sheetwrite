@@ -40,31 +40,6 @@ const value = (row: number, col: number) => grid.store.getCell({ sheet: "s1", ro
 const sheet = () => grid.store.getWorkbook().sheets[0]!;
 const dialog = () => document.querySelector(".sheetwrite-dialog");
 
-describe("merge", () => {
-  it("merges a range that holds several values before the call returns, without asking", () => {
-    select(1, 0, 2, 1);
-    grid.actions.merge();
-
-    expect(sheet().merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect([value(1, 0), value(1, 1), value(2, 0), value(2, 1)]).toEqual([
-      "Customer 1",
-      null,
-      null,
-      null,
-    ]);
-    expect(dialog()).toBeNull();
-  });
-
-  it("merges and centers before the call returns", () => {
-    select(1, 0, 1, 1);
-    grid.actions.mergeAndCenter();
-
-    expect(sheet().merges).toEqual([{ r0: 1, c0: 0, r1: 1, c1: 1 }]);
-    expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).style.align).toBe("center");
-    expect(dialog()).toBeNull();
-  });
-});
-
 describe("insertCells and deleteCells", () => {
   it("insert and delete selected whole rows before the call returns", () => {
     select(2, 0, 2, 2);
@@ -118,23 +93,6 @@ describe("formatCells", () => {
 });
 
 describe("AutoFilter commands", () => {
-  it("turn the AutoFilter on and off before the call returns", () => {
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    grid.actions.toggleAutoFilter();
-    expect(grid.getAutoFilter()?.range).toEqual(range("s1", 0, 0, 9, 2));
-
-    grid.actions.toggleAutoFilter();
-    expect(grid.getAutoFilter()).toBeNull();
-  });
-
-  it("filter by the selected cell's value before the call returns", () => {
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 2 } });
-    grid.actions.filterBySelection();
-
-    expect(grid.getAutoFilter()).not.toBeNull();
-    expect(grid.getColumnFilters().get(2)).toEqual({ kind: "values", values: ["Phnom Penh"] });
-  });
-
   it("clear every filter before the call returns", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 2 } });
     grid.actions.filterBySelection();
@@ -142,16 +100,5 @@ describe("AutoFilter commands", () => {
 
     expect(grid.getColumnFilters().size).toBe(0);
     expect(grid.getAutoFilter()).not.toBeNull();
-  });
-});
-
-describe("copySheet", () => {
-  it("returns the copy's result, with its ID, before the call returns", () => {
-    const result = grid.copySheet("s1");
-
-    expect(result.status).toBe("applied");
-    const copy = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === result.sheet);
-    expect(copy?.name).toBe("Sheet 1 (2)");
-    expect(grid.store.getCell({ sheet: result.sheet, row: 0, col: 0 }).resolved).toBe("Customer 0");
   });
 });

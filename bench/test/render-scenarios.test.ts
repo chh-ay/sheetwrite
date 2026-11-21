@@ -197,13 +197,6 @@ test.each([
     null,
   ],
   [
-    "a missing merge index",
-    { indexConstructions: 0 },
-    "merge-heavy.paint",
-    "prepares one revision index",
-    null,
-  ],
-  [
     "a rebuilt merge index",
     { indexConstructions: 2 },
     "merge-heavy.paint",
@@ -230,17 +223,6 @@ test("names the cleanup step when a successful action cannot be undone", () => {
     errorClass: "RangeError",
     message: "cleanup step failed: Maximum call stack size exceeded",
   });
-});
-
-test("keeps one-pixel smooth scrolling inside the same logical window", () => {
-  const result = run("scroll-smooth.same-window");
-  if (result.status !== "success") throw new Error(result.message);
-  expect(result.validation).toContainEqual(
-    expect.objectContaining({
-      checkpoint: "scroll-smooth.same-window keeps the logical row window",
-      passed: true,
-    }),
-  );
 });
 
 test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {

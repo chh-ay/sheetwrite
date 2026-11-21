@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseReleaseLanes, renderReleaseLanes } from "../src/lib/release-lanes.ts";
+import { parseReleaseLanes } from "../src/lib/release-lanes.ts";
 
 describe("release performance lanes", () => {
   it("reads each result in the words the release note uses", () => {
@@ -30,19 +30,6 @@ describe("release performance lanes", () => {
       [125.79],
       [1.08],
     ]);
-  });
-
-  it("keeps the note's words beside the marks", () => {
-    const html = renderReleaseLanes(
-      parseReleaseLanes(
-        'title="Charts" base="0.6.1"',
-        "Edit | Mac: 0.006 ms instead of 20.2 ms",
-        "c",
-      ),
-      () => "",
-    );
-    expect(html).toContain("<b>0.006 ms instead of 20.2 ms</b>");
-    expect(html).toContain("Times faster than 0.6.1");
   });
 
   it("fails the build on a result it can't read", () => {

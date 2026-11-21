@@ -3081,7 +3081,7 @@ export class StoreDataEngine {
     const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
     const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
 
-    if (remoteLoad) this.wasm.beginPageLoad();
+    if (remoteLoad) this.wasm.beginRemoteLoad();
     try {
       if (replayPivotSources) this.releaseReplayedPivotOutputs(patches);
       for (const patch of patches) {

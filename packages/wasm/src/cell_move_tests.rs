@@ -159,6 +159,12 @@ fn a_range_moves_an_edge_only_when_the_block_holds_it_and_moves_along_it() {
         after_move("=SUM(Data!A:A)", [0, 0, 1, 1], (5, 0)),
         "=SUM(Data!A:A)"
     );
+    // Only `A:A`, which runs to the sheet edge at row 1,048,576, keeps
+    // spanning it; a range down to the last row of a short sheet does not.
+    assert_eq!(
+        after_move("=SUM(Data!A1:A30)", [29, 0, 1, 1], (24, 0)),
+        "=SUM(Data!A1:A25)"
+    );
 }
 
 #[test]
@@ -259,15 +265,6 @@ fn a_spill_moves_with_its_formula_and_a_move_that_does_not_fit_changes_nothing()
     assert_eq!(text(&store, data, 0, 4), "=SEQUENCE(3)");
     assert_eq!(number(&store, data, 2, 4), 3.0);
     assert!(is_empty(&store, data, 2, 0), "the old spill is gone");
-}
-
-#[test]
-fn a_range_down_to_the_last_row_of_a_short_sheet_is_not_a_whole_column() {
-    // Only `A:A`, which runs to the sheet edge at row 1,048,576, keeps spanning it.
-    assert_eq!(
-        after_move("=SUM(Data!A1:A30)", [29, 0, 1, 1], (24, 0)),
-        "=SUM(Data!A1:A25)"
-    );
 }
 
 #[test]

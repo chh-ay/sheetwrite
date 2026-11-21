@@ -93,12 +93,11 @@ export function VolatileDiagram() {
       steps={[
         { title: "A transaction", lines: ["that changes cells"], tone: "accent" },
         {
-          title: "Volatile formulas",
+          title: "Volatile formulas and their dependents",
           code: ["NOW · TODAY · RAND", "OFFSET · INDIRECT"],
-          lines: ["and their dependents"],
           tone: "muted",
         },
-        { title: "Other formulas", lines: ["Only when a cell", "they read changed"] },
+        { title: "Other formulas", lines: ["Only when a cell they read changed"] },
       ]}
       text={{
         title: "What a transaction recalculates",
@@ -113,19 +112,26 @@ export function VolatileDiagram() {
 const RECOVERY_GROUPS: readonly FigureStep[] = [
   {
     title: "Fix the input",
-    code: ["SnapshotValidationError", "DelimitedTextOptionsError", "SyncProtocolError"],
+    code: ["SnapshotValidationError", "SyncProtocolError"],
     tone: "danger",
   },
+  { title: "Fix the option", code: ["DelimitedTextOptionsError"], tone: "danger" },
   {
     title: "Reduce it, or raise the limit",
-    code: ["SnapshotResourceError", "DelimitedTextResourceError", "XlsxResourceError"],
+    code: ["SnapshotResourceError", "XlsxResourceError"],
+    tone: "muted",
+  },
+  {
+    title: "Reduce it, or change the limit",
+    code: ["DelimitedTextResourceError"],
     tone: "muted",
   },
   { title: "Load the pages", code: ["IncompleteDataError"], tone: "accent" },
   { title: "Drain pending work", code: ["SyncPendingCapacityError"], tone: "accent" },
   {
     title: "Read the cause or code",
-    code: ["PersistenceError", "IndexedDbPendingCommitStorageError"],
+    code: ["PersistenceError"],
+    lines: ["Also the IndexedDB queue's error"],
   },
   { title: "The grid keeps working", code: ["renderer-fallback", "worker → canvas"] },
 ];
@@ -151,17 +157,17 @@ export function VirtualScrollDiagram() {
     <FlowFigure
       note="OffsetIndex maps a row to its offset and back in O(log n)."
       steps={[
-        { title: "Every row", lines: ["Taller than the", "browser's height cap"] },
-        { title: "Scroll sizer, capped", lines: ["Measured by a probe,", "again on zoom"] },
+        { title: "Every row", lines: ["Taller than the browser's height cap"] },
+        { title: "Scroll sizer, capped", lines: ["Measured by a probe, again on zoom"] },
         {
           title: "ScaledScroll",
-          lines: ["Maps the capped bar", "onto every row"],
+          lines: ["Maps the capped bar onto every row"],
           tone: "accent",
         },
         {
           title: "The painted window",
           code: ["[start, end)"],
-          lines: ["Plus overscan rows", "on each side"],
+          lines: ["Plus overscan rows on each side"],
         },
       ]}
       text={{
@@ -185,7 +191,7 @@ export function GenerationsDiagram() {
       note="Reattach subscriptions in onReady; never keep a Grid from an earlier generation."
       steps={generations.map(([title, code, line], index) => ({
         title,
-        code: ["onReady", code],
+        code: [code],
         lines: [line],
         ...(index === 0 ? { tone: "accent" as const } : {}),
       }))}
@@ -211,14 +217,14 @@ export function LiveOrResetDiagram() {
       tiles={[
         {
           title: "Updated in place",
-          code: ["theme", "readOnly", "config", "overscan", "minColumns"],
+          code: ["theme · readOnly · config", "overscan · minColumns"],
           tone: "accent",
         },
         {
           title: "New one: input-reset",
-          code: ["workbook", "data", "datasource", "presentation", "editors …"],
+          code: ["workbook · data · datasource", "presentation · editors …"],
         },
-        { title: "New one: renderer-reset", code: ["renderer", "workerUrl", "renderers"] },
+        { title: "New one: renderer-reset", code: ["renderer · workerUrl", "renderers"] },
       ]}
     />
   );
@@ -261,7 +267,7 @@ export function StreamingImportDiagram() {
         kind: "fail",
         step: {
           title: "signal aborts",
-          lines: ["Rejects with signal.reason; nothing partial"],
+          lines: ["Rejects with signal.reason;", "keeps nothing partial"],
           tone: "danger",
         },
       }}
@@ -277,7 +283,7 @@ export function StreamingImportDiagram() {
           lines: ["Parsed from bounded", "inflated chunks"],
           tone: "accent",
         },
-        { title: "Snapshot cells", lines: ["Built as rows", "stream in"] },
+        { title: "Snapshot cells", lines: ["Built as rows stream in"] },
       ]}
       text={{
         title: "How a large XLSX file imports",
@@ -296,11 +302,11 @@ export function KeptPartsDiagram() {
       steps={[
         {
           title: "Import",
-          lines: ["Opaque parts keep their", "compressed ZIP bytes"],
           code: ["workbook.xlsxSource"],
+          lines: ["Opaque parts kept as ZIP bytes"],
           tone: "accent",
         },
-        { title: "Always kept", lines: ["VBA, customXml,", "theme, connections,", "properties"] },
+        { title: "Always kept", lines: ["VBA, customXml, theme,", "connections, properties"] },
         {
           title: "If the sheet's shape",
           lines: ["didn't change: images,", "drawings, XML tables"],
@@ -329,8 +335,8 @@ export function WorkerRenderingDiagram() {
         kind: "fail",
         step: {
           title: "Construction throws",
-          lines: ["CanvasRenderer paints on the main thread"],
           code: ["renderer-fallback, once"],
+          lines: ["The main thread paints instead"],
           tone: "danger",
         },
       }}
@@ -341,7 +347,7 @@ export function WorkerRenderingDiagram() {
           lines: ["First, before the", "canvas is transferred"],
           tone: "accent",
         },
-        { title: "Transfer the canvas", lines: ["Its control moves", "to the worker"] },
+        { title: "Transfer the canvas", lines: ["Its control moves to the worker"] },
         {
           title: "Post each window",
           code: ["VisibleWindowView"],
@@ -404,12 +410,12 @@ export function FormulaReadsDiagram() {
         },
         {
           title: "Ask the engine",
-          lines: ["Which same-sheet cells", "do they read, also", "through other formulas?"],
+          lines: ["Which same-sheet cells do they read,", "also through other formulas?"],
         },
         { title: "Load them too", lines: ["With the window, within", "one 32,768-cell budget"] },
         {
           title: "Kept while visible",
-          lines: ["Protected from", "clean-cache eviction"],
+          lines: ["Protected from clean-cache eviction"],
           tone: "muted",
         },
       ]}
@@ -429,21 +435,21 @@ export function IterationDiagram() {
       steps={[
         {
           title: "Start",
-          lines: ["From the values", "shown; #CYCLE!", "starts at 0"],
+          lines: ["From the values shown;", "#CYCLE! starts at 0"],
           tone: "accent",
         },
         {
           title: "One pass",
-          lines: ["Cycle cells in row", "order, each reads", "the newest values"],
+          lines: ["Cycle cells in row order,", "each reads the newest values"],
         },
         {
           title: "Stop",
-          lines: ["Nothing moved more", "than maxChange, or", "maxIterations ran"],
+          lines: ["Nothing moved more than maxChange,", "or maxIterations ran"],
           tone: "muted",
         },
         {
           title: "Then its readers",
-          lines: ["Formulas that read", "the cycle calculate", "once, after it settles"],
+          lines: ["Formulas that read the cycle", "calculate once, after it settles"],
         },
       ]}
       text={{
@@ -498,12 +504,12 @@ export function PendingCommitsDiagram() {
       steps={[
         {
           title: "1 · Persist",
-          lines: ["Each commit, before", "it can be sent"],
+          lines: ["Each commit, before it can be sent"],
           tone: "accent",
         },
         { title: "2 · Restore", lines: ["On startup, reapplied", "as remote, not echoed"] },
         { title: "3 · Retry", lines: ["After reconnect or reload,", "with the same mutation id"] },
-        { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "muted" },
+        { title: "4 · Remove", lines: ["Only after applied or duplicate"], tone: "muted" },
       ]}
       text={{
         title: "What durable pending commits do",
@@ -528,22 +534,22 @@ export function ImportContractsDiagram() {
         {
           eyebrow: "Workbook",
           title: "fromXlsxWorkbook",
-          lines: ["ArrayBuffer or Uint8Array"],
           code: ["→ WorkbookSnapshot"],
+          lines: ["From an ArrayBuffer or Uint8Array"],
           tone: "accent",
         },
         {
           eyebrow: "Workbook",
           title: "fromXlsxWorkbookFile",
-          lines: ["File or Blob, not buffered"],
           code: ["→ WorkbookSnapshot"],
+          lines: ["From a File or Blob, not buffered"],
           tone: "accent",
         },
         {
           eyebrow: "Table",
           title: "fromXlsxTable",
-          lines: ["One table, resolved values"],
           code: ["→ ColumnarData"],
+          lines: ["One table of resolved values"],
         },
       ]}
     />
@@ -559,11 +565,11 @@ export function ViewPipelineDiagram() {
         { title: "Every row", lines: ["In data order"] },
         {
           title: "Column filters",
-          lines: ["All active filters,", "ANDed together"],
+          lines: ["All active filters, ANDed together"],
           tone: "accent",
         },
-        { title: "Minus hidden", lines: ["Hidden rows and", "collapsed groups"] },
-        { title: "Sorted", lines: ["By the active", "multi-key sort"], tone: "muted" },
+        { title: "Minus hidden", lines: ["Hidden rows and collapsed groups"] },
+        { title: "Sorted", lines: ["By the active multi-key sort"], tone: "muted" },
       ]}
       text={{
         title: "How a view picks and orders the displayed rows",

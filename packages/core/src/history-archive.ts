@@ -1,5 +1,6 @@
 import { MAX_ATOMIC_BATCH_VERSIONS } from "./atomic-batch.js";
 import {
+  type CheckedSnapshot,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   validateDocumentOperationShape,
@@ -386,7 +387,7 @@ function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
  * once per archived transaction.
  */
 async function withReplayStore<T>(
-  snapshot: WorkbookSnapshot,
+  checkpoint: CheckedSnapshot,
   tail: readonly string[],
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
@@ -398,8 +399,8 @@ async function withReplayStore<T>(
   let store: SheetwriteStore;
   try {
     store = buildOnEngineInstance(instance, () =>
-      SheetwriteStore.fromSnapshot(snapshot, {
-        storage: replayStorage(snapshot),
+      SheetwriteStore.fromSnapshot(checkpoint, {
+        storage: replayStorage(checkpoint.snapshot),
         cacheBytes: REPLAY_WINDOW_BYTES,
         transactionResourceLimits: {
           maxOperations: MAX_OPERATIONS,
@@ -417,7 +418,7 @@ async function withReplayStore<T>(
   forgetLiveStoreEngine(store);
 
   try {
-    let revision = snapshot.version ?? 0;
+    let revision = checkpoint.snapshot.version ?? 0;
     let batch: DocumentOp[] = [];
     let batchBytes = 0;
 
@@ -772,7 +773,7 @@ export class HistoryArchive {
     return this.withPinnedVersion(id, signal, async (checkpoint, version, read) => {
       const rebuilt =
         version.tail.length === 0
-          ? checkpoint
+          ? checkpoint.snapshot
           : await withReplayStore(
               checkpoint,
               version.tail,
@@ -902,7 +903,7 @@ export class HistoryArchive {
     id: string,
     signal: AbortSignal | undefined,
     use: (
-      checkpoint: WorkbookSnapshot,
+      checkpoint: CheckedSnapshot,
       version: HistoryVersion,
       read: HistoryRecordReader,
     ) => Promise<T>,
@@ -951,7 +952,7 @@ export class HistoryArchive {
       };
 
       const checkpoint = await readCheckpoint(version.checkpoint, read, this.limits);
-      if (checkpoint.documentId !== this.documentId) {
+      if (checkpoint.snapshot.documentId !== this.documentId) {
         throw new HistoryError("integrity", "History checkpoint belongs to another document");
       }
 

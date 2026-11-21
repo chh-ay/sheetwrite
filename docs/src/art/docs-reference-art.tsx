@@ -14,17 +14,14 @@ export function LibreOfficeRoundTripDiagram() {
         from: 1,
         step: {
           title: "Known producer difference",
-          lines: [
-            "LibreOffice omits a conditional rule's",
-            "stopIfTrue; it is recorded separately",
-          ],
+          lines: ["LibreOffice omits a conditional", "rule's stopIfTrue; noted separately"],
           tone: "muted",
         },
       }}
       note="A passing comparison doesn't mean byte-identical files or full Excel support."
       steps={[
         { title: "Sheetwrite writes", code: ["toXlsxWorkbook(…)"], lines: ["an .xlsx file"] },
-        { title: "LibreOffice 26.8", lines: ["opens and saves", "the file again"] },
+        { title: "LibreOffice 26.8", lines: ["opens and saves the file again"] },
         {
           title: "Sheetwrite reads",
           code: ["fromXlsxWorkbook(…)"],
@@ -47,7 +44,7 @@ export function XlsxExportsDiagram() {
     <FanFigure
       source={{
         title: "One document, two ways to save it as .xlsx",
-        lines: ["Both need the @sheetwrite/xlsx add-on"],
+        lines: ["Both need @sheetwrite/xlsx"],
       }}
       text={{
         title: "Table export and workbook export",
@@ -58,12 +55,12 @@ export function XlsxExportsDiagram() {
         {
           title: "Table: grid.exportXlsx",
           code: ["toXlsxTable(workbook, store)"],
-          lines: ["Active sheet only, a header row", "added, values not formulas"],
+          lines: ["Active sheet, header row, values"],
         },
         {
           title: "Workbook: toXlsxWorkbook",
           code: ["toXlsxWorkbook(snapshot)"],
-          lines: ["Every sheet, formula source,", "styles, merges, names, tables"],
+          lines: ["Every sheet, formulas and styles"],
           tone: "accent",
         },
       ]}
@@ -79,10 +76,7 @@ export function ApiGateDiagram() {
         from: 2,
         step: {
           title: "The gate fails",
-          lines: [
-            "An export the list doesn't hold, a listed",
-            "export that's gone, or a changed signature",
-          ],
+          lines: ["An unlisted export, a listed one", "gone, or a changed signature"],
           tone: "danger",
         },
         kind: "fail",
@@ -95,8 +89,8 @@ export function ApiGateDiagram() {
         },
         {
           title: "bun run api:check",
-          lines: ["Compares every export", "with the reviewed list"],
           code: ["public-api-baseline.json"],
+          lines: ["Compares every export to this list"],
           tone: "accent",
         },
       ]}
@@ -115,7 +109,7 @@ export function LimitsDiagram() {
     <FanFigure
       source={{
         title: "Every resource has a stated ceiling",
-        lines: ["One from each area, and what happens above it"],
+        lines: ["One from each area, and what", "happens above it"],
       }}
       text={{
         title: "A ceiling from each area and what happens above it",
@@ -123,13 +117,13 @@ export function LimitsDiagram() {
           "Each area states its ceilings. A formula range above 1,000,000 cells resolves to #NUM!. A transaction above 10,000 operations is rejected. A snapshot above 256 sheets is rejected. Delimited text above 32 MiB of input throws. A remote version above 10,000 operations emits a protocol error and requires a reload.",
       }}
       tiles={[
-        { title: "Formulas", lines: ["Range above", "1,000,000 cells:", "#NUM!"] },
-        { title: "Transactions", lines: ["Above 10,000", "operations:", "rejected"] },
-        { title: "Snapshots", lines: ["Above 256", "sheets:", "rejected"] },
-        { title: "Delimited text", lines: ["Above 32 MiB", "of input:", "throws"] },
+        { title: "Formulas", lines: ["Range above 1,000,000 cells: #NUM!"] },
+        { title: "Transactions", lines: ["Above 10,000 operations: rejected"] },
+        { title: "Snapshots", lines: ["Above 256 sheets: rejected"] },
+        { title: "Delimited text", lines: ["Above 32 MiB of input: throws"] },
         {
           title: "Sync",
-          lines: ["A version above", "10,000", "operations", "needs a reload"],
+          lines: ["A version above 10,000", "operations needs a reload"],
           tone: "muted",
         },
       ]}
@@ -151,14 +145,14 @@ export function RebaseDiagram() {
       }}
       note="Validate untrusted snapshot JSON first: SnapshotValidationError names the failing path."
       steps={[
-        { title: "Pending local ops", lines: ["Not yet acknowledged", "by the server"] },
+        { title: "Pending local ops", lines: ["Not yet acknowledged by the server"] },
         {
           title: "Rebase",
           code: ["rebaseDocumentOperations"],
           lines: ["over the remote versions"],
           tone: "accent",
         },
-        { title: "Rebased queue", lines: ["Only when the ops", "can't overlap"] },
+        { title: "Rebased queue", lines: ["Only when the ops can't overlap"] },
       ]}
       text={{
         title: "How pending operations are rebased",
@@ -175,7 +169,7 @@ export function EventDirectionDiagram() {
     <FanFigure
       source={{
         title: "grid.on(evt, fn) returns off()",
-        lines: ["Only change carries committed document changes"],
+        lines: ["Only change carries committed", "document changes"],
       }}
       text={{
         title: "Which grid events carry committed changes",
@@ -186,15 +180,14 @@ export function EventDirectionDiagram() {
         { title: 'change, "local"', lines: ["Persist it"], tone: "accent" },
         {
           title: 'change, "remote"',
-          lines: ["Already persisted:", "don't enqueue it"],
+          lines: ["Already persisted: don't enqueue it"],
           tone: "muted",
         },
         {
-          title: "UI events",
+          title: "UI events, observe only",
           code: ["selection · scroll", "edit-begin · search"],
-          lines: ["Observe only"],
         },
-        { title: "Failures", code: ["renderer-fallback", "datasource-error", "engine-failed"] },
+        { title: "Failures", code: ["renderer-fallback", "datasource-error · …"] },
       ]}
     />
   );

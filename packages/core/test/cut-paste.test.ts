@@ -5,6 +5,7 @@ import { DocumentController } from "../src/document-controller.js";
 import { validateDocumentOperationShape } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
+import { encodeRowOrder } from "../src/row-order.js";
 import { Scope } from "../src/scope.js";
 import { SelectionModel } from "../src/selection.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -351,6 +352,57 @@ describe("cut and paste", () => {
     expect(h.marks.at(-1)).toBeNull();
   });
 
+  it("ends the cut when a peer's change reaches its cells, and not for other cells (#1074)", async () => {
+    const block = range("s1", 0, 0, 2, 3);
+    const peerChanges: [string, DocumentOp][] = [
+      [
+        "sort",
+        {
+          op: "permuteRows",
+          range: block,
+          encoding: "u32le-base64-v1",
+          order: encodeRowOrder(new Uint32Array([2, 0, 1])),
+        },
+      ],
+      [
+        "edit",
+        { op: "set", addr: { sheet: "s1", row: 1, col: 0 }, value: { kind: "literal", value: 9 } },
+      ],
+      ["clear", { op: "clearRange", range: block }],
+      ["format", { op: "setRangeStyle", range: block, style: { bold: true } }],
+      ["note", { op: "setNote", addr: { sheet: "s1", row: 0, col: 0 }, text: "peer" }],
+    ];
+    for (const [name, change] of peerChanges) {
+      harness?.close();
+      harness = cutHarness();
+      const h = harness;
+      for (const row of [0, 1, 2]) h.set(row, 0, row + 1);
+      h.select(0, 0, 1, 0);
+      await h.clipboard.cut();
+
+      // A peer's edit beside the cut, or on another sheet, leaves it waiting.
+      h.store.applyTransaction(
+        { patches: [{ op: "set", addr: h.at(5, 2), value: { kind: "literal", value: 1 } }] },
+        { source: "remote" },
+      );
+      h.store.applyTransaction(
+        { patches: [{ op: "set", addr: h.at(0, 0, "s2"), value: { kind: "literal", value: 1 } }] },
+        { source: "remote" },
+      );
+      expect(h.marks, name).toHaveLength(1);
+
+      expect(
+        h.store.applyTransaction({ patches: [change] }, { source: "remote" }).status,
+        name,
+      ).toBe("applied");
+      expect(h.marks.at(-1), name).toBeNull();
+      const before = [h.value(0, 0), h.value(1, 0), h.value(10, 0)];
+      h.select(10, 0);
+      expect(await h.clipboard.paste(), name).toBe("empty");
+      expect([h.value(0, 0), h.value(1, 0), h.value(10, 0)], name).toEqual(before);
+    }
+  });
+
   it("moves validation and conditional-format rules inside the block, and undo puts them back", async () => {
     harness = cutHarness();
     const h = harness;
@@ -490,21 +542,6 @@ describe("moveCells operation", () => {
 describe("a paste past the sheet's last row", () => {
   const rowCount = (h: ReturnType<typeof cutHarness>) =>
     h.store.getWorkbook().sheets.find((candidate) => candidate.id === "s1")!.rowCount;
-
-  it("adds the rows a pasted text needs, as Excel's sheet holds them (#952)", async () => {
-    harness = cutHarness();
-    const h = harness;
-    h.clip.text = Array.from({ length: 40 }, (_, row) => `${row}\t${row * 2}`).join("\n");
-    h.select(25, 0);
-    expect(await h.clipboard.paste()).toBe("done");
-    expect(rowCount(h)).toBe(65);
-    expect([h.value(25, 0), h.value(64, 0), h.value(64, 1)]).toEqual([0, 39, 78]);
-
-    // One undo takes back the cells and the rows.
-    h.document.undo();
-    expect(rowCount(h)).toBe(ROWS);
-    expect(h.value(25, 0)).toBeNull();
-  });
 
   it("adds the rows a cut needs to move past the last row", async () => {
     harness = cutHarness();

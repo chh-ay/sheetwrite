@@ -233,40 +233,22 @@ describe("feed type", () => {
 });
 
 describe("moved docs pages", () => {
-  it("redirects every old address, with or without its trailing slash, to its new page", async () => {
+  it("redirects every old page, merged showcase and removed API page, with or without its trailing slash, to its new page", async () => {
     const root = await fixture();
     await prepareDocsDeployment(root);
-    const moved = Object.entries(MOVED_PAGES);
-    expect(moved.length).toBeGreaterThan(0);
-    for (const [from, page] of moved) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(page.to);
-      }
-    }
-  });
-
-  it("redirects every merged showcase to the showcase that holds its story now", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(to);
-      }
-    }
-  });
-
-  it("redirects each API page of a removed export to the page of what replaces it", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const [from, to] of Object.entries(REMOVED_API_PAGES)) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(to);
+    const tables = [
+      Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
+      Object.entries(MOVED_SHOWCASES),
+      Object.entries(REMOVED_API_PAGES),
+    ];
+    for (const redirects of tables) {
+      expect(redirects.length).toBeGreaterThan(0);
+      for (const [from, to] of redirects) {
+        for (const pathname of [from, from.slice(0, -1)]) {
+          const response = await requestPackagedFile(root, pathname);
+          expect(response?.status).toBe(308);
+          expect(response?.headers.Location).toBe(to);
+        }
       }
     }
   });
