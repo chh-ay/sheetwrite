@@ -838,7 +838,7 @@ function closingIndex(text: string, open: number): number {
  * as the manifest records it (`<T>(a: A, b?: B): R`) or as a declaration
  * (`function name(…): R`); undefined when neither shape matches.
  */
-function functionFields(signature: string, name: string): FunctionFields | undefined {
+export function functionFields(signature: string, name: string): FunctionFields | undefined {
   const declared = signature.indexOf(`function ${name}`);
   let open = declared === -1 ? 0 : declared + `function ${name}`.length;
   if (signature[open] === "<") open = closingIndex(signature, open) + 1;

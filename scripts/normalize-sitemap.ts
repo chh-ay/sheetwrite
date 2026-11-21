@@ -73,7 +73,7 @@ export function normalizeSitemap(xml: string): { xml: string; kept: number; drop
  * else the formula data for a formula reference page, else its route module
  * (`/showcases/sort/` is `docs/src/routes/showcases.sort.tsx`).
  */
-function pageSources(pathname: string, html: string): string[] {
+export function pageSources(pathname: string, html: string): string[] {
   const linked = [
     ...new Set([...html.matchAll(SOURCE_LINK)].map((match) => decodeURIComponent(match[1] ?? ""))),
   ];

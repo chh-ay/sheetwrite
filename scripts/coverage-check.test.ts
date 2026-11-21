@@ -144,6 +144,13 @@ describe("policy schema", () => {
     [{ ...valid, schemaVersion: 2 }, "Unsupported coverage policy schema version"],
     [{ ...valid, typo: true }, "unknown field"],
     [{ ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } }, "unknown field"],
+    [
+      {
+        ...valid,
+        floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
+      },
+      "unknown field",
+    ],
     [{ ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] }, "unknown field"],
   ])("rejects policy %#", (value, message) => {
     expect(() => parseCoveragePolicy(value)).toThrow(message);

@@ -26,7 +26,7 @@ export interface GoogleWorkbookManifest {
   timeZone?: string;
 }
 
-interface GoogleCaptureDependencies {
+export interface GoogleCaptureDependencies {
   producerVersion: string;
   request: (url: string, init?: RequestInit) => Promise<Response>;
   persist: (artifact: CaptureArtifact) => Promise<string>;
@@ -202,7 +202,7 @@ function assertArrayEnvelope(sheet: unknown, entry: ConformanceCase, batchIndex:
   }
 }
 
-async function captureGoogleWithDependencies(
+export async function captureGoogleWithDependencies(
   corpus: ConformanceCorpus,
   dependencies: GoogleCaptureDependencies,
 ): Promise<string> {

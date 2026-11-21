@@ -4,13 +4,16 @@ import { resolve } from "node:path";
 
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import {
+  documentationLinkRoutes,
+  functionFields,
   movedPageIssues,
   parseableDeclaration,
   prepareDeclarationShapes,
+  renderEntryPage,
   renderSymbolPage,
   undocumentedApi,
 } from "./docs-api.js";
-import { trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
+import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
 import {
   landingBenchPayload,
   landingDownloads,
@@ -19,6 +22,7 @@ import {
   splitPerformancePages,
 } from "./docs-performance.js";
 import { adapterContractIssues } from "./docs.js";
+import { headingAnchors } from "./markdown-anchors.js";
 import { extractFigureAssets, perfFigure } from "./perf-figures.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
@@ -53,11 +57,125 @@ function entryPoint(subpath: string, exports: ApiExport[]): ApiEntryPoint {
   };
 }
 
+function exportNamed(entry: ApiEntryPoint, name: string): ApiExport {
+  const found = entry.exports.find((item) => item.name === name);
+  if (found === undefined) throw new Error(`fixture has no export ${name}`);
+  return found;
+}
+
 function section(page: string, pattern: RegExp): string {
   return pattern.exec(page)?.[0] ?? "";
 }
 
+const coreEntry = entryPoint(".", [
+  apiExport(
+    "Grid",
+    "interface",
+    'interface Grid { applyTransaction(tx: unknown): unknown; rendererKind(): "canvas" | "worker"; parse(x: string): number; parse(x: number): number; }',
+    "Imperative grid handle.",
+    [
+      {
+        name: "applyTransaction",
+        documentation: "Applies a committed transaction to the {@link Grid}. Bypasses history.",
+      },
+    ],
+  ),
+  apiExport("CommitReason", "type", 'type CommitReason = "api" | "edit-enter";'),
+  apiExport(
+    "ChangeEvent",
+    "interface",
+    "interface ChangeEvent { commitReason: CommitReason; }",
+    "Committed transaction event.",
+    [
+      {
+        name: "commitReason",
+        documentation: "What produced this commit — see {@link CommitReason}.",
+      },
+    ],
+  ),
+]);
+const corePackage: ApiPackage = { name: "@sheetwrite/core", entryPoints: [coreEntry] };
+
 describe("API reference pages", () => {
+  it("links symbols and gives every member and overload row a unique anchor", async () => {
+    const symbolPage = await renderSymbolPage(
+      corePackage,
+      coreEntry,
+      exportNamed(coreEntry, "Grid"),
+    );
+    expect(renderEntryPage(corePackage, coreEntry)).toContain('href="/docs/api/core/grid/"');
+
+    const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
+    expect(new Set(anchors).size).toBe(anchors.length);
+    expect(anchors).toEqual(expect.arrayContaining(["applytransaction", "rendererkind"]));
+    const members = [
+      ...symbolPage.matchAll(/<article class="api-card api-member" id="([^"]+)"/gu),
+    ].map((match) => match[1]);
+    expect(members.filter((id) => id?.startsWith("grid-parse"))).toHaveLength(2);
+    expect(members).toContain("grid-parse");
+    expect(symbolPage).toContain("Bypasses history.");
+    expect(symbolPage).toContain('<a href="/docs/api/core/grid/"><code>Grid</code></a>');
+    const changeEventPage = await renderSymbolPage(
+      corePackage,
+      coreEntry,
+      exportNamed(coreEntry, "ChangeEvent"),
+    );
+    expect(changeEventPage).toContain(
+      '<a href="/docs/api/core/commit-reason/"><code>CommitReason</code></a>',
+    );
+  });
+
+  it("renders examples and related links on symbols and member rows", async () => {
+    const grid: ApiExport = {
+      ...exportNamed(coreEntry, "Grid"),
+      documentation: [
+        "Imperative grid handle.",
+        "@example",
+        "```tsx",
+        "const view = <div />;",
+        "```",
+        "@see {@link CommitReason | Commit reasons}",
+        "@see https://example.com/guide",
+      ].join("\n"),
+      memberDocs: [
+        {
+          name: "applyTransaction",
+          documentation: [
+            "Apply one transaction.",
+            "@example",
+            "```ts",
+            "grid.applyTransaction({ patches: [] });",
+            "```",
+            "@see {@link Grid.rendererKind | Renderer}",
+          ].join("\n"),
+        },
+      ],
+    };
+    const entry = entryPoint(".", [grid, ...coreEntry.exports.slice(1)]);
+    const pkg = { ...corePackage, entryPoints: [entry] };
+    const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
+
+    const page = await renderSymbolPage(pkg, entry, grid, routes);
+    expect(page).toContain("```tsx compile\nconst view = <div />;\n```");
+    expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
+    expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
+    // Symbol sections sit under the page title (H2), member sections under their group (H4).
+    expect(page.slice(0, page.indexOf("## Members"))).not.toMatch(/^### /m);
+    expect(section(page, /<aside class="api-layout__aside"[\s\S]*?<\/aside>/)).toMatch(
+      /^## Examples$/m,
+    );
+    const member = section(
+      page,
+      /<article class="api-card api-member" id="grid-apply-transaction"[\s\S]*?<\/article>/,
+    );
+    // Anchored to the line start: "##### Examples" would contain "#### Examples".
+    expect(member).toMatch(
+      /^#### Examples\n\n```ts compile\ngrid\.applyTransaction\(\{ patches: \[\] \}\);/m,
+    );
+    expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
+    expect(page).not.toMatch(/@(?:example|see)\b/);
+  });
+
   it("lists members, parameters and return values the reference shows without a description", async () => {
     const shape = apiExport(
       "CountShape",
@@ -162,6 +280,22 @@ describe("API reference pages", () => {
     ]);
   });
 
+  it("reads parameters and the return type from a recorded signature", () => {
+    expect(
+      functionFields(
+        "<T>(map: Map<string, T>, pick?: (value: T, key: string) => boolean, ...rest: T[]): Promise<T[]>",
+        "pickAll",
+      ),
+    ).toEqual({
+      parameters: [
+        { name: "map", type: "Map<string, T>", optional: false },
+        { name: "pick", type: "(value: T, key: string) => boolean", optional: true },
+        { name: "...rest", type: "T[]", optional: false },
+      ],
+      returns: "Promise<T[]>",
+    });
+  });
+
   it("links Source to a file in the repository, never to build output", async () => {
     const chartAnchor: ApiExport = {
       ...apiExport("ChartAnchor", "interface", "interface ChartAnchor { row: number; }"),
@@ -174,13 +308,51 @@ describe("API reference pages", () => {
       chartsEntry,
       chartAnchor,
     );
-    expect(chartsPage).toMatch(
-      /<a href="https:\/\/github\.com\/chh-ay\/sheetwrite\/blob\/develop\/packages\/core\/src\/types\/chart\.ts#L(\d+)"><code>packages\/core\/src\/types\/chart\.ts#L\1<\/code><\/a>/,
+    // The link names the line that declares the symbol in the repository source.
+    const chartSource = await readFile(
+      resolve(import.meta.dir, "../packages/core/src/types/chart.ts"),
+      "utf8",
+    );
+    const line =
+      chartSource.split("\n").findIndex((text) => text.startsWith("export interface ChartAnchor")) +
+      1;
+    expect(line).toBeGreaterThan(0);
+    expect(chartsPage).toContain(
+      `<a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L${line}"><code>packages/core/src/types/chart.ts#L${line}</code></a>`,
     );
   });
 });
 
 describe("documentation content", () => {
+  it("reads fences the way the site's Markdown parser does", () => {
+    const content = [
+      "````md compile",
+      "```ts",
+      "inner",
+      "```",
+      "````",
+      "",
+      "~~~ts compile",
+      "const value: number = 'text';",
+      "~~~",
+      "",
+      "Inline ```code``` is not a fence.",
+    ].join("\n");
+
+    expect(parseFences(content)).toEqual([
+      { language: "md", meta: "compile", code: "```ts\ninner\n```", line: 1 },
+      { language: "ts", meta: "compile", code: "const value: number = 'text';", line: 7 },
+    ]);
+    expect([...headingAnchors("## Example\n\n## Example\n\n## Example\n")]).toEqual([
+      "example",
+      "example-1",
+      "example-2",
+    ]);
+    expect([
+      ...headingAnchors('<table><tr id="fn-sum"><td>SUM</td></tr><tr id="fn-abs"></tr></table>'),
+    ]).toEqual(["fn-sum", "fn-abs"]);
+  });
+
   it("keeps published package README links valid outside the monorepo", async () => {
     const root = resolve(import.meta.dir, "..");
     const allowed = [`${SITE_URL}/`, "https://github.com/chh-ay/sheetwrite/"];
@@ -413,6 +585,28 @@ describe("performance pages", () => {
     expect(() => splitPerformancePages(`${evidence}\n## New benchmark\n\nBody.\n`)).toThrow(
       "performance section has no page: New benchmark",
     );
+  });
+
+  it("lifts a one-section page's headings to sit right under its title", () => {
+    const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
+    const pages = pagesOf(
+      evidence
+        .replace(
+          "Formula engine benchmark body.\n",
+          `### Scale\n\n<h4>Card</h4>\n\n#### Detail\n\n${fenced}`,
+        )
+        .replace("Runtime resource ownership body.\n", "### Owners\n"),
+    );
+
+    const formula = pages.get("performance/formula-engine.md") ?? "";
+    // A one-section page takes its heading from its title.
+    expect(formula).not.toContain("## Formula engine benchmark");
+    expect(formula).toMatch(/^## Scale$/m);
+    expect(formula).toContain("<h3>Card</h3>");
+    expect(formula).toMatch(/^### Detail$/m);
+    expect(formula).toContain(fenced);
+    // A page with several sections keeps their H2s, so nothing moves.
+    expect(pages.get("performance/memory.md")).toMatch(/^### Owners$/m);
   });
 
   it("moves every figure out of its page into a static asset, leaving a placeholder", () => {

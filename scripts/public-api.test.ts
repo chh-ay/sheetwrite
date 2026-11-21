@@ -121,6 +121,51 @@ describe("re-export documentation", () => {
     expect(external?.memberDocs).toEqual([{ name: "value", documentation: "Upstream property." }]);
   });
 
+  it("preserves example and see tags for symbols and their members", async () => {
+    const tagged = [
+      "/** A documented service.",
+      " * @example",
+      " * ```ts",
+      " * const service = new Service();",
+      " * ```",
+      " * @see {@link DataSource | Load data}",
+      " * @see DataSource",
+      " */",
+      "export declare class Service {",
+      "  /** Make a service for `name`. */",
+      "  constructor(name: string);",
+      "  /** Run the service.",
+      "   * @example",
+      "   * ```ts",
+      "   * service.run();",
+      "   * ```",
+      "   * @see https://example.com/run",
+      "   */",
+      "  run(): void;",
+      "}",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const service = manifest.packages[0]?.entryPoints[0]?.exports.find(
+      (candidate) => candidate.name === "Service",
+    );
+    expect(service?.documentation).toContain(
+      "@example\n```ts\nconst service = new Service();\n```",
+    );
+    expect(service?.documentation).toContain("@see\n{@link DataSource | Load data}");
+    expect(service?.documentation).toContain("@see\nDataSource");
+    expect(service?.memberDocs).toContainEqual({
+      name: "run",
+      documentation:
+        "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
+    });
+    expect(service?.memberDocs).toContainEqual({
+      name: "constructor",
+      documentation: "Make a service for `name`.",
+    });
+  });
+
   it("keeps param, returns and throws tags, a thrown type as code, and drops empty ones", async () => {
     const tagged = [
       "/**",
