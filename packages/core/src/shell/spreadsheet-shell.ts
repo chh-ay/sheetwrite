@@ -4,8 +4,8 @@
 // policy stay under the caller's `GridConfig` control, and the grid host
 // remains the single spreadsheet keyboard/focus authority.
 
-import { createGridController, type GridController } from "../grid-controller.js";
 import { focusInto } from "../focus-exit.js";
+import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
 import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { Scope } from "../scope.js";
