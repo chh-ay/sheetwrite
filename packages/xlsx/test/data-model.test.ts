@@ -153,8 +153,9 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
   expect(xml).toMatch(/<c r="A5"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Region<\/t>/u);
   expect(xml).toMatch(/<c r="A7"[^>]*t="inlineStr"[^>]*><is><t[^>]*>Total<\/t>/u);
   // The Sum value keeps its field's number format (0.00 is Excel's built-in 2); the measure is General.
+  // Style 1 is the text columns' Text format, so the Sum value's style is 2.
   expect(partText(saved, "xl/styles.xml")).toMatch(/<xf numFmtId="2"/u);
-  expect(xml).toMatch(/<c r="B6" s="1"><v>7<\/v><\/c>/u);
+  expect(xml).toMatch(/<c r="B6" s="2"><v>7<\/v><\/c>/u);
   expect(xml).toMatch(/<c r="C6"><v>7<\/v><\/c>/u);
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Pivot table By region was not written as a native pivot because a model pivot needs an Excel data-model binary; its current values were written as cells and it remains in Sheetwrite metadata",
