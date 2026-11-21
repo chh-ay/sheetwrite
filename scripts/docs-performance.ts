@@ -2186,32 +2186,40 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       name.endsWith(".tarballBytes"),
     );
     // Each package's download size in the last releases, oldest first: the
-    // same numbers as the tables below, as bars on one axis. The tables keep
-    // every release; the figure keeps few enough bars to read on a phone.
-    const shownReleases = sizeHistory.releases.slice(-SIZE_FIGURE_RELEASES);
+    // same numbers and changes as the tables below, as bars on one linear axis
+    // from 0, so a package's growth between releases shows as a longer bar.
+    // The tables keep every release; the figure keeps few enough bars to read
+    // on a phone.
+    const firstShown = Math.max(0, sizeHistory.releases.length - SIZE_FIGURE_RELEASES);
+    const shownReleases = sizeHistory.releases.slice(firstShown);
     lines.push(
       perfFigure({
         id: "delivery-size-tarballs",
         title: `Download size per package, v${shownReleases[0]?.version ?? latestRelease.version} to v${latestRelease.version}`,
         unit: "bytes",
-        scale: "log",
+        scale: "linear",
         rowHeader: "Package",
         groups: [
           {
             label: "npm registry tarballs",
             rows: packageMetricKeys.map((key) => ({
               label: key.slice("package.".length, -".tarballBytes".length),
-              bars: shownReleases.flatMap((release) => {
+              bars: shownReleases.flatMap((release, index) => {
                 const metric = release.metrics[key];
-                return metric === undefined
-                  ? []
-                  : [
-                      {
-                        label: `v${release.version}`,
-                        role: "measured" as const,
-                        stat: { value: metric.actual },
-                      },
-                    ];
+                if (metric === undefined) return [];
+                const previous = sizeHistory.releases[firstShown + index - 1]?.metrics[key];
+                // The change from the release before, as the table below gives it.
+                const label =
+                  previous === undefined
+                    ? `v${release.version}`
+                    : `v${release.version} · ${formatMetricDelta(metric, previous)[1]}`;
+                return [
+                  {
+                    label,
+                    role: "measured" as const,
+                    stat: { value: metric.actual },
+                  },
+                ];
               }),
             })),
           },
