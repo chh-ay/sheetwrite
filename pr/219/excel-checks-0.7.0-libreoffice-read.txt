@@ -1,0 +1,975 @@
+Saved by: LibreOffice/26.8.1.1$Linux_X86_64 LibreOffice_project/bf8adb135da2784a1be3ca33001278b7a20af5c1 (Sheetwrite wrote it as unknown)
+Repair message on open: (not answered)
+
+== 1. Sort order (#353), sheet "1 Sort order"
+  61 of 152 the same
+  DIFFER A to Z, B10
+         Sheetwrite: -10
+         Excel:      3
+  DIFFER A to Z, B11
+         Sheetwrite: -1
+         Excel:      -10
+  DIFFER A to Z, B13
+         Sheetwrite: 3
+         Excel:      -1
+  DIFFER A to Z, B14
+         Sheetwrite: A1
+         Excel:      A11
+  DIFFER A to Z, B16
+         Sheetwrite: A11
+         Excel:      A1
+  DIFFER A to Z, B17
+         Sheetwrite: 0
+         Excel:      Z
+  DIFFER A to Z, B18
+         Sheetwrite: 1
+         Excel:      B
+  DIFFER A to Z, B19
+         Sheetwrite: 2
+         Excel:      A
+  DIFFER A to Z, B20
+         Sheetwrite: 3
+         Excel:      >
+  DIFFER A to Z, B21
+         Sheetwrite: 4
+         Excel:      =
+  DIFFER A to Z, B22
+         Sheetwrite: 5
+         Excel:      <
+  DIFFER A to Z, B23
+         Sheetwrite: 6
+         Excel:      +
+  DIFFER A to Z, B24
+         Sheetwrite: 7
+         Excel:      ~
+  DIFFER A to Z, B25
+         Sheetwrite: 8
+         Excel:      }
+  DIFFER A to Z, B26
+         Sheetwrite: 9
+         Excel:      |
+  DIFFER A to Z, B27
+         Sheetwrite:  
+         Excel:      {
+  DIFFER A to Z, B28
+         Sheetwrite: !
+         Excel:      `
+  DIFFER A to Z, B29
+         Sheetwrite: "
+         Excel:      _
+  DIFFER A to Z, B30
+         Sheetwrite: #
+         Excel:      ^
+  DIFFER A to Z, B31
+         Sheetwrite: $
+         Excel:      ]
+  DIFFER A to Z, B32
+         Sheetwrite: %
+         Excel:      \
+  DIFFER A to Z, B33
+         Sheetwrite: &
+         Excel:      [
+  DIFFER A to Z, B34
+         Sheetwrite: (
+         Excel:      @
+  DIFFER A to Z, B35
+         Sheetwrite: )
+         Excel:      ?
+  DIFFER A to Z, B36
+         Sheetwrite: *
+         Excel:      ;
+  DIFFER A to Z, B37
+         Sheetwrite: ,
+         Excel:      :
+  DIFFER A to Z, B38
+         Sheetwrite: .
+         Excel:      /
+  DIFFER A to Z, B39
+         Sheetwrite: /
+         Excel:      .
+  DIFFER A to Z, B40
+         Sheetwrite: :
+         Excel:      ,
+  DIFFER A to Z, B41
+         Sheetwrite: ;
+         Excel:      *
+  DIFFER A to Z, B42
+         Sheetwrite: ?
+         Excel:      )
+  DIFFER A to Z, B43
+         Sheetwrite: @
+         Excel:      (
+  DIFFER A to Z, B44
+         Sheetwrite: [
+         Excel:      &
+  DIFFER A to Z, B45
+         Sheetwrite: \
+         Excel:      %
+  DIFFER A to Z, B46
+         Sheetwrite: ]
+         Excel:      $
+  DIFFER A to Z, B47
+         Sheetwrite: ^
+         Excel:      #
+  DIFFER A to Z, B48
+         Sheetwrite: _
+         Excel:      "
+  DIFFER A to Z, B49
+         Sheetwrite: `
+         Excel:      !
+  DIFFER A to Z, B50
+         Sheetwrite: {
+         Excel:       
+  DIFFER A to Z, B51
+         Sheetwrite: |
+         Excel:      9
+  DIFFER A to Z, B52
+         Sheetwrite: }
+         Excel:      8
+  DIFFER A to Z, B53
+         Sheetwrite: ~
+         Excel:      7
+  DIFFER A to Z, B54
+         Sheetwrite: +
+         Excel:      6
+  DIFFER A to Z, B55
+         Sheetwrite: <
+         Excel:      5
+  DIFFER A to Z, B56
+         Sheetwrite: =
+         Excel:      4
+  DIFFER A to Z, B57
+         Sheetwrite: >
+         Excel:      3
+  DIFFER A to Z, B58
+         Sheetwrite: A
+         Excel:      2
+  DIFFER A to Z, B59
+         Sheetwrite: B
+         Excel:      1
+  DIFFER A to Z, B60
+         Sheetwrite: Z
+         Excel:      0
+  DIFFER A to Z, B61
+         Sheetwrite: a
+         Excel:      b
+  DIFFER A to Z, B62
+         Sheetwrite: A
+         Excel:      B
+  DIFFER A to Z, B63
+         Sheetwrite: b
+         Excel:      a
+  DIFFER A to Z, B64
+         Sheetwrite: B
+         Excel:      A
+  DIFFER A to Z, B65
+         Sheetwrite: coop
+         Excel:      co-op
+  DIFFER A to Z, B66
+         Sheetwrite: co-op
+         Excel:      cop
+  DIFFER A to Z, B67
+         Sheetwrite: cop
+         Excel:      coop
+  DIFFER A to Z, B68
+         Sheetwrite: oak
+         Excel:      o'clock
+  DIFFER A to Z, B69
+         Sheetwrite: o'clock
+         Excel:      oak
+  DIFFER A to Z, B70
+         Sheetwrite: FALSE
+         Excel:      =TRUE()
+  DIFFER A to Z, B71
+         Sheetwrite: TRUE
+         Excel:      =FALSE()
+  DIFFER A to Z, B75
+         Sheetwrite: 1
+         Excel:      (blank)
+  DIFFER A to Z, B77
+         Sheetwrite: (blank)
+         Excel:      1
+  DIFFER A to Z, B78
+         Sheetwrite: =2+3
+         Excel:      (blank)
+  DIFFER A to Z, B79
+         Sheetwrite: 7
+         Excel:      =1/0
+  DIFFER A to Z, B80
+         Sheetwrite: alpha
+         Excel:      =FALSE()
+  DIFFER A to Z, B81
+         Sheetwrite: ="beta"
+         Excel:      alpha
+  DIFFER A to Z, B82
+         Sheetwrite: FALSE
+         Excel:      7
+  DIFFER A to Z, B83
+         Sheetwrite: =TRUE
+         Excel:      ="beta"
+  DIFFER A to Z, B84
+         Sheetwrite: =1/0
+         Excel:      =TRUE()
+  DIFFER A to Z, B85
+         Sheetwrite: (blank)
+         Excel:      =2+3
+  DIFFER Z to A, F11
+         Sheetwrite: 0.5
+         Excel:      -10
+  DIFFER Z to A, F12
+         Sheetwrite: -1
+         Excel:      0.5
+  DIFFER Z to A, F13
+         Sheetwrite: -10
+         Excel:      -1
+  DIFFER Z to A, F65
+         Sheetwrite: o'clock
+         Excel:      co-op
+  DIFFER Z to A, F66
+         Sheetwrite: oak
+         Excel:      cop
+  DIFFER Z to A, F67
+         Sheetwrite: cop
+         Excel:      coop
+  DIFFER Z to A, F68
+         Sheetwrite: co-op
+         Excel:      o'clock
+  DIFFER Z to A, F69
+         Sheetwrite: coop
+         Excel:      oak
+  DIFFER Z to A, F70
+         Sheetwrite: TRUE
+         Excel:      =TRUE()
+  DIFFER Z to A, F71
+         Sheetwrite: FALSE
+         Excel:      =FALSE()
+  DIFFER Z to A, F75
+         Sheetwrite: 2
+         Excel:      (blank)
+  DIFFER Z to A, F76
+         Sheetwrite: 1
+         Excel:      2
+  DIFFER Z to A, F77
+         Sheetwrite: (blank)
+         Excel:      1
+  DIFFER Z to A, F78
+         Sheetwrite: =1/0
+         Excel:      (blank)
+  DIFFER Z to A, F79
+         Sheetwrite: =TRUE
+         Excel:      =1/0
+  DIFFER Z to A, F80
+         Sheetwrite: FALSE
+         Excel:      =FALSE()
+  DIFFER Z to A, F81
+         Sheetwrite: ="beta"
+         Excel:      alpha
+  DIFFER Z to A, F82
+         Sheetwrite: alpha
+         Excel:      7
+  DIFFER Z to A, F83
+         Sheetwrite: 7
+         Excel:      ="beta"
+  DIFFER Z to A, F84
+         Sheetwrite: =2+3
+         Excel:      =TRUE()
+  DIFFER Z to A, F85
+         Sheetwrite: (blank)
+         Excel:      =2+3
+
+== 2. Formulas that move with a sort (#353), sheet "2 Sort formulas"
+  1 of 12 the same
+  DIFFER A9
+         Sheetwrite: 1
+         Excel:      3
+  DIFFER B9
+         Sheetwrite: =$A$9+'2 Sort formulas'!A11
+         Excel:      =A9*10
+  DIFFER A10
+         Sheetwrite: 2
+         Excel:      1
+  DIFFER B10
+         Sheetwrite: =A9+1
+         Excel:      =$A$9+$'2 Sort formulas'.A11
+  DIFFER A11
+         Sheetwrite: 3
+         Excel:      2
+  DIFFER B11
+         Sheetwrite: =A11*10
+         Excel:      =A10+1
+  DIFFER A12
+         Sheetwrite: 4
+         Excel:      5
+  DIFFER B12
+         Sheetwrite: =SUM(A12:A12)
+         Excel:      =A12*A$9
+  DIFFER A13
+         Sheetwrite: 5
+         Excel:      4
+  DIFFER B13
+         Sheetwrite: =A13*A$9
+         Excel:      =SUM(A13:A13)
+  same   D9
+         Sheetwrite: =A9*2
+         Excel:      =A9*2
+  DIFFER D9 value
+         Sheetwrite: 2
+         Excel:      6
+
+== 3. Quick sort and the header row (#353), sheet "3 Quick sort header"
+  2 of 16 the same
+  DIFFER A10
+         Sheetwrite: apple
+         Excel:      pear
+  DIFFER B10
+         Sheetwrite: 1
+         Excel:      3
+  DIFFER A11
+         Sheetwrite: fig
+         Excel:      apple
+  DIFFER B11
+         Sheetwrite: 2
+         Excel:      1
+  DIFFER A12
+         Sheetwrite: pear
+         Excel:      fig
+  DIFFER B12
+         Sheetwrite: 3
+         Excel:      2
+  DIFFER D9
+         Sheetwrite: Lima
+         Excel:      Town
+  DIFFER E9
+         Sheetwrite: Peru
+         Excel:      Country
+  DIFFER D10
+         Sheetwrite: Oslo
+         Excel:      Paris
+  DIFFER E10
+         Sheetwrite: Norway
+         Excel:      France
+  DIFFER D11
+         Sheetwrite: Paris
+         Excel:      Lima
+  DIFFER E11
+         Sheetwrite: France
+         Excel:      Peru
+  DIFFER D12
+         Sheetwrite: Town
+         Excel:      Oslo
+  DIFFER E12
+         Sheetwrite: Country
+         Excel:      Norway
+
+== 4. A table sorted in Sheetwrite (#353), sheet "4 Table sorted"
+  8 of 8 the same
+  same   A10
+         Sheetwrite: kiwi
+         Excel:      kiwi
+  same   B10
+         Sheetwrite: 5
+         Excel:      5
+  same   A11
+         Sheetwrite: pear
+         Excel:      pear
+  same   B11
+         Sheetwrite: 3
+         Excel:      3
+  same   A12
+         Sheetwrite: fig
+         Excel:      fig
+  same   B12
+         Sheetwrite: 2
+         Excel:      2
+  same   A13
+         Sheetwrite: apple
+         Excel:      apple
+  same   B13
+         Sheetwrite: 1
+         Excel:      1
+  DIFFER table Fruit sort state
+         Sheetwrite: sortState(ref=A10:B13) sortCondition(ref=B10:B13, descending=1)
+         Excel:      none
+
+== 5. A range sorted in Excel (#353), sheet "5 Sort range"
+  0 of 8 the same
+  DIFFER A10
+         Sheetwrite: apple
+         Excel:      pear
+  DIFFER B10
+         Sheetwrite: 1
+         Excel:      3
+  DIFFER A11
+         Sheetwrite: fig
+         Excel:      apple
+  DIFFER B11
+         Sheetwrite: 2
+         Excel:      1
+  DIFFER A12
+         Sheetwrite: kiwi
+         Excel:      fig
+  DIFFER B12
+         Sheetwrite: 5
+         Excel:      2
+  DIFFER A13
+         Sheetwrite: pear
+         Excel:      kiwi
+  DIFFER B13
+         Sheetwrite: 3
+         Excel:      5
+  sort state Excel saved: none
+  same   view sort after Sheetwrite's import
+         Sheetwrite: none
+         Excel:      none
+
+== 6. Relationships from Excel's data model (#229), sheet "6 Relationship"
+  Excel's data model: none
+  DIFFER relationships after Sheetwrite's import
+         Sheetwrite: orders6[customer] → customers6[id]; orders7[customer] → customers7[id]
+         Excel:      orders7[customer] → customers7[id]
+
+== 7. A Sheetwrite workbook with a model pivot (#229), sheet "7 Model pivot"
+  10 of 10 the same
+  same   A16
+         Sheetwrite: Region
+         Excel:      Region
+  same   B16
+         Sheetwrite: Sum of Amount
+         Excel:      Sum of Amount
+  same   A17
+         Sheetwrite: North
+         Excel:      North
+  same   B17
+         Sheetwrite: 15
+         Excel:      15
+  same   A18
+         Sheetwrite: South
+         Excel:      South
+  same   B18
+         Sheetwrite: 20
+         Excel:      20
+  same   A19
+         Sheetwrite: West
+         Excel:      West
+  same   B19
+         Sheetwrite: 7
+         Excel:      7
+  same   A20
+         Sheetwrite: Total
+         Excel:      Total
+  same   B20
+         Sheetwrite: 42
+         Excel:      42
+  same   PivotTable parts on the sheet
+         Sheetwrite: no
+         Excel:      no
+
+== 8. A saved query refreshes in Excel (#227), sheet "8 Query refresh"
+  3 of 6 the same
+  same   A10
+         Sheetwrite: Ana
+         Excel:      Ana
+  DIFFER B10
+         Sheetwrite: 34
+         Excel:      0
+  same   A11
+         Sheetwrite: Ben
+         Excel:      Ben
+  DIFFER B11
+         Sheetwrite: 27
+         Excel:      0
+  same   A12
+         Sheetwrite: Chloe
+         Excel:      Chloe
+  DIFFER B12
+         Sheetwrite: 41
+         Excel:      0
+  same   Power Query parts
+         Sheetwrite: DataMashup present; connections: Query - People
+         Excel:      DataMashup present; connections: Query - People
+  same   query after Sheetwrite's import
+         Sheetwrite: People → table People
+         Excel:      People → table People
+
+== 9. TEXT with a percent code past the largest number (#433), sheet "9 TEXT overflow"
+  0 of 3 the same
+  DIFFER =TEXT(9.99999999999999E+307,"0%")
+         Sheetwrite: #NUM!
+         Excel:      #FMT
+  DIFFER =TEXT(-9.99999999999999E+307,"0.0%;(0.0%)")
+         Sheetwrite: #NUM!
+         Excel:      #FMT
+  DIFFER =TEXT(1E+305,"0%%")
+         Sheetwrite: #NUM!
+         Excel:      10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000%%
+
+== 10. External links from a Sheetwrite workbook (#226), sheet "10 Links"
+  3 of 6 the same
+  same   B10 value
+         Sheetwrite: 1200
+         Excel:      1200
+  DIFFER B10 formula
+         Sheetwrite: =[Budget.xlsx]Annual!C10
+         Excel:      ='file:///home/vvin/learn/excelchecks/lo/in/Budget.xlsx'#$Annual.C10
+  same   B11 value
+         Sheetwrite: 1500
+         Excel:      1500
+  DIFFER B11 formula
+         Sheetwrite: =SUM([Budget.xlsx]Annual!C10:C11)
+         Excel:      =SUM('file:///home/vvin/learn/excelchecks/lo/in/Budget.xlsx'#$Annual.C10:C11)
+  same   B12 value
+         Sheetwrite: 2400
+         Excel:      2400
+  DIFFER B12 formula
+         Sheetwrite: =[Budget.xlsx]Annual!C10*2
+         Excel:      ='file:///home/vvin/learn/excelchecks/lo/in/Budget.xlsx'#$Annual.C10*2
+  DIFFER external links
+         Sheetwrite: Budget.xlsx [C10=1200, C11=300]; Prices.xlsx [no values]
+         Excel:      ../in/Budget.xlsx [C10=1200, C11=300]; ../in/Prices.xlsx [no values]
+
+== 11. A link Sheetwrite added (#226), sheet "11 Link added"
+  0 of 2 the same
+  DIFFER B10 value
+         Sheetwrite: #REF!
+         Excel:      0
+  DIFFER B10 formula
+         Sheetwrite: =[Prices.xlsx]List!B2
+         Excel:      ='file:///home/vvin/learn/excelchecks/lo/in/Prices.xlsx'#$List.B2
+
+== 12. A model pivot with measures (#230), sheet "12 Measures pivot"
+  24 of 24 the same
+  same   PivotTable parts on the sheet
+         Sheetwrite: no
+         Excel:      no
+
+== 13. Measures with no relationships through Excel (#230), sheet "13 Measures model"
+  0 of 1 the same
+  DIFFER B10
+         Sheetwrite: 125
+         Excel:      120
+  same   measures after Sheetwrite's import
+         Sheetwrite: Revenue =SUM(Orders[Amount]); Share =[Revenue]/CALCULATE([Revenue], ALL(Orders[Region]))
+         Excel:      Revenue =SUM(Orders[Amount]); Share =[Revenue]/CALCULATE([Revenue], ALL(Orders[Region]))
+  same   home table of the measures
+         Sheetwrite: Orders
+         Excel:      Orders
+
+== 14. A dashboard in Excel (#231), sheet "14 Dashboard"
+  DIFFER D3
+         Sheetwrite: 0.2748091603053435
+         Excel:      0.274809160305344
+  DIFFER D4
+         Sheetwrite: 0.2900763358778626
+         Excel:      0.290076335877863
+  DIFFER D5
+         Sheetwrite: 0.2900763358778626
+         Excel:      0.290076335877863
+  DIFFER D6
+         Sheetwrite: 0.8549618320610687
+         Excel:      0.854961832061069
+  23 of 27 cells the same
+  DIFFER chart 1
+         Sheetwrite: kind barChart/col; title "Revenue by region"; pivot no; noMultiLvlLbl absent; categories '14 Dashboard'!$A$3:$A$5 one level; values '14 Dashboard'!$C$3:$C$5
+         Excel:      kind barChart/col; title "Revenue by region"; pivot no; noMultiLvlLbl 0; categories '14 Dashboard'!$A$3:$A$5 one level; values '14 Dashboard'!$C$3:$C$5
+  same   chart 1 draws
+         Sheetwrite: labels [0:East 1:North 2:West] values [180 190 190]
+         Excel:      labels [0:East 1:North 2:West] values [180 190 190]
+
+== 15. Multi-level category labels (#501), sheet "15 Chart levels"
+  DIFFER chart 1
+         Sheetwrite: kind barChart/col; title "Amount by region and segment"; pivot no; noMultiLvlLbl absent; categories '15 Chart levels'!$A$10:$B$13 multi-level; values '15 Chart levels'!$C$10:$C$13
+         Excel:      kind barChart/col; title "Amount by region and segment"; pivot no; noMultiLvlLbl 0; categories '15 Chart levels'!$A$10:$B$13 multi-level; values '15 Chart levels'!$C$10:$C$13
+  DIFFER chart 1 draws
+         Sheetwrite: labels [0:Retail 1:Online 2:Retail 3:Online | 0:East 2:North] values [10 7 4 11]
+         Excel:      labels [0:Retail 1:Online 2:Retail 3:Online | 0:East 2:West] values [10 7 4 11]
+  DIFFER chart 2
+         Sheetwrite: kind barChart/bar; title "One row of labels"; pivot no; noMultiLvlLbl 1; categories '15 Chart levels'!$A$10:$B$13 multi-level; values '15 Chart levels'!$C$10:$C$13
+         Excel:      kind barChart/bar; title "One row of labels"; pivot no; noMultiLvlLbl 0; categories '15 Chart levels'!$A$10:$B$13 multi-level; values '15 Chart levels'!$C$10:$C$13
+  DIFFER chart 2 draws
+         Sheetwrite: labels [0:Retail 1:Online 2:Retail 3:Online | 0:East 2:North] values [10 7 4 11]
+         Excel:      labels [0:Retail 1:Online 2:Retail 3:Online | 0:East 2:West] values [10 7 4 11]
+  DIFFER chart 3
+         Sheetwrite: kind barChart/col; title "Sales by segment"; pivot []15 Chart levels!Sales by segment; noMultiLvlLbl absent; categories '15 Chart levels'!$A$27:$A$33 multi-level; values '15 Chart levels'!$B$27:$B$33
+         Excel:      kind barChart/col; title "Sales by segment"; pivot no; noMultiLvlLbl 0; categories '15 Chart levels'!$A$27:$A$33 one level; values '15 Chart levels'!$B$27:$B$33
+  DIFFER chart 3 draws
+         Sheetwrite: labels [0:Online 1:Retail 2:Retail 3:Online 4:Retail | 0:East 2:North 3:West] values [7 10 6 11 4]
+         Excel:      labels [0:Online 1:Retail 2:North 3:Retail 4:West 5:Online 6:Retail] values [7 10 6 6 15 11 4]
+  Sheet "15 Board":
+  DIFFER chart 1
+         Sheetwrite: kind barChart/col; title "Board sales"; pivot no; noMultiLvlLbl absent; categories #REF! multi-level; values no range
+         Excel:      kind barChart/col; title "Board sales"; pivot no; noMultiLvlLbl 0; categories categories multi-level; values 0
+  same   chart 1 draws
+         Sheetwrite: labels [0:Online 1:Retail 2:Retail 3:Online 4:Retail | 0:East 2:North 3:West] values [7 10 6 11 4]
+         Excel:      labels [0:Online 1:Retail 2:Retail 3:Online 4:Retail | 0:East 2:North 3:West] values [7 10 6 11 4]
+
+== 16. Fraction and Text formats (#799, #809), sheet "16 Number formats"
+  6 of 80 the same
+  DIFFER 0 as # ?/?
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER -0.0001 as # ?/?
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 0 as # ??/??
+         Sheetwrite: [0      ]
+         Excel:      [0      ]
+  DIFFER -0.0001 as # ??/??
+         Sheetwrite: [0      ]
+         Excel:      [0      ]
+  DIFFER 0 as # ???/???
+         Sheetwrite: [0        ]
+         Excel:      [0        ]
+  DIFFER -0.0001 as # ???/???
+         Sheetwrite: [0        ]
+         Excel:      [0        ]
+  DIFFER 0 as ??/??
+         Sheetwrite: [ 0/1 ]
+         Excel:      [ 0/1 ]
+  DIFFER -0.0001 as ??/??
+         Sheetwrite: [ 0/1 ]
+         Excel:      [ 0/1 ]
+  DIFFER 0 as ???/???
+         Sheetwrite: [  0/1  ]
+         Excel:      [  0/1  ]
+  DIFFER -0.0001 as ???/???
+         Sheetwrite: [  0/1  ]
+         Excel:      [  0/1  ]
+  DIFFER 0 as # ?/2
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 0.25 as # ?/2
+         Sheetwrite: [ 1/2]
+         Excel:      [0   ]
+  DIFFER 0.75 as # ?/2
+         Sheetwrite: [1   ]
+         Excel:      [ 1/2]
+  DIFFER 1.25 as # ?/2
+         Sheetwrite: [1 1/2]
+         Excel:      [1   ]
+  DIFFER -1.25 as # ?/2
+         Sheetwrite: [-1 1/2]
+         Excel:      [-1   ]
+  DIFFER -0.25 as # ?/2
+         Sheetwrite: [- 1/2]
+         Excel:      [0   ]
+  DIFFER 2 as # ?/2
+         Sheetwrite: [2   ]
+         Excel:      [2   ]
+  DIFFER -2 as # ?/2
+         Sheetwrite: [-2   ]
+         Excel:      [-2   ]
+  DIFFER 0.99 as # ?/2
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.999 as # ?/2
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 3.14159265 as # ?/2
+         Sheetwrite: [3   ]
+         Excel:      [3   ]
+  DIFFER 0.05 as # ?/2
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER -0.0001 as # ?/2
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 7.875 as # ?/2
+         Sheetwrite: [8   ]
+         Excel:      [8   ]
+  DIFFER 0.142857 as # ?/2
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 100.03 as # ?/2
+         Sheetwrite: [100   ]
+         Excel:      [100   ]
+  DIFFER 0 as # ?/4
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 2 as # ?/4
+         Sheetwrite: [2   ]
+         Excel:      [2   ]
+  DIFFER -2 as # ?/4
+         Sheetwrite: [-2   ]
+         Excel:      [-2   ]
+  DIFFER 0.99 as # ?/4
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.999 as # ?/4
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.05 as # ?/4
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER -0.0001 as # ?/4
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 7.875 as # ?/4
+         Sheetwrite: [8   ]
+         Excel:      [7 3/4]
+  DIFFER 100.03 as # ?/4
+         Sheetwrite: [100   ]
+         Excel:      [100   ]
+  DIFFER 0 as # ?/8
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 2 as # ?/8
+         Sheetwrite: [2   ]
+         Excel:      [2   ]
+  DIFFER -2 as # ?/8
+         Sheetwrite: [-2   ]
+         Excel:      [-2   ]
+  DIFFER 0.99 as # ?/8
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.999 as # ?/8
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.05 as # ?/8
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER -0.0001 as # ?/8
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 100.03 as # ?/8
+         Sheetwrite: [100   ]
+         Excel:      [100   ]
+  DIFFER 0 as # ??/16
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 2 as # ??/16
+         Sheetwrite: [2    ]
+         Excel:      [2    ]
+  DIFFER -2 as # ??/16
+         Sheetwrite: [-2    ]
+         Excel:      [-2    ]
+  DIFFER 0.99 as # ??/16
+         Sheetwrite: [1    ]
+         Excel:      [1    ]
+  DIFFER 0.999 as # ??/16
+         Sheetwrite: [1    ]
+         Excel:      [1    ]
+  DIFFER -0.0001 as # ??/16
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 100.03 as # ??/16
+         Sheetwrite: [100    ]
+         Excel:      [100    ]
+  DIFFER 0 as # ?/10
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 0.25 as # ?/10
+         Sheetwrite: [ 3/10]
+         Excel:      [ 2/10]
+  DIFFER 0.75 as # ?/10
+         Sheetwrite: [ 8/10]
+         Excel:      [ 7/10]
+  DIFFER 1.25 as # ?/10
+         Sheetwrite: [1 3/10]
+         Excel:      [1 2/10]
+  DIFFER -1.25 as # ?/10
+         Sheetwrite: [-1 3/10]
+         Excel:      [-1 2/10]
+  DIFFER -0.25 as # ?/10
+         Sheetwrite: [- 3/10]
+         Excel:      [- 2/10]
+  DIFFER 2 as # ?/10
+         Sheetwrite: [2   ]
+         Excel:      [2   ]
+  DIFFER -2 as # ?/10
+         Sheetwrite: [-2   ]
+         Excel:      [-2   ]
+  DIFFER 0.99 as # ?/10
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.999 as # ?/10
+         Sheetwrite: [1   ]
+         Excel:      [1   ]
+  DIFFER 0.05 as # ?/10
+         Sheetwrite: [ 1/10]
+         Excel:      [0   ]
+  DIFFER -0.0001 as # ?/10
+         Sheetwrite: [0   ]
+         Excel:      [0   ]
+  DIFFER 100.03 as # ?/10
+         Sheetwrite: [100   ]
+         Excel:      [100   ]
+  DIFFER 0 as # ??/100
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 2 as # ??/100
+         Sheetwrite: [2    ]
+         Excel:      [2    ]
+  DIFFER -2 as # ??/100
+         Sheetwrite: [-2    ]
+         Excel:      [-2    ]
+  DIFFER 0.999 as # ??/100
+         Sheetwrite: [1    ]
+         Excel:      [1    ]
+  DIFFER -0.0001 as # ??/100
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 7.875 as # ??/100
+         Sheetwrite: [7 88/100]
+         Excel:      [7 87/100]
+  DIFFER 0 as 0 ?/?
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER -0.0001 as 0 ?/?
+         Sheetwrite: [0    ]
+         Excel:      [0    ]
+  DIFFER 0 as #,##0 ??/??
+         Sheetwrite: [0      ]
+         Excel:      [0      ]
+  DIFFER -0.0001 as #,##0 ??/??
+         Sheetwrite: [0      ]
+         Excel:      [0      ]
+  DIFFER -0.0001 as # ?/?;-# ?/?;"zero"
+         Sheetwrite: [-0    ]
+         Excel:      [-0    ]
+
+== 17. Paste Special's operations on formulas and text (#821), sheet "17 Paste Special"
+  6 of 12 the same
+  DIFFER C9
+         Sheetwrite: 11
+         Excel:      1
+  DIFFER C10
+         Sheetwrite: =(5)+20
+         Excel:      =5
+  same   C11
+         Sheetwrite: 7
+         Excel:      7
+  same   C12
+         Sheetwrite: xyz
+         Excel:      xyz
+  DIFFER E9
+         Sheetwrite: 11
+         Excel:      1
+  DIFFER E10
+         Sheetwrite: =(5)+(E9*2)
+         Excel:      =5
+  same   E11
+         Sheetwrite: 7
+         Excel:      7
+  same   E12
+         Sheetwrite: xyz
+         Excel:      xyz
+  DIFFER K9
+         Sheetwrite: =1/0
+         Excel:      1
+  DIFFER K10
+         Sheetwrite: =(5)/(K9*2)
+         Excel:      =5
+  same   K11
+         Sheetwrite: 7
+         Excel:      7
+  same   K12
+         Sheetwrite: xyz
+         Excel:      xyz
+
+== 18. AutoFill series beyond Excel's table (#827, #824), sheet "18 AutoFill"
+  0 of 21 the same
+  DIFFER A11
+         Sheetwrite: A2
+         Excel:      (blank)
+  DIFFER A12
+         Sheetwrite: B2
+         Excel:      (blank)
+  DIFFER A13
+         Sheetwrite: A3
+         Excel:      (blank)
+  DIFFER A14
+         Sheetwrite: B3
+         Excel:      (blank)
+  DIFFER C10
+         Sheetwrite: Quarter 1
+         Excel:      (blank)
+  DIFFER C11
+         Sheetwrite: Quarter 2
+         Excel:      (blank)
+  DIFFER C12
+         Sheetwrite: Quarter 3
+         Excel:      (blank)
+  DIFFER C13
+         Sheetwrite: Quarter 4
+         Excel:      (blank)
+  DIFFER D10
+         Sheetwrite: 1 Apple
+         Excel:      (blank)
+  DIFFER D11
+         Sheetwrite: 1 Apple
+         Excel:      (blank)
+  DIFFER D12
+         Sheetwrite: 1 Apple
+         Excel:      (blank)
+  DIFFER D13
+         Sheetwrite: 1 Apple
+         Excel:      (blank)
+  DIFFER E10
+         Sheetwrite: Q4 2025
+         Excel:      (blank)
+  DIFFER E11
+         Sheetwrite: Q4 2026
+         Excel:      (blank)
+  DIFFER E12
+         Sheetwrite: Q4 2027
+         Excel:      (blank)
+  DIFFER E13
+         Sheetwrite: Q4 2028
+         Excel:      (blank)
+  DIFFER G10
+         Sheetwrite: 2026-01-05
+         Excel:      (blank)
+  DIFFER G11
+         Sheetwrite: 2026-01-06
+         Excel:      (blank)
+  DIFFER G12
+         Sheetwrite: 2026-01-07
+         Excel:      (blank)
+  DIFFER G13
+         Sheetwrite: 2026-01-08
+         Excel:      (blank)
+  DIFFER G14
+         Sheetwrite: 2026-01-09
+         Excel:      (blank)
+
+== #605. GROUPBY blank keys (#605), sheet "605 GROUPBY blank keys"
+  0 of 9 the same
+  DIFFER Result row 1
+         Sheetwrite: Row field 1 | Row field 2 | SUM
+         Excel:      #VALUE!
+  DIFFER Result row 2
+         Sheetwrite: x |  | 13
+         Excel:      #VALUE!
+  DIFFER Result row 3
+         Sheetwrite: x | Total | 13
+         Excel:      #VALUE!
+  DIFFER Result row 4
+         Sheetwrite: y |  | 23
+         Excel:      #VALUE!
+  DIFFER Result row 5
+         Sheetwrite: y | Total | 23
+         Excel:      #VALUE!
+  DIFFER Result row 6
+         Sheetwrite: Total |  | 36
+         Excel:      #VALUE!
+  DIFFER Result row 7
+         Sheetwrite: #REF!
+         Excel:      #VALUE!
+  DIFFER Result row 8
+         Sheetwrite: #REF!
+         Excel:      #VALUE!
+  DIFFER Result row 9
+         Sheetwrite: #REF!
+         Excel:      #VALUE!
+
+== Spill export (found while building this file), sheet "Spill export"
+  3 of 3 the same
+  same   A9 value
+         Sheetwrite: 1
+         Excel:      1
+  same   A10 value
+         Sheetwrite: 2
+         Excel:      2
+  same   A11 value
+         Sheetwrite: 3
+         Excel:      3
