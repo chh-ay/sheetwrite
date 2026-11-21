@@ -1,0 +1,12 @@
+sort-light-1x: bytes differ (32145 → 30987 B); size 1200x720 vs 1200x720; differing pixels 22798.4; PSNR 18.8503 dB
+sort-light-2x: bytes differ (65155 → 63029 B); size 2400x1440 vs 2400x1440; differing pixels 99986.7; PSNR 17.5752 dB
+sort-dark-1x: bytes differ (29776 → 28560 B); size 1200x720 vs 1200x720; differing pixels 20892.9; PSNR 19.6309 dB
+sort-dark-2x: bytes differ (56659 → 55060 B); size 2400x1440 vs 2400x1440; differing pixels 91109.6; PSNR 18.3638 dB
+queries-light-1x: bytes differ (30088 → 29355 B); size 1200x720 vs 1200x720; differing pixels 22225.7; PSNR 18.9443 dB
+queries-light-2x: bytes differ (61214 → 59825 B); size 2400x1440 vs 2400x1440; differing pixels 98376.4; PSNR 17.59 dB
+queries-dark-1x: bytes differ (28079 → 27116 B); size 1200x720 vs 1200x720; differing pixels 20471.4; PSNR 19.7345 dB
+queries-dark-2x: bytes differ (54133 → 52941 B); size 2400x1440 vs 2400x1440; differing pixels 90039.4; PSNR 18.3705 dB
+version-history-light-1x: bytes differ (21305 → 21251 B); size 1200x720 vs 1200x720; differing pixels 16742.6; PSNR 20.0136 dB
+version-history-light-2x: bytes differ (41965 → 42509 B); size 2400x1440 vs 2400x1440; differing pixels 75358.9; PSNR 18.5273 dB
+version-history-dark-1x: bytes differ (19984 → 19876 B); size 1200x720 vs 1200x720; differing pixels 15395.4; PSNR 20.8375 dB
+version-history-dark-2x: bytes differ (37405 → 37098 B); size 2400x1440 vs 2400x1440; differing pixels 68806.8; PSNR 19.3216 dB
