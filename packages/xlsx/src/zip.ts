@@ -53,14 +53,9 @@ export function markStoredEntryVerified(entry: StoredZipEntry): void {
 
 /** Build a stored entry when only part of an opaque XML drawing is modelled. */
 export function storedEntryFromBytes(data: Uint8Array): StoredZipEntry {
-  let checksum = 0xffffffff;
-  for (const byte of data) {
-    checksum = (CRC_TABLE[(checksum ^ byte) & 0xff] ?? 0) ^ (checksum >>> 8);
-  }
-
   return {
     method: 0,
-    crc32: (checksum ^ 0xffffffff) >>> 0,
+    crc32: (updateCrc32(0xffffffff, data) ^ 0xffffffff) >>> 0,
     compressedSize: data.length,
     uncompressedSize: data.length,
     data,
@@ -100,9 +95,7 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   const accept = (chunk: Uint8Array): void => {
     written += chunk.byteLength;
     if (written > entry.uncompressedSize) fail("retained inflated size exceeds declaration");
-    for (let index = 0; index < chunk.length; index++) {
-      checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-    }
+    checksum = updateCrc32(checksum, chunk);
   };
   const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
   try {
@@ -342,15 +335,95 @@ function preflightExpansion(bytes: Uint8Array, context: XlsxCodecContext): void 
   }
 }
 
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < table.length; n++) {
+/** Slice-by-8 CRC-32 tables: table `k` holds the CRC of a byte followed by `k` zero bytes. */
+const CRC_TABLES = (() => {
+  const tables = new Uint32Array(8 * 256);
+  for (let n = 0; n < 256; n++) {
     let value = n;
     for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-    table[n] = value >>> 0;
+    tables[n] = value;
   }
-  return table;
+  for (let index = 256; index < tables.length; index++) {
+    const previous = tables[index - 256] ?? 0;
+    tables[index] = (previous >>> 8) ^ (tables[previous & 0xff] ?? 0);
+  }
+  return tables;
 })();
+
+/** Continue a CRC-32 register over `data`; start at `0xffffffff` and invert the result. */
+function updateCrc32(checksum: number, data: Uint8Array): number {
+  const table = CRC_TABLES;
+  let index = 0;
+  for (const end = data.length - 7; index < end; index += 8) {
+    const word =
+      checksum ^
+      ((data[index] ?? 0) |
+        ((data[index + 1] ?? 0) << 8) |
+        ((data[index + 2] ?? 0) << 16) |
+        ((data[index + 3] ?? 0) << 24));
+    checksum =
+      (table[1792 + (word & 0xff)] ?? 0) ^
+      (table[1536 + ((word >>> 8) & 0xff)] ?? 0) ^
+      (table[1280 + ((word >>> 16) & 0xff)] ?? 0) ^
+      (table[1024 + (word >>> 24)] ?? 0) ^
+      (table[768 + (data[index + 4] ?? 0)] ?? 0) ^
+      (table[512 + (data[index + 5] ?? 0)] ?? 0) ^
+      (table[256 + (data[index + 6] ?? 0)] ?? 0) ^
+      (table[data[index + 7] ?? 0] ?? 0);
+  }
+  for (; index < data.length; index++) {
+    checksum = (table[(checksum ^ (data[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
+  }
+  return checksum;
+}
+
+let nativeInflate: boolean | undefined;
+
+/** Bun, Node 20.12+, Chrome 103+, Firefox 113+ and Safari 16.4+ inflate raw deflate natively. */
+function hasNativeInflate(): boolean {
+  if (nativeInflate === undefined) {
+    try {
+      nativeInflate = new DecompressionStream("deflate-raw") instanceof DecompressionStream;
+    } catch {
+      nativeInflate = false;
+    }
+  }
+  return nativeInflate;
+}
+
+/**
+ * Inflate with the runtime's zlib. The stream pulls the next input slice only after its output
+ * is read, so one slice bounds the output that the caller has not checked yet.
+ */
+async function* inflateNative(input: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
+  const stream = new DecompressionStream("deflate-raw");
+  const writer = stream.writable.getWriter();
+  const reader = stream.readable.getReader();
+  void (async () => {
+    try {
+      for await (const chunk of input) {
+        // Web streams take no views of shared memory.
+        const { buffer, byteOffset, byteLength } = chunk;
+        await writer.write(
+          buffer instanceof ArrayBuffer
+            ? new Uint8Array(buffer, byteOffset, byteLength)
+            : chunk.slice(),
+        );
+      }
+      await writer.close();
+    } catch (error) {
+      // An input failure (an abort or a read error) reaches the reader through the abort.
+      await writer.abort(error).catch(() => undefined);
+    }
+  })();
+  try {
+    for (let step = await reader.read(); !step.done; step = await reader.read()) {
+      yield step.value;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
 
 /** Seekable ZIP reader: only the directory and one requested part are resident. */
 export class ZipReader {
@@ -431,20 +504,23 @@ export class ZipReader {
 
   async *chunks(name: string): AsyncGenerator<Uint8Array> {
     const entry = this.#entry(name);
-    let written = 0;
-    let checksum = 0xffffffff;
-    const pending: Uint8Array[] = [];
-    const accept = (chunk: Uint8Array): void => {
-      written += chunk.length;
-      if (written > entry.uncompressedSize) fail(`inflated size exceeds declaration for ${name}`);
-      for (let index = 0; index < chunk.length; index++) {
-        checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-      }
-      if (chunk.length) pending.push(chunk);
-    };
     if (entry.method === 0 && entry.compressedSize !== entry.uncompressedSize)
       fail(`stored size mismatch for ${name}`);
-    const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
+    let written = 0;
+    let checksum = 0xffffffff;
+    const data = entry.method === 8 ? this.#inflate(entry, name) : this.#payload(entry);
+    for await (const chunk of data) {
+      written += chunk.length;
+      if (written > entry.uncompressedSize) fail(`inflated size exceeds declaration for ${name}`);
+      checksum = updateCrc32(checksum, chunk);
+      yield chunk;
+    }
+    if (written !== entry.uncompressedSize) fail(`inflated size mismatch for ${name}`);
+    if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail(`CRC mismatch for ${name}`);
+  }
+
+  /** The compressed bytes of an entry, in codec input slices. */
+  async *#payload(entry: ZipEntry): AsyncGenerator<Uint8Array> {
     const readBytes = 256 * 1024;
     for (let rangeOffset = 0; rangeOffset < entry.compressedSize; rangeOffset += readBytes) {
       const range = await this.#range(
@@ -452,25 +528,54 @@ export class ZipReader {
         Math.min(readBytes, entry.compressedSize - rangeOffset),
       );
       for (let offset = 0; offset < range.length; offset += CODEC_INPUT_CHUNK_BYTES) {
-        const chunk = range.subarray(offset, offset + CODEC_INPUT_CHUNK_BYTES);
-        const isFinal = rangeOffset + offset + chunk.length === entry.compressedSize;
-        try {
-          if (inflater) inflater.push(chunk, isFinal);
-          else accept(chunk);
-        } catch (error) {
-          if (error instanceof TypeError && error.message.startsWith("Sheetwrite:")) throw error;
-          throw new TypeError(
-            boundedErrorText(`Sheetwrite: invalid XLSX ZIP: deflate stream for ${name} is corrupt`),
-            { cause: error },
-          );
-        }
-        yield* pending;
-        pending.length = 0;
+        yield range.subarray(offset, offset + CODEC_INPUT_CHUNK_BYTES);
       }
     }
-    if (inflater && entry.compressedSize === 0) inflater.push(new Uint8Array(0), true);
-    if (written !== entry.uncompressedSize) fail(`inflated size mismatch for ${name}`);
-    if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail(`CRC mismatch for ${name}`);
+  }
+
+  /**
+   * Native zlib inflates when the runtime has it. When zlib rejects a stream, fflate inflates it
+   * again and decides, so accepted input and error text do not depend on the runtime.
+   */
+  async *#inflate(entry: ZipEntry, name: string): AsyncGenerator<Uint8Array> {
+    let produced = 0;
+    if (hasNativeInflate()) {
+      try {
+        for await (const chunk of inflateNative(this.#payload(entry))) {
+          produced += chunk.length;
+          yield chunk;
+        }
+        return;
+      } catch (error) {
+        if (isAbort(this.context, error)) throw error;
+      }
+    }
+    // fflate output repeats the bytes that zlib produced before it failed; skip them.
+    let skip = produced;
+    const pending: Uint8Array[] = [];
+    const inflater = new Inflate((chunk) => {
+      if (skip >= chunk.length) {
+        skip -= chunk.length;
+      } else {
+        pending.push(chunk.subarray(skip));
+        skip = 0;
+      }
+    });
+    let consumed = 0;
+    const push = (chunk: Uint8Array): void => {
+      consumed += chunk.length;
+      try {
+        inflater.push(chunk, consumed === entry.compressedSize);
+      } catch (error) {
+        fail(`deflate stream for ${name} is corrupt`, error);
+      }
+    };
+    if (entry.compressedSize === 0) push(new Uint8Array(0));
+    for await (const chunk of this.#payload(entry)) {
+      push(chunk);
+      yield* pending;
+      pending.length = 0;
+    }
   }
 
   async read(name: string): Promise<Uint8Array> {
