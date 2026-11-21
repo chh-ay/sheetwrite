@@ -5,7 +5,7 @@
 //! corpus (`scripts/conformance/formula-evidence.ts`) are left to it.
 
 use crate::store::CellStore;
-use crate::tests::support::{assert_formulas, assert_results_on, write_cells};
+use crate::tests::support::{assert_formulas, assert_results_on, shown, write_cells};
 
 /// `Data!A1:A3` = 1, 2, 3; `B1:B3` = 10, 20, 30; `C1:C3` = 4, 5, 6;
 /// `D1:D2` = 5 and "x"; `E3` = `=D1*2`. Every other cell is blank.
@@ -15,40 +15,45 @@ const DATA: &[&[&str]] = &[
     &["3", "30", "6", "", "=D1*2"],
 ];
 
-/// Evaluates the cases in sheet `Report` of a workbook whose sheet `Data`
-/// holds [`DATA`].
-fn assert_results(cases: &[(&str, &str)]) {
+/// A workbook whose sheet `Data` holds [`DATA`], with an empty sheet
+/// `Report` of `report_cols` × `report_rows` cells for the cases. Returns
+/// the store and the report sheet.
+fn data_workbook(report_cols: usize, report_rows: usize) -> (CellStore, usize) {
     const DATA_COLS: usize = 6;
     const DATA_ROWS: usize = 12;
     let mut store = CellStore::new();
-    let report = store.add_sheet(2, cases.len());
+    let report = store.add_sheet(report_cols, report_rows);
     let data = store.add_sheet(DATA_COLS, DATA_ROWS);
     store.set_sheet_name(report, "report", "Report");
     store.set_sheet_name(data, "data", "Data");
     write_cells(&mut store, data, DATA);
-    assert_formulas(&mut store, report, 0, cases);
+    (store, report)
 }
 
-/// The report column where [`assert_spills`] enters its formula, right of
-/// `Report!C1:C3` so that a spill of up to five columns has room.
-const SPILL_COL: usize = 3;
+/// Evaluates the cases in sheet `Report` of a workbook whose sheet `Data`
+/// holds [`DATA`].
+fn assert_results(cases: &[(&str, &str)]) {
+    let (mut store, report) = data_workbook(2, cases.len());
+    assert_formulas(&mut store, report, 0, cases);
+}
 
 /// A formula, the width of the array it spills, and the cells it shows,
 /// row by row.
 type SpillCase<'a> = (&'a str, usize, &'a [&'a str]);
 
-/// Evaluates each formula alone at `Report!D1` and compares the array it
-/// spills, read row by row, with the expected cells. Reports all mismatches
-/// at once.
+/// Evaluates each formula alone at `Report!A1` of its own workbook and
+/// compares the array it spills, read row by row, with the expected cells.
+/// Reports all mismatches at once.
 fn assert_spills(cases: &[SpillCase<'_>]) {
+    const REPORT_SIZE: usize = 8;
     let mismatches: Vec<String> = cases
         .iter()
         .filter_map(|&(formula, cols, expected)| {
-            let (mut store, report, _) = workbook();
-            store.set_formula(report, 0, SPILL_COL, formula, 0);
-            store.recompute(report);
+            let (mut store, report) = data_workbook(REPORT_SIZE, REPORT_SIZE);
+            store.set_formula(report, 0, 0, formula, 0);
+            store.commit_sources();
             let actual: Vec<String> = (0..expected.len())
-                .map(|index| shown(&store, report, index / cols, SPILL_COL + index % cols))
+                .map(|index| shown(&store, report, index / cols, index % cols))
                 .collect();
             (actual != expected)
                 .then(|| format!("{formula}: expected {expected:?}, got {actual:?}"))
@@ -2607,12 +2612,12 @@ fn branch_functions_take_array_arguments_element_by_element() {
 #[test]
 fn a_scalar_condition_evaluates_only_the_branch_it_takes() {
     let result_and_arrays_built = |formula: &str| {
-        let (mut store, report, _) = workbook();
-        store.set_formula(report, 0, FORMULA_COL, formula, 0);
+        let (mut store, report) = data_workbook(1, 1);
+        store.set_formula(report, 0, 0, formula, 0);
         super::matrix::reset_matrix_resource_stats();
-        store.recompute(report);
+        store.commit_sources();
         let [_, _, arrays_built] = super::matrix::matrix_resource_stats();
-        (shown(&store, report, 0, FORMULA_COL), arrays_built)
+        (shown(&store, report, 0, 0), arrays_built)
     };
 
     assert_eq!(
