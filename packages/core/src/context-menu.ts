@@ -846,32 +846,37 @@ export class ContextMenu {
     event.stopPropagation();
   }
 
-  private readonly onPointerDown = (e: PointerEvent): void => {
+  /** A press, wheel turn or touch drag outside the menu closes it. */
+  private readonly onOutsideInput = (e: Event): void => {
     if (!(e.target instanceof Element) || !this.ownsElement(e.target)) this.close();
   };
 
+  // The menu does not handle Page Up and Page Down, so they scroll the page.
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === "Escape") this.close();
+    if (e.key === "Escape" || e.key === "PageUp" || e.key === "PageDown") this.close();
   };
 
   private readonly onDismiss = (): void => {
     this.close();
   };
 
+  // The menu closes when the user scrolls, so it listens for the user's input,
+  // not for `scroll` events. The page's own scrolls, such as the one that
+  // brings the grid into view when it takes the focus, send their `scroll`
+  // event at the next frame, which can come after a right-click opened the menu.
   private addDismissListeners(): void {
-    document.addEventListener("pointerdown", this.onPointerDown, true);
+    document.addEventListener("pointerdown", this.onOutsideInput, true);
+    document.addEventListener("wheel", this.onOutsideInput, { capture: true, passive: true });
+    document.addEventListener("touchmove", this.onOutsideInput, { capture: true, passive: true });
     document.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("scroll", this.onDismiss, {
-      capture: true,
-      once: true,
-    });
     window.addEventListener("resize", this.onDismiss, { once: true });
   }
 
   private removeDismissListeners(): void {
-    document.removeEventListener("pointerdown", this.onPointerDown, true);
+    document.removeEventListener("pointerdown", this.onOutsideInput, true);
+    document.removeEventListener("wheel", this.onOutsideInput, true);
+    document.removeEventListener("touchmove", this.onOutsideInput, true);
     document.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("scroll", this.onDismiss, true);
     window.removeEventListener("resize", this.onDismiss);
   }
 }
