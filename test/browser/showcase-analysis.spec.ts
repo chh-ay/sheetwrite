@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { expect, nextFrames, test } from "./fixtures.js";
+import { expect, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -156,9 +156,6 @@ test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page },
 
 test("a chart's right-click menu deletes it, and undo brings it back", async ({ page }) => {
   await open(page);
-  // The menu closes on scroll, as Excel's does: let the scroll into view settle first.
-  await chart(page).scrollIntoViewIfNeeded();
-  await nextFrames(page);
   await chart(page).click({ button: "right" });
   const menu = page.locator(".sheetwrite-context-menu");
   await expect(menu.getByText("Edit chart")).toBeVisible();
