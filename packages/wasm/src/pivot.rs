@@ -137,10 +137,14 @@ const CAPITAL_SIGMA: char = 'Σ';
 
 /// Writes the case fold of `text` into `folded`, equal to
 /// `text.to_lowercase()` (the fold group keys use) but into a reused buffer,
-/// so a row check allocates nothing.
+/// so a row check allocates nothing. ASCII text, the common case, folds byte
+/// by byte without decoding characters.
 fn fold_case(text: &str, folded: &mut String) {
     folded.clear();
-    if text.contains(CAPITAL_SIGMA) {
+    if text.is_ascii() {
+        folded.push_str(text);
+        folded.make_ascii_lowercase();
+    } else if text.contains(CAPITAL_SIGMA) {
         // Only the whole-string mapping knows a sigma's context; every other
         // letter folds the same one at a time.
         folded.push_str(&text.to_lowercase());
@@ -2474,5 +2478,14 @@ mod tests {
         assert_eq!(sum.value(), 1.0);
 
         remove_all(&mut sum, &[1.0, 1e100, -1e100]);
+    }
+
+    #[test]
+    fn fold_case_equals_to_lowercase() {
+        let mut folded = String::from("left over");
+        for text in ["", "EMEA", "Desk Lamp 2", "ÉCOLE", "ΟΔΟΣ ΟΔΟΣ", "İstanbul"] {
+            fold_case(text, &mut folded);
+            assert_eq!(folded, text.to_lowercase(), "{text}");
+        }
     }
 }
