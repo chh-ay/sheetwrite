@@ -386,6 +386,26 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
 }
 
 #[test]
+fn distinct_texts_come_joined_with_their_utf16_lengths() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 4);
+    for (row, text) in ["Oslo", "Zürich", "😀 Lima", "Oslo"]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_string(sheet, row, 0, text, 0);
+    }
+    store.recompute(sheet);
+
+    // "ü" is one UTF-16 unit and two UTF-8 bytes; "😀" is two units and four bytes.
+    let mut joined = store.distinct_values(sheet, 0, 0);
+    assert_eq!(joined.take_text_joined(), "OsloZürich😀 Lima");
+    assert_eq!(joined.take_text_lengths(), vec![4, 6, 7]);
+    let mut split = store.distinct_values(sheet, 0, 0);
+    assert_eq!(split.take_texts(), vec!["Oslo", "Zürich", "😀 Lima"]);
+}
+
+#[test]
 fn distinct_values_in_rows_reads_only_the_row_range() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 16);

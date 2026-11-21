@@ -65,8 +65,8 @@ fn sources(function: Function, args: &[Ast]) -> &[Ast] {
     }
 }
 
-fn is_array_argument(ast: &Ast, sheet: usize, shapes: Shapes<'_>) -> bool {
-    range_from_ast(ast, sheet).is_some() || ast_produces_array(ast, shapes)
+fn is_array_argument(ast: &Ast, shapes: Shapes<'_>) -> bool {
+    range_from_ast(ast, shapes.names()).is_some() || ast_produces_array(ast, shapes)
 }
 
 /// Excel shows a blank source cell as 0 in a reshaped array.
@@ -98,8 +98,7 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -157,7 +156,7 @@ fn source_extent(
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<Option<(usize, usize)>, FormulaError> {
-    if !is_array_argument(ast, sheet, pass.shapes()) {
+    if !is_array_argument(ast, pass.shapes(store.name_scope(sheet))) {
         return Ok(Some((1, 1)));
     }
     if let Ast::Func(Func::Analysis(id), args) = ast {
@@ -170,7 +169,7 @@ fn source_extent(
     }
     match store.matrix_shape(ast, sheet, pass) {
         Ok((rows, cols, _)) => Ok(Some((rows, cols))),
-        Err(error) if range_from_ast(ast, sheet).is_some() => Err(error),
+        Err(error) if range_from_ast(ast, store.name_scope(sheet)).is_some() => Err(error),
         Err(_) => match store.dynamic_array_bound(ast, sheet, pass) {
             Some(Err(error)) => Err(error),
             Some(Ok(_)) | None => Ok(None),
@@ -386,7 +385,7 @@ impl Evaluation<'_, '_> {
     }
 
     fn source(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if is_array_argument(ast, self.sheet, self.pass.shapes()) {
+        if is_array_argument(ast, self.pass.shapes(self.store.name_scope(self.sheet))) {
             self.store
                 .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
         } else {
