@@ -36,7 +36,12 @@ import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
-import { failingValidationRule, hasListDropdown, validationListItems } from "./validation-rule.js";
+import {
+  failingValidationRule,
+  hasListDropdown,
+  ValidationBudgetError,
+  validationListItems,
+} from "./validation-rule.js";
 
 const PRINTABLE = /^.$/u;
 const MINUTES_PER_HOUR = 60;
@@ -581,14 +586,21 @@ export class InteractionSessions {
               },
             ];
       const entry: CellEntry = { address, value, patches, navigate };
-      const rule = this.brokenRule(patches);
-      if (rule) {
-        const text =
-          typeof input === "string" ? input : this.entryText(value, column?.type ?? "text");
-        this.alertEntry(rule, entry, text);
-        return;
-      }
-      this.commitCellEditAt(entry, viewRow);
+      const decide = (): void => {
+        const rule = this.brokenRule(patches);
+        if (rule) {
+          const text =
+            typeof input === "string" ? input : this.entryText(value, column?.type ?? "text");
+          this.alertEntry(rule, entry, text);
+          return;
+        }
+        this.commitCellEditAt(entry, viewRow);
+      };
+      // The grid's check and the store's check of the entry are one check:
+      // each list source is read once.
+      const reads = storeEngine(this.deps.store)?.validationReads;
+      if (reads) reads.check(decide);
+      else decide();
     } finally {
       this.deps.editDraft.end();
     }
@@ -597,7 +609,9 @@ export class InteractionSessions {
   /**
    * The rule an entry breaks, checked before it is stored, as Excel does. A
    * Stop rule comes first, so Yes on a Warning never meets a Stop afterwards.
-   * A formula is checked by the result it would have in its cell.
+   * A formula is checked by the result it would have in its cell. A check
+   * that runs out of its budget finds none here; the store then refuses the
+   * entry.
    */
   private brokenRule(patches: readonly DocumentOp[]): DataValidationRule | undefined {
     const rules = this.deps.sheet().validationRules;
@@ -611,12 +625,18 @@ export class InteractionSessions {
       if (covering.length === 0) continue;
       const value = this.enteredScalar(patch.addr, patch.value);
       if (value === undefined) continue;
-      const rule = failingValidationRule(
-        covering,
-        patch.addr,
-        value,
-        storeEngine(this.deps.store)?.validationReads,
-      );
+      let rule: DataValidationRule | undefined;
+      try {
+        rule = failingValidationRule(
+          covering,
+          patch.addr,
+          value,
+          storeEngine(this.deps.store)?.validationReads,
+        );
+      } catch (error) {
+        if (error instanceof ValidationBudgetError) return undefined;
+        throw error;
+      }
       if (rule?.policy === "reject") return rule;
       broken ??= rule;
     }

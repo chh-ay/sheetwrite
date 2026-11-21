@@ -270,6 +270,26 @@ describe("AutoComplete's list", () => {
     key("Enter");
     expect(value(4)).toBe("Nor");
   });
+
+  it("reads the column at the first typed key: text pasted before it lists nothing", async () => {
+    const listed = () =>
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
+        (option) => option.textContent,
+      );
+    mount(["North", "Northeast"]);
+    at(2);
+    key("F2");
+    // AutoComplete loads with the grid's first edit; let it arrive before the paste.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const field = editor();
+    field.value = "Nor";
+    field.setSelectionRange(3, 3);
+    field.dispatchEvent(new InputEvent("input", { inputType: "insertFromPaste", bubbles: true }));
+    expect(listed()).toEqual([]);
+
+    await type("t");
+    expect(listed()).toEqual(["North", "Northeast"]);
+  });
 });
 
 // https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f

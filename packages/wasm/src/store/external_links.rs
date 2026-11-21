@@ -6,6 +6,7 @@
 
 use wasm_bindgen::prelude::*;
 
+use super::names::NameScope;
 use super::CellStore;
 use crate::calc::sheet_name_key;
 
@@ -75,10 +76,10 @@ impl CellStore {
             }
 
             let mut changed = false;
+            let names = NameScope::new(&self.bindings, formula_sheet as u32);
             data.formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
-                    changed |=
-                        entry.relink_sheet(key, handle, formula_sheet as u32, &self.sheet_names);
+                    changed |= entry.relink_sheet(key, handle, names, &self.sheet_names);
                 });
             if changed {
                 data.formulas.mark_all_dirty();
