@@ -192,7 +192,7 @@ const rows = grid.aggregate(0, "count");
 
 ## Frozen panes and zoom
 
-Frozen panes and zoom are view geometry, not data mutations:
+Frozen panes freeze rows and columns, as Excel's Freeze Panes does. Frozen panes and zoom are view geometry, not data mutations:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.setFrozen(1, 1); // pin first view row and first column
