@@ -101,6 +101,19 @@ function containsQuery(data: PagefindResultData, words: readonly string[]): bool
   );
 }
 
+/**
+ * For a query of several words, the first heading that holds them as one
+ * phrase: "find all" names "Options and Find All in the find bar".
+ */
+function phraseSection(data: PagefindResultData, query: string): SearchEntry | undefined {
+  for (const anchor of data.anchors ?? []) {
+    const text = anchor.text ?? "";
+    if (!/^h\d$/iu.test(anchor.element) || !normalized(text).includes(query)) continue;
+    return { url: `${data.url}#${anchor.id}`, title: text.trim(), excerpt: data.meta.title ?? "" };
+  }
+  return undefined;
+}
+
 function entriesFor(data: PagefindResultData, exact: SearchEntry | undefined): SearchEntry[] {
   const page: SearchEntry = {
     url: data.url,
@@ -118,17 +131,26 @@ function entriesFor(data: PagefindResultData, exact: SearchEntry | undefined): S
 /**
  * The entries to show for `query`, from Pagefind's pages in its order: first
  * the pages titled exactly as the query, then the pages with a section of
- * that name (shown first, above its page), then the rest.
+ * that name (shown first, above its page). For a query of several words, the
+ * pages whose title or a heading holds them as one phrase come next, so
+ * "data validation" finds the Data Validation guide before the API types
+ * whose names hold both words. Then the rest.
  */
 function rankEntries(pages: readonly PagefindResultData[], rawQuery: string): SearchEntry[] {
   const query = normalized(rawQuery);
   const words = query.split(/\s+/u).filter(Boolean);
+  const isPhrase = words.length > 1;
   const ranked = pages
     .filter((page) => containsQuery(page, words))
     .map((page, order) => {
-      const isTitle = normalized(page.meta.title ?? "") === query;
-      const exact = isTitle ? undefined : exactSection(page, query);
-      return { page, exact, order, rank: isTitle ? 0 : exact === undefined ? 2 : 1 };
+      const title = normalized(page.meta.title ?? "");
+      if (title === query) return { page, exact: undefined, order, rank: 0 };
+      const exact = exactSection(page, query);
+      if (exact !== undefined) return { page, exact, order, rank: 1 };
+      if (!isPhrase) return { page, exact: undefined, order, rank: 3 };
+      if (title.includes(query)) return { page, exact: undefined, order, rank: 2 };
+      const phrase = phraseSection(page, query);
+      return { page, exact: phrase, order, rank: phrase === undefined ? 3 : 2 };
     })
     .sort((left, right) => left.rank - right.rank || left.order - right.order)
     .slice(0, SHOWN_PAGES);
