@@ -66,7 +66,7 @@ Bounds can be formulas too (`"=B1"`, `"=TODAY()"`). A custom rule passes a value
 
 ### The dropdown list
 
-A selected cell of a list rule shows a dropdown arrow just right of it, as in Excel. The arrow and Alt+Down open the list, an ARIA `combobox` with a `listbox`. Typing in the cell opens the list too, and keeps only the items that contain the typed text, ignoring case, as Excel's AutoComplete for dropdown lists does.
+A selected cell of a list rule shows a dropdown arrow just right of it, as in Excel. The arrow and Alt+Down open the list, an ARIA `combobox` with a `listbox`, with the cell's value highlighted; the cell keeps showing its value, as in Excel. Typing, in the cell or with the list open, replaces the value as in Excel, and keeps only the items that contain the typed text, ignoring case, as Excel's AutoComplete for dropdown lists does.
 
 | Key | Result |
 | --- | --- |
