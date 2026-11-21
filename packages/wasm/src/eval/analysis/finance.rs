@@ -1,6 +1,7 @@
 //! Financial functions that are not part of the default engine.
 
 use super::super::functions::{integer_arg, number_arg, require_arity, FuncAccumulator, FuncValue};
+use super::super::lift::ValueArgs;
 use super::super::value::aggregate_number;
 use crate::types::{EvalResult, FormulaError, Value};
 
@@ -23,6 +24,30 @@ family_functions! {
     SYD,
     XIRR,
     XNPV,
+}
+
+/// The arguments of `function` that take one value: every argument, except
+/// the schedules, cash flows and dates, which are ranges or arrays.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::FVSCHEDULE | Function::XNPV => ValueArgs::at(&[0]),
+        Function::MIRR => ValueArgs::at(&[1, 2]),
+        Function::XIRR => ValueArgs::at(&[2]),
+        Function::CUMIPMT
+        | Function::CUMPRINC
+        | Function::DB
+        | Function::DDB
+        | Function::DOLLARDE
+        | Function::DOLLARFR
+        | Function::EFFECT
+        | Function::ISPMT
+        | Function::NOMINAL
+        | Function::NPER
+        | Function::PDURATION
+        | Function::RRI
+        | Function::SLN
+        | Function::SYD => ValueArgs::ALL,
+    }
 }
 
 const DAYS_PER_YEAR: f64 = 365.0;

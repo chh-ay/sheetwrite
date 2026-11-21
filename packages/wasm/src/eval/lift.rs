@@ -32,12 +32,13 @@ const LAST_ARGUMENT_BIT: usize = u8::BITS as usize - 1;
 pub(super) struct ValueArgs(u8);
 
 impl ValueArgs {
-    const NONE: Self = Self(0);
+    /// No argument: the function is never lifted.
+    pub(super) const NONE: Self = Self(0);
     /// Every argument, however many the call has.
-    const ALL: Self = Self(u8::MAX);
+    pub(super) const ALL: Self = Self(u8::MAX);
 
     /// The arguments at `positions`, each below [`LAST_ARGUMENT_BIT`].
-    const fn at(positions: &[usize]) -> Self {
+    pub(super) const fn at(positions: &[usize]) -> Self {
         let mut bits = 0;
         let mut next = 0;
         while next < positions.len() {
@@ -80,13 +81,23 @@ const LOOKUP_ARGS: ValueArgs = ValueArgs::at(&[0, 2, 3]);
 /// listed is never lifted: its arguments take ranges or arrays (SUM, CONCAT,
 /// INDEX, XLOOKUP's return array), a reference (ISREF, ISFORMULA, CELL), the
 /// value as a whole (TYPE, N, T), or the call belongs to one cell (HYPERLINK).
-/// TODAY, NOW and RAND take no argument.
+/// TODAY, NOW and RAND take no argument. Each analysis family declares its
+/// own functions.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "every other function takes no argument that lifts; listing the other Func variants adds nothing"
 )]
-pub(super) const fn value_args(func: Func) -> ValueArgs {
+#[cfg_attr(
+    not(feature = "analysis"),
+    allow(
+        clippy::missing_const_for_fn,
+        reason = "the full engine's arm calls a family's declaration through a function pointer, which a const fn cannot"
+    )
+)]
+pub(super) fn value_args(func: Func) -> ValueArgs {
     match func {
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => (super::analysis::family(id).value_args)(id),
         Func::Workday | Func::NetworkDays => DAYS_ARGS,
         Func::Large
         | Func::Small

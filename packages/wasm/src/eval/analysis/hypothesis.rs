@@ -4,6 +4,7 @@
 use super::super::functions::{
     number_arg, numeric_entries, require_arity, FuncAccumulator, FuncValue,
 };
+use super::super::lift::ValueArgs;
 use super::distributions::{ensure, f_probability, gamma_probability, normal_cdf, student_tail};
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
@@ -16,6 +17,18 @@ family_functions! {
     TTEST,
     Z_TEST = "Z.TEST",
     ZTEST,
+}
+
+/// The arguments of `function` that take one value: the tails and type of
+/// T.TEST, and `x` and sigma of Z.TEST. The samples are ranges or arrays.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::CHISQ_TEST | Function::CHITEST | Function::F_TEST | Function::FTEST => {
+            ValueArgs::NONE
+        }
+        Function::T_TEST | Function::TTEST => ValueArgs::at(&[2, 3]),
+        Function::Z_TEST | Function::ZTEST => ValueArgs::at(&[1, 2]),
+    }
 }
 
 const ONE_TAIL: f64 = 1.0;

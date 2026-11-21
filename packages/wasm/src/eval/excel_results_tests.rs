@@ -2679,9 +2679,40 @@ const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=RANDBETWEEN(Data!A1:A2,Data!A1:A2)", 1, &["1", "2"]),
 ];
 
+/// The full engine's functions under the same rule; each family declares
+/// which of its arguments take one value. Microsoft Support, "TEXTBEFORE
+/// function": an array of delimiters means any of them, so that argument is
+/// not lifted (documented). Every other row is on the Excel checks list
+/// (#219).
+#[cfg(feature = "analysis")]
+const LIFTED_ANALYSIS_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
+    ("=TEXTBEFORE(\"a-b;c\",{\"-\",\";\"})", 1, &["a", ""]),
+    // Unverified: the rule above, for functions Microsoft doesn't show.
+    ("=FACT({3,4})", 2, &["6", "24"]),
+    ("=FACT({3,-1})", 2, &["6", "#NUM!"]),
+    ("=BITAND({12,10},{10;6})", 2, &["8", "10", "4", "2"]),
+    ("=TEXTBEFORE({\"a-b\",\"cd-e\"},\"-\")", 2, &["a", "cd"]),
+    ("=COMBIN(Data!A1:A3+2,2)", 1, &["3", "6", "10"]),
+    ("=DEC2BIN({5,6})", 2, &["101", "110"]),
+    (
+        "=DATEDIF(DATE(2024,1,1),DATE(2024,{2,3},1),\"m\")",
+        2,
+        &["1", "2"],
+    ),
+    ("=PERCENTILE.EXC(Data!B1:B3,{0.25,0.5})", 2, &["10", "20"]),
+    ("=CONVERT({1,2},\"m\",\"cm\")", 2, &["100", "200"]),
+    ("=IMABS({\"3+4i\",\"6+8i\"})", 2, &["5", "10"]),
+    ("=REGEXTEST({\"abc\",\"xyz\"},\"b\")", 2, &["TRUE", "FALSE"]),
+    ("=LENB({\"ab\",\"c\"})", 2, &["2", "1"]),
+    ("=IMSUM({\"1+i\",\"2\"})", 1, &["3+i", ""]),
+    ("=SUMSQ({1,2})", 1, &["5", ""]),
+];
+
 #[test]
 fn functions_that_take_one_value_run_once_for_each_element() {
     assert_spills(LIFTED_FUNCTION_RESULTS);
+    #[cfg(feature = "analysis")]
+    assert_spills(LIFTED_ANALYSIS_FUNCTION_RESULTS);
 }
 
 /// A scalar condition evaluates only the branch it takes: the SEQUENCE in

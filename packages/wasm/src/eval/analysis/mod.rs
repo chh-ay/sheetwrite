@@ -128,6 +128,7 @@ use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::functions::FuncAccumulator;
+use super::lift::ValueArgs;
 use super::matrix::EvalMatrix;
 use super::EvalPass;
 
@@ -170,6 +171,9 @@ pub(super) struct Family {
     /// `SUM(A1)`: text and logical values in the cell are ignored instead of
     /// converted.
     pub(super) reference_cells: fn(u16) -> bool,
+    /// The arguments of a function that take one value, so that an array
+    /// there runs the function once for each element (`eval/lift.rs`).
+    pub(super) value_args: fn(u16) -> ValueArgs,
     pub(super) evaluate: Option<ScalarEvaluator>,
     /// Runs before accumulator coercion and retains the original arguments.
     pub(super) evaluate_ast: Option<AstEvaluator>,
@@ -178,11 +182,17 @@ pub(super) struct Family {
 
 /// Whether no function of a family reads single-cell arguments as references.
 const NO_REFERENCE_CELLS: fn(u16) -> bool = |_| false;
+/// A family whose functions take one value in every argument.
+const EVERY_ARGUMENT: fn(u16) -> ValueArgs = |_| ValueArgs::ALL;
+/// A family whose functions take ranges, arrays or LAMBDAs, and are never
+/// lifted.
+const NO_VALUE_ARGS: fn(u16) -> ValueArgs = |_| ValueArgs::NONE;
 
 const FAMILIES: &[Family] = &[
     Family {
         names: groupby::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(groupby::evaluate_ast)),
         array: Some(array_hooks!(groupby::evaluate_matrix)),
@@ -190,6 +200,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: aggregate::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(aggregate::evaluate_ast)),
         array: None,
@@ -197,6 +208,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: database::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(database::evaluate_ast)),
         array: None,
@@ -204,6 +216,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: dates::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| dates::value_args(dates::Function::of(id)),
         evaluate: Some(scalar_hook!(dates::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -211,6 +224,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: descriptive::NAMES,
         reference_cells: |id| descriptive::reads_cells_as_references(descriptive::Function::of(id)),
+        value_args: |id| descriptive::value_args(descriptive::Function::of(id)),
         evaluate: Some(scalar_hook!(descriptive::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -218,6 +232,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: distributions::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(distributions::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -227,6 +242,7 @@ const FAMILIES: &[Family] = &[
         reference_cells: |id| {
             compatibility::reads_cells_as_references(compatibility::Function::of(id))
         },
+        value_args: |id| compatibility::value_args(compatibility::Function::of(id)),
         evaluate: Some(scalar_hook!(compatibility::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -234,6 +250,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: discrete::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(discrete::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -241,6 +258,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: hypothesis::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| hypothesis::value_args(hypothesis::Function::of(id)),
         evaluate: Some(scalar_hook!(hypothesis::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -248,6 +266,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: engineering::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(engineering::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -255,6 +274,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: complex::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| complex::value_args(complex::Function::of(id)),
         evaluate: Some(scalar_hook!(complex::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -262,6 +282,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: bessel::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(bessel::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -269,6 +290,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: units::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(units::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -276,6 +298,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: bytes::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(bytes::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -283,6 +306,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: finance::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| finance::value_args(finance::Function::of(id)),
         evaluate: Some(scalar_hook!(finance::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -290,6 +314,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: depreciation::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(depreciation::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -297,6 +322,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: securities::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: EVERY_ARGUMENT,
         evaluate: Some(scalar_hook!(securities::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -304,6 +330,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: math::NAMES,
         reference_cells: |id| math::reads_cells_as_references(math::Function::of(id)),
+        value_args: |id| math::value_args(math::Function::of(id)),
         evaluate: Some(scalar_hook!(math::evaluate)),
         evaluate_ast: None,
         array: None,
@@ -311,6 +338,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: matrices::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(matrices::evaluate_ast)),
         array: Some(array_hooks!(matrices::evaluate_matrix)),
@@ -318,6 +346,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: regression::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| regression::value_args(regression::Function::of(id)),
         evaluate: Some(scalar_hook!(regression::evaluate)),
         evaluate_ast: None,
         array: Some(array_hooks!(regression::evaluate_array)),
@@ -325,6 +354,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: text::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: |id| text::value_args(text::Function::of(id)),
         evaluate: None,
         evaluate_ast: Some(ast_hook!(text::evaluate_ast)),
         array: Some(array_hooks!(text::evaluate_matrix)),
@@ -332,6 +362,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: reshape::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: None,
         array: Some(array_hooks!(reshape::evaluate)),
@@ -339,6 +370,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: pivot_data::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(pivot_data::evaluate_ast)),
         array: None,
@@ -346,6 +378,7 @@ const FAMILIES: &[Family] = &[
     Family {
         names: lambda::NAMES,
         reference_cells: NO_REFERENCE_CELLS,
+        value_args: NO_VALUE_ARGS,
         evaluate: None,
         evaluate_ast: Some(ast_hook!(lambda::evaluate, lambda::Invocation)),
         array: Some(array_hooks!(lambda::evaluate_matrix, lambda::Invocation)),
@@ -451,6 +484,19 @@ pub(crate) fn names() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn family(id: u16) -> &'static Family {
     &FAMILIES[usize::from(id >> FAMILY_SHIFT)]
+}
+
+/// The array hooks of the family of `id` when they evaluate this call as an
+/// array; `None` for a family without them or a call they leave scalar.
+pub(super) fn array_hooks(
+    id: u16,
+    args: &[Ast],
+    shapes: super::array::Shapes<'_>,
+) -> Option<&'static ArrayHooks> {
+    family(id)
+        .array
+        .as_ref()
+        .filter(|hooks| (hooks.produces_array)(id, args, shapes))
 }
 
 pub(super) fn evaluate_scalar(id: u16, values: &FuncAccumulator) -> EvalResult {
