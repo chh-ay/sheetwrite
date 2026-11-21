@@ -251,11 +251,11 @@ fn criteria_wildcards_approximate_lookup_and_empty_logic_follow_spreadsheet_sema
 #[test]
 fn number_text_and_wildcards_read_the_same_in_every_function() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(24, 2);
+    let sheet = store.add_sheet(25, 2);
     store.set_string(sheet, 1, 0, "İ", 0);
     store.set_string(sheet, 1, 1, "café", 0);
     store.set_string(sheet, 1, 2, "inf", 0);
-    let cases: [(&str, Result<f64, &str>); 24] = [
+    let cases: [(&str, Result<f64, &str>); 25] = [
         // A group separator, a percent and a date read alike everywhere.
         ("=VALUE(\"1,000\")", Ok(1000.0)),
         ("=\"1,000\"+0", Ok(1000.0)),
@@ -285,6 +285,8 @@ fn number_text_and_wildcards_read_the_same_in_every_function() {
         ("=SEARCH(\"CAFÉ\",B2)", Ok(1.0)),
         ("=COUNTIF(B2,\"CAF?\")", Ok(1.0)),
         ("=XMATCH(\"CAFÉ\",B2:B2,2)", Ok(1.0)),
+        // A wildcard match after multi-byte text is counted in characters.
+        ("=SEARCH(\"z?\",\"ééz!\")", Ok(3.0)),
     ];
     for (col, (formula, _)) in cases.iter().enumerate() {
         store.set_formula(sheet, 0, col, formula, 0);
