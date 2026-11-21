@@ -508,6 +508,23 @@ ms until that finishes and 1.7–1.9 ms after, so a 50 ms sample measured when t
 compiler finished. With synchronous compilation, or an idle pause before the
 row, both engines start at steady speed and no wasm memory grows during it.
 
+`independent-parse-load` at 1,000 and 10,000 formulas warms up for at least
+2 seconds. These rows time `setFormula` calls, and JavaScriptCore compiles
+that code with its optimizing tier in the background, on the same pinned core
+as the runs. Until it finishes, a 10,000-formula load takes about 21 ms on
+Linux; after it, about 10 ms (1,000 formulas: 5.4 ms, then 1.0 ms). A fresh
+process gets there after 1–2 seconds of loads, and three warm-up fixtures end
+well before that, so the 10,000 row's ratio swung with the compiler instead of
+the engine. The rows measure the steady state: the speed of loading formulas
+once the engine code is optimized, as in a page that has loaded before.
+
+`linear-chain` at 8 formulas warms up for at least one second, for the same
+reason as `diamond-edit`: it recalculates in a few microseconds right after
+the 100,000-formula rows, so its 50 ms sample measured how far the compiler
+had got with the code those rows made hot. Two engines that ran at 2.9–3.1 µs
+per recalculation after the warm-up measured 1.35–1.46 apart without it
+(#625).
+
 The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
 were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
 For each row it takes the median of the paired candidate/base ratios and

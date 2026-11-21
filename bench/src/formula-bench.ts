@@ -697,11 +697,29 @@ function missingCellStoreMethod(error: unknown): string | undefined {
  * sample's result by 10–15% under the gate (30 µs to 34 µs) while both
  * engines ran at 29.2–29.5 µs per edit after warm-up; with 500 ms of warm-up
  * the gate measured the same 1.007.
+ *
+ * `independent-parse-load` at 1,000 and 10,000 formulas measured the same
+ * race: until JavaScriptCore's optimizing tier has compiled the parse path on
+ * the pinned core, a 1,000-formula load takes about 5.4 ms and a 10,000-formula
+ * load about 21 ms on Linux; after it, 1.0 ms and 10 ms. Three warm-up fixtures
+ * end well before that (a fresh process reaches steady speed after 1–2 s of
+ * loads), so the 10,000 row swung with the compiler, not the engine. Two
+ * seconds of warm-up make both rows measure the steady state.
+ *
+ * `linear-chain` at 8 formulas recalculates in a few microseconds, so its
+ * 50 ms sample falls inside the tier-up of the recompute path, as for
+ * `diamond-edit`. A change that adds hot code to the parse path delays that
+ * tier-up on the pinned core and moved the sample by up to 1.46 under the
+ * gate, while both engines ran at 2.9–3.1 µs per recalculation after one
+ * second of warm-up (#625).
  */
 const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
   "workload=unicode-text-date-edit;size=1000": 1_000,
   "workload=independent-first-recompute;size=10000": 500,
   "workload=diamond-edit;size=32": 500,
+  "workload=independent-parse-load;size=1000": 2_000,
+  "workload=independent-parse-load;size=10000": 2_000,
+  "workload=linear-chain;size=8": 1_000,
 };
 
 /**
