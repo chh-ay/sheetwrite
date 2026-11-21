@@ -74,9 +74,13 @@ function harness() {
     mergeAnchorAt: () => null,
     toDataRow: (row) => row,
     toViewRow: (row) => row,
+    undo: () => {
+      throw new Error("This harness has no undo history");
+    },
+    lastUndo: () => null,
     rowSpan: (first, last) => ({ first, last }),
     commit: (patches, reason) => {
-      document.commit(patches, reason);
+      return document.commit(patches, reason);
     },
     onCutChange: () => {},
     loadPasteSpecial: () => import("../src/paste-special.js"),
