@@ -313,6 +313,23 @@ test("everyday words and questions find their guide among the first three pages"
   }
 });
 
+test("a query that names a framework or a feature guide lists that guide first", async ({
+  page,
+}) => {
+  for (const [query, guide] of [
+    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
+    ["how do I use sheetwrite with svelte", "/docs/frameworks/svelte/"],
+    ["how do I add a chart", "/docs/features/analysis/charts/"],
+    ["how to use conditional formatting", "/docs/features/formatting/conditional-formats/"],
+  ] as const) {
+    const { dialog, input } = await openSearch(page);
+    await input.fill(query);
+    const first = dialog.getByRole("option").first();
+    await expect(first).toBeVisible({ timeout: 15_000 });
+    expect((await first.getAttribute("href"))?.split("#")[0], query).toBe(guide);
+  }
+});
+
 test.describe(() => {
   // A missing page or index logs its failed request to the console.
   test.use({ allowErrors: true });

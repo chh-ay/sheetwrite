@@ -57,7 +57,7 @@ const GENERIC_SECTIONS = new Set(["Members", "Declaration", "Variants", "Exporte
 /**
  * Words of a question that name nothing. Pagefind returns only pages that hold
  * every word, so "how do I freeze rows" would find only pages that say "how"
- * and "do" too.
+ * and "do" too. "Use" asks how, as in "how to use conditional formatting".
  */
 const QUESTION_WORDS = new Set([
   "a",
@@ -81,6 +81,8 @@ const QUESTION_WORDS = new Set([
   "or",
   "the",
   "to",
+  "use",
+  "using",
   "what",
   "when",
   "where",
@@ -191,8 +193,22 @@ interface Ranked {
 
 const TIER_TITLE = 0;
 const TIER_SECTION = 1;
-const TIER_TITLE_WORDS_OR_PHRASE = 2;
-const TIER_OTHER = 3;
+const TIER_GUIDE_NAMED = 2;
+const TIER_TITLE_WORDS_OR_PHRASE = 3;
+const TIER_OTHER = 4;
+
+/** Letters two long words share at their start when they name one thing: "formats" and "formatting". */
+const SHARED_STEM_LENGTH = 6;
+
+/** Two words name the same thing: equal but for a plural "s", or long words with one stem. */
+function sameWord(left: string, right: string): boolean {
+  if (singular(left) === singular(right)) return true;
+  return (
+    left.length >= SHARED_STEM_LENGTH &&
+    right.length >= SHARED_STEM_LENGTH &&
+    left.slice(0, SHARED_STEM_LENGTH) === right.slice(0, SHARED_STEM_LENGTH)
+  );
+}
 
 function rankPage(
   page: PagefindResultData,
@@ -201,17 +217,31 @@ function rankPage(
   words: readonly string[],
 ): Ranked {
   const title = normalized(page.meta.title ?? "");
+  const isApiReference = page.url.startsWith(API_REFERENCE_PREFIX);
   const ranked = (tier: number, exact?: SearchEntry): Ranked => ({
     page,
     exact,
     order,
     tier,
-    isApiReference: page.url.startsWith(API_REFERENCE_PREFIX),
+    isApiReference,
   });
   if (title === query || singular(title) === singular(query)) return ranked(TIER_TITLE);
   const exact = exactSection(page, query);
   if (exact !== undefined) return ranked(TIER_SECTION, exact);
   if (words.length < 2) return ranked(TIER_OTHER);
+  // A question names a guide by its title: "use sheetwrite with react" names
+  // React, "add a chart" names Charts. API pages are left out: their one-word
+  // titles (Grid, Range, Theme) are words of many questions.
+  const titleWords = title
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 0 && !QUESTION_WORDS.has(word));
+  if (
+    !isApiReference &&
+    titleWords.length > 0 &&
+    titleWords.every((titleWord) => words.some((word) => sameWord(word, titleWord)))
+  ) {
+    return ranked(TIER_GUIDE_NAMED);
+  }
   if (title.includes(query) || words.every((word) => holdsWord(title, word))) {
     return ranked(TIER_TITLE_WORDS_OR_PHRASE);
   }
@@ -222,10 +252,12 @@ function rankPage(
 /**
  * The entries to show for `rawQuery`, from Pagefind's pages in its order:
  * first the pages titled as the query, then the pages with a section of that
- * name (shown first, above its page). For a query of several words, the pages
- * whose title holds every word, or whose title or a heading holds them as one
- * phrase, come next, so "data validation" finds the Data Validation guide
- * before the API types whose names hold both words. Then the rest. Within a
+ * name (shown first, above its page). For a query of several words, the
+ * guides whose every title word the query names come next ("how do I use
+ * sheetwrite with react" names React), then the pages whose title holds every
+ * word, or whose title or a heading holds them as one phrase, so "data
+ * validation" finds the Data Validation guide before the API types whose
+ * names hold both words. Then the rest. Within a
  * tier, a query in plain words lists guides before the API reference; a query
  * that names code keeps Pagefind's order.
  */
