@@ -2,7 +2,7 @@
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
-import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { blitScroll, paintFrame, paintFreezeDivider, sidewaysBlitSafe } from "./canvas-paint.js";
 import { KIND_NUMBER, KIND_STRING, NO_STRING } from "./store/wire-tags.js";
 import type { CellScalar } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
@@ -39,6 +39,7 @@ interface WorkerPane {
   rowHeights?: Float64Array;
   rowNumbers?: Uint32Array;
   filteredRows?: { start: number; end: number };
+  filterHeader?: { row: number; start: number; end: number };
 }
 
 interface PanesMessage {
@@ -112,6 +113,7 @@ interface WorkerRuntimeState {
   dpr: number;
   lastViewport: Viewport | null;
   lastDpr: number;
+  lastSidewaysSafe: boolean;
 }
 
 function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
@@ -198,7 +200,8 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
   const round = Math.round;
   state.viewport.scrollTop = round(state.viewport.scrollTop * state.dpr) / state.dpr;
   state.viewport.scrollLeft = round(state.viewport.scrollLeft * state.dpr) / state.dpr;
-  const damage = blitVerticalScroll(
+  const sidewaysSafe = sidewaysBlitSafe(view, state.layout);
+  const damage = blitScroll(
     state.ctx,
     state.canvas,
     state.theme,
@@ -206,6 +209,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
     state.viewport,
     state.dpr,
     state.lastDpr,
+    state.lastSidewaysSafe && sidewaysSafe,
   );
   paintFrame(
     state.ctx,
@@ -219,6 +223,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
   );
   state.lastViewport = { ...state.viewport };
   state.lastDpr = state.dpr;
+  state.lastSidewaysSafe = sidewaysSafe;
   return true;
 }
 
@@ -239,6 +244,7 @@ function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean 
       rowHeights: pane.rowHeights,
       rowNumbers: pane.rowNumbers,
       filteredRows: pane.filteredRows,
+      filterHeader: pane.filterHeader,
     };
     paintFrame(
       state.ctx,
@@ -286,6 +292,7 @@ export function createWorkerMessageHandler(
     dpr: 1,
     lastViewport: null,
     lastDpr: 1,
+    lastSidewaysSafe: false,
   };
 
   const acknowledgeFrame = (painted: boolean): void => {

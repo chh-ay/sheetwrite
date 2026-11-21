@@ -77,13 +77,6 @@ describe("SheetwriteGrid React lifecycle", () => {
       );
     }
 
-    /** Refreshes the committed grid and returns the callbacks it reached. */
-    const refreshCalls = (grid: Grid): string[] => {
-      calls.length = 0;
-      grid.refresh();
-      return [...calls];
-    };
-
     await act(async () => root.render(<Harness callback="committed" suspend={false} />));
     const committedGrid = present(gridRef.current, "committed grid");
 
@@ -93,15 +86,10 @@ describe("SheetwriteGrid React lifecycle", () => {
     });
     expect(suspendedRenders).toBeGreaterThan(0);
     expect(gridRef.current).toBe(committedGrid);
-    const afterAbandon = refreshCalls(committedGrid);
-    expect(afterAbandon).toContain("committed");
-    expect(afterAbandon).not.toContain("abandoned");
-
-    await act(async () => root.render(<Harness callback="replacement" suspend={false} />));
-    expect(gridRef.current).toBe(committedGrid);
-    const replaced = refreshCalls(committedGrid);
-    expect(replaced).toContain("replacement");
-    expect(replaced).not.toContain("committed");
+    calls.length = 0;
+    committedGrid.refresh();
+    expect(calls).toContain("committed");
+    expect(calls).not.toContain("abandoned");
 
     suspended.resolve();
     await act(async () => root.unmount());

@@ -251,23 +251,41 @@ describe("first-paint counterfactual evidence", () => {
     expect(firstPaintGate(evidence)).toEqual({ admitted: true, reasons: [] });
   });
 
-  it.each<[string, (fixture: FirstPaintFixture) => void]>([
-    ["checksum", (fixture) => (fixture.candidate.checksum = "b".repeat(64))],
-    ["provenance", (fixture) => (fixture.provenance.buildMode = "development")],
-    ["samples", (fixture) => (fixture.candidate.timing.samplesMs = [19])],
-    ["recorded delta", (fixture) => (fixture.delta.brotliBytes = 9_999)],
-  ])("rejects an incomparable %s", (_label, mutate) => {
+  it.each<[string, (fixture: FirstPaintFixture) => void, string]>([
+    [
+      "checksum",
+      (fixture) => (fixture.candidate.checksum = "b".repeat(64)),
+      "first-paint semantics differ",
+    ],
+    [
+      "provenance",
+      (fixture) => (fixture.provenance.buildMode = "development"),
+      "provenance is incomplete or incomparable",
+    ],
+    ["samples", (fixture) => (fixture.candidate.timing.samplesMs = [19]), "finite samples"],
+    [
+      "recorded delta",
+      (fixture) => (fixture.delta.brotliBytes = 9_999),
+      "recorded size delta is inconsistent",
+    ],
+  ])("rejects an incomparable %s", (_label, mutate, message) => {
     const evidence = firstPaintEvidence();
     mutate(evidence.fixtures[0]);
-    expect(() => validateFirstPaintEvidence(evidence)).toThrow();
+    expect(() => validateFirstPaintEvidence(evidence)).toThrow(message);
   });
 
   it.each([
-    ["bytes", { candidateBrotli: 60_000 - (FIRST_PAINT_BROTLI_GATE_BYTES - 1) }],
-    ["percent", { baselineBrotli: 100_000, candidateBrotli: 92_000 }],
-    ["median", { baselineMs: [...steady(20).slice(1), 40], candidateMs: steady(21) }],
-    ["p95", { candidateMs: [...steady(19).slice(1), 25] }],
-  ] as const)("blocks admission when only the %s gate fails", (_gate, change) => {
+    [
+      /^vite Brotli reduction is below \d+ bytes$/,
+      { candidateBrotli: 60_000 - (FIRST_PAINT_BROTLI_GATE_BYTES - 1) },
+    ],
+    [/^vite Brotli reduction is below \d+%$/, { baselineBrotli: 100_000, candidateBrotli: 92_000 }],
+    [
+      /^vite candidate median first paint is slower$/,
+      { baselineMs: [...steady(20).slice(1), 40], candidateMs: steady(21) },
+    ],
+    [/^vite candidate p95 first paint is slower$/, { candidateMs: [...steady(19).slice(1), 25] }],
+  ] as const)("blocks admission when only the gate %p fails", (reason, change) => {
     const evidence = firstPaintEvidence();
     const vite = evidence.fixtures[1];
     if ("baselineBrotli" in change)
@@ -281,8 +299,9 @@ describe("first-paint counterfactual evidence", () => {
     vite.delta.brotliBytes = reduction;
     vite.delta.brotliPercent = (reduction / baselineBytes) * 100;
 
-    const decision = firstPaintGate(evidence);
-    expect(decision.admitted).toBe(false);
-    expect(decision.reasons).toHaveLength(1);
+    expect(firstPaintGate(evidence)).toEqual({
+      admitted: false,
+      reasons: [expect.stringMatching(reason)],
+    });
   });
 });

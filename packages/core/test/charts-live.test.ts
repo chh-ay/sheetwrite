@@ -206,41 +206,23 @@ describe("chart change events", () => {
 });
 
 // Engine selection is process-wide, and only the full engine computes pivot output.
-// So each case runs the full provider in its own process.
-describe("chart change events for pivot output", () => {
-  async function runProbe(scenario: string) {
-    const probe = Bun.spawn(
-      [
-        process.execPath,
-        "--preload",
-        "./test-setup.ts",
-        "./packages/core/test/charts-live-pivot-probe.ts",
-        scenario,
-      ],
-      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-    );
-    const [exitCode, stdout, stderr] = await Promise.all([
-      probe.exited,
-      new Response(probe.stdout).text(),
-      new Response(probe.stderr).text(),
-    ]);
-    return { exitCode, stdout, stderr };
-  }
-
-  const passed = { exitCode: 0, stdout: "", stderr: "" };
-
-  it("refreshes a chart that reads pivot output when the pivot source changes", async () => {
-    expect(await runProbe("source-edit")).toEqual(passed);
-  });
-
-  it("refreshes a chart under the output when a pivot is set or removed", async () => {
-    expect(await runProbe("set")).toEqual(passed);
-    expect(await runProbe("remove")).toEqual(passed);
-  });
-
-  it("leaves a chart on a sheet without pivots alone when another sheet's pivot changes", async () => {
-    expect(await runProbe("other-sheet")).toEqual(passed);
-  });
+// So the cases run the full provider in a process of their own.
+it("refreshes a chart over pivot output on a source edit, a set and a removal, and no chart on another sheet", async () => {
+  const probe = Bun.spawn(
+    [
+      process.execPath,
+      "--preload",
+      "./test-setup.ts",
+      "./packages/core/test/charts-live-pivot-probe.ts",
+    ],
+    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+  );
+  const [exitCode, stdout, stderr] = await Promise.all([
+    probe.exited,
+    new Response(probe.stdout).text(),
+    new Response(probe.stderr).text(),
+  ]);
+  expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
 });
 
 it("calls no engine when its grid is destroyed while the pivot views load", async () => {
@@ -313,6 +295,35 @@ describe("resolveChartView", () => {
         truncated: false,
         referenceError: false,
       },
+    ]);
+  });
+
+  it("gives each series the categories of its own range when several series share one", () => {
+    const { store } = setup();
+    const values = range("data", 0, 1, 1, 1);
+    const shared = range("data", 0, 0, 1, 0);
+    apply(store, [
+      set("data", 0, 2, "East"),
+      set("data", 1, 2, "West"),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("mixed", values),
+          series: [
+            { values, categories: shared },
+            { values, categories: range("data", 0, 2, 1, 2) },
+            { values, categories: shared },
+          ],
+        },
+      },
+    ]);
+
+    const categories = resolveChartView(store, "data", "mixed")?.series.map((s) => s.categories);
+    expect(categories).toEqual([
+      ["Q1", "Q2"],
+      ["East", "West"],
+      ["Q1", "Q2"],
     ]);
   });
 

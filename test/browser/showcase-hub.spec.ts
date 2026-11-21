@@ -19,27 +19,22 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   expect(await shownOwners()).toEqual(owners);
   await expect(page.locator('main [role="grid"], main canvas')).toHaveCount(0);
 
-  // No card clips its content at any common width, in either theme.
+  // No card clips its content at any common width (the theme changes colours, not layout).
   for (const width of [1440, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const theme of ["light", "dark"]) {
-      await page.evaluate((value) => {
-        document.documentElement.dataset.theme = value;
-      }, theme);
-      const clipped = await launchers.evaluateAll((cards) =>
-        cards.flatMap((card) =>
-          [card, ...card.querySelectorAll("*")]
-            .filter(
-              (element) =>
-                element.getClientRects().length > 0 &&
-                (element.scrollWidth > element.clientWidth ||
-                  element.scrollHeight > element.clientHeight),
-            )
-            .map((element) => element.textContent?.trim()),
-        ),
-      );
-      expect(clipped, `${width}px ${theme}`).toEqual([]);
-    }
+    const clipped = await launchers.evaluateAll((cards) =>
+      cards.flatMap((card) =>
+        [card, ...card.querySelectorAll("*")]
+          .filter(
+            (element) =>
+              element.getClientRects().length > 0 &&
+              (element.scrollWidth > element.clientWidth ||
+                element.scrollHeight > element.clientHeight),
+          )
+          .map((element) => element.textContent?.trim()),
+      ),
+    );
+    expect(clipped, `${width}px`).toEqual([]);
   }
 
   // Filters are toggle buttons that work from the keyboard and show focus.
@@ -55,12 +50,18 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
+  // The filter shows exactly the cards its group labels, and some.
   await expect
-    .poll(shownOwners)
-    .toEqual(["data-tools", "database", "host-rows", "performance", "queries", "sort"]);
+    .poll(() =>
+      shownLaunchers
+        .locator(".sw-hub-launch__meta")
+        .evaluateAll((labels) => [...new Set(labels.map((label) => label.textContent?.trim()))]),
+    )
+    .toEqual(["Data & scale"]);
+  const dataGroup = page.locator(".sw-hub-launch__meta", { hasText: /^\s*Data & scale\s*$/ });
+  await expect(shownLaunchers).toHaveCount(await launchers.filter({ has: dataGroup }).count());
   await allFilter.click();
   await expect(shownLaunchers).toHaveCount(owners.length);
-
   // Every owning showcase URL resolves.
   for (const owner of CAPABILITY_OWNERS) {
     expect((await page.request.get(owner.href)).ok(), owner.href).toBe(true);

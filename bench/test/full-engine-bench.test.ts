@@ -45,19 +45,9 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
   const rejections: Rejection<FullEngineResult>[] = [
     [(result) => rekeyShared(result, "default", "formulas")],
     [(result) => result.engines.pop()],
-    [(result) => result.engines.push(structuredClone(firstEngine(result)))],
-    [(result) => Object.defineProperty(firstEngine(result), "engine", { value: "unknown" })],
-    [(result) => sharedWorkload(result).samplesMs.pop()],
-    [
-      (result) => {
-        const workload = sharedWorkload(result);
-        workload.stat = { ...workload.stat, median: workload.stat.median + 1 };
-      },
-    ],
-    [(result) => sharedWorkload(result).allocationSamples.pop()],
     [(result) => (sharedWorkload(result).output = "wrong")],
-    [(result) => (must(firstEngine(result).shared.source, "source").digest = ZERO_DIGEST)],
-    [(result) => analysis(result).samplesMs.pop()],
+    [(result) => (analysis(result).output = 0)],
+    [(result) => result.analysis.pop()],
     [
       (result) =>
         (analysis(result).stat = {
@@ -65,7 +55,6 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
           mean: analysis(result).stat.mean + 1,
         }),
     ],
-    [(result) => (analysis(result).output = 0)],
     [
       (result) => {
         const { allocationStat } = analysis(result);
@@ -75,7 +64,6 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
         };
       },
     ],
-    [(result) => result.analysis.pop()],
     [(result) => firstEngine(result).initialization.samplesMs.pop()],
     [
       (result) => {

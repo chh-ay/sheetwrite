@@ -5,6 +5,10 @@ use crate::formula_tokens::{check_formula_syntax, formula_tokens, TokenKind};
 
 /// One decoded token: kind, UTF-16 `from` and `to`, and whitespace before it.
 type Token = (TokenKind, u32, u32, bool);
+/// A source and the tokens it gives.
+type TokenCase = (&'static str, &'static [Token]);
+/// A source and the kinds of the tokens it gives.
+type KindCase = (&'static str, &'static [TokenKind]);
 
 const KINDS: [TokenKind; 18] = [
     TokenKind::Number,
@@ -54,138 +58,112 @@ fn error(src: &str) -> Option<(u32, u32, bool, String)> {
     })
 }
 
+/// Offsets count UTF-16 units (the emoji takes two, and four UTF-8 bytes);
+/// leading space and one `=` are skipped; text that cannot be read is one
+/// `Bad` token, and an open quote runs it to the end.
 #[test]
-fn counts_offsets_in_utf16_units_past_non_bmp_text() {
+fn tokens_carry_utf16_offsets_and_the_space_before_them() {
     use TokenKind::*;
 
-    // The emoji takes two UTF-16 units and four UTF-8 bytes.
-    assert_eq!(
-        tokens("=\"😀\"&A1"),
-        vec![
-            (String, 1, 5, false),
-            (Operator, 5, 6, false),
-            (Ident, 6, 8, false),
-        ]
-    );
-    assert_eq!(
-        error("=\"😀\"&)"),
-        Some((6, 7, false, "Enter a value before this.".into()))
-    );
+    let cases: &[TokenCase] = &[
+        (
+            "=\"😀\"&A1",
+            &[
+                (String, 1, 5, false),
+                (Operator, 5, 6, false),
+                (Ident, 6, 8, false),
+            ],
+        ),
+        ("  =1", &[(Number, 3, 4, false)]),
+        ("= 1", &[(Number, 2, 3, true)]),
+        (
+            "=1 @ 2",
+            &[
+                (Number, 1, 2, false),
+                (Bad, 3, 4, true),
+                (Number, 5, 6, true),
+            ],
+        ),
+        (
+            "=1&\"ab",
+            &[
+                (Number, 1, 2, false),
+                (Operator, 2, 3, false),
+                (Bad, 3, 6, false),
+            ],
+        ),
+    ];
+    for &(src, expected) in cases {
+        assert_eq!(tokens(src), expected, "{src}");
+    }
 }
 
 #[test]
-fn skips_leading_space_and_one_equals_sign() {
-    assert_eq!(tokens("  =1"), vec![(TokenKind::Number, 3, 4, false)]);
-    assert_eq!(tokens("= 1"), vec![(TokenKind::Number, 2, 3, true)]);
-    assert_eq!(
-        kinds("1+2"),
-        vec![TokenKind::Number, TokenKind::Operator, TokenKind::Number]
-    );
-}
-
-#[test]
-fn tells_logical_values_from_calls_and_sheets() {
+fn tells_every_kind_apart() {
     use TokenKind::*;
 
-    assert_eq!(kinds("=TRUE"), vec![Bool]);
-    assert_eq!(kinds("=false"), vec![Bool]);
-    assert_eq!(kinds("=TRUE()"), vec![Ident, LParen, RParen]);
-    assert_eq!(kinds("=TRUE!A1"), vec![Ident, Bang, Ident]);
+    let cases: &[KindCase] = &[
+        ("1+2", &[Number, Operator, Number]),
+        ("=TRUE", &[Bool]),
+        ("=false", &[Bool]),
+        ("=TRUE()", &[Ident, LParen, RParen]),
+        ("=TRUE!A1", &[Ident, Bang, Ident]),
+        (
+            "='My sheet'!A1#+Table1[Col]&#N/A",
+            &[
+                QuotedSheet,
+                Bang,
+                Ident,
+                Hash,
+                Operator,
+                Ident,
+                StructuredRef,
+                Operator,
+                ErrorLiteral,
+            ],
+        ),
+        (
+            "={1,2;3,4}<>1",
+            &[
+                LBrace, Number, Comma, Number, Semicolon, Number, Comma, Number, RBrace, Operator,
+                Number,
+            ],
+        ),
+    ];
+    for &(src, expected) in cases {
+        assert_eq!(kinds(src), expected, "{src}");
+    }
 }
 
+/// An open quote or bracket and a missing end are incomplete; the end of
+/// the text is where the missing part goes.
 #[test]
-fn reads_every_other_kind() {
-    use TokenKind::*;
-
-    assert_eq!(
-        kinds("='My sheet'!A1#+Table1[Col]&#N/A"),
-        vec![
-            QuotedSheet,
-            Bang,
-            Ident,
-            Hash,
-            Operator,
-            Ident,
-            StructuredRef,
-            Operator,
-            ErrorLiteral
-        ]
-    );
-    assert_eq!(
-        kinds("={1,2;3,4}<>1"),
-        vec![
-            LBrace, Number, Comma, Number, Semicolon, Number, Comma, Number, RBrace, Operator,
-            Number
-        ]
-    );
-}
-
-#[test]
-fn goes_on_after_text_it_cannot_read() {
-    use TokenKind::*;
-
-    assert_eq!(
-        tokens("=1 @ 2"),
-        vec![
-            (Number, 1, 2, false),
-            (Bad, 3, 4, true),
-            (Number, 5, 6, true)
-        ]
-    );
-    assert_eq!(
-        error("=1 @ 2"),
-        Some((3, 4, false, "@ is not allowed in a formula.".into()))
-    );
-}
-
-#[test]
-fn runs_an_open_quote_or_bracket_to_the_end_as_incomplete() {
-    use TokenKind::*;
-
-    assert_eq!(
-        tokens("=1&\"ab"),
-        vec![
-            (Number, 1, 2, false),
-            (Operator, 2, 3, false),
-            (Bad, 3, 6, false)
-        ]
-    );
-    assert_eq!(
-        error("=1&\"ab"),
-        Some((3, 6, true, "Add \" to close the text.".into()))
-    );
-    assert_eq!(
-        error("='Q1"),
-        Some((1, 4, true, "Add ' to close the sheet name.".into()))
-    );
-    assert_eq!(
-        error("=T[Col"),
-        Some((2, 6, true, "Add ] to close the table reference.".into()))
-    );
-}
-
-#[test]
-fn reports_a_missing_end_as_incomplete_at_the_end_of_the_text() {
-    assert_eq!(
-        error("=SUM(1"),
-        Some((6, 6, true, "Add ) to close the (.".into()))
-    );
-    assert_eq!(
-        error("=1+"),
-        Some((3, 3, true, "Enter a value to complete the formula.".into()))
-    );
-    assert_eq!(
-        error("="),
-        Some((1, 1, true, "Enter a value to complete the formula.".into()))
-    );
-    assert_eq!(
-        error("={1,2"),
-        Some((5, 5, true, "Add } to close the array constant.".into()))
-    );
-    assert_eq!(
-        error("=A1:"),
-        Some((4, 4, true, "Enter a cell, column or row after :.".into()))
-    );
+fn reports_the_span_and_message_of_a_syntax_error() {
+    let cases = [
+        ("=\"😀\"&)", (6, 7, false, "Enter a value before this.")),
+        ("=1 @ 2", (3, 4, false, "@ is not allowed in a formula.")),
+        ("=1&\"ab", (3, 6, true, "Add \" to close the text.")),
+        ("='Q1", (1, 4, true, "Add ' to close the sheet name.")),
+        (
+            "=T[Col",
+            (2, 6, true, "Add ] to close the table reference."),
+        ),
+        ("=SUM(1", (6, 6, true, "Add ) to close the (.")),
+        (
+            "=1+",
+            (3, 3, true, "Enter a value to complete the formula."),
+        ),
+        ("=", (1, 1, true, "Enter a value to complete the formula.")),
+        ("={1,2", (5, 5, true, "Add } to close the array constant.")),
+        ("=A1:", (4, 4, true, "Enter a cell, column or row after :.")),
+    ];
+    for (src, (from, to, incomplete, message)) in cases {
+        assert_eq!(
+            error(src),
+            Some((from, to, incomplete, message.to_owned())),
+            "{src}"
+        );
+    }
 }
 
 #[test]

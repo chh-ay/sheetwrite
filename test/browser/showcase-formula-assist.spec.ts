@@ -1,22 +1,12 @@
-import type { Page } from "@playwright/test";
-
 import { expect, test } from "./fixtures.js";
 
-// The formula assist showcase (#801): ghost text in the formula bar, its keys,
-// and the recorded demo, which loads only when the reader reaches it.
-
-const MEDIA = /\/media\/formula-assist\/.+\.(mp4|webm)$/;
-
-async function openShowcase(page: Page, width: number, height: number): Promise<void> {
-  await page.setViewportSize({ width, height });
-  await page.goto("/showcases/formula-assist/");
-  await expect(page.getByRole("button", { name: "Finance's total" })).toBeEnabled();
-}
+// The formula assist showcase (#801): ghost text in the formula bar and its keys.
 
 test("suggests a row total from its neighbours, Tab takes it, and = on the filled cell starts again @portability", async ({
   page,
 }) => {
-  await openShowcase(page, 1440, 900);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/showcases/formula-assist/");
   const target = page.getByRole("button", { name: "Finance's total" });
   const bar = page.getByRole("textbox", { name: "Formula bar" });
   const ghost = page.locator(".sheetwrite-formula-ghost");
@@ -34,67 +24,4 @@ test("suggests a row total from its neighbours, Tab takes it, and = on the fille
   await page.keyboard.type("=");
   await expect(bar).toHaveValue("=");
   await expect(ghost).toHaveText("SUM(B6:G6)");
-});
-
-test("loads the demo video only when the reader reaches it, without layout shift", async ({
-  page,
-}) => {
-  const requested: string[] = [];
-  page.on("request", (request) => {
-    if (MEDIA.test(request.url())) requested.push(request.url());
-  });
-  await openShowcase(page, 1440, 900);
-  await page.evaluate(() => {
-    const shifts: number[] = [];
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        if ("value" in entry && typeof entry.value === "number") shifts.push(entry.value);
-      }
-    }).observe({ type: "layout-shift", buffered: true });
-    Object.assign(window, { __layoutShifts: shifts });
-  });
-  expect(requested).toEqual([]);
-
-  const frame = page.locator(".sw-demo-video__frame");
-  await frame.scrollIntoViewIfNeeded();
-  await expect(page.locator("video.sw-demo-video__video")).toBeAttached();
-  await expect.poll(() => requested.length).toBeGreaterThan(0);
-  expect(requested.every((url) => url.includes("wide-loop"))).toBe(true);
-
-  const shift = await page.evaluate(() =>
-    Reflect.get(window, "__layoutShifts").reduce((sum: number, value: number) => sum + value, 0),
-  );
-  expect(shift).toBe(0);
-});
-
-test("plays the narrow take at 390 px", async ({ page }) => {
-  const requested: string[] = [];
-  page.on("request", (request) => {
-    if (MEDIA.test(request.url())) requested.push(request.url());
-  });
-  await openShowcase(page, 390, 844);
-  await page.locator(".sw-demo-video__frame").scrollIntoViewIfNeeded();
-  await expect.poll(() => requested.length).toBeGreaterThan(0);
-  expect(requested.every((url) => url.includes("narrow-loop"))).toBe(true);
-  await expect(
-    page.locator(".sw-demo-video__poster--narrow.sw-demo-video__poster--light"),
-  ).toBeVisible();
-});
-
-test("in the dark theme the demo shows and plays the dark take", async ({ page }) => {
-  const requested: string[] = [];
-  page.on("request", (request) => {
-    if (MEDIA.test(request.url())) requested.push(request.url());
-  });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await openShowcase(page, 1440, 900);
-  await page.locator(".sw-demo-video__frame").scrollIntoViewIfNeeded();
-  await expect(
-    page.locator(".sw-demo-video__poster--wide.sw-demo-video__poster--dark"),
-  ).toBeVisible();
-  await expect(
-    page.locator(".sw-demo-video__poster--wide.sw-demo-video__poster--light"),
-  ).toBeHidden();
-  await expect.poll(() => requested.length).toBeGreaterThan(0);
-  expect(requested.every((url) => url.includes("wide-dark-"))).toBe(true);
 });

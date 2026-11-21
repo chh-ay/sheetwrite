@@ -5,7 +5,6 @@ import { initSheetwrite, type VersionedOperation } from "@sheetwrite/core";
 import {
   ShowcaseCollaborationServer,
   type ShowcaseCommitRecord,
-  ShowcaseLinkError,
   ShowcaseNetworkLink,
 } from "../src/showcases/collaboration-protocol.ts";
 import {
@@ -13,8 +12,9 @@ import {
   makeCollaborationSnapshot,
 } from "../src/showcases/collaboration-seed.js";
 
-// Two-client convergence, presence, version gaps, conflicts and the peer's
-// atomic batch apply are owned by test/browser/database-collaboration.spec.ts.
+// Two-client convergence, presence, version gaps, the lost-acknowledgement
+// retry and the peer's atomic batch apply are owned by
+// test/browser/database-collaboration.spec.ts.
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -86,22 +86,6 @@ describe("showcase collaboration server", () => {
 });
 
 describe("showcase network link", () => {
-  it("loses one acknowledgement and its echo, then answers the retry with duplicate", async () => {
-    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
-    const link = new ShowcaseNetworkLink(server);
-    cleanups.push(() => link.destroy());
-    const delivered: number[] = [];
-    link.subscribe((operation) => delivered.push(operation.version));
-
-    link.dropNextAcknowledgement();
-    const request = commitRequest("flaky-m1", [0]);
-    await expect(link.commit(request)).rejects.toBeInstanceOf(ShowcaseLinkError);
-    // The server stored the commit, but neither the ack nor the echo arrived.
-    expect(delivered).toEqual([]);
-
-    expect(await link.commit(request)).toMatchObject({ status: "duplicate", version: 1 });
-  });
-
   it("hands every broadcast a remount missed to the next subscriber, in order", async () => {
     const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
     const link = new ShowcaseNetworkLink(server);

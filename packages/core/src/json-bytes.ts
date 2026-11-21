@@ -29,6 +29,13 @@ interface JsonMeasure {
 export interface JsonMeasureOptions {
   /** Match JSON object encoding by omitting own properties whose value is undefined. */
   omitUndefinedProperties?: boolean;
+  /**
+   * The caller built `value` in this call from plain data no other code has
+   * reached: no getters, holes, named array fields or symbol keys. Fields
+   * are then read directly instead of being proven data properties; every
+   * other check stays.
+   */
+  builtByCaller?: boolean;
 }
 
 /** Bytes of `null` and `true`. */
@@ -93,7 +100,8 @@ export function measureJson(
 ): JsonMeasure {
   const walk: JsonWalk = { limit, options, segments: [], ancestors: new Set(), bytes: 0 };
   try {
-    visitJson(walk, value);
+    if (options.builtByCaller) visitBuiltJson(walk, value);
+    else visitJson(walk, value);
     return { bytes: walk.bytes };
   } catch (stop) {
     if (!(stop instanceof JsonWalkStop)) throw stop;
@@ -209,38 +217,43 @@ export function jsonNumberLength(value: number): number {
   return length;
 }
 
-function visitJson(walk: JsonWalk, value: unknown): void {
+/** Count `value` when it is a JSON scalar and return true; return false for an object or array. */
+function addJsonScalar(walk: JsonWalk, value: unknown): boolean {
   if (value === null) {
     addBytes(walk, FOUR_LETTER_LITERAL_BYTES);
-    return;
+    return true;
   }
 
   switch (typeof value) {
     case "string":
       addJsonString(walk, value);
-      return;
+      return true;
     case "boolean":
       addBytes(walk, value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES);
-      return;
+      return true;
     case "number":
       if (!Number.isFinite(value)) stopInvalid(walk, "JSON numbers must be finite");
       addBytes(walk, jsonNumberLength(value));
-      return;
+      return true;
     case "object":
-      break;
+      return false;
     default:
       stopInvalid(walk, `${typeof value} values are not JSON-safe`);
   }
+}
 
-  if (walk.ancestors.has(value)) stopInvalid(walk, "JSON values cannot contain cycles");
-  if (Object.getOwnPropertySymbols(value).length > 0) {
+function visitJson(walk: JsonWalk, value: unknown): void {
+  if (addJsonScalar(walk, value)) return;
+  const record = value as object;
+  if (walk.ancestors.has(record)) stopInvalid(walk, "JSON values cannot contain cycles");
+  if (Object.getOwnPropertySymbols(record).length > 0) {
     stopInvalid(walk, "Symbol-keyed properties are not JSON-safe");
   }
 
-  walk.ancestors.add(value);
-  if (Array.isArray(value)) visitJsonArray(walk, value);
-  else visitJsonObject(walk, value);
-  walk.ancestors.delete(value);
+  walk.ancestors.add(record);
+  if (Array.isArray(record)) visitJsonArray(walk, record);
+  else visitJsonObject(walk, record);
+  walk.ancestors.delete(record);
 }
 
 function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
@@ -269,6 +282,51 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
     visitJson(walk, descriptor.value);
     walk.segments.pop();
   }
+}
+
+/**
+ * `visitJson` for a value the caller built (`builtByCaller`): fields and
+ * entries are read directly, and symbol keys are not looked for. It does not
+ * share functions with the exact walk, so neither makes the other's property
+ * reads polymorphic.
+ */
+function visitBuiltJson(walk: JsonWalk, value: unknown): void {
+  if (addJsonScalar(walk, value)) return;
+  const record = value as object;
+  if (walk.ancestors.has(record)) stopInvalid(walk, "JSON values cannot contain cycles");
+  walk.ancestors.add(record);
+  if (Array.isArray(record)) {
+    if (Object.getPrototypeOf(record) !== Array.prototype) {
+      stopInvalid(walk, "Arrays with custom prototypes are not JSON-safe");
+    }
+    addBytes(walk, DELIMITER_PAIR_BYTES);
+    for (let index = 0; index < record.length; index++) {
+      if (index > 0) addBytes(walk, 1);
+      walk.segments.push(index);
+      // A hole reads as undefined, which the walk refuses.
+      visitBuiltJson(walk, record[index]);
+      walk.segments.pop();
+    }
+  } else {
+    if (Object.getPrototypeOf(record) !== Object.prototype) {
+      stopInvalid(walk, "Only plain objects are JSON-safe");
+    }
+    addBytes(walk, DELIMITER_PAIR_BYTES);
+    let isFirstField = true;
+    for (const key in record) {
+      if (!Object.hasOwn(record, key)) continue;
+      const field: unknown = record[key as keyof object];
+      if (field === undefined && walk.options.omitUndefinedProperties) continue;
+      walk.segments.push(key);
+      if (!isFirstField) addBytes(walk, 1);
+      isFirstField = false;
+      addJsonString(walk, key);
+      addBytes(walk, 1);
+      visitBuiltJson(walk, field);
+      walk.segments.pop();
+    }
+  }
+  walk.ancestors.delete(record);
 }
 
 /** Arrays Sheetwrite built itself from values it read once, by the generation they were built in. */

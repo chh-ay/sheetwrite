@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
+import type { CellStyle, Grid } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
@@ -190,6 +190,41 @@ describe("Ctrl+Enter", () => {
 });
 
 describe("the cell editor", () => {
+  // #1107: Excel's in-cell editor keeps the cell's alignment and font.
+  it("keeps the cell's alignment and font while it edits", () => {
+    const set = (row: number, col: number, style: CellStyle) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col },
+      value: { kind: "literal" as const, value: `Cell ${row}` },
+      style,
+    });
+    grid.applyTransaction({
+      patches: [
+        set(1, 0, { align: "right" }),
+        set(2, 0, { align: "center" }),
+        set(3, 0, { bold: true, fontSize: 14, color: "#c00000" }),
+      ],
+    });
+    const look = (row: number, col: number) => {
+      select(row, col);
+      press("F2");
+      const field = editor();
+      if (field === null) throw new Error("The cell editor did not open");
+      const style = getComputedStyle(field);
+      const shown = [style.textAlign, style.fontWeight, style.fontSize, style.color];
+      press("Escape");
+      return shown;
+    };
+    expect(look(1, 0)[0]).toBe("right");
+    expect(look(2, 0)[0]).toBe("center");
+    const [align, weight, size, color] = look(3, 0);
+    expect([align, weight, size]).toEqual(["left", "bold", "14px"]);
+    // Browsers report the colour as rgb(), happy-dom as written.
+    expect(["#c00000", "rgb(192, 0, 0)"]).toContain(color ?? "");
+    // General alignment: the amounts column is numeric, so its values edit right-aligned.
+    expect(look(4, 1)[0]).toBe("right");
+  });
+
   it("opens with F2 with the caret at the end, as in Excel", () => {
     select(0, 0);
     press("F2");

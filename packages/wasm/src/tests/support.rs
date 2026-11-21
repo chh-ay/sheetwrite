@@ -48,6 +48,56 @@ pub(crate) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) ->
     store.get_cell(sheet, row, col).string()
 }
 
+/// Sets the table `id` named `name` over the cells `[first_row, first_col,
+/// last_row, last_col]` of `sheet`, with a header row, no totals row and one
+/// column for each `(id, name)` of `columns`.
+pub(crate) fn set_header_table(
+    store: &mut CellStore,
+    (id, name): (&str, &str),
+    sheet: usize,
+    [first_row, first_col, last_row, last_col]: [usize; 4],
+    columns: &[(&str, &str)],
+) -> bool {
+    let (column_ids, column_names) = columns
+        .iter()
+        .map(|&(column_id, column_name)| (column_id.to_owned(), column_name.to_owned()))
+        .unzip();
+    store.set_table(
+        id,
+        name,
+        sheet,
+        first_row,
+        first_col,
+        last_row,
+        last_col,
+        true,
+        false,
+        column_ids,
+        column_names,
+    )
+}
+
+/// Formula evaluations that `recalculate` runs.
+pub(crate) fn evaluations(recalculate: impl FnOnce()) -> usize {
+    crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+    recalculate();
+    crate::eval::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
+}
+
+/// The tree of the formula at (`row`, `col`), as an address that changes
+/// when the formula is parsed or bound again.
+pub(crate) fn tree_address(
+    store: &CellStore,
+    sheet: usize,
+    row: u32,
+    col: u32,
+) -> Option<*const crate::calc::Ast> {
+    let entry = store.sheets[sheet]
+        .formulas
+        .get((row, col), &store.formula_slots)?;
+    entry.ast.as_ref().map(std::ptr::from_ref)
+}
+
 pub(super) struct DecodedWindow {
     pub(super) kinds: Vec<u8>,
     pub(super) string_index: Vec<i32>,

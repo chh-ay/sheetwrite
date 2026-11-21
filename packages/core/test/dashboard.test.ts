@@ -103,8 +103,7 @@ function snapshot(): WorkbookSnapshot {
   };
 }
 
-function mount(input: WorkbookSnapshot = snapshot()): Grid {
-  const host = document.createElement("div");
+function mount(input: WorkbookSnapshot = snapshot(), host = document.createElement("div")): Grid {
   document.body.appendChild(host);
   const grid = createGridFromSnapshot(host, input);
   grids.push(grid);
@@ -196,17 +195,96 @@ describe("dashboard sheets", () => {
     expect(dashboardOf(grid)?.items).toEqual([pivotItem, slicer]);
     expect(grid.getPivots("dash")).toEqual([byRegion]);
   });
+});
 
-  it("undoes and redoes a slicer selection", () => {
-    const grid = mount();
-    const west = { ...slicer, selected: ["West"] };
+/** Dash shown in a sized host, with Orders holding East and West. */
+async function mountView() {
+  const host = document.createElement("div");
+  Object.defineProperties(host, { clientWidth: { value: 1200 }, clientHeight: { value: 600 } });
+  const grid = mount(snapshot(), host);
+  const cells = [
+    ["Region", "Amount"],
+    ["East", 1],
+    ["West", 2],
+  ].flatMap((row, r) =>
+    row.map((value, col): DocumentOp => ({
+      op: "set",
+      addr: { sheet: "data", row: r, col },
+      value: { kind: "literal", value },
+    })),
+  );
+  expect(grid.applyTransaction({ patches: cells }).status).toBe("applied");
+  grid.setActiveSheet("dash");
+  await import("../src/dashboard/dashboard-view.js");
+  await Promise.resolve();
+  const labelled = (label: string) => {
+    const found = host.querySelector<HTMLElement>(`.sheetwrite-dashboard [aria-label="${label}"]`);
+    if (found === null) throw new Error(`nothing labelled ${label}`);
+    return found;
+  };
+  const press = (target: Element, init: MouseEventInit = {}) =>
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0, ...init }));
+  return { grid, host, labelled, press };
+}
 
-    expect(apply(grid, { op: "setDashboardItem", sheet: "dash", item: west })).toBe("applied");
-    grid.undo();
-    expect(dashboardOf(grid)?.items[1]).toEqual(slicer);
-    grid.redo();
-    expect(dashboardOf(grid)?.items[1]).toEqual(west);
-  });
+it("keeps one slicer value on a click and adds one with Ctrl, as saved changes", async () => {
+  const { grid, host, press } = await mountView();
+  const value = (label: string) => {
+    const button = [
+      ...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value"),
+    ].find((candidate) => candidate.textContent === label);
+    if (button === undefined) throw new Error(`no slicer value ${label}`);
+    return button;
+  };
+  const region = () => dashboardOf(grid)?.items.find((item) => item.id === "region");
+  const { selected: _selected, ...unfiltered } = slicer;
+
+  press(value("West"));
+  expect(region()).toEqual({ ...slicer, selected: ["West"] });
+
+  press(value("East"), { ctrlKey: true });
+  // Every value kept is no selection.
+  expect(region()).toEqual(unfiltered);
+
+  grid.undo();
+  expect(region()).toEqual({ ...slicer, selected: ["West"] });
+});
+
+it("adds a dashboard from Insert › New Dashboard and shows it", async () => {
+  const grid = mount();
+  grid.actions.newDashboard();
+  await import("../src/dashboard/dashboard-layout.js");
+  await Promise.resolve();
+
+  const added = grid.store.getWorkbook().sheets.at(-1);
+  expect(added).toMatchObject({ name: "Dashboard1", kind: "dashboard" });
+  expect(grid.getActiveSheet()).toBe(added?.id ?? "");
+});
+
+it("moves an item with the keyboard, one undo step per arrow, and refuses an occupied place", async () => {
+  const { grid, host, labelled, press } = await mountView();
+  const key = (name: string) =>
+    labelled("Region").dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+  const box = () => dashboardOf(grid)?.items.find((item) => item.id === "region")?.box;
+
+  press(labelled("Region item actions"));
+  const move = [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (candidate) => candidate.textContent === "Move",
+  );
+  if (move === undefined) throw new Error("no Move in the item actions");
+  press(move);
+  key("ArrowDown");
+  expect(box()).toEqual({ ...slicer.box, y: 1 });
+
+  key("ArrowLeft");
+  expect(box()).toEqual({ ...slicer.box, y: 1 });
+  expect(document.querySelector(".sheetwrite-dashboard-status")?.textContent).toBe(
+    "Another item is in that place.",
+  );
+
+  key("Escape");
+  grid.undo();
+  expect(box()).toEqual(slicer.box);
 });
 
 describe("dashboard rebase", () => {

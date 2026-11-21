@@ -87,11 +87,6 @@ describe("published declarations", () => {
     const root = await writePackage(TYPED_PACKAGE);
 
     await assertPublishedDeclarations(root, ["package.json", "dist/index.js", ...REACHABLE]);
-  });
-
-  it("rejects a published declaration no type entry reaches", async () => {
-    const root = await writePackage(TYPED_PACKAGE);
-
     expect(
       await rejection(assertPublishedDeclarations(root, [...REACHABLE, "dist/internal.d.ts"])),
     ).toContain("unreachable dist/internal.d.ts");
