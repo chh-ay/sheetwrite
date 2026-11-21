@@ -150,6 +150,21 @@ describe("Format Cells", () => {
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');
   });
 
+  // Excel's Sample shows the number in its format section's color.
+  it("shows the sample in the color of its format section", async () => {
+    const dialog = await openFormatCells();
+    setValue(control(dialog, "Category", HTMLSelectElement), "Custom");
+    const code = [...dialog.querySelectorAll<HTMLInputElement>("input[type=text]")][0]!;
+    const sample = control(dialog, "Sample", HTMLOutputElement);
+    code.value = "[Red]0.0";
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+    expect([sample.textContent, sample.style.color]).toEqual(["0.5", "#ff0000"]);
+    code.value = "0.0";
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+    expect([sample.textContent, sample.style.color]).toEqual(["0.5", ""]);
+    await answerDialog(host, "Cancel");
+  });
+
   it("offers Excel's Fraction types and the Text category", async () => {
     let dialog = await openFormatCells();
     setValue(control(dialog, "Category", HTMLSelectElement), "Fraction");
