@@ -9,7 +9,7 @@ import { xlsxAddon } from "../../xlsx/src/index.js";
 import { barMisses, QUALITY_BAR } from "../bench/bar.js";
 import { REPLAY_SETS, replayWorkbooks } from "../bench/corpora.js";
 import { replayMetrics, replaySet } from "../bench/replay.js";
-import { openPrediction } from "../src/predictor.js";
+import { attachPredictor, SIGNALS } from "../src/predictor.js";
 
 // The quality gate of #801: replay every formula of each set key by key and
 // hold the predictor to the bar of bench/bar.ts.
@@ -28,7 +28,9 @@ for (const set of REPLAY_SETS) {
   it(
     `meets the quality bar on ${set}`,
     async () => {
-      const counts = await replaySet(replayWorkbooks(set), (edit) => openPrediction(edit));
+      const counts = await replaySet(replayWorkbooks(set), (store) =>
+        attachPredictor(store, { signals: SIGNALS, build: "now" }),
+      );
       expect(barMisses(set, replayMetrics(counts), bar)).toEqual([]);
     },
     SET_TIMEOUT_MS,

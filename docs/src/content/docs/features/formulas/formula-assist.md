@@ -12,7 +12,7 @@ import { formulaAssistAddon } from "@sheetwrite/formula-assist";
 await initSheetwrite({ addons: [formulaAssistAddon()] });
 ```
 
-Grids created after `initSheetwrite` show suggestions in their [formula bar](/docs/features/grid/toolbar-and-ribbon/). The add-on adds nothing to the page's first load until it is installed. Its entry only registers it. The predictor is a separate chunk that starts loading when the grid mounts, so it is ready by the first formula edit.
+Grids created after `initSheetwrite` show suggestions in their [formula bar](/docs/features/grid/toolbar-and-ribbon/). The add-on adds nothing to the page's first load until it is installed. Its entry only registers it. The predictor is a separate chunk that starts loading when the grid mounts, so it is ready by the first formula edit. Once it is there, it counts the workbook's formulas while the page is idle.
 
 ## What it adds to Excel
 
@@ -36,14 +36,18 @@ While the function list is open, Tab takes the list's entry, as in Excel. A sugg
 
 ## How it predicts
 
-Predictions are deterministic. They use the workbook only: no network, no AI. Two signals each propose whole formulas, strongest first:
+Predictions are deterministic. They use the workbook only: no network, no AI. Four signals each propose whole formulas, strongest first:
 
-1. **Neighbouring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them. A formula only one side gives was wrong too often on real workbooks, so it is not suggested.
+1. **Neighbouring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them.
 2. **Syntax.** The one function or visible sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take. Hidden and very hidden sheets are never suggested.
+3. **The column's pattern.** The nearest formula above or below in the same column, up to 100 rows away inside the same block of filled cells, moved to the cell. A formula that several cells in a row repeat is likelier, and so is one whose inputs in the cell's own row are filled: an empty row is often a total.
+4. **The workbook's formulas.** The formulas of every visible sheet, counted by their shape: two formulas have the same shape when a fill or a paste turns one into the other. The most common shapes are moved to the cell, and one shows once it holds most of the formulas that still fit what you typed.
 
-The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, and the end of the block a typed range starts. None was right often enough to show, so none ships.
+The add-on counts the workbook's formulas while the page is idle, never during its first load, and keeps the count current as cells change. It reads visible sheets only, keeps the count in memory only, and counts at most 100,000 formula cells and 5,000 different formulas per workbook. At that limit, the count takes about 7 MB of memory (6.6 MiB measured on a 100,000-row sheet).
 
-Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion shows only when it is at least 90% likely and 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
+The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, the end of the block a typed range starts, the formulas typed earlier in the session, and the formula in the same cell of other sheets. None was right often enough to show, so none ships.
+
+Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion from the neighbours or the syntax shows only when it is at least 90% likely, and one from the column or the workbook only when it is at least 98% likely. It must also be 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
 
 ### When it isn't sure
 
@@ -51,12 +55,14 @@ It shows nothing. If no proposal clears the bar above, no ghost text appears and
 
 ### How well it does
 
-The add-on was measured on 50 workbooks from the Enron spreadsheet corpus that it was never tuned on: 975 real formulas, typed key by key in their own workbooks.
+The add-on was measured on workbooks from the Enron spreadsheet corpus that it was never tuned on, with real formulas typed key by key in their own workbooks:
 
-- **Keystrokes saved:** 38.5%. Excel's function list alone saves 3.1% on the same formulas.
-- **Wrong suggestions:** 2.6% of the suggestions it showed (15 of 587) weren't how the formula went on.
+| Set | Formulas | Keystrokes saved | Wrong suggestions | Excel's function list alone |
+| --- | ---: | ---: | ---: | ---: |
+| 50 whole workbooks | 966 | 62.0% | 0.7% (5 of 735 shown) | 5.8% saved |
+| 50 workbooks, the cells near each formula | 975 | 48.3% | 2.2% (16 of 715 shown) | 3.1% saved |
 
-Neighbouring formulas give almost all of the savings. A formula without agreeing neighbours, like a one-off total, mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
+A wrong suggestion is one that wasn't how the formula went on. The neighbouring formulas give most of the savings; the column's pattern and the workbook's formulas add suggestions where the neighbours don't agree on one, such as the last row of a column. A one-off formula mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
 
 ## Accessibility
 

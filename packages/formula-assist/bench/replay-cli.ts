@@ -1,27 +1,28 @@
 // Prints the replay's metrics as Markdown tables.
 //
-//   bun packages/formula-assist/bench/replay-cli.ts [--set <name>]... [--per-signal]
+//   bun packages/formula-assist/bench/replay-cli.ts [--set <name>]... [--signals a,b] [--per-signal]
 //
-// Without `--set` it runs every committed set except `enron-heldout`, the set
-// kept back for the gate: tune on `enron-dev`, `enron-dev2` and
-// `enron-dev-large` (built by enron/build.ts --dev-large), never on the
-// held-out set.
-// `--per-signal` adds each signal alone and the predictor without each one.
+// Without `--set` it runs every committed development set. Tune on those and
+// on `enron-dev-large` and `enron-dev-large-whole` (built by enron/build.ts),
+// never on the held-out sets.
+// `--signals` runs those signals instead of all of them; `--per-signal` adds
+// each signal alone and the predictor without each one.
 
 import { parseArgs } from "node:util";
 
 import { initSheetwrite } from "@sheetwrite/core";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
-import { openPrediction, SIGNALS, type SignalName } from "../src/predictor.js";
+import { attachPredictor, SIGNALS, type SignalName } from "../src/predictor.js";
 import { barMisses, percent, QUALITY_BAR } from "./bar.js";
-import { REPLAY_SETS, type ReplaySetName, replayWorkbooks } from "./corpora.js";
+import { DEVELOPMENT_SETS, REPLAY_SETS, type ReplaySetName, replayWorkbooks } from "./corpora.js";
 import { type ReplayCounts, replayMetrics, replaySet } from "./replay.js";
 
 const { values } = parseArgs({
   options: {
     set: { type: "string", multiple: true },
     "per-signal": { type: "boolean", default: false },
+    signals: { type: "string" },
   },
 });
 
@@ -29,17 +30,28 @@ function isSetName(name: string): name is ReplaySetName {
   return REPLAY_SETS.some((set) => set === name);
 }
 
-const requested =
-  values.set ?? REPLAY_SETS.filter((set) => set !== "enron-heldout" && set !== "enron-dev-large");
+const requested = values.set ?? DEVELOPMENT_SETS;
 const sets = requested.map((name) => {
   if (!isSetName(name)) throw new Error(`Unknown set ${name}; sets: ${REPLAY_SETS.join(", ")}`);
+  return name;
+});
+
+function isSignalName(name: string): name is SignalName {
+  return SIGNALS.some((signal) => signal === name);
+}
+
+const chosen = (values.signals?.split(",") ?? SIGNALS).map((name) => {
+  if (!isSignalName(name))
+    throw new Error(`Unknown signal ${name}; signals: ${SIGNALS.join(", ")}`);
   return name;
 });
 
 await initSheetwrite({ addons: [xlsxAddon()] });
 
 function replay(set: ReplaySetName, signals: readonly SignalName[]): Promise<ReplayCounts> {
-  return replaySet(replayWorkbooks(set), (edit) => openPrediction(edit, { signals }));
+  return replaySet(replayWorkbooks(set), (store) =>
+    attachPredictor(store, { signals, build: "now" }),
+  );
 }
 
 const MS_DIGITS = 3;
@@ -67,13 +79,14 @@ for (const set of sets) {
   process.stdout.write(`\n### ${set}\n\n${HEADER}\n`);
   const floor = await replay(set, []);
   process.stdout.write(`| ${row("Excel floor (function list only)", floor)} |\n`);
-  const all = await replay(set, SIGNALS);
-  process.stdout.write(`| ${row("All signals", all)} |\n`);
+  const all = await replay(set, chosen);
+  const label = values.signals === undefined ? "All signals" : chosen.join(", ");
+  process.stdout.write(`| ${row(label, all)} |\n`);
 
   if (values["per-signal"]) {
-    for (const signal of SIGNALS) {
+    for (const signal of chosen) {
       process.stdout.write(`| ${row(`${signal} alone`, await replay(set, [signal]))} |\n`);
-      const without = SIGNALS.filter((other) => other !== signal);
+      const without = chosen.filter((other) => other !== signal);
       process.stdout.write(`| ${row(`all but ${signal}`, await replay(set, without))} |\n`);
     }
   }

@@ -15,6 +15,7 @@ import { xlsxAddon } from "@sheetwrite/xlsx";
 
 import { calibrationKey, continues, type Signal } from "../src/candidates.js";
 import { openSignals, SIGNALS } from "../src/predictor.js";
+import { WorkbookPatterns } from "../src/workbook-patterns.js";
 import { percent } from "./bar.js";
 import { REPLAY_SETS, type ReplaySetName, replayWorkbooks } from "./corpora.js";
 import { agrees, emptyCounts, type ReplaySession, replayWorkbook } from "./replay.js";
@@ -27,10 +28,19 @@ const { values } = parseArgs({
 });
 
 function isDevelopmentSet(name: string): name is ReplaySetName {
-  return name !== "enron-heldout" && REPLAY_SETS.some((set) => set === name);
+  return !name.startsWith("enron-heldout") && REPLAY_SETS.some((set) => set === name);
 }
 
-const sets = (values.set ?? ["enron-dev", "enron-dev2", "conformance", "fixtures"]).map((name) => {
+/** The sets src/calibration.ts is written from. */
+const CALIBRATION_SETS = [
+  "enron-dev",
+  "enron-dev2",
+  "enron-dev-large-whole",
+  "conformance",
+  "fixtures",
+];
+
+const sets = (values.set ?? CALIBRATION_SETS).map((name) => {
   if (!isDevelopmentSet(name)) throw new Error(`${name} is not a development set`);
   return name;
 });
@@ -88,9 +98,15 @@ for (const set of sets) {
     );
     await replayWorkbook(
       workbook,
-      (edit) => {
-        const formula = formulas.get(`${edit.cell.sheet}:${edit.cell.row}:${edit.cell.col}`) ?? "";
-        return scoring(openSignals(edit, SIGNALS), formula);
+      (store) => {
+        const patterns = new WorkbookPatterns(store, "now");
+        return {
+          open: (edit) => {
+            const at = `${edit.cell.sheet}:${edit.cell.row}:${edit.cell.col}`;
+            return scoring(openSignals(edit, SIGNALS, patterns), formulas.get(at) ?? "");
+          },
+          dispose: () => patterns.dispose(),
+        };
       },
       counts,
     );

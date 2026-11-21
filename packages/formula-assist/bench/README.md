@@ -7,9 +7,12 @@ Three tools measure the predictor against the bar set on #801.
 `replay-cli.ts` types formulas key by key into the workbook they came from, after removing their cell:
 
 ```sh
-bun packages/formula-assist/bench/replay-cli.ts                 # every set but the held-out half
-bun packages/formula-assist/bench/replay-cli.ts --set enron-dev --per-signal
+bun packages/formula-assist/bench/replay-cli.ts                 # every committed development set
+bun packages/formula-assist/bench/replay-cli.ts --set enron-dev-large-whole --per-signal
+bun packages/formula-assist/bench/replay-cli.ts --set enron-dev --signals neighbours,syntax
 ```
+
+The predictor follows the workbook's changes as it does in a grid: it counts the workbook's formulas before the first formula is typed, and clearing a formula's cell takes the formula out of that count before its edit opens, so no signal sees the formula it is to suggest.
 
 The typist:
 
@@ -28,7 +31,7 @@ The ghost shown is the one the formula bar would show: core's `shownSuggestion` 
 | Accepted | Suggestions taken, ÷ shown |
 | Shown per 100 keys | How often a suggestion appears: the "in the way" measure |
 
-The row "Excel floor" uses no signal: only the function list, as Excel has it. `--per-signal` adds each signal alone and the predictor without each one, which shows what each signal earns.
+The row "Excel floor" uses no signal: only the function list, as Excel has it. `--signals` runs only the signals named. `--per-signal` adds each signal alone and the predictor without each one, which shows what each signal earns.
 
 ### Sets
 
@@ -37,7 +40,9 @@ The row "Excel floor" uses no signal: only the function list, as Excel has it. `
 | `enron-dev` | 50 workbooks of the Enron sample (see `enron/README.md`) | Tune here |
 | `enron-dev2` | 50 more, a burned held-out set | Tune here |
 | `enron-dev-large` | 500 more, not committed: `enron/build.ts --dev-large` builds it. Run it with `--set enron-dev-large`. | Tune here |
+| `enron-dev-large-whole` | The same 500 workbooks and formulas with all their cells, not committed: `enron/build.ts --dev-large-whole` builds it | Tune here |
 | `enron-heldout` | 50 workbooks neither development set nor a burned draw holds | Gate only, never read while tuning |
+| `enron-heldout-whole` | 50 whole workbooks no other set or draw holds, not committed: `enron/build.ts --held-out-whole` builds it | Measured once, never read while tuning |
 | `conformance` | Every formula case of the conformance corpus | Regression floor |
 | `fixtures` | Every formula of the XLSX fixtures | Wrong-suggestion ceiling |
 
@@ -48,10 +53,10 @@ The row "Excel floor" uses no signal: only the function list, as Excel has it. `
 `calibrate.ts` asks every signal for its candidates at every key and counts how often each kind (signal and reason) is right:
 
 ```sh
-bun packages/formula-assist/bench/calibrate.ts --write   # enron-dev, enron-dev2, conformance and fixtures
+bun packages/formula-assist/bench/calibrate.ts --write   # enron-dev, enron-dev2, enron-dev-large-whole, conformance and fixtures
 ```
 
-The confidences in `src/calibration.ts` are the 95% lower bounds this prints, from the development sets only. `--write` writes that file.
+The confidences in `src/calibration.ts` are the 95% lower bounds this prints, from the development sets only. `--write` writes that file. It needs `enron-dev-large-whole`, which `enron/build.ts --dev-large-whole` builds.
 
 ## Latency: 4 ms per key on 100,000 rows
 
