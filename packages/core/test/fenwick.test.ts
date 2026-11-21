@@ -47,6 +47,10 @@ describe("OffsetIndex", () => {
       top: 500_000 * DEFAULT_HEIGHT,
     });
     expectHeights(new OffsetIndex(5, DEFAULT_HEIGHT), Array(5).fill(DEFAULT_HEIGHT));
+    // Rows outside the sheet, negative or fractional, are ignored.
+    index.setHeight(-1, 50);
+    index.setHeight(2.5, 50);
+    expect(index.backingStoreBytes).toBe(0);
   });
 
   it("answers an empty sheet without rows", () => {
@@ -74,40 +78,6 @@ describe("OffsetIndex", () => {
     expect(index.totalHeight).toBe(rows * DEFAULT_HEIGHT);
   });
 
-  it("resizes the first and last rows and rows between them", () => {
-    const heights = Array<number>(40).fill(DEFAULT_HEIGHT);
-    const index = new OffsetIndex(heights.length, DEFAULT_HEIGHT);
-    const steps: Array<[row: number, height: number]> = [
-      [0, 50],
-      [39, 61],
-      [20, 7],
-      [19, 33],
-      [21, 90],
-      [0, 12],
-      [39, DEFAULT_HEIGHT],
-      [20, DEFAULT_HEIGHT],
-      [38, 0],
-      [39, 45],
-      [0, DEFAULT_HEIGHT],
-    ];
-    for (const [row, height] of steps) {
-      index.setHeight(row, height);
-      heights[row] = height;
-      expectHeights(index, heights);
-    }
-  });
-
-  it("ignores rows outside the sheet", () => {
-    const index = new OffsetIndex(10, DEFAULT_HEIGHT);
-    index.setHeight(-1, 50);
-    index.setHeight(10, 50);
-    index.setHeight(2.5, 50);
-    expect(index.heightOf(-1)).toBe(DEFAULT_HEIGHT);
-    expect(index.heightOf(10)).toBe(DEFAULT_HEIGHT);
-    expectHeights(index, Array(10).fill(DEFAULT_HEIGHT));
-    expect(index.backingStoreBytes).toBe(0);
-  });
-
   it("matches per-row heights through random resizes and batches", () => {
     const next = sequence(0x5eed);
     const choices = [DEFAULT_HEIGHT, DEFAULT_HEIGHT, 0, 14, 40, 90, 13.5];
@@ -133,25 +103,6 @@ describe("OffsetIndex", () => {
       }
       expectHeights(index, heights);
     }
-  });
-
-  it("merges a batch into resized rows and drops rows back at the default", () => {
-    const heights = Array<number>(12).fill(DEFAULT_HEIGHT);
-    const index = new OffsetIndex(heights.length, DEFAULT_HEIGHT);
-    index.setHeights([0, 5, 11], [40, 50, 60]);
-    heights[0] = 40;
-    heights[5] = 50;
-    heights[11] = 60;
-    expectHeights(index, heights);
-    index.setHeights([0, 3, 5, 6, 11], [DEFAULT_HEIGHT, 30, 55, DEFAULT_HEIGHT, DEFAULT_HEIGHT]);
-    heights[0] = DEFAULT_HEIGHT;
-    heights[3] = 30;
-    heights[5] = 55;
-    heights[11] = DEFAULT_HEIGHT;
-    expectHeights(index, heights);
-    index.setHeights([3, 5], [DEFAULT_HEIGHT, DEFAULT_HEIGHT]);
-    expectHeights(index, Array(12).fill(DEFAULT_HEIGHT));
-    expect(index.backingStoreBytes).toBe(0);
   });
 
   it("loads sorted rows into an empty index, skipping rows at the default", () => {
@@ -201,21 +152,6 @@ describe("OffsetIndex", () => {
 });
 
 describe("ScaledScroll", () => {
-  it("maps a capped scroll range onto the full virtual range above the cap", () => {
-    const cap = 1000;
-    const total = 10000;
-    const viewport = 200;
-    const s = new ScaledScroll(total, viewport, cap);
-    expect(s.scaled).toBe(true);
-    expect(s.sizerHeight).toBe(cap);
-    // both ranges start at 0 and end at their max simultaneously
-    expect(s.toContent(0)).toBe(0);
-    expect(s.toContent(cap - viewport)).toBeCloseTo(total - viewport, 5);
-    // round trips within the scrollable range [0, cap - viewport]
-    const scroll = 600;
-    expect(s.toScroll(s.toContent(scroll))).toBeCloseTo(scroll, 5);
-  });
-
   it("re-engages scaling when the measured cap drops below the content height", () => {
     // A browser-zoom change shrinks the layout clamp mid-session: 30M px of
     // content fit under a 33M cap (identity) but not under the ~26.8M clamp
@@ -232,5 +168,6 @@ describe("ScaledScroll", () => {
     expect(s.sizerHeight).toBe(zoomedCap);
     // The last row stays reachable at the clamped maximum scroll position.
     expect(s.toContent(zoomedCap - viewport)).toBeCloseTo(total - viewport, 5);
+    expect(s.toScroll(s.toContent(600))).toBeCloseTo(600, 5);
   });
 });

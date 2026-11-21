@@ -9,6 +9,7 @@ import {
   HistoryArchive,
   HistoryError,
   MemoryHistoryStorage,
+  type HistoryGetRequest,
   type HistoryLimits,
   type HistoryStorageAdapter,
 } from "../src/history-archive.js";
@@ -114,6 +115,20 @@ async function initialized(storage: HistoryStorageAdapter, limits?: Partial<Hist
   const archive = await open(storage, limits);
   await archive.initialize(snapshot(), 0);
   return archive;
+}
+
+/** Memory storage that counts the cell pages it hands out. */
+class PageCountingStorage extends MemoryHistoryStorage {
+  cellPageReads = 0;
+
+  override async get(request: HistoryGetRequest) {
+    const response = await super.get(request);
+    if ("bytes" in response && response.kind === "cells") {
+      this.cellPageReads += 1;
+    }
+
+    return response;
+  }
 }
 
 for (const backend of ["memory", "indexeddb"] as const) {
@@ -330,6 +345,21 @@ describe("history replay memory", () => {
     expect(cells?.[rows - 1]?.value).toEqual({ kind: "literal", value: text(rows - 1) });
     expect(cells?.[0]?.value).toEqual({ kind: "literal", value: 1 });
     expect(getEngine().getMemory().buffer.byteLength).toBe(documentBytes);
+  });
+
+  it("rebuilds a version once for the reads that follow, and again after the head moves", async () => {
+    const storage = new PageCountingStorage();
+    const archive = await initialized(storage);
+    await archive.record(change(1));
+
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    storage.cellPageReads = 0;
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    expect(storage.cellPageReads).toBe(0);
+
+    // Another tab moves the head through the same storage.
+    await (await open(storage)).record(change(2));
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 2 });
   });
 });
 

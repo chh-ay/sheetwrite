@@ -14,6 +14,33 @@ import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
 
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
+const FILTER_BUTTON_SIZE = 16;
+
+/**
+ * Where an AutoFilter header cell's filter button sits: a square at the
+ * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
+ */
+export function filterButtonRect(cell: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
+  return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
+
+/**
+ * The width of an AutoFilter header cell's text box, which starts at the
+ * cell's left edge and ends where the filter button starts, as in Excel. Text
+ * of every alignment lays out, clips and is edited in this box, so the button
+ * never covers it.
+ */
+export function filterTextWidth(cell: { x: number; y: number; w: number; h: number }): number {
+  return filterButtonRect(cell).x - cell.x;
+}
+
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
 const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
@@ -489,7 +516,45 @@ export interface PaintDamage {
   h: number;
 }
 
-export function blitVerticalScroll(
+/** Whether `value` is an empty cell, through which text spills. */
+function emptyValue(value: CellScalar | undefined): boolean {
+  return value === null || value === "" || value === undefined;
+}
+
+/**
+ * Whether a frame of `view` can be shifted sideways and still match a full
+ * repaint. Text spills only through the empty cells of the painted window, so
+ * a text cell beside an empty one may paint differently once the window has
+ * moved; and a cell border is a stroke across the cell edge, which a shift can
+ * leave a pixel apart from a fresh stroke. Such frames repaint in full.
+ */
+export function sidewaysBlitSafe(view: VisibleWindowView, layout: RenderLayout): boolean {
+  for (const style of view.styles) if (style.border) return false;
+  for (const col of view.cols) if (layout.columns[col]?.cellStyle?.border) return false;
+  const nCols = view.cols.length;
+  for (let index = 0; index < view.values.length; index++) {
+    const value = view.values[index];
+    if (typeof value !== "string" || value === "") continue;
+    const cj = index % nCols;
+    const col = view.cols[cj] ?? -1;
+    const leftSpill = cj > 0 && view.cols[cj - 1] === col - 1 && emptyValue(view.values[index - 1]);
+    const rightSpill =
+      cj < nCols - 1 && view.cols[cj + 1] === col + 1 && emptyValue(view.values[index + 1]);
+    if (leftSpill || rightSpill) return false;
+  }
+  return true;
+}
+
+/**
+ * Shift the last frame's pixels by a scroll along one axis and return the
+ * strip the scroll exposed, which is all the frame then has to paint. A
+ * vertical scroll moves the body below the header; a sideways scroll moves
+ * the header and the body right of the row gutter, and only when
+ * `sidewaysSafe` ({@link sidewaysBlitSafe}) holds for both frames.
+ * `undefined` when nothing can be reused: the first frame, changed content or
+ * size, a scroll on both axes, or a shift of a fraction of a device pixel.
+ */
+export function blitScroll(
   ctx: Ctx,
   canvas: HTMLCanvasElement | OffscreenCanvas,
   theme: Theme,
@@ -497,26 +562,50 @@ export function blitVerticalScroll(
   viewport: Viewport,
   dpr: number,
   lastDpr: number,
+  sidewaysSafe: boolean,
 ): PaintDamage | undefined {
   if (!prev) return undefined;
   if (prev.contentRevision === undefined || viewport.contentRevision === undefined)
     return undefined;
   if (prev.contentRevision !== viewport.contentRevision) return undefined;
-  if (prev.scrollLeft !== viewport.scrollLeft) return undefined;
   if (prev.width !== viewport.width || prev.height !== viewport.height) return undefined;
   if (lastDpr !== dpr) return undefined;
-
-  const bodyTop = theme.headerHeight;
-  const bodyH = viewport.height - bodyTop;
-  if (bodyH <= 0) return undefined;
+  const rowsMoved = prev.scrollTop !== viewport.scrollTop;
+  const columnsMoved = prev.scrollLeft !== viewport.scrollLeft;
+  if (rowsMoved === columnsMoved) return undefined;
+  if (columnsMoved && !sidewaysSafe) return undefined;
 
   // Blit only exact device-pixel shifts. A fractional shift would copy pixels
   // rounded to the nearest device pixel while the exposed strip repaints at
   // the true offset - each touchpad scroll then strands sub-pixel-shifted
   // stale glyph slices that accumulate into visible ghosting.
-  const deltaDevice = (viewport.scrollTop - prev.scrollTop) * dpr;
+  const deltaDevice = rowsMoved
+    ? (viewport.scrollTop - prev.scrollTop) * dpr
+    : (viewport.scrollLeft - prev.scrollLeft) * dpr;
   const deltaPx = Math.round(deltaDevice);
   if (Math.abs(deltaDevice - deltaPx) > 0.001) return undefined;
+  const shift = { deltaPx, dpr };
+  return rowsMoved
+    ? blitRows(ctx, canvas, theme, viewport, shift)
+    : blitColumns(ctx, canvas, theme, viewport, shift);
+}
+
+/** A whole device-pixel scroll shift, and the canvas's device pixel ratio. */
+interface PixelShift {
+  deltaPx: number;
+  dpr: number;
+}
+
+/** {@link blitScroll} along the rows: the body below the header moves. */
+function blitRows(
+  ctx: Ctx,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  theme: Theme,
+  viewport: Viewport,
+  { deltaPx, dpr }: PixelShift,
+): PaintDamage | undefined {
+  const bodyTop = theme.headerHeight;
+  if (viewport.height - bodyTop <= 0) return undefined;
   const bodyTopPx = Math.round(bodyTop * dpr);
   const heightPx = Math.round(viewport.height * dpr);
   const widthPx = Math.round(viewport.width * dpr);
@@ -539,6 +628,40 @@ export function blitVerticalScroll(
 
   ctx.drawImage(canvas, 0, bodyTopPx, widthPx, copyH, 0, bodyTopPx + shiftPx, widthPx, copyH);
   return { x: 0, y: bodyTop, w: viewport.width, h: shiftPx / dpr };
+}
+
+/** {@link blitScroll} along the columns: the header and body right of the gutter move. */
+function blitColumns(
+  ctx: Ctx,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  theme: Theme,
+  viewport: Viewport,
+  { deltaPx, dpr }: PixelShift,
+): PaintDamage | undefined {
+  const gutter = theme.rowHeaderWidth;
+  if (viewport.width - gutter <= 0) return undefined;
+  const gutterPx = Math.round(gutter * dpr);
+  const heightPx = Math.round(viewport.height * dpr);
+  const widthPx = Math.round(viewport.width * dpr);
+  const bodyWPx = widthPx - gutterPx;
+  const shiftPx = Math.abs(deltaPx);
+  if (shiftPx === 0 || shiftPx >= bodyWPx) return undefined;
+
+  const copyW = bodyWPx - shiftPx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  if (deltaPx > 0) {
+    ctx.drawImage(canvas, gutterPx + shiftPx, 0, copyW, heightPx, gutterPx, 0, copyW, heightPx);
+    return {
+      x: viewport.width - shiftPx / dpr,
+      y: 0,
+      w: shiftPx / dpr,
+      h: viewport.height,
+    };
+  }
+
+  ctx.drawImage(canvas, gutterPx, 0, copyW, heightPx, gutterPx + shiftPx, 0, copyW, heightPx);
+  return { x: gutter, y: 0, w: shiftPx / dpr, h: viewport.height };
 }
 
 /** Solid lines on the freeze boundaries, drawn over the pane seams (Sheets-style). */
@@ -587,8 +710,17 @@ export function paintFrame(
   damage?: PaintDamage,
   pane?: PaintDamage,
 ): void {
-  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights, rowNumbers, filteredRows } =
-    viewport;
+  const {
+    width,
+    height,
+    scrollTop,
+    scrollLeft,
+    rowTops,
+    rowHeights,
+    rowNumbers,
+    filteredRows,
+    filterHeader,
+  } = viewport;
   const { rowHeight, headerHeight } = theme;
   const colX = columnEdges(layout);
   const g = theme.rowHeaderWidth;
@@ -655,6 +787,10 @@ export function paintFrame(
   );
   const paintTop = Math.max(headerHeight, clipTop);
   const paintBottom = Math.min(height, clipBottom);
+  // A sideways blit leaves a strip of columns to paint; cells, headers and the
+  // row gutter outside it are skipped, not painted under the clip.
+  const paintLeft = Math.max(damage ? damage.x : 0, pane ? pane.x : 0);
+  const paintRight = Math.min(damage ? damage.x + damage.w : width, pane ? pane.x + pane.w : width);
 
   ctx.save();
   ctx.beginPath();
@@ -682,14 +818,24 @@ export function paintFrame(
       const styleId = view.styleIds[i]!;
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
+      // An AutoFilter header cell lays out its text in a box that ends before
+      // its filter button, for every alignment, as in Excel.
+      const textW =
+        filterHeader !== undefined &&
+        row === filterHeader.row &&
+        col >= filterHeader.start &&
+        col <= filterHeader.end
+          ? filterTextWidth({ x, y, w: cw, h: ch })
+          : cw;
 
       // Sheets lets text spill through adjacent empty cells, but never through
       // occupied cells. Compute the contiguous empty run around this cell; the
       // painter chooses the relevant side after resolving alignment. Numbers
-      // and custom renderers deliberately keep their own cell bounds.
+      // and custom renderers deliberately keep their own cell bounds, and a
+      // filter header cell keeps its text in its box.
       let spillX = x;
-      let spillRight = x + cw;
-      if (!merge && typeof value === "string" && value !== "") {
+      let spillRight = x + textW;
+      if (!merge && textW === cw && typeof value === "string" && value !== "") {
         for (let k = cj - 1; k >= 0; k--) {
           const adjacent = view.cols[k]! + 1 === view.cols[k + 1]!;
           const neighbour = view.values[ri * nCols + k];
@@ -706,6 +852,7 @@ export function paintFrame(
           spillRight = colX[view.cols[k]! + 1]! - scrollLeft + g;
         }
       }
+      if (Math.max(x + cw, spillRight) <= paintLeft || Math.min(x, spillX) >= paintRight) continue;
 
       paintCell(
         ctx,
@@ -718,6 +865,7 @@ export function paintFrame(
         y,
         cw,
         ch,
+        textW,
         spillX,
         spillRight - spillX,
         renderers,
@@ -728,9 +876,10 @@ export function paintFrame(
     }
   }
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+  // Gridlines are filled one-pixel rectangles, not stroked lines: a long
+  // stroked line is not rasterized the same at every offset, so a line copied
+  // by a scroll blit could differ by a pixel from the line a full repaint draws.
+  ctx.fillStyle = theme.gridLine;
   for (let ri = 0; ri < nRows; ri++) {
     const row = view.rows.start + ri;
     const rowBottom =
@@ -750,28 +899,20 @@ export function paintFrame(
         const gapStart = Math.max(g, colX[merge.c0]! - scrollLeft + g);
         const gapEnd = Math.min(width, colX[merge.c1 + 1]! - scrollLeft + g);
         if (gapEnd <= cursorX || gapStart >= width) continue;
-        if (gapStart > cursorX) {
-          ctx.moveTo(cursorX, lineY);
-          ctx.lineTo(gapStart, lineY);
-        }
+        if (gapStart > cursorX) ctx.fillRect(cursorX, lineY - 0.5, gapStart - cursorX, 1);
 
         cursorX = Math.max(cursorX, gapEnd);
       }
     }
 
-    if (cursorX < width) {
-      ctx.moveTo(cursorX, lineY);
-      ctx.lineTo(width, lineY);
-    }
+    if (cursorX < width) ctx.fillRect(cursorX, lineY - 0.5, width - cursorX, 1);
   }
 
-  ctx.stroke();
   ctx.restore();
   state.lastFont = theme.font;
-  state.lastFill = theme.bg;
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.beginPath();
+  ctx.fillStyle = theme.gridLine;
+  state.lastFill = theme.gridLine;
   const appendVerticalGridline = (c: number, lineX: number): void => {
     if (lineX < g || lineX > width) return;
     const mergesByRow =
@@ -794,19 +935,13 @@ export function paintFrame(
           mergeTop + mergeRowSpanHeight(merge, view.rows.start, nRows, rowHeights, rowHeight),
         );
         if (gapEnd <= cursorY || gapStart >= height) continue;
-        if (gapStart > cursorY) {
-          ctx.moveTo(lineX, cursorY);
-          ctx.lineTo(lineX, gapStart);
-        }
+        if (gapStart > cursorY) ctx.fillRect(lineX - 0.5, cursorY, 1, gapStart - cursorY);
 
         cursorY = Math.max(cursorY, gapEnd);
       }
     }
 
-    if (cursorY < height) {
-      ctx.moveTo(lineX, cursorY);
-      ctx.lineTo(lineX, height);
-    }
+    if (cursorY < height) ctx.fillRect(lineX - 0.5, cursorY, 1, height - cursorY);
   };
 
   for (let cj = 0; cj < nCols; cj++) {
@@ -819,11 +954,12 @@ export function paintFrame(
     appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
 
-  ctx.stroke();
+  if (clipTop < headerHeight) {
+    const strip = { width, left: paintLeft, right: paintRight };
+    paintHeader(ctx, theme, layout, colX, view.cols, strip, scrollLeft, g, state);
+  }
 
-  paintHeader(ctx, theme, layout, colX, view.cols, width, scrollLeft, g, state);
-
-  if (g > 0) {
+  if (g > 0 && paintLeft < g) {
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, g, height);
@@ -937,6 +1073,8 @@ function paintCell(
   y: number,
   w: number,
   h: number,
+  /** Width of the box the text lays out and clips in: `w`, or less before a filter button. */
+  textW: number,
   spillX: number,
   spillW: number,
   renderers: ReadonlyMap<string, CellRenderer>,
@@ -1016,7 +1154,7 @@ function paintCell(
         ? "right"
         : "left");
   let text = cellDisplayText(value, numberFormat, column?.numberLocale);
-  const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
+  const availableTextWidth = Math.max(0, textW - CELL_PAD * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
       state.measuredFont = state.lastFont;
@@ -1045,7 +1183,7 @@ function paintCell(
 
   ctx.save();
   if (effective.wrap && !numeric) {
-    clipCell(ctx, x, y, w, h);
+    clipCell(ctx, x, y, textW, h);
 
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
@@ -1059,21 +1197,21 @@ function paintCell(
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
       const lineText = lines[line]!;
-      fillAlignedText(ctx, lineText, align, x, w, cy);
+      fillAlignedText(ctx, lineText, align, x, textW, cy);
       if (effective.underline || effective.strikethrough) {
-        paintTextDecoration(ctx, effective, lineText, align, x, w, cy, fontPx);
+        paintTextDecoration(ctx, effective, lineText, align, x, textW, cy, fontPx);
       }
     }
   } else {
     // Left-aligned strings spill right, right-aligned strings spill left, and
     // centered strings can use both sides. Numeric output never spills.
     let textClipX = x;
-    let textClipW = w;
+    let textClipW = textW;
     if (!numeric) {
       if (align === "left") textClipW = spillX + spillW - x;
       else if (align === "right") {
         textClipX = spillX;
-        textClipW = x + w - spillX;
+        textClipW = x + textW - spillX;
       } else {
         textClipX = spillX;
         textClipW = spillW;
@@ -1086,9 +1224,9 @@ function paintCell(
         ? y + h / 2
         : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
     clipCell(ctx, textClipX, y, textClipW, h);
-    fillAlignedText(ctx, text, align, x, w, cy);
+    fillAlignedText(ctx, text, align, x, textW, cy);
     if (effective.underline || effective.strikethrough) {
-      paintTextDecoration(ctx, effective, text, align, x, w, cy, fontPx);
+      paintTextDecoration(ctx, effective, text, align, x, textW, cy, fontPx);
     }
   }
 
@@ -1126,13 +1264,20 @@ function paintBorders(
   ctx.setLineDash(SOLID_DASH);
 }
 
+/** The canvas width, and the band from `left` to `right` that a frame paints. */
+interface PaintStrip {
+  width: number;
+  left: number;
+  right: number;
+}
+
 function paintHeader(
   ctx: Ctx,
   theme: Theme,
   layout: RenderLayout,
   colX: number[],
   cols: readonly number[],
-  width: number,
+  strip: PaintStrip,
   scrollLeft: number,
   g: number,
   state: PaintState,
@@ -1141,14 +1286,16 @@ function paintHeader(
 
   // Default header bar; any per-column `headerStyle` background paints over it.
   applyFill(ctx, state, theme.headerBg);
-  ctx.fillRect(0, 0, width, h);
+  ctx.fillRect(0, 0, strip.width, h);
 
   const cy = h / 2;
+  const left = Math.max(g, strip.left);
+  const right = Math.min(strip.width, strip.right);
   for (const c of cols) {
     const column = layout.columns[c]!;
     const x = colX[c]! - scrollLeft + g;
     const w = colX[c + 1]! - colX[c]!;
-    if (x + w <= g || x >= width) continue;
+    if (x + w <= left || x >= right) continue;
 
     const headerStyle = column.headerStyle;
 
@@ -1192,12 +1339,8 @@ function paintHeader(
     ctx.restore();
   }
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, h - 0.5);
-  ctx.lineTo(width, h - 0.5);
-  ctx.stroke();
+  applyFill(ctx, state, theme.gridLine);
+  ctx.fillRect(0, h - 1, strip.width, 1);
 }
 
 export interface MergeRect {

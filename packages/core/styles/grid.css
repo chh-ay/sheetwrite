@@ -112,6 +112,15 @@
   outline: none;
 }
 
+/* A list opened without typing keeps its focused box out of sight, so the
+   cell keeps showing its value; the first typed text shows the box. */
+.sheetwrite-validation-input-idle {
+  height: 0;
+  padding: 0;
+  border-width: 0;
+  opacity: 0;
+}
+
 .sheetwrite-validation-list {
   box-sizing: border-box;
   border: 1px solid var(--sheetwrite-selection-border);
