@@ -1,0 +1,48 @@
+== chromium /showcases/performance/ run 1 11.00 10.69 10.12
+{"label":"idle 1 s","ms":1509,"frames":90,"p50":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":4283,"frames":214,"p50":16.7,"p95":33.4,"p99":33.5,"max":50,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3978,"frames":213,"p50":16.7,"p95":33.3,"p99":33.4,"max":33.4,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":3705,"frames":145,"p50":16.8,"p95":33.4,"p99":50.1,"max":50.1,"over50":3,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1482,"frames":67,"p50":16.7,"p95":33.4,"p99":50.1,"max":50.1,"over50":1,"over100":0}
+== chromium /showcases/performance/ run 2 12.48 11.05 10.25
+{"label":"idle 1 s","ms":1510,"frames":90,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":4510,"frames":215,"p50":16.7,"p95":33.4,"p99":33.4,"max":50,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3925,"frames":212,"p50":16.7,"p95":33.3,"p99":33.4,"max":33.4,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":3506,"frames":145,"p50":16.7,"p95":33.4,"p99":50.1,"max":50.1,"over50":2,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1430,"frames":71,"p50":16.7,"p95":33.3,"p99":50,"max":50,"over50":0,"over100":0}
+== chromium /showcases/recalculation/ run 1 12.47 11.19 10.32
+{"label":"idle 1 s","ms":1510,"frames":90,"p50":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":3494,"frames":209,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3499,"frames":209,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":2504,"frames":149,"p50":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1294,"frames":77,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+== chromium /showcases/recalculation/ run 2 10.80 10.88 10.23
+{"label":"idle 1 s","ms":1514,"frames":90,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":3509,"frames":210,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3500,"frames":209,"p50":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":2503,"frames":149,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1297,"frames":77,"p50":16.7,"p95":16.7,"p99":16.8,"max":16.8,"over50":0,"over100":0}
+== firefox /showcases/performance/ run 1 9.21 10.53 10.13
+{"label":"idle 1 s","ms":1512,"frames":90,"p50":17.1,"p95":17.2,"p99":17.2,"max":17.2,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":3580,"frames":145,"p50":17.2,"p95":34.2,"p99":50.4,"max":67.4,"over50":4,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3301,"frames":133,"p50":17.1,"p95":50.4,"p99":66.4,"max":67.5,"over50":9,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":3537,"frames":75,"p50":33.3,"p95":116.7,"p99":133.8,"max":133.8,"over50":28,"over100":7}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1846,"frames":89,"p50":17.1,"p95":33.3,"p99":50.4,"max":50.4,"over50":2,"over100":0}
+== firefox /showcases/performance/ run 2 8.40 10.24 10.05
+{"label":"idle 1 s","ms":1515,"frames":89,"p50":17,"p95":17.2,"p99":17.5,"max":17.5,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":4203,"frames":144,"p50":33.2,"p95":50.3,"p99":66.6,"max":67.5,"over50":10,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":3582,"frames":136,"p50":17.1,"p95":50.4,"p99":66.7,"max":67.4,"over50":15,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":4194,"frames":58,"p50":82.6,"p95":117.1,"p99":133,"max":133,"over50":40,"over100":18}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":2011,"frames":82,"p50":17.1,"p95":50.4,"p99":82.8,"max":82.8,"over50":5,"over100":0}
+== firefox /showcases/recalculation/ run 1 10.88 10.66 10.19
+{"label":"idle 1 s","ms":1514,"frames":91,"p50":17,"p95":17.2,"p99":17.3,"max":17.3,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":3096,"frames":150,"p50":17.1,"p95":33.3,"p99":33.9,"max":34.2,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":2519,"frames":150,"p50":17.1,"p95":17.2,"p99":17.3,"max":17.4,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":1840,"frames":109,"p50":17.1,"p95":17.2,"p99":17.2,"max":17.2,"over50":0,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1430,"frames":84,"p50":17.1,"p95":17.2,"p99":33.2,"max":33.2,"over50":0,"over100":0}
+== firefox /showcases/recalculation/ run 2 11.47 10.82 10.25
+{"label":"idle 1 s","ms":1513,"frames":90,"p50":17,"p95":17.2,"p99":17.4,"max":17.4,"over50":0,"over100":0}
+{"label":"wheel down 60 x 300 px, 16 ms apart","ms":3274,"frames":149,"p50":17.1,"p95":33.5,"p99":34.2,"max":49.7,"over50":0,"over100":0}
+{"label":"wheel fast down 60 x 3000 px","ms":2632,"frames":149,"p50":17,"p95":33.2,"p99":33.8,"max":34.2,"over50":0,"over100":0}
+{"label":"wheel right 40 x 400 px","ms":1843,"frames":110,"p50":16.7,"p95":17.2,"p99":17.4,"max":17.5,"over50":0,"over100":0}
+{"label":"keyboard Ctrl+End then PageUp x20","ms":1457,"frames":85,"p50":17.1,"p95":17.2,"p99":33.3,"max":33.3,"over50":0,"over100":0}
