@@ -78,6 +78,7 @@ function harness() {
       throw new Error("This harness has no undo history");
     },
     lastUndo: () => null,
+    rowSpan: (first, last) => ({ first, last }),
     commit: (patches, reason) => {
       return document.commit(patches, reason);
     },

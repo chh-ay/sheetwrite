@@ -265,6 +265,8 @@ function makeHarness(
       throw new Error("This harness has no undo history");
     },
     lastUndo: () => null,
+    // A harness with its own row order stands for a sorted or filtered view.
+    rowSpan: (first, last) => (options.toDataRow ? null : { first, last }),
     commit: (patches, reason) => {
       commitReasons.push(reason);
       store.apply(patches);
@@ -1010,6 +1012,7 @@ describe("spill clipboard commands", () => {
         throw new Error("This harness has no undo history");
       },
       lastUndo: () => null,
+      rowSpan: (first, last) => ({ first, last }),
       commit: (patches, reason) => {
         return document.commit(patches, reason);
       },

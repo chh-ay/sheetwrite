@@ -1,0 +1,89 @@
+---
+title: Formula assist
+description: The optional formula-assist add-on predicts the rest of the formula typed in the formula bar and shows it as ghost text that Tab accepts.
+---
+
+`@sheetwrite/formula-assist` is an optional add-on. While you type a formula in the formula bar, it shows the most likely rest of the formula as dimmed text after the caret. Tab takes it.
+
+```ts compile title="Install the add-on"
+import { initSheetwrite } from "@sheetwrite/core";
+import { formulaAssistAddon } from "@sheetwrite/formula-assist";
+
+await initSheetwrite({ addons: [formulaAssistAddon()] });
+```
+
+Grids created after `initSheetwrite` show suggestions in their [formula bar](/docs/features/grid/toolbar-and-ribbon/). The add-on adds nothing to the page's first load until it is installed. Its entry only registers it. The predictor is a separate chunk that starts loading when the grid mounts, so it is ready by the first formula edit.
+
+## What it adds to Excel
+
+Excel's own keys and defaults keep working: the function list, Tab to take its entry, Enter, Esc, F2, F4 and pointing at cells. The add-on adds these on top:
+
+- **The rest of the formula, before you type it.** Under a column of `=C4*D4`, typing `=` in row 5 shows `C5*D5`. Excel completes only function names, so you would retype what the sheet already shows. One key replaces a dozen, and you read the formula before you take it.
+- **One word at a time.** Ctrl+→ takes one word of the suggestion: a function name with its `(`, a whole reference such as `Sheet2!$A$2:$A$90`, a number, a string or an operator. You keep the part you agree with and type the rest.
+- **The next argument on Tab.** Inside a call that still lacks a required argument, Tab writes the `,` and moves to the next argument, where the suggestion for that argument appears. Excel's Tab can only refuse a formula with too few arguments there.
+- **Where it points.** The ranges a suggestion names get a faint fill on the grid in their reference colour, before you take it. A wrong suggestion is easy to see.
+
+## Keys
+
+| Key | With a suggestion | Without a suggestion |
+| --- | --- | --- |
+| Tab | Takes the whole suggestion | Inside a call that still lacks a required argument, while the argument guide shows it: writes `,` and moves to the next argument. Everywhere else: Excel's Tab. |
+| Ctrl+→ (also ⌥→ on macOS) | Takes one word | Moves the caret by a word |
+| Esc | Hides the suggestion until the text changes. The add-on doesn't suggest the same formula again during this edit. | Excel's Esc |
+| Enter | Commits only the text you typed | Excel's Enter |
+
+While the function list is open, Tab takes the list's entry, as in Excel. A suggestion shows then only when it is exactly what one entry inserts, and that entry becomes the selected one. Suggestions show only while the caret is at the end of the text, with nothing selected and no IME composition open. The cell editor has no suggestions: it keeps Excel's AutoComplete.
+
+## How it predicts
+
+Predictions are deterministic. They use the workbook only: no network, no AI. Two signals each propose whole formulas, strongest first:
+
+1. **Neighbouring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them. A formula only one side gives was wrong too often on real workbooks, so it is not suggested.
+2. **Syntax.** The one function or visible sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take. Hidden and very hidden sheets are never suggested.
+
+The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, and the end of the block a typed range starts. None was right often enough to show, so none ships.
+
+Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion shows only when it is at least 90% likely and 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
+
+### When it isn't sure
+
+It shows nothing. If no proposal clears the bar above, no ghost text appears and you type as usual. A suggestion you refuse with Esc doesn't come back during that edit.
+
+### How well it does
+
+The add-on was measured on 50 workbooks from the Enron spreadsheet corpus that it was never tuned on: 975 real formulas, typed key by key in their own workbooks.
+
+- **Keystrokes saved:** 38.5%. Excel's function list alone saves 3.1% on the same formulas.
+- **Wrong suggestions:** 2.6% of the suggestions it showed (15 of 587) weren't how the formula went on.
+
+Neighbouring formulas give almost all of the savings. A formula without agreeing neighbours, like a one-off total, mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
+
+## Accessibility
+
+The suggestion is drawn in the layer that colours the formula's references, so screen readers don't read it twice. A polite status announces "Suggestion: … Tab to accept." once a suggestion has held for 400 ms, never on every key.
+
+## Styles
+
+The ghost text uses the field's text colour at `--sheetwrite-formula-ghost-opacity` (0.45 by default, at least 3:1 contrast on the light and dark grid backgrounds). It is part of `@sheetwrite/core/styles/formula-help.css`.
+
+## Write your own suggester
+
+The formula bar reads suggestions from any add-on that registers a `FormulaSuggester` in its grid hook:
+
+```ts compile title="A suggester that closes SUM calls"
+import type { FormulaSuggester, SheetwriteAddon } from "@sheetwrite/core";
+
+const suggester: FormulaSuggester = {
+  open: () => ({
+    suggest: (text) => (/^=SUM\([A-Z]+\d+:[A-Z]+\d+$/i.test(text) ? { text: ")" } : null),
+    close: () => {},
+  }),
+};
+
+const closeSums: SheetwriteAddon = {
+  name: "closeSums",
+  grid: ({ formulaSuggestions }) => formulaSuggestions(suggester),
+};
+```
+
+`open` runs once per edit, with the cell and `reads`: formulas, values, Ctrl+Arrow edges and reference moves. `suggest` runs on every key with the text and its [`analyzeFormula`](/docs/features/formulas/formula-help/) result, and must return within a frame. `openFormulaEdit` from `@sheetwrite/core/testing` builds the same edit without a grid, for tests and benchmarks.

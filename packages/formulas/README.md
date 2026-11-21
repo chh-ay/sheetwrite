@@ -160,7 +160,7 @@ A family is one Rust file that owns a group of functions. Only the full engine c
 
    `reference_cells` lists the names whose single-cell arguments are references, like `SUM(A1)`: text and logical values in that cell are ignored instead of converted. Use it for functions that take a list of numbers, such as `SKEW` or `DEVSQ`. Leave it empty for functions whose arguments are single values, such as the distributions.
 
-   These are the only shared lines that you change. Do not edit `calc.rs`, `eval/mod.rs`, `eval/functions.rs`, or `eval/array.rs`. Name lookup, `functionNames()`, formula assist, and dispatch already read `FAMILIES`.
+   These are the only shared lines that you change. Do not edit `calc/functions.rs`, `eval/mod.rs`, `eval/functions.rs`, or `eval/array.rs`. Name lookup, `functionNames()`, formula assist, and dispatch already read `FAMILIES`.
 
 3. Select the hooks. Use `None` for a hook that the family does not need. The types are in `analysis/mod.rs`:
 

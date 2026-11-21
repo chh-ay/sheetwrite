@@ -65,6 +65,11 @@ export interface ClipboardControllerDeps {
   toDataRow: (viewRow: number) => number;
   /** The view row of a sheet row; `null` when a filter or the user hides it. */
   toViewRow: (dataRow: number) => number | null;
+  /**
+   * The data rows view rows `first` to `last` span with the rows hidden by
+   * hand between them; null under a sort or a filter between them.
+   */
+  rowSpan: (first: number, last: number) => { first: number; last: number } | null;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Undo the last local change, as Ctrl+Z does. */
   undo: () => void;
@@ -231,6 +236,42 @@ const PAYLOAD_TOKEN = /^\{"version":3,"token":"([^"\\]{16,256})"/u;
 /** How much of a payload holds its token. */
 const PAYLOAD_TOKEN_PREFIX = 300;
 
+/**
+ * The attribute on the HTML table of a copy or cut that holds its token.
+ * Firefox and Safari keep only plain text and HTML on the clipboard, so a
+ * grid finds its own copy or cut by this marker there.
+ */
+const CLIPBOARD_TOKEN_ATTRIBUTE = "data-sheetwrite-clipboard";
+const CLIPBOARD_TOKEN_PATTERN = new RegExp(
+  `\\b${CLIPBOARD_TOKEN_ATTRIBUTE}="([0-9a-f]{16,256})"`,
+  "u",
+);
+/**
+ * How much of the HTML holds the token: the table comes first, after the
+ * wrapper a browser may add, so a large paste is not scanned.
+ */
+const CLIPBOARD_TOKEN_PREFIX = 1_024;
+
+/** The token an HTML copy from a grid carries, or `null` for HTML from elsewhere. */
+function clipboardToken(html: string): string | null {
+  return CLIPBOARD_TOKEN_PATTERN.exec(html.slice(0, CLIPBOARD_TOKEN_PREFIX))?.[1] ?? null;
+}
+
+/** Whether two clipboard texts hold the same cells; browsers may change line endings. */
+function sameClipboardText(left: string, right: string): boolean {
+  const lines = (text: string) => text.replaceAll("\r\n", "\n").replace(/\n$/u, "");
+  return lines(left) === lines(right);
+}
+
+/** The text of the first clipboard item that holds `type`, or `null` when none does. */
+async function readClipboardType(
+  items: readonly ClipboardItem[],
+  type: string,
+): Promise<string | null> {
+  const item = items.find((candidate) => candidate.types.includes(type));
+  return item ? (await item.getType(type)).text() : null;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -289,8 +330,8 @@ function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type
   return { value: parsed.value, style };
 }
 
-function clipboardHtml(snapshot: ClipboardSnapshot): string {
-  let html = "<table><tbody>";
+function clipboardHtml(snapshot: ClipboardSnapshot, token: string): string {
+  let html = `<table ${CLIPBOARD_TOKEN_ATTRIBUTE}="${token}"><tbody>`;
   for (const row of snapshot.cells) {
     html += "<tr>";
     for (const cell of row) {
@@ -790,8 +831,11 @@ export class ClipboardController {
       this.endCut();
       // A read-only grid copies: nothing can move.
       if (this.deps.readOnly()) return "done";
-      // The snapshot holds the selected rows, which are the ones shown.
-      const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
+      // The rows the move takes that the view does not show.
+      let hidden = 0;
+      for (let row = source.start.row; row <= source.end.row; row++) {
+        if (this.deps.toViewRow(row) === null) hidden++;
+      }
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
       if (hidden > 0) {
@@ -812,7 +856,7 @@ export class ClipboardController {
     const clipboard = navigator.clipboard;
     if (typeof clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
       const plain = new Blob([snapshot.tsv], { type: "text/plain" });
-      const html = new Blob([clipboardHtml(snapshot)], { type: "text/html" });
+      const html = new Blob([clipboardHtml(snapshot, token)], { type: "text/html" });
       try {
         await clipboard.write([
           new ClipboardItem({
@@ -1014,8 +1058,10 @@ export class ClipboardController {
 
   /**
    * Read what the clipboard holds. Every read awaits; a read whose scope
-   * closed meanwhile gives nothing. A payload other than the waiting cut ends
-   * the cut.
+   * closed meanwhile gives nothing. This grid's own copy or cut is found by
+   * its token: in the custom format where the browser keeps one (Chromium),
+   * else in the HTML. A payload other than the waiting cut ends the cut, so a
+   * copy in another application since the cut is a plain paste, as in Excel.
    */
   private async readPayload(
     read: Scope,
@@ -1056,42 +1102,31 @@ export class ClipboardController {
           }
           const token = own ? leading : envelope?.token;
           if (token === undefined) continue;
-          if (this.pendingCut?.token === token) return { kind: "cut", cut: this.pendingCut };
-          // A cut that was pasted or ended does not paste again, as in Excel.
-          if (this.endedCutToken === token) return EMPTY;
+          const mine = this.ownPayload(token, null);
+          if (mine) return mine;
           this.endCut();
-          if (this.trusted?.token === token) {
-            return { kind: "internal", snapshot: this.trusted.snapshot };
-          }
           if (envelope) return { kind: "foreign", snapshot: envelope.snapshot };
         }
 
+        const html = await readClipboardType(items, "text/html");
+        const text = await readClipboardType(items, "text/plain");
+        if (read.closed) return EMPTY;
+        // This grid's own copy, by the token on its HTML: its cells are in
+        // memory, so the HTML is not parsed.
+        const token = html === null ? null : clipboardToken(html);
+        const mine = token === null ? null : this.ownPayload(token, text);
+        if (mine) return mine;
+
         // The clipboard no longer holds the cut: this is a plain paste.
         this.endCut();
-        for (const item of items) {
-          if (!item.types.includes("text/html")) continue;
-          const html = await (await item.getType("text/html")).text();
-          if (read.closed) return EMPTY;
+        if (html !== null) {
           const grid = limited(() => parseClipboardHtml(html, valuesOnly));
-          if (grid instanceof DelimitedTextResourceError) {
-            tooLarge ??= grid;
-            continue;
-          }
-          if (!grid) continue;
-          return { kind: "html", grid };
+          if (grid instanceof DelimitedTextResourceError) tooLarge ??= grid;
+          else if (grid) return { kind: "html", grid };
         }
-
-        for (const item of items) {
-          if (!item.types.includes("text/plain")) continue;
-          const text = await (await item.getType("text/plain")).text();
-          if (read.closed) return EMPTY;
-          if (text.length === 0) {
-            if (tooLarge) throw tooLarge;
-            return EMPTY;
-          }
-          return { kind: "text", text };
-        }
+        if (text !== null && text.length > 0) return { kind: "text", text };
         if (tooLarge) throw tooLarge;
+        if (text !== null) return EMPTY;
       } catch (error) {
         if (error instanceof DelimitedTextResourceError) throw error;
         richReadFailed = true;
@@ -1110,6 +1145,23 @@ export class ClipboardController {
     } catch {
       return { kind: "outcome", outcome: "blocked" };
     }
+  }
+
+  /**
+   * The payload of this grid's own copy or cut with `token`, or `null` when
+   * the token is another's. A cut that was pasted or ended does not paste
+   * again, as in Excel. `text` is the clipboard's plain text, when it has
+   * one: text that differs from the copy's was changed in another
+   * application, so the paste is a plain one.
+   */
+  private ownPayload(token: string, text: string | null): ClipboardPayload | null {
+    if (this.endedCutToken === token) return EMPTY;
+    const trusted = this.trusted;
+    if (trusted?.token !== token) return null;
+    if (text !== null && !sameClipboardText(text, trusted.snapshot.tsv)) return null;
+    if (this.pendingCut?.token === token) return { kind: "cut", cut: this.pendingCut };
+    this.endCut();
+    return { kind: "internal", snapshot: trusted.snapshot };
   }
 
   /**
@@ -1892,11 +1944,25 @@ export class ClipboardController {
       { length: rect.c1 - rect.c0 + 1 },
       (_, index) => rect.c0 + index,
     );
+    // Rows hidden by hand between the selected rows are copied, as in Excel;
+    // rows a filter hides are not, and neither are rows past a view sort's order.
+    const span = this.deps.rowSpan(rect.r0, rect.r1);
+    const handHidden = span && span.last - span.first !== rect.r1 - rect.r0 ? span : null;
+    const rowCount = handHidden ? handHidden.last - handHidden.first + 1 : rect.r1 - rect.r0 + 1;
     const bulk = this.deps.store.getClipboardWindow?.(
       activeSheet,
-      { start: rect.r0, end: rect.r1 + 1 },
+      handHidden
+        ? { start: handHidden.first, end: handHidden.last + 1 }
+        : { start: rect.r0, end: rect.r1 + 1 },
       selectedColumns,
+      handHidden ? { dataRows: true } : undefined,
     );
+    /** The view row of the `index`th copied row; null for a row hidden by hand. */
+    const viewRowAt = (index: number): number | null =>
+      handHidden ? this.deps.toViewRow(handHidden.first + index) : rect.r0 + index;
+    const dataRowAt = (index: number): number =>
+      bulk?.dataRows[index] ??
+      (handHidden ? handHidden.first + index : this.deps.toDataRow(rect.r0 + index));
     // A projected child has no source to move. Reject the whole cut before
     // replacing the clipboard when its owning formula is outside the selection.
     if (cut && bulk?.spillDerived.some((derived) => derived === 1)) {
@@ -1925,19 +1991,20 @@ export class ClipboardController {
       : null;
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
-    const firstDataRow = this.deps.toDataRow(rect.r0);
-    // A filter or hidden rows leave gaps between the selected data rows; a
-    // view sort puts them out of order.
+    const firstDataRow = dataRowAt(0);
+    // A filter leaves gaps between the selected data rows; a view sort puts
+    // them out of order.
     let contiguous = true;
     let ascending = true;
     let lastDataRow = firstDataRow;
     let merged = false;
-    for (let row = rect.r0; row <= rect.r1; row++) {
-      const dataRow = this.deps.toDataRow(row);
-      contiguous &&= dataRow === firstDataRow + row - rect.r0;
-      ascending &&= row === rect.r0 || dataRow > lastDataRow;
+    for (let index = 0; index < rowCount; index++) {
+      const dataRow = dataRowAt(index);
+      contiguous &&= dataRow === firstDataRow + index;
+      ascending &&= index === 0 || dataRow > lastDataRow;
       lastDataRow = dataRow;
-      for (let col = rect.c0; col <= rect.c1 && !merged; col++) {
+      const row = viewRowAt(index);
+      for (let col = rect.c0; col <= rect.c1 && !merged && row !== null; col++) {
         merged = this.deps.mergeAnchorAt(row, col) !== null;
       }
     }
@@ -1960,7 +2027,7 @@ export class ClipboardController {
               return (
                 hyperlink.range.sheet === activeSheet &&
                 r0 >= firstDataRow &&
-                r1 <= firstDataRow + rect.r1 - rect.r0 &&
+                r1 <= firstDataRow + rowCount - 1 &&
                 c0 >= rect.c0 &&
                 c1 <= rect.c1
               );
@@ -1968,26 +2035,21 @@ export class ClipboardController {
             .map(cloneCellHyperlink)
         : [];
 
-    for (let r = rect.r0; r <= rect.r1; r++) {
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+      const r = viewRowAt(rowIndex);
       const cellLine: ClipboardCell[] = [];
       const valueLine: CellScalar[] = [];
       for (let c = rect.c0; c <= rect.c1; c++) {
-        const merge = this.deps.mergeAnchorAt(r, c);
+        const merge = r === null ? null : this.deps.mergeAnchorAt(r, c);
         if (merge && (merge.r0 !== r || merge.c0 !== c)) {
           cellLine.push({ value: { kind: "literal", value: null }, resolved: null, style: {} });
           valueLine.push(null);
           continue;
         }
 
-        const rowIndex = r - rect.r0;
         const colIndex = c - rect.c0;
         const offset = rowIndex * selectedColumns.length + colIndex;
-        const addr = {
-          sheet: activeSheet,
-          row: bulk?.dataRows[rowIndex] ?? this.deps.toDataRow(r),
-          col: c,
-        };
-
+        const addr = { sheet: activeSheet, row: dataRowAt(rowIndex), col: c };
         const bulkResolved = bulk?.values[offset];
         const cell =
           bulk === undefined
@@ -2019,7 +2081,7 @@ export class ClipboardController {
       values.push(valueLine);
     }
 
-    const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
+    const anchor = { row: firstDataRow, col: rect.c0 };
     const sheet = this.deps.sheet();
     return {
       anchor,

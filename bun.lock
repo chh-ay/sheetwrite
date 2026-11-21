@@ -51,6 +51,7 @@
         "@fontsource/jetbrains-mono": "^5.2.8",
         "@sheetwrite/charts": "workspace:*",
         "@sheetwrite/core": "workspace:*",
+        "@sheetwrite/formula-assist": "workspace:*",
         "@sheetwrite/formulas": "workspace:*",
         "@sheetwrite/queries": "workspace:*",
         "@sheetwrite/react": "workspace:*",
@@ -126,6 +127,17 @@
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
         "fflate": "0.8.3",
+      },
+    },
+    "packages/formula-assist": {
+      "name": "@sheetwrite/formula-assist",
+      "version": "0.6.1",
+      "devDependencies": {
+        "@sheetwrite/core": "workspace:*",
+        "@sheetwrite/xlsx": "workspace:*",
+      },
+      "peerDependencies": {
+        "@sheetwrite/core": "workspace:*",
       },
     },
     "packages/formulas": {
@@ -604,6 +616,8 @@
     "@sheetwrite/docs-hovers": ["@sheetwrite/docs-hovers@workspace:docs/hovers"],
 
     "@sheetwrite/docs-svelte-codegen": ["@sheetwrite/docs-svelte-codegen@workspace:docs/svelte-codegen"],
+
+    "@sheetwrite/formula-assist": ["@sheetwrite/formula-assist@workspace:packages/formula-assist"],
 
     "@sheetwrite/formulas": ["@sheetwrite/formulas@workspace:packages/formulas"],
 

@@ -175,3 +175,24 @@ It passes when the code section is byte-identical and the data section keeps
 its length: the only data bytes that may differ are the line and column
 numbers of panic locations, which move with source lines. Put its output in
 the pull request. Any other difference goes through the gate.
+
+A change that only moves Rust items into other modules or files is never
+byte-identical. rustc numbers functions and lays out constants by module path,
+and each new file adds its name to the panic locations. Such a move can skip
+the gate when it runs the same code. The check needs the function names, so
+compare the `.wasm` that `wasm-pack` writes, before `wasm-factory.ts` removes
+them:
+
+```bash
+cd packages/wasm
+wasm-pack build --target web --out-dir pkg    # default engine
+CARGO_TARGET_DIR=target/analysis wasm-pack build --target web --out-dir ../formulas/pkg -- --features analysis
+bun ../../scripts/wasm-compare.ts --relocations --module calc::parser=calc <before>.wasm <after>.wasm
+```
+
+`--module` names each module that the move created, with the module its items
+came from. The check pairs functions by name. It passes when each pair has the
+same instructions apart from function numbers and data addresses, and when the
+only data that no constant explains is panic-location file names and zero
+padding. Put its output for both engines and a raw and Brotli size table in
+the pull request.
