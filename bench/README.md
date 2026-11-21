@@ -508,15 +508,18 @@ ms until that finishes and 1.7–1.9 ms after, so a 50 ms sample measured when t
 compiler finished. With synchronous compilation, or an idle pause before the
 row, both engines start at steady speed and no wasm memory grows during it.
 
-`independent-parse-load` at 1,000 and 10,000 formulas warms up for at least
-2 seconds. These rows time `setFormula` calls, and JavaScriptCore compiles
-that code with its optimizing tier in the background, on the same pinned core
-as the runs. Until it finishes, a 10,000-formula load takes about 21 ms on
-Linux; after it, about 10 ms (1,000 formulas: 5.4 ms, then 1.0 ms). A fresh
-process gets there after 1–2 seconds of loads, and three warm-up fixtures end
-well before that, so the 10,000 row's ratio swung with the compiler instead of
-the engine. The rows measure the steady state: the speed of loading formulas
-once the engine code is optimized, as in a page that has loaded before.
+`independent-parse-load` at 10,000 formulas warms up for at least 2 seconds.
+The row times `setFormula` calls, and JavaScriptCore compiles that code with
+its optimizing tier in the background, on the same pinned core as the runs.
+Until it finishes, a 10,000-formula load takes about 21 ms on Linux; after
+it, about 10 ms. A fresh process gets there after 1–2 seconds of loads, and
+three warm-up fixtures end well before that, so the row's ratio swung with
+the compiler instead of the engine. The row measures the steady state: the
+speed of loading formulas once the engine code is optimized, as in a page
+that has loaded before. The 1,000-formula row keeps the default warm-up:
+about one process in five runs it at about twice the time of the others,
+even after 5 seconds of warm-up, so that mode is not tier-up. Its cause is
+not known yet, and it widens that row's same-engine spread.
 
 `linear-chain` at 8 formulas warms up for at least one second, for the same
 reason as `diamond-edit`: it recalculates in a few microseconds right after
