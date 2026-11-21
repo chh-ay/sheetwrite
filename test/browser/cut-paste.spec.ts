@@ -40,16 +40,16 @@ async function select(page: Page, row: number, col: number, toRow = row): Promis
   await page.locator(".sheetwrite").first().focus();
 }
 
-/** The values of A40:A41 and D40:D41, and the formula in C40. */
+/** The values of A3:A4 and D3:D4, and the formula in C3. */
 function state(page: Page) {
   return page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
     const sheet = grid.getActiveSheet();
     const value = (row: number, col: number) => grid.store.getCell({ sheet, row, col }).resolved;
     return {
-      source: [value(39, 0), value(40, 0)],
-      target: [value(39, 3), value(40, 3)],
-      formula: grid.store.getFormula({ sheet, row: 39, col: 2 }),
+      source: [value(2, 0), value(3, 0)],
+      target: [value(2, 3), value(3, 3)],
+      formula: grid.store.getFormula({ sheet, row: 2, col: 2 }),
     };
   });
 }
@@ -59,31 +59,28 @@ test("cut and paste moves the cells and their references @portability", async ({
   browserName,
 }) => {
   await open(page, browserName);
+  // Cells near the top, so the cut's moving border is on screen.
   await page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
     const sheet = grid.getActiveSheet();
     grid.applyTransaction({
       patches: [
-        { op: "set", addr: { sheet, row: 39, col: 0 }, value: { kind: "literal", value: 10 } },
-        { op: "set", addr: { sheet, row: 40, col: 0 }, value: { kind: "literal", value: 20 } },
-        {
-          op: "set",
-          addr: { sheet, row: 39, col: 2 },
-          value: { kind: "formula", src: "=A40+A41" },
-        },
+        { op: "set", addr: { sheet, row: 2, col: 0 }, value: { kind: "literal", value: 10 } },
+        { op: "set", addr: { sheet, row: 3, col: 0 }, value: { kind: "literal", value: 20 } },
+        { op: "set", addr: { sheet, row: 2, col: 2 }, value: { kind: "formula", src: "=A3+A4" } },
       ],
     });
   });
 
-  await select(page, 39, 0, 40);
+  await select(page, 2, 0, 3);
   await page.keyboard.press("ControlOrMeta+x");
   await expect(page.locator("[data-sheetwrite-cut]").first()).toBeVisible();
   expect((await state(page)).source).toEqual([10, 20]);
 
-  await select(page, 39, 3);
+  await select(page, 2, 3);
   await page.keyboard.press("ControlOrMeta+v");
   await expect
     .poll(() => state(page), { timeout: 15_000 })
-    .toEqual({ source: [null, null], target: [10, 20], formula: "=D40+D41" });
+    .toEqual({ source: [null, null], target: [10, 20], formula: "=D3+D4" });
   await expect(page.locator("[data-sheetwrite-cut]")).toHaveCount(0);
 });
