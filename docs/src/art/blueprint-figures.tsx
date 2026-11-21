@@ -15,7 +15,7 @@ import {
   ROOM,
   SPACING,
 } from "./blueprint.js";
-import { BRACKET } from "./layout.js";
+import { BRACKET, spread } from "./layout.js";
 
 /** The width a wide drawing fills in the reading column, and a narrow one on a phone. */
 export const WIDE = ROOM.wide;
@@ -179,9 +179,25 @@ const XLSX_TEXT = {
 };
 
 /**
+ * A side box sized to its text, centred level with the middle of the steps
+ * whose arrows enter it. Its arrows enter its side spread apart, so the
+ * box stays its own size however far apart those steps are.
+ */
+function besideSteps(
+  spec: Omit<BlueprintNode, "rect">,
+  x: number,
+  w: number,
+  steps: readonly BlueprintNode[],
+): BlueprintNode {
+  const centres = steps.map((step) => step.rect.y + step.rect.h / 2);
+  const h = nodeHeight(spec);
+  return node({ ...spec, x, y: (Math.min(...centres) + Math.max(...centres)) / 2 - h / 2, w, h });
+}
+
+/**
  * Import down the left, export down the right, and between them the typed
  * error beside the steps that can fail and the warnings level with the two
- * steps that report them, so every side arrow runs straight across.
+ * steps that report them.
  */
 function xlsxWide(): BlueprintLayout {
   const importSteps = [
@@ -231,7 +247,6 @@ function xlsxWide(): BlueprintLayout {
   const exportFirstRow = 2;
   const nodes: BlueprintNode[] = [
     ...importSteps.map((step, row) => node({ ...step, x: 0, y: rowY(row), w: columns[0], h })),
-    node({ ...error, x: columnX[1], y: rowY(1), w: columns[1], h: rowY(2) + h - rowY(1) }),
     node({ ...warnings, x: columnX[1], y: rowY(3), w: columns[1], h }),
     ...exportSteps.map((step, row) =>
       node({ ...step, x: columnX[2], y: rowY(exportFirstRow + row), w: columns[2], h }),
@@ -239,11 +254,7 @@ function xlsxWide(): BlueprintLayout {
   ];
   const [, unzip, parse] = nodes;
   if (unzip === undefined || parse === undefined) throw new Error("The XLSX steps are missing");
-  const errorBox = nodes[importSteps.length];
-  if (errorBox === undefined) throw new Error("The XLSX error box is missing");
-  // Fail arrows enter the tall error box level with the step they leave.
-  const level = (from: BlueprintNode) =>
-    (from.rect.y + from.rect.h / 2 - errorBox.rect.y) / errorBox.rect.h;
+  nodes.push(besideSteps(error, columnX[1], columns[1], [unzip, parse]));
   return {
     nodes,
     edges: [
@@ -251,8 +262,8 @@ function xlsxWide(): BlueprintLayout {
       { from: "unzip", fromSide: "bottom", to: "parse", kind: "main" },
       { from: "parse", fromSide: "bottom", to: "workbook", kind: "main" },
       { from: "workbook", fromSide: "bottom", to: "grid", kind: "main" },
-      { from: "unzip", fromSide: "right", to: "error", toT: level(unzip), kind: "fail" },
-      { from: "parse", fromSide: "right", to: "error", toT: level(parse), kind: "fail" },
+      { from: "unzip", fromSide: "right", to: "error", toT: spread(0, 2), kind: "fail" },
+      { from: "parse", fromSide: "right", to: "error", toT: spread(1, 2), kind: "fail" },
       { from: "workbook", fromSide: "right", to: "warnings", kind: "back" },
       { from: "write", fromSide: "left", to: "warnings", kind: "back" },
       { from: "source", fromSide: "bottom", to: "write", kind: "main" },
@@ -287,25 +298,16 @@ function xlsxNarrow(): BlueprintLayout {
   const rightAt = { x: w + SPACING.link, w: right.w };
   const [, unzip, parse, workbook, , , write] = nodes;
   if (!unzip || !parse || !workbook || !write) throw new Error("The XLSX steps are missing");
-  const error = node({
-    id: "error",
-    ...rightAt,
-    y: unzip.rect.y,
-    h: parse.rect.y + parse.rect.h - unzip.rect.y,
-    ...errorText,
-    tone: "danger",
-  });
-  const warnings = node({
-    id: "warnings",
-    ...rightAt,
-    y: workbook.rect.y,
-    h: write.rect.y + write.rect.h - workbook.rect.y,
-    ...warningsText,
-    tone: "muted",
-  });
-  // Side connectors enter the tall boxes level with the step they leave.
-  const level = (from: BlueprintNode, to: BlueprintNode) =>
-    (from.rect.y + from.rect.h / 2 - to.rect.y) / to.rect.h;
+  const error = besideSteps({ id: "error", ...errorText, tone: "danger" }, rightAt.x, rightAt.w, [
+    unzip,
+    parse,
+  ]);
+  const warnings = besideSteps(
+    { id: "warnings", ...warningsText, tone: "muted" },
+    rightAt.x,
+    rightAt.w,
+    [workbook, write],
+  );
   return {
     nodes: [...nodes, error, warnings],
     edges: [
@@ -314,22 +316,10 @@ function xlsxNarrow(): BlueprintLayout {
       { from: "parse", fromSide: "bottom", to: "workbook", kind: "main" },
       { from: "workbook", fromSide: "bottom", to: "grid", kind: "main" },
       { from: "source", fromSide: "bottom", to: "write", kind: "main" },
-      { from: "unzip", fromSide: "right", to: "error", toT: level(unzip, error), kind: "fail" },
-      { from: "parse", fromSide: "right", to: "error", toT: level(parse, error), kind: "fail" },
-      {
-        from: "workbook",
-        fromSide: "right",
-        to: "warnings",
-        toT: level(workbook, warnings),
-        kind: "back",
-      },
-      {
-        from: "write",
-        fromSide: "right",
-        to: "warnings",
-        toT: level(write, warnings),
-        kind: "back",
-      },
+      { from: "unzip", fromSide: "right", to: "error", toT: spread(0, 2), kind: "fail" },
+      { from: "parse", fromSide: "right", to: "error", toT: spread(1, 2), kind: "fail" },
+      { from: "workbook", fromSide: "right", to: "warnings", toT: spread(0, 2), kind: "back" },
+      { from: "write", fromSide: "right", to: "warnings", toT: spread(1, 2), kind: "back" },
     ],
   };
 }
