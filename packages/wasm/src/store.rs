@@ -536,6 +536,8 @@ impl CellStore {
     /// writes are stored values and keep cells with an unacknowledged edit;
     /// unlike a page load, they recalculate only the formulas that read them,
     /// as local edits do.
+    ///
+    /// @internal
     #[wasm_bindgen(js_name = beginRemoteLoad)]
     pub fn begin_remote_load(&mut self) {
         self.begin_page_load();
