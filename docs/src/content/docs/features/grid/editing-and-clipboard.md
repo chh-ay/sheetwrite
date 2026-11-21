@@ -217,6 +217,7 @@ if (outcome === "blocked") console.warn("Allow clipboard access to paste.");
 | `"unsupported"` | The Clipboard API, or the method it needs, is missing. Examples: a non-secure context, or Firefox `readText`. |
 | `"blocked"` | The browser rejected the request, usually because of a permissions policy or missing user activation. |
 | `"empty"` | There is nothing to act on: no focused selection, an empty clipboard, or paste on a read-only grid. |
+| `"rejected"` | The grid refused the paste, so nothing was pasted: a protected range, the host's admission, or a document limit. The grid tells the user why, and fires `mutation-rejected`. |
 
 Custom UI can show the outcome without tripping global error monitoring.
 

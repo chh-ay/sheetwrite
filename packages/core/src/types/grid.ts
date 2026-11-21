@@ -165,8 +165,11 @@ export interface CellEditor {
  *   a read-only grid on paste), or the action stopped without a change to the
  *   grid because a newer action of the same kind (copy or cut, paste) started
  *   or the grid was destroyed first.
+ * - `"rejected"` — the grid refused the paste's change, so nothing was
+ *   pasted: a protected range, a host's admission, or a document limit. The
+ *   grid says why, beside the `mutation-rejected` event.
  */
-export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "rejected";
 
 /**
  * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s

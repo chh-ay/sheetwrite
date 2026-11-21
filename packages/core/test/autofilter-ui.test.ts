@@ -47,7 +47,7 @@ function mount(
         id: "s1",
         name: "Orders",
         order: 0,
-        rowCount: 10,
+        rowCount: Math.max(10, rows.length),
         columns: [
           { key: "item", header: "A", width: 100, type: "text" },
           { key: "qty", header: "B", width: 100, type: "number" },
@@ -384,6 +384,95 @@ describe("AutoFilter in the grid", () => {
       ],
     });
     expect(grid.canPasteVisibleRows()).toBe(false);
+  });
+
+  it("pastes over more than 10,000 shown cells of a filtered range", async () => {
+    // Excel fills one copied value into every shown cell of the selection,
+    // however many; the paste is one operation, not one per cell.
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("5") },
+    });
+    const rows: CellScalar[][] = [["Item", "Qty"]];
+    for (let row = 1; row <= 12_000; row++) rows.push([row % 2 === 1 ? "keep" : "hide", row]);
+    const { grid, store } = mount(rows);
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 12_000, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["keep"] });
+    // 6,000 shown rows × 2 columns.
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 6_000, col: 1 } },
+    });
+    expect(await grid.actions.paste()).toBe("done");
+    const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col }).resolved;
+    expect([cell(1, 0), cell(1, 1), cell(11_999, 0), cell(11_999, 1)]).toEqual(["5", 5, "5", 5]);
+    // The hidden rows keep their cells.
+    expect([cell(2, 0), cell(2, 1)]).toEqual(["hide", 2]);
+  });
+
+  it("offers Paste into visible rows only only after a paste that applied, and undoes only that paste", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("10\n20\n30") },
+    });
+    const { grid, host, store } = mount();
+    // An earlier edit, which no paste offer may undo.
+    grid.beginEdit(8, 0, "x");
+    host
+      .querySelector("textarea.sheetwrite-editor")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+      );
+    expect(store.getCell({ sheet: "s1", row: 8, col: 0 }).resolved).toBe("x");
+
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    // The host refuses writes to the hidden B3, so the whole paste is refused.
+    grid.setProtectedRange({
+      id: "locked",
+      range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 2, col: 1 } },
+    });
+    grid.setProtectionResolver(() => "deny");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("rejected");
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    expect([1, 2, 3].map(qty)).toEqual([3, 12, 7]);
+    expect(grid.canPasteVisibleRows()).toBe(false);
+    expect(document.querySelector(".sheetwrite-action-status")?.textContent).toBe(
+      'Nothing was pasted: Protected range "locked" denied this mutation.',
+    );
+
+    grid.actions.pasteVisibleRows();
+    expect(store.getCell({ sheet: "s1", row: 8, col: 0 }).resolved).toBe("x");
+  });
+
+  it("says a paste or a cut's paste that the grid refused pasted nothing", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("10\n20") },
+    });
+    const { grid, store } = mount();
+    grid.setProtectedRange({
+      id: "locked",
+      range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 2, col: 1 } },
+    });
+    grid.setProtectionResolver(() => "deny");
+    const notice = () => document.querySelector(".sheetwrite-action-status")?.textContent;
+    const refused = 'Nothing was pasted: Protected range "locked" denied this mutation.';
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("rejected");
+    expect(notice()).toBe(refused);
+    expect([1, 2].map(qty)).toEqual([3, 12]);
+
+    stubClipboard();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
+    expect(await grid.actions.cut()).toBe("done");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    expect(await grid.actions.paste()).toBe("rejected");
+    expect(notice()).toBe(refused);
+    expect([1, 2].map(qty)).toEqual([3, 12]);
   });
 
   it("shows the rows Hide Rows hid, from the cut notice's Show them", async () => {

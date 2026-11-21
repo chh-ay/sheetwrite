@@ -77,8 +77,9 @@ function harness() {
     undo: () => {
       throw new Error("This harness has no undo history");
     },
+    lastUndo: () => null,
     commit: (patches, reason) => {
-      document.commit(patches, reason);
+      return document.commit(patches, reason);
     },
     onCutChange: () => {},
     loadPasteSpecial: () => import("../src/paste-special.js"),
