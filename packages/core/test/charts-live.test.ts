@@ -207,7 +207,7 @@ describe("chart change events", () => {
 
 // Engine selection is process-wide, and only the full engine computes pivot output.
 // So the cases run the full provider in a process of their own.
-it("refreshes a chart under pivot output when the pivot is set or removed, and no chart on another sheet", async () => {
+it("refreshes a chart over pivot output on a source edit, a set and a removal, and no chart on another sheet", async () => {
   const probe = Bun.spawn(
     [
       process.execPath,
