@@ -150,7 +150,7 @@ See [Formulas → Point mode and reference rewriting](/docs/features/formulas/au
 ## Edge cases and limits
 
 - Merges are **not drawn while a sort or filter view is active**, because the display order no longer maps cleanly to the merged region. Clear the view to see them again. See [Data operations](/docs/features/data/data-operations/#display-views).
-- While a filter hides rows, the fill handle fills only the rows that show, as in Excel; the hidden rows between keep their values. Rows hidden with Hide Rows are skipped too, where Excel fills them (#925). Under a view sort it fills the rows in the order they show. When `readOnly` is on, the handle still shows, but a fill changes nothing.
+- While a filter hides rows, the fill handle fills only the rows that show, as in Excel; the hidden rows between keep their values. Rows hidden with Hide Rows are skipped too, where Excel fills them. Under a view sort it fills the rows in the order they show. When `readOnly` is on, the handle still shows, but a fill changes nothing.
 - A resize preview does not change the document. Only the release commits.
 
 ## See also
