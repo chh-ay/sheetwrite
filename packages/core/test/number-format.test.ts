@@ -10,38 +10,6 @@ import {
 } from "../src/number-format.js";
 
 describe("formatNumber", () => {
-  it.each([
-    [-246, "$#,##0", "-$246"],
-    [-1234.5, "$#,##0.00", "-$1,234.50"],
-    [-246, '"€"#,##0', "-€246"],
-    [-246, "[$€-2] #,##0", "-€ 246"],
-    [-246, "$#,##0;($#,##0)", "($246)"],
-  ] as const)("formats %s with %s as %s", (value, code, expected) => {
-    expect(formatNumber(value, code)).toBe(expected);
-    expect(formatNumber(value, code)).toBe(expected);
-  });
-
-  it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
-    const cases: Array<{ value: number; code: string }> = [
-      { value: 1.005, code: "#,##0.00" },
-      { value: -1.005, code: "#,##0.00" },
-      { value: -0, code: "#,##0.00" },
-      { value: -0.004, code: "#,##0.00" },
-      { value: 999.995, code: "#,##0.00" },
-      { value: 1e21, code: "#,##0.00" },
-    ];
-
-    for (const { value, code } of cases) {
-      expect(formatNumber(value, code)).toBe(
-        new Intl.NumberFormat("en-US", {
-          useGrouping: true,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(value),
-      );
-    }
-  });
-
   // Excel's General shows up to 11 characters in a standard-width cell, the
   // minus sign not counted, with no thousands separators.
   it.each([
@@ -67,11 +35,6 @@ describe("formatNumber", () => {
     expect(formatNumber(value, "@")).toBe(expected);
   });
 
-  it("writes General with the locale's decimal separator and no grouping", () => {
-    expect(formatNumber(1234.5, undefined, "de-DE")).toBe("1234,5");
-    expect(formatNumber(123456789012, undefined, "de-DE")).toBe("1,23457E+11");
-  });
-
   it("narrows General to a narrower cell as Excel does, and gives up where Excel shows ####", () => {
     expect(formatGeneral(1234.5678, 6)).toBe("1234.6");
     expect(formatGeneral(1234.5678, 4)).toBe("1235");
@@ -81,28 +44,11 @@ describe("formatNumber", () => {
     expect(formatGeneral(123456789, 4)).toBeNull();
   });
 
-  it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {
-    expect(formatNumber(45_351, "yyyy-mm-dd")).toBe("2024-02-29");
-    expect(formatNumber(45_351.75, "yyyy-mm-dd hh:mm:ss")).toBe("2024-02-29 18:00:00");
+  it("preserves Excel's 1900 serial boundary", () => {
     expect(dateToSerial(new Date(Date.UTC(1900, 0, 1)))).toBe(1);
     expect(dateToSerial(new Date(Date.UTC(1900, 1, 28)))).toBe(59);
     expect(dateToSerial(new Date(Date.UTC(1900, 2, 1)))).toBe(61);
     expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
-  });
-
-  it("shows serial 60 as Excel's 29 February 1900 in every date code", () => {
-    expect(formatNumber(59, "yyyy-mm-dd")).toBe("1900-02-28");
-    expect(formatNumber(60, "yyyy-mm-dd")).toBe("1900-02-29");
-    expect(formatNumber(61, "yyyy-mm-dd")).toBe("1900-03-01");
-    expect(formatNumber(60, "d mmm yyyy")).toBe("29 Feb 1900");
-    expect(formatNumber(60, "dd/mm/yy")).toBe("29/02/00");
-    expect(formatNumber(60, "mmmm")).toBe("February");
-    expect(formatNumber(60, "dddd")).toBe("Wednesday");
-    expect(formatNumber(60, "ddd d")).toBe("Wed 29");
-    expect(formatNumber(61, "dddd")).toBe("Thursday");
-    expect(formatNumber(60.75, "yyyy-mm-dd hh:mm")).toBe("1900-02-29 18:00");
-    expect(formatNumber(1, "yyyy-mm-dd")).toBe("1900-01-01");
-    expect(formatNumber(45_351, "d mmmm yyyy")).toBe("29 February 2024");
   });
 
   it("names weekdays before 1 March 1900 as Excel and WEEKDAY count them", () => {
@@ -112,75 +58,34 @@ describe("formatNumber", () => {
       expect(formatNumber(serial, "dddd"), String(serial)).toBe(weekday);
       expect(formatNumber(serial, "ddd"), String(serial)).toBe(weekday.slice(0, 3));
     }
-
-    expect(formatNumber(1, "yyyy-mm-dd dddd")).toBe("1900-01-01 Sunday");
-    expect(formatNumber(59, "yyyy-mm-dd ddd")).toBe("1900-02-28 Tue");
-    expect(formatNumber(59.5, "dddd hh:mm")).toBe("Tuesday 12:00");
-    expect(formatNumber(61, "yyyy-mm-dd dddd")).toBe("1900-03-01 Thursday");
-    expect(formatNumber(45_351, "dddd")).toBe("Thursday");
   });
 
-  it("reads 29 February 1900 back as serial 60", () => {
-    expect(parseDateInput("1900-02-29")).toBe(60);
-    expect(parseDateInput("1900-02-29 18:00")).toBe(60.75);
-    expect(parseDateInput("02/29/1900")).toBe(60);
-    expect(parseDateInput("29/02/1900")).toBe(60);
-    expect(parseDateInput("1900-02-28")).toBe(59);
-    expect(parseDateInput("1900-03-01")).toBe(61);
-    expect(parseDateInput(formatNumber(60, "yyyy-mm-dd"))).toBe(60);
-
-    for (const invalid of ["1900-02-30", "1899-02-29", "1901-02-29", "1900-02-29 24:00"]) {
-      expect(parseDateInput(invalid), invalid).toBeNull();
-    }
-  });
-
-  it("parses supported UTC calendar forms and rejects ambiguous invalid components", () => {
+  it("reads dates back as serials, 29 February 1900 as Excel's serial 60, and rejects invalid ones", () => {
     const leapDay = dateToSerial(new Date(Date.UTC(2024, 1, 29)));
-    expect(parseDateInput(" 2024-02-29 ")).toBe(leapDay);
-    expect(parseDateInput("2024-02-29 12:30")).toBe(leapDay + 12.5 / 24);
-    expect(parseDateInput("2024-02-29T23:59:58")).toBe(
-      leapDay + (23 * 3600 + 59 * 60 + 58) / 86_400,
-    );
-    expect(parseDateInput("31/01/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 0, 31))));
-    expect(parseDateInput("01/31/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 0, 31))));
-    expect(parseDateInput("04/05/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 3, 5))));
-
-    for (const invalid of [
-      "2023-02-29",
-      "2024-13-01",
-      "2024-01-32",
-      "2024-01-01 24:00",
-      "2024-01-01 12:60",
-      "13/14/2024",
-      "99-01-01",
-      "not a date",
-    ]) {
-      expect(parseDateInput(invalid), invalid).toBeNull();
+    const cases: [string, number | null][] = [
+      ["1900-02-29", 60],
+      ["1900-02-29 18:00", 60.75],
+      ["02/29/1900", 60],
+      ["29/02/1900", 60],
+      ["1900-02-28", 59],
+      ["1900-03-01", 61],
+      [" 2024-02-29 ", leapDay],
+      ["2024-02-29 12:30", leapDay + 12.5 / 24],
+      ["2024-02-29T23:59:58", leapDay + (23 * 3600 + 59 * 60 + 58) / 86_400],
+      ["31/01/2024", leapDay - 29],
+      ["01/31/2024", leapDay - 29],
+      ["04/05/2024", leapDay + 36],
+    ];
+    for (const invalid of ["1900-02-30", "1899-02-29", "1901-02-29", "1900-02-29 24:00"]) {
+      cases.push([invalid, null]);
     }
-  });
-
-  it("formats scientific notation with an explicit exponent width", () => {
-    expect(formatNumber(12_345, "0.00E+00")).toBe("1.23E+04");
-    expect(formatNumber(0.0012, "0.0E+000")).toBe("1.2E-003");
-  });
-
-  it("selects positive, negative, zero, and text sections", () => {
-    const code = '0.00;[Red](0.00);"none";"value: "@';
-    expect(formatNumber(2.5, code)).toBe("2.50");
-    expect(formatNumber(-2.5, code)).toBe("(2.50)");
-    expect(formatNumber(0, code)).toBe("none");
-    expect(formatNumber("draft", code)).toBe("value: draft");
-  });
-
-  it("supports quoted and escaped literal affixes", () => {
-    expect(formatNumber(12.5, '"USD "0.00\\!')).toBe("USD 12.50!");
-    expect(formatNumber(-12.5, '0.0;"loss "0.0')).toBe("loss 12.5");
-  });
-
-  it("distinguishes month and minute tokens and renders names and AM/PM", () => {
-    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
-    expect(formatNumber(serial, "mmm d, yyyy h:mm:ss AM/PM")).toBe("Jul 4, 2024 3:06:07 PM");
-    expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
+    for (const invalid of ["2023-02-29", "2024-13-01", "2024-01-32", "2024-01-01 24:00"]) {
+      cases.push([invalid, null]);
+    }
+    for (const invalid of ["2024-01-01 12:60", "13/14/2024", "99-01-01", "not a date"]) {
+      cases.push([invalid, null]);
+    }
+    for (const [input, serial] of cases) expect(parseDateInput(input), input).toBe(serial);
   });
 
   // `[h]`, `[m]` and `[s]` show elapsed time, past one day or one hour.
@@ -230,43 +135,83 @@ describe("formatNumber", () => {
 
   it("returns exact text for fixed values on repeated calls", () => {
     resetNumberFormatResourcesForTest();
-    const cases: ReadonlyArray<[number, string | undefined, string | undefined, string]> = [
-      [1234.5, "¤#,##0.00", "en-US", "$1,234.50"],
-      [1, "¤0.00", "en-US", "$1.00"],
-      [1234.5, "¤#,##0.00", "de-DE", "$1.234,50"],
-      [1234.5, "#,##0.00", "de-DE", "1.234,50"],
-      [1234.5, "#,##0.00", "en-US", "1,234.50"],
-      [1234.5, "#,##0.0", "en-US", "1,234.5"],
-      [-1234.5, "#,##0.00", "en-US", "-1,234.50"],
-      [-0.4, "$#,##0", "en-US", "-$0"],
-      [-0.05, "0.0%", "en-US", "-5.0%"],
-      [-246, '0" USD"', "en-US", "-246 USD"],
-      [-5, "0", "en-US", "-5"],
-      [-0, "$0.00", "en-US", "$-0.00"],
-      [0, "$0.00", "en-US", "$0.00"],
-      [-1, "yyyy-mm-dd", "en-US", "1899-12-30"],
-      [-0, undefined, undefined, "0"],
-      [0, undefined, undefined, "0"],
-      [-0, "0.00", undefined, "-0.00"],
-      [0, "0.00", undefined, "0.00"],
-      [Number.NaN, "#,##0", undefined, ""],
-      [Number.NaN, undefined, undefined, ""],
-      [Number.POSITIVE_INFINITY, "#,##0.00", undefined, ""],
-      [Number.NEGATIVE_INFINITY, undefined, undefined, ""],
-      [1e21, "#,##0.00", undefined, "1,000,000,000,000,000,000,000.00"],
-      [1e-7, "0.00000000", undefined, "0.00000010"],
-      [45_351, "yyyy-mm-dd", undefined, "2024-02-29"],
-      [45_351, "mmm d, yyyy", undefined, "Feb 29, 2024"],
-      [-2.5, "#,##0.00;(#,##0.00)", undefined, "(2.50)"],
-      [0.5, "0%", undefined, "50%"],
-      [0.123, "0.0%", undefined, "12.3%"],
-      [12_345.6789, "0.00E+00", undefined, "1.23E+04"],
-    ];
+    const july4 = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
+    const cases: ReadonlyArray<[number | string, string | undefined, string | undefined, string]> =
+      [
+        [-246, "$#,##0", undefined, "-$246"],
+        [-1234.5, "$#,##0.00", undefined, "-$1,234.50"],
+        [-246, '"€"#,##0', undefined, "-€246"],
+        [-246, "[$€-2] #,##0", undefined, "-€ 246"],
+        [-246, "$#,##0;($#,##0)", undefined, "($246)"],
+        [1.005, "#,##0.00", undefined, "1.01"],
+        [-0, "#,##0.00", undefined, "-0.00"],
+        [-1.005, "#,##0.00", undefined, "-1.01"],
+        [-0.004, "#,##0.00", undefined, "-0.00"],
+        [999.995, "#,##0.00", undefined, "1,000.00"],
+        [45_351.75, "yyyy-mm-dd hh:mm:ss", undefined, "2024-02-29 18:00:00"],
+        [1, "yyyy-mm-dd", undefined, "1900-01-01"],
+        [59, "yyyy-mm-dd", undefined, "1900-02-28"],
+        [60, "yyyy-mm-dd", undefined, "1900-02-29"],
+        [61, "yyyy-mm-dd", undefined, "1900-03-01"],
+        [60, "d mmm yyyy", undefined, "29 Feb 1900"],
+        [60, "dd/mm/yy", undefined, "29/02/00"],
+        [60.75, "yyyy-mm-dd hh:mm", undefined, "1900-02-29 18:00"],
+        [45_351, "d mmmm yyyy", undefined, "29 February 2024"],
+        [0.0012, "0.0E+000", undefined, "1.2E-003"],
+        [2.5, '0.00;[Red](0.00);"none";"value: "@', undefined, "2.50"],
+        [-2.5, '0.00;[Red](0.00);"none";"value: "@', undefined, "(2.50)"],
+        [0, '0.00;[Red](0.00);"none";"value: "@', undefined, "none"],
+        ["draft", '0.00;[Red](0.00);"none";"value: "@', undefined, "value: draft"],
+        [12.5, '"USD "0.00\\!', undefined, "USD 12.50!"],
+        [-12.5, '0.0;"loss "0.0', undefined, "loss 12.5"],
+        [july4, "mmm d, yyyy h:mm:ss AM/PM", undefined, "Jul 4, 2024 3:06:07 PM"],
+        [july4, "mmmm dd", undefined, "July 04"],
+        [1234.5, "¤#,##0.00", "en-US", "$1,234.50"],
+        [1, "¤0.00", "en-US", "$1.00"],
+        [1234.5, "¤#,##0.00", "de-DE", "$1.234,50"],
+        [1234.5, "#,##0.00", "de-DE", "1.234,50"],
+        [1234.5, "#,##0.00", "en-US", "1,234.50"],
+        [-0.4, "$#,##0", "en-US", "-$0"],
+        [-0.05, "0.0%", "en-US", "-5.0%"],
+        [-246, '0" USD"', "en-US", "-246 USD"],
+        [-0, "$0.00", "en-US", "$-0.00"],
+        [0, "$0.00", "en-US", "$0.00"],
+        [-1, "yyyy-mm-dd", "en-US", "1899-12-30"],
+        [1234.5, "#,##0.0", "en-US", "1,234.5"],
+        [-1234.5, "#,##0.00", "en-US", "-1,234.50"],
+        [-5, "0", "en-US", "-5"],
+        [-0, undefined, undefined, "0"],
+        [Number.NaN, "#,##0", undefined, ""],
+        [Number.NEGATIVE_INFINITY, undefined, undefined, ""],
+        [45_351, "mmm d, yyyy", undefined, "Feb 29, 2024"],
+        [-2.5, "#,##0.00;(#,##0.00)", undefined, "(2.50)"],
+        [0.5, "0%", undefined, "50%"],
+        [60, "mmmm", undefined, "February"],
+        [60, "ddd d", undefined, "Wed 29"],
+        [59.5, "dddd hh:mm", undefined, "Tuesday 12:00"],
+        [1, "yyyy-mm-dd dddd", undefined, "1900-01-01 Sunday"],
+        [59, "yyyy-mm-dd ddd", undefined, "1900-02-28 Tue"],
+        [61, "yyyy-mm-dd dddd", undefined, "1900-03-01 Thursday"],
+        [45_351, "dddd", undefined, "Thursday"],
+        [12_345, "0.00E+00", undefined, "1.23E+04"],
+        [1234.5, undefined, "de-DE", "1234,5"],
+        [123456789012, undefined, "de-DE", "1,23457E+11"],
+        [-0, "0.00", undefined, "-0.00"],
+        [0, "0.00", undefined, "0.00"],
+        [0, undefined, undefined, "0"],
+        [Number.NaN, undefined, undefined, ""],
+        [Number.POSITIVE_INFINITY, "#,##0.00", undefined, ""],
+        [1e21, "#,##0.00", undefined, "1,000,000,000,000,000,000,000.00"],
+        [1e-7, "0.00000000", undefined, "0.00000010"],
+        [45_351, "yyyy-mm-dd", undefined, "2024-02-29"],
+        [0.123, "0.0%", undefined, "12.3%"],
+        [12_345.6789, "0.00E+00", undefined, "1.23E+04"],
+      ];
 
     for (const [value, code, locale, expected] of cases) {
-      expect(formatNumber(value, code, locale), `cold ${value}`).toBe(expected);
+      expect(formatNumber(value, code, locale), `cold ${value} ${code}`).toBe(expected);
       // The second call serves the entry the first call stored.
-      expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
+      expect(formatNumber(value, code, locale), `warm ${value} ${code}`).toBe(expected);
     }
   });
 });
