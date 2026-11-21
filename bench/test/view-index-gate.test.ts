@@ -20,23 +20,18 @@ const PACKED = [
   { lookupMedianNs: 24.76, lookupP95Ns: 53.0 },
 ];
 
-test("the smoke passes the packed lookup that a shared runner's p95 failed", () => {
+test("the smoke gates best medians, so a shared runner's p95 cannot fail it; a full run keeps p95", () => {
   expect(lookupGate("smoke", MAP, PACKED)).toEqual({
     name: "lookupBestMedian",
     regression: 22.16 / 32.62 - 1,
     passed: true,
   });
-});
-
-test("a full run keeps the strict p95 comparison", () => {
   expect(lookupGate("full", MAP, PACKED)).toEqual({
     name: "lookupP95",
     regression: 73.43 / 49.09 - 1,
     passed: false,
   });
-});
-
-test("the smoke still fails a packed lookup that does twice its work", () => {
+  // The smoke still fails a packed lookup that does twice its work.
   const slowed = PACKED.map((run) => ({
     lookupMedianNs: run.lookupMedianNs * 2,
     lookupP95Ns: run.lookupP95Ns * 2,

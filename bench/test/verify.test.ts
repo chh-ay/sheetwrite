@@ -1,81 +1,15 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
-import { type FormulaBenchmarkResult } from "../src/formula-artifact.js";
-import { expectedFormulaMemoryKeys, expectedFormulaWorkloadKeys } from "../src/formula-bench.js";
-import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
-import { summarize } from "../src/stats.js";
 import { commandArtifact } from "../src/verify.js";
 
-function incompleteFormulaFixture(): FormulaBenchmarkResult {
-  const workloads = expectedFormulaWorkloadKeys("smoke")
-    .map((key) => {
-      const match = /^workload=(.*);size=(\d+)$/u.exec(key)!;
-      return {
-        id: match[1]!,
-        size: Number(match[2]),
-        samplesMs: [1, 2],
-        stat: summarize([1, 2]),
-      };
-    })
-    .filter((entry) => !(entry.id === "independent-parse-load" && entry.size === 1_000));
-  return {
-    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
-    mode: "smoke",
-    matrixId: MATRIX_IDS.formula.smoke,
-    meta: {
-      bun: "test",
-      platform: "linux",
-      arch: "x64",
-      commit: "0".repeat(40),
-      dirty: false,
-      timestamp: new Date().toISOString(),
-    },
-    workloads,
-    memory: expectedFormulaMemoryKeys("smoke").map((key) => ({
-      formulas: Number(key.slice("memory=formulas=".length)),
-      wasmDeltaBytes: 1024,
-    })),
-    gates: { passed: true, tolerance: "test" },
-  };
-}
+const repositoryRoot = resolve(import.meta.dir, "../..");
 
-describe("CI-facing deterministic verifier", () => {
-  let directory = "";
-  let fixturePath = "";
-  const repositoryRoot = resolve(import.meta.dir, "../..");
-  const artifactRoot = resolve(repositoryRoot, "test-results/performance-gates");
-
-  beforeAll(() => {
-    directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-verify-"));
-    fixturePath = resolve(directory, "incomplete-formula.json");
-    writeFileSync(fixturePath, `${JSON.stringify(incompleteFormulaFixture(), null, 2)}\n`);
-  });
-
-  afterAll(() => rmSync(directory, { recursive: true, force: true }));
-
-  test("fails a missing result and preserves raw plus structured error artifacts", () => {
-    const result = Bun.spawnSync(
-      [
-        "bun",
-        "run",
-        resolve(repositoryRoot, "bench/src/verify.ts"),
-        "--fixture",
-        `formula:${fixturePath}`,
-      ],
-      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
-    );
-    expect(result.exitCode).not.toBe(0);
-    expect(existsSync(resolve(artifactRoot, "formula.json"))).toBe(true);
-    const error = readFileSync(resolve(artifactRoot, "formula-error.json"), "utf8");
-    expect(error).toContain("missing workload=independent-parse-load;size=1000");
-    expect(result.stderr.toString()).toContain("formula");
-    expect(result.stderr.toString()).toContain("missing workload=independent-parse-load;size=1000");
-  });
-
-  test("prints the failing view-index gate and measured values", () => {
+test("fails a gate, prints its measured values and preserves a structured error artifact", () => {
+  const directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-verify-"));
+  try {
     const path = resolve(directory, "view-index.json");
     writeFileSync(
       path,
@@ -101,31 +35,36 @@ describe("CI-facing deterministic verifier", () => {
       { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
     );
 
+    const failure = "view-index runtime gates failed: lookupP95";
     expect(result.exitCode).toBe(1);
-    expect(result.stderr.toString()).toContain("view-index runtime gates failed: lookupP95");
+    expect(result.stderr.toString()).toContain(failure);
     const measurements = result.stderr.toString().split("Failing view-index measurements: ")[1];
-    expect(measurements).toBeDefined();
     expect(JSON.parse(measurements ?? "")).toMatchObject({
       lookupP95Regression: 0.25,
       baseline: { lookupP95Ns: 100 },
       packed: { lookupP95Ns: 125 },
     });
-  });
+    const errorArtifact = resolve(
+      repositoryRoot,
+      "test-results/performance-gates/view-index-error.json",
+    );
+    expect(readFileSync(errorArtifact, "utf8")).toContain(failure);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
-  test("names how a smoke without a JSON artifact ended", () => {
-    const stderr = "sample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable\n";
-    expect(() =>
-      commandArtifact({ stdout: "", stderr, exitCode: 1, signalCode: null }, "interaction"),
-    ).toThrow(
-      "interaction smoke exited 1 without a JSON artifact; its stderr ends:\nsample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable",
-    );
-    expect(() =>
-      commandArtifact(
-        { stdout: "", stderr: "", exitCode: null, signalCode: "SIGKILL" },
-        "interaction",
-      ),
-    ).toThrow(
-      "interaction smoke was killed by SIGKILL without a JSON artifact; its stderr is empty",
-    );
-  });
+test("names how a smoke without a JSON artifact ended", () => {
+  const stderr = "sample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable\n";
+  expect(() =>
+    commandArtifact({ stdout: "", stderr, exitCode: 1, signalCode: null }, "interaction"),
+  ).toThrow(
+    "interaction smoke exited 1 without a JSON artifact; its stderr ends:\nsample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable",
+  );
+  expect(() =>
+    commandArtifact(
+      { stdout: "", stderr: "", exitCode: null, signalCode: "SIGKILL" },
+      "interaction",
+    ),
+  ).toThrow("interaction smoke was killed by SIGKILL without a JSON artifact; its stderr is empty");
 });

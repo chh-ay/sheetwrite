@@ -24,7 +24,7 @@ import {
 import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { type Stat, summarize } from "./stats.js";
 
-export const PAGED_FULL_ROWS = 1_000_000;
+const PAGED_FULL_ROWS = 1_000_000;
 export const PAGED_SMOKE_ROWS = 10_000;
 const COLUMNS = 5;
 const FULL_RUNS = 12;
