@@ -8,6 +8,7 @@ import type { CellStyle, Renderer } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
+  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -88,18 +89,18 @@ describe("Format Cells", () => {
       "Border",
       "Fill",
     ]);
-    expect(document.activeElement === tabs[0]!).toBe(true);
+    expectSameNode(document.activeElement, tabs[0]!);
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expect(document.activeElement === tabs[1]!).toBe(true);
+    expectSameNode(document.activeElement, tabs[1]!);
     expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
     const panels = [...dialog.querySelectorAll<HTMLElement>("[role=tabpanel]")];
     expect(panels.map((panel) => panel.hidden)).toEqual([true, false, true, true, true]);
     tabs[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(document.activeElement === tabs[4]!).toBe(true);
+    expectSameNode(document.activeElement, tabs[4]!);
 
     await answerDialog(host, "Cancel");
-    expect(document.activeElement === host).toBe(true);
+    expectSameNode(document.activeElement, host);
     expect(cell(0, 1).style).toEqual({});
   });
 
@@ -152,7 +153,7 @@ describe("Format Cells", () => {
     type("");
     dialog.querySelector<HTMLButtonElement>(".sheetwrite-dialog-default")!.click();
     expect(dialog.isConnected).toBe(true);
-    expect(document.activeElement === code).toBe(true);
+    expectSameNode(document.activeElement, code);
     type('0.0 "kg"');
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');

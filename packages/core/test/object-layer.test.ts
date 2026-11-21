@@ -10,7 +10,7 @@ import type {
   GridOptions,
   Workbook,
 } from "../src/types.js";
-import { makeWorkbook } from "./fixtures.js";
+import { expectSameNode, makeWorkbook } from "./fixtures.js";
 
 const ROW_HEIGHT = DEFAULT_THEME.rowHeight;
 /** Column widths of `makeWorkbook`: name, amount, city. */
@@ -263,7 +263,7 @@ describe("object layer editing", () => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
     focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(document.activeElement).toBe(frame);
+    expectSameNode(document.activeElement, frame);
 
     press(frame, "ContextMenu");
     expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
@@ -282,7 +282,7 @@ describe("object layer editing", () => {
     expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
 
     press(frame, "Escape");
-    expect(document.activeElement).toBe(hostOf(grid));
+    expectSameNode(document.activeElement, hostOf(grid));
     expect(frame.classList.contains("sheetwrite-object-selected")).toBe(false);
   });
 });

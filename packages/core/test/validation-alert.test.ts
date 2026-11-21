@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { type GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { DataValidationRule } from "../src/types.js";
-import { answerDialog, elementAdded, mountGridWithData } from "./fixtures.js";
+import { answerDialog, elementAdded, expectSameNode, mountGridWithData } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -58,7 +58,7 @@ describe("data validation error alert", () => {
     expect(dialog.querySelector(".sheetwrite-dialog-title")?.textContent).toBe("Quantity");
     expect(dialog.textContent).toContain("Enter 1 to 5.");
     await answerDialog(host, "Cancel");
-    expect(document.activeElement === host).toBe(true);
+    expectSameNode(document.activeElement, host);
     expect(store.getCell(amount).resolved).toBe(0.5);
     grid.destroy();
     store.dispose();

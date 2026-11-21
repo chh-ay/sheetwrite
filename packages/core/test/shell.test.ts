@@ -10,7 +10,13 @@ import {
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, Workbook } from "../src/types.js";
-import { answerDialog, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import {
+  answerDialog,
+  expectSameNode,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+} from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -180,7 +186,7 @@ describe("createToolbar", () => {
       piece.element.dispatchEvent(
         new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
       );
-      expect(document.activeElement, key).toBe(controls[expected]!);
+      expectSameNode(document.activeElement, controls[expected]!, key);
     }
     expect(piece.element.getAttribute("role")).toBe("toolbar");
     expect(piece.element.getAttribute("aria-label")).toBe("Editing");
@@ -274,7 +280,7 @@ describe("createNameBox", () => {
 
     // Typing on the grid edits the cell in the formula bar; Enter stores it.
     press(host, "x");
-    expect(document.activeElement).toBe(field);
+    expectSameNode(document.activeElement, field);
     expect(field.value).toBe("x");
     press(field, "Enter");
     expect(store.getCell(a3).resolved).toBe("x");
@@ -400,7 +406,7 @@ describe("createFormulaBar", () => {
       bar.focus();
       type(bar, "Typed");
       expect(cellEditor()?.value).toBe("Typed");
-      expect(document.activeElement).toBe(bar);
+      expectSameNode(document.activeElement, bar);
       type(bar, "Typed in bar", "insertFromPaste");
       expect(cellEditor()?.value).toBe("Typed in bar");
       bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
@@ -426,7 +432,7 @@ describe("createFormulaBar", () => {
       if (!editor) throw new Error("the cell editor did not open");
       type(editor, "ab");
       bar.focus();
-      expect(cellEditor()).toBe(editor);
+      expectSameNode(cellEditor(), editor);
       type(bar, "abc");
       expect(editor.value).toBe("abc");
       editor.focus();

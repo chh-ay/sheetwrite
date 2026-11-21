@@ -4,7 +4,7 @@ import { FindBar } from "../src/find-bar.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { ColumnarData, Grid, Workbook } from "../src/types.js";
-import { makeWorkbook, mountHost } from "./fixtures.js";
+import { expectSameNode, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 const cleanups: (() => void)[] = [];
@@ -108,7 +108,7 @@ describe("FindBar", () => {
     bar.open();
     field("input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(bar.isOpen).toBe(false);
-    expect(document.activeElement === host).toBe(true);
+    expectSameNode(document.activeElement, host);
     expect(value(grid, 0)).toBe("Lovelace");
   });
 });
