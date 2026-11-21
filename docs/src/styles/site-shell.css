@@ -353,11 +353,18 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-document__header {
   margin-bottom: var(--sw-space-10);
 }
-/* The page's group, in the accent colour above the title. */
+/* The page's group, in the accent colour above the title, after the icon its
+   sidebar entry shows: the same glyph, in the label's colour and size. */
 .sw-document__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
   margin: 0 0 var(--sw-space-2);
   color: var(--sw-accent-strong);
   font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
+}
+.sw-document__eyebrow > .sw-icon {
+  --sw-icon-accent: currentColor;
 }
 .sw-document__header h1 {
   display: flex;

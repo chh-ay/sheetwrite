@@ -207,6 +207,33 @@ test("framework tabs synchronize and persist across guides", async ({ page }) =>
   await expectHighlighted("svelte");
 });
 
+test("a page's eyebrow carries its section's sidebar icon, and no icon stands alone", async ({
+  page,
+}) => {
+  await page.goto("/docs/start/installation/");
+  const eyebrow = page.locator(".sw-document__eyebrow");
+  await expect(eyebrow).toHaveText("Getting started");
+  // The same glyph as the section's row in the sidebar.
+  const sidebarGlyph = await page
+    .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
+    .getAttribute("href");
+  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
+  // Beside its label: centred on the label's line.
+  const offset = await eyebrow.evaluate((label) => {
+    const icon = label.querySelector(".sw-icon")?.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const text = [...range.getClientRects()].at(-1);
+    if (icon === undefined || text === undefined) return Number.NaN;
+    return icon.top + icon.height / 2 - (text.top + text.height / 2);
+  });
+  expect(Math.abs(offset)).toBeLessThanOrEqual(1);
+
+  // A tab's landing page has no eyebrow, so it shows no icon above its title.
+  await page.goto("/docs/");
+  await expect(page.locator(".sw-document__header svg")).toHaveCount(0);
+});
+
 test("generated API pages show member signatures and mark member deep links", async ({ page }) => {
   await page.setViewportSize({ width: 1568, height: 900 });
   await page.goto("/docs/api/core/");
