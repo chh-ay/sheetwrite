@@ -1,0 +1,8 @@
+
+Running 4 tests using 1 worker
+
+[1/4] [chromium] › test/browser/docs-art-geometry.spec.ts:18:5 › docs art has sound geometry, wide, light
+[2/4] [chromium] › test/browser/docs-art-geometry.spec.ts:18:5 › docs art has sound geometry, wide, dark
+[3/4] [chromium] › test/browser/docs-art-geometry.spec.ts:18:5 › docs art has sound geometry, phone, light
+[4/4] [chromium] › test/browser/docs-art-geometry.spec.ts:18:5 › docs art has sound geometry, phone, dark
+  4 passed (2.4m)

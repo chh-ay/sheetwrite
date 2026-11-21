@@ -1,0 +1,5 @@
+
+Running 1 test using 1 worker
+
+[1/1] [chromium] › test/browser/showcase-hub.spec.ts:4:1 › hub links every showcase, filters accessibly, and never clips a card
+  1 passed (2.9s)
