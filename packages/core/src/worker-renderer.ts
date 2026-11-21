@@ -331,6 +331,7 @@ export class WorkerRenderer implements Renderer {
         rowHeights: pane.rowHeights,
         rowNumbers: pane.rowNumbers,
         filteredRows: pane.filteredRows,
+        filterHeader: pane.filterHeader,
       };
     });
 
