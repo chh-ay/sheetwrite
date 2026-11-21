@@ -3,7 +3,6 @@
 // concept diagrams that sit beside a page's text.
 import type { JSX } from "solid-js";
 
-import type { ArtProps } from "./Art.js";
 import { cardLayout, DOCS_CARD } from "./blueprint-cards.js";
 import {
   DashboardSlicerFigure,
@@ -18,6 +17,11 @@ import {
 } from "./blueprint-figures.js";
 import { BlueprintCard } from "./blueprint.js";
 import { CollaborationRecoveryDiagram, PagingDiagram } from "./diagrams.js";
+
+/** What a section card's picture accepts: an extra class for the box it sits in. */
+interface ArtProps {
+  readonly class?: string;
+}
 
 /** Each section card's picture: what the section's pages lead the reader through. */
 const DOCS_CARD_LAYOUTS = {

@@ -1,10 +1,13 @@
 import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
+import { For } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
+import { DataGuardsDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { DataEvents } from "../showcases/data-tools/DataEvents.js";
 import { DataToolsStage } from "../showcases/data-tools/DataToolsStage.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import {
   DATA_COLUMNS,
@@ -15,6 +18,7 @@ import {
 import DataToolsSnippet from "../showcases/snippets/data-tools.mdx";
 import DataToolsSnippetSource from "../showcases/snippets/data-tools.mdx?source";
 
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/data-tools.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -26,6 +30,7 @@ export const Route = createFileRoute("/showcases/data-tools")({
       "Filter and organize 4,800 dispatch orders. Exercise validation, protected ranges, row grouping and visibility with live Grid event receipts.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -46,6 +51,23 @@ function DataToolsShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
+        explain={
+          <ShowcaseSection
+            id="data-rules"
+            figure={<DataGuardsDiagram />}
+            title="What the guarded columns do"
+          >
+            <ul>
+              <For each={RULE_PROBES}>
+                {(probe) => (
+                  <li>
+                    <strong>{probe.header}:</strong> {probe.rule}
+                  </li>
+                )}
+              </For>
+            </ul>
+          </ShowcaseSection>
+        }
         code={{
           title: "How it is built",
           Snippet: DataToolsSnippet,

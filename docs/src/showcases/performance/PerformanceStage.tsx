@@ -224,8 +224,8 @@ function DrawingControls() {
         </Show>
       </details>
       <p class="sw-showcase__control-description" id="scale-stress-description">
-        A tight {STRESS_CEILING_MIB} MiB ceiling remounts the Grid so clean tiles evict early;
-        sparse edits survive.
+        A tight {STRESS_CEILING_MIB} MiB ceiling restarts the grid, so unedited tiles are dropped
+        sooner. Your edits stay.
       </p>
       <Button
         aria-describedby="scale-stress-description"
