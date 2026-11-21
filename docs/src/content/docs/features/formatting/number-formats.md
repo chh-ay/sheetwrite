@@ -132,10 +132,12 @@ A column's `type` decides how a typed entry is read. The columns Sheetwrite make
 | `1 1/2` | 1.5 | `# ?/?` |
 | `1/15/2026`, `2026-01-15` | the date serial 46037 | `m/d/yyyy` |
 | `15-Jan-2026`, `Jan 15, 2026` | 46037 | `d-mmm-yy` |
+| `Jan-26`, `1/26` | 26 January of this year | `d-mmm` |
+| `Feb-30`, `1/99` | 1 February 1930, 1 January 1999 | `mmm-yy` |
 | `9:30`, `9:30 PM` | 0.3958…, 0.8958… | `h:mm`, `h:mm AM/PM` |
 | `'007` | the text `007` | none |
 
-The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
+The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A month with one number is a day of this year when that day exists, else the first day of the month in that year, as in Excel. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
 
 The grid actions `setNumberFormat(code: string | null)` and `stepDecimals(direction: 1 | -1)` change the format of the selection. `setNumberFormat(null)` returns the cells to the column's format. `stepDecimals` shows one more (`1`) or one fewer (`-1`) decimal place than the focus cell does.
 
