@@ -49,10 +49,26 @@ test("fails a gate, prints its measured values and preserves a structured error 
       "test-results/performance-gates/view-index-error.json",
     );
     expect(readFileSync(errorArtifact, "utf8")).toContain(failure);
+
+    // Each fixture family runs its own gate validator, so an empty formula artifact fails.
+    const formulaPath = resolve(directory, "formula.json");
+    writeFileSync(formulaPath, "{}");
+    const formula = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        resolve(repositoryRoot, "bench/src/verify.ts"),
+        "--fixture",
+        `formula:${formulaPath}`,
+      ],
+      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(formula.exitCode).toBe(1);
+    expect(formula.stderr.toString()).toContain("benchmark formula failed");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
+}, 30_000);
 
 test("names how a smoke without a JSON artifact ended", () => {
   const stderr = "sample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable\n";

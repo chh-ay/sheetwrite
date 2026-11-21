@@ -103,8 +103,10 @@ type Fixture = ReturnType<typeof fixture>;
 const variant = (evidence: Fixture, index: number) =>
   must(evidence.variants[index], `variant ${index}`);
 
-it("selects by the declared Brotli policy", () => {
+it("keeps Rust opt-level separate and selects by the declared Brotli policy", () => {
   const parsed = parseWasmProfileMatrix(fixture());
+  expect(parsed.rustProfile.optLevel).toBe(3);
+  expect(parsed.variants.map(({ wasmOpt }) => wasmOpt)).toEqual(["-O3", "-Os", "-Oz"]);
   expect(decideWasmProfile(parsed)).toEqual({
     status: "recommended",
     wasmOpt: "-Oz",
@@ -145,6 +147,11 @@ it("rejects unshared inputs, non-gating commands, opted-out gates and unmatched 
 
 it("blocks the decision on any failed gate or an unclassified compile probe failure", () => {
   for (const [edit, failure] of [
+    [
+      (evidence: Fixture) =>
+        Object.assign(variant(evidence, 2).formulaGate, { status: "failed", exitCode: 1 }),
+      "-Oz formula gate failed",
+    ],
     [
       (evidence: Fixture) =>
         Object.assign(variant(evidence, 1).renderGate, { status: "failed", exitCode: 1 }),

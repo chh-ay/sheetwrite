@@ -197,6 +197,13 @@ test.each([
     null,
   ],
   [
+    "a missing merge index",
+    { indexConstructions: 0 },
+    "merge-heavy.paint",
+    "prepares one revision index",
+    null,
+  ],
+  [
     "a rebuilt merge index",
     { indexConstructions: 2 },
     "merge-heavy.paint",

@@ -154,6 +154,10 @@ it("accepts a complete comparison and rejects drifted versions, summaries, outpu
       "engineVersions.exceljs",
     ],
     [
+      (artifact) => Reflect.set(artifact.metadata.engineVersions, "sheetwrite", "^0.4.0"),
+      "engineVersions.sheetwrite",
+    ],
+    [
       (artifact) => {
         const first = must(artifact.summaries[0], "summary");
         first.durationMs = { ...first.durationMs, median: 0.5 };

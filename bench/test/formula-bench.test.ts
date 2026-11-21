@@ -161,6 +161,13 @@ describe("formula benchmark schema", () => {
         (result) => (firstWorkload(result).stat = { ...firstWorkload(result).stat, stddev: 0.1 }),
         "does not match raw samples",
       ],
+      [
+        (result) => {
+          const stat = firstWorkload(result).allocationStat;
+          stat.retainedBytes = { ...stat.retainedBytes, stddev: 0.1 };
+        },
+        "does not match raw samples",
+      ],
       [(result) => (result.meta.commit = "A".repeat(40)), "lowercase Git SHA"],
       [(result) => result.runner.command.push("--invented"), "command does not match"],
       [
@@ -168,6 +175,7 @@ describe("formula benchmark schema", () => {
         "must be a SHA-256 digest",
       ],
       [(result) => (result.source.digest = "b".repeat(64)), "digest does not match"],
+      [(result) => (result.source.files.unbounded = SOURCE_HASH), "must contain exactly"],
       [
         (result) => delete result.source.files["bench/src/formula-fixtures.ts"],
         "must contain exactly",

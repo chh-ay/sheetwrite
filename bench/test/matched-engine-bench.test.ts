@@ -89,6 +89,7 @@ it.each([
   "missing",
   "order",
   "checksum",
+  "summary",
   "allocation",
   "ratio",
   "spread",
@@ -104,6 +105,7 @@ it.each([
   if (fault === "missing") row.samples.pop();
   if (fault === "order") sample.engine = "full";
   if (fault === "checksum") sample.output = "wrong";
+  if (fault === "summary") row.defaultStat = { ...row.defaultStat, mean: row.defaultStat.mean + 1 };
   if (fault === "allocation") sample.allocationSamples.pop();
   if (fault === "ratio") row.ratioStat = { ...row.ratioStat, median: row.ratioStat.median + 1 };
   if (fault === "spread") row.ratioP10 += 1;
