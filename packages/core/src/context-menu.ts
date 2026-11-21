@@ -45,6 +45,9 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
         { action: "pasteTranspose" },
         { action: "pasteFormatting" },
         { action: "pasteLink" },
+        // Beyond Excel: after a paste wrote into hidden rows, the same paste
+        // on the shown rows only.
+        { action: "pasteVisibleRows", visible: () => grid.canPasteVisibleRows() },
       ],
     },
     { action: "pasteSpecial" },
@@ -151,6 +154,7 @@ const ACTION_ICON: Record<
   pasteFormatting: "pasteFormatting",
   pasteTranspose: "pasteTranspose",
   pasteLink: "pasteLink",
+  pasteVisibleRows: "pasteVisibleRows",
   pasteSpecial: "pasteSpecial",
   clearContents: "clear",
   merge: "merge",
@@ -212,6 +216,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   pasteFormatting: "Formatting",
   pasteTranspose: "Transpose",
   pasteLink: "Paste Link",
+  pasteVisibleRows: "Paste into visible rows only",
   pasteSpecial: "Paste Special…",
   clearContents: "Clear contents",
   merge: "Merge cells",
@@ -274,6 +279,9 @@ function actionHandler(
 
     case "pasteLink":
       return () => actions.pasteSpecial({ link: true });
+
+    case "pasteVisibleRows":
+      return () => actions.pasteVisibleRows();
 
     case "pasteSpecial":
       return () => actions.pasteSpecial({ ask: true });
