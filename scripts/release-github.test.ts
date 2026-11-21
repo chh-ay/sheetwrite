@@ -345,9 +345,12 @@ describe("version GitHub release", () => {
       [...PUBLISHABLE_PACKAGE_ORDER].sort(),
     ]);
     // Entries need their pull request and author for the release notes.
-    expect(config.changelog).toEqual([
-      "@changesets/changelog-github",
-      { repo: "chh-ay/sheetwrite" },
+    expect(config.changelog).toEqual(["./changelog.js", { repo: "chh-ay/sheetwrite" }]);
+    const [{ default: github }, { default: changelog }] = await Promise.all([
+      import("@changesets/changelog-github"),
+      import("../.changeset/changelog.js"),
     ]);
+    expect(changelog.getReleaseLine).toBe(github.getReleaseLine);
+    expect(await changelog.getDependencyReleaseLine([], [], null)).toBe("");
   });
 });
