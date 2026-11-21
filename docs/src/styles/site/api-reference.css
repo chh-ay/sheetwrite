@@ -415,6 +415,12 @@
   margin-block: var(--sw-space-3);
 }
 
+/* Card text keeps the prose measure; the card's code and tables stay wide. */
+.sw-prose .api-card__doc,
+.sw-prose .api-card > :is(p, ul):not(.api-card__head) {
+  max-width: var(--sw-measure-prose);
+}
+
 /* A member's parameters, return value and throws: a label beside each line. */
 .sw-prose .api-card__tags {
   display: grid;
