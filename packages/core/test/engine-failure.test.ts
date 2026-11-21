@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
 import { releaseEngineMemory } from "../src/engine-memory.js";
 import { SheetwriteError } from "../src/errors.js";
@@ -20,6 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  mock.restore();
   restoreStubs();
   // Every test leaves a running engine behind, whether or not it stopped one.
   await initSheetwrite();
@@ -203,7 +204,8 @@ describe("engine failure", () => {
 
   it("keeps a restarted engine running when a grid uses a store from the stopped one", async () => {
     const bystander = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    expectEngineFailed(stopThrough(new SheetwriteStore(makeWorkbook(5), makeColumnarData(5))));
+    const stopped = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
+    expectEngineFailed(stopThrough(stopped));
     await initSheetwrite();
     const healthy = mountGrid();
 
@@ -230,36 +232,20 @@ describe("engine failure", () => {
       reason: "read-only",
     });
     expect(healthy.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
+    // The stopped engine's store is out of the live set, so release does not read it.
+    await releaseEngineMemory();
+    expect(healthy.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("kept");
+    stopped.dispose();
 
     stale.destroy();
     healthy.destroy();
   });
 
-  it("migrates only the running engine's stores after a restart", async () => {
-    const stopped = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    expectEngineFailed(stopThrough(stopped));
-    await initSheetwrite();
-
-    const running = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    running.applyTransaction({ patches: [setText("kept")] });
-
-    // The stopped store is out of the live set, so release does not read it.
-    await releaseEngineMemory();
-    expect(running.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("kept");
-    running.dispose();
-  });
-
   it("keeps the resource-limit error when a snapshot load traps", async () => {
     const snapshot = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5)).exportSnapshot();
-    const hydrate = spyOn(StoreDataEngine.prototype, "hydrateSnapshot").mockImplementation(
-      trapAndPoison,
-    );
-    let failure: unknown;
-    try {
-      failure = caught(() => SheetwriteStore.fromSnapshot(snapshot));
-    } finally {
-      hydrate.mockRestore();
-    }
+    spyOn(StoreDataEngine.prototype, "hydrateSnapshot").mockImplementation(trapAndPoison);
+    const failure = caught(() => SheetwriteStore.fromSnapshot(snapshot));
+    mock.restore();
 
     expect(failure).toMatchObject({
       name: "SnapshotValidationError",
@@ -275,26 +261,22 @@ describe("engine failure", () => {
     const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const prepare = spyOn(StoreDataEngine.prototype, "prepareMemoryRelease");
 
-    try {
-      // History migration wraps the allocation failure in its own error.
-      prepare.mockImplementation(() => {
-        throw new Error("Sheetwrite: compact history migration failed", {
-          cause: new RangeError("Array buffer allocation failed"),
-        });
+    // History migration wraps the allocation failure in its own error.
+    prepare.mockImplementation(() => {
+      throw new Error("Sheetwrite: compact history migration failed", {
+        cause: new RangeError("Array buffer allocation failed"),
       });
-      await expect(releaseEngineMemory()).rejects.toMatchObject({
-        code: "resource-limit",
-        operation: "engine",
-      });
-      expect(isSheetwriteReady()).toBe(true);
-      expect(store.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
+    });
+    await expect(releaseEngineMemory()).rejects.toMatchObject({
+      code: "resource-limit",
+      operation: "engine",
+    });
+    expect(isSheetwriteReady()).toBe(true);
+    expect(store.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
 
-      prepare.mockImplementation(trap);
-      expectEngineFailed(await releaseEngineMemory().catch((error: unknown) => error));
-      expect(isSheetwriteReady()).toBe(false);
-      expectEngineFailed(caught(() => store.applyTransaction({ patches: [setText("lost")] })));
-    } finally {
-      prepare.mockRestore();
-    }
+    prepare.mockImplementation(trap);
+    expectEngineFailed(await releaseEngineMemory().catch((error: unknown) => error));
+    expect(isSheetwriteReady()).toBe(false);
+    expectEngineFailed(caught(() => store.applyTransaction({ patches: [setText("lost")] })));
   });
 });
