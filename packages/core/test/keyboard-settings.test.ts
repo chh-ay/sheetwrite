@@ -6,6 +6,7 @@ import { DEFAULT_BINDINGS, Keymap } from "../src/keymap.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, KeyboardOptions, Workbook } from "../src/types.js";
+import { expectSameNode } from "./fixtures.js";
 
 // The Keyboard shortcuts panel (#802): the user rebinds the grid's built-in
 // commands. Each change applies at once and reaches the host as one
@@ -155,7 +156,7 @@ describe("opening the panel", () => {
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");
     expect(byLabel(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
     // The search box has focus, so typing searches at once.
-    expect(document.activeElement === byLabel(panel, "Search commands or press keys")).toBe(true);
+    expectSameNode(document.activeElement, byLabel(panel, "Search commands or press keys"));
   });
 });
 
@@ -182,7 +183,7 @@ describe("Excel's defaults on each platform", () => {
       expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe(label);
       // Firefox reserves no default; Safari keeps ⌘⇧3 for Date.
       const warned = platform === "MacIntel" ? pasteSpecial : panel;
-      expect(warned.querySelector(".sheetwrite-keys-warning")).toBe(null);
+      expectSameNode(warned.querySelector(".sheetwrite-keys-warning"), null);
       const event = new KeyboardEvent("keydown", { key: "v", ctrlKey: true, metaKey: true });
       expect(new Keymap().action(event)).toBe(ctrlCmdV);
     },
@@ -228,11 +229,11 @@ describe("recording keys", () => {
     press(document.activeElement as HTMLElement, "Escape");
     expect(status(panel)).toBe("Stopped recording. Italic keeps Ctrl+I, Ctrl+3.");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).not.toBeNull();
-    expect(document.activeElement === byLabel(panel, "Change Ctrl+I for Italic")).toBe(true);
+    expectSameNode(document.activeElement, byLabel(panel, "Change Ctrl+I for Italic"));
 
     press(document.activeElement as HTMLElement, "Escape");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).toBeNull();
-    expect(document.activeElement === opener).toBe(true);
+    expectSameNode(document.activeElement, opener);
     expect(events).toEqual([]);
   });
 
@@ -286,7 +287,7 @@ describe("conflicts", () => {
 
     record(panel, "Change Ctrl+B for Bold", "u", { ctrlKey: true, code: "KeyU" });
     expect(prompt.textContent).toContain("Ctrl+U is assigned to Underline.");
-    expect(document.activeElement === button(prompt, "Swap")).toBe(true);
+    expectSameNode(document.activeElement, button(prompt, "Swap"));
     button(prompt, "Cancel").click();
     expect(events).toEqual([]);
 

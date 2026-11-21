@@ -109,35 +109,6 @@ fn edits_on_a_local_sheet_keep_no_dirty_overlay() {
 }
 
 #[test]
-fn a_local_sheet_stays_local_through_a_memory_transfer() {
-    use crate::cells::CellStorage;
-    use crate::transfer::{Reader, Writer};
-
-    let (store, dense, local) = twin_sheets(SHORT_ROWS);
-    let mut out = Writer::new(1);
-    store.sheets[local].cells.write_transfer(&mut out);
-    let mut input = Reader::new(&out.0, 1).unwrap();
-    let restored = CellStorage::read_transfer(&mut input).unwrap();
-    input.finish().unwrap();
-    assert!(restored.is_local_paged() && !restored.is_datasource_paged());
-    assert!(restored.is_fully_loaded());
-    let original = &store.sheets[dense].cells;
-    for index in 0..SHORT_ROWS * COLS {
-        assert_eq!(
-            (
-                restored.source_kind_at(index),
-                restored.source_payload_at(index)
-            ),
-            (
-                original.source_kind_at(index),
-                original.source_payload_at(index)
-            ),
-            "cell {index}"
-        );
-    }
-}
-
-#[test]
 fn lookups_on_a_local_sheet_match_the_dense_sheet() {
     let (mut store, dense, local) = twin_sheets(ROWS);
     let lookups = [
@@ -216,15 +187,14 @@ fn a_memory_transfer_drops_the_rows_of_free_local_pages() {
         assert!(cells.write_cell(row, 0, KIND_NUMBER, 7, 0, None), "write");
     }
     cells.delete_rows(4_096, 4_096).unwrap();
-    let transfer = |cells: &CellStorage| {
-        let mut out = Writer::new(1);
-        cells.write_transfer(&mut out);
-        out.0
-    };
-    let before = transfer(&cells);
+    let mut out = Writer::new(1);
+    cells.write_transfer(&mut out);
+    let before = out.0;
     let mut input = Reader::new(&before, 1).unwrap();
     let mut restored = CellStorage::read_transfer(&mut input).unwrap();
     input.finish().unwrap();
+    assert!(restored.is_local_paged() && !restored.is_datasource_paged());
+    assert!(restored.is_fully_loaded());
     assert!(
         // One page holds 13 bytes a row; the other page is free.
         before.len() < 2 * 4_096 * 13,

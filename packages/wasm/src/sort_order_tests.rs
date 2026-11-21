@@ -48,25 +48,72 @@ fn sorted(store: &CellStore, sheet: usize, ascending: bool) -> Vec<u32> {
     single
 }
 
-#[test]
-fn numbers_sort_from_the_smallest_negative_to_the_largest_positive() {
-    let (store, sheet) = column(&[
-        Entry::Number(3.0),
-        Entry::Number(-10.0),
-        Entry::Number(0.5),
-        Entry::Number(-1.0),
-    ]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![1, 3, 2, 0]);
-    assert_eq!(sorted(&store, sheet, false), vec![0, 2, 3, 1]);
-}
+/// A column, its row order ascending and, when checked, descending.
+type SortCase<'a> = (&'a str, &'a [Entry], &'a [u32], Option<&'a [u32]>);
 
 #[test]
-fn text_sorts_character_by_character() {
-    let (store, sheet) = column(&[Entry::Text("A11"), Entry::Text("A100"), Entry::Text("A1")]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![2, 1, 0]);
-    assert_eq!(sorted(&store, sheet, false), vec![0, 1, 2]);
+fn columns_sort_in_the_documented_order() {
+    use Entry::{Blank, Bool, Formula, Number, Text};
+    let cases: &[SortCase<'_>] = &[
+        (
+            "numbers from the smallest negative to the largest positive",
+            &[Number(3.0), Number(-10.0), Number(0.5), Number(-1.0)],
+            &[1, 3, 2, 0],
+            Some(&[0, 2, 3, 1]),
+        ),
+        (
+            "text character by character",
+            &[Text("A11"), Text("A100"), Text("A1")],
+            &[2, 1, 0],
+            Some(&[0, 1, 2]),
+        ),
+        (
+            "text ignores case and keeps the original order of equal text",
+            &[Text("b"), Text("B"), Text("a"), Text("A")],
+            &[2, 3, 0, 1],
+            Some(&[0, 1, 2, 3]),
+        ),
+        (
+            "text ignores apostrophes and hyphens, the hyphen last on a tie",
+            &[
+                Text("co-op"),
+                Text("cop"),
+                Text("coop"),
+                Text("o'clock"),
+                Text("oak"),
+            ],
+            &[2, 0, 1, 4, 3],
+            None,
+        ),
+        (
+            "error values are equal",
+            &[Formula("=NA()"), Formula("=1/0"), Formula("=SQRT(-1)")],
+            &[0, 1, 2],
+            Some(&[0, 1, 2]),
+        ),
+        (
+            "numbers, text, logical values, errors, then blanks",
+            &[
+                Blank,
+                Formula("=1/0"),
+                Bool(false),
+                Text("alpha"),
+                Number(7.0),
+                Formula("=\"beta\""),
+                Formula("=TRUE"),
+                Formula("=2+3"),
+            ],
+            &[7, 4, 3, 5, 2, 6, 1, 0],
+            Some(&[1, 6, 2, 5, 3, 4, 7, 0]),
+        ),
+    ];
+    for &(name, entries, ascending, descending) in cases {
+        let (store, sheet) = column(entries);
+        assert_eq!(sorted(&store, sheet, true), ascending, "{name}");
+        if let Some(descending_rows) = descending {
+            assert_eq!(sorted(&store, sheet, false), descending_rows, "{name}");
+        }
+    }
 }
 
 #[test]
@@ -82,63 +129,7 @@ fn text_characters_follow_the_documented_order() {
         .map(|text| Entry::Text(text))
         .collect();
     let (store, sheet) = column(&entries);
-    let last = documented.len() as u32 - 1;
-    let ascending: Vec<u32> = (0..=last).rev().collect();
+    let ascending: Vec<u32> = (0..documented.len() as u32).rev().collect();
 
     assert_eq!(sorted(&store, sheet, true), ascending);
-}
-
-#[test]
-fn text_ignores_case_and_keeps_the_original_order_of_equal_text() {
-    let (store, sheet) = column(&[
-        Entry::Text("b"),
-        Entry::Text("B"),
-        Entry::Text("a"),
-        Entry::Text("A"),
-    ]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![2, 3, 0, 1]);
-    assert_eq!(sorted(&store, sheet, false), vec![0, 1, 2, 3]);
-}
-
-#[test]
-fn text_ignores_apostrophes_and_hyphens_and_puts_the_hyphen_last_on_a_tie() {
-    let (store, sheet) = column(&[
-        Entry::Text("co-op"),
-        Entry::Text("cop"),
-        Entry::Text("coop"),
-        Entry::Text("o'clock"),
-        Entry::Text("oak"),
-    ]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![2, 0, 1, 4, 3]);
-}
-
-#[test]
-fn error_values_are_equal() {
-    let (store, sheet) = column(&[
-        Entry::Formula("=NA()"),
-        Entry::Formula("=1/0"),
-        Entry::Formula("=SQRT(-1)"),
-    ]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![0, 1, 2]);
-    assert_eq!(sorted(&store, sheet, false), vec![0, 1, 2]);
-}
-
-#[test]
-fn types_sort_as_numbers_text_logical_values_errors_then_blanks() {
-    let (store, sheet) = column(&[
-        Entry::Blank,
-        Entry::Formula("=1/0"),
-        Entry::Bool(false),
-        Entry::Text("alpha"),
-        Entry::Number(7.0),
-        Entry::Formula("=\"beta\""),
-        Entry::Formula("=TRUE"),
-        Entry::Formula("=2+3"),
-    ]);
-
-    assert_eq!(sorted(&store, sheet, true), vec![7, 4, 3, 5, 2, 6, 1, 0]);
-    assert_eq!(sorted(&store, sheet, false), vec![1, 6, 2, 5, 3, 4, 7, 0]);
 }
