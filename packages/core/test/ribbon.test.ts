@@ -535,6 +535,21 @@ it("fills from a palette pick and clears with No Fill", async () => {
   expect(cell(0, 0).style.backgroundColor).toBeUndefined();
 });
 
+it("ties a one-letter word to its neighbour, so a large label breaks only between phrases", async () => {
+  const { control, openTab } = await setup();
+  openTab("Data");
+  const ascending = control("Sort A to Z");
+  const label = ascending.querySelector(".sheetwrite-ribbon-label");
+  // "Sort" / "A to Z" on two lines; the name and tooltip keep plain spaces.
+  expect(label?.textContent).toBe("Sort A\u00a0to\u00a0Z");
+  expect(ascending.title).toBe("Sort A to Z");
+  const descending = control("Sort Z to A").querySelector(".sheetwrite-ribbon-label");
+  expect(descending?.textContent).toBe("Sort Z\u00a0to\u00a0A");
+  expect(control("Custom Sort").querySelector(".sheetwrite-ribbon-label")?.textContent).toBe(
+    "Custom Sort",
+  );
+});
+
 it("opens on Home when the File tab shows, as Excel does", async () => {
   const { host } = await setup(false, undefined, true, { keyboardSettings: true });
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
