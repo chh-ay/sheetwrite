@@ -82,6 +82,8 @@ export interface EditorLook {
   readonly font: string;
   readonly color: string;
   readonly decoration: string;
+  /** Space between the text and the cell's left and right gridlines, as the cell paints it at the zoom. */
+  readonly pad: number;
 }
 
 export interface BeginEditOptions {
@@ -243,6 +245,7 @@ export class EditController {
       style.color = look.color;
       style.textAlign = look.align;
       style.textDecoration = look.decoration;
+      style.setProperty("--sheetwrite-cell-pad", `${look.pad}px`);
     }
 
     this.host.appendChild(ta);

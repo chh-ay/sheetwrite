@@ -1,11 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { NOTE_HOVER_DELAY_MS } from "../src/note-popover.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellAddress } from "../src/types.js";
-import { expectSameNode, makeColumnarData, makeWorkbook, scrollerOf } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, scrollerOf } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
 
@@ -85,13 +86,13 @@ describe("note hover card", () => {
 
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS - 1);
-    expectSameNode(noteCard(host), null);
+    expectSame(noteCard(host), null);
 
     jest.advanceTimersByTime(1);
     expect(noteCard(host)?.textContent).toBe("Check the totals");
     expect(noteCard(host)?.getAttribute("role")).toBe("tooltip");
     // The card does not take the focus.
-    expectSameNode(document.activeElement, focused);
+    expectSame(document.activeElement, focused);
   });
 
   it.each([
@@ -116,7 +117,7 @@ describe("note hover card", () => {
 
     dismiss(host, target);
 
-    expectSameNode(noteCard(host), null);
+    expectSame(noteCard(host), null);
   });
 });
 
@@ -126,7 +127,7 @@ describe("note editor", () => {
 
     openEditor(target, NOTED);
     const editor = noteEditor(host);
-    expectSameNode(document.activeElement, editor);
+    expectSame(document.activeElement, editor);
     expect(editor.value).toBe("Check the totals");
 
     editor.value = "Totals checked";
@@ -134,7 +135,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Totals checked");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
 
     target.undo();
     expect(target.getNote(NOTED)).toBe("Check the totals");
@@ -161,7 +162,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
   });
 
   it("opens on the focus cell when Shift+F2 is pressed", () => {

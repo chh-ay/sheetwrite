@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { renderControl } from "../src/ribbon/ribbon-controls.js";
 import { ribbonHeight } from "../src/ribbon/ribbon-metrics.js";
@@ -8,7 +9,6 @@ import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, IconOverrides, Workbook } from "../src/types.js";
-import { expectSameNode } from "./fixtures.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -196,7 +196,7 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expect(cell(0, 0).style.fontSize).toBeCloseTo(fourteenPoints);
   expect(cell(1, 0).style.fontSize).toBeCloseTo(fourteenPoints);
   expect(size.value).toBe("14");
-  expectSameNode(document.activeElement, host);
+  expectSame(document.activeElement, host);
 });
 
 // #731: a cell that takes its format from its column showed "General".
@@ -254,13 +254,13 @@ it.each(["full", "compact"] as const)(
       expect(cell(0, 0).style.border?.top).toBeDefined();
       expect(cell(0, 0).style.border?.bottom).toBeUndefined();
       expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
-      expectSameNode(document.activeElement, options);
+      expectSame(document.activeElement, options);
 
       press(options);
       key(document.activeElement as HTMLElement, "Escape");
       expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
       expect(options.getAttribute("aria-expanded")).toBe("false");
-      expectSameNode(document.activeElement, options);
+      expectSame(document.activeElement, options);
     } finally {
       requestFrame.mockRestore();
     }
@@ -367,17 +367,17 @@ it("keeps a form open when it moves focus to show an error or wrap Tab", async (
     field.value = "javascript:alert(1)";
     form.dispatchEvent(new Event("submit", { cancelable: true }));
     expect(form.querySelector('[role="alert"]')?.hasAttribute("hidden")).toBe(false);
-    expectSameNode(document.activeElement, field);
+    expectSame(document.activeElement, field);
 
     key(field, "Tab");
-    expectSameNode(document.activeElement, ok);
+    expectSame(document.activeElement, ok);
     key(ok, "Tab");
-    expectSameNode(document.activeElement, field);
+    expectSame(document.activeElement, field);
     field.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
     );
-    expectSameNode(document.activeElement, ok);
-    expectSameNode(host.querySelector(".sheetwrite-ribbon-popup"), form);
+    expectSame(document.activeElement, ok);
+    expectSame(host.querySelector(".sheetwrite-ribbon-popup"), form);
   } finally {
     restore();
   }
@@ -494,7 +494,7 @@ it("disables editing controls while read-only but keeps view controls", async ()
 
   key(tab("Home"), "End");
   expect(tab("View").getAttribute("aria-selected")).toBe("true");
-  expectSameNode(document.activeElement, tab("View"));
+  expectSame(document.activeElement, tab("View"));
   grid.setReadOnly(true);
   press(control("Zoom In"));
   expect(control("Zoom In").disabled).toBe(false);
@@ -537,11 +537,11 @@ it("opens on Home when the File tab shows, as Excel does", async () => {
   if (file === undefined || home === undefined) throw new Error("no File or Home tab");
   expect(file.hidden).toBe(false);
   // Identity checks: a failing toBe on DOM nodes prints whole elements, which is slow.
-  expectSameNode(tabs[0], file);
+  expectSame(tabs[0], file);
 
   const selected = host.querySelector('.sheetwrite-ribbon [role="tab"][aria-selected="true"]');
   expect(selected?.textContent).toBe("Home");
-  expectSameNode(selected, home);
+  expectSame(selected, home);
   const panel = host.querySelector(".sheetwrite-ribbon-panel:not([hidden])");
   expect(panel?.getAttribute("aria-labelledby")).toBe(home.id);
   expect(home.tabIndex).toBe(0);
@@ -564,7 +564,7 @@ it("gives the grid the panel's height back when minimized", async () => {
 
   home.focus();
   key(home, "Escape");
-  expectSameNode(document.activeElement, host);
+  expectSame(document.activeElement, host);
 });
 
 it("moves the tabs that do not fit into a More tabs menu instead of cutting one off", async () => {
@@ -598,7 +598,7 @@ it("moves the tabs that do not fit into a More tabs menu instead of cutting one 
   const last = tabs.at(-1)!;
   press(items.at(-1)!);
   expect(last.getAttribute("aria-selected")).toBe("true");
-  expectSameNode(document.activeElement, last);
+  expectSame(document.activeElement, last);
   expect(names(inRow())).toEqual(names([...tabs.slice(0, 2), last]));
   expect(host.querySelector('[role="menu"][aria-label="More tabs"]')).toBeNull();
 

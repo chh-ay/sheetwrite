@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { dateToSerial } from "../src/date-serial.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, WorkbookSnapshot } from "../src/types.js";
-import { expectSameNode } from "./fixtures.js";
 
 const ACTIONS_MODULE = "../src/autofilter-actions.js";
 let restoreStubs: () => void;
@@ -177,7 +177,7 @@ describe("AutoFilter in the grid", () => {
     expect(store.viewRowCount("s1")).toBe(9);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
 
     press(host, "L", { ctrlKey: true, shiftKey: true });
     expect(grid.getAutoFilter()).toBeNull();
@@ -509,7 +509,7 @@ describe("AutoFilter in the grid", () => {
     expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
     notice()?.querySelector("button")?.click();
     // The grid keeps the keys, so Ctrl+Z can undo it.
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
     expect(grid.hiddenRows()).toEqual([]);
     grid.undo();
     expect(grid.hiddenRows()).toEqual([2]);

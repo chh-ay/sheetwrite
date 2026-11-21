@@ -14,6 +14,7 @@ import {
 } from "../src/canvas-paint.js";
 import { contrastRatio, parseRgbColor, relativeLuminance } from "../src/color-contrast.js";
 import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
+import { listButtonRect } from "../src/overlay-painter.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
@@ -278,23 +279,37 @@ it("lays out header text before the filter button for every alignment, as Excel 
   expect(text("Region of sale")?.clips).toContainEqual(clip);
 });
 
-it("insets the filter button from the gridline by the text padding, at any row height", () => {
-  for (const h of [20, 24, 32]) {
-    const cell = { x: 0, y: 0, w: 100, h };
-    const button = filterButtonRect(cell);
-    // As much room right of the button as left of the text, and centred in the row.
-    expect(button).toEqual({ x: 100 - 6 - 16, y: (h - 16) / 2, w: 16, h: 16 });
-    // The text box ends that much room again before the button.
-    expect(filterTextRight(cell)).toBe(button.x - 6);
-    // A touch opens the dropdown 24 px wide, over the inset to the gridline.
-    const hit = filterButtonHitRect(cell);
-    expect([hit.x, hit.w, hit.y, hit.h]).toEqual([
-      76,
-      24,
-      Math.max(0, h / 2 - 12),
-      Math.min(h, 24),
-    ]);
+it("scales the filter button, its room and the text padding with the zoom, as Excel does", () => {
+  for (const zoom of [0.5, 1, 1.5, 2]) {
+    for (const height of [20, 32]) {
+      const cell = { x: 0, y: 0, w: 100 * zoom, h: height * zoom };
+      const button = filterButtonRect(cell, zoom);
+      // A 16 px button, 6 px from the right gridline as the text is from the
+      // left one, centred in the row: all at the zoom.
+      expect(button).toEqual({
+        x: (100 - 6 - 16) * zoom,
+        y: ((height - 16) / 2) * zoom,
+        w: 16 * zoom,
+        h: 16 * zoom,
+      });
+      // The text box ends that room again before the button.
+      expect(filterTextRight(cell, zoom)).toBe((100 - 6 - 16 - 6) * zoom);
+      // A pointer opens the dropdown over the button and the inset, at least 24 px wide for touch.
+      const hit = filterButtonHitRect(cell, zoom);
+      expect([hit.x + hit.w, hit.w]).toEqual([100 * zoom, Math.max(24, 22 * zoom)]);
+      // A list cell's arrow grows with the cell too.
+      expect(listButtonRect(cell, zoom).w).toBe(Math.min(18 * zoom, cell.h));
+    }
   }
+
+  // Cell text keeps 12 px from its gridlines at 200%, not 6.
+  const styleIds = new Uint32Array(6);
+  styleIds[1] = 1;
+  const view = makeView(styleIds, [{ align: "right" }, {}], [0, 1]);
+  (view.values as string[]).splice(0, 2, "Units", "Region");
+  const ctx = render(view, { ...makeLayout(textColumns([100, 100])), zoom: 2 }, UNIFORM_VIEWPORT);
+  const text = (label: string) => ctx.fillTexts.find((call) => call.text === label);
+  expect([text("Units")?.x, text("Region")?.x]).toEqual([100 - 12, 100 + 12]);
 });
 
 // One width unit per character, so expected breaks can be worked out by hand.

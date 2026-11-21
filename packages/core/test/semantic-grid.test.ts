@@ -1,12 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, GridOptions, Workbook } from "../src/types.js";
 import {
   answerDialog,
-  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -273,7 +273,7 @@ describe("custom editor canonical lifecycle", () => {
       addr: { sheet: "s1", row: 1, col: 1 },
     });
     expect(changes).toBeGreaterThanOrEqual(2);
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
 
     grid.undo();
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
@@ -298,7 +298,7 @@ describe("custom editor canonical lifecycle", () => {
     input = activeEditorInput(host);
     press(input, "Escape");
     expect(stats.cancels).toBe(1);
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
     await Promise.resolve();
     expect(stats.mounts).toBe(4);
     expect(stats.destroys).toBe(4);
@@ -382,7 +382,7 @@ describe("custom editor canonical lifecycle", () => {
     const { grid, host } = mountGrid({ workbook, editors: { stepper: editor } });
 
     grid.beginEdit(0, 0);
-    expectSameNode(document.activeElement, activeEditorInput(host));
+    expectSame(document.activeElement, activeEditorInput(host));
     pressLikeWebKit(host.querySelector<HTMLButtonElement>(".sheetwrite-custom-editor button")!);
     expect({ commits, steps }).toEqual({ commits: 0, steps: 1 });
     expect(host.querySelector(".sheetwrite-custom-editor")).not.toBeNull();
@@ -522,7 +522,7 @@ describe("custom editor canonical lifecycle", () => {
         if (viewChange === "clearView") grid.clearView();
         else if (viewChange === "filter") grid.filterBy(0, "Customer 2");
         else grid.setViewSort([{ col: 1, ascending: false }]);
-        expectSameNode(host.querySelector(selector), editor);
+        expectSame(host.querySelector(selector), editor);
         if (editorKind === "list") press(editor, "ArrowDown");
         press(editor, editorKind === "checkbox" ? " " : "Enter");
 
@@ -689,7 +689,7 @@ describe("custom editor canonical lifecycle", () => {
     press(activeEditorInput(host), "Escape");
     expect(hookSignals).toEqual([true, true]);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
     expect(reported).toHaveLength(1);
 
     grid.beginEdit(0, 0);

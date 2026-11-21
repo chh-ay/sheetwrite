@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -60,7 +61,7 @@ describe("config.keyboard: (e, grid) => boolean (host interceptor)", () => {
     // Returning true consumes: stock ArrowDown navigation must NOT run.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: A(2, 0) });
-    expect(received).toBe(grid);
+    expectSame(received, grid);
 
     // Returning false falls through: stock ArrowRight navigation moves the cell.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
