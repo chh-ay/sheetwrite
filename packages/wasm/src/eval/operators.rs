@@ -138,8 +138,7 @@ impl Operand {
 }
 
 impl CellStore {
-    /// `ast` as an array when it evaluates to one, otherwise as its value.
-    pub(super) fn operator_operand(
+    fn operator_operand(
         &self,
         ast: &Ast,
         sheet: usize,

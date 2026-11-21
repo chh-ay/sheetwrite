@@ -65,10 +65,14 @@ fn assert_results(cases: &[(&str, &str)]) {
 /// `Report!C1:C3` so that a spill of up to five columns has room.
 const SPILL_COL: usize = 3;
 
+/// A formula, the width of the array it spills, and the cells it shows,
+/// row by row.
+type SpillCase<'a> = (&'a str, usize, &'a [&'a str]);
+
 /// Evaluates each formula alone at `Report!D1` and compares the array it
-/// spills, read row by row `cols` cells wide, with the expected cells.
-/// Reports all mismatches at once.
-fn assert_spills(cases: &[(&str, usize, &[&str])]) {
+/// spills, read row by row, with the expected cells. Reports all mismatches
+/// at once.
+fn assert_spills(cases: &[SpillCase<'_>]) {
     let mismatches: Vec<String> = cases
         .iter()
         .filter_map(|&(formula, cols, expected)| {
@@ -535,6 +539,7 @@ fn branch_functions_take_array_arguments_element_by_element() {
             &["-1", "none", "3"],
         ),
         ("=IFERROR(1/{1,0},{\"a\",\"b\"})", 2, &["1", "b"]),
+        ("=IFERROR(SEQUENCE(0),\"none\")", 1, &["none"]),
         ("=IFNA({1,#N/A,#DIV/0!},\"na\")", 3, &["1", "na", "#DIV/0!"]),
         (
             "=IFS(Data!A1:A3>2,\"big\",Data!A1:A3>1,\"mid\")",

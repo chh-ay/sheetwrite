@@ -12,7 +12,6 @@
 //! #N/A outside itself, and the scalar rule picks each element.
 
 use std::cmp::Ordering;
-use std::mem::size_of;
 
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
@@ -170,33 +169,54 @@ fn pick_switch(count: usize, mut element: impl FnMut(usize) -> Value) -> Pick {
     }
 }
 
+/// A lifted call: its rule, its arguments, and the sheet and depth it is
+/// evaluated at.
+#[derive(Clone, Copy)]
+struct LiftedCall<'a> {
+    kind: Branching,
+    args: &'a [Ast],
+    sheet: usize,
+    depth: usize,
+}
+
+/// Rows, columns and cells of an array.
+type ArrayShape = (usize, usize, usize);
+
 impl CellStore {
-    /// An IF, IFERROR, IFNA, IFS, SWITCH or CHOOSE call as an array: the
+    /// An IF, IFERROR, IFNA, IFS, SWITCH or CHOOSE `call` as an array: the
     /// argument it takes, or the lifted call when a selecting argument is
-    /// an array. Any other `func` is #VALUE!. Out of line, like every
+    /// an array. Any other node is #VALUE!. Out of line, like every
     /// `*_family` handler, so the array path adds nothing to `eval_ast`.
     #[inline(never)]
     pub(super) fn eval_branches_family(
         &self,
-        func: Func,
-        args: &[Ast],
+        call: &Ast,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let kind = Branching::of(func).ok_or(FormulaError::Value)?;
+        let Ast::Func(func, args) = call else {
+            return Err(FormulaError::Value);
+        };
+        let kind = Branching::of(*func).ok_or(FormulaError::Value)?;
         if !kind.takes(args.len()) {
             return Err(FormulaError::Value);
         }
         if kind.lifts(args, pass.shapes(self.name_scope(sheet))) {
-            return self.eval_lifted_branches(kind, args, sheet, pass, depth);
+            let lifted = LiftedCall {
+                kind,
+                args,
+                sheet,
+                depth,
+            };
+            return self.eval_lifted_branches(lifted, pass);
         }
 
         let picked = kind.pick(args, |index| {
             self.eval_ast(&args[index], sheet, pass, depth + 1)
         });
         let value = match picked {
-            Pick::Argument(index) => match self.branch_operand(&args[index], sheet, pass, depth)? {
+            Pick::Argument(index) => match self.branch_operand(&args[index], sheet, pass, depth) {
                 Operand::Array(matrix) => return Ok(matrix),
                 Operand::Scalar(value) => value,
             },
@@ -205,19 +225,21 @@ impl CellStore {
         Ok(EvalMatrix::new(1, 1, vec![value]))
     }
 
-    /// The array shape of a lifted call before evaluation: the largest row
+    /// The array shape of a lifted `call` before evaluation: the largest row
     /// and column count of its arguments. A call that takes one argument has
     /// the shape of the argument it takes, unknown until it runs, so it has
     /// no static shape (#VALUE!).
     pub(super) fn branches_shape(
         &self,
-        func: Func,
-        args: &[Ast],
+        call: &Ast,
         formula_sheet: usize,
         pass: &mut EvalPass<'_>,
-    ) -> Result<(usize, usize, usize), FormulaError> {
+    ) -> Result<ArrayShape, FormulaError> {
+        let Ast::Func(func, args) = call else {
+            return Err(FormulaError::Value);
+        };
         let names = self.name_scope(formula_sheet);
-        let lifted = Branching::of(func)
+        let lifted = Branching::of(*func)
             .is_some_and(|kind| kind.takes(args.len()) && kind.lifts(args, pass.shapes(names)));
         if !lifted {
             return Err(FormulaError::Value);
@@ -252,34 +274,43 @@ impl CellStore {
     }
 
     /// One argument of a branching call: an empty argument is 0, as in
-    /// Excel, and any other is its array or its value.
+    /// Excel, and any other is its array or its value. An array that fails
+    /// is that error as a value, which IFERROR and IFNA test and the other
+    /// functions return where they take it.
     fn branch_operand(
         &self,
         arg: &Ast,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<Operand, FormulaError> {
+    ) -> Operand {
         if matches!(arg, Ast::Missing) {
-            return Ok(Operand::Scalar(Value::Number(0.0)));
+            return Operand::Scalar(Value::Number(0.0));
         }
-        self.operator_operand(arg, sheet, pass, depth)
+        match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
+            Some(Ok(matrix)) => Operand::Array(matrix),
+            Some(Err(error)) => Operand::Scalar(Value::Error(error)),
+            None => Operand::Scalar(self.eval_ast(arg, sheet, pass, depth + 1)),
+        }
     }
 
     /// The lifted call: every argument evaluated and broadcast to one shape,
     /// each element picked by the function's scalar rule.
     fn eval_lifted_branches(
         &self,
-        kind: Branching,
-        args: &[Ast],
-        sheet: usize,
+        call: LiftedCall<'_>,
         pass: &mut EvalPass<'_>,
-        depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
+        let LiftedCall {
+            kind,
+            args,
+            sheet,
+            depth,
+        } = call;
         let mut operands = Vec::with_capacity(args.len());
         let (mut rows, mut cols, mut operand_bytes) = (1, 1, 0_usize);
         for arg in args {
-            let operand = self.branch_operand(arg, sheet, pass, depth)?;
+            let operand = self.branch_operand(arg, sheet, pass, depth);
             let (operand_rows, operand_cols) = operand.shape();
             rows = rows.max(operand_rows);
             cols = cols.max(operand_cols);

@@ -236,6 +236,10 @@ pub(crate) struct ShapeScope<'a> {
     kinds: &'a [Kind<'a>],
     /// Where the called LAMBDA was created.
     outer: Shapes<'a>,
+    /// The LAMBDA called.
+    callee: &'a LambdaDefinition,
+    /// The call whose body holds this call, while its shape is decided.
+    caller: Option<&'a ShapeScope<'a>>,
 }
 
 #[derive(Clone, Copy)]
@@ -782,6 +786,17 @@ fn call_produces_array<'a>(arguments: &'a [Ast], shapes: Shapes<'a>) -> bool {
     let Some((callee, created)) = shapes.callee(function) else {
         return false;
     };
+    // A LAMBDA whose shape is being decided further out calls itself here.
+    // Its result has the shape its other paths give, so the call adds
+    // nothing; checking it again would double the work for every call in
+    // the body, at each level, up to the depth limit.
+    let mut deciding = shapes.scope;
+    while let Some(scope) = deciding {
+        if std::ptr::eq(scope.callee, callee) {
+            return false;
+        }
+        deciding = scope.caller;
+    }
     let LambdaDefinition { parameters, body } = callee;
     if parameters.len() != supplied.len() {
         return false;
@@ -799,6 +814,8 @@ fn call_produces_array<'a>(arguments: &'a [Ast], shapes: Shapes<'a>) -> bool {
     let scope = ShapeScope {
         kinds: &kinds,
         outer: created,
+        callee,
+        caller: shapes.scope,
     };
     ast_produces_array(
         body,

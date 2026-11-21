@@ -575,14 +575,11 @@ impl CellStore {
             Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
             Ast::Func(Func::TrimRange, args) => self.eval_trim_range(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Choose, args) => {
-                self.eval_branches_family(Func::Choose, args, sheet, pass, depth + 1)
-            }
-            Ast::Func(
-                func @ (Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch),
-                args,
-            ) if ast_produces_array(ast, pass.shapes(self.name_scope(sheet))) => {
-                self.eval_branches_family(*func, args, sheet, pass, depth + 1)
+            Ast::Func(Func::Choose, _) => self.eval_branches_family(ast, sheet, pass, depth + 1),
+            Ast::Func(Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch, _)
+                if ast_produces_array(ast, pass.shapes(self.name_scope(sheet))) =>
+            {
+                self.eval_branches_family(ast, sheet, pass, depth + 1)
             }
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
@@ -751,14 +748,9 @@ impl CellStore {
             }
             Ast::Func(Func::Sequence, args) => return sequence_shape(args),
             Ast::Func(
-                func @ (Func::If
-                | Func::IfError
-                | Func::IfNa
-                | Func::Ifs
-                | Func::Switch
-                | Func::Choose),
-                args,
-            ) => return self.branches_shape(*func, args, formula_sheet, pass),
+                Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
+                _,
+            ) => return self.branches_shape(ast, formula_sheet, pass),
             Ast::Func(Func::Take | Func::Drop, args) => {
                 let source = args.first().ok_or(FormulaError::Value)?;
                 let (rows, cols, _) = self.matrix_shape(source, formula_sheet, pass)?;
