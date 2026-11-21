@@ -116,6 +116,25 @@ The code `General` takes a cell out of its column's format.
 
 XLSX import keeps each cell's own format, so a column that mixes formats round-trips cell by cell.
 
+### What typing stores
+
+A column's `type` decides how a typed entry is read. The columns Sheetwrite makes itself are `general`: new sheets from +, Insert and Shift+F11, `addSheet` without `columns`, the empty columns right of a sheet's own, and XLSX imports without one number format per column. A `general` column reads an entry as Excel's General format does, and gives an unformatted cell the format that shows it as typed:
+
+| You type | The cell holds | Format |
+| --- | --- | --- |
+| `42`, `007`, `-3.5`, `(42)` | 42, 7, -3.5, -42 | none |
+| `1,234.5` | 1234.5 | `#,##0.00` |
+| `15%` | 0.15 | `0%` |
+| `$1,234.50` | 1234.5 | `$#,##0.00` |
+| `1e5` | 100000 | `0.00E+00` |
+| `1 1/2` | 1.5 | `# ?/?` |
+| `1/15/2026`, `2026-01-15` | the date serial 46037 | `m/d/yyyy` |
+| `15-Jan-2026`, `Jan 15, 2026` | 46037 | `d-mmm-yy` |
+| `9:30`, `9:30 PM` | 0.3958…, 0.8958… | `h:mm`, `h:mm AM/PM` |
+| `'007` | the text `007` | none |
+
+The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
+
 The grid actions `setNumberFormat(code: string | null)` and `stepDecimals(direction: 1 | -1)` change the format of the selection. `setNumberFormat(null)` returns the cells to the column's format. `stepDecimals` shows one more (`1`) or one fewer (`-1`) decimal place than the focus cell does.
 
 ### Keys and the Format Cells dialog

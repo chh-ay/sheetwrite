@@ -293,13 +293,10 @@ export async function ingestWorksheetRows(
         cellStyles.push(styleIndex);
         let column = columnCells.get(address.col);
         if (!column) {
-          column = { styleIndices: new Set(), hasNumericValue: false };
+          column = { styleIndices: new Set() };
           columnCells.set(address.col, column);
         }
         column.styleIndices.add(styleIndex);
-        if (value?.kind === "literal" && typeof value.value === "number") {
-          column.hasNumericValue = true;
-        }
         if (sharedFormula) {
           pendingSharedFormulas.push({
             cell,

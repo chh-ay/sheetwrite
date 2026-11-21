@@ -131,7 +131,6 @@ export function columnFromParsed(
       semanticTypes.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
     }
   }
-  const hasNumericValue = cells?.hasNumericValue === true;
   if (definition?.type) semanticTypes.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
   // A column default is chosen only when every formatted cell agrees; cells
@@ -141,9 +140,9 @@ export function columnFromParsed(
   const numberFormat = mixed
     ? undefined
     : (definition?.numberFormat ?? formats.values().next().value);
-  const type: Column["type"] = mixed
-    ? "number"
-    : (definition?.type ?? onlyType ?? (hasNumericValue ? "number" : "text"));
+  // Without one format for the column, it reads typing as Excel's General
+  // does; each cell keeps its stored value and format.
+  const type: Column["type"] = mixed ? "general" : (definition?.type ?? onlyType ?? "general");
   const defaultStyle = definition?.cellStyle ?? styles.at(0).style;
   return {
     key,

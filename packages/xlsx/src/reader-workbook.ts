@@ -137,7 +137,7 @@ export function extendSheet(sheet: SheetSnapshot, row: number, col: number): voi
     while (sheet.columns.length <= col) {
       const index = sheet.columns.length;
       const key = claimColumnKey(`column${index + 1}`, keys);
-      sheet.columns.push({ key, header: colToA1(index), width: 75, type: "text" });
+      sheet.columns.push({ key, header: colToA1(index), width: 75, type: "general" });
     }
   }
   const block = sheet.cells[0];

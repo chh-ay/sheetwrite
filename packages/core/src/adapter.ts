@@ -461,7 +461,7 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   title: string;
   /** Unzoomed width in CSS pixels; defaults to 120. */
   width?: number;
-  /** Input and formatting type; defaults to `text`. */
+  /** Input and formatting type; defaults to `general`, which reads entries as Excel's General format does. */
   type?: CellFormat;
   /** Excel number-format code used for number, date, or currency display. */
   numberFormat?: string;
@@ -550,7 +550,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
       key: column.key,
       header: column.title,
       width: column.width ?? DEFAULT_SIMPLE_COLUMN_WIDTH,
-      type: column.type ?? "text",
+      type: column.type ?? "general",
       numberFormat: column.numberFormat,
       headerStyle: column.headerStyle,
       cellStyle: column.cellStyle,

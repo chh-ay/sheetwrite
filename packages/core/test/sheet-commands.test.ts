@@ -117,6 +117,31 @@ describe("Insert", () => {
     expect(names()).toEqual(["Sales", "Sheet5", "Costs", "Old", "Notes"]);
     expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet5");
   });
+
+  it("takes typed numbers, percentages and dates in a new sheet, as Excel's General does", () => {
+    press("F11", { shiftKey: true });
+    const id = grid.getActiveSheet();
+    expect(new Set(sheetById(id)?.columns.map((column) => column.type))).toEqual(
+      new Set(["general"]),
+    );
+    const enter = (row: number, text: string): void => {
+      (grid as GridImpl).beginEdit(row, 0, text);
+      host
+        .querySelector("textarea.sheetwrite-editor")
+        ?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+        );
+    };
+    enter(0, "5");
+    enter(1, "12%");
+    enter(2, "1/15/2026");
+    enter(3, "=SUM(A1:A3)");
+    const cell = (row: number) => store.getCell({ sheet: id, row, col: 0 });
+    expect(cell(0).resolved).toBe(5);
+    expect([cell(1).resolved, cell(1).style.numberFormat]).toEqual([0.12, "0%"]);
+    expect([cell(2).resolved, cell(2).style.numberFormat]).toEqual([46_037, "m/d/yyyy"]);
+    expect(cell(3).resolved).toBeCloseTo(46_042.12, 9);
+  });
 });
 
 describe("Tab Color", () => {
