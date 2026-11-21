@@ -26,6 +26,7 @@ function open(overrides: Partial<AutoFilterMenuRequest> = {}) {
     total: 5,
     filter: undefined,
     format: (value) => String(value),
+    isDate: () => false,
     parse: (text) => (Number.isFinite(Number(text)) ? Number(text) : text),
     canSort: true,
     sort: (ascending) => sorted.push(ascending),
