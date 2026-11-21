@@ -19,7 +19,7 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
   Excel offers a correction only after Enter, as a yes or no question about the whole formula. Here the fix shows while you type, says in words what it changes, and changes only the marked text. Without a fix to offer, Tab commits and moves right, as in Excel.
 - **Colored references.** Each reference gets a color in the text, and its range on the grid gets a fill in the same color. Equal references share one color.
 
-- **Result preview.** When you stop typing for a moment and the formula has no problem, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
+- **Result preview.** When you stop typing for a moment and the formula has no problem and does not end in a name you are still typing (such as `=AVER` while the list offers AVERAGE), as in Excel, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
 
 ## Result preview
 

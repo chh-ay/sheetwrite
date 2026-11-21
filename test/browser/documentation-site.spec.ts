@@ -170,6 +170,33 @@ test("documentation pages render one heading and a canonical URL", async ({ page
   }
 });
 
+test("a code-name title wraps between its words, never inside one", async ({ page }) => {
+  for (const [width, route] of [
+    [1440, "api/react-styles-dashboard-css/"],
+    [390, "api/core-browser/indexed-db-pending-commit-storage-error-code/"],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/docs/${route}`);
+    // Each run of the title's text between break points sits on one line.
+    const splitRuns = await page
+      .locator("main h1 > span")
+      .first()
+      .evaluate((title) =>
+        [...title.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+          .filter((node) => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return (
+              new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size > 1
+            );
+          })
+          .map((node) => node.textContent),
+      );
+    expect(splitRuns, `${route} at ${width} px`).toEqual([]);
+  }
+});
+
 test("framework tabs synchronize and persist across guides", async ({ page }) => {
   await page.goto("/docs/start/installation/");
   await waitForHydration(page);
@@ -205,6 +232,37 @@ test("framework tabs synchronize and persist across guides", async ({ page }) =>
   await expectHighlighted("vue");
   await tab("Svelte").click();
   await expectHighlighted("svelte");
+});
+
+test("a page's eyebrow carries its section's sidebar icon, and no icon stands alone", async ({
+  page,
+}) => {
+  await page.goto("/docs/start/installation/");
+  const eyebrow = page.locator(".sw-document__eyebrow");
+  await expect(eyebrow).toHaveText("Getting started");
+  // The same glyph as the section's row in the sidebar.
+  // The sidebar's markup is in the page twice (the phone menu holds a copy).
+  const sidebarGlyph = await page
+    .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
+    .first()
+    .getAttribute("href");
+  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
+  // Beside its label: centred on the label's line.
+  const offset = await eyebrow.evaluate((label) => {
+    const icon = label.querySelector(".sw-icon")?.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const text = [...range.getClientRects()].at(-1);
+    if (icon === undefined || text === undefined) return Number.NaN;
+    return icon.top + icon.height / 2 - (text.top + text.height / 2);
+  });
+  expect(Math.abs(offset)).toBeLessThanOrEqual(1);
+
+  // A tab's landing page has no eyebrow, so it shows no icon above its title.
+  await page.goto("/docs/");
+  await expect(page.locator(".sw-document__eyebrow")).toHaveCount(0);
+  // Its head's other icons are the page actions', each beside its label.
+  await expect(page.locator(".sw-document__header > svg")).toHaveCount(0);
 });
 
 test("generated API pages show member signatures and mark member deep links", async ({ page }) => {
@@ -347,6 +405,23 @@ test("everyday words and questions find their guide among the first three pages"
   }
 });
 
+test("a query that names a framework or a feature guide lists that guide first", async ({
+  page,
+}) => {
+  for (const [query, guide] of [
+    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
+    ["how do I use sheetwrite with svelte", "/docs/frameworks/svelte/"],
+    ["how do I add a chart", "/docs/features/analysis/charts/"],
+    ["how to use conditional formatting", "/docs/features/formatting/conditional-formats/"],
+  ] as const) {
+    const { dialog, input } = await openSearch(page);
+    await input.fill(query);
+    const first = dialog.getByRole("option").first();
+    await expect(first).toBeVisible({ timeout: 15_000 });
+    expect((await first.getAttribute("href"))?.split("#")[0], query).toBe(guide);
+  }
+});
+
 test.describe(() => {
   // A missing page or index logs its failed request to the console.
   test.use({ allowErrors: true });
@@ -387,4 +462,38 @@ test.describe(() => {
       }
     });
   }
+});
+
+/** Layout rounds boxes to device pixels. */
+const ICON_CENTRE_TOLERANCE_PX = 1;
+
+test("a sidebar icon centres on its label's first line, also when the label wraps", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/concepts/");
+  const offsets = await page.locator(".sw-sidebar__nav a:has(> .sw-icon)").evaluateAll((links) =>
+    // Links inside a closed group have no box.
+    links
+      .filter((link) => link.getClientRects().length > 0)
+      .map((link) => {
+        const icon = link.querySelector(":scope > .sw-icon")?.getBoundingClientRect();
+        const label = link.querySelector(":scope > span");
+        const range = document.createRange();
+        if (label !== null) range.selectNodeContents(label);
+        const firstLine = range.getClientRects()[0];
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+        return {
+          label: label?.textContent?.trim() ?? "",
+          lines,
+          offset:
+            icon === undefined || firstLine === undefined
+              ? Number.NaN
+              : icon.top + icon.height / 2 - (firstLine.top + firstLine.height / 2),
+        };
+      }),
+  );
+  // The page's sidebar holds at least one label that wraps.
+  expect(offsets.some((row) => row.lines > 1)).toBe(true);
+  expect(offsets.filter((row) => !(Math.abs(row.offset) <= ICON_CENTRE_TOLERANCE_PX))).toEqual([]);
 });

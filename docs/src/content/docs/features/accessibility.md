@@ -92,6 +92,21 @@ requestAnimationFrame(() => {
 The visual layers — the scroller, the overlay, and the `<canvas>` — are all marked
 `aria-hidden="true"`, so screen readers ignore the pixels and read the mirror.
 
+## Leaving the grid with the keyboard
+
+Inside the grid, Tab and Shift + Tab move the active cell, as in Excel. Two
+keys take the focus out of the grid, so the keyboard is never trapped:
+
+- **F6 and Shift + F6** move to the next or previous part of the window, as
+  Excel's F6 does. In the [spreadsheet shell](/docs/features/grid/toolbar-and-ribbon/)
+  the parts are the ribbon or toolbar, the formula bar, the sheet, the sheet
+  tabs and the status bar. A grid on its own moves to the page's next or
+  previous control.
+- **Escape, then Tab or Shift + Tab**, when no cell is being edited, moves to
+  the page's next or previous control.
+
+The host's `aria-description` says this once, when the focus enters the grid. A host that sets its own `aria-description` keeps it.
+
 ## The SR-only mirror
 
 Alongside the host the grid appends a visually-hidden `<div class="sheetwrite-aria">`

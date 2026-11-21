@@ -27,6 +27,24 @@ test("suggests a row total from its neighbours and Tab takes it @portability", a
   await expect(ghost).toHaveCount(0);
 });
 
+test("going back to a filled cell and typing = starts a new formula", async ({ page }) => {
+  await openShowcase(page, 1440, 900);
+  const target = page.getByRole("button", { name: "Finance's total" });
+  const bar = page.getByRole("textbox", { name: "Formula bar" });
+  const ghost = page.locator(".sheetwrite-formula-ghost");
+  await target.click();
+  await page.keyboard.type("=");
+  await expect(ghost).toHaveText("SUM(B6:G6)");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await expect(bar).toHaveValue("=SUM(B6:G6)");
+
+  await target.click();
+  await page.keyboard.type("=");
+  await expect(bar).toHaveValue("=");
+  await expect(ghost).toHaveText("SUM(B6:G6)");
+});
+
 test("loads the demo video only when the reader reaches it, without layout shift", async ({
   page,
 }) => {
@@ -67,5 +85,25 @@ test("plays the narrow take at 390 px", async ({ page }) => {
   await page.locator(".sw-demo-video__frame").scrollIntoViewIfNeeded();
   await expect.poll(() => requested.length).toBeGreaterThan(0);
   expect(requested.every((url) => url.includes("narrow-loop"))).toBe(true);
-  await expect(page.locator(".sw-demo-video__poster--narrow")).toBeVisible();
+  await expect(
+    page.locator(".sw-demo-video__poster--narrow.sw-demo-video__poster--light"),
+  ).toBeVisible();
+});
+
+test("in the dark theme the demo shows and plays the dark take", async ({ page }) => {
+  const requested: string[] = [];
+  page.on("request", (request) => {
+    if (MEDIA.test(request.url())) requested.push(request.url());
+  });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openShowcase(page, 1440, 900);
+  await page.locator(".sw-demo-video__frame").scrollIntoViewIfNeeded();
+  await expect(
+    page.locator(".sw-demo-video__poster--wide.sw-demo-video__poster--dark"),
+  ).toBeVisible();
+  await expect(
+    page.locator(".sw-demo-video__poster--wide.sw-demo-video__poster--light"),
+  ).toBeHidden();
+  await expect.poll(() => requested.length).toBeGreaterThan(0);
+  expect(requested.every((url) => url.includes("wide-dark-"))).toBe(true);
 });

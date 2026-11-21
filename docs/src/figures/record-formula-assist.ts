@@ -1,9 +1,9 @@
 /**
  * Records the formula assist demo for /showcases/formula-assist/: a scripted,
  * human-paced session in the formula bar, captured frame by frame at 60 fps
- * from Chromium's headless shell.
+ * from Chromium's headless shell, in the site's light and dark themes.
  *
- *   bun docs/src/figures/record-formula-assist.ts [wide|narrow]...
+ *   bun docs/src/figures/record-formula-assist.ts [wide|narrow|wide-dark|narrow-dark]...
  *
  * Every frame is produced on demand with `HeadlessExperimental.beginFrame`
  * while the page's clock runs on virtual time, 1/60 s per frame, so no frame
@@ -49,15 +49,18 @@ function nextFrameTicks(): number {
 /**
  * The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). Each is
  * as wide in CSS pixels as the page shows it, so the formula bar reads at its
- * own size, and is drawn at `scale` device pixels per CSS pixel.
+ * own size, and is drawn at `scale` device pixels per CSS pixel. Each shape is
+ * recorded in both site themes; DemoVideo.tsx plays the page's theme.
  *
  * `reveal` scrolls each scene's cell into view. The wide take holds every cell
  * the session fills, so it never scrolls; the narrow one has to.
  */
 const TAKES = {
-  wide: { width: 960, height: 540, scale: 2, mobile: false, reveal: false },
+  wide: { width: 960, height: 540, scale: 2, mobile: false, reveal: false, theme: "light" },
   // A narrow window, not a phone emulation: the shell lays out the same as on a 390 px phone.
-  narrow: { width: 390, height: 700, scale: 2, mobile: false, reveal: true },
+  narrow: { width: 390, height: 700, scale: 2, mobile: false, reveal: true, theme: "light" },
+  "wide-dark": { width: 960, height: 540, scale: 2, mobile: false, reveal: false, theme: "dark" },
+  "narrow-dark": { width: 390, height: 700, scale: 2, mobile: false, reveal: true, theme: "dark" },
 } as const;
 type TakeName = keyof typeof TAKES;
 
@@ -440,7 +443,11 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       sessionId,
     );
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true }, sessionId);
-    await cdp.send("Page.navigate", { url: `${origin}/assist.html?theme=light` }, sessionId);
+    await cdp.send(
+      "Page.navigate",
+      { url: `${origin}/assist.html?theme=${take.theme}` },
+      sessionId,
+    );
     await pumpUntil(cdp, sessionId, "document.documentElement.dataset.figureReady === 'true'");
 
     // Warm up: one formula edit loads the add-on's predictor, then the page is put back.

@@ -27,7 +27,7 @@ Round trips through LibreOffice 26.8 on the test workbooks give:
 
 A passing semantic comparison does **not** mean byte-identical files or full Excel feature support.
 
-[Try it live: producer compatibility evidence](/showcases/interoperability/#contract).
+[Try it live: producer compatibility evidence](/showcases/interoperability/#vault).
 
 <details>
 <summary>Full setup</summary>

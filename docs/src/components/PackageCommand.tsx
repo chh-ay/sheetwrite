@@ -112,7 +112,9 @@ export function PackageCommand(props: Readonly<PackageCommandProps>) {
           <Show when={copied()} fallback={<Icon name="copy" />}>
             <Icon name="check" />
           </Show>
-          <span aria-live="polite">{copied() ? "Copied" : "Copy"}</span>
+          <span aria-live="polite" class="sw-visually-hidden">
+            {copied() ? "Copied" : "Copy"}
+          </span>
         </button>
       </div>
       <pre

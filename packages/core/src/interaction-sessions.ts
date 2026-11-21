@@ -9,6 +9,7 @@ import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
 import { type AutoFillChoice, FillController, type FillTip } from "./fill-controller.js";
+import { focusOutside } from "./focus-exit.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
 import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
@@ -236,6 +237,8 @@ export class InteractionSessions {
   private readonly fills: FillController;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /** Escape was the last key on the grid, so Tab leaves the grid instead of moving the cell. */
+  private escapeLeaves = false;
   /** Excel's cell mode, which the `cell-mode` event last reported. */
   private mode: CellMode = "ready";
   /**
@@ -1612,6 +1615,25 @@ export class InteractionSessions {
     return PRINTABLE.test(e.key) && this.deps.editActiveCell(e.key);
   }
 
+  /**
+   * The keys that take the focus out of the grid, so Tab can move between
+   * cells as in Excel without trapping the keyboard: F6 and Shift+F6, as
+   * Excel's F6 moves between the parts of its window, and Escape then Tab or
+   * Shift+Tab. A shell handles F6 itself before this. They run before a
+   * host's own keymap, so no binding can close the way out.
+   */
+  private leaveGridKey(e: KeyboardEvent): boolean {
+    // Shift on its own, on the way to Shift+Tab, keeps Escape's effect.
+    if (Object.hasOwn(MODIFIER_KEYS, e.key)) return false;
+    const afterEscape = this.escapeLeaves;
+    this.escapeLeaves = e.key === "Escape";
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key !== "F6" && !(afterEscape && e.key === "Tab")) return false;
+    e.preventDefault();
+    focusOutside(this.deps.host, !e.shiftKey);
+    return true;
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
@@ -1631,6 +1653,7 @@ export class InteractionSessions {
       e.preventDefault();
       return;
     }
+    if (this.leaveGridKey(e)) return;
 
     // Headless hosts own the keymap: a handler intercepts first and consumes
     // by returning true; `false` drops every stock binding but keeps the

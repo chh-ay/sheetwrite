@@ -10,7 +10,7 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
-import { DemoVideo, type DemoTake } from "../showcases/formula-assist/DemoVideo.js";
+import { DemoVideo, type DemoTake, type DemoTakes } from "../showcases/formula-assist/DemoVideo.js";
 import { FormulaAssistStage } from "../showcases/formula-assist/FormulaAssistStage.js";
 import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/showcases/formula-assist")({
 
 const MEDIA = "/media/formula-assist";
 
-function take(name: "wide" | "narrow", width: number, height: number): DemoTake {
+function take(name: string, width: number, height: number): DemoTake {
   return {
     width,
     height,
@@ -48,9 +48,14 @@ function take(name: "wide" | "narrow", width: number, height: number): DemoTake 
   };
 }
 
+/** The light and dark takes of one shape, as record-formula-assist.ts names them. */
+function takes(name: "wide" | "narrow", width: number, height: number): DemoTakes {
+  return { light: take(name, width, height), dark: take(`${name}-dark`, width, height) };
+}
+
 /** Recorded by docs/src/figures/record-formula-assist.ts at 60 fps. */
-const WIDE = take("wide", 960, 540);
-const NARROW = take("narrow", 390, 700);
+const WIDE = takes("wide", 960, 540);
+const NARROW = takes("narrow", 390, 700);
 const DEMO_LENGTH = "1:01";
 
 function FormulaAssistShowcase() {

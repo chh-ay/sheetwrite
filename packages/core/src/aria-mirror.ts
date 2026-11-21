@@ -1,4 +1,6 @@
+import { cellDisplayText } from "./canvas-paint.js";
 import type { CellRef } from "./selection.js";
+import type { Column } from "./types/cell.js";
 import type { Selection } from "./types/coordinates.js";
 import type { VisibleWindowView } from "./types/store.js";
 
@@ -41,6 +43,8 @@ export interface AriaMirrorDeps {
   readOnly: boolean;
   presentation: "spreadsheet" | "data-grid";
   columnHeader: (col: number) => string;
+  /** The sheet's column `col`, for its number format and locale. */
+  column: (col: number) => Column | undefined;
   focusCell: () => CellRef | null;
   /** The description of the cell at view `row`, `col`: its note and input message. */
   descriptionAt: (row: number, col: number) => string | null;
@@ -62,6 +66,9 @@ export class AriaMirror {
   private readonly focusCell: () => CellRef | null;
   private readonly descriptionAt: (row: number, col: number) => string | null;
   private readonly columnHeader: (col: number) => string;
+  private readonly column: (col: number) => Column | undefined;
+  /** The painted window's columns, parallel to `cols`. */
+  private readonly columns: (Column | undefined)[] = [];
   private readonly selection: () => Selection | null;
   private key = "";
   private version = 0;
@@ -102,6 +109,7 @@ export class AriaMirror {
     this.focusCell = deps.focusCell;
     this.descriptionAt = deps.descriptionAt;
     this.columnHeader = deps.columnHeader;
+    this.column = deps.column;
     this.selection = deps.selection;
 
     const aria = document.createElement("div");
@@ -164,12 +172,14 @@ export class AriaMirror {
     this.rowCount = nRows;
     this.cols.length = nCols;
     this.headerTexts.length = nCols;
+    this.columns.length = nCols;
     for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
       const col = view.cols[columnIndex];
       if (col === undefined) throw new Error("ARIA header has no visible column");
 
       this.cols[columnIndex] = col;
       this.headerTexts[columnIndex] = this.columnHeader(col);
+      this.columns[columnIndex] = this.column(col);
     }
     const cells = nRows * nCols;
     this.cellTexts.length = cells;
@@ -179,7 +189,14 @@ export class AriaMirror {
       for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
         const index = rowIndex * nCols + columnIndex;
         const value = view.values[index] ?? null;
-        this.cellTexts[index] = value !== null ? String(value) : "";
+        // The text the canvas paints, in the cell's number format: a date, not its serial.
+        const column = this.columns[columnIndex];
+        const format =
+          view.styles[view.styleIds[index] ?? 0]?.numberFormat ??
+          column?.cellStyle?.numberFormat ??
+          column?.numberFormat;
+        this.cellTexts[index] =
+          value === null ? "" : cellDisplayText(value, format, column?.numberLocale);
         this.cellDescriptions[index] = this.descriptionAt(row, this.cols[columnIndex] ?? -1);
       }
     }
