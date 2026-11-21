@@ -3,6 +3,7 @@
 use crate::calc::{parse, parse_a1, Tok};
 use crate::eval::{ast_produces_array, Shapes};
 use crate::formula_tokens::{lex_tolerant, Spanned};
+use crate::store::names::{Bindings, NameScope};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 // MS-XLSX §2.2.3 and §2.2.2 extend ISO/IEC 29500-1 §18.17.2.4:
@@ -557,14 +558,17 @@ pub fn convert_xlsx_formulas(
 }
 
 /// The input indices of the batch's sources whose result is an array, in
-/// order. A source that does not parse is not one.
+/// order. A source that does not parse is not one, and with no workbook a
+/// name stands for nothing.
 fn array_formula_batch(joined: &str, ends: &[u32]) -> Result<Vec<u32>, &'static str> {
     let ascii = joined.is_ascii();
+    let bindings = Bindings::default();
+    let shapes = Shapes::top(NameScope::new(&bindings, 0));
     let mut previous = (0, 0);
     let mut arrays = Vec::new();
     for (index, &end) in ends.iter().enumerate() {
         let source = batch_source(joined, &mut previous, end, ascii)?;
-        if parse(source).is_ok_and(|ast| ast_produces_array(&ast, Shapes::NONE)) {
+        if parse(source).is_ok_and(|ast| ast_produces_array(&ast, shapes)) {
             arrays.push(
                 u32::try_from(index)
                     .map_err(|_overflow| "XLSX formula batch has too many sources")?,
