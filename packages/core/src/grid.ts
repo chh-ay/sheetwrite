@@ -700,6 +700,8 @@ export class GridImpl implements Grid {
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
   private readonly sidePanels = new ScopeSlot(this.lifetime);
+  /** The panel `sidePanels` holds open, which `trimMemory` asks to trim. */
+  private openSidePanel: GridPanel | null = null;
   /** Engine generation of this grid's store; traps from its reads stop that instance only. */
   private readonly engineGeneration: number;
   /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
@@ -4070,6 +4072,7 @@ export class GridImpl implements Grid {
     const wasOpen = this.sidePanels.active;
     const hadFocus = this.panelHost.contains(document.activeElement);
     this.sidePanels.close();
+    this.openSidePanel = panel;
 
     const isOpen = panel !== null;
     // The panel focuses its first control while it mounts; a hidden host refuses focus.
@@ -5141,6 +5144,7 @@ export class GridImpl implements Grid {
 
   trimMemory(): void {
     if (this.lifetime.closed) return;
+    this.openSidePanel?.trimMemory?.();
 
     // A worker drops its strings only when the host reader drops its own, so
     // the next frame resends them. A store without an engine sends no pool ids.
