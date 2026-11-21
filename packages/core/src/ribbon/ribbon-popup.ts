@@ -83,6 +83,11 @@ export class RibbonPopup {
     return this.stack.some((popup) => popup.trigger === trigger);
   }
 
+  /** Whether `node` is inside an open popup. */
+  contains(node: Node | null): boolean {
+    return node !== null && this.stack.some((popup) => popup.surface.contains(node));
+  }
+
   /**
    * Open `surface` below `trigger`. Popups that contain the trigger stay open
    * as its parents; any others close first.

@@ -4,6 +4,7 @@
 pub(crate) mod analysis;
 mod areas;
 mod array;
+mod branches;
 mod criteria;
 #[cfg(feature = "host-functions")]
 pub(crate) mod custom;
@@ -2272,11 +2273,11 @@ impl CellStore {
             }
             let primary = &args[0];
             let value = self.eval_ast(primary, sheet, pass, depth + 1);
+            // As in Excel, a missing or empty fallback gives 0.
             return if matches!(value, Value::Error(_)) {
-                if let Some(fallback) = args.get(1) {
-                    self.eval_ast(fallback, sheet, pass, depth + 1)
-                } else {
-                    Value::Number(0.0)
+                match args.get(1) {
+                    Some(Ast::Missing) | None => Value::Number(0.0),
+                    Some(fallback) => self.eval_ast(fallback, sheet, pass, depth + 1),
                 }
             } else {
                 value
@@ -2289,7 +2290,10 @@ impl CellStore {
             }
             let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
             return if value == Value::Error(FormulaError::Na) {
-                self.eval_ast(&args[1], sheet, pass, depth + 1)
+                match &args[1] {
+                    Ast::Missing => Value::Number(0.0),
+                    fallback => self.eval_ast(fallback, sheet, pass, depth + 1),
+                }
             } else {
                 value
             };

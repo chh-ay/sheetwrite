@@ -375,6 +375,10 @@ const PAGE_SHOTS: readonly Shot[] = [
       const comment = { sheet: "report", row: 2, col: 6 };
       await page.evaluate((addr) => window.__sheetwriteFigureGrid?.scrollToCell(addr), comment);
       await select(page, { kind: "cell", addr: comment });
+      // At this width the Alignment group folds into a menu; open it, so its
+      // Wrap Text and Top Align show as on beside the Font group.
+      await page.getByRole("button", { name: "Alignment", exact: true }).first().click();
+      await settle(page);
     },
   },
   {

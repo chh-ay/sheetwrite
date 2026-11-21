@@ -85,6 +85,14 @@ A scalar applies to every element. Rows and columns expand separately. A size of
 
 Each element uses the scalar rules for values and errors. An error affects its element, not the whole array. Functions that accept arrays use the results directly. For example, `=SUM(A1:A3*B1:B3)` returns one sum. A top-level array result spills into adjacent cells. A blocked spill returns `#SPILL!`. Array size and memory limits still apply.
 
+## Conditions over arrays
+
+`IF`, `IFERROR`, `IFNA`, `IFS`, `SWITCH`, and `CHOOSE` take arrays and ranges as Excel does. When the condition of `IF` or `IFS`, the value that `IFERROR` or `IFNA` tests, the expression or a case of `SWITCH`, or the index of `CHOOSE` is an array, the function runs once for each element and returns an array. For example, `=IF(A1:A3>1,"big","small")` spills three results, and `=SUM(IF(A1:A3>1,B1:B3))` adds the values in column B whose condition is TRUE.
+
+The other arguments expand with the same rules as operators: `=IF({TRUE,FALSE},B1:B3,A1:A3)` and `=CHOOSE({1,2},B1:B3,A1:A3)` return a two-column table. A missing `value_if_false` gives `FALSE` and an empty argument gives `0` in each element. An error in the condition stays in its element.
+
+When the condition is one value, the function returns the argument it takes, which can be a range or an array. For example, `=IF(A1>0,A1:A3,0)` spills `A1:A3` when `A1` is positive. The other argument is not evaluated.
+
 ## Dynamic arrays and spills
 
 `FILTER`, `SORT`, `UNIQUE`, `TRANSPOSE`, `SEQUENCE`, `TAKE`, `DROP`, `CHOOSECOLS`, and `CHOOSEROWS` return rectangular values. A direct range formula such as `=A1:B4` also spills:

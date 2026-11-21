@@ -122,6 +122,10 @@ it.each(["full", "compact"] as const)(
     expect(cell(0, 0).style.bold).toBe(true);
     expect(bold.getAttribute("aria-pressed")).toBe("true");
     expect(undo.disabled).toBe(false);
+    // A1 is bold and A2 is not: Bold shows mixed, as Excel's does.
+    select(0, 0, 1);
+    expect(bold.getAttribute("aria-pressed")).toBe("mixed");
+    select(0, 0);
 
     press(undo);
     await settle();
