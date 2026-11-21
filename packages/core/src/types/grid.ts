@@ -202,8 +202,12 @@ export type PasteSpecialOperation = "none" | "add" | "subtract" | "multiply" | "
  *
  * @example
  * ```ts
+ * import type { Grid } from "@sheetwrite/core";
+ *
  * // Add the copied numbers to the selected cells, leaving their formats.
- * await grid.actions.pasteSpecial({ paste: "values", operation: "add" });
+ * export async function addCopiedNumbers(grid: Grid) {
+ *   return grid.actions.pasteSpecial({ paste: "values", operation: "add" });
+ * }
  * ```
  */
 export interface PasteSpecialOptions {

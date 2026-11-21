@@ -5,9 +5,9 @@ description: Import workbook snapshots or rectangular tables with explicit fidel
 
 ## Open a file from the ribbon
 
-Register the optional backend before creating a grid with `config: { ribbon: true }`.
+Install the XLSX add-on with `initSheetwrite({ addons: [xlsxAddon()] })` before you create a grid with `config: { ribbon: true }`.
 Choose **File › Import XLSX**, then choose an `.xlsx` file in the browser's file
-picker. The File tab is hidden when no workbook backend is registered. Use the
+picker. Import XLSX is hidden when the XLSX add-on is not installed. Use the
 ribbon's arrow-key navigation and Enter or Space to open the picker; the command
 has the accessible name **Import XLSX**.
 
@@ -20,7 +20,7 @@ Excel's Open command. Save or export the old document first if you need it later
 If parsing, validation or cancellation fails, the old document and history stay
 intact. A new import aborts the previous import. Destroying the grid also aborts
 import. The command and picker live in lazy chrome. Document replacement loads
-on first import; core does not load the XLSX codec unless the host registers it.
+on first import; core does not load the XLSX codec unless the host installs the add-on.
 
 ## Replace a document through the API
 
@@ -83,7 +83,7 @@ The snapshot retains `=SUM(A1:A2)`, not a cached result or a raw formula handle.
 <details>
 <summary>Full setup</summary>
 
-Install `@sheetwrite/xlsx` and register it on the import path. This complete example makes its own XLSX input:
+Install `@sheetwrite/xlsx` and its add-on on the import path. This complete example makes its own XLSX input:
 
 ```ts compile title="Import formula source from XLSX bytes"
 import {
@@ -150,7 +150,7 @@ A sheet supports at most 32 rules (the renderer's deterministic `u32` mask). One
 
 ## Options and limits
 
-Every import path uses `XlsxWorkbookOptions`. Missing registration and codec errors reject with `SheetwriteError`; resource errors remain `XlsxResourceError` and satisfy `isSheetwriteError`. Read error `code` rather than matching installation text. Use [bounded resource options](/docs/import-export/large-files-and-streaming/#resource-limits), including cancellation, for untrusted files.
+Every import path uses `XlsxWorkbookOptions`. A missing XLSX add-on and codec errors reject with `SheetwriteError`; resource errors remain `XlsxResourceError` and satisfy `isSheetwriteError`. Read error `code` rather than matching installation text. Use [bounded resource options](/docs/import-export/large-files-and-streaming/#resource-limits), including cancellation, for untrusted files.
 
 ## See also
 

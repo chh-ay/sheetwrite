@@ -772,23 +772,27 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
 
-  const resolveManifest = async (): Promise<void> => {
-    if (referenceRoutes && memberReferences && symbolPreviews) return;
-    try {
-      const { readFile } = await import("node:fs/promises");
-      const { join } = await import("node:path");
-      const manifestPath = join(options.cwd, "src/generated/public-api.json");
-      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
-      referenceRoutes = apiReferenceRoutes(manifest);
-      memberReferences = apiMemberReferences(manifest);
-      symbolPreviews = apiSymbolPreviews(manifest);
-    } catch {
-      // Docs generation has not run yet; hovers simply render without links.
-      referenceRoutes = new Map();
-      memberReferences = new Map();
-      symbolPreviews = new Map();
-    }
-  };
+  // The build compiles every generated API page at once, and each asks for
+  // the manifest before the first read ends. One shared read keeps one copy
+  // of the file in memory instead of one per page.
+  let manifestRead: Promise<void> | undefined;
+  const resolveManifest = (): Promise<void> =>
+    (manifestRead ??= (async () => {
+      try {
+        const { readFile } = await import("node:fs/promises");
+        const { join } = await import("node:path");
+        const manifestPath = join(options.cwd, "src/generated/public-api.json");
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
+        referenceRoutes = apiReferenceRoutes(manifest);
+        memberReferences = apiMemberReferences(manifest);
+        symbolPreviews = apiSymbolPreviews(manifest);
+      } catch {
+        // Docs generation has not run yet; hovers simply render without links.
+        referenceRoutes = new Map();
+        memberReferences = new Map();
+        symbolPreviews = new Map();
+      }
+    })());
 
   return definePlugin({
     name: "sheetwrite-code-hovers",

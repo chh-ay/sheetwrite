@@ -60,7 +60,7 @@ grid.store.recalculateVolatile(new Date("2026-07-13T18:00:00.000Z"));
 
 ## Recalculation and clock
 
-`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates them and their dependents, as in Excel. A transaction without source changes recalculates nothing. `TODAY` and `NOW` read the clock once per recalculation, never during paint or a dependency read, so every formula in one recalculation sees the same time. To recalculate without an edit, or to use a fixed time, the host passes one absolute instant to a barrier:
+`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY`, `NOW`, `SHEET`, `SHEETS` and `INFO` are volatile, and so is a [custom function](/docs/features/formulas/custom-functions/) with `volatile: true`. Each edit recalculates them and their dependents, as in Excel. A transaction without source changes recalculates nothing. `TODAY` and `NOW` read the clock once per recalculation, never during paint or a dependency read, so every formula in one recalculation sees the same time. To recalculate without an edit, or to use a fixed time, the host passes one absolute instant to a barrier:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 store.recalculateVolatile(new Date("2026-07-13T18:00:00.000Z"));

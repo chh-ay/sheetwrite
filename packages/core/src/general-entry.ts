@@ -164,10 +164,74 @@ function generalTime(text: string): GeneralNumber | null {
   return { value, numberFormat: seconds ? "h:mm:ss" : "h:mm" };
 }
 
-const SLASH_DATE = /^(\d{1,2})\/(\d{1,2}|\d{4})(?:\/(\d{2}|\d{4}))?$/;
 const DAY_MONTH_YEAR = /^(\d{1,2})[-\s]([A-Za-z]{3,9})(?:[-\s](\d{2}|\d{4}))?$/;
 const MONTH_DAY_YEAR = /^([A-Za-z]{3,9})\s(\d{1,2}),?\s(\d{4})$/;
 const MONTH_NUMBER = /^([A-Za-z]{3,9})[-\s](\d{1,2}|\d{4})$/;
+
+/**
+ * How a locale writes a short date in numbers, as `Intl` formats it: the
+ * order of day, month and year, the separator, and the date code with a
+ * four-digit year (`m/d/yyyy` in en-US, `dd.mm.yyyy` in de-DE).
+ */
+export interface ShortDate {
+  readonly order: "mdy" | "dmy" | "ymd";
+  readonly separator: string;
+  readonly code: string;
+}
+
+const US_SHORT_DATE: ShortDate = { order: "mdy", separator: "/", code: "m/d/yyyy" };
+const shortDateCache = new Map<string, ShortDate>();
+
+/** The short date of `locale`, read once from `Intl` and cached; US English when unset. */
+export function shortDateOf(locale: string | undefined): ShortDate {
+  if (locale === undefined || locale === "en-US") return US_SHORT_DATE;
+  let found = shortDateCache.get(locale);
+  if (found === undefined) {
+    const parts = new Intl.DateTimeFormat(locale, {
+      dateStyle: "short",
+      timeZone: "UTC",
+    }).formatToParts(Date.UTC(2026, 0, 5));
+    let order = "";
+    let separator = "";
+    let padded = false;
+    for (const part of parts) {
+      if (part.type === "day" || part.type === "month" || part.type === "year") {
+        order += part.type[0];
+        if (part.type === "day") padded = part.value.length === 2;
+      } else if (part.type === "literal" && separator === "") {
+        separator = part.value.trim();
+      }
+    }
+    const known = order === "dmy" || order === "ymd" ? order : "mdy";
+    const sign = separator.length === 1 ? separator : "/";
+    const day = padded ? "dd" : "d";
+    const month = padded ? "mm" : "m";
+    found = {
+      order: known,
+      separator: sign,
+      code:
+        known === "dmy"
+          ? `${day}${sign}${month}${sign}yyyy`
+          : known === "ymd"
+            ? `yyyy${sign}${month}${sign}${day}`
+            : `${month}${sign}${day}${sign}yyyy`,
+    };
+    shortDateCache.set(locale, found);
+  }
+  return found;
+}
+
+/** The date `day` of `month` in the current year, shown as `d-mmm`, or null. */
+function dayOfThisYear(month: number, day: number): GeneralNumber | null {
+  const serial = componentsToSerial(new Date().getFullYear(), month, day, 0, 0, 0);
+  return serial === null ? null : { value: serial, numberFormat: "d-mmm" };
+}
+
+/** The first day of `month` in the year `year` gives, shown as `mmm-yy`, or null. */
+function firstOfMonth(month: number, year: string): GeneralNumber | null {
+  const serial = componentsToSerial(fullYear(year), month, 1, 0, 0, 0);
+  return serial === null ? null : { value: serial, numberFormat: "mmm-yy" };
+}
 
 /**
  * A date of a month and one number, as Excel reads it: day and month of the
@@ -177,25 +241,62 @@ const MONTH_NUMBER = /^([A-Za-z]{3,9})[-\s](\d{1,2}|\d{4})$/;
  * https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/two-digit-year-numbers
  */
 function twoPartDate(month: number, number: string): GeneralNumber | null {
-  if (number.length <= 2) {
-    const day = componentsToSerial(new Date().getFullYear(), month, Number(number), 0, 0, 0);
-    if (day !== null) return { value: day, numberFormat: "d-mmm" };
-  }
-  const first = componentsToSerial(fullYear(number), month, 1, 0, 0, 0);
-  return first === null ? null : { value: first, numberFormat: "mmm-yy" };
+  return (
+    (number.length <= 2 ? dayOfThisYear(month, Number(number)) : null) ??
+    firstOfMonth(month, number)
+  );
 }
 
-/** A date with no time: the forms Excel's General reads in the US English locale. */
-function generalDate(text: string): GeneralNumber | null {
-  const slash = SLASH_DATE.exec(text);
-  if (slash) {
-    const [, month, day, year] = slash;
-    if (year === undefined) return twoPartDate(Number(month), day!);
-    if (day!.length > 2) return null;
-    const serial = componentsToSerial(fullYear(year), Number(month), Number(day), 0, 0, 0);
-    if (serial === null) return null;
-    return { value: serial, numberFormat: "m/d/yyyy" };
+/** Whether `part` is one to four digits. */
+function isDateNumber(part: string): boolean {
+  if (part.length === 0 || part.length > 4) return false;
+  for (let index = 0; index < part.length; index++) {
+    const code = part.charCodeAt(index);
+    if (code < 0x30 || code > 0x39) return false;
   }
+  return true;
+}
+
+/**
+ * A date of two or three numbers split by `/` or the locale's separator, in
+ * the locale's order: `1/15/2026` in en-US, `15.01.2026` in de-DE. Two
+ * numbers are a day of this year, else a month and year, in that order
+ * (Excel's rule for two-part dates). `undefined` when the text has another
+ * shape, so the other forms read it.
+ */
+function numericDate(text: string, dates: ShortDate): GeneralNumber | null | undefined {
+  const parts = text.split(text.includes("/") ? "/" : dates.separator);
+  if (parts.length < 2 || parts.length > 3 || !parts.every(isDateNumber)) return undefined;
+  const [first, second, third] = parts as [string, string, string | undefined];
+  // A four-digit year first is the ISO order, which `parseDateInput` reads.
+  const yearFirst = first.length === 4;
+  if (yearFirst && dates.order !== "ymd") return undefined;
+  if (third === undefined) {
+    if (yearFirst) return firstOfMonth(Number(second), first);
+    if (first.length > 2) return null;
+    if (dates.order !== "dmy") return twoPartDate(Number(first), second);
+    return (
+      (second.length <= 2 ? dayOfThisYear(Number(second), Number(first)) : null) ??
+      firstOfMonth(Number(first), second)
+    );
+  }
+  const [year, month, day] = yearFirst
+    ? [first, second, third]
+    : dates.order === "dmy"
+      ? [third, second, first]
+      : [third, first, second];
+  if (month.length > 2 || day.length > 2 || year.length === 1 || year.length === 3) return null;
+  const serial = componentsToSerial(fullYear(year), Number(month), Number(day), 0, 0, 0);
+  return serial === null ? null : { value: serial, numberFormat: dates.code };
+}
+
+/**
+ * A date with no time: the forms Excel's General reads, with numeric dates
+ * in the order of the locale's short date.
+ */
+function generalDate(text: string, dates: ShortDate): GeneralNumber | null {
+  const numeric = numericDate(text, dates);
+  if (numeric !== undefined) return numeric;
   const dayMonth = DAY_MONTH_YEAR.exec(text);
   if (dayMonth) {
     const [, day, name, year] = dayMonth;
@@ -229,7 +330,7 @@ function generalDate(text: string): GeneralNumber | null {
   }
   const iso = parseDateInput(text);
   if (iso === null) return null;
-  return { value: iso, numberFormat: Number.isInteger(iso) ? "m/d/yyyy" : "m/d/yyyy h:mm" };
+  return { value: iso, numberFormat: Number.isInteger(iso) ? dates.code : `${dates.code} h:mm` };
 }
 
 const DATE_THEN_TIME = /^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm]?)?)$/;
@@ -245,7 +346,8 @@ const MAX_DATE_TEXT_LENGTH = 40;
 /**
  * The number Excel's General format reads from `text` (trimmed, not empty,
  * not a formula), with the number format it gives the cell; `null` when the
- * text stays text. `locale` sets the grouping and decimal separators.
+ * text stays text. `locale` sets the grouping and decimal separators and
+ * the order of a numeric date.
  */
 export function parseGeneralNumber(text: string, locale?: string): GeneralNumber | null {
   const number = generalNumber(text, separatorsOf(locale));
@@ -263,18 +365,19 @@ export function parseGeneralNumber(text: string, locale?: string): GeneralNumber
 
   const time = generalTime(text);
   if (time !== null) return time;
-  const date = generalDate(text);
+  const dates = shortDateOf(locale);
+  const date = generalDate(text, dates);
   if (date !== null) return date;
 
   const stamp = DATE_THEN_TIME.exec(text);
   if (stamp) {
-    const day = generalDate(stamp[1]!);
+    const day = generalDate(stamp[1]!, dates);
     const clock = generalTime(stamp[2]!);
     if (day === null || clock === null || clock.value >= 1) return null;
     const seconds = clock.numberFormat?.includes("ss") === true;
     return {
       value: day.value + clock.value,
-      numberFormat: seconds ? "m/d/yyyy h:mm:ss" : "m/d/yyyy h:mm",
+      numberFormat: `${dates.code} ${seconds ? "h:mm:ss" : "h:mm"}`,
     };
   }
   return null;

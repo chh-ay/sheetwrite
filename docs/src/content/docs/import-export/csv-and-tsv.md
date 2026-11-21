@@ -68,13 +68,13 @@ CSV and TSV are core-only. `fromCsv` projects input fields onto declared visible
 
 ## Output and injection safety
 
-`toCsv` follows the current view row order after sorting, filtering, hidden rows and collapsed groups. `toTsv` instead uses canonical data-space coordinates: reversed corners are normalized, and active views do not remap the range. TSV uses CRLF with no BOM and also injection-hardens values. Both synchronous writers fetch at most `maxWriterWindowRows` rows per packed store read, but still return one in-memory string.
+`toCsv` writes the displayed rows in their displayed order, after view sorts, filters, hidden rows and collapsed groups. `toTsv` instead uses data rows: reversed corners are normalized, and active views do not remap the range. TSV uses CRLF with no BOM and also injection-hardens values. Both synchronous writers fetch at most `maxWriterWindowRows` rows per packed store read, but still return one in-memory string.
 
 CSV output is UTF-8 with a BOM and CRLF endings. For string values, a leading `=`, `+`, `-`, `@`, tab or CR is prefixed with a single quote. The value cannot reopen as an executable formula. For example, the string `=1+1` exports as `'=1+1`, while a real formula cell exports its resolved scalar.
 
 For the full setup, the CSV string is `\uFEFFCustomer,Total\r\nAda,120\r\nLin,75` (BOM and line endings shown as escapes).
 
-Clipboard formulas and references retain rich behavior only when copied/cut and pasted through the same live Sheetwrite grid controller. Payloads from another controller or application, including spreadsheet HTML, paste as injection-neutralized text. `pasteValues` uses resolved literals.
+Clipboard formulas and references retain rich behavior only when copied/cut and pasted through the same live Sheetwrite grid controller. A paste from another controller or application, including spreadsheet HTML, brings no formulas: text that looks like a formula stays text, and other entries are read as typed. Cells in Excel's Text format stay text, as in Excel. `pasteValues` uses resolved literals.
 
 ## Options and edge cases
 

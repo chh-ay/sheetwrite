@@ -366,7 +366,14 @@ export class InteractionSessions {
         viewAddress: { sheet: address.sheet, row: viewRow, col: address.col },
         column,
         value,
-        text: formula ?? cellEditText(value, column.type, this.numberFormatAt(address, column)),
+        text:
+          formula ??
+          cellEditText(
+            value,
+            column.type,
+            this.numberFormatAt(address, column),
+            column.numberLocale,
+          ),
         label: this.editorLabel(viewRow, address.col),
       });
     }
@@ -775,7 +782,12 @@ export class InteractionSessions {
     const text =
       initial ??
       formula ??
-      cellEditText(current, column.type, this.numberFormatAt(dataAddr, column));
+      cellEditText(
+        current,
+        column.type,
+        this.numberFormatAt(dataAddr, column),
+        column.numberLocale,
+      );
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();

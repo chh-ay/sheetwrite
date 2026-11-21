@@ -125,7 +125,7 @@ try {
 
 ## Shell ownership
 
-The shell owns one Grid and its ribbon, name box, formula bar, sheet tabs and selection status. Keep the host at a real size. Call `shell.destroy()` when the view leaves; it destroys its Grid and chrome and is safe to call twice. Do not also mount the Grid's built-in ribbon with `grid.config.ribbon`.
+The shell owns one Grid and its ribbon, name box, formula bar, sheet tabs and selection status. Keep the host at a real size. Call `shell.destroy()` when the view leaves; it destroys its Grid and chrome and is safe to call twice. Do not also turn on the Grid's built-in ribbon with `config.ribbon`.
 
 The file buttons are host-owned. A successful table import destroys the old shell and starts a new one. This also resets undo history and sheet selection. Parse failure leaves the old shell intact. On teardown, abort work before destroying the shell so a late conversion cannot recreate it.
 
@@ -133,7 +133,7 @@ The file buttons are host-owned. A successful table import destroys the old shel
 
 | Choice | Effect |
 | --- | --- |
-| `ribbon: true` | Shows Home, Insert, Data and View instead of the toolbar. Both render the same commands. |
+| `ribbon: true` | Shows Home, Insert, Formulas, Data and View instead of the toolbar, plus File and Review when their commands are on. Both render the same commands. |
 | `ribbon: { mode: "auto" }` | Uses the compact, one-row ribbon while the host is narrower than 768 px. The **Compact** button switches layout at any time. |
 | Narrow host | Labels shrink and groups fold into popup controls. |
 | Double-click a tab | Minimizes the ribbon to its tab row. |
@@ -142,7 +142,7 @@ The file buttons are host-owned. A successful table import destroys the old shel
 
 The ribbon loads as a separate chunk. The shell reserves its height while loading and ignores a late chunk after destruction. A failed load falls back to the toolbar, which shows the same commands, and still reports an unhandled promise rejection; the file-handler `try/catch` does not catch that asynchronous load failure. Keep chunk URLs available after deployment.
 
-The built-in ribbon does not provide a chart-authoring API. Do not treat retained XLSX chart parts as editable charts.
+XLSX column, bar, line, area, pie, doughnut and scatter charts import as editable charts, and **Insert › Chart** adds one; see [Charts](/docs/features/analysis/charts/). Other chart types stay kept parts and cannot be edited.
 
 ## Options and limits
 

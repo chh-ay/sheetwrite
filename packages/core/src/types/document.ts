@@ -259,6 +259,7 @@ export interface Workbook {
   externalLinks?: ExternalLink[];
 }
 
+/** The sheet that `addSheet` adds: its name, and optionally its ID, kind, size, columns and tab position. */
 export interface AddSheetInput {
   id?: SheetId;
   name: string;
