@@ -1,0 +1,8 @@
+[before] formula-assist bar after second '=': '=SUM(B6:G6)=' ghost=[]
+[before] queries after new orders: "Tables match the sources" shown=true, "New orders in the feed" shown=false
+[before] interop #delimited: selected=false scrollY=0
+[before] performance-provenance child widths px: 1640,1640 visible=false
+[before] vault-verify child widths px: 16,1455,177 visible=true
+[before] host-rows scroll area tabindex=null role=null
+[before] database commit button names: ["Add one subscriber seat — Commit sample edit","Save pending now","Close and reopen session"]
+[before] sort grid host role=null label=Orders workbook
