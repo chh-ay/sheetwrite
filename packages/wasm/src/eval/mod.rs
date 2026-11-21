@@ -1017,6 +1017,7 @@ impl CellStore {
     /// affect. It does not settle pivot tables, which is why the pivot settle
     /// loops call it between their own steps.
     pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
+        crate::calc::release_formula_templates();
         if seeds.is_empty() {
             return;
         }

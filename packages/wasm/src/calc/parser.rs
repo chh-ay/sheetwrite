@@ -94,6 +94,9 @@ struct Parser<'a, 's> {
     /// The arguments of the calls being parsed, innermost last. Each call
     /// moves its own into one exact allocation when it closes.
     args: Vec<Ast>,
+    /// Where each `Ast::Cell` and `Ast::Range` came from, in the order they
+    /// were made, when the tree may be kept for reuse (`template`).
+    sites: Option<Vec<RefSite>>,
 }
 
 thread_local! {
@@ -106,6 +109,12 @@ impl<'a> Parser<'a, '_> {
     #[inline]
     fn peek(&mut self) -> Option<&Tok<'a>> {
         self.cursor.peek_at(0)
+    }
+
+    fn record(&mut self, site: RefSite) {
+        if let Some(sites) = &mut self.sites {
+            sites.push(site);
+        }
     }
 
     #[inline]
@@ -240,6 +249,7 @@ impl<'a> Parser<'a, '_> {
             if let Some(start) = AreaEnd::of(&Tok::Num(number)) {
                 let _ = self.next();
                 let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                self.record(RefSite::Fixed);
                 return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
             }
         }
@@ -385,6 +395,7 @@ impl<'a> Parser<'a, '_> {
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
+        let name_span = self.cursor.read_span();
         match self.peek() {
             Some(Tok::Structured(_)) => {
                 let Some(Tok::Structured(raw)) = self.next() else {
@@ -431,10 +442,16 @@ impl<'a> Parser<'a, '_> {
             if let Some(start) = AreaEnd::of_name(name.as_ref()) {
                 let _ = self.next();
                 let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                self.record(if matches!(start, AreaEnd::Cell(..)) {
+                    RefSite::Range(name_span, self.cursor.read_span())
+                } else {
+                    RefSite::Fixed
+                });
                 return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
             }
         }
         if let Some((row, col, flags)) = parse_a1(name.as_ref()) {
+            self.record(RefSite::Cell(name_span));
             Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
         } else {
             self.features.names = true;
@@ -731,6 +748,8 @@ pub(crate) fn parse_with_features(src: &str) -> ParseResult {
 }
 
 /// Bind a sheet token to its stable id while constructing its reference node.
+/// A formula of the same shape as one parsed before it gets a copy of that
+/// tree instead of a parse (`template`).
 pub(crate) fn parse_bound_with_features(
     src: &str,
     resolve: &SheetResolver<'_>,
@@ -750,11 +769,25 @@ pub(crate) fn parse_bound_with_features(
 fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let trimmed = src.trim();
     let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
+    // Only ingest binds references, and only ingest meets long runs of
+    // formulas of one shape, so only its parses reuse a kept tree.
+    let reuse = sheets.is_some();
+    reuse_or_parse(body, reuse, |sites| parse_body(body, sheets, sites))
+}
+
+/// Parses formula text without its `=`, and records in `sites`, when given,
+/// where each cell and range reference of the tree came from.
+fn parse_body(
+    body: &str,
+    sheets: Option<SheetBinding<'_>>,
+    mut sites: Option<&mut Vec<RefSite>>,
+) -> ParseResult {
     let mut parser = Parser {
         cursor: Cursor::over_text(body),
         features: ParseFeatures::default(),
         sheets,
         args: PARSE_ARGS.take(),
+        sites: sites.as_mut().map(|list| std::mem::take(&mut **list)),
     };
     let parsed = parser.expr();
     let trailing = match parsed {
@@ -764,6 +797,9 @@ fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     // A failed parse leaves the arguments of its open calls behind.
     parser.args.clear();
     PARSE_ARGS.set(std::mem::take(&mut parser.args));
+    if let (Some(list), Some(recorded)) = (sites, parser.sites.take()) {
+        *list = recorded;
+    }
     if let Some(error) = parser.cursor.lex_error() {
         return Err(error);
     }
@@ -785,6 +821,7 @@ pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
         features: ParseFeatures::default(),
         sheets: None,
         args: Vec::new(),
+        sites: None,
     };
 
     let result = parser.expr();
