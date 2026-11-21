@@ -309,30 +309,58 @@ describe("restore the workbook", () => {
     expect(value(alice.grid, "data", 2, 0)).toBe(33);
   });
 
-  it("rewrites only the rows whose cells differ from the version", async () => {
-    const { archive, alice } = await session();
-    await edit(alice, [
+  /** A 128-row Data sheet whose row 64 holds 640 in column B, saved as a version. */
+  async function longVersion() {
+    const opened = await session();
+    await edit(opened.alice, [
       { op: "addRows", sheet: "data", at: 8, count: 120 },
       set("data", 64, 1, 640),
     ]);
-    const version = await archive.saveVersion("Long", "alice", 0);
+    const version = await opened.archive.saveVersion("Long", "alice", 0);
+
+    return { ...opened, version };
+  }
+
+  /** Whether an operation of an applied restore writes `row` of sheet Data. */
+  function writesRow(outcome: Awaited<ReturnType<typeof restore>>, row: number): boolean {
+    const patches = outcome.status === "applied" ? outcome.transaction.patches : [];
+    return patches.some(
+      (patch) =>
+        "range" in patch &&
+        patch.range?.sheet === "data" &&
+        Math.min(patch.range.start.row, patch.range.end.row) <= row &&
+        Math.max(patch.range.start.row, patch.range.end.row) >= row,
+    );
+  }
+
+  it("rewrites only the rows whose cells differ from the version", async () => {
+    const { archive, alice, version } = await longVersion();
     await edit(alice, [set("data", 2, 0, 33), set("data", 110, 1, 1100)]);
 
     const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
     expect(outcome.status).toBe("applied");
 
     // Row 64 holds the version's cells already, so no operation of the restore writes it.
-    const patches = outcome.status === "applied" ? outcome.transaction.patches : [];
-    const writesRow64 = patches.some(
-      (patch) =>
-        "range" in patch &&
-        patch.range?.sheet === "data" &&
-        Math.min(patch.range.start.row, patch.range.end.row) <= 64 &&
-        Math.max(patch.range.start.row, patch.range.end.row) >= 64,
-    );
-    expect(writesRow64).toBe(false);
+    expect(writesRow(outcome, 64)).toBe(false);
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 110, 1)]).toEqual([3, null]);
     expect(value(alice.grid, "data", 64, 1)).toBe(640);
+  });
+
+  const reshaped: Array<[string, DocumentOp]> = [
+    ["rows were removed", { op: "removeRows", sheet: "data", at: 120, count: 3 }],
+    ["a column changed", { op: "setColumn", sheet: "data", col: 1, patch: { width: 140 } }],
+  ];
+
+  it.each(reshaped)("rewrites the whole sheet when %s since the version", async (_, change) => {
+    const { archive, alice, version } = await longVersion();
+    await edit(alice, [change, set("data", 2, 0, 33)]);
+
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+
+    // Row 64 did not change, but the whole sheet is written again.
+    expect(writesRow(outcome, 64)).toBe(true);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 64, 1)]).toEqual([3, 640]);
   });
 
   it("restores the version exactly in every scope when only some rows differ, and undo returns the live cells", async () => {
