@@ -233,7 +233,9 @@ test("a page's eyebrow carries its section's sidebar icon, and no icon stands al
 
   // A tab's landing page has no eyebrow, so it shows no icon above its title.
   await page.goto("/docs/");
-  await expect(page.locator(".sw-document__header svg")).toHaveCount(0);
+  await expect(page.locator(".sw-document__eyebrow")).toHaveCount(0);
+  // Its head's other icons are the page actions', each beside its label.
+  await expect(page.locator(".sw-document__header > svg")).toHaveCount(0);
 });
 
 test("generated API pages show member signatures and mark member deep links", async ({ page }) => {
