@@ -600,7 +600,7 @@
     "@sheetwrite/core#./history#HistoryPublishRequest": "b167a93527e5",
     "@sheetwrite/core#./history#HistoryPutRequest": "4f95bf363bc9",
     "@sheetwrite/core#./history#HistoryRecordMetadata": "1f4b999fd0cc",
-    "@sheetwrite/core#./history#HistoryRestoreOptions": "be9c9854f5af",
+    "@sheetwrite/core#./history#HistoryRestoreOptions": "019a64cf5963",
     "@sheetwrite/core#./history#HistoryRestoreScope": "b6343a1055fa",
     "@sheetwrite/core#./history#HistorySnapshotProvider": "9ca2b6568c8f",
     "@sheetwrite/core#./history#HistoryStorageAdapter": "8c61c5cf1a30",
