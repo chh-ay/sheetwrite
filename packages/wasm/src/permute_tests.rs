@@ -3,7 +3,7 @@
 
 use crate::permute::PERMUTE_PARTIAL_SPILL;
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK};
-use crate::types::{KIND_BOOL, KIND_EMPTY};
+use crate::tests::support::shown;
 
 const ROWS: usize = 6;
 const COLS: usize = 4;
@@ -29,16 +29,6 @@ fn permute(
 
 fn losses(store: &CellStore, sheet: usize, cols: usize, order: &[u32]) -> Vec<u32> {
     store.permute_rows_losses(sheet, 0, 0, cols, order)
-}
-
-fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
-    let cell = store.get_cell(sheet, row, col);
-    match cell.string() {
-        Some(text) => text,
-        None if cell.kind() == KIND_EMPTY => String::new(),
-        None if cell.kind() == KIND_BOOL => if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into(),
-        None => cell.num().to_string(),
-    }
 }
 
 fn column(store: &CellStore, sheet: usize, col: usize, rows: usize) -> Vec<String> {
