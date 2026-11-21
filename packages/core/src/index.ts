@@ -405,6 +405,7 @@ export type {
   RemoteOperationOptions,
   RemoteOperationSource,
   ReplaceChange,
+  ReplacePreview,
   ReplaceResult,
   ResolvedCell,
   ResourceOwnerBytes,

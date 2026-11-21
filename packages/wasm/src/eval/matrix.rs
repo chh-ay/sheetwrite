@@ -2,9 +2,10 @@
 
 use crate::calc::{Ast, Func, NameId, SHEET_COLS, SHEET_ROWS};
 use crate::store::names::NameScope;
+use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value};
 
-use super::{placed_cell, placed_range};
+use super::{placed_cell, placed_range, range_view, EvalPass};
 
 use super::preview_limits;
 use std::cell::Cell;
@@ -441,6 +442,36 @@ pub(crate) fn intersection_range(
         Some(_) if empty => Err(FormulaError::Null),
         Some(range) => Ok(range),
         None => Err(FormulaError::Value),
+    }
+}
+
+impl CellStore {
+    pub(super) fn eval_matrix_arg(
+        &self,
+        ast: &Ast,
+        formula_sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<EvalMatrix, FormulaError> {
+        let Some(range) = range_from_ast(ast, self.name_scope(formula_sheet)) else {
+            let Some(result) = self.eval_dynamic_array(ast, formula_sheet, pass, depth + 1) else {
+                return Err(FormulaError::Value);
+            };
+            let matrix = result?;
+            matrix.validate_copies(2)?;
+            return Ok(matrix);
+        };
+        self.eval_range_matrix(range, pass, depth)
+    }
+
+    /// The values of a written range, up to the sheet's used extent.
+    pub(super) fn eval_range_matrix(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<EvalMatrix, FormulaError> {
+        range_view::RangeView::new(self, range, depth)?.materialize(pass)
     }
 }
 

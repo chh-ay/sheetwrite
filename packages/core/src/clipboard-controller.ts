@@ -88,9 +88,15 @@ export interface ClipboardControllerDeps {
    * Called when a cut, then its paste, moves `count` rows that a filter or
    * the user hides, which the selection did not show (`cut`, `paste`), and
    * when a pasted block writes into `count` hidden rows of its target, as
-   * Excel's paste does (`write`).
+   * Excel's paste does (`write`). `rows` are the active sheet's data rows the
+   * step covers: the cut's, after the paste also the rows it landed on, and
+   * the rows a pasted block wrote.
    */
-  onHiddenRowsMoved?: (count: number, step: "cut" | "paste" | "write") => void;
+  onHiddenRowsMoved?: (
+    count: number,
+    step: "cut" | "paste" | "write",
+    rows: readonly { readonly start: number; readonly end: number }[],
+  ) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -713,7 +719,10 @@ export class ClipboardController {
       const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
-      if (hidden > 0) this.deps.onHiddenRowsMoved?.(hidden, "cut");
+      if (hidden > 0) {
+        const rows = { start: source.start.row, end: source.end.row };
+        this.deps.onHiddenRowsMoved?.(hidden, "cut", [rows]);
+      }
       return "done";
     } finally {
       write.close();
@@ -1011,7 +1020,15 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
-    if (cut.hidden > 0) this.deps.onHiddenRowsMoved?.(cut.hidden, "paste");
+    if (cut.hidden > 0) {
+      const landed = { start: firstRow, end: firstRow + rows - 1 };
+      const cutRows = { start: cut.range.start.row, end: cut.range.end.row };
+      this.deps.onHiddenRowsMoved?.(
+        cut.hidden,
+        "paste",
+        cut.range.sheet === this.deps.activeSheet() ? [cutRows, landed] : [landed],
+      );
+    }
     return "done";
   }
 
@@ -1467,6 +1484,8 @@ export class ClipboardController {
         : this.deps.store.viewRowCount(activeSheet) - focus.row,
     );
     const hiddenRows = sheetRows ? this.hiddenRowsIn(firstDataRow, availableRows) : 0;
+    // The sheet rows the block writes, for the hidden-rows notice's Show them.
+    const writtenRows = [{ start: firstDataRow, end: firstDataRow + availableRows - 1 }];
     const width = availableRows > 0 ? widthAt(0) : 0;
     const targetCols = colIndices.slice(startPos, startPos + width);
     const rectangular =
@@ -1562,7 +1581,7 @@ export class ClipboardController {
           "paste",
         );
         check?.report();
-        if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write");
+        if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write", writtenRows);
         return;
       }
     }
@@ -1591,7 +1610,7 @@ export class ClipboardController {
 
     this.deps.commit([...patches, ...extraPatches], "paste");
     check?.report();
-    if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write");
+    if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write", writtenRows);
   }
 
   /** How many of the `count` sheet rows from `first` a filter or the user hides. */

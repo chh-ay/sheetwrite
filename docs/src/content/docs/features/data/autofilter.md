@@ -82,7 +82,7 @@ As in Excel, copy, delete, formatting and the fill handle act on the rows the fi
 
 Paste is the other exception, as in Excel: a pasted block lands on the sheet rows from its first cell down, one row of the block per sheet row, so a row the filter hides in that range is overwritten too. One copied value pasted over a selection fills only the cells the filter shows.
 
-Beyond Excel, which does both without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", its paste "This paste moved 12 hidden rows", and a paste that writes into hidden rows "This paste wrote into 3 hidden rows". **Show them** clears the filters, so you can check the rows. The cut and the paste give Excel's result either way.
+Beyond Excel, which does both without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", its paste "This paste moved 12 hidden rows", and a paste that writes into hidden rows "This paste wrote into 3 hidden rows". **Show them** clears the filters and shows the rows Hide Rows hid in the rows the step covers, as one undo step, so you can check them. The cut and the paste give Excel's result either way.
 
 ## Undo, collaboration and XLSX files
 
