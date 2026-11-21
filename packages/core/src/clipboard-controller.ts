@@ -115,11 +115,11 @@ export interface ClipboardControllerDeps {
     rows: readonly { readonly start: number; readonly end: number }[],
   ) => void;
   /**
-   * Called when the grid refused a paste's commit (`rejected`, `conflict`, or
-   * `noop` other than for an empty paste), so the user reads that nothing
-   * was pasted, and why.
+   * Called with why a paste was refused, so the user reads that nothing was
+   * pasted, and why: the grid refused its commit, or the clipboard holds more
+   * than a paste may have. `reason` is a sentence that starts in lower case.
    */
-  onPasteRefused?: (result: Exclude<ApplyTransactionResult, { status: "applied" }>) => void;
+  onPasteRefused?: (reason: string) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -235,6 +235,50 @@ function limited<T>(parse: () => T): T | DelimitedTextResourceError {
   } catch (error) {
     if (error instanceof DelimitedTextResourceError) return error;
     throw error;
+  }
+}
+
+/**
+ * Why a paste larger than a paste may be was refused, as the user reads it.
+ * Text is measured only up to its limit, so its size is "more than" the limit.
+ */
+function tooLargeReason(error: DelimitedTextResourceError): string {
+  const count = (value: number): string => value.toLocaleString("en-US");
+  const megabytes = `${(error.limit / (1024 * 1024)).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`;
+  switch (error.resource) {
+    case "maxRows":
+      return `this paste has ${count(error.actual)} rows, and a paste can have at most ${count(error.limit)}.`;
+    case "maxColumns":
+      return `this paste has ${count(error.actual)} columns, and a paste can have at most ${count(error.limit)}.`;
+    case "maxCells":
+      return `this paste has ${count(error.actual)} cells, and a paste can have at most ${count(error.limit)}.`;
+    case "maxFieldBytes":
+      return `a cell of this paste has more than ${megabytes} of text, the most a cell can have.`;
+    default:
+      return `this paste has more than ${megabytes} of text, the most a paste can have.`;
+  }
+}
+
+/** Why the grid refused a paste's commit, as the user reads it. */
+function commitRefusalReason(
+  result: Exclude<ApplyTransactionResult, { status: "applied" }>,
+): string {
+  switch (result.status) {
+    case "rejected": {
+      const message = result.issues[0]?.message ?? "the change was refused";
+      return message.endsWith(".") ? message : `${message}.`;
+    }
+    case "conflict":
+      return "the sheet changed meanwhile. Paste again.";
+    case "noop":
+      switch (result.reason) {
+        case "read-only":
+          return "the sheet is read-only.";
+        case "incomplete-data":
+          return "the sheet is still loading. Paste again when it has loaded.";
+        default:
+          return "the paste does not fit on the sheet.";
+      }
   }
 }
 
@@ -952,7 +996,7 @@ export class ClipboardController {
    * formulas/refs; custom, HTML, and plain external inputs are inert.
    */
   paste(): Promise<ClipboardOutcome> {
-    return this.pasteFrom(false);
+    return this.refusingTooLarge(this.pasteFrom(false));
   }
 
   /**
@@ -960,7 +1004,7 @@ export class ClipboardController {
    * styles. For external text this is identical to {@link paste}.
    */
   pasteValues(): Promise<ClipboardOutcome> {
-    return this.pasteFrom(true);
+    return this.refusingTooLarge(this.pasteFrom(true));
   }
 
   /**
@@ -969,7 +1013,26 @@ export class ClipboardController {
    * after OK, within the click that browsers ask of a clipboard read. As in
    * Excel, it is not available while a cut waits for its paste.
    */
-  async pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
+  pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
+    return this.refusingTooLarge(this.pasteSpecialFrom(options));
+  }
+
+  /**
+   * `paste`'s outcome. A clipboard that holds more than a paste may have is
+   * refused while it is read, before anything is written: the grid says how
+   * large it is, and the paste ends `rejected`.
+   */
+  private async refusingTooLarge(paste: Promise<ClipboardOutcome>): Promise<ClipboardOutcome> {
+    try {
+      return await paste;
+    } catch (error) {
+      if (!(error instanceof DelimitedTextResourceError)) throw error;
+      this.deps.onPasteRefused?.(tooLargeReason(error));
+      return "rejected";
+    }
+  }
+
+  private async pasteSpecialFrom(options: PasteSpecialOptions): Promise<ClipboardOutcome> {
     if (this.deps.readOnly() || this.pendingCut || !this.pasteTarget()) return "empty";
     if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
     let chosen: PasteSpecialOptions | null = options;
@@ -1080,7 +1143,7 @@ export class ClipboardController {
     if (result === null) return "empty";
     if (result.status === "applied") return "done";
     if (result.status === "noop" && result.reason === "empty") return "empty";
-    this.deps.onPasteRefused?.(result);
+    this.deps.onPasteRefused?.(commitRefusalReason(result));
     return "rejected";
   }
 

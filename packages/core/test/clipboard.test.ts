@@ -205,6 +205,8 @@ interface Harness {
   setReadOnly: (value: boolean) => void;
   /** The cut marks the controller reported, in order. */
   cutMarks: Array<Range | null>;
+  /** Why the controller refused each paste, in order. */
+  refusals: string[];
 }
 
 function makeHarness(
@@ -250,6 +252,7 @@ function makeHarness(
 
   const commitReasons: string[] = [];
   const cutMarks: Array<Range | null> = [];
+  const refusals: string[] = [];
   const controller = new ClipboardController({
     lifetime,
     store: store as unknown as Store,
@@ -287,6 +290,7 @@ function makeHarness(
       return { status: "applied", epoch: 0, transaction: { patches } };
     },
     onCutChange: (range) => cutMarks.push(range),
+    onPasteRefused: (reason) => refusals.push(reason),
     loadPasteSpecial: () => import("../src/paste-special.js"),
     askPasteSpecial: async () => null,
     sheetName: () => "Sheet 1",
@@ -300,6 +304,7 @@ function makeHarness(
     selection,
     commitReasons,
     cutMarks,
+    refusals,
     select: (row, col) => selection.selectCell(row, col),
     setReadOnly: (value) => {
       readOnly = value;
@@ -917,40 +922,40 @@ describe("ClipboardController", () => {
       });
     const literal = { value: { kind: "literal", value: "x" }, resolved: "x", style: {} };
     const padding = " ".repeat(32 * 1024 * 1024);
+    const wide = "this paste has 16,385 columns, and a paste can have at most 16,384.";
+    const large = "this paste has more than 32 MB of text, the most a paste can have.";
 
     it.each([
       [
         "HTML wider than a sheet",
         "text/html",
         `<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`,
-        "maxColumns",
+        wide,
       ],
       [
         "HTML over the byte limit",
         "text/html",
         `<table><tr><td>x</td></tr></table>${padding}`,
-        "maxInputBytes",
+        large,
       ],
       [
         "a payload wider than a sheet",
         SHEETWRITE_CLIPBOARD_MIME,
         envelope([Array(tooWide).fill(literal)]),
-        "maxColumns",
+        wide,
       ],
       [
         "a payload over the byte limit",
         SHEETWRITE_CLIPBOARD_MIME,
         `${envelope([[literal]])}${padding}`,
-        "maxInputBytes",
+        large,
       ],
-    ])("refuses %s, as pasted text is refused", async (_name, type, text, resource) => {
+    ])("refuses %s, as pasted text is refused", async (_name, type, text, reason) => {
       offer(type, text);
       h.select(1, 0);
 
-      await expect(h.controller.paste()).rejects.toMatchObject({
-        name: "DelimitedTextResourceError",
-        resource,
-      });
+      expect(await h.controller.paste()).toBe("rejected");
+      expect(h.refusals).toEqual([reason]);
       expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).not.toBe("x");
     });
 
@@ -958,10 +963,8 @@ describe("ClipboardController", () => {
       offer(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(tooWide).fill(literal)]));
       h.select(1, 0);
 
-      await expect(h.controller.pasteSpecial({ paste: "values" })).rejects.toMatchObject({
-        name: "DelimitedTextResourceError",
-        resource: "maxColumns",
-      });
+      expect(await h.controller.pasteSpecial({ paste: "values" })).toBe("rejected");
+      expect(h.refusals).toEqual([wide]);
     });
 
     it("pastes the text beside HTML past the limits, as Excel's large HTML gives way to its text", async () => {
