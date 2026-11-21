@@ -563,8 +563,16 @@ function randomOperations(
   if (choice < 0.55) {
     return [{ op: "clearRange", range: rect(), contents: true }];
   }
-  if (choice < 0.65) {
+  if (choice < 0.6) {
     return [{ op: "setRangeStyle", range: rect(), style: { bold: true } }];
+  }
+  if (choice < 0.63) {
+    return [
+      { op: "setSheetMeta", sheet: "data", patch: { frozenRows: below(3), tabColor: "#336699" } },
+    ];
+  }
+  if (choice < 0.65) {
+    return [{ op: "moveSheet", sheet: "notes", to: below(2) }];
   }
   if (choice < 0.8) {
     const count = INSERT_COUNTS[below(INSERT_COUNTS.length)] ?? 1;
