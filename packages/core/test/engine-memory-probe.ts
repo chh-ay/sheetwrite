@@ -54,6 +54,8 @@ await initSheetwrite({
 
 assert.equal(instancesCreated, 1, "Core boot must not eagerly instantiate the public singleton");
 
+if (engineName === "formulas") assert.ok(formulas.functionNames().includes("GROUPBY"));
+
 const publicStore = new provider.CellStore();
 publicStore.free();
 assert.equal(instancesCreated, 2, "Published exports must share one lazily initialized instance");

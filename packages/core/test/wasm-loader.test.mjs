@@ -84,12 +84,13 @@ describe("WASM loader lifecycle", () => {
     });
   }
 
-  // The generated module initializes once per process, so only the first case reaches init():
-  // the explicit module, which nothing else loads. createEngine() reads the packaged binary.
-  for (const source of ["explicit compiled", "packaged default"]) {
-    it(`initializes the Node loader from its ${source} module`, async () => {
+  // The generated module initializes once per process, so in a full run only the first case
+  // reaches init(): the explicit module, which nothing else loads. Coverage runs the packaged
+  // default case alone by its name ("packaged default binary").
+  for (const source of ["an explicit compiled module", "its packaged default binary"]) {
+    it(`initializes the Node loader from ${source}`, async () => {
       const module =
-        source === "explicit compiled"
+        source === "an explicit compiled module"
           ? await WebAssembly.compile(
               await readFile(new URL("../../wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url)),
             )
