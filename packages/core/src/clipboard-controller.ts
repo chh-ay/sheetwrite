@@ -145,6 +145,18 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+/** One style object per number format a paste gives, so a block's cells share it. */
+const formatStyles = new Map<string, CellStyle>();
+
+function formatStyle(numberFormat: string): CellStyle {
+  let style = formatStyles.get(numberFormat);
+  if (style === undefined) {
+    style = { numberFormat };
+    formatStyles.set(numberFormat, style);
+  }
+  return style;
+}
+
 /**
  * Text from elsewhere read as typed input for the target column: a formula
  * lands as inert text, and in a `general` column a number gets the format
@@ -155,7 +167,7 @@ function parseExternalInput(source: string, type: Sheet["columns"][number]["type
   const { value, numberFormat } = parsed;
   if (value.kind === "formula") return { value: { kind: "literal", value: `'${value.src}` } };
   // A paste reads many cells; the parsed entry is the write when it has no format.
-  return numberFormat === undefined ? parsed : { value, style: { numberFormat } };
+  return numberFormat === undefined ? parsed : { value, style: formatStyle(numberFormat) };
 }
 
 /**
@@ -1334,6 +1346,10 @@ export class ClipboardController {
       const refs: Array<[number, { sheet: SheetId; row: number; col: number }]> = [];
       const styleTable: CellStyle[] = [];
       const styleLookup = new Map<string, number>();
+      // Most cells share a style object (none, or one per pasted format), so
+      // the id is found by identity before the style is serialized.
+      const styleIdOf = new Map<CellStyle, number>();
+      const noStyle: CellStyle = {};
       const styleIds: number[] = new Array(availableRows * width);
       let canPack = true;
       for (let row = 0; row < availableRows && canPack; row++) {
@@ -1362,13 +1378,17 @@ export class ClipboardController {
             values[offset] = write.value.value;
           }
 
-          const style = write.style ?? {};
-          const styleKey = JSON.stringify(style);
-          let styleId = styleLookup.get(styleKey);
+          const style = write.style ?? noStyle;
+          let styleId = styleIdOf.get(style);
           if (styleId === undefined) {
-            styleId = styleTable.length;
-            styleLookup.set(styleKey, styleId);
-            styleTable.push(style);
+            const styleKey = JSON.stringify(style);
+            styleId = styleLookup.get(styleKey);
+            if (styleId === undefined) {
+              styleId = styleTable.length;
+              styleLookup.set(styleKey, styleId);
+              styleTable.push(style);
+            }
+            styleIdOf.set(style, styleId);
           }
 
           styleIds[offset] = styleId;
