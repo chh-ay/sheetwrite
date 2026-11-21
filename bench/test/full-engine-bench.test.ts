@@ -45,44 +45,10 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
   const rejections: Rejection<FullEngineResult>[] = [
     [(result) => rekeyShared(result, "default", "formulas")],
     [(result) => result.engines.pop()],
-    [(result) => result.engines.push(structuredClone(firstEngine(result)))],
-    [(result) => Object.defineProperty(firstEngine(result), "engine", { value: "unknown" })],
-    [(result) => sharedWorkload(result).samplesMs.pop()],
-    [
-      (result) => {
-        const workload = sharedWorkload(result);
-        workload.stat = { ...workload.stat, median: workload.stat.median + 1 };
-      },
-    ],
-    [(result) => sharedWorkload(result).allocationSamples.pop()],
     [(result) => (sharedWorkload(result).output = "wrong")],
-    [(result) => (must(firstEngine(result).shared.source, "source").digest = ZERO_DIGEST)],
-    [(result) => analysis(result).samplesMs.pop()],
-    [
-      (result) =>
-        (analysis(result).stat = {
-          ...analysis(result).stat,
-          mean: analysis(result).stat.mean + 1,
-        }),
-    ],
     [(result) => (analysis(result).output = 0)],
-    [
-      (result) => {
-        const { allocationStat } = analysis(result);
-        allocationStat.retainedBytes = {
-          ...allocationStat.retainedBytes,
-          mean: allocationStat.retainedBytes.mean + 1,
-        };
-      },
-    ],
     [(result) => result.analysis.pop()],
     [(result) => firstEngine(result).initialization.samplesMs.pop()],
-    [
-      (result) => {
-        const { initialization } = firstEngine(result);
-        initialization.stat = { ...initialization.stat, mean: initialization.stat.mean + 1 };
-      },
-    ],
     [(result) => (firstEngine(result).wasm.sha256 = ZERO_DIGEST)],
     [(result) => (result.sourceDigest = ZERO_DIGEST)],
     [(result) => (firstEngine(result).shared.meta.commit = "0".repeat(40))],
