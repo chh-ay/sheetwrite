@@ -1000,8 +1000,8 @@ export class GridImpl implements Grid {
       onValidationRefused: (refused, warned) => {
         this.validationRefusedNotice(refused, warned);
       },
-      onPasteRefused: (result) => {
-        this.actionFeedback.show(`Nothing was pasted: ${pasteRefusalReason(result)}`);
+      onPasteRefused: (reason) => {
+        this.actionFeedback.show(`Nothing was pasted: ${reason}`);
       },
       validationReads: () => storeEngine(this.store)?.validationReads,
       // Excel's cut moves, and its paste writes into, the rows a filter or
@@ -5148,27 +5148,6 @@ export class GridImpl implements Grid {
     // string it paints, and the same cells paint the same output.
     this.readWindows.invalidateData();
     this.scheduleRender();
-  }
-}
-
-/** Why the grid refused a paste's commit, as the user reads it. */
-function pasteRefusalReason(
-  result: Exclude<ApplyTransactionResult, { status: "applied" }>,
-): string {
-  switch (result.status) {
-    case "rejected":
-      return `${result.issues[0]?.message ?? "the change was refused"}.`;
-    case "conflict":
-      return "the sheet changed meanwhile. Paste again.";
-    case "noop":
-      switch (result.reason) {
-        case "read-only":
-          return "the sheet is read-only.";
-        case "incomplete-data":
-          return "the sheet is still loading. Paste again when it has loaded.";
-        default:
-          return "the paste does not fit on the sheet.";
-      }
   }
 }
 

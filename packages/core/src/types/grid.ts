@@ -166,8 +166,9 @@ export interface CellEditor {
  *   grid because a newer action of the same kind (copy or cut, paste) started
  *   or the grid was destroyed first.
  * - `"rejected"` — the grid refused the paste's change, so nothing was
- *   pasted: a protected range, a host's admission, or a document limit. The
- *   grid says why, beside the `mutation-rejected` event.
+ *   pasted: a protected range, a host's admission, a document limit, or a
+ *   clipboard with more rows, columns, cells or text than a paste may have.
+ *   The grid says why, beside the `mutation-rejected` event for a change.
  */
 export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "rejected";
 

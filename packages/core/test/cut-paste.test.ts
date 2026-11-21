@@ -117,10 +117,7 @@ function cutHarness(options: { nativeFormatsOnly?: boolean; maxRowsPerSheet?: nu
     loadPasteSpecial: () => import("../src/paste-special.js"),
     askPasteSpecial: async () => null,
     sheetName: () => "Sheet 1",
-    onPasteRefused: (result) => {
-      if (result.status === "rejected") refusals.push(result.issues[0]?.message ?? "");
-      else refusals.push(result.status);
-    },
+    onPasteRefused: (reason) => refusals.push(reason),
   });
   const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
 
