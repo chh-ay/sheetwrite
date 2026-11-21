@@ -1,5 +1,5 @@
 import type { SheetSnapshot } from "@sheetwrite/core";
-import { MAX_HYPERLINK_DISPLAY_LENGTH } from "@sheetwrite/core";
+import { MAX_HYPERLINK_DISPLAY_LENGTH, MAX_VALIDATION_RULES } from "@sheetwrite/core";
 
 import { OpcPackage, relationshipTypeMatches } from "./opc.js";
 import { isRetainedRelationship } from "./preservation.js";
@@ -183,6 +183,14 @@ export async function parseSheet(
         parseValidation(validation, context, reference.name, date1904),
       )
     : [];
+  if (validations.length > MAX_VALIDATION_RULES) {
+    emitWarning(context, {
+      code: "validation-loss",
+      message: `Excel data validation rule limit ${MAX_VALIDATION_RULES} was exceeded; later rules were dropped`,
+      sheet: reference.name,
+    });
+    validations.length = MAX_VALIDATION_RULES;
+  }
   const conditionalFormats = parseConditionalFormats(root, styles, reference.name, context);
   const sortState = parseSortState(root, styles, context, reference.name);
 

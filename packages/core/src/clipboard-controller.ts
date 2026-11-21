@@ -31,12 +31,22 @@ import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import { referenceSheetName } from "./sheet-copy.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
+import type {
+  CommitReason,
+  DataValidationRule,
+  DocumentOp,
+  PackedCellBlock,
+  Sheet,
+} from "./types/document.js";
 import type { ClipboardOutcome, PasteSpecialOptions } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
 import { utf8ByteLength } from "./utf8.js";
-import { failingValidationRule, type ValidationReads } from "./validation-rule.js";
+import {
+  failingValidationRule,
+  ValidationBudgetError,
+  type ValidationReads,
+} from "./validation-rule.js";
 import { copiedValidation, validationPastePatches } from "./validation-transfer.js";
 
 /** Paste Special's code, which loads on first use. */
@@ -1355,8 +1365,26 @@ export class ClipboardController {
    * Walk a `height`×`widthAt(r)` block anchored at `focus`, resolving each cell to
    * a `set` patch via `cellAt`. Honors the view-row mapping, the visible-column
    * order, the row limit, and merge-anchor skipping, then commits one transaction.
+   * A paste that keeps the target's validation rules checks its cells and
+   * commits them in one check, so each list source is read once.
    */
   private writeBlock(
+    focus: CellRef,
+    height: number,
+    widthAt: (r: number) => number,
+    cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
+    extraPatches: DocumentOp[] = [],
+  ): void {
+    const reads = this.deps.keepValidation?.() ? this.deps.validationReads?.() : undefined;
+    if (reads) {
+      reads.check(() => this.writeCells(focus, height, widthAt, cellAt, extraPatches));
+    } else {
+      this.writeCells(focus, height, widthAt, cellAt, extraPatches);
+    }
+  }
+
+  /** {@link writeBlock}, within its check. */
+  private writeCells(
     focus: CellRef,
     height: number,
     widthAt: (r: number) => number,
@@ -1506,7 +1534,8 @@ export class ClipboardController {
    * The check of a paste that keeps the target's validation rules: each
    * cell's value against the rules over its cell. It records the cells a
    * `reject` rule refuses and those a `warn` rule refuses, once each, and
-   * `report` hands them to the grid's notice.
+   * `report` hands them to the grid's notice. Once the check runs out of its
+   * budget it admits every cell, and the store refuses the paste.
    */
   private validationCheck(): {
     admits(write: CellWrite, addr: CellAddress): boolean;
@@ -1526,7 +1555,13 @@ export class ClipboardController {
           value = typeof result === "object" && result !== null ? result.error : result;
         }
         if (value === undefined) return true;
-        const rule = failingValidationRule(rules, addr, value, reads);
+        let rule: DataValidationRule | undefined;
+        try {
+          rule = failingValidationRule(rules, addr, value, reads);
+        } catch (error) {
+          if (error instanceof ValidationBudgetError) return true;
+          throw error;
+        }
         if (!rule) return true;
         const key = `${addr.row}:${addr.col}`;
         if (rule.policy === "reject") {

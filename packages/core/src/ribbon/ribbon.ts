@@ -82,6 +82,8 @@ export class Ribbon {
   private readonly tabSpecs: readonly RibbonTabSpec[];
   private readonly panels: (PanelView | undefined)[] = [];
   private readonly tabList: HTMLDivElement;
+  /** Opens a menu of the tabs that do not fit in the tab row; hidden while they all fit. */
+  private readonly moreTabsButton: HTMLButtonElement;
   private readonly minimizeButton: HTMLButtonElement;
   private readonly modeButton: HTMLButtonElement;
   /** The compact ribbon's gear, which opens the Keyboard shortcuts panel; only with `keyboardSettings`. */
@@ -128,7 +130,21 @@ export class Ribbon {
     this.tabList.setAttribute("role", "tablist");
     this.tabList.setAttribute("aria-label", "Ribbon tabs");
     this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
-    this.tabList.addEventListener("scroll", this.updateTabOverflow, { passive: true });
+
+    this.moreTabsButton = document.createElement("button");
+    this.moreTabsButton.type = "button";
+    this.moreTabsButton.className = "sheetwrite-ribbon-more-tabs";
+    this.moreTabsButton.title = "More tabs";
+    this.moreTabsButton.setAttribute("aria-label", "More tabs");
+    this.moreTabsButton.setAttribute("aria-haspopup", "menu");
+    this.moreTabsButton.setAttribute("aria-expanded", "false");
+    this.moreTabsButton.hidden = true;
+    const moreCaret = document.createElement("span");
+    moreCaret.className = "sheetwrite-ribbon-caret";
+    moreCaret.setAttribute("aria-hidden", "true");
+    this.moreTabsButton.appendChild(moreCaret);
+    this.moreTabsButton.addEventListener("mousedown", (event) => event.preventDefault());
+    this.moreTabsButton.addEventListener("click", (event) => this.openMoreTabs(event.detail === 0));
 
     this.modeButton = document.createElement("button");
     this.modeButton.type = "button";
@@ -163,7 +179,11 @@ export class Ribbon {
       this.settingsButton = settings;
     }
 
-    tabRow.append(this.tabList, ...(this.settingsButton ? [this.settingsButton] : []));
+    tabRow.append(
+      this.tabList,
+      this.moreTabsButton,
+      ...(this.settingsButton ? [this.settingsButton] : []),
+    );
     tabRow.append(this.modeButton, this.minimizeButton);
     this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
@@ -232,7 +252,6 @@ export class Ribbon {
       // Roving tabindex: Tab reaches the tab row once, arrows move within it.
       tab.tabIndex = selected ? 0 : -1;
     });
-    if (focus) this.tabs[index]?.focus();
 
     const panel = this.panelAt(index);
     for (const [panelIndex, view] of this.panels.entries()) {
@@ -242,6 +261,8 @@ export class Ribbon {
     this.fittedWidth = -1;
     // A following key can open a menu before the next animation frame.
     this.fit();
+    // After the fit, which shows the selected tab if it was in the More tabs menu.
+    if (focus) this.tabs[index]?.focus();
   }
 
   /** Build a tab's panel on first use; most sessions never open most tabs. */
@@ -441,24 +462,53 @@ export class Ribbon {
     if (this.fitFrame !== 0 || this.lifetime.closed) return;
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = 0;
-      this.updateTabOverflow();
       this.fit();
     });
   }
 
   /**
-   * Mark which ends of the tab list hide tabs, so the stylesheet fades those
-   * edges instead of cutting a tab label off beside the layout buttons.
+   * Move the tabs that do not fit, last first, into the More tabs menu, so no
+   * tab label is cut off. The selected tab always stays in the row.
    */
-  private readonly updateTabOverflow = (): void => {
+  private fitTabs(): void {
     const list = this.tabList;
-    const hiddenBefore = list.scrollLeft > 0;
-    const hiddenAfter = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
-    if (hiddenBefore && hiddenAfter) list.dataset.overflow = "both";
-    else if (hiddenBefore) list.dataset.overflow = "start";
-    else if (hiddenAfter) list.dataset.overflow = "end";
-    else delete list.dataset.overflow;
-  };
+    for (const tab of this.tabs) delete tab.dataset.overflow;
+    // Both widths round to whole pixels, so fractional tab widths can differ by one.
+    const overflows = (): boolean => list.scrollWidth > list.clientWidth + 1;
+    this.moreTabsButton.hidden = !overflows();
+    for (let index = this.tabs.length - 1; index >= 0 && overflows(); index -= 1) {
+      const tab = this.tabs[index];
+      if (tab !== undefined && index !== this.activeTab && !tab.hidden) tab.dataset.overflow = "";
+    }
+  }
+
+  /** List the tabs that did not fit; picking one selects it, which brings it into the row. */
+  private openMoreTabs(keyboard: boolean): void {
+    const trigger = this.moreTabsButton;
+    if (this.popup.isOpen(trigger)) {
+      this.popup.closeFrom(trigger, keyboard);
+      return;
+    }
+    const menu = document.createElement("div");
+    menu.className = "sheetwrite-ribbon-menu";
+    this.tabs.forEach((tab, index) => {
+      if (tab.hidden || tab.dataset.overflow === undefined) return;
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "sheetwrite-ribbon-menu-item";
+      item.setAttribute("role", "menuitem");
+      item.tabIndex = -1;
+      item.textContent = tab.textContent;
+      item.addEventListener("mousedown", (event) => event.preventDefault());
+      item.addEventListener("click", (event) => {
+        this.popup.closeAll(false);
+        if (this.minimized) this.setMinimized(false);
+        this.selectTab(index, event.detail === 0);
+      });
+      menu.appendChild(item);
+    });
+    this.popup.open(trigger, menu, { role: "menu", label: "More tabs", focus: keyboard });
+  }
 
   private updateLayout(): void {
     const compact = ribbonIsCompact(this.element.clientWidth, this.mode, this.options.compactWidth);
@@ -476,6 +526,8 @@ export class Ribbon {
 
   private fit(): void {
     this.updateLayout();
+    // The settings button shows only in the compact layout, so fit the tabs after it.
+    this.fitTabs();
     const panel = this.panels[this.activeTab];
     if (panel === undefined || this.minimized) return;
     const width = panel.element.clientWidth;
