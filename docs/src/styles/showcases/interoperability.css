@@ -111,7 +111,7 @@
     --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
     --sheetwrite-menu-shadow: var(--sw-shadow-lg);
     --sheetwrite-find-shadow: var(--sw-shadow-lg);
-    --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
+    --sheetwrite-tab-font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
     --sheetwrite-tab-bg: var(--sw-surface-2);
     --sheetwrite-tab-fg: var(--sw-fg-muted);
     --sheetwrite-tab-border: var(--sw-border);
@@ -564,7 +564,7 @@
 .sw-si-workbench .sheetwrite-shell-status {
   padding-left: 0;
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1 var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1 var(--sw-font-mono);
   opacity: 1;
 }
 

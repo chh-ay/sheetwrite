@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { MutationRevisionIndex } from "../src/mutation-revision-index.js";
 import type { CellAddress, DocumentOp } from "../src/types.js";
 
+const NOTHING_RETAINED = { points: 0, rectangles: 0, retainedRequests: 0, retainedRevisions: 0 };
 const address = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });
 
 describe("MutationRevisionIndex", () => {
@@ -12,12 +13,7 @@ describe("MutationRevisionIndex", () => {
       [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: "ignored" } }],
       1,
     );
-    expect(index.stats()).toEqual({
-      points: 0,
-      rectangles: 0,
-      retainedRequests: 0,
-      retainedRevisions: 0,
-    });
+    expect(index.stats()).toEqual(NOTHING_RETAINED);
 
     const release = index.retainRevision(0);
     const operations: DocumentOp[] = [
@@ -67,12 +63,7 @@ describe("MutationRevisionIndex", () => {
 
     release();
     release();
-    expect(index.stats()).toEqual({
-      points: 0,
-      rectangles: 0,
-      retainedRequests: 0,
-      retainedRevisions: 0,
-    });
+    expect(index.stats()).toEqual(NOTHING_RETAINED);
   });
 
   it("clears retained generations so obsolete coordinates cannot survive a structural reset", () => {
@@ -84,12 +75,7 @@ describe("MutationRevisionIndex", () => {
     );
     index.clear();
     release();
-    expect(index.stats()).toEqual({
-      points: 0,
-      rectangles: 0,
-      retainedRequests: 0,
-      retainedRevisions: 0,
-    });
+    expect(index.stats()).toEqual(NOTHING_RETAINED);
     expect(index.isNewerThan(address(99, 2), 4)).toBe(false);
   });
 });

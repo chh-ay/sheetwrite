@@ -2,6 +2,7 @@
 
 use super::preview::{FormulaPreview, FormulaPreviewKind, FormulaPreviewStatus, TrialValue};
 use crate::store::CellStore;
+use crate::tests::support::{evaluations, write_number_column};
 
 fn preview(store: &CellStore, sheet: usize, source: &str) -> FormulaPreview {
     store.preview_formula(sheet, 4, 2, source)
@@ -73,24 +74,11 @@ fn referenced_formulas_give_their_stored_results_without_recalculating() {
 }
 
 #[test]
-fn the_store_is_left_exactly_as_it_was() {
+fn a_preview_leaves_pending_edits_and_the_enclosing_reads_alone() {
     let (mut store, sheet) = small_store();
     store.set_number(sheet, 1, 0, 50.0, 0);
     let before = store.export_memory_state();
 
-    for source in [
-        "=SEQUENCE(4)",
-        "=SUM(A1:A3)&\"new text\"",
-        "=LET(x,A1:A3,SUM(x*2))",
-        "=TODAY()+NOW()*0",
-        "=OFFSET(A1,0,0,3,1)",
-        "=B1",
-        "=XLOOKUP(2,A1:A3,A1:A3)",
-    ] {
-        let _ = preview(&store, sheet, source);
-    }
-
-    assert_eq!(store.export_memory_state(), before);
     // A nested preview must not add its dynamic references to the enclosing
     // formula's runtime dependency recording.
     let enclosing = super::reference::start_runtime_reads();
@@ -100,6 +88,7 @@ fn the_store_is_left_exactly_as_it_was() {
     );
     let reads = super::reference::finish_runtime_reads(enclosing);
     assert!(reads.ranges.is_empty());
+    assert_eq!(store.export_memory_state(), before);
     // The pending edit still recalculates as it would have.
     store.commit_sources();
     assert_eq!(store.get_cell(sheet, 0, 1).num(), 54.0);
@@ -140,7 +129,7 @@ fn a_cell_that_is_not_loaded_makes_the_preview_wait() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
     store.begin_page_load();
-    crate::tests::support::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
+    write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
     store.commit_sources();
 
     assert_eq!(number(&preview(&store, sheet, "=SUM(A1:A4)")), 10.0);
@@ -154,7 +143,7 @@ fn a_cell_that_is_not_loaded_makes_the_preview_wait() {
 fn typed_range_reads_reach_a_million_cells_and_no_further() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 1_000_001);
-    crate::tests::support::write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 1_000_001]);
+    write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 1_000_001]);
     store.commit_sources();
 
     assert_eq!(
@@ -189,13 +178,7 @@ fn a_refused_preview_scans_no_more_cells() {
 
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, PREVIEW_TYPED_CELLS);
-    crate::tests::support::write_number_column(
-        &mut store,
-        sheet,
-        0,
-        0,
-        &vec![1.0; PREVIEW_TYPED_CELLS],
-    );
+    write_number_column(&mut store, sheet, 0, 0, &vec![1.0; PREVIEW_TYPED_CELLS]);
     store.commit_sources();
 
     // The first whole-column read spends the typed budget; IFERROR catches
@@ -221,7 +204,7 @@ fn a_refused_preview_scans_no_more_cells() {
 fn cell_by_cell_reads_and_arrays_have_smaller_limits() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 60_001);
-    crate::tests::support::write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 60_001]);
+    write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 60_001]);
     store.commit_sources();
 
     // Copying a range into an array reads each cell; 50,000 at most.
@@ -311,13 +294,6 @@ fn settled_store() -> (CellStore, usize) {
     (store, sheet)
 }
 
-/// Formula evaluations a recalculation runs.
-fn evaluations(recalculate: impl FnOnce()) -> usize {
-    super::FORMULA_EVALUATIONS.with(|count| count.set(0));
-    recalculate();
-    super::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
-}
-
 #[test]
 fn previews_leave_values_spills_dirty_state_strings_and_dependencies_unchanged() {
     let (mut previewed, sheet) = settled_store();
@@ -335,6 +311,9 @@ fn previews_leave_values_spills_dirty_state_strings_and_dependencies_unchanged()
         ("=XLOOKUP(3,A1:A3,B1:B3)", FormulaPreviewStatus::Value),
         ("=COUNTIF(A1:A4,\"new text\")", FormulaPreviewStatus::Value),
         ("=Base*2&\"other text\"", FormulaPreviewStatus::Value),
+        ("=LET(x,A1:A3,SUM(x*2))", FormulaPreviewStatus::Value),
+        ("=TODAY()+NOW()*0", FormulaPreviewStatus::Value),
+        ("=OFFSET(A1,0,0,3,1)", FormulaPreviewStatus::Array),
         ("=SEQUENCE(2,2)", FormulaPreviewStatus::Array),
         ("=SEQUENCE(20000)", FormulaPreviewStatus::CostLimit),
         ("=A1+RAND()", FormulaPreviewStatus::UnsafeFunction),

@@ -1,4 +1,4 @@
-import { validateWorkbookSnapshot } from "../document-protocol.js";
+import { CheckedSnapshot, validateWorkbookSnapshot } from "../document-protocol.js";
 import type { SheetSnapshot, SnapshotCell, WorkbookSnapshot } from "../types/document.js";
 import {
   decodeRecord,
@@ -61,12 +61,15 @@ export interface CheckpointWrite {
 /** Fetch one verified record by ID. */
 export type HistoryRecordReader = (id: string) => Promise<HistoryStoredRecord>;
 
-function reserveSnapshot(input: unknown, limits: Readonly<HistoryLimits>): void {
+/** Check the working-set reservation of `input`; returns its JSON size in bytes. */
+function reserveSnapshot(input: unknown, limits: Readonly<HistoryLimits>): number {
   const encoded = historyJsonSize(input, limits.maxSnapshotBytes);
 
   if (encoded * SNAPSHOT_RESERVATION_MULTIPLIER > limits.maxWorkingBytes) {
     throw new HistoryError("capacity", "History snapshot exceeds its working-set reservation");
   }
+
+  return encoded;
 }
 
 /** Store one metadata value; a large array becomes a list of block records. */
@@ -428,15 +431,16 @@ async function readSheet(
 }
 
 /**
- * Rebuild a checkpoint into a validated snapshot. Every reference is checked
- * against its owner, and decoded bytes are counted against the working-set
- * reservation before the next page is read.
+ * Rebuild a checkpoint into a validated snapshot, which a replay store takes
+ * without validating every cell again. Every reference is checked against its
+ * owner, and decoded bytes are counted against the working-set reservation
+ * before the next page is read.
  */
 export async function readCheckpoint(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
-): Promise<WorkbookSnapshot> {
+): Promise<CheckedSnapshot> {
   const record = await read(id);
   const root = await decodeRecord(record, limits);
   if (record.kind !== "checkpoint" || !object(root)) {
@@ -483,7 +487,7 @@ export async function readCheckpoint(
     sheets,
   };
 
-  reserveSnapshot(input, limits);
+  const serializedBytes = reserveSnapshot(input, limits);
 
   const checked = validateWorkbookSnapshot(input, {
     storage: "paged",
@@ -494,7 +498,7 @@ export async function readCheckpoint(
     throw new HistoryError("integrity", "Reconstructed history snapshot is invalid");
   }
 
-  return checked.value;
+  return new CheckedSnapshot(checked.value, serializedBytes);
 }
 
 /** Read only the log fields of a checkpoint; its cells are not decoded. */

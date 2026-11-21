@@ -1,8 +1,8 @@
-import { type CDPSession, expect, type Page, test } from "@playwright/test";
+import type { CDPSession, Page } from "@playwright/test";
 
-import { siteUrl } from "./playwright.config.js";
+import { expect, test } from "./fixtures.js";
 
-const FIXTURE_URL = siteUrl("/test/grid-memory/");
+const FIXTURE_URL = "/test/grid-memory/";
 const HOST = '[aria-label="Grid memory browser fixture"]';
 const STATUS = "#grid-memory-status";
 const DOCUMENT = "#grid-memory-document";
@@ -35,14 +35,11 @@ async function runAction(page: Page, label: string, status: string): Promise<voi
 async function cachedStrings(page: Page): Promise<number> {
   return Number(await page.locator(STRINGS).getAttribute("data-entries"));
 }
+// Chromium only: the heap is read through the Chromium DevTools protocol.
 test("trimMemory lowers retained heap and keeps the document and the visible grid", async ({
   page,
-  browserName,
 }) => {
-  test.skip(browserName !== "chromium", "The heap is read through the Chromium DevTools protocol.");
   test.setTimeout(180_000);
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1_000, height: 800 });
 
   await page.goto(FIXTURE_URL);
@@ -75,5 +72,4 @@ test("trimMemory lowers retained heap and keeps the document and the visible gri
   expect(stringsBefore).toBeGreaterThan(MIN_CACHED_STRINGS);
   expect(stringsAfter).toBeLessThan(MAX_STRINGS_AFTER_TRIM);
   expect(heapBefore - heapAfter).toBeGreaterThan(MIN_TRIMMED_BYTES);
-  expect(errors).toEqual([]);
 });

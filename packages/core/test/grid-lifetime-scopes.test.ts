@@ -306,10 +306,18 @@ describe("grid destroy", () => {
     });
     const toolbarRow = shell.element.querySelector(".sheetwrite-shell-toolbar-row");
     shell.destroy();
+    // A live shell's ribbon loads within the same wait.
+    const live = createSpreadsheetShell(mountHost(), {
+      grid: { workbook: makeWorkbook(3) },
+      ribbon: true,
+    });
+    const liveRow = live.element.querySelector(".sheetwrite-shell-toolbar-row");
 
     await import("../src/shell/ribbon-factory.js");
     await mountTurns();
 
     expect(toolbarRow?.childElementCount).toBe(0);
+    expect(liveRow?.childElementCount).toBeGreaterThan(0);
+    live.destroy();
   });
 });

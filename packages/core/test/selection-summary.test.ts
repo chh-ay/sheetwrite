@@ -8,6 +8,7 @@ import type { CellMode, Workbook } from "../src/types.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
+const pieces: { destroy(): void }[] = [];
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -16,14 +17,16 @@ beforeEach(() => {
   restore = installCanvasTestStubs();
 });
 afterEach(() => {
+  for (const piece of pieces.splice(0)) piece.destroy();
   for (const grid of grids.splice(0)) grid.destroy();
   document.body.replaceChildren();
   restore();
   jest.useRealTimers();
 });
 
-// Column A mixes numbers, text and a blank; column B is all numbers.
-function setup() {
+// Column A mixes numbers, text and a blank; column B is all numbers, in
+// `numberFormat` when given.
+function setup(numberFormat?: string) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -33,7 +36,13 @@ function setup() {
         rowCount: 4,
         columns: [
           { key: "a", header: "A", type: "text", width: 100 },
-          { key: "b", header: "B", type: "number", width: 100 },
+          {
+            key: "b",
+            header: "B",
+            type: "number",
+            width: 100,
+            ...(numberFormat === undefined ? {} : { numberFormat }),
+          },
         ],
       },
     ],
@@ -47,13 +56,16 @@ function setup() {
   document.body.appendChild(host);
   const grid = new GridImpl(host, { workbook }, store);
   grids.push(grid);
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  pieces.push(piece);
+  const status = () => piece.element.textContent ?? "";
 
   const selectAll = () =>
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
     });
-  return { grid, host, selectAll };
+  return { grid, host, piece, status, selectAll };
 }
 
 it("leaves out rows a filter hides", async () => {
@@ -66,34 +78,49 @@ it("leaves out rows a filter hides", async () => {
 });
 
 it("shows Excel's Average, Count and Sum in the shell status line", async () => {
-  const { grid, selectAll } = setup();
-  const statusHost = document.createElement("div");
-  const piece = createSelectionStatus(statusHost, grid);
+  const { grid, status, selectAll } = setup();
   selectAll();
 
   await grid.summarizeSelection();
-  expect(piece.element.textContent).toContain("Count: 7");
-  expect(piece.element.textContent).toContain("Sum: 22");
+  expect(status()).toContain("Count: 7");
+  expect(status()).toContain("Sum: 22");
   // The status line shows numbers in Excel's General display, as Excel's does.
-  expect(piece.element.textContent).toContain("Average: 3.666666667");
-  piece.destroy();
+  expect(status()).toContain("Average: 3.666666667");
+});
+
+// Excel shows Sum and Average in the number format of the active cell, and
+// Count as a plain count.
+// https://learn.microsoft.com/en-us/answers/questions/5176712/set-display-format-of-sum-of-selected-cells-excel
+it("shows Sum and Average in the active cell's number format", async () => {
+  const { grid, status } = setup("$#,##0.00");
+  // A1:B4 with the active cell B1, in the currency column.
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 0 } },
+  });
+  await grid.summarizeSelection();
+  expect(status()).toContain("Average: $3.67 · Count: 7 · Sum: $22.00");
+
+  // With the active cell A1, in General, the same totals show in General.
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+  });
+  await grid.summarizeSelection();
+  expect(status()).toContain("Average: 3.666666667 · Count: 7 · Sum: 22");
 });
 
 it("names a selected row by its sheet row under a filter", () => {
-  const { grid } = setup();
-  const piece = createSelectionStatus(document.createElement("div"), grid);
+  const { grid, status } = setup();
   // B keeps 3 and 4: view row 1 shows sheet row 3, labelled 4.
   grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
   grid.setSelection({ kind: "row", sheet: "s1", row: 1 });
-  expect(piece.element.textContent).toContain("Row 4");
-  piece.destroy();
+  expect(status()).toContain("Row 4");
 });
 
 it("names the step an undo or redo applied, and tints its cells for a moment", () => {
   jest.useFakeTimers();
-  const { grid, host } = setup();
-  const statusHost = document.createElement("div");
-  const piece = createSelectionStatus(statusHost, grid);
+  const { grid, host, piece, status } = setup();
   const flashed = () => host.querySelectorAll("[data-sheetwrite-flash]").length;
   grid.setSelection({
     kind: "range",
@@ -114,14 +141,12 @@ it("names the step an undo or redo applied, and tints its cells for a moment", (
   expect(piece.element.lastElementChild?.textContent).toStartWith("Redo: Format Cells in A2:B3");
   // The next selection replaces the step with the selection's own status.
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-  expect(piece.element.textContent).not.toContain("Redo");
-  piece.destroy();
+  expect(status()).not.toContain("Redo");
 });
 
 // https://support.microsoft.com/en-us/office/excel-status-bar-options-6055ecd9-e20f-4a7a-a611-4481bd488c55
 it("names Excel's cell mode: Ready, Enter, Edit and Point", () => {
-  const { grid } = setup();
-  const piece = createSelectionStatus(document.createElement("div"), grid);
+  const { grid, piece } = setup();
   const mode = () => piece.element.querySelector(".sheetwrite-shell-mode")?.textContent;
   const modes: CellMode[] = [];
   grid.on("cell-mode", (event) => modes.push(event.mode));
@@ -142,25 +167,22 @@ it("names Excel's cell mode: Ready, Enter, Edit and Point", () => {
   expect(mode()).toBe("Point");
   expect(grid.getCellMode()).toBe("point");
   expect(modes).toEqual(["enter", "edit", "ready", "enter", "point"]);
-  piece.destroy();
 });
 
 it("shows Excel's records found after an AutoFilter filters, until the next edit", () => {
-  const { grid } = setup();
-  const piece = createSelectionStatus(document.createElement("div"), grid);
+  const { grid, status } = setup();
   grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
-  expect(piece.element.textContent).not.toContain("records found");
+  expect(status()).not.toContain("records found");
 
   grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
-  expect(piece.element.textContent).toContain("2 of 3 records found");
+  expect(status()).toContain("2 of 3 records found");
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-  expect(piece.element.textContent).toContain("2 of 3 records found");
+  expect(status()).toContain("2 of 3 records found");
 
   grid.applyTransaction({
     patches: [
       { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 1 } },
     ],
   });
-  expect(piece.element.textContent).not.toContain("records found");
-  piece.destroy();
+  expect(status()).not.toContain("records found");
 });

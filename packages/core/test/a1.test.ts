@@ -27,99 +27,61 @@ describe("A1 column labels", () => {
 });
 
 describe("shiftA1Refs", () => {
-  it("preserves absolute row/column parts", () => {
-    expect(shiftA1Refs("=$A$1", 5, 5)).toBe("=$A$1");
-    expect(shiftA1Refs("=$A1", 2, 3)).toBe("=$A3");
-    expect(shiftA1Refs("=A$1", 2, 3)).toBe("=D$1");
-  });
-
-  it("marks references shifted outside the sheet as invalid", () => {
-    expect(shiftA1Refs("=A1", -5, 0)).toBe("=#REF!");
-    expect(shiftA1Refs("=B2", 0, -10)).toBe("=#REF!");
-    expect(shiftA1Refs("=$A$1+A$1+$A1", -1, -1)).toBe("=$A$1+#REF!+#REF!");
-  });
-
-  it("turns a range with a corner off the sheet into one #REF!", () => {
-    expect(shiftA1Refs("=SUM(A1:B2)", -1, 0)).toBe("=SUM(#REF!)");
-    expect(shiftA1Refs("=SUM(B2:C3)", -1, 0)).toBe("=SUM(B1:C2)");
-    expect(shiftA1Refs('=SUM(A1:B2)&"A1:B2"', 0, -1)).toBe('=SUM(#REF!)&"A1:B2"');
-  });
-
-  it("turns a reference past the last row or column into #REF!", () => {
-    expect(shiftA1Refs("=XFD1", 0, 1)).toBe("=#REF!");
-    expect(shiftA1Refs("=A1048576", 1, 0)).toBe("=#REF!");
-    expect(shiftA1Refs("=XFC1048575", 1, 1)).toBe("=XFD1048576");
-  });
-
-  it("preserves array constants and text while shifting adjacent references", () => {
-    expect(shiftA1Refs('=SUM({1,2;3,4})+A1&{"A1","a""B2"}', 2, 1)).toBe(
-      '=SUM({1,2;3,4})+B3&{"A1","a""B2"}',
-    );
-  });
-
-  it("keeps the spill suffix of a filled reference", () => {
-    expect(shiftA1Refs("=SUM(A1#)+$B$2#", 1, 1)).toBe("=SUM(B2#)+$B$2#");
-  });
-
-  it("preserves function names and identifiers containing reference-like text", () => {
-    expect(shiftA1Refs("=LOG10(A1)+BIN2DEC(B1)+A1_name", 1, 0)).toBe(
-      "=LOG10(A2)+BIN2DEC(B2)+A1_name",
-    );
-  });
-
-  it("moves whole columns and rows by the copy distance", () => {
-    expect(shiftA1Refs("=SUM(A:A)", 0, 1)).toBe("=SUM(B:B)");
-    expect(shiftA1Refs("=SUM(1:1)+SUM($A:A)", 2, 1)).toBe("=SUM(3:3)+SUM($A:B)");
-  });
-
-  it("keeps a name past the last column as a name", () => {
-    expect(shiftA1Refs("=XYZ1+A1", 1, 1)).toBe("=XYZ1+B2");
-  });
-
-  it("keeps the spacing and case of the references that do not change", () => {
-    expect(shiftA1Refs("= sum( a1 , $B$2 )", 1, 0)).toBe("= sum( A2 , $B$2 )");
+  it.each([
+    // Absolute row and column parts stay.
+    ["=$A$1", 5, 5, "=$A$1"],
+    ["=$A1", 2, 3, "=$A3"],
+    ["=A$1", 2, 3, "=D$1"],
+    // A reference shifted outside the sheet, or past its last row or column, is #REF!.
+    ["=A1", -5, 0, "=#REF!"],
+    ["=B2", 0, -10, "=#REF!"],
+    ["=$A$1+A$1+$A1", -1, -1, "=$A$1+#REF!+#REF!"],
+    ["=XFD1", 0, 1, "=#REF!"],
+    ["=A1048576", 1, 0, "=#REF!"],
+    ["=XFC1048575", 1, 1, "=XFD1048576"],
+    // A range with a corner off the sheet becomes one #REF!.
+    ["=SUM(A1:B2)", -1, 0, "=SUM(#REF!)"],
+    ["=SUM(B2:C3)", -1, 0, "=SUM(B1:C2)"],
+    ['=SUM(A1:B2)&"A1:B2"', 0, -1, '=SUM(#REF!)&"A1:B2"'],
+    // Array constants, text, spill suffixes and names stay.
+    ['=SUM({1,2;3,4})+A1&{"A1","a""B2"}', 2, 1, '=SUM({1,2;3,4})+B3&{"A1","a""B2"}'],
+    ["=SUM(A1#)+$B$2#", 1, 1, "=SUM(B2#)+$B$2#"],
+    ["=LOG10(A1)+BIN2DEC(B1)+A1_name", 1, 0, "=LOG10(A2)+BIN2DEC(B2)+A1_name"],
+    ["=XYZ1+A1", 1, 1, "=XYZ1+B2"],
+    // Whole columns and rows move by the copy distance.
+    ["=SUM(A:A)", 0, 1, "=SUM(B:B)"],
+    ["=SUM(1:1)+SUM($A:A)", 2, 1, "=SUM(3:3)+SUM($A:B)"],
+    // Unchanged references keep their spacing and case.
+    ["= sum( a1 , $B$2 )", 1, 0, "= sum( A2 , $B$2 )"],
+  ] as const)("shifts %s by (%d, %d) to %s", (formula, rows, cols, expected) => {
+    expect(shiftA1Refs(formula, rows, cols)).toBe(expected);
   });
 });
 
 describe("remapFormulaA1Refs", () => {
-  it("turns deleted scalar references into #REF!", () => {
-    const removeColumn = { kind: "shift", at: 1, delta: -1 } as const;
-    expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
-  });
-
-  it("moves spill references with their anchor and drops the suffix when it is deleted", () => {
-    const removeRow = { kind: "shift", at: 1, delta: -1 } as const;
-    expect(remapFormulaA1Refs("=SUM(A3#)", "row", removeRow)).toBe("=SUM(A2#)");
-    expect(remapFormulaA1Refs("=SUM(A2#)", "row", removeRow)).toBe("=SUM(#REF!)");
-  });
-
-  it("shrinks a range whose corner is deleted and breaks one with no row left", () => {
-    const removeRows = { kind: "shift", at: 0, delta: -2 } as const;
-    expect(remapFormulaA1Refs("=SUM(A1:B4)", "row", removeRows)).toBe("=SUM(A1:B2)");
-    expect(remapFormulaA1Refs("=SUM(A4:B1)", "row", removeRows)).toBe("=SUM(A1:B2)");
-    expect(remapFormulaA1Refs("=SUM(A1:B2)+C3", "row", removeRows)).toBe("=SUM(#REF!)+C1");
-  });
-
-  it("deletes a whole column with its column and keeps whole rows", () => {
-    const removeFirstColumn = { kind: "shift", at: 0, delta: -1 } as const;
-    expect(remapFormulaA1Refs("=SUM(B:B)+SUM(A:A)", "column", removeFirstColumn)).toBe(
-      "=SUM(A:A)+SUM(#REF!)",
-    );
-    expect(remapFormulaA1Refs("=SUM(2:2)", "column", removeFirstColumn)).toBe("=SUM(2:2)");
-  });
-
-  it("moves references with moved rows", () => {
-    const move = { kind: "move", from: 0, count: 2, to: 1 } as const;
-    expect(remapFormulaA1Refs("=A1+A2+A4", "row", move)).toBe("=A2+A3+A4");
-  });
-
-  it("keeps function names and array text intact", () => {
-    const insertRow = { kind: "shift", at: 0, delta: 1 } as const;
-    expect(remapFormulaA1Refs("=LOG10(A1)+BIN2DEC(B1)", "row", insertRow)).toBe(
-      "=LOG10(A2)+BIN2DEC(B2)",
-    );
-    expect(remapFormulaA1Refs('=A1&{"A1","B2";"C3","D4"}', "row", insertRow)).toBe(
-      '=A2&{"A1","B2";"C3","D4"}',
-    );
+  const removeColumnB = { kind: "shift", at: 1, delta: -1 } as const;
+  const removeRow2 = { kind: "shift", at: 1, delta: -1 } as const;
+  const removeRows1To2 = { kind: "shift", at: 0, delta: -2 } as const;
+  const removeColumnA = { kind: "shift", at: 0, delta: -1 } as const;
+  const moveRows = { kind: "move", from: 0, count: 2, to: 1 } as const;
+  const insertRow = { kind: "shift", at: 0, delta: 1 } as const;
+  it.each([
+    ["=A1+B1+C1", "column", removeColumnB, "=A1+#REF!+B1"],
+    // A spill reference moves with its anchor and breaks when the anchor goes.
+    ["=SUM(A3#)", "row", removeRow2, "=SUM(A2#)"],
+    ["=SUM(A2#)", "row", removeRow2, "=SUM(#REF!)"],
+    // A range shrinks when a corner goes, and breaks with no row left.
+    ["=SUM(A1:B4)", "row", removeRows1To2, "=SUM(A1:B2)"],
+    ["=SUM(A4:B1)", "row", removeRows1To2, "=SUM(A1:B2)"],
+    ["=SUM(A1:B2)+C3", "row", removeRows1To2, "=SUM(#REF!)+C1"],
+    // A whole column goes with its column; whole rows stay.
+    ["=SUM(B:B)+SUM(A:A)", "column", removeColumnA, "=SUM(A:A)+SUM(#REF!)"],
+    ["=SUM(2:2)", "column", removeColumnA, "=SUM(2:2)"],
+    ["=A1+A2+A4", "row", moveRows, "=A2+A3+A4"],
+    // Function names and array text stay.
+    ["=LOG10(A1)+BIN2DEC(B1)", "row", insertRow, "=LOG10(A2)+BIN2DEC(B2)"],
+    ['=A1&{"A1","B2";"C3","D4"}', "row", insertRow, '=A2&{"A1","B2";"C3","D4"}'],
+  ] as const)("remaps %s on a %s edit", (formula, axis, edit, expected) => {
+    expect(remapFormulaA1Refs(formula, axis, edit)).toBe(expected);
   });
 });

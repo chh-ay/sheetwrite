@@ -1062,6 +1062,7 @@ fn runs_mut(columns: &mut [ColumnRuns], col: u32) -> Option<&mut Vec<OwnedRun>> 
 #[cfg(test)]
 mod tests {
     use crate::store::CellStore;
+    use crate::tests::support::evaluations;
 
     fn anchor(store: &CellStore, sheet: usize, row: usize, col: usize) -> (u32, u32) {
         (
@@ -1150,13 +1151,6 @@ mod tests {
             }
         }
         assert_eq!(store.get_cell(sheet, 9, 3).num(), 40.0);
-    }
-
-    /// Formula evaluations that `recalculate` runs.
-    fn evaluations(recalculate: impl FnOnce()) -> usize {
-        crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
-        recalculate();
-        crate::eval::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
     }
 
     /// A spill that grows or shrinks by a row keeps the values of the rows it

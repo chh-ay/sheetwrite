@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { DocumentController } from "../src/document-controller.js";
 import { initSheetwrite } from "../src/grid.js";
@@ -45,6 +45,9 @@ function formula(sheet: string, row: number, col: number, src: string): Document
   return { op: "set", addr: at(sheet, row, col), value: { kind: "formula", src } };
 }
 
+let dispose = () => {};
+afterEach(() => dispose());
+
 /** `Data` holds 1..6 in A1:A6, then `patches` apply. */
 function setup(patches: DocumentOp[]) {
   const store = new SheetwriteStore(workbook());
@@ -63,6 +66,10 @@ function setup(patches: DocumentOp[]) {
     onMutationRejected: () => {},
     onHistoryApplied: () => {},
   });
+  dispose = () => {
+    controller.destroy();
+    store.dispose();
+  };
   return { store, controller };
 }
 
@@ -70,29 +77,24 @@ function formulas(store: SheetwriteStore, cells: CellAddress[]): (string | null)
   return cells.map((cell) => store.getFormula(cell));
 }
 
+// Excel moves the cells: a reference follows the cell it names
+// (https://support.microsoft.com/en-us/excel/move-or-copy-cells-rows-and-columns).
 describe("row and column moves", () => {
-  // Excel moves the cells: a reference follows the cell it names
-  // (https://support.microsoft.com/en-us/excel/move-or-copy-cells-rows-and-columns).
   it("keeps every reference on the cell it named", () => {
     const { store, controller } = setup([
       formula("data", 1, 1, "=A2*2"),
       formula("summary", 0, 0, "=Data!A2*2"),
       formula("summary", 1, 0, "=(Data!A3 + 1) * 2"),
     ]);
-    try {
-      const move: DocumentOp = { op: "moveRows", sheet: "data", from: 1, count: 1, to: 3 };
-      expect(controller.commit([move], "structure").status).toBe("applied");
+    const move: DocumentOp = { op: "moveRows", sheet: "data", from: 1, count: 1, to: 3 };
+    expect(controller.commit([move], "structure").status).toBe("applied");
 
-      expect(
-        formulas(store, [at("summary", 0), at("summary", 1), at("data", 3, 1), at("data", 1, 1)]),
-      ).toEqual(["=Data!A4*2", "=(Data!A2 + 1) * 2", "=A4*2", null]);
-      expect(store.getCell(at("summary", 0)).resolved).toBe(4);
-      expect(store.getCell(at("summary", 1)).resolved).toBe(8);
-      expect(store.getCell(at("data", 3, 1)).resolved).toBe(4);
-    } finally {
-      controller.destroy();
-      store.dispose();
-    }
+    expect(
+      formulas(store, [at("summary", 0), at("summary", 1), at("data", 3, 1), at("data", 1, 1)]),
+    ).toEqual(["=Data!A4*2", "=(Data!A2 + 1) * 2", "=A4*2", null]);
+    expect(store.getCell(at("summary", 0)).resolved).toBe(4);
+    expect(store.getCell(at("summary", 1)).resolved).toBe(8);
+    expect(store.getCell(at("data", 3, 1)).resolved).toBe(4);
   });
 
   it("moves columns the same way", () => {
@@ -100,21 +102,16 @@ describe("row and column moves", () => {
       literal("data", 0, 1, 20),
       formula("summary", 0, 0, "=Data!B1+Data!A1"),
     ]);
-    try {
-      const move: DocumentOp = { op: "moveColumns", sheet: "data", from: 0, count: 1, to: 2 };
-      expect(controller.commit([move], "structure").status).toBe("applied");
+    const move: DocumentOp = { op: "moveColumns", sheet: "data", from: 0, count: 1, to: 2 };
+    expect(controller.commit([move], "structure").status).toBe("applied");
 
-      expect(store.getFormula(at("summary", 0))).toBe("=Data!A1+Data!C1");
-      expect(store.getCell(at("summary", 0)).resolved).toBe(21);
-      expect(store.getWorkbook().sheets[0]?.columns.map((column) => column.key)).toEqual([
-        "b",
-        "c",
-        "a",
-      ]);
-    } finally {
-      controller.destroy();
-      store.dispose();
-    }
+    expect(store.getFormula(at("summary", 0))).toBe("=Data!A1+Data!C1");
+    expect(store.getCell(at("summary", 0)).resolved).toBe(21);
+    expect(store.getWorkbook().sheets[0]?.columns.map((column) => column.key)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
   });
 
   it("is one history step, and undo restores a range that lost a moved row", () => {
@@ -122,27 +119,22 @@ describe("row and column moves", () => {
       formula("summary", 0, 0, "=SUM(Data!A1:A4)"),
       formula("summary", 1, 0, "=Data!A4"),
     ]);
-    try {
-      const move: DocumentOp = { op: "moveRows", sheet: "data", from: 3, count: 1, to: 5 };
-      expect(controller.commit([move], "structure").status).toBe("applied");
-      // The last row of the range moved out of it, so the range lost it.
-      expect(formulas(store, [at("summary", 0), at("summary", 1)])).toEqual([
-        "=SUM(Data!A1:A3)",
-        "=Data!A6",
-      ]);
+    const move: DocumentOp = { op: "moveRows", sheet: "data", from: 3, count: 1, to: 5 };
+    expect(controller.commit([move], "structure").status).toBe("applied");
+    // The last row of the range moved out of it, so the range lost it.
+    expect(formulas(store, [at("summary", 0), at("summary", 1)])).toEqual([
+      "=SUM(Data!A1:A3)",
+      "=Data!A6",
+    ]);
 
-      controller.undo();
+    controller.undo();
 
-      expect(formulas(store, [at("summary", 0), at("summary", 1)])).toEqual([
-        "=SUM(Data!A1:A4)",
-        "=Data!A4",
-      ]);
-      expect(store.getCell(at("summary", 0)).resolved).toBe(10);
-      expect(store.getCell(at("data", 3)).resolved).toBe(4);
-      expect(controller.canUndo).toBe(false);
-    } finally {
-      controller.destroy();
-      store.dispose();
-    }
+    expect(formulas(store, [at("summary", 0), at("summary", 1)])).toEqual([
+      "=SUM(Data!A1:A4)",
+      "=Data!A4",
+    ]);
+    expect(store.getCell(at("summary", 0)).resolved).toBe(10);
+    expect(store.getCell(at("data", 3)).resolved).toBe(4);
+    expect(controller.canUndo).toBe(false);
   });
 });

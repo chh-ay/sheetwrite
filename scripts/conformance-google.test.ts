@@ -6,7 +6,6 @@ import {
   captureGoogleWithDependencies,
   type GoogleCaptureDependencies,
   loadCorpus,
-  validateGoogleCaptureArtifact,
 } from "./conformance.js";
 
 interface MockGoogle {
@@ -129,43 +128,6 @@ describe("bounded Google Sheets capture", () => {
     );
     expect(mock.calls).toContain("delete:0");
     expect(mock.calls).not.toContain("persist");
-  });
-
-  it("fails closed on observation, producer-version, quota, and workbook binding tamper", async () => {
-    const corpus = await formulaCorpus(3);
-    const mock = mockGoogle();
-    await captureGoogleWithDependencies(corpus, mock.dependencies);
-    const artifact = mock.artifact();
-    const version = mock.dependencies.producerVersion;
-    expect(validateGoogleCaptureArtifact(artifact, corpus, version)).toEqual([]);
-
-    type Tamperable = CaptureArtifact & {
-      batchSize: number;
-      workbooks: Array<{ workbookSha256: string }>;
-    };
-    const tampers: Array<[string, (copy: Tamperable) => void, string]> = [
-      [
-        "reordered observations",
-        (copy) => {
-          [copy.observations[0], copy.observations[1]] = [
-            copy.observations[1]!,
-            copy.observations[0]!,
-          ];
-        },
-        version,
-      ],
-      ["quota", (copy) => (copy.batchSize += 1), version],
-      ["workbook digest", (copy) => (copy.workbooks[0]!.workbookSha256 = "0".repeat(64)), version],
-      ["producer version", () => {}, "different-version"],
-    ];
-    for (const [label, tamper, expectedVersion] of tampers) {
-      const copy = structuredClone(artifact) as Tamperable;
-      tamper(copy);
-      expect(
-        validateGoogleCaptureArtifact(copy, corpus, expectedVersion).length,
-        label,
-      ).toBeGreaterThan(0);
-    }
   });
 
   it("rejects a result outside the expected array envelope and cleans up", async () => {

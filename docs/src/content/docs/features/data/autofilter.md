@@ -3,7 +3,7 @@ title: AutoFilter
 description: "Filter rows from buttons on a header row, as with Excel's AutoFilter: value lists, number, text and date conditions, sorting, undo and XLSX."
 ---
 
-An AutoFilter puts a filter button on each cell of a range's first row, the header. Its filters hide only the rows below the header. The header row, and any rows above or below the range, always show. A sheet has one AutoFilter, as in Excel.
+An AutoFilter puts a filter button on each cell of a range's first row, the header. Its filters hide only the rows below the header. The header row, and any rows above or below the range, always show. A sheet has one AutoFilter, as in Excel. As in Excel, a header cell's text, and its editor, end before the button, whatever the alignment, so the button never covers a right-aligned header.
 
 For example, Item and Qty are in A1:B5, with the Qty values 3, 7, 1 and 12. Turn the AutoFilter on, open the Qty dropdown and choose **Number Filters › Greater Than…** with 5. The rows of 3 and 1 hide. The rows of 7 and 12 and the header row stay.
 

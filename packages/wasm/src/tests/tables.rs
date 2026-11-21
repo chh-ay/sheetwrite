@@ -60,48 +60,32 @@ fn stable_table_and_column_identities_rewrite_formula_source_on_rename_and_remov
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 4);
     store.set_number(sheet, 1, 0, 7.0, 0);
-    assert!(store.set_table(
-        "table-id",
-        "Sales",
+    let sales = [0, 0, 2, 1];
+    let columns = |amount| [("amount-id", amount), ("calc-id", "Calc")];
+    assert!(set_header_table(
+        &mut store,
+        ("table-id", "Sales"),
         sheet,
-        0,
-        0,
-        2,
-        1,
-        true,
-        false,
-        vec!["amount-id".into(), "calc-id".into()],
-        vec!["Amount".into(), "Calc".into()],
+        sales,
+        &columns("Amount")
     ));
     store.set_formula(sheet, 0, 2, "=SUM(Sales[Amount])", 0);
     store.set_formula(sheet, 1, 1, "=[@Amount]*2", 0);
     store.recompute(sheet);
 
-    assert!(store.set_table(
-        "other-id",
-        "Archive",
+    assert!(set_header_table(
+        &mut store,
+        ("other-id", "Archive"),
         sheet,
-        3,
-        0,
-        3,
-        0,
-        true,
-        false,
-        vec!["archive-id".into()],
-        vec!["Archived".into()],
+        [3, 0, 3, 0],
+        &[("archive-id", "Archived")]
     ));
-    assert!(!store.set_table(
-        "table-id",
-        "archive",
+    assert!(!set_header_table(
+        &mut store,
+        ("table-id", "archive"),
         sheet,
-        0,
-        0,
-        2,
-        1,
-        true,
-        false,
-        vec!["amount-id".into(), "calc-id".into()],
-        vec!["Value".into(), "Calc".into()],
+        sales,
+        &columns("Value")
     ));
     assert_eq!(
         store.formula_source(sheet, 0, 2).as_deref(),
@@ -109,18 +93,12 @@ fn stable_table_and_column_identities_rewrite_formula_source_on_rename_and_remov
     );
     assert_close(number(&store, sheet, 0, 2), 7.0);
 
-    assert!(store.set_table(
-        "table-id",
-        "Revenue",
+    assert!(set_header_table(
+        &mut store,
+        ("table-id", "Revenue"),
         sheet,
-        0,
-        0,
-        2,
-        1,
-        true,
-        false,
-        vec!["amount-id".into(), "calc-id".into()],
-        vec!["Value".into(), "Calc".into()],
+        sales,
+        &columns("Value")
     ));
     assert_eq!(
         store.formula_source(sheet, 0, 2).as_deref(),
@@ -145,90 +123,50 @@ fn stable_table_and_column_identities_rewrite_formula_source_on_rename_and_remov
 fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 4);
-    assert!(store.set_table(
-        "first",
-        "Café",
+    assert!(set_header_table(
+        &mut store,
+        ("first", "Café"),
         sheet,
-        0,
-        0,
-        1,
-        0,
-        true,
-        false,
-        vec!["value".into()],
-        vec!["Wert".into()],
+        [0, 0, 1, 0],
+        &[("value", "Wert")]
     ));
     store.set_number(sheet, 1, 0, 9.0, 0);
     store.set_formula(sheet, 0, 1, "=SUM(café[wert])", 0);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 9.0);
     assert!(!store.set_named_range("CAFÉ", -1, sheet, 0, 1, 1, 1));
-    assert!(!store.set_table(
-        "second",
-        "café",
-        sheet,
-        2,
-        0,
-        3,
-        0,
-        true,
-        false,
-        vec!["value-2".into()],
-        vec!["Other".into()],
-    ));
-    assert!(!store.set_table(
-        "bad-column",
-        "Other",
-        sheet,
-        2,
-        1,
-        3,
-        1,
-        true,
-        false,
-        vec!["bad".into()],
-        vec!["@Value".into()],
-    ));
-    assert!(!store.set_table(
-        "duplicate-column-id",
-        "Other",
-        sheet,
-        2,
-        0,
-        3,
-        1,
-        true,
-        false,
-        vec!["Å-id".into(), "å-ID".into()],
-        vec!["Left".into(), "Right".into()],
-    ));
-    assert!(!store.set_table(
-        "oversized",
-        "Third",
-        sheet,
-        2,
-        1,
-        3,
-        1,
-        true,
-        false,
-        vec!["x".repeat(129)],
-        vec!["Value".into()],
-    ));
+    let oversized_id = "x".repeat(129);
+    for (table, cells, columns) in [
+        (
+            ("second", "café"),
+            [2, 0, 3, 0],
+            &[("value-2", "Other")][..],
+        ),
+        (("bad-column", "Other"), [2, 1, 3, 1], &[("bad", "@Value")]),
+        (
+            ("duplicate-column-id", "Other"),
+            [2, 0, 3, 1],
+            &[("Å-id", "Left"), ("å-ID", "Right")],
+        ),
+        (
+            ("oversized", "Third"),
+            [2, 1, 3, 1],
+            &[(oversized_id.as_str(), "Value")],
+        ),
+    ] {
+        assert!(
+            !set_header_table(&mut store, table, sheet, cells, columns),
+            "{table:?}"
+        );
+    }
     let mut named_first = CellStore::new();
     let named_sheet = named_first.add_sheet(1, 2);
     assert!(named_first.set_named_range("Sales", -1, named_sheet, 0, 0, 1, 0));
-    assert!(!named_first.set_table(
-        "table-after-name",
-        "sales",
+    assert!(!set_header_table(
+        &mut named_first,
+        ("table-after-name", "sales"),
         named_sheet,
-        0,
-        0,
-        1,
-        0,
-        true,
-        false,
-        vec!["value".into()],
-        vec!["Value".into()],
+        [0, 0, 1, 0],
+        &[("value", "Value")]
     ));
 }

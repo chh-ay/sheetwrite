@@ -1,11 +1,5 @@
-import type {
-  CellScalar,
-  CellStyle,
-  SheetSnapshot,
-  SnapshotCell,
-  WorkbookSnapshot,
-} from "@sheetwrite/core";
-import { cellA1 } from "@sheetwrite/core";
+import type { CellScalar, SheetSnapshot, SnapshotCell, WorkbookSnapshot } from "@sheetwrite/core";
+import { cellA1, colToA1 } from "@sheetwrite/core";
 import { formulaCallsExternalData } from "@sheetwrite/core/external-links";
 
 import { DYNAMIC_ARRAY_CELL_METADATA } from "./dynamic-array.js";
@@ -61,6 +55,14 @@ function cachedValue(value: CellScalar | undefined): { type: string; element: st
   return { type: ' t="str"', element: `<v>${escapeXml(encodeXstring(value))}</v>` };
 }
 
+/** Column letters by column index, filled as cells are written. */
+const columnLetters: string[] = [];
+
+/** `cellA1` with each column's letters computed once. */
+function cellReference(row: number, col: number): string {
+  return `${(columnLetters[col] ??= colToA1(col))}${row + 1}`;
+}
+
 /**
  * A cell, written as Excel stores it. A formula whose result is an array, or
  * that `arrays` lists as an installed spill, is written as a dynamic array:
@@ -77,12 +79,8 @@ export function cellXml(
 ): string {
   const column = sheet.columns[cell.col];
   if (!column) throw new RangeError(`Sheetwrite: XLSX cell column ${cell.col} is out of range`);
-  const mergedStyle: CellStyle = { ...column.cellStyle, ...cell.source.style };
-  const styleId = styles.register(
-    Object.keys(mergedStyle).length > 0 ? mergedStyle : undefined,
-    mergedStyle.numberFormat ?? column.numberFormat,
-  );
-  const reference = cellA1(cell.row, cell.col);
+  const styleId = styles.cellStyleId(column, cell.source.style);
+  const reference = cellReference(cell.row, cell.col);
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {

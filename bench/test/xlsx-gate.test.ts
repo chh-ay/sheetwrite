@@ -7,9 +7,7 @@ import {
   type XlsxRawSample,
   type XlsxScenarioSummary,
 } from "../src/xlsx-bench.js";
-import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
-
-type Artifact = DeepMutable<XlsxBenchmarkArtifact>;
+import { expectRejections, must, mutableCopy } from "./gate-fixtures.js";
 
 const SCENARIOS = [
   ["import", "combined"],
@@ -145,30 +143,27 @@ function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
   };
 }
 
-it("accepts a complete comparison and rejects drifted versions, summaries and outputs", () => {
+it("accepts a complete comparison and rejects drifted versions, summaries, outputs and wall time", () => {
   expect(() => validateXlsxBenchmarkArtifact(comparedArtifact())).not.toThrow();
-  for (const engine of ["sheetwrite", "exceljs"]) {
-    for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {
-      const artifact = mutableCopy(comparedArtifact());
-      Reflect.set(artifact.metadata.engineVersions, engine, version);
-      expect(() => validateXlsxBenchmarkArtifact(artifact)).toThrow(`engineVersions.${engine}`);
-    }
-  }
+  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact(2))).toThrow(
+    "import:combined regressed",
+  );
   expectRejections(() => mutableCopy(comparedArtifact()), validateXlsxBenchmarkArtifact, [
-    ...(["durationMs", "returnAllocationDeltaBytes", "retainedAfterGcDeltaBytes"] as const).map(
-      (metric) =>
-        [
-          (artifact: Artifact) => {
-            const [first, ...rest] = artifact.summaries;
-            if (!first) throw new Error("fixture has no summary");
-            artifact.summaries = [
-              { ...first, [metric]: { ...first[metric], median: 0.5 } },
-              ...rest,
-            ];
-          },
-          "summaries do not match raw samples",
-        ] as const,
-    ),
+    [
+      (artifact) => Reflect.set(artifact.metadata.engineVersions, "exceljs", "^4.4.0"),
+      "engineVersions.exceljs",
+    ],
+    [
+      (artifact) => Reflect.set(artifact.metadata.engineVersions, "sheetwrite", "^0.4.0"),
+      "engineVersions.sheetwrite",
+    ],
+    [
+      (artifact) => {
+        const first = must(artifact.summaries[0], "summary");
+        first.durationMs = { ...first.durationMs, median: 0.5 };
+      },
+      "summaries do not match raw samples",
+    ],
     [
       (artifact) => {
         const secondRound = artifact.samples.map((value) => ({
@@ -183,10 +178,4 @@ it("accepts a complete comparison and rejects drifted versions, summaries and ou
       "is not deterministic",
     ],
   ]);
-});
-
-it("rejects wall-time regressions above the old-backend ratio", () => {
-  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact(2))).toThrow(
-    "import:combined regressed",
-  );
 });

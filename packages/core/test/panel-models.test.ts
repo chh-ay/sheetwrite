@@ -18,6 +18,7 @@ import {
   sourceDataRange,
   type FieldFacts,
   withMeasureValue,
+  withModelField,
 } from "../src/panels/pivot-model.js";
 import type { CellScalar, PivotDefinition, Range, WorkbookTable } from "../src/types.js";
 
@@ -147,7 +148,7 @@ describe("measures in the field list and the Measures panel", () => {
     values: [{ field: 1, aggregation: "SUM" }],
   };
 
-  it("adds a measure as the last value, turning a table source into a model source", () => {
+  it("adds a measure or a related column, turning a table source into a model source", () => {
     const next = withMeasureValue(pivot, [orders], "total");
     expect(next?.source).toEqual({
       model: {
@@ -165,6 +166,19 @@ describe("measures in the field list and the Measures panel", () => {
       source: { range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } } },
     };
     expect(withMeasureValue(range, [orders], "total")).toBeNull();
+
+    const related = withModelField(pivot, [orders], { table: "customers", column: "id" });
+    expect(related?.field).toBe(2);
+    expect(related?.pivot.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "region" },
+          { table: "orders", column: "amount" },
+          { table: "customers", column: "id" },
+        ],
+      },
+    });
   });
 });
 

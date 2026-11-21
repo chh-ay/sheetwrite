@@ -177,7 +177,7 @@ describe("strict benchmark check command", () => {
     }
   }
 
-  test("passes a complete matched result and fails malformed, stale or slower results", async () => {
+  test("gates matched, malformed, stale and slower results; report-only never gates", async () => {
     const passing = await check(freshJson());
     expect(passing.exitCode, passing.stderr).toBe(0);
     expect(passing.stderr).toContain("no statistically detected regression");
@@ -190,9 +190,6 @@ describe("strict benchmark check command", () => {
       expect(failing.exitCode).toBe(1);
       expect(failing.stderr).toContain(verdict);
     }
-  });
-
-  test("keeps report-only explicitly non-gating", async () => {
     const diagnostic = await check("{broken", ["--report-only"]);
     expect(diagnostic.exitCode).toBe(0);
     expect(diagnostic.stderr).toContain("REPORT ONLY — NON-GATING");
