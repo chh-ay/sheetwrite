@@ -742,6 +742,8 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
 #[cfg(test)]
 mod tests {
     use crate::calc::Func;
+    use crate::store::CellStore;
+    use crate::tests::support::{assert_close, number as cell_number, string};
     use crate::types::{FormulaError, Value};
 
     use super::super::test_support::{range_arguments, scalar};
@@ -971,5 +973,44 @@ mod tests {
             ),
             Value::number(29.0)
         );
+    }
+
+    #[test]
+    fn date_time_functions_use_excel_serials_and_controlled_volatile_inputs() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(13, 1);
+        let formulas = [
+            (0, "=DATE(2024,2,29)"),
+            (1, "=DATEVALUE(\"2024-02-29\")"),
+            (2, "=DAY(A1)"),
+            (3, "=MONTH(A1)"),
+            (4, "=YEAR(A1)"),
+            (5, "=TEXT(A1,\"yyyy-mm-dd\")"),
+            (6, "=TODAY()"),
+            (7, "=NOW()"),
+            (8, "=DATE(1900,1,1)"),
+            (9, "=DATE(1900,2,29)"),
+            (10, "=DATE(1900,3,1)"),
+            (11, "=DATE(2024,13,1)"),
+            (12, "=DATE(1900,1,60)"),
+        ];
+        for (col, source) in formulas {
+            store.set_formula(sheet, 0, col, source, 0);
+        }
+        store.recompute_volatile(46_000.75);
+
+        assert_close(cell_number(&store, sheet, 0, 0), 45_351.0);
+        assert_close(cell_number(&store, sheet, 0, 1), 45_351.0);
+        assert_close(cell_number(&store, sheet, 0, 2), 29.0);
+        assert_close(cell_number(&store, sheet, 0, 3), 2.0);
+        assert_close(cell_number(&store, sheet, 0, 4), 2024.0);
+        assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("2024-02-29"));
+        assert_close(cell_number(&store, sheet, 0, 6), 46_000.0);
+        assert_close(cell_number(&store, sheet, 0, 7), 46_000.75);
+        assert_close(cell_number(&store, sheet, 0, 8), 1.0);
+        assert_close(cell_number(&store, sheet, 0, 9), 60.0);
+        assert_close(cell_number(&store, sheet, 0, 10), 61.0);
+        assert_close(cell_number(&store, sheet, 0, 11), 45_658.0);
+        assert_close(cell_number(&store, sheet, 0, 12), 60.0);
     }
 }

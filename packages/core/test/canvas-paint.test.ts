@@ -307,6 +307,25 @@ describe("paintFrame number formats", () => {
       ["$1", "50.0%", "0.5"],
     );
   });
+
+  it("narrows a General number to a narrow cell as Excel does, and fills a fixed format with #", () => {
+    // 60 px wide: 48 px for text, 6 characters at the stub's 7 px each.
+    const layout = makeLayout([{ key: "n", header: "N", width: 60, type: "general" }]);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: 3 },
+      cols: [0],
+      values: [1234.5678, 123456789012, 1234567],
+      styleIds: Uint32Array.from([0, 0, 1]),
+      styles: [{}, { numberFormat: "#,##0" }],
+    };
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
+      ["1234.6", "1E+11", "######"],
+    );
+  });
 });
 
 describe("paintFrame variable row heights", () => {
