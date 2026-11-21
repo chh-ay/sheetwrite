@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
-  blitVerticalScroll,
+  blitScroll,
   fontFor,
   getMergeIndexResourceStatsForTest,
   layoutTextLines,
@@ -545,26 +545,27 @@ describe("paintFrame compiled number formats", () => {
 });
 
 describe("scroll blit and damage-band integrity", () => {
-  const blitViewport = (scrollTop: number): Viewport => ({
-    scrollTop,
+  const blitViewport = (at: Partial<Viewport>): Viewport => ({
+    scrollTop: 0,
     scrollLeft: 0,
     width: 400,
     height: 300,
     contentRevision: 7,
+    ...at,
   });
 
-  function runBlit(prevTop: number, nextTop: number, dpr = 1) {
+  function runBlit(prev: Partial<Viewport>, next: Partial<Viewport>, dpr = 1) {
     const ctx = makeRecordingCtx();
     const draws: unknown[][] = [];
     ctx.drawImage = (...args: unknown[]) => {
       draws.push(args);
     };
-    const damage = blitVerticalScroll(
+    const damage = blitScroll(
       ctx as unknown as CanvasRenderingContext2D,
       {} as HTMLCanvasElement,
       makeTheme(),
-      blitViewport(prevTop),
-      blitViewport(nextTop),
+      blitViewport(prev),
+      blitViewport(next),
       dpr,
       dpr,
     );
@@ -574,15 +575,44 @@ describe("scroll blit and damage-band integrity", () => {
   it("refuses fractional device-pixel shifts instead of stranding stale glyphs", () => {
     // A rounded copy plus an exact-offset repaint leaves sub-pixel-shifted
     // glyph slices that accumulate into ghosting on touchpad scrolls.
-    const { damage, draws } = runBlit(100, 100.4);
+    const { damage, draws } = runBlit({ scrollTop: 100 }, { scrollTop: 100.4 });
     expect(damage).toBeUndefined();
     expect(draws).toHaveLength(0);
   });
 
   it("still blits exact device-pixel shifts", () => {
-    const { damage, draws } = runBlit(100, 103);
+    const { damage, draws } = runBlit({ scrollTop: 100 }, { scrollTop: 103 });
     expect(draws).toHaveLength(1);
     expect(damage).toEqual({ x: 0, y: 297, w: 400, h: 3 });
+  });
+
+  it("blits a sideways scroll and leaves only the exposed columns to paint", () => {
+    const right = runBlit({ scrollLeft: 100 }, { scrollLeft: 130 });
+    expect(right.draws).toHaveLength(1);
+    expect(right.damage).toEqual({ x: 370, y: 0, w: 30, h: 300 });
+    const left = runBlit({ scrollLeft: 130 }, { scrollLeft: 100 });
+    expect(left.damage).toEqual({ x: 0, y: 0, w: 30, h: 300 });
+  });
+
+  it("paints only the cells and header labels inside a sideways strip", () => {
+    const layout = makeLayout(
+      ["A", "B", "C", "D"].map((header) => ({
+        key: header,
+        header,
+        width: 100,
+        type: "text" as const,
+      })),
+    );
+    const view = makeView(new Uint32Array(12), [{}], [0, 1, 2, 3]);
+    // Column D spans x in [300, 400), the strip a sideways blit left.
+    const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme(), {
+      x: 300,
+      y: 0,
+      w: 100,
+      h: 300,
+    });
+    expect(ctx.fillTexts.map((call) => call.text).filter((text) => text !== "x")).toEqual(["D"]);
+    expect(ctx.fillTexts.filter((call) => call.text === "x")).toHaveLength(3);
   });
 
   it("paints a row label whose band overlaps the damage strip but whose center does not", () => {

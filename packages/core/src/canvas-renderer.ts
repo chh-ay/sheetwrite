@@ -1,4 +1,4 @@
-import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { blitScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
 import { SheetwriteError } from "./errors.js";
 import type {
   CellRenderer,
@@ -87,7 +87,7 @@ export class CanvasRenderer implements Renderer {
     const round = Math.round;
     this.viewport.scrollTop = round(this.viewport.scrollTop * this.dpr) / this.dpr;
     this.viewport.scrollLeft = round(this.viewport.scrollLeft * this.dpr) / this.dpr;
-    const damage = blitVerticalScroll(
+    const damage = blitScroll(
       this.ctx,
       this.canvas,
       this.theme,
@@ -115,7 +115,7 @@ export class CanvasRenderer implements Renderer {
     if (!ctx || !this.layout || !this.theme) return;
 
     // Frozen frames never blit: pane boundaries make the single-body-shift
-    // assumption of `blitVerticalScroll` unsound. Invalidate its cache too.
+    // assumption of `blitScroll` unsound. Invalidate its cache too.
     this.lastViewport = null;
 
     for (const pane of panes) {

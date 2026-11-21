@@ -9,26 +9,90 @@ function writeSelected(element: HTMLElement, selected: boolean): void {
   else element.removeAttribute("aria-selected");
 }
 
-/** Make `target` hold the values of `source`, reusing its storage. */
-function copyInto<T>(target: T[], source: readonly T[]): void {
-  target.length = source.length;
-  for (const [index, value] of source.entries()) target[index] = value;
+/**
+ * Make `element`'s text `text`. A cell that holds one text node keeps it and
+ * gets the new data: `textContent` would replace the node, and the browser
+ * would then rebuild the cell's layout box, in every shown cell a loaded page
+ * of values fills.
+ */
+function writeText(element: HTMLElement, text: string): void {
+  const node = element.firstChild;
+  if (text !== "" && node instanceof Text && node.nextSibling === null) node.data = text;
+  else element.textContent = text;
+}
+
+/** A mirror node that stands for one column or one view row, its `key`. */
+interface Keyed {
+  readonly el: HTMLDivElement;
+  readonly key: number;
 }
 
 /**
- * The window content the mirror nodes hold: what the last flush wrote. A
- * patch compares against it instead of reading attributes back from the DOM.
+ * A mirror header cell (its key is its column) and the values it holds: what
+ * the last flush wrote to it. A flush compares against these instead of
+ * reading the DOM back.
  */
-class WrittenWindow {
-  rowStart = 0;
-  focusRow = -1;
-  focusCol = -1;
-  selectedRow: number | null = null;
-  selectedColumn: number | null = null;
-  readonly cols: number[] = [];
-  readonly headerTexts: string[] = [];
-  readonly cellTexts: string[] = [];
-  readonly cellDescriptions: (string | null)[] = [];
+interface MirrorHeader extends Keyed {
+  text: string;
+  selected: boolean;
+}
+
+/** A mirror data cell, keyed by its column (see {@link MirrorHeader}). */
+interface MirrorCell extends Keyed {
+  text: string;
+  description: string | null;
+  selected: boolean;
+}
+
+/** A mirror row, keyed by its view row, and its cells (see {@link MirrorHeader}). */
+interface MirrorRow extends Keyed {
+  selected: boolean;
+  cells: MirrorCell[];
+}
+
+/**
+ * Make `parent`'s nodes `items` the nodes of the keys `keyAt(0)` to
+ * `keyAt(count - 1)`, in that order. A node whose key stays in the window
+ * stays as it is; a node whose key left is removed, and `create` makes the
+ * node of a new key. A scroll by a column or a row then adds and removes a few
+ * nodes instead of rewriting the coordinates and text of every cell. Keys
+ * ascend in both lists, so one pass over them places every node.
+ */
+function reconcile<T extends Keyed>(
+  parent: HTMLElement,
+  items: readonly T[],
+  count: number,
+  keyAt: (index: number) => number,
+  create: (key: number) => T,
+): T[] {
+  const next: T[] = [];
+  let old = 0;
+  for (let index = 0; index < count; index++) {
+    const key = keyAt(index);
+    let kept = items[old];
+    while (kept !== undefined && kept.key < key) {
+      kept.el.remove();
+      old++;
+      kept = items[old];
+    }
+    if (kept?.key === key) {
+      next.push(kept);
+      old++;
+      continue;
+    }
+    const made = create(key);
+    parent.insertBefore(made.el, kept?.el ?? null);
+    next.push(made);
+  }
+  for (let index = old; index < items.length; index++) items[index]?.el.remove();
+  return next;
+}
+
+/** A node with the role `role`. */
+function node(role: string): HTMLDivElement {
+  const el = document.createElement("div");
+  el.setAttribute("role", role);
+  return el;
 }
 
 export interface AriaMirrorDeps {
@@ -86,16 +150,10 @@ export class AriaMirror {
   /** Last `aria-activedescendant` written to the host; avoids redundant writes. */
   private lastFocusId: string | null = null;
 
-  // Shape of the last rebuild plus the live nodes it produced. When a fresh
-  // window has the same nRows × nCols we patch these in place; a differing
-  // window shape forces a full rebuild.
-  private lastNRows = -1;
-  private lastNCols = -1;
-  private headerCells: HTMLDivElement[] = [];
-  private rowEls: HTMLDivElement[] = [];
-  private cellEls: HTMLDivElement[] = [];
-  /** What those nodes hold, so a patch writes only what changed. */
-  private readonly written = new WrittenWindow();
+  // The live nodes with what each holds, keyed by column and view row.
+  private headRow: HTMLDivElement | null = null;
+  private headers: MirrorHeader[] = [];
+  private rows: MirrorRow[] = [];
 
   constructor(deps: AriaMirrorDeps) {
     this.host = deps.host;
@@ -195,15 +253,9 @@ export class AriaMirror {
     if (!this.contentPending) return;
     this.contentPending = false;
 
-    const nCols = this.cols.length;
-    if (this.rowCount === this.lastNRows && nCols === this.lastNCols) {
-      this.patchInPlace(nCols);
-    } else {
-      this.rebuild(nCols);
-      this.lastNRows = this.rowCount;
-      this.lastNCols = nCols;
-    }
-    this.recordWritten();
+    this.writeNodes();
+    this.patchHeaders();
+    for (const [rowIndex, mirrorRow] of this.rows.entries()) this.patchRow(mirrorRow, rowIndex);
     this.writeActiveDescendant(this.focusId);
   }
 
@@ -217,125 +269,96 @@ export class AriaMirror {
     return this.focusRow === row && this.focusCol === col;
   }
 
-  /** Full teardown: build a fresh header + data grid and cache its nodes. */
-  private rebuild(nCols: number): void {
-    const frag = document.createDocumentFragment();
-    this.headerCells = [];
-    this.rowEls = [];
-    this.cellEls = [];
-
-    const headRow = document.createElement("div");
-    headRow.setAttribute("role", "row");
-    headRow.setAttribute("aria-rowindex", "1");
-    for (let cj = 0; cj < nCols; cj++) {
-      const col = this.cols[cj] ?? -1;
-      const cell = document.createElement("div");
-      cell.setAttribute("role", "columnheader");
-      if (this.selectedColumn === col) cell.setAttribute("aria-selected", "true");
-      cell.setAttribute("aria-colindex", String(col + 1));
-      cell.textContent = this.headerTexts[cj] ?? "";
-      headRow.appendChild(cell);
-      this.headerCells.push(cell);
+  /**
+   * Make the mirror's nodes those of the captured window's columns and rows:
+   * the nodes of columns and rows still in the window stay, the others are
+   * removed or made. A new node gets its role and coordinates here; its text,
+   * description and selection come from the patch that follows.
+   */
+  private writeNodes(): void {
+    let headRow = this.headRow;
+    if (headRow === null) {
+      headRow = node("row");
+      headRow.setAttribute("aria-rowindex", "1");
+      this.aria.appendChild(headRow);
+      this.headRow = headRow;
     }
-    frag.appendChild(headRow);
+    const nCols = this.cols.length;
+    const colAt = (index: number) => this.cols[index] ?? -1;
+    this.headers = reconcile(headRow, this.headers, nCols, colAt, (col) => {
+      const el = node("columnheader");
+      el.setAttribute("aria-colindex", String(col + 1));
+      return { el, key: col, text: "", selected: false };
+    });
 
-    for (let ri = 0; ri < this.rowCount; ri++) {
-      const row = this.rowStart + ri;
-      const rowEl = document.createElement("div");
-      if (this.selectedRow === row) rowEl.setAttribute("aria-selected", "true");
-      rowEl.setAttribute("role", "row");
-      rowEl.setAttribute("aria-rowindex", String(row + 2));
-      for (let cj = 0; cj < nCols; cj++) {
-        const col = this.cols[cj] ?? -1;
-        const index = ri * nCols + cj;
-        const cell = document.createElement("div");
-        cell.setAttribute("role", "gridcell");
-        cell.setAttribute("aria-colindex", String(col + 1));
-        cell.id = `${this.aria.id}-${row}-${col}`;
-        const text = this.cellTexts[index] ?? "";
-        if (text !== "") cell.textContent = text;
-        const description = this.cellDescriptions[index] ?? null;
-        if (description !== null) cell.setAttribute("aria-description", description);
-        if (this.isFocused(row, col)) cell.setAttribute("aria-selected", "true");
-        rowEl.appendChild(cell);
-        this.cellEls.push(cell);
-      }
-      frag.appendChild(rowEl);
-      this.rowEls.push(rowEl);
+    const cellOf = (row: number) => (col: number) => {
+      const el = node("gridcell");
+      el.setAttribute("aria-colindex", String(col + 1));
+      el.id = `${this.aria.id}-${row}-${col}`;
+      return { el, key: col, text: "", description: null, selected: false };
+    };
+    this.rows = reconcile(
+      this.aria,
+      this.rows,
+      this.rowCount,
+      (index) => this.rowStart + index,
+      (row) => {
+        const el = node("row");
+        el.setAttribute("aria-rowindex", String(row + 2));
+        const cells = reconcile(el, [], nCols, colAt, cellOf(row));
+        return { el, key: row, selected: false, cells };
+      },
+    );
+    for (const mirrorRow of this.rows) {
+      mirrorRow.cells = reconcile(
+        mirrorRow.el,
+        mirrorRow.cells,
+        nCols,
+        colAt,
+        cellOf(mirrorRow.key),
+      );
     }
-
-    this.aria.replaceChildren(frag);
   }
 
   /**
-   * Same shape, shifted window: rewrite absolute header/cell column indices,
-   * labels, per-row `aria-rowindex`, ids, text, and selection state on the
-   * retained nodes. Each value is compared with what the last flush wrote,
-   * not read back from the DOM, and only a changed value is written.
+   * Write header labels and selection. Each value is compared with what the
+   * node holds, not read back from the DOM, and only a changed value is
+   * written.
    */
-  private patchInPlace(nCols: number): void {
-    this.patchHeaders();
-    for (const [rowIndex, rowElement] of this.rowEls.entries()) {
-      this.patchRow(rowElement, rowIndex, nCols);
-    }
-  }
-
   private patchHeaders(): void {
-    const was = this.written;
-    for (const [columnIndex, header] of this.headerCells.entries()) {
-      const col = this.cols[columnIndex] ?? -1;
-      const wasCol = was.cols[columnIndex] ?? -1;
-      const selected = this.selectedColumn === col;
-      if (selected !== (was.selectedColumn === wasCol)) writeSelected(header, selected);
+    for (const [columnIndex, header] of this.headers.entries()) {
+      const selected = this.selectedColumn === header.key;
+      if (selected !== header.selected) writeSelected(header.el, selected);
       const text = this.headerTexts[columnIndex] ?? "";
-      if (text !== was.headerTexts[columnIndex]) header.textContent = text;
-      if (col !== wasCol) header.setAttribute("aria-colindex", String(col + 1));
+      if (text !== header.text) writeText(header.el, text);
+      header.text = text;
+      header.selected = selected;
     }
   }
 
-  private patchRow(rowElement: HTMLDivElement, rowIndex: number, nCols: number): void {
-    const was = this.written;
-    const row = this.rowStart + rowIndex;
-    const wasRow = was.rowStart + rowIndex;
+  /** {@link patchHeaders} for the row at `rowIndex` of the window and its cells. */
+  private patchRow(mirrorRow: MirrorRow, rowIndex: number): void {
+    const row = mirrorRow.key;
     const selected = this.selectedRow === row;
-    if (selected !== (was.selectedRow === wasRow)) writeSelected(rowElement, selected);
-    if (row !== wasRow) rowElement.setAttribute("aria-rowindex", String(row + 2));
+    if (selected !== mirrorRow.selected) writeSelected(mirrorRow.el, selected);
+    mirrorRow.selected = selected;
 
-    for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
-      const col = this.cols[columnIndex] ?? -1;
-      const wasCol = was.cols[columnIndex] ?? -1;
+    const nCols = this.cols.length;
+    for (const [columnIndex, cell] of mirrorRow.cells.entries()) {
       const index = rowIndex * nCols + columnIndex;
-      const cell = this.cellEls[index];
-      if (cell === undefined) throw new Error("ARIA cell has no visible coordinate");
-
-      if (row !== wasRow || col !== wasCol) cell.id = `${this.aria.id}-${row}-${col}`;
-      if (col !== wasCol) cell.setAttribute("aria-colindex", String(col + 1));
       const text = this.cellTexts[index] ?? "";
-      if (text !== was.cellTexts[index]) cell.textContent = text;
+      if (text !== cell.text) writeText(cell.el, text);
       const description = this.cellDescriptions[index] ?? null;
-      if (description !== (was.cellDescriptions[index] ?? null)) {
-        if (description === null) cell.removeAttribute("aria-description");
-        else cell.setAttribute("aria-description", description);
+      if (description !== cell.description) {
+        if (description === null) cell.el.removeAttribute("aria-description");
+        else cell.el.setAttribute("aria-description", description);
       }
-      const focused = this.isFocused(row, col);
-      if (focused !== (was.focusRow === wasRow && was.focusCol === wasCol)) {
-        writeSelected(cell, focused);
-      }
+      const focused = this.isFocused(row, cell.key);
+      if (focused !== cell.selected) writeSelected(cell.el, focused);
+      cell.text = text;
+      cell.description = description;
+      cell.selected = focused;
     }
-  }
-
-  /** Record the captured content as what the mirror nodes now hold. */
-  private recordWritten(): void {
-    const was = this.written;
-    was.rowStart = this.rowStart;
-    was.focusRow = this.focusRow;
-    was.focusCol = this.focusCol;
-    was.selectedRow = this.selectedRow;
-    was.selectedColumn = this.selectedColumn;
-    copyInto(was.cols, this.cols);
-    copyInto(was.headerTexts, this.headerTexts);
-    copyInto(was.cellTexts, this.cellTexts);
-    copyInto(was.cellDescriptions, this.cellDescriptions);
   }
 
   destroy(): void {

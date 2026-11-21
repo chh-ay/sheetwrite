@@ -8,6 +8,10 @@ const ROW_COUNT = 1_000;
 const HOST_WIDTH = 400;
 const HOST_HEIGHT = 240;
 const SCROLLED_ROWS = 100;
+/** Alternating wide and narrow columns: a sideways scroll changes how many fit the host. */
+const WIDE_SHEET_WIDTHS = Array.from({ length: 40 }, (_, col) => (col % 3 === 0 ? 150 : 60));
+/** Scrolled part of the first, 150 px column: one more column comes into the window. */
+const SCROLLED_LEFT_PX = 60;
 let restoreCanvas: () => void;
 let originalFrame: typeof requestAnimationFrame;
 let originalCancelFrame: typeof cancelAnimationFrame;
@@ -109,6 +113,10 @@ function scrollTo(host: HTMLElement, row: number): void {
   scroller.dispatchEvent(new Event("scroll"));
 }
 
+function headers(host: HTMLElement): HTMLElement[] {
+  return [...mirror(host).querySelectorAll<HTMLElement>('[role="columnheader"]')];
+}
+
 it("mirrors the painted window with its header, rows, values, notes and focus", () => {
   const { grid, host } = mount();
   grid.setNote({ sheet: "s1", row: 1, col: 1 }, "Checked");
@@ -194,6 +202,56 @@ it("follows a scrolled window once the frame paints", () => {
   expect(rowIndices(host)).not.toContain("2");
   expect(gridCell(host, SCROLLED_ROWS, 0)?.textContent).toBe(`Item ${SCROLLED_ROWS}`);
   expect(gridCell(host, 0, 0)).toBeNull();
+});
+
+it("keeps its cells when a sideways scroll changes how many columns show", () => {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
+  Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
+  document.body.appendChild(host);
+  const grid = createGrid(host, {
+    workbook: {
+      activeSheet: "s1",
+      sheets: [
+        {
+          id: "s1",
+          name: "Wide",
+          rowCount: ROW_COUNT,
+          columns: WIDE_SHEET_WIDTHS.map((width, col) => ({
+            key: `c${col}`,
+            header: `C${col}`,
+            type: "text" as const,
+            width,
+          })),
+        },
+      ],
+    },
+    config: { toolbar: false, find: false, contextMenu: false },
+  });
+  mounted = { grid, host };
+  flushFrames();
+  const columnsBefore = headers(host).length;
+  const firstRow = mirror(host).querySelectorAll('[role="row"]')[1];
+  const firstCell = firstRow?.querySelector('[role="gridcell"]');
+
+  const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
+  if (!scroller) throw new Error("The grid scroller is missing");
+  scroller.scrollLeft = SCROLLED_LEFT_PX;
+  scroller.dispatchEvent(new Event("scroll"));
+  flushFrames();
+
+  const shown = headers(host);
+  expect(shown.length).toBe(columnsBefore + 1);
+  // The nodes stay; the new column's cells are added to them.
+  expect(mirror(host).querySelectorAll('[role="row"]')[1] === firstRow).toBe(true);
+  expect(firstRow?.querySelector('[role="gridcell"]') === firstCell).toBe(true);
+  const lastColumn = Number(shown.at(-1)?.getAttribute("aria-colindex")) - 1;
+  const lastCell = firstRow?.querySelectorAll('[role="gridcell"]')[shown.length - 1];
+  expect(lastCell?.id).toBe(`${mirror(host).id}-0-${lastColumn}`);
+  expect(lastCell?.getAttribute("aria-colindex")).toBe(String(lastColumn + 1));
+  for (const row of [...mirror(host).querySelectorAll('[role="row"]')].slice(1)) {
+    expect(row.querySelectorAll('[role="gridcell"]').length).toBe(shown.length);
+  }
 });
 
 it("writes the mirror when the grid mounts, before any frame", () => {
