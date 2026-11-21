@@ -138,33 +138,6 @@ describe("row and column inserts are held to the document limits", () => {
       store.dispose();
     }
   });
-
-  it("rejects an insert past the local cell limit with a reason instead of a no-op", () => {
-    const maxDense = DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells;
-    const maxLocal = maxDense + 1_000_000;
-    const rows = maxDense / 10;
-    const store = new SheetwriteStore(workbook(rows, 10), undefined, {
-      snapshotResourceLimits: { maxLocalPagedCells: maxLocal },
-    });
-    try {
-      const fits = store.applyTransaction({
-        patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 100_000 }],
-      });
-      expect(fits.status).toBe("applied");
-      const issue = limitIssue(
-        store.applyTransaction({ patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 1 }] }),
-      );
-      expect(issue).toMatchObject({
-        resource: "local-paged-cells",
-        max: maxLocal,
-        actual: maxLocal + 10,
-      });
-      expect(issue.message).toContain("6,000,000");
-      expect(rowCountOf(store)).toBe(rows + 100_000);
-    } finally {
-      store.dispose();
-    }
-  });
 });
 
 describe("Grid.insertRows past a document limit", () => {

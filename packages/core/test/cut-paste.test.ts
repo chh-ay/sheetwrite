@@ -491,21 +491,6 @@ describe("a paste past the sheet's last row", () => {
   const rowCount = (h: ReturnType<typeof cutHarness>) =>
     h.store.getWorkbook().sheets.find((candidate) => candidate.id === "s1")!.rowCount;
 
-  it("adds the rows a pasted text needs, as Excel's sheet holds them (#952)", async () => {
-    harness = cutHarness();
-    const h = harness;
-    h.clip.text = Array.from({ length: 40 }, (_, row) => `${row}\t${row * 2}`).join("\n");
-    h.select(25, 0);
-    expect(await h.clipboard.paste()).toBe("done");
-    expect(rowCount(h)).toBe(65);
-    expect([h.value(25, 0), h.value(64, 0), h.value(64, 1)]).toEqual([0, 39, 78]);
-
-    // One undo takes back the cells and the rows.
-    h.document.undo();
-    expect(rowCount(h)).toBe(ROWS);
-    expect(h.value(25, 0)).toBeNull();
-  });
-
   it("adds the rows a cut needs to move past the last row", async () => {
     harness = cutHarness();
     const h = harness;

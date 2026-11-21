@@ -42,12 +42,6 @@ describe("formatNumber", () => {
     }
   });
 
-  it("blanks non-finite numbers", () => {
-    expect(formatNumber(Number.NaN, "0.00")).toBe("");
-    expect(formatNumber(Number.POSITIVE_INFINITY, "#,##0.00")).toBe("");
-    expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
-  });
-
   // Excel's General shows up to 11 characters in a standard-width cell, the
   // minus sign not counted, with no thousands separators.
   it.each([

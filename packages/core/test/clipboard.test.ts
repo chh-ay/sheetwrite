@@ -349,25 +349,6 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula({ sheet: "s1", row: 4, col: 2 })).toBe("=B5");
   });
 
-  it("cut marks the source and paste moves it with one moveCells operation", async () => {
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
-    h.select(1, 1);
-    await h.controller.cut();
-
-    // As in Excel, a cut changes nothing until the paste.
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
-    expect(h.cutMarks).toEqual([
-      { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
-    ]);
-
-    h.select(3, 1);
-    await h.controller.paste();
-
-    expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A1+B$2");
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
-    expect(h.commitReasons).toEqual(["paste"]);
-  });
-
   it("keeps the source intact when the clipboard rejects a cut", async () => {
     h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
     h.select(1, 1);

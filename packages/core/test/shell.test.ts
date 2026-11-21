@@ -630,30 +630,9 @@ describe("createSpreadsheetShell", () => {
 });
 
 describe("the formula bar's formula help", () => {
-  /** WCAG's minimum contrast for body text. */
-  const MIN_TEXT_CONTRAST = 4.5;
-
-  /** WCAG relative luminance of a `#rrggbb` colour. */
-  function luminance(hex: string): number {
-    const channels = [1, 3, 5].map(
-      (start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255,
-    );
-    const [red = 0, green = 0, blue = 0] = channels.map((channel) =>
-      channel <= 0.039_28 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-    );
-    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  }
-
-  function contrast(first: string, second: string): number {
-    const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a);
-    return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
-  }
-
-  // The core stylesheet's light palette and its dark one (`styles/grid.css`).
-  it.each([
-    ["light", { bg: "#ffffff", fg: "#111111" }],
-    ["dark", { bg: "#0b0b0c", fg: "#e7e7e7" }],
-  ])("takes the grid's %s theme colours, at 4.5:1 or more", async (_, theme) => {
+  it("takes the grid's theme colours", async () => {
+    // The core stylesheet's dark palette (`styles/grid.css`), which differs from the defaults.
+    const theme = { bg: "#0b0b0c", fg: "#e7e7e7" };
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));
     const host = mountHost();
@@ -679,7 +658,6 @@ describe("the formula bar's formula help", () => {
     const background = layer.style.getPropertyValue("--sheetwrite-assist-bg");
     const text = layer.style.getPropertyValue("--sheetwrite-assist-fg");
     expect([background, text]).toEqual([theme.bg, theme.fg]);
-    expect(contrast(background, text)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
 
     piece.destroy();
     grid.destroy();

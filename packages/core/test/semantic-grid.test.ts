@@ -57,44 +57,6 @@ it("edits boolean cells using spreadsheet text", () => {
   store.dispose();
 });
 
-it("opens a list rule's list on Alt+Down", () => {
-  const workbook = makeWorkbook(4);
-  workbook.sheets[0]!.validationRules = [
-    {
-      id: "status",
-      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
-      condition: { kind: "list", values: ["Open", "Closed"] },
-      policy: "reject",
-    },
-  ];
-  const store = new SheetwriteStore(workbook, makeColumnarData(4));
-  const host = mountHost();
-  const grid = new GridImpl(host, { workbook }, store);
-  const altDown = () =>
-    host.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "ArrowDown",
-        altKey: true,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-
-  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  altDown();
-  expect(host.querySelector('[role="listbox"]')).not.toBeNull();
-  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  // B2 holds none of the items, so none is highlighted until Down.
-  const box = host.querySelector('[role="combobox"]');
-  for (const key of ["ArrowDown", "Enter"]) {
-    box?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
-  }
-  expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
-
-  grid.destroy();
-  store.dispose();
-});
-
 it("shows a list cell's dropdown arrow, opens the list from it or by typing, and edits text on F2", () => {
   const requestFrame = globalThis.requestAnimationFrame;
   // Paint at once, so the test reads the state that the next frame shows.
@@ -563,6 +525,8 @@ describe("custom editor canonical lifecycle", () => {
         cancelable: true,
       }),
     );
+    // Alt+Down opens the list and keeps the selection where it is.
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
   };
 
   for (const editorKind of ["stock", "list", "checkbox"] as const) {
