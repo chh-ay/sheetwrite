@@ -27,11 +27,12 @@ use std::rc::Rc;
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
-use crate::types::{CellRange, FormulaError, Value};
+use crate::types::{CellRange, EvalResult, FormulaError, Value};
 
-use super::matrix::{range_from_ast, EvalMatrix, SPILL_MAX_COLS, SPILL_MAX_ROWS};
+use super::lookup::{option_code, positive_index};
+use super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_COLS, SPILL_MAX_ROWS};
 use super::value::{bool_from_value, number_from_value, text_from_value};
-use super::{current_formula_origin, read_shifted, sheet_envelopes, EvalPass};
+use super::{address_text, current_formula_origin, read_shifted, sheet_envelopes, EvalPass};
 
 const OFFSET_MIN_ARGS: usize = 3;
 const OFFSET_MAX_ARGS: usize = 5;
@@ -618,4 +619,163 @@ fn r1c1_axis(text: &str, origin: u32, limit: usize) -> Result<u32, FormulaError>
         return Err(FormulaError::Ref);
     }
     Ok(coordinate as u32)
+}
+
+impl CellStore {
+    /// `OFFSET`, `INDIRECT`, reference operators, `CHOOSE`, `ROW(S)`,
+    /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
+    /// out-of-line `*_family` handlers.
+    #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
+    pub(super) fn eval_reference_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if matches!(func, Func::Offset | Func::Indirect) {
+            return self.eval_runtime_reference(func, args, sheet, pass, depth);
+        }
+
+        match func {
+            Func::Intersect => return self.eval_intersection(args, sheet, pass, depth),
+            // A union has several areas, and a value position takes one.
+            Func::Union => return Value::Error(FormulaError::Value),
+            Func::Areas => return self.eval_areas(args, sheet, pass, depth),
+            _ => {}
+        }
+
+        if func == Func::Choose {
+            if args.len() < 2 {
+                return Value::Error(FormulaError::Value);
+            }
+            let index_value = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            let index = match positive_index(&index_value) {
+                Ok(position) if position + 1 < args.len() => position + 1,
+                Ok(_) => return Value::Error(FormulaError::Value),
+                Err(error) => return Value::Error(error),
+            };
+            let selected = &args[index];
+            if range_from_ast(selected, self.name_scope(sheet)).is_some() {
+                return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
+                    Ok(matrix) => matrix.into_first(),
+                    Err(error) => Value::Error(error),
+                };
+            }
+            if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
+                return result.map_or_else(Value::Error, EvalMatrix::into_first);
+            }
+            return self.eval_ast(selected, sheet, pass, depth + 1);
+        }
+
+        if matches!(func, Func::Row | Func::Column) {
+            if args.len() > 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            let coordinate = if let Some(reference) = args.first() {
+                let range = match (range_from_ast(reference, self.name_scope(sheet)), reference) {
+                    (Some(range), _) => range,
+                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
+                        match self.runtime_range(*func, args, sheet, pass, depth + 1) {
+                            Ok(range) => range,
+                            Err(error) => return Value::Error(error),
+                        }
+                    }
+                    (None, Ast::InvalidRef) => return Value::Error(FormulaError::Ref),
+                    (None, _) => return Value::Error(FormulaError::Value),
+                };
+                if func == Func::Row {
+                    range.row_start
+                } else {
+                    range.col_start
+                }
+            } else {
+                let Some((row, col)) = current_formula_origin() else {
+                    return Value::Error(FormulaError::Value);
+                };
+                if func == Func::Row {
+                    row
+                } else {
+                    col
+                }
+            };
+            return Value::number(coordinate as f64 + 1.0);
+        }
+
+        if matches!(func, Func::Rows | Func::Columns) {
+            if args.len() != 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            // A written reference has its shape without its cells, which
+            // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
+            if let Some(range) = range_from_ast(&args[0], self.name_scope(sheet)) {
+                if self.sheets.get(range.sheet as usize).is_none() {
+                    return Value::Error(FormulaError::Ref);
+                }
+                let (start, end) = if func == Func::Rows {
+                    (range.row_start, range.row_end)
+                } else {
+                    (range.col_start, range.col_end)
+                };
+                return Value::number(f64::from(end - start) + 1.0);
+            }
+            let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                Ok(matrix) => matrix,
+                Err(error) => return Value::Error(error),
+            };
+            return Value::number(if func == Func::Rows {
+                matrix.rows as f64
+            } else {
+                matrix.cols as f64
+            });
+        }
+
+        if func == Func::Address {
+            if !(2..=5).contains(&args.len()) {
+                return Value::Error(FormulaError::Value);
+            }
+            let scalar =
+                |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
+            let row = match positive_index(&scalar(&args[0], pass)) {
+                Ok(row) => row,
+                Err(error) => return Value::Error(error),
+            };
+            let col = match positive_index(&scalar(&args[1], pass)) {
+                Ok(col) => col,
+                Err(error) => return Value::Error(error),
+            };
+            let abs = match optional_ast(args, 2) {
+                Some(ast) => match option_code(&scalar(ast, pass)) {
+                    Ok(value @ 1..=4) => value,
+                    Ok(_) => return Value::Error(FormulaError::Value),
+                    Err(error) => return Value::Error(error),
+                },
+                None => 1,
+            };
+            let a1 = match optional_ast(args, 3) {
+                Some(ast) => match bool_from_value(&scalar(ast, pass)) {
+                    Ok(value) => value,
+                    Err(error) => return Value::Error(error),
+                },
+                None => true,
+            };
+            let sheet_name = match optional_ast(args, 4) {
+                Some(ast) => match text_from_value(&scalar(ast, pass)) {
+                    Ok(value) => Some(value.into_owned()),
+                    Err(error) => return Value::Error(error),
+                },
+                None => None,
+            };
+            return match address_text(row, col, abs, a1, sheet_name.as_deref()) {
+                Ok(text) => Value::text(text),
+                Err(error) => Value::Error(error),
+            };
+        }
+        Value::Error(FormulaError::Value)
+    }
 }

@@ -144,7 +144,7 @@ export function staticDashboard(
         key: `column${col + 1}`,
         header: "",
         width: COLUMN_WIDTH,
-        type: "text" as const,
+        type: "general" as const,
       })),
       ...(chartDefinitions.length > 0 ? { charts: chartDefinitions } : {}),
       cells:

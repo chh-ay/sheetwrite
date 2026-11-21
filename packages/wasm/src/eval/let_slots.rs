@@ -22,10 +22,11 @@ use std::ptr;
 use crate::calc::{Ast, Func};
 use crate::memory::MemoryOwnerStats;
 use crate::store::names::NameScope;
-use crate::types::EvalResult;
+use crate::store::CellStore;
+use crate::types::{EvalResult, FormulaError, Value};
 
 use super::reference::ast_contains_runtime_ref;
-use super::{ast_produces_array, expand_let_ast, valid_let_name};
+use super::{ast_produces_array, expand_let_ast, valid_let_name, EvalPass};
 
 /// Rewrites, in place, the uses of the bindings of every LET in `ast` that
 /// [`let_resolvable`] accepts. Each outermost such LET numbers its slots from
@@ -421,6 +422,68 @@ impl LetFrame {
     pub(crate) fn add_memory_stats(&self, stats: &mut MemoryOwnerStats) {
         stats.add_vec::<Option<EvalResult>>(self.values.len(), self.values.capacity());
         stats.add_vec::<*const Ast>(self.bindings.len(), self.bindings.capacity());
+    }
+}
+
+impl CellStore {
+    /// Evaluates a LET whose names were resolved to slots when the formula
+    /// was entered: binds each slot to its expression in the original tree,
+    /// then evaluates the result expression. A binding is evaluated on its
+    /// first use, as the expansion does.
+    #[inline(never)]
+    pub(super) fn eval_let_family(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let Some((result, bindings)) = args.split_last() else {
+            return Value::Error(FormulaError::Value);
+        };
+        let first_slot = match bindings.first() {
+            Some(Ast::LetName { slot, .. }) => *slot,
+            _ => return Value::Error(FormulaError::Value),
+        };
+        let frame = pass.results.let_frame_mut();
+        let opened = frame.open_resolved(first_slot);
+        for pair in bindings.chunks(2) {
+            if let [Ast::LetName { slot, .. }, expression] = pair {
+                frame.bind(*slot, expression);
+            }
+        }
+        let value = self.eval_ast(result, sheet, pass, depth + 1);
+        pass.results.let_frame_mut().close_resolved(opened);
+        value
+    }
+
+    /// The value of a resolved LET name: its slot's value, or its binding's
+    /// value on first use, kept in the slot.
+    #[inline(never)]
+    pub(super) fn eval_let_name_family(
+        &self,
+        slot: u32,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let Some(frame) = pass.results.let_frame() else {
+            return Value::Error(FormulaError::Name);
+        };
+        if let Some(value) = frame.resolved_value(slot) {
+            return value;
+        }
+        // SAFETY: a resolved name occurs only inside its LET, which binds the
+        // slot before evaluating anything in it and is still being evaluated.
+        #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
+        let Some(expression) = (unsafe { frame.binding(slot) }) else {
+            return Value::Error(FormulaError::Name);
+        };
+        let value = self.eval_ast(expression, sheet, pass, depth);
+        if let Some(frame) = pass.results.existing_let_frame_mut() {
+            frame.remember_resolved(slot, value.clone());
+        }
+        value
     }
 }
 
