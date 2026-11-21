@@ -192,6 +192,7 @@ function clipboardHarness(
     store,
     document,
     clipboard,
+    lifetime,
     marks,
     refusals,
     asked,
@@ -250,13 +251,18 @@ function clipboardHarness(
 describe("ClipboardController", () => {
   it("repeats a copied cell over a larger selection, shifting each copy, as Excel does", async () => {
     const h = clipboardHarness();
-    h.set(1, 1, "=A2");
+    h.set(1, 1, "=A2+B$2");
     await h.copy(1, 1);
 
     h.select(3, 1, 5, 2);
     await h.clipboard.paste();
 
-    expect([h.formula(3, 1), h.formula(5, 1), h.formula(4, 2)]).toEqual(["=A4", "=A6", "=B5"]);
+    // Relative A2 shifts with each copy; absolute-row B$2 keeps its row.
+    expect([h.formula(3, 1), h.formula(5, 1), h.formula(4, 2)]).toEqual([
+      "=A4+B$2",
+      "=A6+B$2",
+      "=B5+C$2",
+    ]);
   });
 
   it("marks the captured source when selection changes during the clipboard write", async () => {
@@ -341,6 +347,39 @@ describe("ClipboardController", () => {
     expect([h.value(2, 0), h.value(2, 1)]).toEqual(["anchor", null]);
   });
 
+  it("keeps a cut source when the grid closes before the clipboard accepts it", async () => {
+    const h = clipboardHarness();
+    const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
+    useClipboard({ writeText: () => pendingWrite, readText: () => Promise.resolve("") });
+    h.set(1, 1, "=A1+B$2");
+    h.select(1, 1);
+
+    const cut = h.clipboard.cut();
+    h.lifetime.close();
+    finishWrite();
+
+    expect(await cut).toBe("empty");
+  });
+
+  it("pasteValues writes the resolved literal and no formula", async () => {
+    const h = clipboardHarness();
+    h.set(0, 2, "=5*3");
+    await h.copy(0, 2);
+
+    h.select(2, 2);
+    await h.clipboard.pasteValues();
+
+    expect([h.value(2, 2), h.formula(2, 2)]).toEqual([15, null]);
+  });
+
+  it("neutralizes injection prefixes in external text, never producing a formula", async () => {
+    const h = clipboardHarness();
+    h.clip.text = "=SUM(A1)\tsafe";
+    await h.paste(0, 0);
+
+    expect([h.value(0, 0), h.formula(0, 0)]).toEqual(["'=SUM(A1)", null]);
+  });
+
   it("resolves 'blocked' on a rejected readText and leaves the store unchanged", async () => {
     const h = clipboardHarness();
     h.set(1, 1, "keep");
@@ -350,10 +389,11 @@ describe("ClipboardController", () => {
     expect(h.value(1, 1)).toBe("keep");
   });
 
-  it("round-trips formulas and styles through the browser custom clipboard format", async () => {
+  it("round-trips formulas, refs and styles through the browser custom clipboard format", async () => {
     const h = clipboardHarness();
     h.set(0, 0, "=B1", { bold: true, backgroundColor: "#abcdef" });
-    await h.copy(0, 0);
+    h.apply([{ op: "set", addr: h.at(0, 1), value: { kind: "ref", target: h.at(1, 1) } }]);
+    await h.copy(0, 0, 0, 1);
 
     expect(h.clip.items[0]?.types.sort()).toEqual([
       "text/html",
@@ -363,6 +403,7 @@ describe("ClipboardController", () => {
     await expect(h.paste(2, 0)).resolves.toBe("done");
     expect(h.formula(2, 0)).toBe("=B3");
     expect(h.style(2, 0)).toEqual({ bold: true, backgroundColor: "#abcdef" });
+    expect(h.store.getRefTarget(h.at(2, 1))).toEqual(h.at(1, 1));
   });
 
   it("exports safe colors and both text decorations in copied HTML", async () => {

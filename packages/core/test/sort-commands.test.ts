@@ -71,6 +71,10 @@ it("quick sort moves the cells of the current region and keeps its header", () =
   expect(column(0)).toEqual(["Name", "apple", "fig", "pear"]);
   expect(column(1)).toEqual(["Qty", 1, 2, 3]);
   expect(column(3)).toEqual(["keep", "x", "y", "z"]);
+
+  // One undo restores the cells.
+  grid.undo();
+  expect(column(0)).toEqual(["Name", "pear", "apple", "fig"]);
 });
 
 it("quick sort in a table sorts the table body", () => {
