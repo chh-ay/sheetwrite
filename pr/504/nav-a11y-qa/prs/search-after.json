@@ -1,0 +1,518 @@
+[
+  {
+    "q": "createGrid",
+    "rank": 1,
+    "top3": [
+      "/docs/api/core/create-grid/",
+      "/docs/api/core-adapter/create-grid-controller/",
+      "/docs/api/core/create-grid-from-snapshot/"
+    ],
+    "firstEntries": [
+      "/docs/api/core/create-grid/",
+      "/docs/api/core/create-grid/#examples",
+      "/docs/api/core-adapter/create-grid-controller/",
+      "/docs/api/core-adapter/create-grid-controller/#parameters"
+    ]
+  },
+  {
+    "q": "initSheetwrite",
+    "rank": 1,
+    "top3": [
+      "/docs/api/core/init-sheetwrite/",
+      "/docs/api/core/init-sheetwrite-options/",
+      "/docs/api/charts/charts-addon/"
+    ],
+    "firstEntries": [
+      "/docs/api/core/init-sheetwrite/",
+      "/docs/api/core/init-sheetwrite/#examples",
+      "/docs/api/core/init-sheetwrite/#parameters",
+      "/docs/api/core/init-sheetwrite-options/"
+    ]
+  },
+  {
+    "q": "XLOOKUP",
+    "rank": 1,
+    "top3": [
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/performance/release-comparison/",
+      "/docs/features/formulas/lookup-criteria-and-financial/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/lookup-reference/#fn-xlookup",
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/reference/formula-functions/lookup-reference/#functions",
+      "/docs/performance/release-comparison/"
+    ]
+  },
+  {
+    "q": "VLOOKUP",
+    "rank": 1,
+    "top3": [
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/api/core-functions/formula-completion-kind/",
+      "/docs/api/core-functions/formula-completion-item/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/lookup-reference/#fn-vlookup",
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/reference/formula-functions/lookup-reference/#functions",
+      "/docs/api/core-functions/formula-completion-kind/"
+    ]
+  },
+  {
+    "q": "SUMIFS",
+    "rank": 1,
+    "top3": [
+      "/docs/reference/formula-functions/math/",
+      "/docs/features/formulas/",
+      "/docs/features/formulas/lookup-criteria-and-financial/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/math/#fn-sumifs",
+      "/docs/reference/formula-functions/math/",
+      "/docs/reference/formula-functions/math/#functions",
+      "/docs/features/formulas/"
+    ]
+  },
+  {
+    "q": "LAMBDA",
+    "rank": 1,
+    "top3": [
+      "/docs/reference/formula-functions/logical-control/",
+      "/docs/features/formulas/analysis-formulas/",
+      "/docs/api/core/named-range-snapshot/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/logical-control/#fn-lambda",
+      "/docs/reference/formula-functions/logical-control/",
+      "/docs/reference/formula-functions/logical-control/#functions",
+      "/docs/reference/formula-functions/logical-control/#known-differences"
+    ]
+  },
+  {
+    "q": "INDIRECT",
+    "rank": 1,
+    "top3": [
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/features/formulas/offset-and-indirect/",
+      "/docs/features/formulas/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/lookup-reference/#fn-indirect",
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/reference/formula-functions/lookup-reference/#functions",
+      "/docs/reference/formula-functions/lookup-reference/#known-differences"
+    ]
+  },
+  {
+    "q": "SheetwriteGrid",
+    "rank": 1,
+    "top3": [
+      "/docs/api/react/sheetwrite-grid/",
+      "/docs/api/vue/sheetwrite-grid/",
+      "/docs/api/svelte/sheetwrite-grid/"
+    ],
+    "firstEntries": [
+      "/docs/api/react/sheetwrite-grid/",
+      "/docs/api/react/sheetwrite-grid/#examples",
+      "/docs/api/vue/sheetwrite-grid/",
+      "/docs/api/vue/sheetwrite-grid/#examples"
+    ]
+  },
+  {
+    "q": "conditional formatting",
+    "rank": 1,
+    "top3": [
+      "/docs/features/formatting/conditional-formats/",
+      "/docs/features/formatting/",
+      "/docs/features/formatting/number-formats/"
+    ],
+    "firstEntries": [
+      "/docs/features/formatting/conditional-formats/",
+      "/docs/features/formatting/conditional-formats/#rule-fields",
+      "/docs/features/formatting/conditional-formats/#predicates",
+      "/docs/features/formatting/conditional-formats/#order-and-precedence"
+    ]
+  },
+  {
+    "q": "pivot table",
+    "rank": 1,
+    "top3": [
+      "/docs/features/analysis/pivot-tables/",
+      "/docs/releases/0.6.0/",
+      "/docs/features/analysis/"
+    ],
+    "firstEntries": [
+      "/docs/features/analysis/pivot-tables/",
+      "/docs/features/analysis/pivot-tables/#insert-and-edit-in-the-grid",
+      "/docs/features/analysis/pivot-tables/#styles",
+      "/docs/features/analysis/pivot-tables/#define-a-pivot"
+    ]
+  },
+  {
+    "q": "import xlsx",
+    "rank": 1,
+    "top3": [
+      "/docs/import-export/xlsx-import/",
+      "/docs/api/core/xlsx-table-import-backend/",
+      "/docs/import-export/xlsx-export/"
+    ],
+    "firstEntries": [
+      "/docs/import-export/xlsx-import/",
+      "/docs/import-export/xlsx-import/#open-a-file-from-the-ribbon",
+      "/docs/import-export/xlsx-import/#replace-a-document-through-the-api",
+      "/docs/import-export/xlsx-import/#choose-an-import-contract"
+    ]
+  },
+  {
+    "q": "export to excel",
+    "rank": 2,
+    "top3": [
+      "/docs/reference/compatibility-results/",
+      "/docs/import-export/xlsx-export/",
+      "/docs/tutorials/excel-in-nodejs/"
+    ],
+    "firstEntries": [
+      "/docs/reference/compatibility-results/",
+      "/docs/reference/compatibility-results/#warning-boundaries",
+      "/docs/reference/compatibility-results/#exact-sources",
+      "/docs/import-export/xlsx-export/"
+    ]
+  },
+  {
+    "q": "csv",
+    "rank": 1,
+    "top3": [
+      "/docs/import-export/csv-and-tsv/",
+      "/docs/import-export/",
+      "/docs/releases/0.5.2/"
+    ],
+    "firstEntries": [
+      "/docs/import-export/csv-and-tsv/",
+      "/docs/import-export/csv-and-tsv/#functions",
+      "/docs/import-export/csv-and-tsv/#output-and-injection-safety",
+      "/docs/import-export/csv-and-tsv/#options-and-edge-cases"
+    ]
+  },
+  {
+    "q": "undo redo",
+    "rank": 1,
+    "top3": [
+      "/docs/features/grid/editing-and-clipboard/",
+      "/docs/features/grid/grid-methods/",
+      "/docs/features/grid/toolbar-and-ribbon/"
+    ],
+    "firstEntries": [
+      "/docs/features/grid/editing-and-clipboard/",
+      "/docs/features/grid/editing-and-clipboard/#formula-bar",
+      "/docs/features/grid/editing-and-clipboard/#paste-special",
+      "/docs/features/grid/editing-and-clipboard/#cut-and-paste-moves-cells"
+    ]
+  },
+  {
+    "q": "keyboard shortcuts",
+    "rank": 1,
+    "top3": [
+      "/docs/features/grid/keyboard-shortcuts/",
+      "/docs/features/grid/selection-and-keyboard/",
+      "/docs/features/grid/"
+    ],
+    "firstEntries": [
+      "/docs/features/grid/keyboard-shortcuts/",
+      "/docs/features/grid/keyboard-shortcuts/#what-the-user-can-do",
+      "/docs/features/grid/keyboard-shortcuts/#proposals-beyond-excel",
+      "/docs/features/grid/keyboard-shortcuts/#when-the-keys-are-taken"
+    ]
+  },
+  {
+    "q": "#SPILL!",
+    "rank": 1,
+    "top3": [
+      "/docs/features/formulas/dynamic-arrays-and-spills/",
+      "/docs/concepts/calculation-engine/",
+      "/docs/features/analysis/pivot-tables/"
+    ],
+    "firstEntries": [
+      "/docs/features/formulas/dynamic-arrays-and-spills/",
+      "/docs/features/formulas/dynamic-arrays-and-spills/#array-constants",
+      "/docs/features/formulas/dynamic-arrays-and-spills/#spill-references",
+      "/docs/features/formulas/dynamic-arrays-and-spills/#array-arithmetic"
+    ]
+  },
+  {
+    "q": "#REF!",
+    "rank": 2,
+    "top3": [
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/features/formulas/authoring-and-references/",
+      "/docs/features/formulas/offset-and-indirect/"
+    ],
+    "firstEntries": [
+      "/docs/reference/formula-functions/lookup-reference/",
+      "/docs/reference/formula-functions/lookup-reference/#functions",
+      "/docs/reference/formula-functions/lookup-reference/#known-differences",
+      "/docs/features/formulas/authoring-and-references/"
+    ]
+  },
+  {
+    "q": "custom function",
+    "rank": 1,
+    "top3": [
+      "/docs/features/formulas/custom-functions/",
+      "/docs/reference/formula-functions/date-time/",
+      "/docs/reference/formula-functions/database/"
+    ],
+    "firstEntries": [
+      "/docs/features/formulas/custom-functions/",
+      "/docs/features/formulas/custom-functions/#registration",
+      "/docs/features/formulas/custom-functions/#arguments-and-results",
+      "/docs/features/formulas/custom-functions/#volatility"
+    ]
+  },
+  {
+    "q": "how do I freeze rows",
+    "rank": 0,
+    "top3": [
+      "/docs/features/grid/toolbar-and-ribbon/",
+      "/docs/features/analysis/charts/",
+      "/docs/releases/0.6.0/"
+    ],
+    "firstEntries": [
+      "/docs/features/grid/toolbar-and-ribbon/",
+      "/docs/features/grid/toolbar-and-ribbon/#ribbon",
+      "/docs/features/grid/toolbar-and-ribbon/#layout-for-the-07-features",
+      "/docs/features/grid/toolbar-and-ribbon/#narrow-widths"
+    ]
+  },
+  {
+    "q": "how do I add a dropdown list to a cell",
+    "rank": 1,
+    "top3": [
+      "/docs/features/data/validation-protection-and-notes/",
+      "/docs/features/data/autofilter/",
+      "/docs/releases/0.7.0/"
+    ],
+    "firstEntries": [
+      "/docs/features/data/validation-protection-and-notes/",
+      "/docs/features/data/validation-protection-and-notes/#validation",
+      "/docs/features/data/validation-protection-and-notes/#the-data-validation-dialog",
+      "/docs/features/data/validation-protection-and-notes/#lists-bounds-and-custom-rules"
+    ]
+  },
+  {
+    "q": "how do I use sheetwrite with react",
+    "rank": 1,
+    "top3": [
+      "/docs/tutorials/excel-in-react/",
+      "/docs/frameworks/react/",
+      "/docs/frameworks/"
+    ],
+    "firstEntries": [
+      "/docs/tutorials/excel-in-react/",
+      "/docs/tutorials/excel-in-react/#readiness-and-cleanup",
+      "/docs/tutorials/excel-in-react/#options-and-limits",
+      "/docs/frameworks/react/"
+    ]
+  },
+  {
+    "q": "dark theme",
+    "rank": 0,
+    "top3": [
+      "/docs/features/formatting/styles/",
+      "/docs/features/analysis/charts/",
+      "/docs/features/grid/toolbar-and-ribbon/"
+    ],
+    "firstEntries": [
+      "/docs/features/formatting/styles/",
+      "/docs/features/formatting/styles/#theme",
+      "/docs/features/formatting/styles/#resolution-order",
+      "/docs/features/formatting/styles/#css-custom-properties-and-the-stylesheet"
+    ]
+  },
+  {
+    "q": "charts",
+    "rank": 1,
+    "top3": [
+      "/docs/features/analysis/charts/",
+      "/docs/api/charts/chart-change-event/",
+      "/docs/api/charts/charts-addon/"
+    ],
+    "firstEntries": [
+      "/docs/features/analysis/charts/",
+      "/docs/features/analysis/charts/#add-the-charts-package",
+      "/docs/features/analysis/charts/#draw-a-line-chart",
+      "/docs/features/analysis/charts/#define-a-chart"
+    ]
+  },
+  {
+    "q": "real-time collaboration",
+    "rank": 0,
+    "top3": [],
+    "firstEntries": []
+  },
+  {
+    "q": "number format",
+    "rank": 1,
+    "top3": [
+      "/docs/features/formatting/number-formats/",
+      "/docs/api/core/format-number/",
+      "/docs/features/formatting/"
+    ],
+    "firstEntries": [
+      "/docs/features/formatting/number-formats/",
+      "/docs/features/formatting/number-formats/#column-and-cell-formats",
+      "/docs/features/formatting/number-formats/#what-typing-stores",
+      "/docs/features/formatting/number-formats/#keys-and-the-format-cells-dialog"
+    ]
+  },
+  {
+    "q": "large xlsx file streaming",
+    "rank": 1,
+    "top3": [
+      "/docs/import-export/large-files-and-streaming/",
+      "/docs/import-export/",
+      "/docs/tutorials/excel-in-nodejs/"
+    ],
+    "firstEntries": [
+      "/docs/import-export/large-files-and-streaming/",
+      "/docs/import-export/large-files-and-streaming/#streaming-functions",
+      "/docs/import-export/large-files-and-streaming/#resource-limits",
+      "/docs/import-export/large-files-and-streaming/#abort"
+    ]
+  },
+  {
+    "q": "web worker",
+    "rank": 1,
+    "top3": [
+      "/docs/features/worker-rendering/",
+      "/docs/features/",
+      "/docs/start/installation/"
+    ],
+    "firstEntries": [
+      "/docs/features/worker-rendering/",
+      "/docs/features/worker-rendering/#enabling-it",
+      "/docs/features/worker-rendering/#verify-it-actually-started",
+      "/docs/features/worker-rendering/#how-it-works"
+    ]
+  },
+  {
+    "q": "upgrade to 0.7.0",
+    "rank": 1,
+    "top3": [
+      "/docs/start/upgrade-to-0-7-0/",
+      "/docs/start/",
+      "/docs/releases/"
+    ],
+    "firstEntries": [
+      "/docs/start/upgrade-to-0-7-0/",
+      "/docs/start/upgrade-to-0-7-0/#update-packages-together",
+      "/docs/start/upgrade-to-0-7-0/#sort",
+      "/docs/start/upgrade-to-0-7-0/#revisions-move-to-version-history"
+    ]
+  },
+  {
+    "q": "merge cells",
+    "rank": 1,
+    "top3": [
+      "/docs/features/grid/resize-merge-and-fill/",
+      "/docs/features/formatting/",
+      "/docs/features/grid/context-menu/"
+    ],
+    "firstEntries": [
+      "/docs/features/grid/resize-merge-and-fill/",
+      "/docs/features/grid/resize-merge-and-fill/#merged-cells",
+      "/docs/features/grid/resize-merge-and-fill/#drag-to-fill",
+      "/docs/features/grid/resize-merge-and-fill/#options"
+    ]
+  },
+  {
+    "q": "autofilter",
+    "rank": 1,
+    "top3": [
+      "/docs/features/data/autofilter/",
+      "/docs/api/core/auto-filter/",
+      "/docs/features/data/"
+    ],
+    "firstEntries": [
+      "/docs/features/data/autofilter/",
+      "/docs/features/data/autofilter/#turn-it-on-and-off",
+      "/docs/features/data/autofilter/#the-dropdown",
+      "/docs/features/data/autofilter/#custom-conditions"
+    ]
+  },
+  {
+    "q": "copy and paste",
+    "rank": 1,
+    "top3": [
+      "/docs/features/grid/editing-and-clipboard/",
+      "/docs/features/grid/context-menu/",
+      "/docs/features/data/autofilter/"
+    ],
+    "firstEntries": [
+      "/docs/features/grid/editing-and-clipboard/",
+      "/docs/features/grid/editing-and-clipboard/#formula-bar",
+      "/docs/features/grid/editing-and-clipboard/#clipboard-interoperability",
+      "/docs/features/grid/editing-and-clipboard/#paste-special"
+    ]
+  },
+  {
+    "q": "WebAssembly failed to load",
+    "rank": 5,
+    "top3": [
+      "/docs/api/wasm-history/load-history-kernel/",
+      "/docs/performance/memory/",
+      "/docs/releases/0.5.0/"
+    ],
+    "firstEntries": [
+      "/docs/api/wasm-history/load-history-kernel/",
+      "/docs/api/wasm-history/load-history-kernel/#parameters",
+      "/docs/performance/memory/",
+      "/docs/performance/memory/#release-retained-engine-memory"
+    ]
+  },
+  {
+    "q": "screen reader",
+    "rank": 2,
+    "top3": [
+      "/docs/releases/0.6.1/",
+      "/docs/features/accessibility/",
+      "/docs/features/grid/status-bar/"
+    ],
+    "firstEntries": [
+      "/docs/releases/0.6.1/",
+      "/docs/releases/0.6.1/#highlights",
+      "/docs/releases/0.6.1/#paged-scrolling",
+      "/docs/features/accessibility/"
+    ]
+  },
+  {
+    "q": "libreoffice",
+    "rank": 1,
+    "top3": [
+      "/docs/import-export/libreoffice-compatibility/",
+      "/docs/import-export/",
+      "/docs/features/formatting/fonts-and-alignment/"
+    ],
+    "firstEntries": [
+      "/docs/import-export/libreoffice-compatibility/",
+      "/docs/import-export/libreoffice-compatibility/#what-the-comparison-proves",
+      "/docs/import-export/libreoffice-compatibility/#known-producer-difference",
+      "/docs/import-export/"
+    ]
+  },
+  {
+    "q": "datasource",
+    "rank": 1,
+    "top3": [
+      "/docs/features/data/datasources/",
+      "/docs/api/core/data-source/",
+      "/docs/features/grid/options-and-presentation/"
+    ],
+    "firstEntries": [
+      "/docs/features/data/datasources/",
+      "/docs/features/data/datasources/#requests-and-pages",
+      "/docs/features/data/datasources/#storage",
+      "/docs/features/data/datasources/#cells-that-visible-formulas-read"
+    ]
+  }
+]

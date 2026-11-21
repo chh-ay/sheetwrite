@@ -1,0 +1,14 @@
+before light /: moderate:region(1)
+before dark /: moderate:region(1)
+before light /docs/performance/formula-engine/: critical:label(1), serious:target-size(2)
+before dark /docs/performance/formula-engine/: critical:label(1), serious:target-size(2)
+before light /docs/features/collaboration/: minor:aria-allowed-role(1), serious:target-size(2)
+before dark /docs/features/collaboration/: minor:aria-allowed-role(1), serious:target-size(2)
+before light /docs/api/charts/create-chart-renderer/: serious:link-in-text-block(1)
+before dark /docs/api/charts/create-chart-renderer/: serious:link-in-text-block(1)
+before light /docs/api/core-adapter/create-grid-controller/: moderate:heading-order(1), serious:link-in-text-block(1)
+before dark /docs/api/core-adapter/create-grid-controller/: moderate:heading-order(1), serious:link-in-text-block(1)
+before light /showcases/sort/: serious:color-contrast(1), serious:target-size(5)
+before dark /showcases/sort/: serious:target-size(5)
+before light /docs/releases/0.7.0/: no violations
+before dark /docs/releases/0.7.0/: no violations

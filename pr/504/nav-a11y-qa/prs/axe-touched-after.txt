@@ -1,0 +1,14 @@
+after light /: no violations
+after dark /: no violations
+after light /docs/performance/formula-engine/: serious:target-size(2)
+after dark /docs/performance/formula-engine/: serious:target-size(2)
+after light /docs/features/collaboration/: serious:target-size(2)
+after dark /docs/features/collaboration/: serious:target-size(2)
+after light /docs/api/charts/create-chart-renderer/: no violations
+after dark /docs/api/charts/create-chart-renderer/: no violations
+after light /docs/api/core-adapter/create-grid-controller/: no violations
+after dark /docs/api/core-adapter/create-grid-controller/: no violations
+after light /showcases/sort/: serious:color-contrast(1), serious:target-size(5)
+after dark /showcases/sort/: serious:target-size(5)
+after light /docs/releases/0.7.0/: no violations
+after dark /docs/releases/0.7.0/: no violations
