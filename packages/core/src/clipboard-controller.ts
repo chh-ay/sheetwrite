@@ -111,6 +111,11 @@ export interface ClipboardControllerDeps {
 interface CellWrite {
   value: CellValue;
   style?: CellStyle;
+  /**
+   * The source marks the cell as text, as Excel's Text format does, so it
+   * pastes as text and not as a typed entry.
+   */
+  text?: true;
 }
 
 /** The top-left cell a paste lands on, and the size of the selection it may repeat to fill. */
@@ -291,6 +296,8 @@ function parseExternalInput(source: string, type: Sheet["columns"][number]["type
  * so an external formula lands as inert text; other values keep their kind.
  */
 function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type"]): CellWrite {
+  // Excel pastes a cell in its Text format as the text it holds.
+  if (cell.text) return cell;
   const value = cell.value;
   let source: string;
   if (value.kind === "formula") source = value.src;
@@ -588,6 +595,40 @@ function styleFromHtml(cell: HTMLElement): CellStyle | undefined {
 }
 
 /**
+ * Excel's Text format, `@`, as Excel writes it in the HTML it copies:
+ * `mso-number-format:"\@"` in a class of the page's style sheet or in the
+ * cell's own style.
+ */
+const MSO_TEXT_FORMAT = /mso-number-format\s*:\s*(["']?)\\?@\1\s*(?:;|$)/i;
+
+/** The classes the pasted page's style sheets give Excel's Text format. */
+function textFormatClasses(document: Document): Set<string> | null {
+  let classes: Set<string> | null = null;
+  for (const sheet of document.querySelectorAll("style")) {
+    for (const rule of (sheet.textContent ?? "").matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      if (!MSO_TEXT_FORMAT.test(rule[2] ?? "")) continue;
+      for (const name of (rule[1] ?? "").matchAll(/\.([\w-]+)/g)) {
+        (classes ??= new Set()).add(name[1] ?? "");
+      }
+    }
+  }
+  return classes;
+}
+
+/**
+ * Whether Excel's HTML marks `cell` as text: its Text format, by class or
+ * style, or `x:str`, which Excel writes on a cell whose value is a string.
+ */
+function excelTextCell(cell: Element, classes: Set<string> | null): boolean {
+  if (cell.hasAttribute("x:str")) return true;
+  if (MSO_TEXT_FORMAT.test(cell.getAttribute("style") ?? "")) return true;
+  if (classes !== null) {
+    for (const name of cell.classList) if (classes.has(name)) return true;
+  }
+  return false;
+}
+
+/**
  * The table in pasted HTML, or null when it holds none.
  * @throws {@link DelimitedTextResourceError} when it is larger than pasted text may be.
  */
@@ -597,6 +638,7 @@ function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | 
   const document = new DOMParser().parseFromString(html, "text/html");
   const table = document.querySelector("table");
   if (!table) return null;
+  const textClasses = textFormatClasses(document);
   const grid: CellWrite[][] = [];
   let cellCount = 0;
   for (const row of table.querySelectorAll(
@@ -608,12 +650,17 @@ function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | 
     const values: CellWrite[] = [];
     for (const cell of cells) {
       const formula = valuesOnly ? null : spreadsheetFormula(cell);
-      values.push({
-        value: formula
-          ? { kind: "formula", src: formula }
-          : { kind: "literal", value: cell.textContent ?? "" },
-        style: valuesOnly || !(cell instanceof HTMLElement) ? undefined : styleFromHtml(cell),
-      });
+      const style = valuesOnly || !(cell instanceof HTMLElement) ? undefined : styleFromHtml(cell);
+      const value: CellValue = formula
+        ? { kind: "formula", src: formula }
+        : { kind: "literal", value: cell.textContent ?? "" };
+      // As Excel's paste does, a text cell keeps its text, and its Text format
+      // unless only values are pasted.
+      values.push(
+        !formula && excelTextCell(cell, textClasses)
+          ? { value, style: valuesOnly ? style : { ...style, numberFormat: "@" }, text: true }
+          : { value, style },
+      );
     }
     grid.push(values);
   }
