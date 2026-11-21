@@ -72,7 +72,7 @@ Editing happens in a single real `<textarea>` on top of the active cell. The gri
 
 As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
-In a `general` column, the editor opens a date or a time as Excel's formula bar shows it. A time uses the clock of the column's `numberLocale`, whatever the cell's format: `9:30:00 PM` in `en-US` (the default) and `21:30:00` in `de-DE` or `en-GB`. A date opens month first, such as `1/15/2026`.
+In a `general` column, the editor opens a date or a time as Excel's formula bar shows it. A time uses the clock of the column's `numberLocale`, whatever the cell's format: `9:30:00 PM` in `en-US` (the default) and `21:30:00` in `de-DE` or `en-GB`. A date uses the short date of the same locale, with a four-digit year: `1/15/2026` in `en-US`, `15.01.2026` in `de-DE` and `15/01/2026` in `en-GB`. Typing that text back reads the same date.
 
 The [status bar](/docs/features/grid/status-bar/) names the mode, as Excel's does: **Ready** with no edit open, **Enter**, **Edit**, and **Point** while an arrow key or a click has just picked a reference for a formula. Typing ends Point mode. Hosts read the mode with `grid.getCellMode()` (`"ready"`, `"enter"`, `"edit"` or `"point"`) and hear changes with the `cell-mode` event. A [host-supplied editor](/docs/features/grid/custom-editors/) counts as Edit mode, and a list rule's list as Ready.
 
@@ -272,6 +272,7 @@ grid.on("mutation-rejected", ({ issues }) => {
 - Cut on a read-only grid copies: nothing is marked or moved.
 - A paste that runs past the sheet's last row or column adds the rows and columns it needs. A moved cut adds the rows it needs. Both happen in the same undo step, as in Excel.
 - A sheet holds at most 1,000,000 rows (`maxRowsPerSheet`). A paste that would end past them changes nothing and resolves `"rejected"`. The grid says why, for example "Nothing was pasted: Data cannot grow to 1,000,005 rows: the limit is 1,000,000."
+- Under a view sort, and with Paste into visible rows only, the rows are the view's, so the sheet cannot grow under them. A block taller than the rows left from the selected cell down changes nothing, and the grid says why ("the paste has 3 rows, but only 2 visible rows are left from the selected cell down"). A refused Paste into visible rows only keeps the paste it would have replaced.
 - An undo that is too large to send changes nothing and leaves the history; see [Undo a large clear](#undo-a-large-clear).
 
 ## See also

@@ -719,6 +719,39 @@ describe("paintFrame automatic text colour on fills", () => {
   });
 });
 
+describe("paintFrame number-format colors", () => {
+  // Excel paints a number in its format section's color, over the cell's font color.
+  it("paints a number in its section's color, over the font color", () => {
+    const styles: CellStyle[] = [
+      { numberFormat: "#,##0;[Red]-#,##0" },
+      { numberFormat: "#,##0;[Red]-#,##0" },
+      { numberFormat: "[Blue]0", color: "#123456" },
+      { numberFormat: "0", color: "#123456" },
+    ];
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: styles.length },
+      cols: [0],
+      values: [-1200, 1200, 7, 8],
+      styleIds: Uint32Array.from(styles, (_, row) => row),
+      styles,
+    };
+    const layout: RenderLayout = {
+      ...makeLayout([{ key: "a", header: "A", width: 100, type: "number" }]),
+      totalRows: styles.length,
+    };
+    const ctx = render(view, layout, { ...UNIFORM_VIEWPORT, height: 1_000 });
+    const colorOf = (text: string) => ctx.fillTexts.find((call) => call.text === text)?.fillStyle;
+    expect([colorOf("-1,200"), colorOf("7"), colorOf("8")]).toEqual([
+      "#ff0000",
+      "#0000ff",
+      "#123456",
+    ]);
+    expect(colorOf("1,200")).not.toBe("#ff0000");
+  });
+});
+
 function invert(css: string): string {
   const color = parseRgbColor(css);
   if (!color) throw new Error(`unparsed colour ${css}`);

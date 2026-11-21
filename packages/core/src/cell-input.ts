@@ -1,5 +1,10 @@
 import { parseDateInput } from "./date-serial.js";
-import { mayBeGeneralNumber, numberFormatDateKind, parseGeneralNumber } from "./general-entry.js";
+import {
+  mayBeGeneralNumber,
+  numberFormatDateKind,
+  parseGeneralNumber,
+  shortDateOf,
+} from "./general-entry.js";
 import { formatNumber } from "./number-format.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
@@ -66,13 +71,13 @@ function generalEditText(
   locale: string | undefined,
 ): string {
   if (typeof value === "string") {
-    const reread = parseCellEntry(value, "general").value;
+    const reread = parseCellEntry(value, "general", undefined, locale).value;
     return reread.kind === "literal" && reread.value === value ? value : `'${value}`;
   }
   if (typeof value !== "number") return cellScalarToText(value);
   const text = formulaBarText(value, numberFormat, locale);
   if (text === null) return cellScalarToText(value);
-  const reread = parseCellEntry(text, "general").value;
+  const reread = parseCellEntry(text, "general", undefined, locale).value;
   return reread.kind === "literal" && reread.value === value ? text : cellScalarToText(value);
 }
 
@@ -112,9 +117,9 @@ function twelveHourClock(locale: string | undefined): boolean {
 /**
  * The text Excel's formula bar shows for a number in a date, time or percent
  * format (`1/15/2026`, `9:30:00 PM`, `12%`), or null for any other format,
- * where it shows the number as stored. A time is on the clock of `locale`
- * (US English when unset) whatever the cell's format; dates stay month first,
- * as a `general` column reads them.
+ * where it shows the number as stored. A date is in the short date of
+ * `locale` with a four-digit year (`15.01.2026` in de-DE), and a time is on
+ * its clock, whatever the cell's format. US English when unset.
  */
 export function formulaBarText(
   value: number,
@@ -127,7 +132,8 @@ export function formulaBarText(
   }
   const time = twelveHourClock(locale) ? "h:mm:ss AM/PM" : "h:mm:ss";
   if (kind === "date" || (kind === "time" && value >= 1)) {
-    return formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : `m/d/yyyy ${time}`);
+    const date = shortDateOf(locale).code;
+    return formatNumber(value, Number.isInteger(value) ? date : `${date} ${time}`);
   }
   return formatNumber(value, time);
 }

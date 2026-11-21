@@ -36,8 +36,17 @@ interface DateToken {
   text: string;
 }
 
+/** A section's condition, such as `[<=100]`: a comparison and the number it compares with. */
+interface SectionCondition {
+  readonly operator: "<" | "<=" | ">" | ">=" | "=" | "<>";
+  readonly operand: number;
+}
+
 interface CompiledSection {
   readonly source: string;
+  /** The CSS color of the section's `[Red]` or `[Color10]`, or null. */
+  readonly color: string | null;
+  readonly condition: SectionCondition | null;
   readonly dateTokens: readonly DateToken[] | null;
   readonly numeric: NumericDescriptor | null;
   readonly fraction: FractionDescriptor | null;
@@ -70,6 +79,10 @@ interface CompiledFormat {
    * the text section. Empty for the Text format, `@` alone.
    */
   readonly numberSections: readonly CompiledSection[];
+  /** Whether a number section has a color, so painting skips the rest when none does. */
+  readonly colored: boolean;
+  /** Whether a number section has a condition, which replaces the choice by sign. */
+  readonly conditional: boolean;
 }
 
 export interface NumberFormatResourceStats {
@@ -203,6 +216,7 @@ function sectionFor(
 ): { section: CompiledSection; magnitude: number } {
   const sections = format.numberSections;
   const fallback = sections[0]!;
+  if (format.conditional) return conditionalSection(value, sections);
   if (value > 0 || sections.length === 1) return { section: fallback, magnitude: value };
   if (value < 0) {
     return sections[1] !== undefined
@@ -210,6 +224,174 @@ function sectionFor(
       : { section: fallback, magnitude: value };
   }
   return { section: sections[2] ?? fallback, magnitude: 0 };
+}
+
+function meets(value: number, condition: SectionCondition): boolean {
+  const operand = condition.operand;
+  switch (condition.operator) {
+    case "<":
+      return value < operand;
+    case "<=":
+      return value <= operand;
+    case ">":
+      return value > operand;
+    case ">=":
+      return value >= operand;
+    case "=":
+      return value === operand;
+    case "<>":
+      return value !== operand;
+  }
+}
+
+/** Whether only negative numbers meet `condition`, as only they take a negative section. */
+function onlyNegative(condition: SectionCondition): boolean {
+  return condition.operator === "<"
+    ? condition.operand <= 0
+    : (condition.operator === "<=" || condition.operator === "=") && condition.operand < 0;
+}
+
+/**
+ * The section a condition chooses: the first section whose condition `value`
+ * meets, else the third section when the first two have conditions, else the
+ * second. A section that only negative numbers meet shows the magnitude, as
+ * Excel's negative section does; the other sections keep the sign.
+ */
+function conditionalSection(
+  value: number,
+  sections: readonly CompiledSection[],
+): { section: CompiledSection; magnitude: number } {
+  const first = sections[0]!;
+  const second = sections[1];
+  const many = sections.length > 1;
+  if (first.condition !== null && meets(value, first.condition)) {
+    return { section: first, magnitude: many && onlyNegative(first.condition) ? -value : value };
+  }
+  if (second?.condition && meets(value, second.condition)) {
+    return { section: second, magnitude: onlyNegative(second.condition) ? -value : value };
+  }
+  if (first.condition !== null && second?.condition) {
+    return { section: sections[2] ?? first, magnitude: value };
+  }
+  return { section: first.condition !== null && second ? second : first, magnitude: value };
+}
+
+/** Excel's eight color names. */
+const COLOR_NAMES = new Map([
+  ["black", "#000000"],
+  ["white", "#ffffff"],
+  ["red", "#ff0000"],
+  ["green", "#00ff00"],
+  ["blue", "#0000ff"],
+  ["yellow", "#ffff00"],
+  ["magenta", "#ff00ff"],
+  ["cyan", "#00ffff"],
+]);
+
+/** Excel's default palette, `[Color1]` to `[Color56]`. */
+const PALETTE = [
+  "#000000",
+  "#ffffff",
+  "#ff0000",
+  "#00ff00",
+  "#0000ff",
+  "#ffff00",
+  "#ff00ff",
+  "#00ffff",
+  "#800000",
+  "#008000",
+  "#000080",
+  "#808000",
+  "#800080",
+  "#008080",
+  "#c0c0c0",
+  "#808080",
+  "#9999ff",
+  "#993366",
+  "#ffffcc",
+  "#ccffff",
+  "#660066",
+  "#ff8080",
+  "#0066cc",
+  "#ccccff",
+  "#000080",
+  "#ff00ff",
+  "#ffff00",
+  "#00ffff",
+  "#800080",
+  "#800000",
+  "#008080",
+  "#0000ff",
+  "#00ccff",
+  "#ccffff",
+  "#ccffcc",
+  "#ffff99",
+  "#99ccff",
+  "#ff99cc",
+  "#cc99ff",
+  "#ffcc99",
+  "#3366ff",
+  "#33cccc",
+  "#99cc00",
+  "#ffcc00",
+  "#ff9900",
+  "#ff6600",
+  "#666699",
+  "#969696",
+  "#003366",
+  "#339966",
+  "#003300",
+  "#333300",
+  "#993300",
+  "#993366",
+  "#333399",
+  "#333333",
+];
+
+const PALETTE_COLOR = /^color(\d{1,2})$/i;
+const CONDITION = /^(<=|>=|<>|<|>|=)\s*(-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)$/i;
+
+/** The color and the condition in a section's brackets; colors and conditions take the first of each. */
+function sectionBrackets(source: string): Pick<CompiledSection, "color" | "condition"> {
+  let color: string | null = null;
+  let condition: SectionCondition | null = null;
+  let quoted = false;
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index]!;
+    if (char === '"') quoted = !quoted;
+    else if (quoted) continue;
+    else if (char === "\\") index++;
+    else if (char === "[") {
+      const close = source.indexOf("]", index + 1);
+      if (close < 0) break;
+      const content = source.slice(index + 1, close);
+      index = close;
+      const named = COLOR_NAMES.get(content.toLowerCase());
+      const palette = named === undefined ? PALETTE_COLOR.exec(content) : null;
+      const test = named === undefined && palette === null ? CONDITION.exec(content) : null;
+      if (named !== undefined) color ??= named;
+      else if (palette !== null) color ??= PALETTE[Number(palette[1]) - 1] ?? null;
+      else if (test !== null) {
+        condition ??= {
+          operator: test[1] as SectionCondition["operator"],
+          operand: Number(test[2]),
+        };
+      }
+    }
+  }
+  return { color, condition };
+}
+
+/**
+ * The CSS color, such as `#ff0000`, of the section of `format` that `value`
+ * takes, as Excel paints a section's `[Red]` or `[Color10]`; undefined when
+ * that section has no color. The format compiles once and stays cached.
+ */
+export function numberFormatColor(value: number, format: string | undefined): string | undefined {
+  if (format === undefined || !Number.isFinite(value)) return undefined;
+  const compiled = compileFormat(format);
+  if (!compiled.colored) return undefined;
+  return sectionFor(value, compiled).section.color ?? undefined;
 }
 
 function cacheValue<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V {
@@ -519,6 +701,7 @@ function compileFormat(code: string): CompiledFormat {
   if (cached) return cached;
   const sections = splitRawSections(code).map((source): CompiledSection => ({
     source,
+    ...sectionBrackets(source),
     dateTokens: compileDateFormat(source),
     numeric: parseNumericFormat(source),
     fraction: parseFraction(source),
@@ -528,7 +711,12 @@ function compileFormat(code: string): CompiledFormat {
   // A last section that holds `@` is the text section, which numbers skip.
   const numberSections =
     sections.length < 4 && sections[sections.length - 1]!.text ? sections.slice(0, -1) : sections;
-  const compiled = { sections, numberSections };
+  const compiled = {
+    sections,
+    numberSections,
+    colored: numberSections.some((section) => section.color !== null),
+    conditional: numberSections.some((section) => section.condition !== null),
+  };
   compiledFormats += 1;
   return cacheValue(formatCache, code, compiled, FORMAT_CACHE_LIMIT);
 }
