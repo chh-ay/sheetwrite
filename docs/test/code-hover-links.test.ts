@@ -43,6 +43,69 @@ test("hover see-also tags link guide paths and API names", async () => {
   }
 });
 
+/** Public members that share a name with locals in the sample below. */
+const MANIFEST_WITH_MEMBERS = {
+  packages: [
+    {
+      name: "@sheetwrite/core",
+      entryPoints: [
+        {
+          subpath: ".",
+          classification: "supported",
+          exports: [
+            { name: "GridCommandState" },
+            {
+              name: "Grid",
+              memberDocs: [
+                {
+                  name: "undo",
+                  documentation: "Undo the last recorded cell edit.\n@example\ngrid.undo();",
+                },
+              ],
+            },
+            {
+              name: "IndexedDbHistoryStorage",
+              memberDocs: [{ name: "list", documentation: "The saved versions, newest first." }],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+test("a name the sample declares links no API member that shares it", async () => {
+  const cwd = await mkdtemp(join(new URL("./", import.meta.url).pathname, ".hover-"));
+  try {
+    await mkdir(join(cwd, "src/generated"), { recursive: true });
+    await writeFile(
+      join(cwd, "src/generated/public-api.json"),
+      JSON.stringify(MANIFEST_WITH_MEMBERS),
+    );
+    const renderer = new ExpressiveCode({ plugins: [sheetwriteCodeHovers({ cwd })] });
+
+    const rendered = await renderer.render({
+      language: "ts",
+      code: [
+        'import type { GridCommandState } from "@sheetwrite/core";',
+        "const update = (undo: GridCommandState) => undo.disabled;",
+        'const list = document.createElement("ul");',
+        "list.remove();",
+      ].join("\n"),
+    });
+
+    const hrefs = selectAll("a", rendered.renderedGroupAst).map((link) =>
+      String(link.properties.href),
+    );
+    expect(hrefs.filter((href) => href.includes("#grid-undo"))).toEqual([]);
+    expect(hrefs.filter((href) => href.includes("indexed-db-history-storage"))).toEqual([]);
+    // The parameter's type still links, but its page holds no example of `undo`.
+    expect(hrefs.filter((href) => href.endsWith("#examples"))).toEqual([]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("manifest docs split into the hover summary and its tags", () => {
   expect(
     splitDocumentation(
