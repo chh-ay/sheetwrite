@@ -13,29 +13,20 @@ async function openShowcase(page: Page, width: number, height: number): Promise<
   await expect(page.getByRole("button", { name: "Finance's total" })).toBeEnabled();
 }
 
-test("suggests a row total from its neighbours and Tab takes it @portability", async ({ page }) => {
-  await openShowcase(page, 1440, 900);
-  await page.getByRole("button", { name: "Finance's total" }).click();
-  const bar = page.getByRole("textbox", { name: "Formula bar" });
-  await expect(bar).toBeFocused();
-
-  await page.keyboard.type("=");
-  const ghost = page.locator(".sheetwrite-formula-ghost");
-  await expect(ghost).toHaveText("SUM(B6:G6)");
-  await page.keyboard.press("Tab");
-  await expect(bar).toHaveValue("=SUM(B6:G6)");
-  await expect(ghost).toHaveCount(0);
-});
-
-test("going back to a filled cell and typing = starts a new formula", async ({ page }) => {
+test("suggests a row total from its neighbours, Tab takes it, and = on the filled cell starts again @portability", async ({
+  page,
+}) => {
   await openShowcase(page, 1440, 900);
   const target = page.getByRole("button", { name: "Finance's total" });
   const bar = page.getByRole("textbox", { name: "Formula bar" });
   const ghost = page.locator(".sheetwrite-formula-ghost");
   await target.click();
+  await expect(bar).toBeFocused();
   await page.keyboard.type("=");
   await expect(ghost).toHaveText("SUM(B6:G6)");
   await page.keyboard.press("Tab");
+  await expect(bar).toHaveValue("=SUM(B6:G6)");
+  await expect(ghost).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(bar).toHaveValue("=SUM(B6:G6)");
 

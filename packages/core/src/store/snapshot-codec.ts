@@ -1,5 +1,7 @@
 import { dashboardFields } from "../dashboard.js";
 import {
+  CheckedSnapshot,
+  recheckSnapshotResources,
   SnapshotValidationError,
   type SnapshotValidationOptions,
   validateWorkbookSnapshot,
@@ -23,12 +25,19 @@ export interface DecodedWorkbookSnapshot {
   readonly workbook: Workbook;
 }
 
-/** Validate once at the trust boundary and convert persisted metadata to live collections. */
+/**
+ * Validate once at the trust boundary and convert persisted metadata to live
+ * collections. A `CheckedSnapshot` was validated already; only its checks
+ * that depend on `options` run again.
+ */
 export function decodeWorkbookSnapshot(
   input: unknown,
   options: SnapshotValidationOptions = {},
 ): DecodedWorkbookSnapshot {
-  const checked = validateWorkbookSnapshot(input, options);
+  const checked =
+    input instanceof CheckedSnapshot
+      ? recheckSnapshotResources(input, options)
+      : validateWorkbookSnapshot(input, options);
   if (!checked.ok) throw new SnapshotValidationError(checked.errors);
   const snapshot = checked.value;
   const workbook: Workbook = {

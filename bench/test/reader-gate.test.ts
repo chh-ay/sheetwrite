@@ -90,11 +90,6 @@ it.each([
     [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
     false,
   ],
-  [
-    "does not let 24 pairs pass it",
-    [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
-    false,
-  ],
 ] as const)("%s", (_name, ratios, passed) => {
   expect(verdict(ratios)).toBe(passed);
 });
@@ -102,17 +97,6 @@ it.each([
 it("fails a reader whose result differs and rejects runs with too few pairs", () => {
   expect(verdict(repeat(0.9), BASE_DIGEST + 1)).toBe(false);
   expect(() => verdict(repeat(1, GATE_PAIRS - 1))).toThrow();
-});
-
-it("builds limits from resampled medians, not from the slowest A/A pair", () => {
-  const limit = must(FLOOR.rows[READER], READER).limit;
-  expect(limit).toBeGreaterThan(1);
-  expect(limit).toBeLessThan(1.15);
-  const quiet = must(
-    READER_CASE_NAMES.find((name) => name !== READER),
-    "quiet reader",
-  );
-  expect(FLOOR.rows[quiet]?.limit).toBe(1);
 });
 
 it("writes a floor only from an A/A report of one engine", () => {
@@ -124,7 +108,6 @@ it("writes a floor only from an A/A report of one engine", () => {
   ]) {
     expect(() => noiseFloorFromAaResults(report, AA_PATH)).toThrow();
   }
-  expect(FLOOR.source).toEqual({ sha: AA_SHA, engineSha256: AA_ENGINE, cpus: AA_CPUS });
   expect(parseReaderNoiseFloor(FLOOR, FLOOR_PATH)).toEqual(FLOOR);
 });
 

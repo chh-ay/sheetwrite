@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 
 import { contentComponents } from "../src/lib/content-components.ts";
+import { RELEASES } from "../src/lib/releases.ts";
 
 /** Drops the page's imports and exports, which only the docs build can resolve. */
 function withoutModuleCode() {
@@ -43,9 +44,12 @@ describe("content components", () => {
     expect(html).toContain(
       '<h2 class="sw-update__version" id="v0-6-1"><a href="/docs/releases/0.6.1/">0.6.1</a></h2>',
     );
-    const next = await render(`<Update version="0.7.0">Next.</Update>`);
-    expect(next).toContain('<span class="sw-update__date">Next release</span>');
-    expect(next).toContain(">0.7.0 (next)</a>");
+    const next = RELEASES.find((release) => release.unreleased === true);
+    if (next !== undefined) {
+      const entry = await render(`<Update version="${next.version}">Next.</Update>`);
+      expect(entry).toContain('<span class="sw-update__date">Next release</span>');
+      expect(entry).toContain(`>${next.version} (next)</a>`);
+    }
   });
 
   it("links the stylesheets of the components a page uses that most pages do not", async () => {

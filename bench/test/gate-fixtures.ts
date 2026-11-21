@@ -82,7 +82,6 @@ interface RenderFixtureOptions {
   readonly rows?: readonly number[];
   readonly scenarios?: readonly ScenarioId[];
   readonly measuredSamples?: number;
-  readonly warmupSamples?: number;
   readonly timestamp?: string;
   readonly commit?: string;
   readonly samples?: (round: number, engine: EngineId, scenarioId: ScenarioId) => readonly number[];
@@ -196,7 +195,7 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
       ),
       viewport: { width: 640, height: 480 },
       measuredSamples,
-      warmupSamples: options.warmupSamples ?? 1,
+      warmupSamples: 1,
       minimumSampleDurationMs: 100,
       rounds,
       orderSeed: RENDER_ORDER_SEED,

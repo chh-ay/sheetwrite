@@ -1376,7 +1376,7 @@
   --sheetwrite-assist-fg: var(--sw-fg);
   --sheetwrite-assist-border: var(--sw-border-strong);
   --sheetwrite-assist-selected: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
-  --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
+  --sheetwrite-tab-font: var(--sw-weight-semibold) var(--sw-text-small) / 1 var(--sw-font-body);
   --sheetwrite-tab-bg: var(--sw-surface-0);
   --sheetwrite-tab-fg: var(--sw-fg-muted);
   --sheetwrite-tab-border: var(--sw-border);
@@ -1491,8 +1491,8 @@
 
 :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-add {
   display: grid;
-  min-width: 1.75rem;
-  height: 1.5rem;
+  min-width: 1.875rem;
+  height: 1.625rem;
   align-self: center;
   place-items: center;
   margin-inline-start: 0;
@@ -1500,7 +1500,6 @@
   border-left: 1px solid var(--sw-border-strong);
   border-radius: 0 var(--sw-radius-xs) var(--sw-radius-xs) 0;
   color: var(--sw-accent-strong);
-  font-size: var(--sw-text-body);
   line-height: 1;
 }
 

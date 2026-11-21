@@ -351,6 +351,33 @@ it("filters the dashboard pivot by a slicer as a saved change, and undo clears i
   expect(body()).toEqual(["East", 4, "West", 2, "Total", 6]);
 });
 
+it("builds the dashboard once for a slicer choice", async () => {
+  const { press, body } = await withSlicer();
+  const root = document.querySelector(".sheetwrite-dashboard");
+  if (root === null) throw new Error("the dashboard is shown");
+  const added: Node[] = [];
+  const observer = new MutationObserver((records) => {
+    for (const record of records) added.push(...record.addedNodes);
+  });
+  observer.observe(root, { childList: true });
+
+  press("West");
+  await Promise.resolve();
+  observer.disconnect();
+
+  const builds = added.filter(
+    (node) => node instanceof Element && node.classList.contains("sheetwrite-dashboard-grid"),
+  );
+  expect(builds).toHaveLength(1);
+  expect(body()).toEqual(["West", 2, "Total", 2]);
+  // The build in the page is the one that shows the choice.
+  expect(builds[0]?.isConnected).toBe(true);
+  const west = [...root.querySelectorAll(".sheetwrite-dashboard-slicer-value")].find(
+    (button) => button.textContent === "West",
+  );
+  expect(west?.getAttribute("aria-pressed")).toBe("true");
+});
+
 it("filters only a read-only viewer's own view, without a document change", async () => {
   const { grid, press, body } = await withSlicer(true);
 

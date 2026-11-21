@@ -100,14 +100,16 @@
   justify-content: space-between;
   padding: 0 8px;
   border-top: 1px solid var(--sheetwrite-widget-border, #eeeeee);
-  min-height: 28px;
+  min-height: 30px;
+  /* The sheet tabs and the status share the grid's tab-bar font. */
+  font: var(--sheetwrite-tab-font, 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
 }
 
 /* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css. */
 .sheetwrite-shell-tabs {
   display: flex;
   align-items: stretch;
-  height: 28px;
+  height: 30px;
   overflow-x: auto;
   min-width: 0;
 }

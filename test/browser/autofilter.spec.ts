@@ -92,7 +92,7 @@ async function clickButton(page: Page, col: number) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
-test("Ctrl+Shift+L turns the filter buttons on for the current region and off again", async ({
+test("Ctrl+Shift+L shows the buttons; a value filter hides the unticked rows; the header stays", async ({
   page,
 }) => {
   await open(page);
@@ -100,16 +100,6 @@ test("Ctrl+Shift+L turns the filter buttons on for the current region and off ag
   await expect(buttons(page)).toHaveCount(2);
   await expect(buttons(page).first()).toHaveAttribute("data-filtered", "false");
   await expect(buttonGlyphs(page).first()).toHaveAttribute("data-icon", "filterArrow");
-  await grid(page).press("ControlOrMeta+Shift+L");
-  await expect(buttons(page)).toHaveCount(0);
-  await expect(buttonGlyphs(page)).toHaveCount(0);
-});
-
-test("a value filter from the dropdown hides the unticked rows; the header stays", async ({
-  page,
-}) => {
-  await open(page);
-  await grid(page).press("ControlOrMeta+Shift+L");
   await clickButton(page, 0);
 
   const dialog = dropdown(page, "Item");
@@ -133,6 +123,11 @@ test("a value filter from the dropdown hides the unticked rows; the header stays
   await expect.poll(() => shownItems(page)).toHaveLength(ROWS.length);
   await grid(page).press("ControlOrMeta+Shift+z");
   await expect.poll(() => shownItems(page)).toHaveLength(4);
+
+  // Ctrl+Shift+L again turns the AutoFilter off and removes its buttons.
+  await grid(page).press("ControlOrMeta+Shift+L");
+  await expect(buttons(page)).toHaveCount(0);
+  await expect(buttonGlyphs(page)).toHaveCount(0);
 });
 
 test("a Number Filters condition and Clear Filter From, from the keyboard", async ({ page }) => {

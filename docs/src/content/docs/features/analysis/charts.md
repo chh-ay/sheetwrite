@@ -135,6 +135,9 @@ source range. A longer range draws its first 10,000 cells and shows a note.
 - A deleted source range becomes `#REF!`, and the chart shows a note.
 - Dense line, area and scatter series are thinned to the lowest and highest
   value in each horizontal pixel, so a 10,000-point series stays fast.
+- A column or bar chart with more categories than pixels along its category
+  axis draws each series as one shape that holds all its bars, so a
+  10,000-point series adds one element to the page instead of 10,000.
 - Screen readers announce a chart by its title and kind. The chart image inside
   it has a description that lists the series.
 

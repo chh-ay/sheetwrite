@@ -18,16 +18,18 @@ use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::rc::Rc;
 
 use super::super::array::ast_produces_array;
+use super::super::functions::ReductionFold;
 use super::super::matrix::{
     range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
 };
 use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
 use crate::calc::{Ast, Func, LambdaDefinition};
+use crate::cells::payload_num;
 use crate::memory::MemoryOwnerStats;
 use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
-use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
+use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER};
 
 family_functions! {
     BYCOL,
@@ -635,6 +637,78 @@ fn read_slot_values(
             Err(FormulaError::Value)
         }
     }
+}
+
+/// Folds every value of `args` into `fold` when each argument is a
+/// parameter bound to table rows (a measure's column in one pivot cell):
+/// the values [`read_slot_values`] passes to the accumulator, in the same
+/// order, and an error value returns at once, as it does there. `None`,
+/// having folded nothing, when an argument is anything else.
+pub(in crate::eval) fn fold_row_parameters(
+    store: &CellStore,
+    frame: Option<&CallFrame>,
+    args: &[Ast],
+    fold: &mut ReductionFold,
+) -> Option<Result<(), FormulaError>> {
+    let active = frame?;
+    let row_slot = |arg: &Ast| {
+        let Ast::Parameter { depth, index, .. } = arg else {
+            return None;
+        };
+        active
+            .slot(*depth, *index)
+            .filter(|slot| matches!(slot, Slot::Rows { .. }))
+    };
+    if args.is_empty() || !args.iter().all(|arg| row_slot(arg).is_some()) {
+        return None;
+    }
+    Some(
+        args.iter()
+            .filter_map(row_slot)
+            .try_for_each(|slot| fold_rows(store, slot, fold)),
+    )
+}
+
+/// Folds the rows of one [`Slot::Rows`] column in order. A literal number
+/// goes in from its payload, without building a value; every other cell is
+/// read as [`row_value`] reads it.
+fn fold_rows(store: &CellStore, slot: &Slot, fold: &mut ReductionFold) -> Result<(), FormulaError> {
+    let Slot::Rows {
+        sheet,
+        col,
+        first_row,
+        rows,
+    } = slot
+    else {
+        return Ok(());
+    };
+    if rows.is_empty() {
+        return fold.push(&Value::Blank);
+    }
+    // Without its sheet every row reads `#REF!`, and the first one stops the read.
+    let data = store.sheets.get(*sheet as usize).ok_or(FormulaError::Ref)?;
+    let column = *col as usize;
+    for &data_row in rows.iter() {
+        let row = *first_row as usize + data_row as usize;
+        let source = if data.cells.contains_cell(row, column) {
+            data.cells.loaded_source_at(row, column)
+        } else {
+            None
+        };
+        if let Some((KIND_NUMBER, payload)) = source {
+            let number = payload_num(payload);
+            if number.is_finite() {
+                fold.push_number(number)?;
+                continue;
+            }
+        }
+        let value = settled_cell_value(data, &store.strings, row, column, &store.formula_slots);
+        if let Value::Error(error) = value {
+            return Err(error);
+        }
+        fold.push(&value)?;
+    }
+    Ok(())
 }
 
 /// The values of an array, one-cell or row-list parameter.

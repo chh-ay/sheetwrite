@@ -762,8 +762,13 @@ impl CellStore {
                 );
             }
         }
-        if hydrating {
+        // As in `replace_cell_source`: only a remote edit seeds its cells,
+        // and even a one-cell block seeds that cell rather than a rectangle,
+        // so a batch of remote edits can fall back to recalculating the sheet.
+        if hydrating && !self.remote_load {
             sheet_data.formulas.mark_all_dirty();
+        } else if hydrating {
+            sheet_data.formulas.mark_remote_cells_dirty(keys());
         } else if block.offsets.len() == block.dimensions.0 * block.dimensions.1 {
             if let Some(rect) = DirtyRect::new(
                 block.start.0,

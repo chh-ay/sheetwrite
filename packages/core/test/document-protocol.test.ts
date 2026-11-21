@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { deflateSync } from "fflate";
 
 import {
+  CheckedSnapshot,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
@@ -10,6 +11,7 @@ import {
   documentOpTarget,
   type MergeScanStats,
   overlappingMergeIndices,
+  recheckSnapshotResources,
   resolveTransactionResourceLimits,
   validateDocumentOperationShape,
   validateTransactionResources,
@@ -758,6 +760,36 @@ describe("workbook document protocol", () => {
       path: "sheets[0].rowCount",
       code: "resource-limit",
     });
+  });
+
+  it("rechecks a checked snapshot against every limit as a second validation would", () => {
+    const accepted = validateWorkbookSnapshot(richSnapshot());
+    if (!accepted.ok) throw new Error("the rich snapshot is invalid");
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(accepted.value)).byteLength;
+    const checked = new CheckedSnapshot(accepted.value, serializedBytes);
+    const limits = [
+      { maxSheets: 2 },
+      { maxRowsPerSheet: 4 },
+      { maxColumnsPerSheet: 2 },
+      { maxMetadataEntries: 8 },
+      { maxSerializedBytes: serializedBytes },
+      { maxLogicalCellsPerSheet: 8 },
+      { maxDenseCells: 10, maxLocalPagedCells: 0 },
+      { maxLocalPagedCells: 10, maxDenseCells: 0 },
+    ] as const;
+    for (const resourceLimits of limits) {
+      const [resource, limit] = Object.entries(resourceLimits)[0]!;
+      for (const options of [
+        { resourceLimits },
+        { resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
+        { storage: "paged" as const, resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
+      ]) {
+        const expected = validateWorkbookSnapshot(accepted.value, options);
+        const rechecked = recheckSnapshotResources(checked, options);
+        expect(rechecked.ok).toBe(expected.ok);
+        if (!rechecked.ok && !expected.ok) expect(rechecked.errors).toEqual(expected.errors);
+      }
+    }
   });
 
   it("validates typed validation comparisons without weakening legacy bounds", () => {

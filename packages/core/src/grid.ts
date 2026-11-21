@@ -66,6 +66,7 @@ import {
   ZOOM_MAX,
   CELL_TEXT_HORIZONTAL_PADDING,
   DEFAULT_DISTINCT_VALUES_LIMIT,
+  TAB_BAR_HEIGHT,
 } from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
@@ -196,7 +197,7 @@ import type {
   TransactionResourceLimits,
 } from "./types/transaction.js";
 import { hasInputMessage } from "./validation-rule.js";
-import { seedWidgetTheme } from "./widget-theme.js";
+import { seedWidgetTheme, tabBarFont } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
 /** Platform fallback used when no reliable browser scroll clamp can be measured. */
@@ -826,7 +827,7 @@ export class GridImpl implements Grid {
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
     );
 
-    this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
+    this.tabBarHeight = opts.config?.tabs !== false ? TAB_BAR_HEIGHT : 0;
 
     this.document = new DocumentController({
       store: this.store,
@@ -1881,7 +1882,7 @@ export class GridImpl implements Grid {
   private syncTabBarTheme(): void {
     const bar = this.tabBar;
     if (!bar) return;
-    bar.style.setProperty("--sheetwrite-tab-font", this.baseTheme.font);
+    bar.style.setProperty("--sheetwrite-tab-font", tabBarFont(this.baseTheme.font));
     bar.style.setProperty("--sheetwrite-tab-bg", this.baseTheme.bg);
     bar.style.setProperty("--sheetwrite-tab-fg", this.baseTheme.headerFg);
     bar.style.setProperty("--sheetwrite-tab-border", this.baseTheme.gridLine);
@@ -3538,7 +3539,7 @@ export class GridImpl implements Grid {
     this.sheetTabs = null;
     this.tabBar?.remove();
     this.tabBar = null;
-    this.tabBarHeight = config?.tabs !== false ? 28 : 0;
+    this.tabBarHeight = config?.tabs !== false ? TAB_BAR_HEIGHT : 0;
     if (this.tabBarHeight > 0) this.buildTabBar();
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;

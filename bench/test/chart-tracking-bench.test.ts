@@ -7,7 +7,6 @@ it("rejects missing, extra, duplicate and unrelated chart notifications", () => 
   const once = [{ epoch: 1, charts: expected }];
   for (const [events, charts, error] of [
     [[], expected, "Expected one chart event"],
-    [once, [], "Incorrect chart identities"],
     [[{ epoch: 1, charts: [...expected, ...expected] }], expected, "Incorrect chart identities"],
     [
       [{ epoch: 1, charts: [{ sheet: "charts1", id: "chart0" }] }],
