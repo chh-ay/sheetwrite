@@ -1,0 +1,453 @@
+{
+  "summary": "top 3: 49/50 (first 35: 34/35); guide named by the query listed first: 15/15",
+  "rows": [
+    {
+      "q": "createGrid",
+      "rank": 1,
+      "first3": [
+        "/docs/api/core/create-grid/",
+        "/docs/api/core-adapter/create-grid-controller/",
+        "/docs/api/core/create-grid-from-snapshot/"
+      ]
+    },
+    {
+      "q": "initSheetwrite",
+      "rank": 1,
+      "first3": [
+        "/docs/api/core/init-sheetwrite/",
+        "/docs/api/core/init-sheetwrite-options/",
+        "/docs/api/charts/charts-addon/"
+      ]
+    },
+    {
+      "q": "XLOOKUP",
+      "rank": 1,
+      "first3": [
+        "/docs/reference/formula-functions/lookup-reference/",
+        "/docs/performance/release-comparison/",
+        "/docs/features/formulas/lookup-criteria-and-financial/"
+      ]
+    },
+    {
+      "q": "VLOOKUP",
+      "rank": 1,
+      "first3": [
+        "/docs/reference/formula-functions/lookup-reference/",
+        "/docs/api/core-functions/formula-completion-kind/",
+        "/docs/api/core-functions/formula-completion-item/"
+      ]
+    },
+    {
+      "q": "SUMIFS",
+      "rank": 1,
+      "first3": [
+        "/docs/reference/formula-functions/math/",
+        "/docs/features/formulas/",
+        "/docs/features/formulas/lookup-criteria-and-financial/"
+      ]
+    },
+    {
+      "q": "LAMBDA",
+      "rank": 1,
+      "first3": [
+        "/docs/reference/formula-functions/logical-control/",
+        "/docs/features/formulas/analysis-formulas/",
+        "/docs/api/core/named-range-snapshot/"
+      ]
+    },
+    {
+      "q": "INDIRECT",
+      "rank": 1,
+      "first3": [
+        "/docs/reference/formula-functions/lookup-reference/",
+        "/docs/features/formulas/offset-and-indirect/",
+        "/docs/features/formulas/"
+      ]
+    },
+    {
+      "q": "SheetwriteGrid",
+      "rank": 1,
+      "first3": [
+        "/docs/api/react/sheetwrite-grid/",
+        "/docs/api/vue/sheetwrite-grid/",
+        "/docs/api/svelte/sheetwrite-grid/"
+      ]
+    },
+    {
+      "q": "conditional formatting",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formatting/conditional-formats/",
+        "/docs/features/formatting/",
+        "/docs/features/formatting/number-formats/"
+      ]
+    },
+    {
+      "q": "pivot table",
+      "rank": 1,
+      "first3": [
+        "/docs/features/analysis/pivot-tables/",
+        "/docs/releases/0.6.0/",
+        "/docs/features/analysis/"
+      ]
+    },
+    {
+      "q": "import xlsx",
+      "rank": 1,
+      "first3": [
+        "/docs/import-export/xlsx-import/",
+        "/docs/api/core/xlsx-table-import-backend/",
+        "/docs/import-export/xlsx-export/"
+      ]
+    },
+    {
+      "q": "export to excel",
+      "rank": 2,
+      "first3": [
+        "/docs/reference/compatibility-results/",
+        "/docs/import-export/xlsx-export/",
+        "/docs/tutorials/excel-in-nodejs/"
+      ]
+    },
+    {
+      "q": "csv",
+      "rank": 1,
+      "first3": [
+        "/docs/import-export/csv-and-tsv/",
+        "/docs/import-export/",
+        "/docs/releases/0.5.2/"
+      ]
+    },
+    {
+      "q": "undo redo",
+      "rank": 1,
+      "first3": [
+        "/docs/features/grid/editing-and-clipboard/",
+        "/docs/features/grid/grid-methods/",
+        "/docs/reference/events/"
+      ]
+    },
+    {
+      "q": "keyboard shortcuts",
+      "rank": 1,
+      "first3": [
+        "/docs/features/grid/keyboard-shortcuts/",
+        "/docs/features/grid/selection-and-keyboard/",
+        "/docs/features/grid/"
+      ]
+    },
+    {
+      "q": "#SPILL!",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formulas/dynamic-arrays-and-spills/",
+        "/docs/concepts/calculation-engine/",
+        "/docs/features/analysis/pivot-tables/"
+      ]
+    },
+    {
+      "q": "#REF!",
+      "rank": 2,
+      "first3": [
+        "/docs/reference/formula-functions/lookup-reference/",
+        "/docs/features/formulas/authoring-and-references/",
+        "/docs/features/formulas/offset-and-indirect/"
+      ]
+    },
+    {
+      "q": "custom function",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formulas/custom-functions/",
+        "/docs/reference/formula-functions/date-time/",
+        "/docs/reference/formula-functions/database/"
+      ]
+    },
+    {
+      "q": "how do I freeze rows",
+      "rank": 1,
+      "first3": [
+        "/docs/features/data/data-operations/",
+        "/docs/features/grid/toolbar-and-ribbon/",
+        "/docs/features/analysis/charts/"
+      ]
+    },
+    {
+      "q": "how do I add a dropdown list to a cell",
+      "rank": 1,
+      "first3": [
+        "/docs/features/data/validation-protection-and-notes/",
+        "/docs/features/data/autofilter/",
+        "/docs/features/grid/selection-and-keyboard/"
+      ]
+    },
+    {
+      "q": "how do I use sheetwrite with react",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/react/",
+        "/docs/api/react-styles-css/",
+        "/docs/api/react/"
+      ]
+    },
+    {
+      "q": "dark theme",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formatting/styles/",
+        "/docs/features/analysis/charts/",
+        "/docs/features/grid/toolbar-and-ribbon/"
+      ]
+    },
+    {
+      "q": "charts",
+      "rank": 1,
+      "first3": [
+        "/docs/features/analysis/charts/",
+        "/docs/api/charts/chart-change-event/",
+        "/docs/api/charts/charts-addon/"
+      ]
+    },
+    {
+      "q": "real-time collaboration",
+      "rank": 1,
+      "first3": [
+        "/docs/features/collaboration/"
+      ]
+    },
+    {
+      "q": "number format",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formatting/number-formats/",
+        "/docs/features/formatting/",
+        "/docs/api/core/format-number/"
+      ]
+    },
+    {
+      "q": "large xlsx file streaming",
+      "rank": 1,
+      "first3": [
+        "/docs/import-export/large-files-and-streaming/",
+        "/docs/import-export/",
+        "/docs/tutorials/excel-in-nodejs/"
+      ]
+    },
+    {
+      "q": "web worker",
+      "rank": 1,
+      "first3": [
+        "/docs/features/worker-rendering/",
+        "/docs/features/",
+        "/docs/start/installation/"
+      ]
+    },
+    {
+      "q": "upgrade to 0.7.0",
+      "rank": 1,
+      "first3": [
+        "/docs/start/upgrade-to-0-7-0/",
+        "/docs/start/",
+        "/docs/releases/"
+      ]
+    },
+    {
+      "q": "merge cells",
+      "rank": 1,
+      "first3": [
+        "/docs/features/grid/resize-merge-and-fill/",
+        "/docs/features/formatting/",
+        "/docs/features/grid/context-menu/"
+      ]
+    },
+    {
+      "q": "autofilter",
+      "rank": 1,
+      "first3": [
+        "/docs/features/data/autofilter/",
+        "/docs/api/core/auto-filter/",
+        "/docs/features/data/"
+      ]
+    },
+    {
+      "q": "copy and paste",
+      "rank": 2,
+      "first3": [
+        "/docs/features/grid/context-menu/",
+        "/docs/features/grid/editing-and-clipboard/",
+        "/docs/features/data/autofilter/"
+      ]
+    },
+    {
+      "q": "WebAssembly failed to load",
+      "rank": 5,
+      "first3": [
+        "/docs/api/wasm-history/load-history-kernel/",
+        "/docs/performance/memory/",
+        "/docs/releases/0.5.0/"
+      ]
+    },
+    {
+      "q": "screen reader",
+      "rank": 2,
+      "first3": [
+        "/docs/releases/0.6.1/",
+        "/docs/features/accessibility/",
+        "/docs/features/grid/status-bar/"
+      ]
+    },
+    {
+      "q": "libreoffice",
+      "rank": 1,
+      "first3": [
+        "/docs/import-export/libreoffice-compatibility/",
+        "/docs/import-export/",
+        "/docs/features/formatting/fonts-and-alignment/"
+      ]
+    },
+    {
+      "q": "datasource",
+      "rank": 1,
+      "first3": [
+        "/docs/features/data/datasources/",
+        "/docs/api/core/data-source/",
+        "/docs/features/grid/options-and-presentation/"
+      ]
+    },
+    {
+      "q": "react",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/react/",
+        "/docs/tutorials/excel-in-react/",
+        "/docs/frameworks/"
+      ]
+    },
+    {
+      "q": "vue",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/vue/",
+        "/docs/tutorials/excel-in-vue/",
+        "/docs/frameworks/"
+      ]
+    },
+    {
+      "q": "svelte",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/svelte/",
+        "/docs/tutorials/excel-in-svelte/",
+        "/docs/frameworks/"
+      ]
+    },
+    {
+      "q": "vanilla",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/vanilla/",
+        "/docs/frameworks/",
+        "/docs/start/"
+      ]
+    },
+    {
+      "q": "how do I use sheetwrite with vue",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/vue/",
+        "/docs/api/vue/",
+        "/docs/api/vue-styles-css/"
+      ]
+    },
+    {
+      "q": "how do I use sheetwrite with svelte",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/svelte/",
+        "/docs/api/svelte/",
+        "/docs/api/svelte-styles-css/"
+      ]
+    },
+    {
+      "q": "sheetwrite in vanilla javascript",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/vanilla/",
+        "/docs/tutorials/excel-in-javascript/",
+        "/docs/frameworks/"
+      ]
+    },
+    {
+      "q": "react grid",
+      "rank": 1,
+      "first3": [
+        "/docs/frameworks/react/",
+        "/docs/api/react-styles-grid-css/",
+        "/docs/tutorials/excel-in-react/"
+      ]
+    },
+    {
+      "q": "how do I add a chart",
+      "rank": 1,
+      "first3": [
+        "/docs/features/analysis/charts/",
+        "/docs/api/charts/charts-addon/",
+        "/docs/releases/0.7.0/"
+      ]
+    },
+    {
+      "q": "how do I use pivot tables",
+      "rank": 1,
+      "first3": [
+        "/docs/features/analysis/pivot-tables/",
+        "/docs/releases/0.6.0/",
+        "/docs/features/analysis/"
+      ]
+    },
+    {
+      "q": "how to use conditional formatting",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formatting/conditional-formats/",
+        "/docs/features/formatting/",
+        "/docs/features/formatting/number-formats/"
+      ]
+    },
+    {
+      "q": "how do I import an xlsx file",
+      "rank": 1,
+      "first3": [
+        "/docs/import-export/xlsx-import/",
+        "/docs/import-export/large-files-and-streaming/",
+        "/docs/tutorials/excel-in-nodejs/"
+      ]
+    },
+    {
+      "q": "custom editors",
+      "rank": 1,
+      "first3": [
+        "/docs/features/grid/custom-editors/",
+        "/docs/features/grid/options-and-presentation/",
+        "/docs/features/grid/"
+      ]
+    },
+    {
+      "q": "keyboard shortcuts in vue",
+      "rank": 1,
+      "first3": [
+        "/docs/features/grid/keyboard-shortcuts/",
+        "/docs/releases/0.5.2/",
+        "/docs/features/grid/toolbar-and-ribbon/"
+      ]
+    },
+    {
+      "q": "number formats",
+      "rank": 1,
+      "first3": [
+        "/docs/features/formatting/number-formats/",
+        "/docs/features/formatting/",
+        "/docs/api/core/format-number/"
+      ]
+    }
+  ]
+}
