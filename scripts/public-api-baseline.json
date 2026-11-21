@@ -628,7 +628,6 @@
     "@sheetwrite/core#./shell#describeSelection": "9429ec4bd574",
     "@sheetwrite/core#./testing#CanvasTestStubOptions": "bdd108e211bd",
     "@sheetwrite/core#./testing#RecordingContext2D": "9029c70801e1",
-    "@sheetwrite/core#./testing#ShownSuggestion": "640386aa26b9",
     "@sheetwrite/core#./testing#installCanvasTestStubs": "17c3f0bcfe89",
     "@sheetwrite/core#./testing#installDatasourceClockForTest": "3c20f0203e74",
     "@sheetwrite/core#./testing#openFormulaEdit": "b409f3ea30e9",
