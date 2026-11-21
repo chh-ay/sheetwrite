@@ -1,0 +1,3 @@
+$ bun scripts/public-api.ts check && bun run api:unused:internal
+Public API policy check passed
+$ knip --workspace './packages/*' --include exports,types,nsExports,nsTypes --no-progress --no-gitignore

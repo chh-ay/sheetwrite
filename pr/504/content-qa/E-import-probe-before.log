@@ -1,0 +1,14 @@
+.qa-export-probe.ts(1,15): error TS2305: Module '"@sheetwrite/core"' has no exported member 'AddSheetInput'.
+.qa-export-probe.ts(1,30): error TS2305: Module '"@sheetwrite/core"' has no exported member 'BorderPreset'.
+.qa-export-probe.ts(1,44): error TS2305: Module '"@sheetwrite/core"' has no exported member 'CellRef'.
+.qa-export-probe.ts(1,53): error TS2305: Module '"@sheetwrite/core"' has no exported member 'ClipboardOutcome'.
+.qa-export-probe.ts(1,71): error TS2305: Module '"@sheetwrite/core"' has no exported member 'ClipboardWindowView'.
+.qa-export-probe.ts(1,92): error TS2305: Module '"@sheetwrite/core"' has no exported member 'CompactRangeHistory'.
+.qa-export-probe.ts(1,119): error TS2305: Module '"@sheetwrite/core"' has no exported member 'PasteSpecialOptions'.
+.qa-export-probe.ts(1,140): error TS2305: Module '"@sheetwrite/core"' has no exported member 'RangeMutationAllocationStats'.
+.qa-export-probe.ts(1,170): error TS2305: Module '"@sheetwrite/core"' has no exported member 'RestoreProvenance'.
+.qa-export-probe.ts(1,189): error TS2305: Module '"@sheetwrite/core"' has no exported member 'SelectionSummary'.
+.qa-export-probe.ts(1,207): error TS2305: Module '"@sheetwrite/core"' has no exported member 'XlsxWorkbookExportContext'.
+.qa-export-probe.ts(2,15): error TS2305: Module '"@sheetwrite/core/history"' has no exported member 'AtomicHistoryStorage'.
+.qa-export-probe.ts(2,37): error TS2305: Module '"@sheetwrite/core/history"' has no exported member 'HistoryStorageTransaction'.
+.qa-export-probe.ts(3,15): error TS2724: '"@sheetwrite/core/testing"' has no exported member named 'ShownSuggestion'. Did you mean 'shownSuggestion'?

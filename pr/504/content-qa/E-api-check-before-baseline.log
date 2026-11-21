@@ -1,0 +1,30 @@
+$ bun scripts/public-api.ts check && bun run api:unused:internal
+693 |     const exportCount = Object.keys(baseline.exports).length;
+694 |     process.stdout.write(`Public API baseline lists ${exportCount} exports\n`);
+695 |   } else {
+696 |     const baseline = await readPublicApiBaseline(repositoryRoot);
+697 |     const issues = [...result.issues, ...checkPublicApiBaseline(result.manifest, baseline)];
+698 |     if (issues.length > 0) throw new Error(formatIssues(issues));
+                                           ^
+error: missing-documentation: @sheetwrite/core . export AddSheetInput has no source JSDoc summary
+missing-documentation: @sheetwrite/core . export CellRef has no source JSDoc summary
+missing-documentation: @sheetwrite/core . export RangeMutationAllocationStats has no source JSDoc summary
+missing-documentation: @sheetwrite/core . export XlsxWorkbookExportContext has no source JSDoc summary
+unlisted-export: @sheetwrite/core . AddSheetInput is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . BorderPreset is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . CellRef is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . ClipboardOutcome is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . ClipboardWindowView is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . CompactRangeHistory is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . PasteSpecialOptions is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . RangeMutationAllocationStats is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . RestoreProvenance is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . SelectionSummary is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core . XlsxWorkbookExportContext is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core ./history AtomicHistoryStorage is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core ./history HistoryStorageTransaction is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+unlisted-export: @sheetwrite/core ./testing ShownSuggestion is exported but scripts/public-api-baseline.json does not list it; review it, then run `bun run api:baseline`
+      at /home/vvin/checkouts/dcq-fix/scripts/public-api.ts:698:38
+
+Bun v1.4.4 (Linux x64)
+error: script "api:check" exited with code 1
