@@ -1,0 +1,32 @@
+PASS [interop-firefox-1440] open sheets=Orders,Summary,Assumptions,Analysis,Array formulas 
+PASS [interop-firefox-1440] round trip button cells=408/408 formulas=73/73 status=Compared 408 stored cells. 408 matched; 73/73 formula sources preserved. 
+PASS [interop-firefox-1440] import excel-sort-order-input.xlsx status=Loaded: excel-sort-order-input.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Ascending:70,Descending:70 sample=0,0=3 0,1=A11 0,2=Z 0,3=b 
+PASS [interop-firefox-1440] import libreoffice-rich.xlsx status=Loaded: libreoffice-rich.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Inputs:13,Calc:2,Hidden:1 sample=0,0=Input 0,1=Double 0,2=Styled 0,3=Merged 
+PASS [interop-firefox-1440] import preserve-ExcelPivotTableSample.xlsx status=Loaded: preserve-ExcelPivotTableSample.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Tabelle1:24,Tabelle2:16,Tabelle3:8 sample=0,0=Field1 0,1=Field2 0,2=Field3 0,4=Field1 
+PASS [interop-firefox-1440] import preserve-WithChart.xlsx status=Loaded: preserve-WithChart.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Sheet1:12,Sheet2:0,Sheet3:0 sample=0,0=1 0,1=10 1,0=2 1,1=12 
+PASS [interop-firefox-1440] download xlsx file=sheetwrite-interoperability.xlsx bytes=8572 
+PASS [interop-firefox-1440] re-import download and compare sheets before=Sheet1,Sheet2,Sheet3 after=Sheet1,Sheet2,Sheet3 missing=0  
+PASS [interop-firefox-1440] reset  
+PASS [interop-chromium-390] open sheets=Orders,Summary,Assumptions,Analysis,Array formulas 
+PASS [interop-chromium-390] round trip button cells=408/408 formulas=73/73 status=Compared 408 stored cells. 408 matched; 73/73 formula sources preserved. 
+PASS [interop-chromium-390] import excel-sort-order-input.xlsx status=Loaded: excel-sort-order-input.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Ascending:70,Descending:70 sample=0,0=3 0,1=A11 0,2=Z 0,3=b 
+PASS [interop-chromium-390] import libreoffice-rich.xlsx status=Loaded: libreoffice-rich.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Inputs:13,Calc:2,Hidden:1 sample=0,0=Input 0,1=Double 0,2=Styled 0,3=Merged 
+PASS [interop-chromium-390] import preserve-ExcelPivotTableSample.xlsx status=Loaded: preserve-ExcelPivotTableSample.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Tabelle1:24,Tabelle2:16,Tabelle3:8 sample=0,0=Field1 0,1=Field2 0,2=Field3 0,4=Field1 
+PASS [interop-chromium-390] import preserve-WithChart.xlsx status=Loaded: preserve-WithChart.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Sheet1:12,Sheet2:0,Sheet3:0 sample=0,0=1 0,1=10 1,0=2 1,1=12 
+PASS [interop-chromium-390] download xlsx file=sheetwrite-interoperability.xlsx bytes=8572 
+PASS [interop-chromium-390] re-import download and compare sheets before=Sheet1,Sheet2,Sheet3 after=Sheet1,Sheet2,Sheet3 missing=0  
+PASS [interop-chromium-390] reset  
+PASS [interop-firefox-390] open sheets=Orders,Summary,Assumptions,Analysis,Array formulas 
+PASS [interop-firefox-390] round trip button cells=408/408 formulas=73/73 status=Compared 408 stored cells. 408 matched; 73/73 formula sources preserved. 
+PASS [interop-firefox-390] import excel-sort-order-input.xlsx status=Loaded: excel-sort-order-input.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Ascending:70,Descending:70 sample=0,0=3 0,1=A11 0,2=Z 0,3=b 
+PASS [interop-firefox-390] import libreoffice-rich.xlsx status=Loaded: libreoffice-rich.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Inputs:13,Calc:2,Hidden:1 sample=0,0=Input 0,1=Double 0,2=Styled 0,3=Merged 
+PASS [interop-firefox-390] import preserve-ExcelPivotTableSample.xlsx status=Loaded: preserve-ExcelPivotTableSample.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Tabelle1:24,Tabelle2:16,Tabelle3:8 sample=0,0=Field1 0,1=Field2 0,2=Field3 0,4=Field1 
+PASS [interop-firefox-390] import preserve-WithChart.xlsx status=Loaded: preserve-WithChart.xlsx. Edit any cell, then export, re-import, and compare it cell by cell.; sheets=Sheet1:12,Sheet2:0,Sheet3:0 sample=0,0=1 0,1=10 1,0=2 1,1=12 
+PASS [interop-firefox-390] download xlsx file=sheetwrite-interoperability.xlsx bytes=8572 
+PASS [interop-firefox-390] re-import download and compare sheets before=Sheet1,Sheet2,Sheet3 after=Sheet1,Sheet2,Sheet3 missing=0  
+PASS [interop-firefox-390] reset  
+PASS [interop-chromium-1440] open sheets=Orders,Summary,Assumptions,Analysis,Array formulas
+PASS [interop-chromium-1440] round trip button cells=408/408 formulas=73/73
+PASS [interop-chromium-1440] import excel-sort-order-input.xlsx / libreoffice-rich.xlsx / preserve-ExcelPivotTableSample.xlsx / preserve-WithChart.xlsx: Loaded
+PASS [interop-chromium-1440] download xlsx file=sheetwrite-interoperability.xlsx bytes=8572
+PASS [interop-chromium-1440] re-import download and compare missing=0
