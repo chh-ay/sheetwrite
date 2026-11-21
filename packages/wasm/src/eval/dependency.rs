@@ -1,7 +1,7 @@
 //! Formula dependency indexes, affected-set growth, and depth/cycle checks.
 
 use std::cell::RefCell;
-use std::cmp::{Ordering, Reverse};
+use std::cmp::Ordering;
 
 use crate::formula_slots::{FormulaBits, FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use rustc_hash::FxHashSet;
@@ -245,13 +245,27 @@ impl DepIndex {
         }
 
         matches.clear();
-        matches.extend(row_matches.iter().copied().filter(contains));
-        matches.sort_unstable_by_key(|&group| {
-            let columns = self.range_groups.get(group).map_or((0, 0), |stored| {
-                (stored.range.col_start, stored.range.col_end)
-            });
-            Reverse((columns, group))
-        });
+        // Back into column index order: each match's position among the
+        // column intervals, sorted, then read back as groups.
+        for &group in row_matches.iter().filter(|group| contains(group)) {
+            let Some(stored) = self.range_groups.get(group) else {
+                continue;
+            };
+            let key = RangeInterval::new(stored.range.col_start, stored.range.col_end, group);
+            if let Ok(position) = sheet
+                .col_intervals
+                .binary_search_by(|interval| interval_order(interval, &key))
+            {
+                matches.push(position);
+            }
+        }
+        matches.sort_unstable();
+        matches.reverse();
+        for slot in matches.iter_mut() {
+            if let Some(interval) = sheet.col_intervals.get(*slot) {
+                *slot = interval.group;
+            }
+        }
     }
 
     /// The id of the group for `range` and the number of groups, when more
@@ -1944,6 +1958,7 @@ pub(super) fn circular_components(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cmp::Reverse;
     use crate::store::CellStore;
     use crate::types::Value;
 
