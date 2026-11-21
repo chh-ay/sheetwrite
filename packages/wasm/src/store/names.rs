@@ -47,6 +47,14 @@ use crate::types::{
     AbsCellKey, CellRange, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
 
+#[cfg(test)]
+thread_local! {
+    /// Reads of a defined name on this thread ([`NameScope::read`]). Tests
+    /// read it to count how often names were expanded, which no value shows
+    /// and a timing shows only unreliably.
+    pub(crate) static NAME_READS: Cell<usize> = const { Cell::new(0) };
+}
+
 /// The formula sheet a name's definition is shifted as: no sheet, so a
 /// row or column edit moves only the references that name their sheet. An
 /// unqualified reference reads the sheet of the formula that uses the name.
@@ -172,12 +180,30 @@ pub(super) struct Definition {
     /// some sheet than the ones worked out for it: a workbook formula that
     /// uses a name some sheet defines in its own scope, directly or through
     /// other names. Such a formula is read in a copy whose name shapes are
-    /// marked for the reading sheet, and has no [`Self::facts`]
-    /// ([`shapes`]).
+    /// marked for the reading sheet, and its facts on those sheets are in
+    /// [`Self::sheet_facts`] ([`shapes`]).
     sheet_shapes: bool,
     /// What the formula does that the formulas using the name inherit,
-    /// worked out when the names are bound.
+    /// worked out when the names are bound, as the workbook reads it.
     facts: NameFacts,
+    /// For a formula with [`Self::sheet_shapes`], its facts as each sheet
+    /// that defines a name in its own scope reads it; any other sheet reads
+    /// [`Self::facts`]. Worked out once per sheet when the names are bound,
+    /// so a read never works them out again for each path to the name.
+    sheet_facts: SheetFacts,
+}
+
+/// The facts of a formula by reading sheet: `(sheet, facts)` pairs.
+pub(super) type SheetFacts = Box<[(u32, NameFacts)]>;
+
+impl Definition {
+    /// The facts of the formula as a formula on `sheet` reads it.
+    fn facts_on(&self, sheet: u32) -> NameFacts {
+        self.sheet_facts
+            .iter()
+            .find_map(|&(own, facts)| (own == sheet).then_some(facts))
+            .unwrap_or(self.facts)
+    }
 }
 
 /// What a name's formula does that the formulas using the name inherit:
@@ -390,22 +416,23 @@ impl<'a> NameScope<'a> {
     }
 
     /// The facts of the name `id` for this sheet: a range's (an array when
-    /// it has more than one cell), its formula's as worked out when the
-    /// names were bound, or none while it is undefined. `None` when its
-    /// formula's facts depend on the reading sheet
-    /// ([`Definition::sheet_shapes`]); the caller then reads the name.
+    /// it has more than one cell), its formula's as worked out for this
+    /// sheet when the names were bound, or none while it is undefined.
     #[inline]
-    pub(crate) fn facts(self, id: NameId) -> Option<NameFacts> {
+    pub(crate) fn facts(self, id: NameId) -> NameFacts {
         let Some(entry) = self.table().entry(id) else {
-            return Some(NameFacts::default());
+            return NameFacts::default();
         };
         match NameTable::definition_for(entry, self.sheet) {
-            None => Some(NameFacts::default()),
-            Some(DefinedName::Range(range)) => Some(NameFacts::default().with(
+            None => NameFacts::default(),
+            Some(DefinedName::Range(range)) => NameFacts::default().with(
                 NameFacts::ARRAY,
                 range.row_start != range.row_end || range.col_start != range.col_end,
-            )),
-            Some(DefinedName::Formula(formula)) => (!formula.sheet_shapes).then_some(formula.facts),
+            ),
+            Some(DefinedName::Formula(formula)) if formula.sheet_shapes => {
+                formula.facts_on(self.sheet)
+            }
+            Some(DefinedName::Formula(formula)) => formula.facts,
         }
     }
 
@@ -462,6 +489,8 @@ impl<'a> NameScope<'a> {
     /// [`Self::guarded_read`].
     #[inline(never)]
     pub(crate) fn read(self, id: NameId) -> NameRead<'a> {
+        #[cfg(test)]
+        NAME_READS.with(|reads| reads.set(reads.get() + 1));
         let Some(entry) = self.table().entry(id) else {
             return NameRead::unguarded(if self.table().unsettled_is_linked(id) {
                 NameView::Linked
@@ -981,6 +1010,7 @@ impl CellStore {
             reach: NEVER_IN_PLACE,
             sheet_shapes: false,
             facts: NameFacts::default(),
+            sheet_facts: Box::new([]),
         };
         self.bindings.names.insert(
             name_scope,
@@ -1400,6 +1430,7 @@ impl CellStore {
             reach: NEVER_IN_PLACE,
             sheet_shapes: false,
             facts: NameFacts::default(),
+            sheet_facts: Box::new([]),
         };
         self.bindings.names.insert(
             scope,

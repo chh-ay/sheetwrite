@@ -13,7 +13,7 @@ use crate::eval::{
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::{shapes, FormulaTest, InPlace, NameFacts, NameScope};
+use crate::store::names::{shapes, InPlace, NameFacts, NameScope};
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -456,20 +456,13 @@ const fn calls_volatile(ast: &Ast) -> bool {
 }
 
 /// [`ast_is_volatile`] of a formula that may use a defined name: a name's
-/// formula counts, by its facts ([`NameFacts`]) or read through `names`.
+/// formula counts by its facts ([`NameFacts`]).
 pub(crate) fn ast_with_names_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
-    any_with_names(
-        ast,
-        names,
-        calls_volatile,
-        NameFacts::VOLATILE,
-        ast_with_names_is_volatile,
-    )
+    any_with_names(ast, names, calls_volatile, NameFacts::VOLATILE)
 }
 
 /// Whether a node of `ast` satisfies `node`, or `fact` holds for the
-/// formula of a defined name it uses: by the name's facts, or, when they
-/// depend on the reading sheet, by `test` on its formula read through
+/// formula of a defined name it uses, by the name's facts for the sheet of
 /// `names`. One walk serves each check that looks through names; `node` is
 /// a function item, so each check gets its own copy with the node test
 /// inline.
@@ -478,18 +471,14 @@ fn any_with_names(
     names: NameScope<'_>,
     node: impl Fn(&Ast) -> bool + Copy,
     fact: NameFacts,
-    test: FormulaTest,
 ) -> bool {
     if node(ast) {
         return true;
     }
     if let Ast::DefinedName(id, _) = ast {
-        return names.facts(*id).map_or_else(
-            || names.formula_satisfies_family(*id, test),
-            |facts| facts.has(fact),
-        );
+        return names.facts(*id).has(fact);
     }
-    ast.any_child(&mut |child| any_with_names(child, names, node, fact, test))
+    ast.any_child(&mut |child| any_with_names(child, names, node, fact))
 }
 
 /// Whether the formula's own tree has a LET. A defined name's LET is in the
@@ -526,15 +515,9 @@ const fn calls_spill_ref(ast: &Ast) -> bool {
 }
 
 /// [`ast_contains_spill_ref`] of a formula that may use a defined name: a
-/// name's formula counts, by its facts or read through `names`.
+/// name's formula counts by its facts.
 pub(crate) fn ast_with_names_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
-    any_with_names(
-        ast,
-        names,
-        calls_spill_ref,
-        NameFacts::SPILL_REFS,
-        ast_with_names_contains_spill_ref,
-    )
+    any_with_names(ast, names, calls_spill_ref, NameFacts::SPILL_REFS)
 }
 
 /// Whether the formula `ast` has a spill or runtime reference, through the

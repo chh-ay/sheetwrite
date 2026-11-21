@@ -25,10 +25,7 @@ family_functions! {
 pub(crate) fn ast_calls_pivot_data(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
-        Ast::DefinedName(id, _) => names.facts(*id).map_or_else(
-            || names.formula_satisfies_family(*id, ast_calls_pivot_data),
-            |facts| facts.has(NameFacts::CALLS_PIVOT_DATA),
-        ),
+        Ast::DefinedName(id, _) => names.facts(*id).has(NameFacts::CALLS_PIVOT_DATA),
         _ => ast.any_child(&mut |child| ast_calls_pivot_data(child, names)),
     }
 }
