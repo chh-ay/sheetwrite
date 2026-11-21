@@ -2963,7 +2963,7 @@ export class GridImpl implements Grid {
     const cell = this.anchorCell(row, col);
     return this.cellInputAt(
       { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
-      column.type,
+      column,
     );
   }
 
@@ -2974,14 +2974,11 @@ export class GridImpl implements Grid {
       return focus ? this.getCellInput(focus.row, focus.col) : null;
     }
     const column = this.sheet().columns[hidden.col];
-    return column ? this.cellInputAt({ ...hidden }, column.type) : null;
+    return column ? this.cellInputAt({ ...hidden }, column) : null;
   }
 
-  /** The editable snapshot of the cell at sheet address `address`. */
-  private cellInputAt(
-    address: CellAddress,
-    format: CellInputSnapshot["format"],
-  ): CellInputSnapshot {
+  /** The editable snapshot of the cell at sheet address `address` in `column`. */
+  private cellInputAt(address: CellAddress, column: Column): CellInputSnapshot {
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
     const stored = this.store.getCell(address);
     // The text the cell editor opens with, so the formula bar reads it back the same.
@@ -2993,7 +2990,7 @@ export class GridImpl implements Grid {
         stored.style.numberFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
       );
 
-    return { address, text, format };
+    return { address, text, format: column.type };
   }
 
   scrollToCell(addr: CellAddress): void {
