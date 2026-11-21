@@ -20,6 +20,7 @@ import {
 import { createCommandContext, refreshControls } from "./command-surface.js";
 import {
   renderControl,
+  twoLineLabel,
   type RibbonCommandStates,
   type RibbonContext,
   type RibbonControlView,
@@ -332,6 +333,8 @@ export class Ribbon {
     collapsed.type = "button";
     collapsed.className = "sheetwrite-ribbon-button sheetwrite-ribbon-group-button";
     collapsed.dataset.large = "";
+    // The shown name may break over two lines; the accessible name stays whole.
+    collapsed.setAttribute("aria-label", spec.label);
     collapsed.setAttribute("aria-haspopup", "true");
     collapsed.setAttribute("aria-expanded", "false");
     const glyph = document.createElement("span");
@@ -339,7 +342,8 @@ export class Ribbon {
     glyph.appendChild(iconNode(spec.icon, this.options.icons));
     const text = document.createElement("span");
     text.className = "sheetwrite-ribbon-label";
-    text.textContent = spec.label;
+    // At most two lines in the full ribbon; the compact ribbon shows one.
+    text.textContent = twoLineLabel(spec.label);
     const caret = document.createElement("span");
     caret.className = "sheetwrite-ribbon-caret";
     caret.setAttribute("aria-hidden", "true");
