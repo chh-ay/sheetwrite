@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 
 use crate::calc::{Ast, Func};
+use crate::store::names::{NameFacts, NameScope};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -15,16 +16,20 @@ family_functions! {
     GETPIVOTDATA,
 }
 
-/// Whether `ast` calls GETPIVOTDATA anywhere.
+/// Whether `ast` calls GETPIVOTDATA anywhere, through the defined names it
+/// reads too.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
-pub(crate) fn ast_calls_pivot_data(ast: &Ast) -> bool {
+pub(crate) fn ast_calls_pivot_data(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
-        Ast::NamedFormula(named) => ast_calls_pivot_data(&named.expression),
-        _ => ast.any_child(&mut ast_calls_pivot_data),
+        Ast::DefinedName(id, _) => names.facts(*id).map_or_else(
+            || names.formula_satisfies_family(*id, ast_calls_pivot_data),
+            |facts| facts.has(NameFacts::CALLS_PIVOT_DATA),
+        ),
+        _ => ast.any_child(&mut |child| ast_calls_pivot_data(child, names)),
     }
 }
 
@@ -66,7 +71,7 @@ fn pivot_data(
 
     // The pivot is the one whose output holds the reference's first cell. A
     // value that is not a reference names no pivot.
-    let pivot_cell = match range_from_ast(&args[1], sheet) {
+    let pivot_cell = match range_from_ast(&args[1], store.name_scope(sheet)) {
         Some(range) => range,
         None => {
             return match store.eval_ast(&args[1], sheet, pass, depth + 1) {

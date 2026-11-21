@@ -379,3 +379,18 @@
   color: inherit;
   cursor: pointer;
 }
+
+/* Touch screens get targets of at least 24 px (WCAG 2.2 target size); mouse
+   layouts keep their density. The bar keeps its 28 px: thinner padding gives
+   the tabs 25 px, and the buttons beside them take the tabs' full height. */
+@media (pointer: coarse) {
+  .sheetwrite-tabbar {
+    padding-block: 1px;
+  }
+
+  .sheetwrite-tab-options-button,
+  .sheetwrite-tab-add,
+  .sheetwrite-tab-unhide {
+    height: 100%;
+  }
+}

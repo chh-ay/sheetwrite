@@ -43,7 +43,7 @@ import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./p
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
 import { DYNAMIC_DATE_FILTERS, validFilterCondition } from "./store/autofilter.js";
-import { normalizeMerge } from "./store/ranges.js";
+import { MAX_VALIDATION_RULES, normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
@@ -888,6 +888,14 @@ export function assertWorkbookAllocationLimits(
       );
     }
 
+    if ((sheet.validationRules?.length ?? 0) > MAX_VALIDATION_RULES) {
+      throw new SnapshotResourceError(
+        "maxMetadataEntries",
+        MAX_VALIDATION_RULES,
+        sheet.validationRules!.length,
+      );
+    }
+
     const chartCount = sheet.charts?.length ?? 0;
     if (chartCount > MAX_CHARTS_PER_SHEET) {
       throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chartCount);
@@ -1391,7 +1399,7 @@ function validateHyperlinkShape(
 }
 
 /** The longest formula Excel takes in a data validation rule. */
-const MAX_VALIDATION_FORMULA_LENGTH = 255;
+export const MAX_VALIDATION_FORMULA_LENGTH = 255;
 
 /** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
 function validationFormula(value: unknown): value is string {
@@ -1846,6 +1854,14 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   });
 
   const validationRules = optionalArray(sheet, "validationRules", path, errors);
+  if (validationRules && validationRules.length > MAX_VALIDATION_RULES) {
+    invalid(
+      errors,
+      `${path}.validationRules`,
+      `Data validation rule limit ${MAX_VALIDATION_RULES} exceeded`,
+      "resource-limit",
+    );
+  }
   validationRules?.forEach((entry, index) => {
     validateValidationRuleShape(entry, `${path}.validationRules[${index}]`, errors);
   });
@@ -3741,6 +3757,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
  * Validate and canonically order a schema-1 snapshot without hydrating runtime state.
  *
  * @param input - A snapshot from outside your code, such as parsed JSON.
+ * @param options - The storage model to check capacity against, and resource
+ *   limits that replace the defaults.
  */
 export function validateWorkbookSnapshot(
   input: unknown,

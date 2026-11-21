@@ -69,8 +69,9 @@ impl Context<'_, '_> {
     }
 
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if range_from_ast(ast, self.sheet).is_some()
-            || super::super::array::ast_produces_array(ast, self.pass.shapes())
+        let names = self.store.name_scope(self.sheet);
+        if range_from_ast(ast, names).is_some()
+            || super::super::array::ast_produces_array(ast, self.pass.shapes(names))
         {
             self.store
                 .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)

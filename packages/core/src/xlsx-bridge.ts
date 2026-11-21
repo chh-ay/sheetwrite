@@ -198,6 +198,7 @@ export function toXlsxTableStream(
  * }
  * ```
  * @param data - The bytes of an `.xlsx` file.
+ * @param options - A signal that stops the import, resource limits, and a warning callback.
  * @returns The first sheet's columns, keyed by header text.
  * @see toXlsxTable
  */
@@ -326,6 +327,7 @@ function autoFilteredRows(
  * ```
  * @param input - The workbook to write: a `WorkbookSnapshot`, or a grid, whose
  *   `exportSnapshot()` is called first.
+ * @param options - A signal that stops the export, resource limits, and a warning callback.
  * @returns The bytes of the `.xlsx` file.
  * @see fromXlsxWorkbook
  */
@@ -354,6 +356,7 @@ export async function toXlsxWorkbook(
  *
  * @param input - The workbook to write: a `WorkbookSnapshot`, or a grid, whose
  *   `exportSnapshot()` is called first.
+ * @param options - A signal that stops the export, resource limits, and a warning callback.
  * @returns The `.xlsx` file's bytes, produced as the stream is read; cancelling
  *   the stream stops the export.
  */
@@ -382,6 +385,7 @@ export function toXlsxWorkbookStream(
  * Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.
  *
  * @param file - The `.xlsx` file, such as one picked through `<input type="file">`.
+ * @param options - A signal that stops the import, resource limits, and a warning callback.
  * @returns A workbook snapshot of every sheet, with formulas kept, ready for
  *   `createGridFromSnapshot`.
  */
@@ -423,6 +427,7 @@ export async function fromXlsxWorkbookFile(
  * }
  * ```
  * @param data - The bytes of an `.xlsx` file.
+ * @param options - A signal that stops the import, resource limits, and a warning callback.
  * @returns A workbook snapshot of every sheet, with formulas kept, ready for
  *   `createGridFromSnapshot`.
  * @see toXlsxWorkbook
