@@ -131,23 +131,11 @@ describe("compareRelocations", () => {
     expect(report.isSameCode).toBe(true);
   });
 
-  it("fails when a function uses another constant", () => {
-    const report = compareRelocations(before, moved({ constant: DATA_START + 9 }), MODULES);
-
-    expect(report.isSameCode).toBe(false);
-  });
-
-  it("fails when moved data changed", () => {
-    const changed = [...GREETING];
-    changed[0] = 0x47;
-    const report = compareRelocations(before, moved({ greeting: changed }), MODULES);
-
-    expect(report.isSameCode).toBe(false);
-  });
-
-  it("fails when a call goes to another function", () => {
-    const report = compareRelocations(before, moved({ callee: 0 }), MODULES);
-
-    expect(report.isSameCode).toBe(false);
+  it.each([
+    ["a function uses another constant", { constant: DATA_START + 9 }],
+    ["moved data changed", { greeting: [0x47, ...GREETING.slice(1)] }],
+    ["a call goes to another function", { callee: 0 }],
+  ])("fails when %s", (_label, change) => {
+    expect(compareRelocations(before, moved(change), MODULES).isSameCode).toBe(false);
   });
 });

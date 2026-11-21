@@ -424,7 +424,7 @@ const SEARCH_DESCRIPTION_MAX = 160;
  * two packages re-export from sharing one description. A long result is
  * clipped on a word; a short one stays short, as its JSDoc is.
  */
-export function symbolDescription(
+function symbolDescription(
   name: string,
   kind: string,
   packageLabel: string,
