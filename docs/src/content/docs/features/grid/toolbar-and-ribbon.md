@@ -163,7 +163,8 @@ Three 0.7 features add no ribbon command, because the user reaches them in cells
 As the grid narrows, the ribbon shrinks the way Excel does:
 
 1. Large buttons become small ones, with their labels beside them.
-2. Whole groups fold into one dropdown button, the group's icon and name (such as **Show/Hide**), that opens the group with its labels in a popup. A button never shrinks to an icon without its label.
+2. Whole groups fold into one dropdown button, the group's icon and name (such as **Show/Hide**), that opens the group's commands in one column, with their labels. A button never shrinks to an icon without its label.
+3. If the folded groups still do not fit, the last ones move into one **More** button at the end of the row, which lists each of them under its name. No label is ever cut off at an edge.
 
 Groups fold in Excel order. On Home, Editing folds first, then Cells, Number, Alignment, Clipboard, Font and Undo.
 

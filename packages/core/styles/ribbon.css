@@ -307,6 +307,45 @@
   display: inline-flex;
 }
 
+/* When even collapsed groups do not fit, the last ones fold into "More".
+   Important for the same reason as [hidden] above. */
+.sheetwrite-ribbon .sheetwrite-ribbon-group[data-overflow] {
+  display: none !important;
+}
+
+.sheetwrite-ribbon-panel > .sheetwrite-ribbon-more-groups {
+  flex: none;
+  flex-direction: row;
+  height: auto;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.sheetwrite-ribbon[data-mode="compact"] .sheetwrite-ribbon-panel > .sheetwrite-ribbon-more-groups {
+  align-self: center;
+  height: 24px;
+}
+
+.sheetwrite-ribbon-more-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheetwrite-ribbon-more-heading {
+  padding: 0 4px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-ribbon-more-section > .sheetwrite-ribbon-group-body[data-layout="rows"] {
+  align-items: flex-start;
+}
+
 /* A folded group shows only its button, which already names the group, as in
    Excel's narrow ribbon. The button takes the caption's height and keeps the
    two lines ribbon.ts breaks its name into. The compact ribbon's rules below
@@ -403,12 +442,13 @@
 }
 
 /* Medium: large buttons fall back to a small icon with the label beside it. */
-.sheetwrite-ribbon-group[data-size="medium"]
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
   :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
   grid-row: auto;
 }
 
-.sheetwrite-ribbon-group[data-size="medium"] .sheetwrite-ribbon-button[data-large] {
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
+  .sheetwrite-ribbon-button[data-large] {
   flex-direction: row;
   gap: 4px;
   height: 24px;
@@ -417,7 +457,7 @@
   white-space: nowrap;
 }
 
-.sheetwrite-ribbon-group[data-size="medium"]
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
   .sheetwrite-ribbon-button[data-large]
   > .sheetwrite-ribbon-icon
   > :is(svg, .sheetwrite-icon) {
@@ -487,11 +527,12 @@
   }
 }
 
-.sheetwrite-ribbon-group[data-size="medium"] .sheetwrite-ribbon-split[data-large] {
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
+  .sheetwrite-ribbon-split[data-large] {
   flex-direction: row;
 }
 
-.sheetwrite-ribbon-group[data-size="medium"]
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
   .sheetwrite-ribbon-split[data-large]
   > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
   height: 24px;
@@ -789,9 +830,24 @@ textarea.sheetwrite-ribbon-field {
   opacity: 0.6;
 }
 
-/* A collapsed group's controls, lent to the popup, render at full size. */
+/* A collapsed group's controls, lent to the popup, list one under another in
+   the command model's order, each with its label beside its icon (the medium
+   rules above). Dense rows keep their rows. */
 .sheetwrite-ribbon-group-popup > .sheetwrite-ribbon-group-body {
   min-height: 72px;
+}
+
+.sheetwrite-ribbon-group-popup .sheetwrite-ribbon-group-body[data-layout="flow"] {
+  grid-auto-flow: row;
+  grid-template-rows: none;
+  grid-auto-rows: 24px;
+  grid-template-columns: max-content;
+  gap: 2px 0;
+  min-height: 0;
+}
+
+.sheetwrite-ribbon-group-popup .sheetwrite-ribbon-button[data-large] {
+  justify-content: flex-start;
 }
 
 /* Compact changes only the panel layout. A borrowed group keeps its full

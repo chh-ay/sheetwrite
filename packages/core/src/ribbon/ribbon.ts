@@ -68,6 +68,8 @@ interface PanelView {
   readonly groups: ReadonlyMap<string, GroupView>;
   readonly controls: readonly RibbonControlView[];
   readonly fitSteps: readonly RibbonFitStep[];
+  /** Shown when even collapsed groups do not fit: the last groups fold into it. */
+  readonly more: HTMLButtonElement;
 }
 
 let ribbonSerial = 0;
@@ -299,7 +301,29 @@ export class Ribbon {
       if (group !== undefined) reduceOrder.push({ id, shrinks: group.spec.layout === "flow" });
     }
 
-    const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduceOrder) };
+    // When even the collapsed groups do not fit, the last ones fold into one
+    // labelled "More" button at the end, so no group is cut at an edge.
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className =
+      "sheetwrite-ribbon-button sheetwrite-ribbon-group-button sheetwrite-ribbon-more-groups";
+    more.dataset.large = "";
+    more.setAttribute("aria-label", "More groups");
+    more.setAttribute("aria-haspopup", "true");
+    more.setAttribute("aria-expanded", "false");
+    more.hidden = true;
+    const moreText = document.createElement("span");
+    moreText.className = "sheetwrite-ribbon-label";
+    moreText.textContent = "More";
+    const moreCaret = document.createElement("span");
+    moreCaret.className = "sheetwrite-ribbon-caret";
+    moreCaret.setAttribute("aria-hidden", "true");
+    more.append(moreText, moreCaret);
+    more.addEventListener("mousedown", (event) => event.preventDefault());
+    element.appendChild(more);
+
+    const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduceOrder), more };
+    more.addEventListener("click", (event) => this.openMoreGroups(panel, event.detail === 0));
     this.panels[index] = panel;
     this.element.appendChild(element);
     checkIconStyles(element, "The ribbon");
@@ -550,7 +574,9 @@ export class Ribbon {
     this.popup.closeAll(false);
     for (const group of panel.groups.values()) {
       group.element.dataset.size = this.compact ? "medium" : "large";
+      delete group.element.dataset.overflow;
     }
+    panel.more.hidden = true;
     fitRibbon(
       panel.fitSteps,
       (step) => {
@@ -559,6 +585,57 @@ export class Ribbon {
       },
       () => panel.element.scrollWidth <= panel.element.clientWidth,
     );
+    this.foldIntoMore(panel);
+  }
+
+  /**
+   * When even every group collapsed does not fit, fold the last groups into
+   * the panel's labelled "More" button, so no group or label is cut at an edge.
+   */
+  private foldIntoMore(panel: PanelView): void {
+    const fits = () => panel.element.scrollWidth <= panel.element.clientWidth;
+    if (fits()) return;
+    panel.more.hidden = false;
+    const shown = [...panel.groups.values()].filter((group) => !group.element.hidden);
+    for (let index = shown.length - 1; index > 0 && !fits(); index--) {
+      const group = shown[index];
+      if (group !== undefined) group.element.dataset.overflow = "";
+    }
+    panel.element.scrollLeft = 0;
+  }
+
+  /** The groups folded into More, each under its name, with their labelled commands. */
+  private openMoreGroups(panel: PanelView, keyboard: boolean): void {
+    const trigger = panel.more;
+    if (this.popup.isOpen(trigger)) {
+      this.popup.closeFrom(trigger, keyboard);
+      return;
+    }
+    const folded = [...panel.groups.values()].filter(
+      (group) => group.element.dataset.overflow !== undefined,
+    );
+    const surface = document.createElement("div");
+    surface.className = "sheetwrite-ribbon-group-popup sheetwrite-ribbon-more-popup";
+    for (const group of folded) {
+      const section = document.createElement("div");
+      section.className = "sheetwrite-ribbon-more-section";
+      section.setAttribute("role", "group");
+      section.setAttribute("aria-label", group.spec.label);
+      const heading = document.createElement("div");
+      heading.className = "sheetwrite-ribbon-more-heading";
+      heading.setAttribute("aria-hidden", "true");
+      heading.textContent = group.spec.label;
+      section.append(heading, group.body);
+      surface.appendChild(section);
+    }
+    this.popup.open(trigger, surface, {
+      role: "group",
+      label: "More groups",
+      focus: keyboard,
+      onClose: () => {
+        for (const group of folded) group.element.prepend(group.body);
+      },
+    });
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {

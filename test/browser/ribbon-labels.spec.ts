@@ -6,13 +6,15 @@ import { expect, nextFrames, test } from "./fixtures.js";
 // label too. A group that no longer fits with its labels collapses into one
 // labelled button (the group's icon and name), as Excel's ribbon does, rather
 // than shrinking to bare icons. Excel's own icon rows stay as Excel draws them:
-// the dense Font, Alignment and Number rows, and the zoom box's − and +.
+// the dense Font, Alignment and Number rows, and the zoom box's − and +. No
+// label is ever cut: groups that still do not fit fold into one "More" button.
 
 /**
  * Selects each ribbon tab the row shows and lists the visible buttons with an
- * icon and no visible text, except the rows Excel draws as icons.
+ * icon and no visible text, except the rows Excel draws as icons, and every
+ * label cut by its button, the ribbon's scrolling rows or the page edge.
  */
-function bareIconsOnEveryTab(page: Page): Promise<string[]> {
+function labelProblemsOnEveryTab(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
     const ribbon = document.querySelector(".sheetwrite-ribbon");
     if (ribbon === null) return ["no ribbon"];
@@ -45,6 +47,38 @@ function bareIconsOnEveryTab(page: Page): Promise<string[]> {
       }
       return false;
     };
+    // A label is cut when its text box leaves its button, an ancestor that
+    // clips (a scrolling row), or the page; or when its own text overflows.
+    const cut = (button: Element) => {
+      const page = document.documentElement;
+      const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
+        if ((text.textContent ?? "").trim() === "") continue;
+        const parent = text.parentElement;
+        if (parent === null || hidden(parent, button)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        const box = range.getBoundingClientRect();
+        if (box.width <= 2) continue;
+        if (parent.scrollWidth > parent.clientWidth + 1) return text.textContent ?? "";
+        const boxes: DOMRect[] = [new DOMRect(0, 0, page.clientWidth, page.clientHeight)];
+        for (let node: Element | null = button; node !== null; node = node.parentElement) {
+          if (node === button || getComputedStyle(node).overflowX !== "visible") {
+            boxes.push(node.getBoundingClientRect());
+          }
+          if (node === ribbon) break;
+        }
+        const outside = boxes.some(
+          (edge) =>
+            box.left < edge.left - 1 ||
+            box.right > edge.right + 1 ||
+            box.top < edge.top - 1 ||
+            box.bottom > edge.bottom + 1,
+        );
+        if (outside) return text.textContent ?? "";
+      }
+      return undefined;
+    };
     const found: string[] = [];
     const tabs = [...ribbon.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-tabs [role=tab]")];
     for (const tab of tabs) {
@@ -53,20 +87,23 @@ function bareIconsOnEveryTab(page: Page): Promise<string[]> {
       await frames();
       for (const button of ribbon.querySelectorAll("button")) {
         if (!shown(button)) continue;
+        const group = button.closest(".sheetwrite-ribbon-group")?.getAttribute("aria-label");
+        const name = button.getAttribute("aria-label") ?? button.title;
+        const where = `${tab.textContent ?? ""}: ${group ?? "tab row"} › ${name}`;
+        const clipped = cut(button);
+        if (clipped !== undefined) found.push(`${where} label "${clipped.trim()}" is cut`);
         const icon = button.querySelector("svg, .sheetwrite-icon");
         if (icon === null || !shown(icon) || hasText(button)) continue;
         if (button.closest(".sheetwrite-ribbon-row") !== null) continue;
         if (button.closest('.sheetwrite-ribbon-group[aria-label="Zoom"]') !== null) continue;
-        const group = button.closest(".sheetwrite-ribbon-group")?.getAttribute("aria-label");
-        const name = button.getAttribute("aria-label") ?? button.title;
-        found.push(`${tab.textContent ?? ""}: ${group ?? "tab row"} › ${name}`);
+        found.push(`${where} shows an icon without its label`);
       }
     }
     return found;
   });
 }
 
-test("no ribbon button shows an icon without its label, on any tab, 1440 px to 320 px", async ({
+test("every ribbon button shows its whole label, on any tab, 1440 px to 320 px", async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -85,8 +122,8 @@ test("no ribbon button shows an icon without its label, on any tab, 1440 px to 3
     for (let width = 1_440; width >= 320; width -= 20) {
       await page.setViewportSize({ width, height: 900 });
       await nextFrames(page);
-      for (const bare of await bareIconsOnEveryTab(page)) {
-        problems.add(`${sidePanel ? "with" : "without"} panel at ${width} px, ${bare}`);
+      for (const problem of await labelProblemsOnEveryTab(page)) {
+        problems.add(`${sidePanel ? "with" : "without"} panel at ${width} px, ${problem}`);
       }
     }
   }
@@ -116,15 +153,22 @@ test("a collapsed group is one labelled button that opens its labelled commands"
   for (const name of ["Hide Rows", "Unhide Rows", "Hide Columns", "Unhide Columns"]) {
     await expect(page.getByRole("button", { name, exact: true })).toContainText(name);
   }
-  // The popup stays inside the page's visible area, scrollbar left out.
-  const inside = await page.evaluate(() => {
-    const item = [...document.querySelectorAll("button")].find(
-      (button) => button.textContent === "Unhide Columns" && button.getClientRects().length > 0,
+  // One column in the command model's order, inside the page's visible area
+  // (scrollbar left out).
+  const layout = await page.evaluate(() => {
+    const boxes = ["Hide Rows", "Unhide Rows", "Hide Columns", "Unhide Columns"].map((name) =>
+      [...document.querySelectorAll(".sheetwrite-ribbon-popup button")]
+        .find((button) => button.textContent === name)
+        ?.getBoundingClientRect(),
     );
-    const box = item?.getBoundingClientRect();
-    return box !== undefined && box.left >= 0 && box.right <= document.documentElement.clientWidth;
+    if (boxes.some((box) => box === undefined)) return "missing";
+    const [first, ...rest] = boxes as DOMRect[];
+    if (rest.some((box, index) => box.left !== first?.left || box.top <= (boxes[index]?.top ?? 0)))
+      return "not one column in order";
+    const right = Math.max(...boxes.map((box) => box?.right ?? 0));
+    return right <= document.documentElement.clientWidth ? "ok" : "outside the page";
   });
-  expect(inside).toBe(true);
+  expect(layout).toBe("ok");
   await page.keyboard.press("Escape");
   await expect(button).toHaveAttribute("aria-expanded", "false");
 });
