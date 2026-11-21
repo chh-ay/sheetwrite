@@ -146,7 +146,10 @@ export interface XlsxSpillExport {
   readonly values: readonly CellScalar[];
 }
 
-/** @internal Core-owned provenance for snapshots it materialized during this call. */
+/**
+ * What core tells an XLSX workbook backend about a snapshot it built for this
+ * export call. Core fills it; a backend only reads it.
+ */
 export interface XlsxWorkbookExportContext {
   readonly sourceTracked?: boolean;
   /** Static content of each dashboard sheet, which only core can compute. */
