@@ -60,18 +60,40 @@ function generalEditText(value: CellScalar, numberFormat: string | undefined): s
     return reread.kind === "literal" && reread.value === value ? value : `'${value}`;
   }
   if (typeof value !== "number") return cellScalarToText(value);
-  const kind = numberFormatDateKind(numberFormat);
-  const text =
-    kind === "date" || (kind === "time" && value >= 1)
-      ? formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss AM/PM")
-      : kind === "time"
-        ? formatNumber(value, "h:mm:ss AM/PM")
-        : numberFormat?.endsWith("%")
-          ? `${Number((value * 100).toPrecision(15))}%`
-          : null;
+  const text = formulaBarText(value, numberFormat);
   if (text === null) return cellScalarToText(value);
   const reread = parseCellEntry(text, "general").value;
   return reread.kind === "literal" && reread.value === value ? text : cellScalarToText(value);
+}
+
+/** Each format code's date kind; a workbook uses few codes, and Find asks once per cell. */
+const DATE_KIND_LIMIT = 256;
+const dateKinds = new Map<string, "date" | "time" | null>();
+
+function dateKindOf(format: string | undefined): "date" | "time" | null {
+  if (format === undefined) return null;
+  let kind = dateKinds.get(format);
+  if (kind === undefined) {
+    kind = numberFormatDateKind(format);
+    if (dateKinds.size >= DATE_KIND_LIMIT) dateKinds.clear();
+    dateKinds.set(format, kind);
+  }
+  return kind;
+}
+
+/**
+ * The text Excel's formula bar shows for a number in a date, time or percent
+ * format (`1/15/2026`, `9:30:00 PM`, `12%`), or null for any other format,
+ * where it shows the number as stored. In US English a time is on the
+ * 12-hour clock whatever the cell's format.
+ */
+export function formulaBarText(value: number, numberFormat: string | undefined): string | null {
+  const kind = dateKindOf(numberFormat);
+  if (kind === "date" || (kind === "time" && value >= 1)) {
+    return formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss AM/PM");
+  }
+  if (kind === "time") return formatNumber(value, "h:mm:ss AM/PM");
+  return numberFormat?.endsWith("%") ? `${Number((value * 100).toPrecision(15))}%` : null;
 }
 
 /**

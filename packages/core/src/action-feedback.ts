@@ -3,7 +3,8 @@ import type { ClipboardOutcome, Grid } from "./types/grid.js";
 
 /**
  * What a user reads when a built-in command cannot finish. Outcomes not
- * listed here ("done", "empty") need no message.
+ * listed here need no message: "done" and "empty", and "rejected", which the
+ * grid has already explained.
  */
 const CLIPBOARD_MESSAGES: Partial<Record<ClipboardOutcome, string>> = {
   blocked:
@@ -16,7 +17,13 @@ const CLIPBOARD_MESSAGES: Partial<Record<ClipboardOutcome, string>> = {
 const MESSAGE_MS = 6000;
 
 function isClipboardOutcome(value: unknown): value is ClipboardOutcome {
-  return value === "done" || value === "empty" || value === "blocked" || value === "unsupported";
+  return (
+    value === "done" ||
+    value === "empty" ||
+    value === "blocked" ||
+    value === "unsupported" ||
+    value === "rejected"
+  );
 }
 
 /** The text a user reads for a thrown value: the error message, or the value itself. */
@@ -33,11 +40,14 @@ export function errorDetail(cause: unknown): string {
  */
 class ActionFeedback {
   private readonly el: HTMLElement;
+  /** The grid's element, which gets the keyboard back after a notice's button runs. */
+  private readonly host: HTMLElement;
   private readonly lifetime: Scope;
   private readonly running = new Set<string>();
   private timer: number | undefined;
 
   constructor(host: HTMLElement, lifetime: Scope) {
+    this.host = host;
     this.el = document.createElement("div");
     this.el.className = "sheetwrite-action-status";
     this.el.setAttribute("role", "alert");
@@ -105,6 +115,8 @@ class ActionFeedback {
       button.addEventListener("click", () => {
         this.clear();
         action.run();
+        // The button hides with the notice: the grid keeps the keys, so Ctrl+Z undoes the action.
+        this.host.focus({ preventScroll: true });
       });
       this.el.append(" ", button);
     }

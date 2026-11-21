@@ -37,6 +37,8 @@ export interface AutoFilterMenuRequest {
   readonly filter: ColumnFilter | undefined;
   /** The text a value shows in the column. */
   readonly format: (value: CellScalar) => string;
+  /** Whether a listed number shows as a date, which a date list groups by year, month and day. */
+  readonly isDate: (value: number) => boolean;
   /** A typed condition value: a number, a date's serial, or text. */
   readonly parse: (text: string) => number | string;
   readonly canSort: boolean;
@@ -668,8 +670,14 @@ export class AutoFilterMenu {
     const dates: number[] = [];
     const others: ListItem[] = [];
     for (const value of session.shown) {
-      if (session.dated && typeof value === "number" && value >= 0) dates.push(value);
-      else others.push({ kind: "value", value });
+      if (
+        session.dated &&
+        typeof value === "number" &&
+        value >= 0 &&
+        session.request.isDate(value)
+      ) {
+        dates.push(value);
+      } else others.push({ kind: "value", value });
     }
     session.items = [
       { kind: "all" },

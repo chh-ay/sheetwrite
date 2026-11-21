@@ -105,6 +105,23 @@ describe("snake-case-internals", () => {
     }
   });
 
+  test("skips generated .gen.ts files, which their generator rewrites", async () => {
+    const directory = copyInput();
+
+    try {
+      writeFileSync(
+        join(directory, "routeTree.gen.ts"),
+        "const rootChildren = [1];\nexport const routeTree = rootChildren;\n",
+      );
+
+      const plan = await planRenames(join(directory, "tsconfig.json"), []);
+
+      expect(plan.renames.map((rename) => rename.oldName)).not.toContain("rootChildren");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test("a reflective call follows a private member of another project", async () => {
     const directory = copyInput();
 

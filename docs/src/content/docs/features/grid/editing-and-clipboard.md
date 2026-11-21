@@ -180,6 +180,8 @@ Four more options change how the cells land:
 
 Home › Paste and the context menu's Paste Options row also offer the common choices in one click: Paste, Values, Formulas, Formatting, Transpose and Paste Link.
 
+As in Excel, a pasted block writes into consecutive sheet rows, the rows a filter or Hide Rows hides included, and the grid says so. After such a paste the Paste Options row also offers **Paste into visible rows only**, which pastes the same cells again on the shown rows only, as one undo step. See [AutoFilter](/docs/features/data/autofilter/#copy-cut-and-fill-in-a-filtered-list).
+
 From code, `grid.actions.pasteSpecial(options)` pastes without the dialog, with the names of Excel's `Range.PasteSpecial`:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Add the copied numbers to the selected cells"
@@ -221,6 +223,7 @@ if (outcome === "blocked") console.warn("Allow clipboard access to paste.");
 | `"unsupported"` | The Clipboard API, or the method it needs, is missing. Examples: a non-secure context, or Firefox `readText`. |
 | `"blocked"` | The browser rejected the request, usually because of a permissions policy or missing user activation. |
 | `"empty"` | There is nothing to act on: no focused selection, an empty clipboard, or paste on a read-only grid. |
+| `"rejected"` | The grid refused the paste, so nothing was pasted: a protected range, the host's admission, or a document limit. The grid tells the user why, and fires `mutation-rejected`. |
 
 Custom UI can show the outcome without tripping global error monitoring.
 
