@@ -32,6 +32,11 @@ export interface HistoryPanelArchive {
     scope: HistoryRestoreScope,
     options?: HistoryRestoreOptions,
   ): Promise<ApplyTransactionResult>;
+  /**
+   * Frees the version that the archive keeps rebuilt between calls. The panel
+   * calls it when it closes and when the grid trims memory.
+   */
+  releaseMemory?(): void;
 }
 
 /** Host identity and persistence of one grid's version history panel. */
