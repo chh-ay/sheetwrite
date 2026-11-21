@@ -152,46 +152,6 @@ export function ReferenceOperatorsDiagram() {
   );
 }
 
-/** Lookup, criteria and financial: which rows a SUMIFS adds. */
-export function CriteriaRowsDiagram() {
-  return (
-    <CellsDiagram
-      pictures={[
-        {
-          title: "Criteria pick rows; the sum range adds them",
-          formula: '=SUMIFS(C1:C4,A1:A4,"East",…)',
-          cols: 3,
-          rows: 4,
-          cells: [
-            [0, 0, "East"],
-            [0, 1, "West"],
-            [0, 2, "East"],
-            [0, 3, "East"],
-            [1, 0, "12"],
-            [1, 1, "40"],
-            [1, 2, "8"],
-            [1, 3, "30"],
-            [2, 0, "100"],
-            [2, 1, "200"],
-            [2, 2, "300"],
-            [2, 3, "400"],
-          ],
-          ranges: [
-            { from: [0, 0], to: [2, 0], tone: "accent" },
-            { from: [0, 3], to: [2, 3], tone: "accent" },
-          ],
-          notes: ['With B1:B4 ">10": rows 1 and 4 = 500'],
-        },
-      ]}
-      text={{
-        title: "Which rows a SUMIFS adds",
-        description:
-          '=SUMIFS(C1:C4, A1:A4, "East", B1:B4, ">10") checks each row against every criteria pair. Rows 1 (East, 12) and 4 (East, 30) meet both, so it adds C1 and C4: 100 + 400 = 500. Row 2 is West and row 3 has 8, so they are skipped. The criteria ranges and the sum range have the same shape.',
-      }}
-    />
-  );
-}
-
 /** Authoring and references: how fill rewrites relative and absolute references. */
 export function ReferenceRewriteDiagram() {
   return (
@@ -311,7 +271,6 @@ export function VolatileClockDiagram() {
 export const FORMULA_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "dynamic-references": DynamicReferencesDiagram,
   "reference-operators": ReferenceOperatorsDiagram,
-  "criteria-rows": CriteriaRowsDiagram,
   "reference-rewrite": ReferenceRewriteDiagram,
   "custom-functions": CustomFunctionsDiagram,
   "volatile-clock": VolatileClockDiagram,

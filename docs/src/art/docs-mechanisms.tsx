@@ -3,7 +3,7 @@
 import type { JSX } from "solid-js";
 
 import { DocumentOpsFigure } from "./blueprint-figures.js";
-import { type FigureStep, FlowFigure, PairsFigure, TileFigure } from "./blueprint-layouts.js";
+import { FlowFigure, PairsFigure, TileFigure } from "./blueprint-layouts.js";
 
 /** Calculation engine › Spills. */
 export function SpillDiagram() {
@@ -108,49 +108,6 @@ export function VolatileDiagram() {
   );
 }
 
-/** What each error asks you to do, with the errors that ask it. */
-const RECOVERY_GROUPS: readonly FigureStep[] = [
-  {
-    title: "Fix the input",
-    code: ["SnapshotValidationError", "SyncProtocolError"],
-    tone: "danger",
-  },
-  { title: "Fix the option", code: ["DelimitedTextOptionsError"], tone: "danger" },
-  {
-    title: "Reduce it, or raise the limit",
-    code: ["SnapshotResourceError", "XlsxResourceError"],
-    tone: "muted",
-  },
-  {
-    title: "Reduce it, or change the limit",
-    code: ["DelimitedTextResourceError"],
-    tone: "muted",
-  },
-  { title: "Load the pages", code: ["IncompleteDataError"], tone: "accent" },
-  { title: "Drain pending work", code: ["SyncPendingCapacityError"], tone: "accent" },
-  {
-    title: "Read the cause or code",
-    code: ["PersistenceError"],
-    lines: ["Also the IndexedDB queue's error"],
-  },
-  { title: "The grid keeps working", code: ["renderer-fallback", "worker → canvas"] },
-];
-
-/** Error handling › Recovery by boundary. */
-export function RecoveryDiagram() {
-  return (
-    <TileFigure
-      columns={2}
-      text={{
-        title: "What each error asks you to do",
-        description:
-          "Fix the input for SnapshotValidationError, DelimitedTextOptionsError and SyncProtocolError. Reduce the input or raise the named limit for SnapshotResourceError, DelimitedTextResourceError and XlsxResourceError. Load the pages an IncompleteDataError names. Drain pending work after SyncPendingCapacityError. Read the cause or code of PersistenceError and IndexedDbPendingCommitStorageError. A worker failure switches to the canvas renderer and emits renderer-fallback.",
-      }}
-      tiles={RECOVERY_GROUPS}
-    />
-  );
-}
-
 /** Runtime ownership › Virtualization & scaled scroll. */
 export function VirtualScrollDiagram() {
   return (
@@ -200,32 +157,6 @@ export function GenerationsDiagram() {
         description:
           "onReady receives the grid, a one-based generation that increases whenever the adapter replaces its Grid, and a reason: initial after mount and WASM initialization, input-reset when a reset-classified input changed identity, or renderer-reset when renderer, workerUrl or renderers changed. The exposed handle is set before onReady and cleared when its generation is destroyed.",
       }}
-    />
-  );
-}
-
-/** Adapter lifecycle › Controlled values do not reset the document. */
-export function LiveOrResetDiagram() {
-  return (
-    <TileFigure
-      columns={3}
-      text={{
-        title: "Which props update in place, and which make a new generation",
-        description:
-          "theme, readOnly, config, overscan and minColumns update the current grid in place, as do callbacks and sizing. Changing the identity of workbook, data, datasource, datasourceStorage, presentation, editors, protectionResolver, mutationPolicy or transactionResourceLimits makes a new generation with reason input-reset; renderer, workerUrl or renderers make one with reason renderer-reset.",
-      }}
-      tiles={[
-        {
-          title: "Updated in place",
-          code: ["theme · readOnly · config", "overscan · minColumns"],
-          tone: "accent",
-        },
-        {
-          title: "New one: input-reset",
-          code: ["workbook · data · datasource", "presentation · editors …"],
-        },
-        { title: "New one: renderer-reset", code: ["renderer · workerUrl", "renderers"] },
-      ]}
     />
   );
 }
@@ -587,10 +518,8 @@ export const MECHANISM_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "error-flow": ErrorFlowDiagram,
   volatile: VolatileDiagram,
   "document-ops": DocumentOpsFigure,
-  recovery: RecoveryDiagram,
   "virtual-scroll": VirtualScrollDiagram,
   generations: GenerationsDiagram,
-  "live-or-reset": LiveOrResetDiagram,
   "csv-injection": CsvInjectionDiagram,
   "streaming-import": StreamingImportDiagram,
   "kept-parts": KeptPartsDiagram,

@@ -3,7 +3,6 @@ import { FORMAT_OPTIONS, STYLE_COMMANDS } from "@docs/showcases/scenarios/format
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
-import { FormattingDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { FormattingImported } from "../showcases/formatting/FormattingImported.js";
 import { FONT_FAMILIES, FormattingStage } from "../showcases/formatting/FormattingStage.js";
@@ -12,7 +11,6 @@ import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import FormattingSnippet from "../showcases/snippets/formatting.mdx";
 import FormattingSnippetSource from "../showcases/snippets/formatting.mdx?source";
 
-import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/formatting.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -24,7 +22,6 @@ export const Route = createFileRoute("/showcases/formatting")({
       "Style a live operating budget: typography, alignment, borders, conditional formatting, mixed per-cell number formats, and an executable XLSX round-trip proof.",
     ),
     links: [
-      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -38,11 +35,7 @@ function FormattingShowcase() {
     <NoHydration>
       <ShowcasePage
         explain={
-          <ShowcaseSection
-            id="formatting-notes"
-            figure={<FormattingDiagram />}
-            title="How formatting behaves"
-          >
+          <ShowcaseSection id="formatting-notes" title="How formatting behaves">
             <ul>
               <li>
                 Georgia, Arial and Courier New coexist with the theme font, and an unavailable
@@ -60,6 +53,35 @@ function FormattingShowcase() {
                 <a href="/showcases/interoperability/">spreadsheet interoperability</a>.
               </li>
             </ul>
+            <p>The same ledger, cell by cell:</p>
+            <div class="sw-table-frame">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cell and format</th>
+                    <th>Stored value</th>
+                    <th>Shown</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="sw-cell-short">G3, General</td>
+                    <td class="sw-cell-short">84250.125</td>
+                    <td class="sw-cell-short">84250.125</td>
+                  </tr>
+                  <tr>
+                    <td class="sw-cell-short">G5, Currency</td>
+                    <td class="sw-cell-short">84250.125</td>
+                    <td class="sw-cell-short">$84,250.13</td>
+                  </tr>
+                  <tr>
+                    <td class="sw-cell-short">D4, Currency</td>
+                    <td class="sw-cell-short">-1500</td>
+                    <td>-$1,500.00, with the conditional fill for a negative variance</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </ShowcaseSection>
         }
         code={{

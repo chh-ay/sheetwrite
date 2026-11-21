@@ -45,13 +45,35 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/concepts/documents-and-operations/": [
     { after: "document-protocol-and-storage-transactions", picture: "document-ops" },
   ],
-  "/docs/concepts/error-handling/": [{ after: "recovery-by-boundary", picture: "recovery" }],
+  "/docs/concepts/error-handling/": [
+    {
+      after: "recovery-by-boundary",
+      shot: {
+        name: "paste-refused",
+        size: "panel",
+        alt: "The Orders sheet with B3 selected, and the grid's message over it: Nothing was pasted: this paste has 16,385 columns, and a paste can have at most 16,384.",
+        caption:
+          "A paste past a limit is refused before anything is written, and the grid says why.",
+        narrow: {
+          tablet: {
+            name: "paste-refused-tablet",
+            alt: "The Orders sheet on a tablet-width grid, and the grid's message: Nothing was pasted: this paste has 16,385 columns, and a paste can have at most 16,384.",
+            caption: "A paste past a limit is refused, and the grid says why.",
+          },
+          phone: {
+            name: "paste-refused-phone",
+            alt: "The Orders sheet on a phone-width grid, and the grid's message: Nothing was pasted: this paste has 16,385 columns, and a paste can have at most 16,384.",
+            caption: "A paste past a limit is refused, and the grid says why.",
+          },
+        },
+      },
+    },
+  ],
   "/docs/concepts/runtime-ownership/": [
     { after: "virtualization--scaled-scroll", picture: "virtual-scroll" },
   ],
   "/docs/frameworks/lifecycle/": [
     { after: "readiness-is-generation-scoped", picture: "generations" },
-    { after: "controlled-values-do-not-reset-the-document", picture: "live-or-reset" },
   ],
   "/docs/import-export/": [{ after: AFTER_LEAD, picture: "xlsx" }],
   "/docs/import-export/csv-and-tsv/": [
@@ -144,7 +166,30 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
-  "/docs/features/grid/grid-methods/": [{ after: AFTER_LEAD, picture: "grid-handle" }],
+  "/docs/features/grid/grid-methods/": [
+    {
+      after: "views-sort-filter-hide-and-group",
+      shot: {
+        name: "grid-methods",
+        size: "panel",
+        alt: "The Orders data with its rows shown by Revenue, largest first. The top Revenue cell, $158,720, is selected, and the name box calls it E177: its place in the data.",
+        caption:
+          "setViewSort shows the rows by Revenue, largest first; the cells keep their order.",
+        narrow: {
+          tablet: {
+            name: "grid-methods-tablet",
+            alt: "Columns Month to Revenue with the rows shown by Revenue, largest first, and the top Revenue cell, E177, selected.",
+            caption: "setViewSort shows the rows by Revenue, largest first.",
+          },
+          phone: {
+            name: "grid-methods-phone",
+            alt: "Product, Units and Revenue with the rows shown by Revenue, largest first: $158,720, $135,040, $128,740.",
+            caption: "setViewSort shows the rows by Revenue, largest first.",
+          },
+        },
+      },
+    },
+  ],
   "/docs/features/grid/options-and-presentation/": [
     { after: "custom-cell-renderers", picture: "cell-renderer-hooks" },
     {
@@ -252,7 +297,27 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/formulas/lookup-criteria-and-financial/": [
-    { after: "criteria-semantics-and-shapes", picture: "criteria-rows" },
+    {
+      after: "criteria-semantics-and-shapes",
+      shot: {
+        name: "formula-bar",
+        size: "panel",
+        alt: "A revenue cell selected on the Report sheet, and the formula bar showing its formula, =SUMIFS(Orders[Revenue],Orders[Region],A3).",
+        caption: "A SUMIFS formula adds the Revenue of the Orders rows whose Region matches A3.",
+        narrow: {
+          tablet: {
+            name: "formula-bar-tablet",
+            alt: "C3 selected on the Report sheet, and the formula bar showing =SUMIFS(Orders[Revenue],Orders[Region],A3).",
+            caption: "A SUMIFS formula in the formula bar.",
+          },
+          phone: {
+            name: "formula-bar-phone",
+            alt: "The formula =SUMIFS(Orders[Revenue],Orders[Region],A3) in the formula bar, over the selected revenue cell, $4,047,955.",
+            caption: "A SUMIFS formula in the formula bar.",
+          },
+        },
+      },
+    },
   ],
   "/docs/features/formulas/offset-and-indirect/": [
     { after: "dynamic-references", picture: "dynamic-references" },
@@ -277,14 +342,33 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     { after: "update-packages-together", picture: "upgrade-0-6-0" },
   ],
   "/docs/start/upgrade-to-0-7-0/": [
-    { after: "update-packages-together", picture: "upgrade-0-7-0" },
+    {
+      after: "sort",
+      shot: {
+        name: "sort",
+        size: "app",
+        alt: "The Sort panel beside the Orders sheet: the range A1:E12, My data has headers checked, and a sort level by Month.",
+        caption: "The Sort panel sorts the cells of a range in place, as Excel's Sort does.",
+        narrow: {
+          tablet: {
+            name: "sort-tablet",
+            alt: "The Sort panel: the range A1:E12, My data has headers checked, a sort level by Month, and Sort view only unchecked.",
+            caption: "The Sort panel sorts the cells in place.",
+          },
+          phone: {
+            name: "sort-phone",
+            alt: "The Sort panel: the range A1:E12, My data has headers checked, a sort level by Month from A to Z, and Sort view only unchecked.",
+            caption: "The Sort panel sorts the cells in place.",
+          },
+        },
+      },
+    },
   ],
   "/docs/import-export/libreoffice-compatibility/": [
     { after: "what-the-comparison-proves", picture: "libreoffice-round-trip" },
   ],
   "/docs/import-export/xlsx-export/": [{ after: "table-interchange", picture: "xlsx-exports" }],
   "/docs/reference/api-contract/": [{ after: AFTER_LEAD, picture: "api-gate" }],
-  "/docs/reference/compatibility-limits/": [{ after: AT_START, picture: "limits" }],
   "/docs/reference/document-operations/": [{ after: "snapshots-and-rebase", picture: "rebase" }],
   "/docs/reference/events/": [{ after: "event-direction", picture: "event-direction" }],
   "/docs/performance/benchmark-protocol/": [
@@ -387,7 +471,6 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/analysis/pivot-tables/": [
-    { after: "define-a-pivot", picture: "pivot-output" },
     {
       after: AFTER_LEAD,
       shot: {

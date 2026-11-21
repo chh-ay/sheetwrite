@@ -146,6 +146,25 @@ async function select(page: Page, selection: GridSelection) {
   await settle(page);
 }
 
+/**
+ * A paste of one row of 16,385 columns, one more than a paste may have: the
+ * grid refuses it before anything is written, and says why.
+ */
+function pasteRefused(name: string, size: ShotSize): Shot {
+  return {
+    name,
+    size,
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 2, col: 1 } });
+      await page.evaluate(() => navigator.clipboard.writeText(`${"1\t".repeat(16_384)}1`));
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.paste());
+      await page.locator(".sheetwrite-action-status", { hasText: "Nothing was pasted" }).waitFor();
+      await settle(page);
+    },
+  };
+}
+
 const PAGE_SHOTS: readonly Shot[] = [
   // The dashboard hero, cropped to the items so the chart and the pivot show
   // whole. Shown at about its own width in the docs column, so its labels stay
@@ -526,6 +545,24 @@ const PAGE_SHOTS: readonly Shot[] = [
       await settle(page);
     },
   },
+  // The Grid methods page's view sort on the Orders data: the rows shown by
+  // Revenue, largest first, while the cells keep their order.
+  {
+    name: "grid-methods",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },
+    steps: async (page) => {
+      await page.evaluate(() =>
+        window.__sheetwriteFigureGrid?.setViewSort([{ col: 4, ascending: false }]),
+      );
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 4 } });
+    },
+  },
+  // The paste refused past its limits, at the page size and at the tablet and
+  // phone sizes: its message is wider than a phone crop of the page size.
+  pasteRefused("paste-refused", "panel"),
+  pasteRefused("paste-refused-tablet", "sectionTablet"),
+  pasteRefused("paste-refused-phone", "sectionPhone"),
   // The formula assist demo's stage and budget: March's total in D13, whose
   // neighbours left and right agree, so `=` in the formula bar shows the rest.
   // The Formula assist page shows it at the panel size.
@@ -572,6 +609,10 @@ const SECTION_CROPS: Readonly<
   filter: { tablet: { x: 8, y: 0 }, phone: { x: 48, y: 66 } },
   // The formula bar over the sheet; then the formula over the selected cell.
   "formula-bar": { tablet: { x: 0, y: 0 }, phone: { x: 100, y: 66 } },
+  // The formula bar and columns A to E in the view sort; then Product, Units and Revenue.
+  "grid-methods": { tablet: { x: 12, y: 66 }, phone: { x: 248, y: 100 } },
+  // The Sort panel beside the sheet; then the panel from its range to the Sort button.
+  sort: { tablet: { x: 640, y: 158 }, phone: { x: 880, y: 192 } },
 };
 
 /**

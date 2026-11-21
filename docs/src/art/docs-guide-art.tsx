@@ -5,14 +5,7 @@
 // comes from the page the diagram sits on.
 import type { JSX } from "solid-js";
 
-import {
-  ExchangeFigure,
-  FanFigure,
-  type FigureStep,
-  FlowFigure,
-  PairsFigure,
-} from "./blueprint-layouts.js";
-import type { BlueprintText } from "./blueprint.js";
+import { ExchangeFigure, FanFigure, type FigureStep, FlowFigure } from "./blueprint-layouts.js";
 
 /** One framework's adapter: what the app passes in and what comes back out. */
 interface Adapter {
@@ -249,50 +242,6 @@ export function ShellTutorialDiagram() {
   );
 }
 
-/** One API change: the old call and what replaces it. */
-type ApiChange = readonly [before: string, after: string];
-
-/** Old calls on the left, their replacements on the right. */
-function MigrationDiagram(props: Readonly<{ text: BlueprintText; changes: readonly ApiChange[] }>) {
-  return (
-    <PairsFigure
-      pairs={props.changes.map(([before, after], index) => ({
-        from: {
-          ...(index === 0 ? { eyebrow: "Before" } : {}),
-          title: "",
-          code: before.split("\n"),
-        },
-        to: {
-          ...(index === 0 ? { eyebrow: "After" } : {}),
-          title: "",
-          code: after.split("\n"),
-          tone: "accent",
-        },
-      }))}
-      text={props.text}
-    />
-  );
-}
-
-export function Upgrade070Diagram() {
-  return (
-    <MigrationDiagram
-      changes={[
-        ["grid.setSort(keys)", "grid.setViewSort(keys)"],
-        ["grid.sortBy(col)\n// sorted the view", "grid.sortBy(col)\n// sorts the cells"],
-        ["new RevisionCoordinator(…)", "HistoryArchive.open({ … })"],
-        ['import "…/xlsx/register"', "initSheetwrite({ addons })\n// addons: [xlsxAddon()]"],
-        ["initSheetwrite(source, engine)", "initSheetwrite(options)\n// { source, engine }"],
-      ]}
-      text={{
-        title: "The main API changes in 0.7.0",
-        description:
-          "grid.setSort and sortByMulti are removed: use grid.setViewSort. grid.sortBy used to sort the view and now sorts the cells in place. RevisionCoordinator is replaced by HistoryArchive.open({ documentId, storage }). Register add-ons with initSheetwrite({ addons: [xlsxAddon()] }) instead of importing @sheetwrite/xlsx/register, and pass initSheetwrite one options object, { source, engine }.",
-      }}
-    />
-  );
-}
-
 export function Upgrade060Diagram() {
   return (
     <FanFigure
@@ -403,7 +352,6 @@ export const GUIDE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "tutorial-svelte": SvelteTutorialDiagram,
   "tutorial-nodejs": NodeTutorialDiagram,
   "tutorial-shell": ShellTutorialDiagram,
-  "upgrade-0-7-0": Upgrade070Diagram,
   "upgrade-0-6-0": Upgrade060Diagram,
   "engine-memory-release": EngineMemoryReleaseDiagram,
   "regression-check": RegressionCheckDiagram,
