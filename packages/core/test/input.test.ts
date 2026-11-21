@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
+import type { DocumentOp, Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -267,6 +267,24 @@ describe("pointer input: touch policy", () => {
 
     const at = (row: number) => ({ sheet: "s1", row, col: 1 });
 
+    it("fills only the rows a filter shows, from the fill handle, as Excel does", () => {
+      const { grid, store, scroller, workbook } = makeGrid();
+      // Tokyo is in sheet rows 1, 4 and 7, which the view shows as rows 0 to 2.
+      grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+
+      // One number copies, as in Excel; the hidden rows between keep their values.
+      expect([1, 2, 3, 4, 5, 6, 7].map((row) => store.getCell(at(row)).resolved)).toEqual([
+        10.5, 20.5, 30.5, 10.5, 50.5, 60.5, 10.5,
+      ]);
+      grid.destroy();
+      store.dispose();
+    });
+
     it("shows the value the last cell will get beside the dragged fill handle, as Excel does", () => {
       const { grid, store, scroller, workbook, host } = makeGrid();
       store.applyTransaction({
@@ -323,6 +341,104 @@ describe("pointer input: touch policy", () => {
       expect(store.getCell(at(7)).resolved).toBe(70.5);
       grid.destroy();
       store.dispose();
+    });
+
+    describe("data validation, as Excel's fill copies it", () => {
+      const list = (id: string, row: number, col: number, values: string[]): DocumentOp => ({
+        op: "setValidationRule",
+        sheet: "s1",
+        rule: {
+          id,
+          range: { sheet: "s1", start: { row, col }, end: { row, col } },
+          condition: { kind: "list", values },
+          policy: "reject",
+        },
+      });
+      /** The conditions of the rules over a cell. */
+      const rulesAt = (store: SheetwriteStore, row: number, col = 1): unknown[] =>
+        (store.getWorkbook().sheets[0]?.validationRules ?? [])
+          .filter(
+            ({ range }) =>
+              range.start.row <= row &&
+              row <= range.end.row &&
+              range.start.col <= col &&
+              col <= range.end.col,
+          )
+          .map((rule) => rule.condition);
+      const fruit = { kind: "list", values: ["Apple", "Pear"] };
+      const other = { kind: "list", values: ["X", "Y"] };
+      const key = (host: HTMLElement, key: string): void => {
+        host.dispatchEvent(
+          new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true, cancelable: true }),
+        );
+      };
+
+      it("gives the filled cells the source's rule in place of their own, with the fill handle, Ctrl+D and Ctrl+R", () => {
+        const { grid, store, scroller, workbook, host } = makeGrid();
+        store.applyTransaction({
+          patches: [
+            { op: "set", addr: at(1), value: { kind: "literal", value: "Apple" } },
+            list("fruit", 1, 1, ["Apple", "Pear"]),
+            list("other", 2, 1, ["X", "Y"]),
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: at(1) });
+
+        scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointermove", cellPoint(3, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointerup", cellPoint(3, 1, workbook)));
+        // The filled value lands although B3's old rule refused it, as in Excel.
+        expect([2, 3].map((row) => store.getCell(at(row)).resolved)).toEqual(["Apple", "Apple"]);
+        expect([1, 2, 3].map((row) => rulesAt(store, row))).toEqual([[fruit], [fruit], [fruit]]);
+
+        grid.setSelection({
+          kind: "range",
+          range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 5, col: 1 } },
+        });
+        key(host, "d");
+        expect([4, 5].map((row) => rulesAt(store, row))).toEqual([[fruit], [fruit]]);
+
+        grid.setSelection({
+          kind: "range",
+          range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 2 } },
+        });
+        key(host, "r");
+        expect(rulesAt(store, 1, 2)).toEqual([fruit]);
+
+        grid.actions.undo();
+        expect(rulesAt(store, 1, 2)).toEqual([]);
+        grid.destroy();
+        store.dispose();
+      });
+
+      it("keeps the target's rules for Fill Without Formatting only", () => {
+        const { grid, store, scroller, workbook, host } = makeGrid();
+        store.applyTransaction({
+          patches: [
+            { op: "set", addr: at(1), value: { kind: "literal", value: "Apple" } },
+            list("fruit", 1, 1, ["Apple", "Pear"]),
+            list("other", 2, 1, ["X", "Y"]),
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: at(1) });
+        const before = store.getCell(at(2)).resolved;
+        const choose = (label: string): void => {
+          host.querySelector<HTMLElement>(".sheetwrite-auto-fill-options")?.click();
+          const rows = host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu-item");
+          [...rows].find((row) => row.textContent === label)?.click();
+        };
+
+        scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+        scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+        choose("Fill Without Formatting");
+        expect([store.getCell(at(2)).resolved, rulesAt(store, 2)]).toEqual(["Apple", [other]]);
+        // Excel counts a cell's validation with its formats.
+        choose("Fill Formatting Only");
+        expect([store.getCell(at(2)).resolved, rulesAt(store, 2)]).toEqual([before, [fruit]]);
+        grid.destroy();
+        store.dispose();
+      });
     });
 
     it("redoes a fill from the Auto Fill Options button as one undo step", () => {
@@ -499,6 +615,94 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 });
+
+// Excel copies and fills the rows hidden with Hide Rows; only the rows a
+// filter hides stay out ("Copy visible cells only").
+describe("rows hidden by hand, as Excel's copy and fill take them", () => {
+  /** B1:B6 hold 1, 2 and blanks, C1 holds x, and row 3 is hidden. */
+  function hiddenRowGrid(): ReturnType<typeof makeGrid> {
+    const harness = makeGrid();
+    const set = (row: number, col: number, value: number | string | null): DocumentOp => ({
+      op: "set",
+      addr: { sheet: "s1", row, col },
+      value: { kind: "literal", value },
+    });
+    harness.store.applyTransaction({
+      patches: [
+        ...[0, 1, 2, 3, 4, 5].flatMap((row) => [
+          set(row, 1, row < 2 ? row + 1 : null),
+          set(row, 2, row === 0 ? "x" : null),
+        ]),
+      ],
+    });
+    harness.grid.actions.hideRows([2]);
+    return harness;
+  }
+  const value = (store: SheetwriteStore, row: number, col: number) =>
+    store.getCell({ sheet: "s1", row, col }).resolved;
+  const select = (grid: Grid, r0: number, c0: number, r1: number, c1: number): void => {
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: r0, col: c0 }, end: { row: r1, col: c1 } },
+    });
+  };
+  const ctrl = (host: HTMLElement, key: string): void => {
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+  };
+
+  it("copies the hidden row with the rows around it", async () => {
+    const { grid, store } = hiddenRowGrid();
+    let written: Record<string, Blob> = {};
+    Object.defineProperty(globalThis, "ClipboardItem", {
+      configurable: true,
+      value: class {
+        constructor(entries: Record<string, Blob>) {
+          written = entries;
+        }
+      },
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { write: () => Promise.resolve() },
+    });
+    store.applyTransaction({
+      patches: [2, 3].map((row) => ({
+        op: "set" as const,
+        addr: { sheet: "s1", row, col: 1 },
+        value: { kind: "literal" as const, value: row + 1 },
+      })),
+    });
+    // View rows 0 to 2 are sheet rows 1, 2 and 4: B3 is hidden between them.
+    select(grid, 0, 1, 2, 1);
+    expect(await grid.actions.copy()).toBe("done");
+    expect(await written["text/plain"]?.text()).toBe("1\r\n2\r\n3\r\n4");
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("fills the hidden row with the fill handle, Ctrl+D and Ctrl+R, a series counting through it", () => {
+    const { grid, store, scroller, workbook, host } = hiddenRowGrid();
+    select(grid, 0, 1, 1, 1);
+    // Drag B1:B2's handle to view row 3, sheet row 5.
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(3, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(3, 1, workbook)));
+    expect([2, 3, 4].map((row) => value(store, row, 1))).toEqual([3, 4, 5]);
+
+    select(grid, 0, 2, 3, 2);
+    ctrl(host, "d");
+    expect([1, 2, 3, 4].map((row) => value(store, row, 2))).toEqual(["x", "x", "x", "x"]);
+
+    select(grid, 0, 1, 3, 2);
+    ctrl(host, "r");
+    expect([0, 1, 2, 3, 4].map((row) => value(store, row, 2))).toEqual([1, 2, 3, 4, 5]);
+    grid.destroy();
+    store.dispose();
+  });
+});
+
 describe("pointer input: drag lifecycle", () => {
   it("pointercancel mid fill-drag clears the preview and commits nothing", () => {
     const { grid, store, scroller, workbook } = makeGrid();

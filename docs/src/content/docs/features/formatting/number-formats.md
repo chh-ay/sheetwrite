@@ -114,6 +114,8 @@ grid.styleRange(
 
 The code `General` takes a cell out of its column's format.
 
+A number with no format, `General` or the Text format `@` shows as Excel's General format shows it: no thousands separators, up to 11 characters (the minus sign not counted), and scientific notation when its whole part does not fit or it is below 0.0001. So `2026` shows as `2026`, `0.0001234` as `0.0001234` and `123456789012` as `1.23457E+11`. In a narrow cell the number takes fewer decimals, then scientific notation, before it shows `####`.
+
 XLSX import keeps each cell's own format, so a column that mixes formats round-trips cell by cell.
 
 ### What typing stores
@@ -133,7 +135,7 @@ A column's `type` decides how a typed entry is read. The columns Sheetwrite make
 | `9:30`, `9:30 PM` | 0.3958…, 0.8958… | `h:mm`, `h:mm AM/PM` |
 | `'007` | the text `007` | none |
 
-The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
+The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
 
 The grid actions `setNumberFormat(code: string | null)` and `stepDecimals(direction: 1 | -1)` change the format of the selection. `setNumberFormat(null)` returns the cells to the column's format. `stepDecimals` shows one more (`1`) or one fewer (`-1`) decimal place than the focus cell does.
 

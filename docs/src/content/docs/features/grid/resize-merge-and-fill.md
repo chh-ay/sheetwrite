@@ -83,7 +83,7 @@ As in Excel, when more than one cell of the range holds a value, Merge, Merge & 
 
 ## Drag-to-fill
 
-A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the new region. The dominant axis wins. As in Excel, the fill continues a series along the direction you drag and copies everything else, with each source cell's format:
+A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the new region. The dominant axis wins. As in Excel, the fill continues a series along the direction you drag and copies everything else, with each source cell's format and data validation rules (see [Paste and validation](/docs/features/data/validation-protection-and-notes/#paste-and-validation)):
 
 | Source | Fill |
 | --- | --- |
@@ -101,6 +101,8 @@ A small fill handle sits at the bottom-right corner of the selection. Drag it **
 
 Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
 
+Rows hidden by hand (Hide Rows or a collapsed group) between the rows a fill covers fill too, and a series counts through them, as in Excel; the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R over a range all do this. With one cell selected, Ctrl/Cmd + D and Ctrl/Cmd + R copy only the cell before it. Rows a filter hides are not filled (see below).
+
 While you drag, a tip beside the pointer shows the value the last cell will get, as in Excel, with Ctrl counted as you move. A cell that will get a formula shows no tip.
 
 Every new cell on screen also shows the value it will get, as faint text in the cell, so you see the whole series and catch a wrong pattern (a copy instead of a series, a step of 2) before you release. A cell that will get a formula shows nothing until it is written. Only the cells on screen are drawn, so a fill of 10,000 cells costs about half a millisecond per pointer move in Chromium. Esc ends the drag without filling, as in Excel.
@@ -111,8 +113,8 @@ After a drag or a double-click on the fill handle, the **Auto Fill Options** but
 | --- | --- |
 | Copy Cells | Copies the source cells, with their formats. |
 | Fill Series | Continues the series; one number counts up by 1. |
-| Fill Formatting Only | Copies only the formats; the cells keep their values. |
-| Fill Without Formatting | Fills the values; the cells keep their formats. |
+| Fill Formatting Only | Copies only the formats and the data validation rules; the cells keep their values. |
+| Fill Without Formatting | Fills the values; the cells keep their formats and their data validation rules. |
 | Fill Days, Fill Weekdays, Fill Months, Fill Years | Offered for dates: steps the first date by a day, a weekday (skipping Saturday and Sunday), a month or a year per cell. |
 
 Any other change, or a switch to another sheet, removes the button, as in Excel. Sheetwrite has no Flash Fill, so the menu does not offer it. A grid with `contextMenu: false` shows no button. See Microsoft's [Fill data automatically in worksheet cells](https://support.microsoft.com/en-us/excel/get-started/fill-data-automatically-in-worksheet-cells).
@@ -150,7 +152,7 @@ See [Formulas → Point mode and reference rewriting](/docs/features/formulas/au
 ## Edge cases and limits
 
 - Merges are **not drawn while a sort or filter view is active**, because the display order no longer maps cleanly to the merged region. Clear the view to see them again. See [Data operations](/docs/features/data/data-operations/#display-views).
-- Drag-to-fill is unavailable while a sort or filter view is active (the handle is hidden). When `readOnly` is on, the handle still shows, but a fill changes nothing.
+- While a filter hides rows, the fill handle fills only the rows that show, as in Excel; the hidden rows between keep their values. Rows hidden with Hide Rows fill, as in Excel. Under a view sort it fills the rows in the order they show. When `readOnly` is on, the handle still shows, but a fill changes nothing.
 - A resize preview does not change the document. Only the release commits.
 
 ## See also

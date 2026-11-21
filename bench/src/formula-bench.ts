@@ -401,9 +401,10 @@ export function validateRecordedFormulaCapture(capture: FormulaBenchmarkResult):
 }
 
 // Check every entry path before it can load or measure the selected baseline.
-if (ENGINE_ROOT !== undefined) {
-  captureEngineBaselineContext(protocolCaptureMeta().commit, [ENGINE_PACKAGE]);
-}
+const BASELINE_CONTEXT =
+  ENGINE_ROOT === undefined
+    ? undefined
+    : captureEngineBaselineContext(protocolCaptureMeta().commit, [ENGINE_PACKAGE]);
 
 function allocationAt(store: CellStore): FormulaAllocationSample {
   const memory = Array.from(store.memoryStats());
@@ -630,11 +631,28 @@ export function collectFixture(
   };
 }
 
+/**
+ * An earlier release's engine, captured as a release baseline, predates some
+ * rows of the expanded matrix: it lacks their API or answers them differently.
+ * Such a row is left out, as in any recorded capture of an older matrix, and
+ * the release comparison shows it as new in the candidate. Every engine must
+ * run the core rows.
+ */
 function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
   const samples = smoke ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
-  return formulaWorkloads(smoke).map(({ id, size, rangeSize }) =>
-    collectFixture(id, size, () => createFormulaFixture(id, size, rangeSize), samples),
-  );
+  const results: CompleteFormulaWorkloadResult[] = [];
+  for (const { id, size, rangeSize } of formulaWorkloads(smoke)) {
+    try {
+      results.push(
+        collectFixture(id, size, () => createFormulaFixture(id, size, rangeSize), samples),
+      );
+    } catch (error) {
+      if (BASELINE_CONTEXT === undefined || !EXPANDED_FORMULA_WORKLOAD_IDS.has(id)) throw error;
+      const reason = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${formulaWorkloadKey({ id, size })} left out: ${reason}\n`);
+    }
+  }
+  return results;
 }
 
 /** One side of a paired formula gate comparison: aggregated timings and exact counters. */

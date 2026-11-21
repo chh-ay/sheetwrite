@@ -547,7 +547,7 @@ export async function validateFormulaContractRepository(
   const [schemaSource, inventorySource, parserSource, analysisSources] = await Promise.all([
     readFile(resolve(root, SCHEMA_PATH), "utf8"),
     inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
-    readFile(resolve(root, "packages/wasm/src/calc.rs"), "utf8"),
+    readFile(resolve(root, "packages/wasm/src/calc/functions.rs"), "utf8"),
     readAnalysisSources(root),
   ]);
   let schema: unknown;

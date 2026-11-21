@@ -25,6 +25,7 @@ export type CapabilityOwnerId =
   | "spreadsheet"
   | "analysis"
   | "sort"
+  | "formula-assist"
   | "queries"
   | "data-model"
   | "version-history"
@@ -208,6 +209,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.analysis.tsx",
     responsibility:
       "Pivot tables and live charts over two years of orders: a pivot by month and region, a chart over its output, and the side panel that edits both.",
+    kind: "capability",
+  },
+  {
+    id: "formula-assist",
+    label: "Formula assist",
+    href: "/showcases/formula-assist/",
+    routeFile: "docs/src/routes/showcases.formula-assist.tsx",
+    responsibility:
+      "The optional formula-assist add-on: ghost-text formula suggestions in the formula bar, Tab, Ctrl+→ and Esc, the benchmark behind them, and a recorded demo.",
     kind: "capability",
   },
   {
@@ -599,6 +609,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
     boundary:
       "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+  },
+  {
+    id: "editing.formula-assist",
+    title: "Formula suggestions",
+    area: "editing",
+    primary: "formula-assist",
+    interaction:
+      "Type `=` in the formula bar on an empty total: the rest of the formula shows as ghost text; Tab takes it, Ctrl+→ one word, Esc hides it.",
+    scope: "browser",
+    accessibility:
+      "The ghost text is drawn outside the accessibility tree; a polite status announces a suggestion once it holds, and every key works from the keyboard.",
+    testPath: "test/browser/showcase-formula-assist.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/formula-assist.ts"],
+    boundary:
+      "Predictions are local and deterministic, from the open workbook only; the add-on sends nothing to a host or network.",
   },
   {
     id: "data.sort-in-place",

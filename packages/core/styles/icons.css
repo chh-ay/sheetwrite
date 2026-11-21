@@ -478,3 +478,7 @@
   --sheetwrite-icon-x: -3;
   --sheetwrite-icon-y: -18;
 }
+.sheetwrite-icon[data-icon="pasteVisibleRows"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -19.5;
+}

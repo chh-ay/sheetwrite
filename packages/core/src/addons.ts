@@ -108,6 +108,16 @@ export class AddonRegistry {
           historyCommand(command) {
             grid.historyCommand = command;
           },
+          formulaSuggestions(suggester) {
+            const registered = import("./formula-suggestions.js").then((seam) =>
+              seam.setFormulaSuggester(grid.store, suggester),
+            );
+            const remove = (): void => {
+              void registered.then((unregister) => unregister());
+            };
+            grid.addCleanup(remove);
+            return remove;
+          },
         });
         if (cleanup) grid.addCleanup(cleanup);
       }

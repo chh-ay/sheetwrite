@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@2.3.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "chh-ay/sheetwrite" }],
+  "changelog": ["./changelog.js", { "repo": "chh-ay/sheetwrite" }],
   "commit": false,
   "fixed": [
     [
@@ -10,6 +10,7 @@
       "@sheetwrite/core",
       "@sheetwrite/xlsx",
       "@sheetwrite/charts",
+      "@sheetwrite/formula-assist",
       "@sheetwrite/react",
       "@sheetwrite/vue",
       "@sheetwrite/svelte"

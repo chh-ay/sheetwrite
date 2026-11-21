@@ -638,6 +638,11 @@ export class GridImpl implements Grid {
 
   /** The shell's formula bar hearing the cell edit's draft (internal, see `edit-draft.ts`). */
   private readonly editDraftListeners = new Set<EditDraftSink>();
+  /**
+   * The active cell when {@link goToCell} went to a row the view hides, in
+   * sheet coordinates; null otherwise. The selection is then empty.
+   */
+  private hiddenActive: CellAddress | null = null;
 
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -973,13 +978,18 @@ export class GridImpl implements Grid {
       lifetime: this.lifetime,
       store: this.store,
       selection: () => this.selection,
+      hiddenActive: () => this.hiddenActive,
       activeSheet: () => this.activeSheet,
       sheet: () => this.sheet(),
       colIndices: () => this.geometry.columnIndices,
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      rowSpan: (first, last) => this.rowSpan(first, last),
       commit: (patches, reason) => this.document.commit(patches, reason),
+      undo: () => this.undo(),
+      lastUndo: () => this.document.lastUndo,
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
       askPasteSpecial: (ownCopy) =>
@@ -991,18 +1001,29 @@ export class GridImpl implements Grid {
       onValidationRefused: (refused, warned) => {
         this.validationRefusedNotice(refused, warned);
       },
+      onPasteRefused: (result) => {
+        this.actionFeedback.show(`Nothing was pasted: ${pasteRefusalReason(result)}`);
+      },
       validationReads: () => storeEngine(this.store)?.validationReads,
-      // Excel's cut moves the rows a filter or Hide Rows hides without a word;
-      // say so. Show them clears the filters and shows the step's hidden rows,
-      // as one undo step.
+      // Excel's cut moves, and its paste writes into, the rows a filter or
+      // Hide Rows hides without a word; say so. Show them clears the filters
+      // and shows the step's hidden rows, as one undo step.
       onHiddenRowsMoved: (count, step, spans) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
+        // The rows are the sheet's that is active now; Show them acts on it
+        // even after a switch to another sheet.
+        const sheetId = this.activeSheet;
         this.actionFeedback.show(
-          step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
+          step === "cut"
+            ? `This cut includes ${rows}.`
+            : step === "paste"
+              ? `This paste moved ${rows}.`
+              : `This paste wrote into ${rows}. Paste Options › Paste into visible rows only skips them.`,
           {
             label: "Show them",
             run: () => {
-              const sheet = this.sheet();
+              const sheet = this.sheetById(sheetId);
+              if (!sheet) return;
               const shown = [...(sheet.hiddenRows ?? [])].filter((row) =>
                 spans.some(({ start, end }) => row >= start && row <= end),
               );
@@ -1088,6 +1109,14 @@ export class GridImpl implements Grid {
       columnHeader: (col) => this.columnHeader(col),
       toViewRow: (row) => this.toViewRow(row),
       editListeners: this.listeners,
+      hiddenActive: () => this.hiddenActive,
+      nearestShownRow: (row, direction) => this.nearestShownRow(row, direction),
+      editActiveCell: (initial) => {
+        for (const listener of this.editDraftListeners) {
+          if (listener.edit?.(initial)) return true;
+        }
+        return false;
+      },
       editDraft: {
         text: (value) => {
           for (const listener of this.editDraftListeners) listener.text(value);
@@ -1152,6 +1181,7 @@ export class GridImpl implements Grid {
         this.screenRect(row, col, contentTop, scrollLeft),
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
+      rowSpan: (first, last) => this.rowSpan(first, last),
       clearSelection: () => this.clearSelection(),
       emitSelection: () => this.emitSelection(),
       scrollToCell: (addr) => this.scrollToCell(addr),
@@ -1476,6 +1506,18 @@ export class GridImpl implements Grid {
         this.emitSelection();
         this.scroller.scrollTop = 0;
         this.readWindows.invalidateData();
+      }
+    }
+
+    // A filter cleared or changed: the hidden active cell is selected once its
+    // row shows.
+    const hidden = this.hiddenActive;
+    if (hidden && effects & RECONCILE_VIEW) {
+      const row = this.toViewRow(hidden.row);
+      if (row !== null) {
+        const cell = { ...hidden, row };
+        this.setSelection({ kind: "cell", addr: cell });
+        this.scrollToCell(cell);
       }
     }
 
@@ -2036,6 +2078,32 @@ export class GridImpl implements Grid {
   }
 
   /**
+   * The data rows that view rows `first` to `last` span, with the rows hidden
+   * by hand (Hide Rows or a collapsed group) between them, as Excel's copy and
+   * fill take them. Null when a sort orders the view or a filter hides a row
+   * between them: then only the rows the view shows count, as in Excel.
+   */
+  private rowSpan(first: number, last: number): { first: number; last: number } | null {
+    const sheet = this.sheet();
+    if ((sheet.sortKeys?.length ?? 0) > 0) return null;
+    const start = this.toDataRow(first);
+    const end = this.toDataRow(last);
+    const gaps = end - start - (last - first);
+    if (gaps === 0) return { first: start, last: end };
+    const hidden = new Set<number>();
+    for (const row of sheet.hiddenRows ?? []) {
+      if (row > start && row < end) hidden.add(row);
+    }
+    for (const group of sheet.rowGroups ?? []) {
+      if (!group.collapsed) continue;
+      for (let row = Math.max(group.start, start + 1); row <= Math.min(group.end, end - 1); row++) {
+        hidden.add(row);
+      }
+    }
+    return hidden.size === gaps ? { first: start, last: end } : null;
+  }
+
+  /**
    * Select the cells that `patches` change and scroll to them, as Excel's
    * undo and redo do. When they change no cell of the active sheet, the
    * sheet of the first changed cell becomes active first, so the change is
@@ -2245,6 +2313,17 @@ export class GridImpl implements Grid {
   }
 
   private clearSelection(): void {
+    // Delete on a hidden active cell clears it, as in Excel.
+    const hidden = this.hiddenActive;
+    if (hidden) {
+      if (this.readOnly) return;
+      const cell = { row: hidden.row, col: hidden.col };
+      this.document.commit(
+        [{ op: "clearRange", range: { sheet: hidden.sheet, start: cell, end: cell } }],
+        "clear",
+      );
+      return;
+    }
     if (this.readOnly || this.selection.isEmpty) return;
 
     const sheet = this.sheet();
@@ -2319,9 +2398,11 @@ export class GridImpl implements Grid {
     }
 
     const focus = this.selection.focusCell;
+    // A selected cell ends a hidden active cell.
+    if (focus) this.hiddenActive = null;
     const sheetFocus = focus
       ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
-      : null;
+      : this.hiddenActive && { ...this.hiddenActive };
     for (const listener of this.listeners.selection) listener({ selection, sheetFocus });
     this.emitCommandStateChange();
   }
@@ -2852,6 +2933,7 @@ export class GridImpl implements Grid {
     }
 
     this.interactions.reconcile("sheet");
+    this.hiddenActive = null;
     this.notes.dismiss();
     this.cancelAutoFit();
     this.domOverlay.reset();
@@ -2922,11 +3004,24 @@ export class GridImpl implements Grid {
     if (!column || row < 0 || row >= this.geometry.rowCount) return null;
 
     const cell = this.anchorCell(row, col);
-    const address = {
-      sheet: this.activeSheet,
-      row: this.toDataRow(cell.row),
-      col: cell.col,
-    };
+    return this.cellInputAt(
+      { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
+      column,
+    );
+  }
+
+  getActiveCellInput(): CellInputSnapshot | null {
+    const hidden = this.hiddenActive;
+    if (!hidden) {
+      const focus = this.selection.focusCell;
+      return focus ? this.getCellInput(focus.row, focus.col) : null;
+    }
+    const column = this.sheet().columns[hidden.col];
+    return column ? this.cellInputAt({ ...hidden }, column) : null;
+  }
+
+  /** The editable snapshot of the cell at sheet address `address` in `column`. */
+  private cellInputAt(address: CellAddress, column: Column): CellInputSnapshot {
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
     const stored = this.store.getCell(address);
     // The text the cell editor opens with, so the formula bar reads it back the same.
@@ -2992,6 +3087,8 @@ export class GridImpl implements Grid {
   }
 
   setSelection(sel: Selection | null): void {
+    // The host's selection replaces a hidden active cell, an empty one too.
+    this.hiddenActive = null;
     this.selection.set(sel);
     this.emitSelection();
     this.scheduleRender();
@@ -4264,6 +4361,7 @@ export class GridImpl implements Grid {
       paste: () => this.clipboard.paste(),
       pasteValues: () => this.clipboard.pasteValues(),
       pasteSpecial: (options) => this.clipboard.pasteSpecial(options),
+      pasteVisibleRows: () => this.clipboard.pasteShownRows(),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => {
         try {
@@ -4728,6 +4826,10 @@ export class GridImpl implements Grid {
     return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
   }
 
+  canPasteVisibleRows(): boolean {
+    return this.clipboard.canPasteShownRows;
+  }
+
   sheetRowOf(viewRow: number): number | null {
     if (!Number.isInteger(viewRow) || viewRow < 0 || viewRow >= this.geometry.rowCount) {
       return null;
@@ -4740,6 +4842,80 @@ export class GridImpl implements Grid {
       return null;
     }
     return this.toViewRow(sheetRow);
+  }
+
+  goToCell(addr: CellAddress): boolean {
+    const target = this.store.getWorkbook().sheets.find((sheet) => sheet.id === addr.sheet);
+    if (
+      !target ||
+      !Number.isInteger(addr.row) ||
+      addr.row < 0 ||
+      addr.row >= target.rowCount ||
+      !Number.isInteger(addr.col) ||
+      addr.col < 0
+    ) {
+      return false;
+    }
+    if (addr.sheet !== this.activeSheet) this.setActiveSheet(addr.sheet);
+    if (addr.sheet !== this.activeSheet || !this.sheet().columns[addr.col]) return false;
+
+    const row = this.toViewRow(addr.row);
+    if (row !== null) {
+      const cell = { sheet: addr.sheet, row, col: addr.col };
+      this.setSelection({ kind: "cell", addr: cell });
+      this.scrollToCell(cell);
+      return true;
+    }
+    // A hidden row: nothing shows as selected, as in Excel. The view scrolls
+    // to where the row would be.
+    this.selection.set(null);
+    this.hiddenActive = { sheet: addr.sheet, row: addr.row, col: addr.col };
+    this.emitSelection();
+    const near = this.nearestShownRow(addr.row, 1) ?? this.nearestShownRow(addr.row, -1);
+    if (near !== null) this.scrollToCell({ sheet: addr.sheet, row: near, col: addr.col });
+    this.scheduleRender();
+    return true;
+  }
+
+  getActiveSheetCell(): CellAddress | null {
+    if (this.hiddenActive) return { ...this.hiddenActive };
+    const focus = this.selection.focusCell;
+    return focus
+      ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+      : null;
+  }
+
+  /**
+   * The view row of the row that shows nearest to sheet row `row` in
+   * `direction`, or null when none does. View rows show sheet rows in order
+   * unless a view sort reorders them, so a binary search finds it; under a
+   * view sort the closest sheet row wins.
+   */
+  private nearestShownRow(row: number, direction: 1 | -1): number | null {
+    const count = this.geometry.rowCount;
+    if ((this.sheet().sortKeys?.length ?? 0) > 0) {
+      let best: number | null = null;
+      let bestRow = 0;
+      for (let viewRow = 0; viewRow < count; viewRow++) {
+        const sheetRow = this.toDataRow(viewRow);
+        if ((sheetRow - row) * direction <= 0) continue;
+        if (best === null || (sheetRow - bestRow) * direction < 0) {
+          best = viewRow;
+          bestRow = sheetRow;
+        }
+      }
+      return best;
+    }
+    // The first view row past `row`.
+    let low = 0;
+    let high = count;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.toDataRow(middle) <= row) low = middle + 1;
+      else high = middle;
+    }
+    if (direction > 0) return low < count ? low : null;
+    return low > 0 ? low - 1 : null;
   }
 
   hideColumns(cols?: readonly number[]): void {
@@ -4961,6 +5137,27 @@ export class GridImpl implements Grid {
     // string it paints, and the same cells paint the same output.
     this.readWindows.invalidateData();
     this.scheduleRender();
+  }
+}
+
+/** Why the grid refused a paste's commit, as the user reads it. */
+function pasteRefusalReason(
+  result: Exclude<ApplyTransactionResult, { status: "applied" }>,
+): string {
+  switch (result.status) {
+    case "rejected":
+      return `${result.issues[0]?.message ?? "the change was refused"}.`;
+    case "conflict":
+      return "the sheet changed meanwhile. Paste again.";
+    case "noop":
+      switch (result.reason) {
+        case "read-only":
+          return "the sheet is read-only.";
+        case "incomplete-data":
+          return "the sheet is still loading. Paste again when it has loaded.";
+        default:
+          return "the paste does not fit on the sheet.";
+      }
   }
 }
 

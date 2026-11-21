@@ -13,7 +13,6 @@ import {
 } from "../editor-textarea.js";
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
-import { selectionCell } from "../selection.js";
 import type { Range } from "../types/coordinates.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";
 import { commitCellInput } from "./grid-binding.js";
@@ -42,9 +41,10 @@ const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\
  * on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
  * accepted. References use the sheet's row numbers, as the row headers do,
  * also while a filter, hidden rows or a view sort change which rows show; a
- * typed range selects the rows of it that show. Invalid or out-of-bounds
- * references, and a cell whose row does not show, set `aria-invalid` and make
- * no grid calls; Escape restores the displayed reference.
+ * typed range selects the rows of it that show, and a typed cell on a hidden
+ * row becomes the active cell, as in Excel (`Grid.goToCell`). Invalid or
+ * out-of-bounds references set `aria-invalid` and change nothing; Escape
+ * restores the displayed reference.
  *
  * @param host - Element the name box is appended to.
  * @param grid - The grid the name box reads and selects in.
@@ -67,9 +67,9 @@ export function createNameBox(
 
   const refresh = (): void => {
     if (document.activeElement === input && dirty) return;
-    const focus = selectionCell(grid.getSelection());
-    const row = focus ? grid.sheetRowOf(focus.row) : null;
-    committed = focus && row !== null ? `${colToA1(focus.col)}${row + 1}` : "";
+    // The active cell in sheet rows, also on a row the view hides.
+    const cell = grid.getActiveSheetCell();
+    committed = cell ? `${colToA1(cell.col)}${cell.row + 1}` : "";
     input.value = committed;
     input.removeAttribute("aria-invalid");
     dirty = false;
@@ -96,6 +96,19 @@ export function createNameBox(
     const rowCount =
       grid.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId)?.rowCount ?? 0;
 
+    // One cell becomes the active cell, also on a row a filter or Hide Rows
+    // hides, as in Excel.
+    if (start.row === end.row && start.col === end.col) {
+      // Not dirty, so the selection event shows the cell's reference.
+      dirty = false;
+      if (!grid.goToCell({ sheet: sheetId, row: start.row, col: start.col })) {
+        dirty = true;
+        input.setAttribute("aria-invalid", "true");
+        return;
+      }
+      options.focusGrid?.();
+      return;
+    }
     // The typed sheet rows that show, as view rows; a filter, hidden rows or a
     // view sort can leave gaps or change their order.
     const shown: number[] = [];
@@ -227,6 +240,7 @@ export function createFormulaBar(
 
   const assist = new FormulaAssist({
     highlightCells: (ranges) => grid.highlightCells(ranges),
+    suggestions: true,
     sheet: () => grid.getActiveSheet(),
     cell: () => snapshot?.address ?? null,
     store: grid.store,
@@ -251,8 +265,7 @@ export function createFormulaBar(
 
   const refresh = (): void => {
     if (editing || (document.activeElement === input && dirty)) return;
-    const focus = selectionCell(grid.getSelection());
-    snapshot = focus ? grid.getCellInput(focus.row, focus.col) : null;
+    snapshot = grid.getActiveCellInput();
     committed = snapshot?.text ?? "";
     input.value = committed;
     size();
@@ -326,6 +339,20 @@ export function createFormulaBar(
     // Typing within a line keeps the bar's height, so it is laid out only at a line break.
     if (editorLineCount(text) !== sizedLines) size();
   };
+  /**
+   * Edit an active cell the view hides, which has no cell editor: the bar
+   * takes the focus and starts from the typed key, or the cell's text (F2).
+   */
+  const onEditRequest = (initial: string | null): boolean => {
+    if (readOnly || !snapshot) return false;
+    input.focus();
+    if (initial !== null) input.value = initial;
+    input.setSelectionRange(input.value.length, input.value.length);
+    dirty = true;
+    size();
+    assist.update();
+    return true;
+  };
   const onEditEnd = (): void => {
     editing = false;
     dirty = false;
@@ -355,7 +382,9 @@ export function createFormulaBar(
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
-  if (draft) lifetime.add(draft.subscribe({ text: onEditInput, end: onEditEnd }));
+  if (draft) {
+    lifetime.add(draft.subscribe({ text: onEditInput, end: onEditEnd, edit: onEditRequest }));
+  }
   host.appendChild(input);
   refresh();
   lifetime.add(() => input.remove());

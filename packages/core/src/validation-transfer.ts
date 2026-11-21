@@ -1,10 +1,10 @@
 /**
- * The data validation rules a copy carries and a paste lands. Excel's Paste,
- * and Paste Special's All and Validation choices, give the cells a paste
- * covers the copied cells' rules in place of their own. This module is the one
- * path for that: the clipboard's paste and Paste Special (#821) both call
- * `validationPastePatches`, and the Data Validation command shares
- * `clearedValidationPatches` with it.
+ * The data validation rules a copy carries and a paste or fill lands. Excel's
+ * Paste, Paste Special's All and Validation choices, and its fills give the
+ * cells they cover the copied cells' rules in place of their own. This module
+ * is the one path for that: the clipboard's paste, Paste Special (#821) and
+ * the fill handle, Ctrl+D and Ctrl+R (#926) call `validationPastePatches`,
+ * and the Data Validation command shares `clearedValidationPatches` with it.
  */
 
 import { shiftA1Refs } from "./a1.js";
@@ -18,13 +18,16 @@ export type ValidationSettings = Omit<DataValidationRule, "id" | "range">;
 
 /**
  * A copied rule over part of the copied block: `rows` and `cols` are offsets
- * from the block's top-left cell, inclusive. Its formulas are anchored at the
- * piece's own top-left cell, so a paste only places the piece.
+ * from the block's top-left cell, inclusive. Its formulas are written for the
+ * cell `at` (data row and column), the piece's top-left where it was copied;
+ * where it lands, their relative references shift by the move, as a copied
+ * formula's do.
  */
 export interface CopiedValidation {
   readonly rule: ValidationSettings;
   readonly rows: readonly [number, number];
   readonly cols: readonly [number, number];
+  readonly at: readonly [row: number, col: number];
 }
 
 /** Where a paste lands, in data rows: its top-left cell and its size. */
@@ -74,20 +77,30 @@ export function validationIdSource(rules: readonly DataValidationRule[]): () => 
   };
 }
 
-/** `rule`'s settings with its formulas anchored at `cell` instead of its range's top-left. */
+/** `settings` with the relative references of their formulas moved by `rows` and `cols`. */
+function shifted(settings: ValidationSettings, rows: number, cols: number): ValidationSettings {
+  if (rows === 0 && cols === 0) return settings;
+  return {
+    ...settings,
+    condition: mapValidationFormulas(settings.condition, (formula) =>
+      shiftA1Refs(formula, rows, cols),
+    ),
+  };
+}
+
+/** `rule`'s settings with its formulas written for `cell` instead of its range's top-left. */
 function reanchored(
   rule: DataValidationRule,
   cell: { row: number; col: number },
 ): ValidationSettings {
   const origin = normalizedRange(rule.range).start;
   const { id: _id, range: _range, ...settings } = rule;
-  const rows = cell.row - origin.row;
-  const cols = cell.col - origin.col;
-  if (rows === 0 && cols === 0) return settings;
-  return {
-    ...settings,
-    condition: mapValidationFormulas(rule.condition, (formula) => shiftA1Refs(formula, rows, cols)),
-  };
+  return shifted(settings, cell.row - origin.row, cell.col - origin.col);
+}
+
+/** `rule` over `range`, a part of its own range, with its formulas written for the part's top-left. */
+function cutTo(rule: DataValidationRule, id: string, range: Range): DataValidationRule {
+  return { ...reanchored(rule, normalizedRange(range).start), id, range };
 }
 
 /** The rules over the copied `block` (data rows), cut to it. */
@@ -112,6 +125,7 @@ export function copiedValidation(
       rule: reanchored(rule, start),
       rows: [start.row - source.start.row, end.row - source.start.row],
       cols: [start.col - source.start.col, end.col - source.start.col],
+      at: [start.row, start.col],
     });
   }
   return pieces;
@@ -120,7 +134,8 @@ export function copiedValidation(
 /**
  * The operations that take the rules off `areas` of `sheet`: a rule inside
  * them goes, and a rule they cover in part keeps its other cells, split into
- * rectangles with new IDs from `newId`.
+ * rectangles with new IDs from `newId`, each with its formulas written for its
+ * own top-left cell.
  */
 export function clearedValidationPatches(
   sheet: SheetId,
@@ -134,11 +149,11 @@ export function clearedValidationPatches(
     const [kept, ...split] = subtractRanges(rule.range, areas);
     patches.push(
       kept
-        ? { op: "setValidationRule", sheet, rule: { ...rule, range: kept } }
+        ? { op: "setValidationRule", sheet, rule: cutTo(rule, rule.id, kept) }
         : { op: "removeValidationRule", sheet, id: rule.id },
     );
     for (const range of split) {
-      patches.push({ op: "setValidationRule", sheet, rule: { ...rule, id: newId(), range } });
+      patches.push({ op: "setValidationRule", sheet, rule: cutTo(rule, newId(), range) });
     }
   }
   return patches;
@@ -193,7 +208,11 @@ export function validationPastePatches(
         patches.push({
           op: "setValidationRule",
           sheet: sheet.id,
-          rule: { ...piece.rule, id: newId(), range },
+          rule: {
+            ...shifted(piece.rule, range.start.row - piece.at[0], range.start.col - piece.at[1]),
+            id: newId(),
+            range,
+          },
         });
       }
     }

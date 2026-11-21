@@ -442,3 +442,95 @@ impl CellStore {
         self.eval_info_func(func, args, sheet, pass, depth + 1)
     }
 }
+
+/// FORMULATEXT, ISFORMULA, HYPERLINK and CELL describe a referenced cell or
+/// return a display value.
+#[cfg(test)]
+mod tests {
+    use crate::store::CellStore;
+    use crate::tests::support::{assert_close, number, string};
+    use crate::types::KIND_BOOL;
+
+    fn bool_at(store: &CellStore, sheet: usize, col: usize) -> bool {
+        assert_eq!(store.get_cell(sheet, 0, col).kind(), KIND_BOOL, "col {col}");
+        number(store, sheet, 0, col) != 0.0
+    }
+
+    #[test]
+    fn information_functions_read_formula_sources_and_cell_facts() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(2, 4);
+        store.set_sheet_name(data, "data", "Data");
+        let main = store.add_sheet(32, 3);
+        store.set_sheet_name(main, "main", "Main");
+        store.set_number(data, 0, 0, 5.0, 0);
+        store.set_formula(data, 1, 0, "=A1*2", 0);
+        store.set_string(data, 2, 0, "label", 0);
+
+        let texts = [
+            (0, "=FORMULATEXT(Data!A2)", "=A1*2"),
+            (1, "=FORMULATEXT(Data!A1)", "#N/A"),
+            (2, "=FORMULATEXT(Data!A4)", "#N/A"),
+            (3, "=FORMULATEXT(1)", "#VALUE!"),
+            (4, "=FORMULATEXT(1/0)", "#DIV/0!"),
+            (5, "=FORMULATEXT(Data!A2:A3)", "=A1*2"),
+            // The reference is a dependency, so a self-reference is a cycle.
+            (6, "=FORMULATEXT(G1)", "#CYCLE!"),
+            (7, "=ISFORMULA(\"A1\")", "#VALUE!"),
+            (
+                8,
+                "=HYPERLINK(\"https://example.com\")",
+                "https://example.com",
+            ),
+            (9, "=HYPERLINK(\"https://example.com\",\"Docs\")", "Docs"),
+            (10, "=HYPERLINK(1/0,\"Docs\")", "#DIV/0!"),
+            (11, "=HYPERLINK()", "#VALUE!"),
+            (12, "=CELL(\"address\",Data!B3)", "'Data'!$B$3"),
+            (13, "=CELL(\"Address\",B3)", "$B$3"),
+            (14, "=CELL(\"type\",Data!A3)", "l"),
+            (15, "=CELL(\"type\",Data!A4)", "b"),
+            (16, "=CELL(\"type\",Data!A1)", "v"),
+            (17, "=CELL(\"format\",Data!A1)", "#VALUE!"),
+            (18, "=CELL(1,A1)", "#VALUE!"),
+            (19, "=CELL(\"bogus\",A1)", "#VALUE!"),
+            (29, "=CELL(\" row\",A1)", "#VALUE!"),
+        ];
+        let numbers = [
+            (20, "=HYPERLINK(\"https://example.com\",Data!A1)", 5.0),
+            (21, "=CELL(\"row\",Data!B3)", 3.0),
+            (22, "=CELL(\"col\",Data!B3)", 2.0),
+            (23, "=CELL(\"contents\",Data!A2)", 10.0),
+            (24, "=CELL(\"col\")", 25.0),
+        ];
+        let bools = [
+            (25, "=ISFORMULA(Data!A2)", true),
+            (26, "=ISFORMULA(Data!A1)", false),
+            (27, "=ISFORMULA(Data!A4)", false),
+            (28, "=ISFORMULA(Data!A2:A3)", true),
+        ];
+        for (col, formula, _) in texts {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in numbers {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in bools {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        store.commit_sources();
+
+        for (col, formula, expected) in texts {
+            assert_eq!(
+                string(&store, main, 0, col).as_deref(),
+                Some(expected),
+                "{formula}"
+            );
+        }
+        for (col, _, expected) in numbers {
+            assert_close(number(&store, main, 0, col), expected);
+        }
+        for (col, formula, expected) in bools {
+            assert_eq!(bool_at(&store, main, col), expected, "{formula}");
+        }
+    }
+}

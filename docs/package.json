@@ -19,6 +19,7 @@
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@sheetwrite/charts": "workspace:*",
     "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/formula-assist": "workspace:*",
     "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/queries": "workspace:*",
     "@sheetwrite/react": "workspace:*",

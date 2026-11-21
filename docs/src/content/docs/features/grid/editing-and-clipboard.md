@@ -133,9 +133,13 @@ To supply your own editor, see [Host-supplied editors](/docs/features/grid/custo
 
 ## Clipboard interoperability
 
-Copy and cut always produce injection-hardened TSV. Where the browser exposes `ClipboardItem`, they also write sanitized `text/html` and Sheetwrite's private `application/x-sheetwrite+json` payload. The private payload keeps formula source and cell styles for same-app round trips. The HTML contains only escaped table markup, plain cell text, safe `data-sheetwrite-formula` attributes, and a bounded style subset. No pasted HTML goes into the document.
+Copy and cut always produce injection-hardened TSV. Where the browser exposes `ClipboardItem`, they also write sanitized `text/html`, and where the browser keeps custom formats (Chromium), Sheetwrite's private `application/x-sheetwrite+json` payload. The HTML contains only escaped table markup, plain cell text, safe `data-sheetwrite-formula` attributes, a bounded style subset, and a random token on the table. No pasted HTML goes into the document.
 
-Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then plain TSV:
+As in Excel, a copy takes the rows hidden by hand (Hide Rows or a collapsed group) between the selected rows; the rows a filter hides stay out, and so do rows out of order under a view sort ([Copy visible cells only](https://support.microsoft.com/en-us/excel/copy-visible-cells-only)).
+
+A grid keeps its last copy or cut, with formula source and cell styles, in memory. A paste whose clipboard carries that copy's token, in the private payload or in the HTML, pastes it with its formulas and styles, or moves the cells of a cut. This works the same in Chromium, Firefox and Safari, whose clipboards keep only plain text and HTML. A token from another grid, or HTML whose text was changed in another app, pastes as external content.
+
+Other content pastes from the private payload, then sanitized HTML tables, then plain TSV:
 
 - HTML parsing uses an inert `DOMParser` document. It accepts only cell text, safe formula attributes, and supported inline styles.
 - External formulas that contain control characters become text.
@@ -173,6 +177,8 @@ Four more options change how the cells land:
 - **Paste Link** (L) writes formulas that refer to the copied cells instead of their contents: `=$A$1` for one cell, `=A1` and so on for more, with the sheet's name from another sheet (`=Data!A1`).
 
 Home › Paste and the context menu's Paste Options row also offer the common choices in one click: Paste, Values, Formulas, Formatting, Transpose and Paste Link.
+
+As in Excel, a pasted block writes into consecutive sheet rows, the rows a filter or Hide Rows hides included, and the grid says so. After such a paste the Paste Options row also offers **Paste into visible rows only**, which pastes the same cells again on the shown rows only, as one undo step. See [AutoFilter](/docs/features/data/autofilter/#copy-cut-and-fill-in-a-filtered-list).
 
 From code, `grid.actions.pasteSpecial(options)` pastes without the dialog, with the names of Excel's `Range.PasteSpecial`:
 
@@ -215,6 +221,7 @@ if (outcome === "blocked") console.warn("Allow clipboard access to paste.");
 | `"unsupported"` | The Clipboard API, or the method it needs, is missing. Examples: a non-secure context, or Firefox `readText`. |
 | `"blocked"` | The browser rejected the request, usually because of a permissions policy or missing user activation. |
 | `"empty"` | There is nothing to act on: no focused selection, an empty clipboard, or paste on a read-only grid. |
+| `"rejected"` | The grid refused the paste, so nothing was pasted: a protected range, the host's admission, or a document limit. The grid tells the user why, and fires `mutation-rejected`. |
 
 Custom UI can show the outcome without tripping global error monitoring.
 

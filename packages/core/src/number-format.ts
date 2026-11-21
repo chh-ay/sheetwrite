@@ -1,4 +1,5 @@
 import { FICTIONAL_LEAP_DAY_SERIAL, serialToDate, serialToWeekdayDate } from "./date-serial.js";
+import { formatGeneral, GENERAL_WIDTH, isGeneralCode } from "./general-format.js";
 
 interface NumericDescriptor {
   percent: boolean;
@@ -345,19 +346,6 @@ function formatter(locale: string, decimals: number, grouped: boolean): Intl.Num
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     }),
-    NUMBER_FORMATTER_CACHE_LIMIT,
-  );
-}
-
-function defaultFormatter(locale: string): Intl.NumberFormat {
-  const key = `default:${locale}`;
-  const cached = numberFormatterCache.get(key);
-  if (cached) return cached;
-  numberFormatters += 1;
-  return cacheValue(
-    numberFormatterCache,
-    key,
-    new Intl.NumberFormat(locale),
     NUMBER_FORMATTER_CACHE_LIMIT,
   );
 }
@@ -796,9 +784,6 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
   return text + fraction.suffix;
 }
 
-/** Excel's explicit "no format" code; a cell can carry it to opt out of its column's format. */
-const GENERAL_CODE_RE = /^general$/i;
-
 /**
  * Deterministic Excel-style number/date formatter. Supports explicit locale
  * separators, percent/scientific notation, UTC date/time tokens, four-section
@@ -813,7 +798,7 @@ const GENERAL_CODE_RE = /^general$/i;
  * @returns The value as Excel would show it with that code.
  */
 export function formatNumber(value: number | string, format?: string, locale = "en-US"): string {
-  const code = format !== undefined && GENERAL_CODE_RE.test(format) ? undefined : format;
+  const code = isGeneralCode(format) ? undefined : format;
   if (typeof value === "string") {
     if (!code) return value;
     const textSection = compileFormat(code).sections[3];
@@ -836,11 +821,11 @@ export function formatNumber(value: number | string, format?: string, locale = "
 
 /** Uncached format core; `formatNumber` owns the shared text cache. */
 function renderNumberText(value: number, code: string | undefined, locale: string): string {
-  if (!code) return defaultFormatter(locale).format(value);
+  if (!code) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
 
   const format = compileFormat(code);
-  // The Text format, `@` alone, shows a number as General would.
-  if (format.numberSections.length === 0) return defaultFormatter(locale).format(value);
+  // A text format, such as `"Code "@`, shows a number as General would.
+  if (format.numberSections.length === 0) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
   const { section, magnitude } = sectionFor(value, format);
   if (section.fraction) return renderFraction(magnitude, section.fraction, locale);
   if (section.dateTokens) return renderDate(magnitude, section.dateTokens, locale);

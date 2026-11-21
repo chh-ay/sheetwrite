@@ -165,8 +165,11 @@ export interface CellEditor {
  *   a read-only grid on paste), or the action stopped without a change to the
  *   grid because a newer action of the same kind (copy or cut, paste) started
  *   or the grid was destroyed first.
+ * - `"rejected"` — the grid refused the paste's change, so nothing was
+ *   pasted: a protected range, a host's admission, or a document limit. The
+ *   grid says why, beside the `mutation-rejected` event.
  */
-export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "rejected";
 
 /**
  * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s
@@ -421,6 +424,14 @@ export interface GridActions {
    * available while a cut waits, as in Excel. Never rejects.
    */
   pasteSpecial(options?: PasteSpecialOptions): Promise<ClipboardOutcome>;
+  /**
+   * Paste into visible rows only. As in Excel, a pasted block writes into
+   * consecutive sheet rows, the rows a filter or Hide Rows hides included.
+   * When the last change is such a paste, this pastes the same cells again on
+   * the shown rows only, as one undo step; otherwise it does nothing. See
+   * {@link Grid.canPasteVisibleRows}.
+   */
+  pasteVisibleRows(): void;
   /** Clear the selected cells' contents, keeping their formatting; does nothing when read-only. */
   clearContents(): void;
   /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
@@ -615,6 +626,7 @@ export type ContextMenuActionName =
   | "pasteFormatting"
   | "pasteTranspose"
   | "pasteLink"
+  | "pasteVisibleRows"
   | "pasteSpecial"
   | "clearContents"
   | "merge"
@@ -1112,7 +1124,8 @@ export interface GridEvents {
    * The selection changed; `null` when nothing is selected. `selection` is in
    * view rows; `sheetFocus` is its focus cell in sheet rows, which differ
    * under a filter, hidden rows or a view sort. Use the sheet address to
-   * store or look up data.
+   * store or look up data. After `goToCell` on a row the view hides,
+   * `selection` is null and `sheetFocus` is that cell.
    */
   selection: { selection: Selection | null; sheetFocus: CellAddress | null };
   /** The grid scrolled; reports the scroll offsets in CSS pixels and the visible rows and columns. */
@@ -1250,6 +1263,30 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /**
+   * Editable snapshot of the active cell, also when its row is hidden (see
+   * {@link goToCell}); null without an active cell.
+   */
+  getActiveCellInput(): CellInputSnapshot | null;
+  /**
+   * Make the cell at sheet address `addr` the active cell, as Excel's Name Box
+   * and Go To do. A cell whose row shows is selected and scrolled into view.
+   * A cell on a row a filter or Hide Rows hides becomes the active cell with
+   * nothing selected on screen: {@link getSelection} returns null, the
+   * `selection` event reports it as `sheetFocus`, Copy, Cut and Delete act on
+   * it, Up and Down move to the nearest row that shows, and Left and Right
+   * stay on its row. Typing, F2 and Backspace edit it in the spreadsheet
+   * shell's formula bar; a grid without a formula bar does nothing on them,
+   * as the cell has no place on screen for its editor. Returns false,
+   * changing nothing, for a cell outside the sheet.
+   */
+  goToCell(addr: CellAddress): boolean;
+  /**
+   * The active cell in sheet rows: the selection's active cell, or the cell
+   * {@link goToCell} made active on a hidden row; null without one.
+   */
+  getActiveSheetCell(): CellAddress | null;
   /**
    * The text a cell shows: its value through the cell's or the column's number
    * format, as the grid paints it. `addr` is a data address on any sheet.
@@ -1461,6 +1498,11 @@ export interface Grid {
   showRows(rows?: readonly number[]): void;
   /** Currently hidden data rows on the active sheet. */
   hiddenRows(): readonly number[];
+  /**
+   * Whether the last change is a paste on the active sheet that wrote into
+   * hidden rows, which `actions.pasteVisibleRows()` can paste on the shown rows only.
+   */
+  canPasteVisibleRows(): boolean;
   /**
    * The sheet row, zero-based, that view row `viewRow` shows on the active
    * sheet. Selections, `scrollToCell` and the selection events count rows in

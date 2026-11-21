@@ -301,6 +301,7 @@ const SNIPPET_COMPILER_OPTIONS = {
   paths: {
     "@sheetwrite/charts": ["../packages/charts/dist/index.d.ts"],
     "@sheetwrite/core": ["../packages/core/dist/index.d.ts"],
+    "@sheetwrite/formula-assist": ["../packages/formula-assist/dist/index.d.ts"],
     // Subpaths whose `exports` target differs from the file name; the wildcard below
     // would resolve `history` to the internal undo module.
     "@sheetwrite/core/history": ["../packages/core/dist/history-archive.d.ts"],

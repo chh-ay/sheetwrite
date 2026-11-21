@@ -18,6 +18,7 @@
     "**/*.d.ts",
     "**/*.svelte",
     "bench/results",
+    "packages/formula-assist/bench/enron/*.json",
     "docs/src/generated",
     "packages/core/src/generated",
     "docs/src/routeTree.gen.ts",

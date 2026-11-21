@@ -80,7 +80,11 @@ As in Excel, edits don't filter again on their own. A row whose value no longer 
 
 As in Excel, copy, delete, formatting and the fill handle act on the rows the filter shows and skip the rows it hides. Cut is the exception, as in Excel: it moves every row from the first selected row to the last, the hidden ones too, so their data stays with the rows around it.
 
-Beyond Excel, which moves the hidden rows without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", and its paste "This paste moved 12 hidden rows". **Show them** clears the filters and shows the rows Hide Rows hid in the cut and where it landed, as one undo step, so you can check where the rows went. The cut and the paste give Excel's result either way.
+Paste is the other exception, as in Excel: a pasted block lands on the sheet rows from its first cell down, one row of the block per sheet row, so a row the filter or Hide Rows hides in that range is overwritten too. One copied value pasted over a selection fills only the cells the filter shows.
+
+Beyond Excel, which does both without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", its paste "This paste moved 12 hidden rows", and a paste that writes into hidden rows "This paste wrote into 3 hidden rows". **Show them** clears the filters and shows the rows Hide Rows hid in the rows the step covers, as one undo step, so you can check them. The cut and the paste give Excel's result either way.
+
+After a paste that wrote into hidden rows, the context menu's Paste Options row offers **Paste into visible rows only**, and `grid.actions.pasteVisibleRows()` does the same: it pastes the same cells again on the rows the filter and Hide Rows show, skipping the hidden ones, as one undo step. `grid.canPasteVisibleRows()` tells whether the last change is such a paste; any other change ends the offer.
 
 ## Undo, collaboration and XLSX files
 
