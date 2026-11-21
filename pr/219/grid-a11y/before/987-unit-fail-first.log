@@ -1,0 +1,5 @@
+(fail) mirrors the painted window with its header, rows, values, notes and focus [94.44ms]
+(fail) owns only rows in the grid role, and not the host's chrome [7.80ms]
+(fail) names no missing element when the active cell is outside the mirrored window [20.39ms]
+ 6 pass
+ 3 fail

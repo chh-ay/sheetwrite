@@ -1,0 +1,8 @@
+/vanilla/
+[[".sheetwrite-shell-fx","rgb(26, 35, 51)","opacity",0.6],[".sheetwrite-shell-mode","rgb(26, 35, 51)","opacity",0.72]]
+/showcases/recalculation/
+[[".sheetwrite-shell-fx","rgb(26, 35, 51)","opacity",0.6],[".sheetwrite-shell-mode","rgb(26, 35, 51)","opacity",0.72]]
+/svelte/
+[[".sheetwrite-shell-fx",null],[".sheetwrite-shell-mode","rgb(75, 85, 103)","opacity",0.72]]
+/showcases/spreadsheet/
+[[".sheetwrite-shell-fx","rgb(26, 35, 51)","opacity",0.6],[".sheetwrite-shell-mode","rgb(26, 35, 51)","opacity",0.72]]

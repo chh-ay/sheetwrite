@@ -1,0 +1,36 @@
+{"path":"/react/","theme":"light","violations":[{"id":"label-content-name-mismatch","impact":"serious","nodes":["summary :: Fix any of the following: Text inside the element is not included in the accessible name"]}]}
+{"path":"/vue/","theme":"light","violations":[]}
+{"path":"/svelte/","theme":"light","violations":[]}
+{"path":"/vanilla/","theme":"light","violations":[]}
+{"path":"/showcases/spreadsheet/","theme":"light","violations":[]}
+{"path":"/showcases/collaboration/","theme":"light","violations":[]}
+{"path":"/showcases/formatting/","theme":"light","violations":[]}
+{"path":"/showcases/host-rows/","theme":"light","violations":[{"id":"scrollable-region-focusable","impact":"serious","nodes":[".host-row-table-scroll :: Fix any of the following: Element should have focusable content Element should be focusable"]}]}
+{"path":"/showcases/interoperability/","theme":"light","violations":[]}
+{"path":"/showcases/formula-assist/","theme":"light","violations":[]}
+{"path":"/showcases/queries/","theme":"light","violations":[]}
+{"path":"/showcases/recalculation/","theme":"light","violations":[]}
+{"path":"/showcases/version-history/","theme":"light","violations":[]}
+{"path":"/showcases/sort/","theme":"light","violations":[]}
+{"path":"/showcases/functions/","theme":"light","violations":[]}
+{"path":"/showcases/dashboards/","theme":"light","violations":[]}
+{"path":"/showcases/data-model/","theme":"light","violations":[]}
+{"path":"/showcases/database/","theme":"light","violations":[{"id":"label-content-name-mismatch","impact":"serious","nodes":[".sw-button[data-variant=\"default\"][type=\"button\"]:nth-child(1) :: Fix any of the following: Text inside the element is not included in the accessible name"]}]}
+{"path":"/react/","theme":"dark","violations":[{"id":"label-content-name-mismatch","impact":"serious","nodes":["summary :: Fix any of the following: Text inside the element is not included in the accessible name"]}]}
+{"path":"/vue/","theme":"dark","violations":[]}
+{"path":"/svelte/","theme":"dark","violations":[]}
+{"path":"/vanilla/","theme":"dark","violations":[]}
+{"path":"/showcases/spreadsheet/","theme":"dark","violations":[]}
+{"path":"/showcases/collaboration/","theme":"dark","violations":[]}
+{"path":"/showcases/formatting/","theme":"dark","violations":[]}
+{"path":"/showcases/host-rows/","theme":"dark","violations":[{"id":"scrollable-region-focusable","impact":"serious","nodes":[".host-row-table-scroll :: Fix any of the following: Element should have focusable content Element should be focusable"]}]}
+{"path":"/showcases/interoperability/","theme":"dark","violations":[]}
+{"path":"/showcases/formula-assist/","theme":"dark","violations":[]}
+{"path":"/showcases/queries/","theme":"dark","violations":[]}
+{"path":"/showcases/recalculation/","theme":"dark","violations":[]}
+{"path":"/showcases/version-history/","theme":"dark","violations":[]}
+{"path":"/showcases/sort/","theme":"dark","violations":[]}
+{"path":"/showcases/functions/","theme":"dark","violations":[]}
+{"path":"/showcases/dashboards/","theme":"dark","violations":[]}
+{"path":"/showcases/data-model/","theme":"dark","violations":[]}
+{"path":"/showcases/database/","theme":"dark","violations":[{"id":"label-content-name-mismatch","impact":"serious","nodes":[".sw-button[data-variant=\"default\"][type=\"button\"]:nth-child(1) :: Fix any of the following: Text inside the element is not included in the accessible name"]}]}

@@ -1,0 +1,155 @@
+
+Running 7 tests using 1 worker
+
+  ✘  1 [chromium] › test/browser/grid-focus-exit.spec.ts:39:3 › the spreadsheet shell › Tab stays in the sheet, and F6 cycles the shell's parts (1.3s)
+  ✘  2 [chromium] › test/browser/grid-focus-exit.spec.ts:58:3 › the spreadsheet shell › Escape then Tab leaves the sheet (1.2s)
+  ✘  3 [chromium] › test/browser/grid-focus-exit.spec.ts:65:3 › the spreadsheet shell › the grid names its way out once, in its description (6.0s)
+  ✘  4 [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › F6 moves the focus after the grid (1.5s)
+  ✘  5 [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Shift+F6 moves the focus before the grid (1.5s)
+  ✘  6 [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Tab moves the focus after the grid (1.5s)
+  ✘  7 [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Shift+Tab moves the focus before the grid (1.5s)
+
+
+  1) [chromium] › test/browser/grid-focus-exit.spec.ts:39:3 › the spreadsheet shell › Tab stays in the sheet, and F6 cycles the shell's parts 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      43 |
+      44 |     await page.keyboard.press("F6");
+    > 45 |     expect((await focusIn(page, GRID, ".sheetwrite-shell-tabs")).inPart).toBe(true);
+         |                                                                          ^
+      46 |     await page.keyboard.press("F6");
+      47 |     expect((await focusIn(page, GRID, ".sheetwrite-shell-status")).inPart).toBe(true);
+      48 |     await page.keyboard.press("F6");
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:45:74
+
+    Error Context: test-results/playwright/grid-focus-exit-the-spread-82c7e-F6-cycles-the-shell-s-parts-chromium/error-context.md
+
+  2) [chromium] › test/browser/grid-focus-exit.spec.ts:58:3 › the spreadsheet shell › Escape then Tab leaves the sheet 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      60 |     await page.keyboard.press("Escape");
+      61 |     await page.keyboard.press("Tab");
+    > 62 |     expect((await focusIn(page, GRID)).inGrid).toBe(false);
+         |                                                ^
+      63 |   });
+      64 |
+      65 |   test("the grid names its way out once, in its description", async ({ page }) => {
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:62:48
+
+    Error Context: test-results/playwright/grid-focus-exit-the-spread-cf40f-e-then-Tab-leaves-the-sheet-chromium/error-context.md
+
+  3) [chromium] › test/browser/grid-focus-exit.spec.ts:65:3 › the spreadsheet shell › the grid names its way out once, in its description 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.sheetwrite-shell-grid')
+    Expected pattern: /F6/
+    Received string:  ""
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" locator('.sheetwrite-shell-grid') with timeout 5000ms
+      - waiting for locator('.sheetwrite-shell-grid')
+        13 × locator resolved to <div role="grid" tabindex="0" aria-rowcount="51" aria-colcount="14" aria-multiselectable="true" aria-label="Spreadsheet grid" class="sheetwrite-shell-grid sheetwrite" aria-activedescendant="sheetwrite-grid-1-1-1">…</div>
+           - unexpected value "null"
+
+
+      65 |   test("the grid names its way out once, in its description", async ({ page }) => {
+      66 |     await focusGrid(page);
+    > 67 |     await expect(page.locator(GRID)).toHaveAttribute("aria-description", /F6/);
+         |                                      ^
+      68 |   });
+      69 | });
+      70 |
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:67:38
+
+    Error Context: test-results/playwright/grid-focus-exit-the-spread-e1f73-out-once-in-its-description-chromium/error-context.md
+
+  4) [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › F6 moves the focus after the grid 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "after"
+    Received: "grid"
+
+      102 |           : "before";
+      103 |       }, GRID);
+    > 104 |       expect(side).toBe(forward ? "after" : "before");
+          |                    ^
+      105 |     });
+      106 |   }
+      107 | });
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:104:20
+
+    Error Context: test-results/playwright/grid-focus-exit-a-grid-on--60901-es-the-focus-after-the-grid-chromium/error-context.md
+
+  5) [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Shift+F6 moves the focus before the grid 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "before"
+    Received: "grid"
+
+      102 |           : "before";
+      103 |       }, GRID);
+    > 104 |       expect(side).toBe(forward ? "after" : "before");
+          |                    ^
+      105 |     });
+      106 |   }
+      107 | });
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:104:20
+
+    Error Context: test-results/playwright/grid-focus-exit-a-grid-on--0bd90-s-the-focus-before-the-grid-chromium/error-context.md
+
+  6) [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Tab moves the focus after the grid 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "after"
+    Received: "grid"
+
+      102 |           : "before";
+      103 |       }, GRID);
+    > 104 |       expect(side).toBe(forward ? "after" : "before");
+          |                    ^
+      105 |     });
+      106 |   }
+      107 | });
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:104:20
+
+    Error Context: test-results/playwright/grid-focus-exit-a-grid-on--c951e-es-the-focus-after-the-grid-chromium/error-context.md
+
+  7) [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Shift+Tab moves the focus before the grid 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "before"
+    Received: "grid"
+
+      102 |           : "before";
+      103 |       }, GRID);
+    > 104 |       expect(side).toBe(forward ? "after" : "before");
+          |                    ^
+      105 |     });
+      106 |   }
+      107 | });
+        at /home/vvin/checkouts/grida11y-base/test/browser/grid-focus-exit.spec.ts:104:20
+
+    Error Context: test-results/playwright/grid-focus-exit-a-grid-on--c99e7-s-the-focus-before-the-grid-chromium/error-context.md
+
+  7 failed
+    [chromium] › test/browser/grid-focus-exit.spec.ts:39:3 › the spreadsheet shell › Tab stays in the sheet, and F6 cycles the shell's parts 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:58:3 › the spreadsheet shell › Escape then Tab leaves the sheet 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:65:3 › the spreadsheet shell › the grid names its way out once, in its description 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › F6 moves the focus after the grid 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Shift+F6 moves the focus before the grid 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Tab moves the focus after the grid 
+    [chromium] › test/browser/grid-focus-exit.spec.ts:90:5 › a grid on its own › Escape then Shift+Tab moves the focus before the grid 

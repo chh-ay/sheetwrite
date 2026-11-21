@@ -1,0 +1,3 @@
+(fail) reads each cell as the canvas shows it, in the cell's number format [10.07ms]
+ 7 pass
+ 1 fail

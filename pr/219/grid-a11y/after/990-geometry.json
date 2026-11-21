@@ -1,0 +1,20 @@
+{
+  "add": [
+    281,
+    311
+  ],
+  "tabs": [
+    26,
+    311
+  ],
+  "tabsScroll": [
+    285,
+    285
+  ],
+  "status": [
+    317,
+    364
+  ],
+  "statusText": "Ready",
+  "rightOfAdd": "BUTTON.sheetwrite-tab-add"
+}

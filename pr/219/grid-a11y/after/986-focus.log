@@ -1,0 +1,24 @@
+/showcases/spreadsheet/ Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/showcases/spreadsheet/ Shift+Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/showcases/spreadsheet/ Escape then Tab -> outside: button.sheetwrite-tab sheetwrite-tab-active Sales sheet
+/showcases/spreadsheet/ Escape then Shift+Tab -> outside: textarea.sheetwrite-shell-formula Formula bar
+/showcases/spreadsheet/ F6 -> outside: button.sheetwrite-tab sheetwrite-tab-active Sales sheet
+/showcases/spreadsheet/ Shift+F6 -> outside: textarea.sheetwrite-shell-formula sheetwrite-form Formula bar
+/showcases/spreadsheet/ F6 then F6 -> outside: output.sheetwrite-shell-status 
+/showcases/spreadsheet/ F6 then F6 then F6 -> outside: button.sheetwrite-ribbon-tab 
+/vanilla/ Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/vanilla/ Shift+Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/vanilla/ Escape then Tab -> outside: button.sw-demo-radio-item 
+/vanilla/ Escape then Shift+Tab -> outside: textarea.sheetwrite-shell-formula Formula bar
+/vanilla/ F6 -> outside: button.sw-demo-radio-item 
+/vanilla/ Shift+F6 -> outside: textarea.sheetwrite-shell-formula Formula bar
+/vanilla/ F6 then F6 -> outside: button.sw-demo-radio-item 
+/vanilla/ F6 then F6 then F6 -> outside: button.sw-demo-radio-item 
+/showcases/sort/ Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/showcases/sort/ Shift+Tab -> IN GRID: div.sheetwrite-shell-grid sheetwrite Spreadsheet grid
+/showcases/sort/ Escape then Tab -> outside: button.sheetwrite-tab sheetwrite-tab-active Orders sheet
+/showcases/sort/ Escape then Shift+Tab -> outside: textarea.sheetwrite-shell-formula Formula bar
+/showcases/sort/ F6 -> outside: button.sheetwrite-tab sheetwrite-tab-active Orders sheet
+/showcases/sort/ Shift+F6 -> outside: textarea.sheetwrite-shell-formula Formula bar
+/showcases/sort/ F6 then F6 -> outside: output.sheetwrite-shell-status 
+/showcases/sort/ F6 then F6 then F6 -> outside: button.sheetwrite-ribbon-tab 

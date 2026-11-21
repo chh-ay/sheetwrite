@@ -1,0 +1,20 @@
+{
+  "add": [
+    281,
+    311
+  ],
+  "tabs": [
+    26,
+    296
+  ],
+  "tabsScroll": [
+    285,
+    270
+  ],
+  "status": [
+    302,
+    364
+  ],
+  "statusText": "Ready",
+  "rightOfAdd": "OUTPUT.sheetwrite-shell-status"
+}
