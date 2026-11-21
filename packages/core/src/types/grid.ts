@@ -1262,9 +1262,12 @@ export interface Grid {
    * and Go To do. A cell whose row shows is selected and scrolled into view.
    * A cell on a row a filter or Hide Rows hides becomes the active cell with
    * nothing selected on screen: {@link getSelection} returns null, the
-   * `selection` event reports it as `sheetFocus`, the formula bar edits it,
-   * Up and Down move to the nearest row that shows, and Left and Right stay
-   * on its row. Returns false, changing nothing, for a cell outside the sheet.
+   * `selection` event reports it as `sheetFocus`, Copy, Cut and Delete act on
+   * it, Up and Down move to the nearest row that shows, and Left and Right
+   * stay on its row. Typing, F2 and Backspace edit it in the spreadsheet
+   * shell's formula bar; a grid without a formula bar does nothing on them,
+   * as the cell has no place on screen for its editor. Returns false,
+   * changing nothing, for a cell outside the sheet.
    */
   goToCell(addr: CellAddress): boolean;
   /**

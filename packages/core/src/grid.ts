@@ -978,6 +978,7 @@ export class GridImpl implements Grid {
       lifetime: this.lifetime,
       store: this.store,
       selection: () => this.selection,
+      hiddenActive: () => this.hiddenActive,
       activeSheet: () => this.activeSheet,
       sheet: () => this.sheet(),
       colIndices: () => this.geometry.columnIndices,
