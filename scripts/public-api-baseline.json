@@ -531,6 +531,7 @@
     "@sheetwrite/core#./browser#IndexedDbPendingCommitStorageOptions": "a8bbe7187525",
     "@sheetwrite/core#./browser/history#IndexedDbHistoryStorage": "e374ea6a078e",
     "@sheetwrite/core#./browser/history#IndexedDbHistoryStorageOptions": "49e31bb8431b",
+    "@sheetwrite/core#./codec#validateBuiltWorkbookSnapshot": "fd6e7f3774b6",
     "@sheetwrite/core#./external-links#ExternalLinkRequest": "33b564eb8c40",
     "@sheetwrite/core#./external-links#ExternalLinkResolver": "327441989c1a",
     "@sheetwrite/core#./external-links#ExternalLinkUpdate": "de5fee13436b",

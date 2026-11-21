@@ -2,12 +2,15 @@ import {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   isSheetwriteError,
   SheetwriteError,
+  type SnapshotValidationOptions,
   validateWorkbookSnapshot,
+  type WorkbookSnapshot,
   XlsxResourceError,
   type XlsxResourceLimits,
   type XlsxWorkbookOptions,
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
+import { validateBuiltWorkbookSnapshot } from "@sheetwrite/core/codec";
 
 export interface XlsxCodecContext {
   readonly operation: "import" | "export";
@@ -175,9 +178,9 @@ export function assertResource(
   }
 }
 
-/** Validate a sparse codec snapshot without applying live dense-store allocation ceilings. */
-export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext) {
-  return validateWorkbookSnapshot(input, {
+/** The snapshot options of the codec: its own limits, without live dense-store allocation ceilings. */
+function codecSnapshotOptions(context: XlsxCodecContext): SnapshotValidationOptions {
+  return {
     storage: "paged",
     resourceLimits: {
       maxSheets: context.limits.maxSheets,
@@ -188,7 +191,20 @@ export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext)
       maxMetadataEntries: Number.MAX_SAFE_INTEGER,
       maxSerializedBytes: context.limits.maxTotalUncompressedBytes,
     },
-  });
+  };
+}
+
+/** Validate a sparse codec snapshot from outside the codec, such as one passed to export. */
+export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext) {
+  return validateWorkbookSnapshot(input, codecSnapshotOptions(context));
+}
+
+/**
+ * Validate the snapshot the reader assembled in this call from the package's
+ * XML, which no other code has reached: the same checks, with direct reads.
+ */
+export function validateReadSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext) {
+  return validateBuiltWorkbookSnapshot(snapshot, codecSnapshotOptions(context));
 }
 
 /** Report a fidelity warning. Warnings after the first `MAX_WARNINGS` are not reported. */
