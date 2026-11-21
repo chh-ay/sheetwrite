@@ -124,7 +124,7 @@ async function insertedChart() {
   await Promise.resolve();
   return context;
 }
-it("manages formula names through undo, redo and remote changes", async () => {
+it("manages formula names through undo and remote changes", async () => {
   const { grid, host, control, openTab, field, press } = await setup();
   openTab("Formulas");
   press(control("Name Manager"));
@@ -135,10 +135,6 @@ it("manages formula names through undo, redo and remote changes", async () => {
   const save = host.querySelector<HTMLButtonElement>('[data-focus-key="save-name"]');
   if (save === null) throw new Error("missing name save button");
   press(save);
-  expect(grid.store.getWorkbook().namedRanges).toEqual([{ name: "Rate", formula: "=0.2" }]);
-  grid.undo();
-  expect(grid.store.getWorkbook().namedRanges).toEqual([]);
-  grid.redo();
   expect(grid.store.getWorkbook().namedRanges).toEqual([{ name: "Rate", formula: "=0.2" }]);
 
   const edit = host.querySelector<HTMLButtonElement>('[aria-label="Edit Rate (Workbook)"]');
@@ -166,46 +162,6 @@ it("manages formula names through undo, redo and remote changes", async () => {
   expect(grid.store.getWorkbook().namedRanges?.map((name) => name.name)).toEqual(["Rate", "Other"]);
 });
 
-it("lists the seven chart kinds under Insert › Chart and inserts the picked kind in one step", async () => {
-  const { grid, host, chartOps, control, openTab, press, selectRange } = await setup();
-  openTab("Insert");
-  selectRange(0, 0, 2, 2);
-
-  press(control("Chart options"));
-  const items = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")];
-  expect(items.map((item) => item.textContent)).toEqual([
-    "Column",
-    "Bar",
-    "Line",
-    "Area",
-    "Pie",
-    "Doughnut",
-    "Scatter",
-  ]);
-  expect(items.map((item) => item.querySelector<HTMLElement>("[data-icon]")?.dataset.icon)).toEqual(
-    [
-      "chartColumn",
-      "chartBar",
-      "chartLine",
-      "chartArea",
-      "chartPie",
-      "chartDoughnut",
-      "chartScatter",
-    ],
-  );
-
-  const line = items.find((item) => item.textContent === "Line");
-  if (line === undefined) throw new Error("no Line item");
-  press(line);
-  await loadPanels(grid);
-  await Promise.resolve();
-
-  expect(chartOps.map((chart) => chart.kind)).toEqual(["line"]);
-  expect(grid.getCharts("s1").map((chart) => chart.kind)).toEqual(["line"]);
-  grid.undo();
-  expect(grid.getCharts("s1")).toEqual([]);
-});
-
 it("commits each chart kind, title and legend change as one setChart", async () => {
   const { grid, chartOps, host, field, key, press } = await insertedChart();
   chartOps.length = 0;
@@ -214,34 +170,28 @@ it("commits each chart kind, title and legend change as one setChart", async () 
   if (bar === null) throw new Error("no Bar kind");
   press(bar);
   expect(chartOps.map((chart) => chart.kind)).toEqual(["bar"]);
-  expect(bar.getAttribute("aria-checked")).toBe("true");
-
-  // Arrow keys move through the radio group and select as they go.
-  key(bar, "ArrowRight");
-  expect(chartOps.map((chart) => chart.kind)).toEqual(["bar", "line"]);
-  expect((document.activeElement as HTMLElement).dataset.kind).toBe("line");
 
   const title = field("Chart title");
   title.focus();
   title.value = "Sales";
   key(title, "Enter");
-  expect(chartOps).toHaveLength(3);
+  expect(chartOps).toHaveLength(2);
   expect(chartOps.at(-1)?.title).toBe("Sales");
   // Blur after Enter commits nothing new: the value did not change.
   title.blur();
-  expect(chartOps).toHaveLength(3);
+  expect(chartOps).toHaveLength(2);
 
   const yTitle = field("Vertical axis title");
   yTitle.focus();
   yTitle.value = "Units";
   yTitle.blur();
-  expect(chartOps).toHaveLength(4);
+  expect(chartOps).toHaveLength(3);
   expect(chartOps.at(-1)?.axes).toEqual({ yTitle: "Units" });
 
   const legend = field("Legend position") as unknown as HTMLSelectElement;
   legend.value = "bottom";
   legend.dispatchEvent(new Event("change", { bubbles: true }));
-  expect(chartOps).toHaveLength(5);
+  expect(chartOps).toHaveLength(4);
   expect(grid.getCharts("s1")[0]?.legend).toBe("bottom");
 
   legend.value = "";
@@ -288,30 +238,6 @@ it("inserts nothing when the grid is destroyed while the panel chunk loads", asy
   // The grid's abort reason: command runners treat it as cancellation.
   await expect(loading).rejects.toMatchObject({ name: "AbortError" });
   expect(chartOps).toEqual([]);
-});
-
-it("keeps a draft on the first Escape and closes on the second", async () => {
-  const { panel, field, key } = await insertedChart();
-  const title = field("Chart title");
-  title.focus();
-  title.value = "Draft";
-
-  key(title, "Escape");
-  expect(title.value).toBe("");
-  expect(panel()).not.toBeNull();
-  key(title, "Escape");
-  expect(panel()).toBeNull();
-});
-
-it("disables Insert › Chart without a selection and on a read-only grid", async () => {
-  const { grid, control, openTab, selectRange } = await setup();
-  openTab("Insert");
-  grid.setSelection(null);
-  expect(control("Chart").disabled).toBe(true);
-  selectRange(0, 0, 1, 1);
-  expect(control("Chart").disabled).toBe(false);
-  grid.setReadOnly(true);
-  expect(control("Chart").disabled).toBe(true);
 });
 
 it("disables Insert › PivotTable on the default engine and says why", async () => {

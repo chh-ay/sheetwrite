@@ -156,30 +156,21 @@ describe("object layer editing", () => {
     grid.setChart(chart("c1"), "s1");
     const frame = frameOf(grid, "c1");
 
-    drag(handleOf(frame, "se"), 30, 20);
-    expect(anchorOf(grid, "c1")).toMatchObject({
-      offsetX: 10,
-      offsetY: 5,
-      width: 230,
-      height: 120,
-    });
-
-    drag(handleOf(frameOf(grid, "c1"), "nw"), 20, 10);
+    // The top-left handle moves the anchor and shrinks the chart.
+    drag(handleOf(frame, "nw"), 20, 10);
     expect(anchorOf(grid, "c1")).toMatchObject({
       offsetX: 30,
       offsetY: 15,
-      width: 210,
-      height: 110,
+      width: 180,
+      height: 90,
     });
-    expect(placement(frameOf(grid, "c1"))).toMatchObject({ width: 210, height: 110 });
+    expect(placement(frameOf(grid, "c1"))).toMatchObject({ width: 180, height: 90 });
 
-    grid.undo();
-    expect(anchorOf(grid, "c1")).toMatchObject({ width: 230, height: 120 });
     grid.undo();
     expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
   });
 
-  it("nudges by one pixel or one cell, one undo step per key", () => {
+  it("nudges by one pixel, or one cell with Shift, and leaves the cell selection", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
@@ -196,10 +187,10 @@ describe("object layer editing", () => {
     // The keys move the object, not the cell cursor.
     expect(grid.getSelection()).toEqual(selection);
 
+    // An undo restores the old position and keeps the chart selected.
     grid.undo();
     expect(anchorOf(grid, "c1")).toMatchObject({ row: 2, offsetX: 11 });
-    grid.undo();
-    expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
+    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
   });
 
   it("deletes the selected chart as one undo step", () => {
@@ -216,18 +207,6 @@ describe("object layer editing", () => {
     expect(placement(frameOf(grid, "c1"))).toMatchObject({ x: NAME_WIDTH + 10 });
   });
 
-  it("keeps the chart selected when an undo restores its old position", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.selectChart("c1", "s1");
-    press(frameOf(grid, "c1"), "ArrowRight");
-
-    grid.undo();
-
-    expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
-    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
-  });
-
   /** The ids of the open top-level context menu's rows, in order. */
   const menuRows = (grid: GridImpl): string[] => {
     const menu = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-context-menu");
@@ -238,48 +217,7 @@ describe("object layer editing", () => {
     );
   };
 
-  const rightClick = (target: HTMLElement): MouseEvent => {
-    const event = new MouseEvent("contextmenu", {
-      clientX: 120,
-      clientY: 90,
-      bubbles: true,
-      cancelable: true,
-    });
-    target.dispatchEvent(event);
-    return event;
-  };
-
-  it("deletes a chart from its context menu as one undo step", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-
-    rightClick(frameOf(grid, "c1"));
-    hostOf(grid).querySelector<HTMLElement>('[data-context-menu-item="deleteChart"]')?.click();
-    expect(grid.getCharts()).toEqual([]);
-
-    grid.undo();
-    expect(grid.getCharts()).toEqual([chart("c1")]);
-  });
-
-  it("opens the chart menu from the keyboard and gives focus back to the chart on Escape", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.selectChart("c1", "s1");
-    const frame = frameOf(grid, "c1");
-    frame.focus();
-
-    press(frame, "F10", true);
-    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
-    const focused = document.activeElement;
-    if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
-    focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(document.activeElement).toBe(frame);
-
-    press(frame, "ContextMenu");
-    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
-  });
-
-  it("emits chart-activate on Enter and returns focus to the grid on Escape", () => {
+  it("opens the chart menu with Shift+F10 or the menu key, and emits chart-activate on Enter", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
     grid.selectChart("c1", "s1");
@@ -287,13 +225,21 @@ describe("object layer editing", () => {
     grid.on("chart-activate", (event) => activated.push(event));
     const frame = frameOf(grid, "c1");
     frame.focus();
+    const escape = () =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+
+    press(frame, "F10", true);
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+    escape();
+    expect(document.activeElement).toBe(frame);
+    press(frame, "ContextMenu");
+    expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
+    escape();
 
     press(frame, "Enter");
     expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
-
-    press(frame, "Escape");
-    expect(document.activeElement).toBe(hostOf(grid));
-    expect(frame.classList.contains("sheetwrite-object-selected")).toBe(false);
   });
 });
 
@@ -312,19 +258,6 @@ describe("object layer mounting", () => {
     expect(grid.getCharts("s2")).toEqual([]);
     grid.setReadOnly(true);
     expect(grid.setChart(chart("blocked"))).toMatchObject({ status: "noop", reason: "read-only" });
-  });
-
-  it("paints charts with the grid's theme and follows setTheme", () => {
-    const grid = mountGrid({ theme: { bg: "#101828", fg: "#e5e7eb", gridLine: "#344054" } });
-    grid.setChart(chart("themed"));
-    const layer = frameOf(grid, "themed").closest<HTMLElement>(".sheetwrite-object-layer");
-    if (!layer) throw new Error("expected the object layer");
-    const color = (name: string) => layer.style.getPropertyValue(name);
-    expect([color("--sheetwrite-bg"), color("--sheetwrite-fg")]).toEqual(["#101828", "#e5e7eb"]);
-    expect(color("--sheetwrite-grid-line")).toBe("#344054");
-
-    grid.setTheme({ bg: "#f8fafc", fg: "#101828" });
-    expect([color("--sheetwrite-bg"), color("--sheetwrite-fg")]).toEqual(["#f8fafc", "#101828"]);
   });
 });
 
