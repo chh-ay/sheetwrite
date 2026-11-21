@@ -165,3 +165,23 @@ impl CellStore {
         Ok(EvalMatrix::new(row_count, col_count, values))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::store::CellStore;
+    use crate::tests::support::string;
+
+    #[test]
+    fn scalar_index_does_not_charge_unselected_text_to_its_result_budget() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 72);
+        store.set_string(sheet, 0, 0, "short", 0);
+        let long = "x".repeat(1024 * 1024);
+        for row in 1..72 {
+            store.set_string(sheet, row, 0, &long, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=INDEX(A1:A72,1)", 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("short"));
+    }
+}
