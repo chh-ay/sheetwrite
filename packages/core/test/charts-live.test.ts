@@ -316,6 +316,35 @@ describe("resolveChartView", () => {
     ]);
   });
 
+  it("gives each series the categories of its own range when several series share one", () => {
+    const { store } = setup();
+    const values = range("data", 0, 1, 1, 1);
+    const shared = range("data", 0, 0, 1, 0);
+    apply(store, [
+      set("data", 0, 2, "East"),
+      set("data", 1, 2, "West"),
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: {
+          ...chart("mixed", values),
+          series: [
+            { values, categories: shared },
+            { values, categories: range("data", 0, 2, 1, 2) },
+            { values, categories: shared },
+          ],
+        },
+      },
+    ]);
+
+    const categories = resolveChartView(store, "data", "mixed")?.series.map((s) => s.categories);
+    expect(categories).toEqual([
+      ["Q1", "Q2"],
+      ["East", "West"],
+      ["Q1", "Q2"],
+    ]);
+  });
+
   it("reads a category range of several rows as one level per row when the values run along a row", () => {
     const { store } = setup();
     apply(store, [

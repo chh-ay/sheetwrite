@@ -223,6 +223,15 @@ function readCategories(
   return { ...categoryLevels(read, layout), truncated: read.truncated };
 }
 
+/** What decides the categories `readCategories` returns for `source`: its range and level layout. */
+function categoryKey(kind: ChartKind, source: ChartSeries): string {
+  const { categories } = source;
+  if (categories === undefined || categories === "#REF!") return String(categories);
+
+  const layout = categoryLevelLayout(kind, source);
+  return JSON.stringify([layout, categories.sheet, categories.start, categories.end]);
+}
+
 function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, index: number): string {
   if (series.name !== undefined) return series.name;
   if (series.nameRange === "#REF!") return "#REF!";
@@ -321,9 +330,17 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
     return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };
   }
 
+  // The series of a chart usually share one category range. It is read once,
+  // and those series share its arrays, as the view shares the definition.
+  const categoryReads = new Map<string, ReturnType<typeof readCategories>>();
   const series = chart.series.map((source, index): ChartSeriesView => {
     const values = readRange(store, sheets, source.values);
-    const categories = readCategories(store, sheets, chart.kind, source);
+    const key = categoryKey(chart.kind, source);
+    let categories = categoryReads.get(key);
+    if (categories === undefined) {
+      categories = readCategories(store, sheets, chart.kind, source);
+      categoryReads.set(key, categories);
+    }
 
     return {
       name: seriesName(store, sheets, source, index),

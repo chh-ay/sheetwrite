@@ -1,6 +1,31 @@
 import type { Theme } from "./types/render.js";
 
 /**
+ * The UI type scale, in CSS pixels: the sizes the docs site's text tokens
+ * use (`--sw-text-eyebrow` 12 px, `--sw-text-caption` 13 px,
+ * `--sw-text-small` 14 px, …).
+ */
+const TYPE_SCALE_PX = [11, 12, 13, 14, 16, 17, 20, 24, 30, 36] as const;
+const FONT_PX = /(\d+(?:\.\d+)?)px/;
+
+/**
+ * The sheet-tab bar's font: the theme's cell font, one step up the type
+ * scale, so the tab names, the status text and the bar's icons read a touch
+ * larger than the cells (13 px cells give a 14 px bar). A font without a
+ * pixel size is used as it is.
+ *
+ * @param font - The theme's CSS font shorthand, such as `13px system-ui`.
+ * @returns The same shorthand with the next size up.
+ */
+export function tabBarFont(font: string): string {
+  const match = FONT_PX.exec(font);
+  if (!match) return font;
+  const px = Number(match[1]);
+  const next = TYPE_SCALE_PX.find((size) => size > px) ?? Math.round(px * 1.2);
+  return `${font.slice(0, match.index)}${next}px${font.slice(match.index + match[0].length)}`;
+}
+
+/**
  * Custom properties the built-in widgets (find bar, toolbar, context menu) read
  * for their cosmetic styling. They are declared in `styles.css` via `var(...)`
  * and seeded here from the resolved {@link Theme} so the default look is
@@ -17,6 +42,8 @@ const WIDGET_THEME_VARS = {
   "--sheetwrite-toolbar-bg": (t: Theme) => t.headerBg,
   "--sheetwrite-toolbar-fg": (t: Theme) => t.headerFg,
   "--sheetwrite-menu-hover": (t: Theme) => t.gridLine,
+  // The shell's bottom row (sheet tabs and status) reads it, as the grid's own tab bar does.
+  "--sheetwrite-tab-font": (t: Theme) => tabBarFont(t.font),
 } as const;
 
 /**

@@ -863,12 +863,18 @@ function baselinePixel(axis: Axis): number {
   return axisPixel(axis, zero);
 }
 
+/**
+ * One rect per bar; with more categories than pixels along the category
+ * axis, each series draws its bars as the subpaths of one path instead, with
+ * the same geometry. A 10,000-point series then adds one element, not 10,000.
+ */
 function drawBars(context: DrawContext, axis: Axis, plot: Box, horizontal: boolean): void {
   const series = context.view.series;
   const count = pointCount(series);
   if (count === 0 || series.length === 0) return;
 
   const length = horizontal ? plot.bottom - plot.top : plot.right - plot.left;
+  const isDense = count > length;
   const band = length / count;
   const barSize = (band * BAR_GROUP_SHARE) / series.length;
   const groupOffset = (band * (1 - BAR_GROUP_SHARE)) / 2;
@@ -880,6 +886,7 @@ function drawBars(context: DrawContext, axis: Axis, plot: Box, horizontal: boole
       { class: "sheetwrite-chart-series", fill: seriesColor(seriesIndex) },
       context.root,
     );
+    let path = "";
 
     entry.values.forEach((value, index) => {
       if (value === null) return;
@@ -891,8 +898,15 @@ function drawBars(context: DrawContext, axis: Axis, plot: Box, horizontal: boole
       const rect = horizontal
         ? { x: low, y: plot.top + along, width: extent, height: barSize }
         : { x: plot.left + along, y: low, width: barSize, height: extent };
-      context.svg.element("rect", { class: "sheetwrite-chart-bar", ...rect }, group);
+      if (isDense) {
+        path += `M${rect.x} ${rect.y}h${rect.width}v${rect.height}h${-rect.width}Z`;
+      } else {
+        context.svg.element("rect", { class: "sheetwrite-chart-bar", ...rect }, group);
+      }
     });
+    if (path !== "") {
+      context.svg.element("path", { class: "sheetwrite-chart-bars", d: path }, group);
+    }
   });
 }
 

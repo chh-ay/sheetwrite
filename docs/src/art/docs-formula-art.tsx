@@ -71,10 +71,7 @@ export function DynamicReferencesDiagram() {
             { from: [0, 0], to: [0, 0], tone: "muted" },
             { from: [1, 0], to: [1, 2], tone: "accent" },
           ],
-          notes: [
-            "From A1: 0 rows down, 1 column right,",
-            "3 tall and 1 wide: B1:B3, which sum to 60.",
-          ],
+          notes: ["1 column right, 3 rows: B1:B3 = 60"],
         },
         {
           title: "INDIRECT reads reference text",
@@ -94,10 +91,7 @@ export function DynamicReferencesDiagram() {
             { from: [0, 1], to: [0, 1], tone: "muted" },
             { from: [1, 1], to: [1, 1], tone: "accent" },
           ],
-          notes: [
-            '"B"&A2 is the text "B2", so C1 reads B2.',
-            "Inserted rows never rewrite that text.",
-          ],
+          notes: ['Reads "B2"; inserts never rewrite it'],
         },
       ]}
       text={{
@@ -125,7 +119,7 @@ export function ReferenceOperatorsDiagram() {
             { from: [1, 1], to: [3, 3], tone: "muted" },
             { from: [1, 1], to: [2, 2], tone: "accent" },
           ],
-          notes: ["Adds the shared cells, B2:C3.", "No shared cells: #NULL!"],
+          notes: ["Adds B2:C3; no overlap is #NULL!"],
         },
         {
           title: "Union: a comma in ( )",
@@ -137,7 +131,7 @@ export function ReferenceOperatorsDiagram() {
             { from: [0, 0], to: [0, 1], tone: "accent" },
             { from: [2, 0], to: [2, 1], tone: "accent" },
           ],
-          notes: ["Adds both ranges. A comma", "between arguments isn't one."],
+          notes: ["Adds both; needs the extra ( )"],
         },
         {
           title: "3-D: a span of sheets",
@@ -146,7 +140,7 @@ export function ReferenceOperatorsDiagram() {
           rows: 4,
           cells: [[1, 1, "×3"]],
           ranges: [{ from: [1, 1], to: [1, 1], tone: "accent" }],
-          notes: ["B2 on Jan, Feb and Mar,", "in tab order."],
+          notes: ["B2 on Jan, Feb and Mar, in tab order"],
         },
       ]}
       text={{
@@ -165,7 +159,7 @@ export function CriteriaRowsDiagram() {
       pictures={[
         {
           title: "Criteria pick rows; the sum range adds them",
-          formula: '=SUMIFS(C1:C4, A1:A4, "East", B1:B4, ">10")',
+          formula: '=SUMIFS(C1:C4,A1:A4,"East",…)',
           cols: 3,
           rows: 4,
           cells: [
@@ -186,12 +180,7 @@ export function CriteriaRowsDiagram() {
             { from: [0, 0], to: [2, 0], tone: "accent" },
             { from: [0, 3], to: [2, 3], tone: "accent" },
           ],
-          notes: [
-            "Rows 1 and 4 meet both criteria,",
-            "so the result is 500. Every range",
-            "has the same shape; another shape",
-            "is #VALUE!",
-          ],
+          notes: ['With B1:B4 ">10": rows 1 and 4 = 500'],
         },
       ]}
       text={{
@@ -245,7 +234,7 @@ export function ReferenceRewriteDiagram() {
             { from: [1, 0], to: [1, 2], tone: "accent" },
             { from: [3, 0], to: [3, 0], tone: "muted" },
           ],
-          notes: ["$D$1 stays $D$1 in every copy, while", "A1 becomes A2, then A3: 10, 20, 30."],
+          notes: ["$D$1 stays; A1 becomes A2, A3"],
         },
       ]}
       text={{
@@ -263,7 +252,7 @@ export function CustomFunctionsDiagram() {
     <FanFigure
       source={{
         title: "functionsAddon([...]) or a grid's addons.functions",
-        lines: ["Each function: { metadata, implementation },", "on the full engine"],
+        lines: ["Each: { metadata, implementation }", "on the full engine"],
       }}
       text={{
         title: "Where a registered custom function shows up",
@@ -273,21 +262,16 @@ export function CustomFunctionsDiagram() {
       tiles={[
         {
           title: "In formulas",
-          lines: ["Called by name while", "recalculating; returns", "a number, text or bool"],
+          lines: ["Called by name while recalculating;", "returns a number, text or bool"],
           tone: "accent",
         },
         {
           title: "In formula help",
-          lines: ["Its metadata names", "and describes it and", "its arguments"],
+          lines: ["Its metadata names and describes", "it and its arguments"],
         },
         {
           title: "On recalculation",
-          lines: [
-            "volatile: true runs",
-            "on every edit; the",
-            "rest when their",
-            "arguments change",
-          ],
+          lines: ["volatile: true runs on every edit;", "others when their arguments change"],
           tone: "muted",
         },
         { title: "On failure", lines: ["A thrown error or a", "promise shows #VALUE!"] },
@@ -304,14 +288,13 @@ export function VolatileClockDiagram() {
       steps={[
         {
           title: "An edit, or",
-          code: ["recalculateVolatile(", '  new Date("…Z"))'],
+          code: ["recalculateVolatile(instant)"],
           tone: "accent",
         },
         { title: "The clock, read once", lines: ["One UTC serial for the", "whole recalculation"] },
         {
-          title: "Volatile formulas",
-          code: ["NOW · TODAY", "RAND · RANDBETWEEN", "OFFSET · INDIRECT"],
-          lines: ["and their dependents"],
+          title: "Volatile formulas and their dependents",
+          code: ["NOW · TODAY · RAND · OFFSET", "RANDBETWEEN · INDIRECT"],
           tone: "muted",
         },
       ]}

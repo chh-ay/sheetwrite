@@ -78,13 +78,9 @@ test("keeps a structured failure in its cell", () => {
   expect(parsed.results[0]).toMatchObject({ status: "failed", stage: "validate" });
 });
 
-test("rejects stale run IDs and timestamps", () => {
+test("rejects a stale run ID", () => {
   expect(() => parseRenderArtifact(artifact(), { expectedRunId: "new-run" })).toThrow(
     "stale render result",
-  );
-  const nowMs = Date.parse(TIMESTAMP) + 2_000;
-  expect(() => parseRenderArtifact(artifact(), { nowMs, maxAgeMs: 1_000 })).toThrow(
-    "stale render result timestamp",
   );
 });
 

@@ -20,6 +20,7 @@
     "bench:core-paths": "bun run src/core-paths-bench.ts --output results/core-paths-results.json",
     "bench:core-paths:smoke": "bun run src/core-paths-bench.ts --smoke",
     "bench:sync-queue-depth": "bun run src/sync-queue-depth-bench.ts",
+    "bench:query-refresh": "bun run src/query-refresh-bench.ts",
     "bench:release": "bun run src/release-capture.ts",
     "bench:release:smoke": "bun run src/release-capture.ts --smoke",
     "bench:release:machine": "bun run src/machine-capture.ts",

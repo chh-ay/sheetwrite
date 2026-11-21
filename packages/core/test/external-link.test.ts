@@ -1,6 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { formulaCallsExternalData, rewriteExternalSheets } from "../src/external-link-formula.js";
+import {
+  formulaCallsExternalData,
+  formulaContainsExternalReference,
+  rewriteExternalSheets,
+} from "../src/external-link-formula.js";
 import {
   type ExternalLink,
   type ExternalLinkCell,
@@ -69,6 +73,23 @@ describe("external formula text", () => {
       expect(formulaCallsExternalData(`"${name}(1)"&A1`)).toBe(false);
     }
     expect(formulaCallsExternalData('RTD"x"(1)')).toBe(true);
+  });
+
+  it("finds other workbooks and live-data calls outside quoted text", () => {
+    const cases: [formula: string, external: boolean][] = [
+      ["SUM(A1:B2)", false],
+      ['IF(C2>500,"high","low")', false],
+      ['"RTD(1)"&A1', false],
+      ['Sheet1!A1+"[x]"', false],
+      ["'It''s'!A1", false],
+      ['RTD("prog",,"x")', true],
+      ['A1&"x"&DDE("a","b")', true],
+      ["'[1]Sheet 1'!A1", true],
+      ["[Book.xlsx]Sheet1!A1", true],
+    ];
+    for (const [formula, external] of cases) {
+      expect(formulaContainsExternalReference(formula), formula).toBe(external);
+    }
   });
 
   it("rewrites only the names of other workbooks", () => {

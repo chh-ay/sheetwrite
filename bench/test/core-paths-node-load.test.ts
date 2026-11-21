@@ -13,11 +13,8 @@ const fastBlockingLoad: NodeLoadSample = {
   nodeVersion: "v26.12.1",
 };
 
-test("accepts a cold load that finishes between two heartbeat ticks", () => {
+test("accepts a cold load between two heartbeat ticks, not an implausible gap or wrong result", () => {
   expect(() => checkNodeLoadSample({ ...fastBlockingLoad, heartbeatTicks: 0 })).not.toThrow();
-});
-
-test("still rejects an implausible heartbeat gap and a wrong engine result", () => {
   expect(() => checkNodeLoadSample({ ...fastBlockingLoad, largestGapMs: 6_000 })).toThrow(
     "implausible heartbeat gap",
   );

@@ -616,8 +616,9 @@ function jsonPath(segments: readonly (string | number)[]): string {
 function findJsonSafetyIssue(
   input: unknown,
   maxBytes: number,
+  builtByCaller: boolean,
 ): DocumentValidationError | undefined {
-  const { issue } = measureJson(input, maxBytes);
+  const { issue } = measureJson(input, maxBytes, { builtByCaller });
   if (issue === undefined) return undefined;
 
   const path = jsonPath(issue.segments);
@@ -1035,13 +1036,17 @@ function requireString(
   return undefined;
 }
 
+/** Reads one field of a record under validation: `ownValue`, or `walkedField` after the JSON-safety walk. */
+type FieldReader = (record: PlainRecord, key: string) => unknown;
+
 function optionalString(
   record: PlainRecord,
   key: string,
   path: string,
   errors: DocumentValidationError[],
+  read: FieldReader = ownValue,
 ): void {
-  const value = ownValue(record, key);
+  const value = read(record, key);
   if (value !== undefined && typeof value !== "string") {
     invalid(errors, `${path}.${key}`, `${key} must be a string`);
   }
@@ -1052,8 +1057,9 @@ function optionalBoolean(
   key: string,
   path: string,
   errors: DocumentValidationError[],
+  read: FieldReader = ownValue,
 ): void {
-  const value = ownValue(record, key);
+  const value = read(record, key);
   if (value !== undefined && typeof value !== "boolean") {
     invalid(errors, `${path}.${key}`, `${key} must be a boolean`);
   }
@@ -1086,47 +1092,57 @@ function scalar(value: unknown): boolean {
   );
 }
 
-function validateCellBorder(value: unknown, path: string, errors: DocumentValidationError[]): void {
+function validateCellBorder(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+  read: FieldReader,
+): void {
   const border = recordAt(value, path, errors);
   if (!border) return;
-  optionalString(border, "color", path, errors);
-  const width = ownValue(border, "width");
+  optionalString(border, "color", path, errors, read);
+  const width = read(border, "width");
   if (width !== undefined && (!finiteNumber(width) || width < 0)) {
     invalid(errors, `${path}.width`, "Border width must be finite and non-negative");
   }
-  const style = ownValue(border, "style");
+  const style = read(border, "style");
   if (style !== undefined && !["solid", "dashed", "dotted"].includes(String(style))) {
     invalid(errors, `${path}.style`, "Border style is invalid");
   }
 }
 
-function validateCellStyle(value: unknown, path: string, errors: DocumentValidationError[]): void {
+function validateCellStyle(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+  read: FieldReader = ownValue,
+): void {
   const style = recordAt(value, path, errors);
   if (!style) return;
   for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"]) {
-    optionalBoolean(style, key, path, errors);
+    optionalBoolean(style, key, path, errors, read);
   }
 
   for (const key of ["color", "backgroundColor"]) {
-    optionalString(style, key, path, errors);
+    optionalString(style, key, path, errors, read);
   }
 
-  const fontSize = ownValue(style, "fontSize");
+  const fontSize = read(style, "fontSize");
   if (fontSize !== undefined && (!finiteNumber(fontSize) || fontSize < 0)) {
     invalid(errors, `${path}.fontSize`, "fontSize must be finite and non-negative");
   }
 
-  const align = ownValue(style, "align");
+  const align = read(style, "align");
   if (align !== undefined && !["left", "center", "right"].includes(String(align))) {
     invalid(errors, `${path}.align`, "align must be left, center, or right");
   }
 
-  const verticalAlign = ownValue(style, "verticalAlign");
+  const verticalAlign = read(style, "verticalAlign");
   if (verticalAlign !== undefined && !isCellVerticalAlign(verticalAlign)) {
     invalid(errors, `${path}.verticalAlign`, "verticalAlign must be top, middle, or bottom");
   }
 
-  const fontFamily = ownValue(style, "fontFamily");
+  const fontFamily = read(style, "fontFamily");
   if (
     fontFamily !== undefined &&
     (typeof fontFamily !== "string" || !isCellFontFamily(fontFamily))
@@ -1138,7 +1154,7 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
     );
   }
 
-  const numberFormat = ownValue(style, "numberFormat");
+  const numberFormat = read(style, "numberFormat");
   if (
     numberFormat !== undefined &&
     (typeof numberFormat !== "string" || !isCellNumberFormat(numberFormat))
@@ -1150,13 +1166,15 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
     );
   }
 
-  const borders = ownValue(style, "border");
+  const borders = read(style, "border");
   if (borders !== undefined) {
     const borderRecord = recordAt(borders, `${path}.border`, errors);
     if (borderRecord) {
       for (const side of ["all", "top", "right", "bottom", "left"]) {
-        const border = ownValue(borderRecord, side);
-        if (border !== undefined) validateCellBorder(border, `${path}.border.${side}`, errors);
+        const border = read(borderRecord, side);
+        if (border !== undefined) {
+          validateCellBorder(border, `${path}.border.${side}`, errors, read);
+        }
       }
     }
   }
@@ -1779,7 +1797,16 @@ function validateWorkbookTableShape(
   }
 }
 
-function validateSheetShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
+/**
+ * `walked` says the JSON-safety walk accepted `value` in this validation, with
+ * no code run since, so its cells may be accepted by `isValidWalkedCell`.
+ */
+function validateSheetShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+  walked = false,
+): void {
   const sheet = recordAt(value, path, errors);
   if (!sheet) return;
   requireString(sheet, "id", path, errors, true);
@@ -1960,6 +1987,8 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   });
 
   const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
+  // Cells can share a style object; each one is checked once per sheet.
+  const validStyles = new Set<unknown>();
   blocks?.forEach((entry, blockIndex) => {
     const blockPath = `${path}.cells[${blockIndex}]`;
     const block = recordAt(entry, blockPath, errors);
@@ -1972,6 +2001,7 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
     const cells = arrayAt(ownValue(block, "cells"), `${blockPath}.cells`, errors);
     cells?.forEach((cellEntry, cellIndex) => {
+      if (walked && isValidWalkedCell(cellEntry, validStyles)) return;
       // Paths are read only by recorded errors, and almost every cell is valid,
       // so a cell's three path strings are built only to report the errors a
       // path-free pass already found.
@@ -2002,6 +2032,48 @@ function validateCellShape(entry: unknown, path: string, errors: DocumentValidat
   validateCellValueShape(ownValue(cell, "value"), `${path}.value`, errors);
   const style = ownValue(cell, "style");
   if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+}
+
+/**
+ * `record[key]` when it is an own enumerable property, else undefined: the
+ * same value as `ownValue` for a record the JSON-safety walk accepted, whose
+ * own enumerable properties are all data properties.
+ */
+function walkedField(record: PlainRecord, key: string): unknown {
+  return Object.prototype.propertyIsEnumerable.call(record, key) ? record[key] : undefined;
+}
+
+/**
+ * Whether `validateCellShape` accepts `entry`, decided with direct reads and
+ * without building paths. Only for a cell the JSON-safety walk accepted in
+ * this validation. False means "check fully", not "invalid": a reference
+ * cell or a style that fails takes the full check, which reports the errors.
+ * `validStyles` holds the style objects already accepted in this validation.
+ */
+function isValidWalkedCell(entry: unknown, validStyles: Set<unknown>): boolean {
+  if (!isPlainRecord(entry)) return false;
+  if (
+    !nonNegativeInteger(walkedField(entry, "rowOffset")) ||
+    !nonNegativeInteger(walkedField(entry, "colOffset"))
+  ) {
+    return false;
+  }
+  const value = walkedField(entry, "value");
+  if (!isPlainRecord(value)) return false;
+  const kind = walkedField(value, "kind");
+  const valid =
+    kind === "literal"
+      ? scalar(walkedField(value, "value"))
+      : kind === "formula" && typeof walkedField(value, "src") === "string";
+  if (!valid) return false;
+
+  const style = walkedField(entry, "style");
+  if (style === undefined || validStyles.has(style)) return true;
+  const styleErrors: DocumentValidationError[] = [];
+  validateCellStyle(style, "", styleErrors, walkedField);
+  if (styleErrors.length > 0) return false;
+  validStyles.add(style);
+  return true;
 }
 
 function validateMergeShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
@@ -3266,7 +3338,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   }
 
   sheets?.forEach((sheet, index) => {
-    validateSheetShape(sheet, `sheets[${index}]`, errors);
+    // `validateWorkbookSnapshot` runs the JSON-safety walk over `input` first.
+    validateSheetShape(sheet, `sheets[${index}]`, errors, true);
   });
 
   if (errors.length > 0) return { ok: false, errors };
@@ -3764,6 +3837,41 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 }
 
 /**
+ * A snapshot that `validateWorkbookSnapshot` accepted, with its JSON size as
+ * measured before that check. Only Sheetwrite builds one, around a snapshot
+ * nothing else holds, so a store built from it repeats only the checks that
+ * depend on its own options instead of walking every cell again.
+ */
+export class CheckedSnapshot {
+  constructor(
+    readonly snapshot: WorkbookSnapshot,
+    readonly serializedBytes: number,
+  ) {}
+}
+
+/**
+ * The checks of `validateWorkbookSnapshot` that depend on `options`, for a
+ * snapshot it accepted with other options: the resource preflight and the
+ * byte limit. Validation keeps known fields only, so the snapshot is no larger
+ * than the measured input; an input over the limit gets the full validation.
+ */
+export function recheckSnapshotResources(
+  checked: CheckedSnapshot,
+  options: SnapshotValidationOptions = {},
+): DocumentValidationResult {
+  const resolved = resolveSnapshotValidationOptions(options);
+  if ("code" in resolved) return { ok: false, errors: [resolved] };
+  if (checked.serializedBytes > resolved.limits.maxSerializedBytes) {
+    return validateWorkbookSnapshot(checked.snapshot, options);
+  }
+
+  const resourceIssue = preflightSnapshotResources(checked.snapshot, resolved);
+  return resourceIssue
+    ? { ok: false, errors: [resourceIssue] }
+    : { ok: true, value: checked.snapshot };
+}
+
+/**
  * Validate and canonically order a schema-1 snapshot without hydrating runtime state.
  *
  * @param input - A snapshot from outside your code, such as parsed JSON.
@@ -3774,12 +3882,40 @@ export function validateWorkbookSnapshot(
   input: unknown,
   options: SnapshotValidationOptions = {},
 ): DocumentValidationResult {
+  return validateSnapshot(input, options, false);
+}
+
+/**
+ * `validateWorkbookSnapshot` for a snapshot the caller built in this call
+ * from plain data that no other code has reached, such as the snapshot an
+ * XLSX reader assembles. The checks and the result are the same, except
+ * that fields are read directly: the caller vouches that no property is a
+ * getter and that no array has holes, named fields or symbol keys. Never
+ * use it on a snapshot that came from outside your code.
+ *
+ * @internal For Sheetwrite's own codecs, through `@sheetwrite/core/codec`;
+ *   no compatibility promise.
+ * @param input - A snapshot your code built in this call.
+ * @param options - The same options as `validateWorkbookSnapshot`.
+ */
+export function validateBuiltWorkbookSnapshot(
+  input: unknown,
+  options: SnapshotValidationOptions = {},
+): DocumentValidationResult {
+  return validateSnapshot(input, options, true);
+}
+
+function validateSnapshot(
+  input: unknown,
+  options: SnapshotValidationOptions,
+  builtByCaller: boolean,
+): DocumentValidationResult {
   try {
     const resolved = resolveSnapshotValidationOptions(options);
     if ("code" in resolved) return { ok: false, errors: [resolved] };
     const resourceIssue = preflightSnapshotResources(input, resolved);
     if (resourceIssue) return { ok: false, errors: [resourceIssue] };
-    const issue = findJsonSafetyIssue(input, resolved.limits.maxSerializedBytes);
+    const issue = findJsonSafetyIssue(input, resolved.limits.maxSerializedBytes, builtByCaller);
     if (issue) return { ok: false, errors: [issue] };
 
     return validateJsonSafeSnapshot(input);
