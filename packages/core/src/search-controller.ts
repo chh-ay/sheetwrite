@@ -273,7 +273,9 @@ function formattedNumberText(
   lookIn: "formulas" | "values",
 ): string | null {
   if (typeof value !== "number" || isGeneralCode(format)) return null;
-  return lookIn === "values" ? formatNumber(value, format, locale) : formulaBarText(value, format);
+  return lookIn === "values"
+    ? formatNumber(value, format, locale)
+    : formulaBarText(value, format, locale);
 }
 
 /** Rows a formatted-number pass reads at once, so a large sheet is read in bounded windows. */

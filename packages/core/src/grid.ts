@@ -3042,6 +3042,7 @@ export class GridImpl implements Grid {
         stored.resolved,
         column.type,
         stored.style.numberFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
+        column.numberLocale,
       );
 
     return { address, text, format: column.type };
