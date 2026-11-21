@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { expectedLlmsFiles, LLMS_FULL_PATH, LLMS_SITE_BASE } from "./docs-llms.js";
+import { expectedLlmsFiles, LLMS_FULL_PATH } from "./docs-llms.js";
 
 /** The full-text endpoint built from the given docs pages, keyed by content path. */
 async function fullText(pages: Readonly<Record<string, string>>): Promise<string> {
