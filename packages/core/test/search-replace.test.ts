@@ -46,6 +46,15 @@ describe("replaceInText", () => {
     expect(replaceInText("xy", "x", "-", { wholeCell: true })).toBeNull();
     expect(replaceInText("x~y", "~y", "-")).toBe("x-");
     expect(replaceInText("a?c abc", "a~?c", "-")).toBe("- abc");
+    expect(replaceInText("one two three", "t*e", "-")).toBe("one -");
+    expect(replaceInText("one two three", "t?o*e", "-")).toBe("one -");
+    expect(replaceInText("x😀b", "?b", "-")).toBe("x-");
+    expect(replaceInText("ab*", "b~*", "-")).toBe("a-");
+    expect(findMatcher("c*r 1?", { wholeCell: true })("Customer 12")).toBe(true);
+    expect(findMatcher("c*r 1?", { wholeCell: true })("Customer 123")).toBe(false);
+    expect(findMatcher("*o?e", { wholeCell: true })("one done")).toBe(true);
+    expect(findMatcher("??", { wholeCell: true })("😀x")).toBe(true);
+    expect(findMatcher("a*b*c")("xxaxxbxxc")).toBe(true);
   });
   it("finds and replaces wildcards in time linear in the text", () => {
     // A backtracking matcher scans to the end of the text from every `a`

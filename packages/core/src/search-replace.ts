@@ -8,40 +8,21 @@ export interface ReplaceOptions {
 
 /** Excel's Find wildcards: `*`, `?`, or a `~` that escapes one of `*?~`. */
 const WILDCARD = /[*?]/u;
+/** Characters a regular expression with the `u` flag needs escaped. */
+const REGEX_SYNTAX = /[\\^$.*+?()[\]{}|/]/gu;
 
 /** Whether `query` uses Excel's wildcards, as the engine's Find reads them. */
 function hasWildcards(query: string): boolean {
   return WILDCARD.test(query) || query.includes("~~");
 }
 
-/** The token `?`, any one character; the other tokens are code points. */
-const ANY_ONE = -1;
-/** The token `*`, any run of characters. */
-const ANY_RUN = -2;
-
 /**
- * The most steps one text may cost the wildcard matcher. A step is one
- * pattern position at one character, so a search costs at most the text's
- * length times the pattern's. Cell text (32,767 characters) under a pattern of
- * Excel's 255 characters stays within it; a text past it does not match.
+ * The most steps one text may cost the wildcard matcher, counted in
+ * characters searched. A search costs at most the text's length times the
+ * pattern's, so cell text (32,767 characters) under a pattern of Excel's 255
+ * characters stays within it; a text past it does not match.
  */
 const MAX_WILDCARD_STEPS = 1 << 24;
-
-/** Code points outside ASCII without case, found once each. */
-const foldedCodePoints = new Map<number, number>();
-
-/** `code` without case: one code point for one, so `?` still counts characters as written. */
-function foldCase(code: number): number {
-  if (code < 0x80) return code >= 0x41 && code <= 0x5a ? code + 0x20 : code;
-  let folded = foldedCodePoints.get(code);
-  if (folded === undefined) {
-    const lower = String.fromCodePoint(code).toLowerCase();
-    const first = lower.codePointAt(0) ?? code;
-    folded = lower.length === (first > 0xffff ? 2 : 1) ? first : code;
-    foldedCodePoints.set(code, folded);
-  }
-  return folded;
-}
 
 /** The steps a text has left; shared by every search over one text. */
 interface StepBudget {
@@ -49,196 +30,168 @@ interface StepBudget {
 }
 
 /**
- * An Excel wildcard pattern, parsed once and matched against many texts.
+ * A run of a pattern between stars, as regular expressions. Without a star a
+ * run matches text of one length, so none of them can backtrack far: each
+ * place it is tried costs at most the run's length.
+ */
+interface Segment {
+  /** Finds the run at or after `lastIndex`. */
+  readonly search: RegExp;
+  /** Matches the run at `lastIndex` only. */
+  readonly at: RegExp;
+  /** Matches through the run's last place at or after `lastIndex`. */
+  readonly last: RegExp;
+  /** Finds the run where it ends the text, at or after `lastIndex`. */
+  readonly ending: RegExp;
+}
+
+/**
+ * An Excel wildcard pattern, parsed once and matched against many texts:
  * `*` is any run of characters, `?` exactly one, and `~` makes the next `*`,
- * `?` or `~` literal. Without `matchCase`, characters compare without case.
- * Neither match backtracks more than the last star, as the engine's
- * `wildcard.rs` does, so a text costs at most its length times the pattern's.
+ * `?` or `~` literal. Without `matchCase`, letters compare without case, as a
+ * regular expression's `i` flag folds them.
+ *
+ * The pattern is the runs of characters between its stars. A match places the
+ * first run at its start, each middle run where it is first found after the one
+ * before, and the last run at its end. A star is never backtracked into, so a
+ * text costs at most its length times the pattern's: a regular expression of
+ * the whole pattern backtracks once per star and can take seconds per cell.
  */
 class WildcardPattern {
-  private readonly tokens: Int32Array;
-  /** Whether the pattern has a star; without one it matches runs of one length. */
-  private readonly hasRun: boolean;
-  /** For {@link span}: the start of the thread in each pattern position, or -1. */
-  private current: Int32Array;
-  private next: Int32Array;
+  private readonly segments: readonly Segment[];
+  /** Whether the pattern starts or ends with a star. */
+  private readonly leadingRun: boolean;
+  private readonly trailingRun: boolean;
+  /**
+   * The whole-cell match of a pattern with at most one run, as one regular
+   * expression: a star at either end backtracks at most once per character.
+   * Null when the pattern has more runs.
+   */
+  private readonly whole: RegExp | null;
 
-  constructor(
-    query: string,
-    private readonly matchCase: boolean,
-  ) {
+  constructor(query: string, matchCase: boolean) {
+    const flags = matchCase ? "u" : "iu";
     const characters = Array.from(query);
-    const tokens: number[] = [];
+    const segments: Segment[] = [];
+    let source = "";
+    let endsWithRun = false;
+    let lastSource = "";
+    const endSegment = () => {
+      if (source === "") return;
+      segments.push({
+        search: new RegExp(source, `g${flags}`),
+        at: new RegExp(source, `y${flags}`),
+        last: new RegExp(`[\\s\\S]*(?:${source})`, `y${flags}`),
+        ending: new RegExp(`(?:${source})$`, `g${flags}`),
+      });
+      lastSource = source;
+      source = "";
+    };
     for (let index = 0; index < characters.length; index++) {
       const character = characters[index]!;
       const next = characters[index + 1];
+      endsWithRun = character === "*";
       if (character === "~" && (next === "*" || next === "?" || next === "~")) {
-        tokens.push(this.code(next.codePointAt(0)!));
+        source += next.replace(REGEX_SYNTAX, "\\$&");
         index++;
       } else if (character === "*") {
-        // A run of stars matches what one star matches.
-        if (tokens.at(-1) !== ANY_RUN) tokens.push(ANY_RUN);
+        endSegment();
       } else if (character === "?") {
-        tokens.push(ANY_ONE);
+        source += "[\\s\\S]";
       } else {
-        tokens.push(this.code(character.codePointAt(0)!));
+        source += character.replace(REGEX_SYNTAX, "\\$&");
       }
     }
-    this.tokens = Int32Array.from(tokens);
-    this.hasRun = tokens.includes(ANY_RUN);
-    this.current = new Int32Array(tokens.length + 1);
-    this.next = new Int32Array(tokens.length + 1);
+    endSegment();
+    this.segments = segments;
+    this.leadingRun = characters[0] === "*";
+    this.trailingRun = endsWithRun;
+    this.whole =
+      segments.length === 1
+        ? new RegExp(
+            `^(?:${this.leadingRun ? "[\\s\\S]*" : ""}${lastSource}${endsWithRun ? "[\\s\\S]*" : ""})$`,
+            flags,
+          )
+        : null;
   }
 
-  private code(code: number): number {
-    if (this.matchCase) return code;
-    return code < 0x80 ? (code >= 0x41 && code <= 0x5a ? code + 0x20 : code) : foldCase(code);
+  /** A test of whole texts, or with `within` of runs of them, for Find. */
+  matcher(within: boolean): (text: string) => boolean {
+    const whole = this.whole;
+    if (whole && !within) return (text) => whole.test(text);
+    const budget = { steps: 0 };
+    return (text) => {
+      budget.steps = MAX_WILDCARD_STEPS;
+      return this.test(text, within, budget);
+    };
   }
 
-  /**
-   * Whether the pattern matches all of `text`, or with `within` some run of
-   * it. A star that fails to match further takes one more character, and only
-   * the last star does, which is enough when the pattern is read left to right.
-   */
+  /** Whether the pattern matches all of `text`, or with `within` some run of it. */
   test(text: string, within: boolean, budget: StepBudget): boolean {
-    const tokens = this.tokens;
-    let token = 0;
+    if (this.whole && !within) return this.whole.test(text);
+    const segments = this.segments;
+    const count = segments.length;
+    if (count === 0) return true;
+    const startFree = within || this.leadingRun;
+    const endFree = within || this.trailingRun;
+    let position = 0;
     let index = 0;
-    // The token after the last star and the text offset that star has reached.
-    let starToken = within ? 0 : -1;
-    let starEnd = 0;
-    for (;;) {
-      if (--budget.steps < 0) return false;
-      if (token === tokens.length) {
-        if (within || index === text.length) return true;
-      } else {
-        const expected = tokens[token]!;
-        if (expected === ANY_RUN) {
-          token++;
-          starToken = token;
-          starEnd = index;
-          continue;
-        }
-        if (index < text.length) {
-          const code = text.codePointAt(index)!;
-          if (expected === ANY_ONE || expected === this.code(code)) {
-            index += code > 0xffff ? 2 : 1;
-            token++;
-            continue;
-          }
-        }
-      }
-      if (starToken < 0 || starEnd >= text.length) return false;
-      starEnd += text.codePointAt(starEnd)! > 0xffff ? 2 : 1;
-      token = starToken;
-      index = starEnd;
+    if (!startFree) {
+      position = run(segments[0]!.at, text, 0, budget);
+      if (position < 0) return false;
+      if (count === 1 && !endFree) return position === text.length;
+      index = 1;
     }
+    const middle = endFree ? count : count - 1;
+    for (; index < middle; index++) {
+      position = run(segments[index]!.search, text, position, budget);
+      if (position < 0) return false;
+    }
+    return endFree || run(segments[count - 1]!.ending, text, position, budget) >= 0;
   }
 
   /**
-   * The leftmost longest non-empty run of `text`, at or after `from`, that
-   * the pattern matches, as `[start, end]`; or null when none does or the
-   * budget runs out. It runs every pattern position at once over the text
-   * (Thompson's construction), so it never backtracks. A position reached
-   * from two starts keeps the earlier one, which gives the leftmost match, and
-   * the search runs on while that start can still match further.
+   * The leftmost longest non-empty run of `text`, at or after `from`, that the
+   * pattern matches, as `[start, end]`; or null when none does or the budget
+   * runs out. When the first run's first place leaves the rest unmatched, no
+   * later place can match: the rest has less text to search.
    */
   span(text: string, from: number, budget: StepBudget): [start: number, end: number] | null {
-    if (!this.hasRun) return this.fixedSpan(text, from, budget);
-    const tokens = this.tokens;
-    const accept = tokens.length;
-    let current = this.current;
-    let next = this.next;
-    current.fill(-1);
-    let bestStart = -1;
-    let bestEnd = -1;
+    const segments = this.segments;
+    const count = segments.length;
+    if (count === 0) return from < text.length ? [from, text.length] : null;
+    let start = from;
     let position = from;
-    let alive = false;
-    for (;;) {
-      if (bestStart === -1) {
-        // With no thread running, a pattern that begins with a character
-        // can start only where that character is.
-        if (!alive && tokens[0]! >= 0) {
-          position = this.seek(text, position, tokens[0]!, budget);
-          if (position < 0) return null;
-        }
-        alive = this.enter(current, 0, position) || alive;
-      }
-      const start = current[accept]!;
-      if (start !== -1 && position > start && (bestStart === -1 || start <= bestStart)) {
-        bestStart = start;
-        bestEnd = position;
-      }
-      if (position >= text.length || !alive) break;
-
-      const code = text.codePointAt(position)!;
-      const character = this.code(code);
-      next.fill(-1);
-      alive = false;
-      for (let state = 0; state < accept; state++) {
-        const threadStart = current[state]!;
-        if (threadStart === -1 || (bestStart !== -1 && threadStart > bestStart)) continue;
-        if (--budget.steps < 0) return null;
-        const token = tokens[state]!;
-        if (token === ANY_RUN) alive = this.enter(next, state, threadStart) || alive;
-        else if (token === ANY_ONE || token === character) {
-          alive = this.enter(next, state + 1, threadStart) || alive;
-        }
-      }
-      [current, next] = [next, current];
-      position += code > 0xffff ? 2 : 1;
+    let index = 0;
+    if (!this.leadingRun) {
+      const search = segments[0]!.search;
+      search.lastIndex = from;
+      const found = search.exec(text);
+      budget.steps -= text.length - from;
+      if (!found || budget.steps < 0) return null;
+      start = found.index;
+      position = search.lastIndex;
+      if (count === 1 && !this.trailingRun) return [start, position];
+      index = 1;
     }
-    this.current = current;
-    this.next = next;
-    return bestStart === -1 ? null : [bestStart, bestEnd];
-  }
-
-  /**
-   * {@link span} for a pattern without a star: every match has its length,
-   * so the leftmost is the longest, and each start costs at most the
-   * pattern's length.
-   */
-  private fixedSpan(text: string, from: number, budget: StepBudget): [number, number] | null {
-    const tokens = this.tokens;
-    for (let start = from; start < text.length;) {
-      let position = start;
-      let token = 0;
-      for (; token < tokens.length && position < text.length; token++) {
-        const code = text.codePointAt(position)!;
-        const expected = tokens[token]!;
-        if (expected !== ANY_ONE && expected !== this.code(code)) break;
-        position += code > 0xffff ? 2 : 1;
-      }
-      budget.steps -= token + 1;
-      if (budget.steps < 0) return null;
-      if (token === tokens.length) return [start, position];
-      start += text.codePointAt(start)! > 0xffff ? 2 : 1;
+    const middle = this.trailingRun ? count : count - 1;
+    for (; index < middle; index++) {
+      position = run(segments[index]!.search, text, position, budget);
+      if (position < 0) return null;
     }
-    return null;
+    const end = this.trailingRun
+      ? text.length
+      : run(segments[count - 1]!.last, text, position, budget);
+    return end > start ? [start, end] : null;
   }
+}
 
-  /** The first offset of `text`, at or after `from`, that holds `expected`; -1 when none does. */
-  private seek(text: string, from: number, expected: number, budget: StepBudget): number {
-    let position = from;
-    while (position < text.length) {
-      if (--budget.steps < 0) return -1;
-      const code = text.codePointAt(position)!;
-      if (this.code(code) === expected) return position;
-      position += code > 0xffff ? 2 : 1;
-    }
-    return -1;
-  }
-
-  /** Enter `state`, and every state after a star, for a thread that began at `start`. */
-  private enter(states: Int32Array, state: number, start: number): boolean {
-    for (;;) {
-      const held = states[state]!;
-      if (held !== -1 && held <= start) return true;
-      states[state] = start;
-      if (this.tokens[state] !== ANY_RUN) return true;
-      state++;
-    }
-  }
+/** Run `pattern` on `text` from `from`: where its match ends, or -1 when none does. */
+function run(pattern: RegExp, text: string, from: number, budget: StepBudget): number {
+  budget.steps -= text.length - from;
+  if (budget.steps < 0) return -1;
+  pattern.lastIndex = from;
+  return pattern.test(text) ? pattern.lastIndex : -1;
 }
 
 /** The pattern of the last query, which Replace all matches against every cell. */
@@ -257,9 +210,7 @@ function wildcardPattern(query: string, matchCase: boolean): WildcardPattern {
  */
 export function findMatcher(query: string, opts: ReplaceOptions = {}): (text: string) => boolean {
   if (hasWildcards(query)) {
-    const pattern = new WildcardPattern(query, opts.matchCase === true);
-    const within = opts.wholeCell !== true;
-    return (text) => pattern.test(text, within, { steps: MAX_WILDCARD_STEPS });
+    return new WildcardPattern(query, opts.matchCase === true).matcher(opts.wholeCell !== true);
   }
   if (opts.matchCase) {
     return opts.wholeCell ? (text) => text === query : (text) => text.includes(query);
