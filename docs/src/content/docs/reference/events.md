@@ -26,23 +26,27 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | Event | Payload |
 | --- | --- |
 | `change` | `ChangeEvent`: `{ transaction; changes; commitReason; source: "local" \| "remote"; epoch? }` |
-| `selection` | `{ selection: Selection \| null }` |
+| `selection` | `{ selection: Selection \| null; sheetFocus: CellAddress \| null }`. `selection` is in displayed rows. `sheetFocus` is the active cell in data rows; it names a hidden active cell when `selection` is `null`. |
 | `scroll` | `{ scrollTop; firstRow; lastRow; scrollLeft; firstVisibleColumn; lastVisibleColumn }`; the visible-column fields are `number \| null`. |
-| `edit-begin` | `{ addr: CellAddress }` |
-| `edit-commit` | `{ addr: CellAddress; value: CellValue }` |
+| `edit-begin` | `{ addr: CellAddress; sheetAddress: CellAddress }`: `addr` in displayed rows, `sheetAddress` in data rows. |
+| `edit-commit` | `{ addr: CellAddress; sheetAddress: CellAddress; value: CellValue }` |
 | `cell-mode` | `{ mode: CellMode }`: `ready`, `enter`, `edit` or `point`, when Excel's cell mode changes. `grid.getCellMode()` reads it. See [Inline editing](/docs/features/grid/editing-and-clipboard/#inline-editing). |
 | `search` | `SearchResult`: `{ query: string; matches: CellAddress[]; active: number }` |
 | `command-state-change` | `{ states }`: every command's `GridCommandState`. See [Host-owned command state](/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state). |
 | `mutation-rejected` | `{ issues: MutationIssue[] }` |
 | `active-sheet` | `{ sheet: SheetId }`, after the visible sheet changes (direct call or cross-sheet scroll). |
+| `history-step` | `{ direction: "undo" \| "redo"; step: string; range: Range \| null }`, after an undo or redo. `step` names it, such as "Paste"; `range` is the changed cells in data rows, or `null`. |
 | `hyperlink-activate` | `HyperlinkActivationEvent` |
 | `theme-change` | `{ theme: Theme }`, after `setTheme` or `replaceTheme` changes the base theme. |
 | `renderer-fallback` | `{ requested: "worker"; error: SheetwriteError }`, once, when the worker renderer could not start or stopped. `error.context.failure` is `spawn`, `crash`, `protocol`, `timeout` or `fatal`. |
 | `datasource-error` | `{ request; error: SheetwriteError }`; `request` is the `DataSourceRequest` without its `signal`. `error.context` holds the request numbers, `columnBandCount` and the `start` and `end` of the first 64 column bands; read the column keys from `request`. |
 | `export-error` | `{ format: "csv" \| "xlsx"; error: SheetwriteError }`, when a built-in toolbar or context-menu export fails. |
+| `chart-select` | `ChartRef \| null`, when a chart on the active sheet is selected; `null` when no chart is selected. |
+| `chart-activate` | `ChartRef`, when the user presses Enter on a selected chart, for example to open its editor. |
 | `engine-failed` | `{ error: SheetwriteError }`, once, when the engine stopped after a WASM trap. The grid stays read-only; see [Engine failure](/docs/concepts/error-handling/#engine-failure). |
+| `key-bindings-change` | `{ bindings: KeyBindings }`, after each change in the Keyboard shortcuts panel. `bindings` holds every action whose keys differ from Excel's defaults (`{}` after Reset all); store it and pass it back as `config.keyboard.bindings`. |
 
-`commitReason` is one of `edit-blur`, `edit-enter`, `edit-tab`, `edit-programmatic`, `paste`, `cut`, `clear`, `fill`, `structure`, `style`, `replace`, `undo`, `redo` or `api`.
+`commitReason` is one of `edit-blur`, `edit-enter`, `edit-tab`, `edit-programmatic`, `paste`, `clear`, `fill`, `structure`, `style`, `replace`, `sort`, `restore`, `undo`, `redo` or `api`. The type still lists `cut`, but no commit has it: a cut changes nothing, and its paste commits as `paste`.
 
 ## Sync coordinator events
 

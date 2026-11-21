@@ -48,3 +48,6 @@ The API manifest describes type compatibility. Runtime behavior remains protecte
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `SourceSnapshot.byteLength` | None (no caller); `RangeSnapshot.byteLength` is unchanged | 0.6.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Changed the `texts: string[]` argument of `CellStore.setSparseBlock` | `textBuf` and `textOffsets`: the UTF-8 bytes of the string entries, as `setBlockPacked` takes them | 0.7.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `PivotFields.names()` and `types()` | `takeNames()` and `takeTypes()` | 0.7.0 |
+| `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | `setColumnBlockPacked`, `setBlockPacked` or `setSparseBlock` | 0.7.0 |
+| `@sheetwrite/wasm` (history kernel) | Removed `DiffKernel.clearPage` and `pageLength` | Consume the returned page arrays; read the length of a page array | 0.7.0 |
+| `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `formulaToXlsx` and `formulaFromXlsx`; changed `convertXlsxFormulas` to take joined sources | A one-source `convertXlsxFormulas` batch; see [Direct engine calls](/docs/start/upgrade-to-0-7-0/#direct-engine-calls) | 0.7.0 |

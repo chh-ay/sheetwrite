@@ -19,7 +19,7 @@ const saved = await toXlsxWorkbook(snapshot, options);
 console.log(snapshot.workbook.xlsxSource?.graphs.length ?? 0);
 ```
 
-The saved workbook retains its modelled cells. Eligible charts, pivots, images and macros travel alongside them as opaque package parts, not as flattened cell values. Charts that the chart model can hold are not kept parts: import reads them into `Sheet.charts`, edits keep them, and export writes them again. See [Charts in XLSX files](/docs/features/analysis/charts/#charts-in-xlsx-files).
+The saved workbook retains its modeled cells. Eligible charts, pivot tables, images and macros that Sheetwrite cannot represent travel alongside them as opaque package parts, not as flattened cell values. Charts that the chart model can hold are not kept parts: import reads them into `Sheet.charts`, edits keep them, and export writes them again. Pivot tables that Sheetwrite represents import as pivot definitions; see [XLSX saves](/docs/features/analysis/pivot-tables/#xlsx-saves). See [Charts in XLSX files](/docs/features/analysis/charts/#charts-in-xlsx-files).
 
 | Operation | Result for a kept chart graph (a chart that the chart model cannot hold) |
 | --- | --- |
@@ -64,7 +64,7 @@ The payload is base64-encoded for JSON-safe persistence: about four thirds of it
 | --- | --- |
 | VBA project (`.xlsm`), customXml items, XML maps, data connections, theme, core and custom document properties | Always: they do not read cells. Macro workbooks retain the macro content type. |
 | Images and other drawings without charts, single-cell XML tables | Their sheet still exists and no row or column on it was inserted, removed, moved, resized, hidden or merged. |
-| Charts that the chart model cannot hold, and pivot tables, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
+| Charts that the chart model cannot hold, and pivot tables that Sheetwrite cannot represent, with their caches | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
 
 Shared parts such as a pivot and its cache form one graph: they are kept or dropped together.
 

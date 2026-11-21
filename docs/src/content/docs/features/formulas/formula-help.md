@@ -1,6 +1,6 @@
 ---
 title: Formula help
-description: Formula AutoComplete, the argument guide, live errors, coloured references and Explain Formula, and the analyzeFormula API that they use.
+description: Formula AutoComplete, the argument guide, live errors, colored references and Explain Formula, and the analyzeFormula API that they use.
 ---
 
 When a cell editor or the formula bar holds a formula (text that starts with `=`), the grid shows formula help:
@@ -17,7 +17,7 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
   - **Did you mean SUM?** for an unknown function within two edits of a known one, such as `SUMM`;
   - **Did you mean SalesUnits?** for a name that no defined name or table has but one comes within two edits of. Such a name is marked as an error too, because the cell would show `#NAME?`. A formula with `LET` or `LAMBDA` gets no name fixes, because it names its own values.
   Excel offers a correction only after Enter, as a yes or no question about the whole formula. Here the fix shows while you type, says in words what it changes, and changes only the marked text. Without a fix to offer, Tab commits and moves right, as in Excel.
-- **Coloured references.** Each reference gets a colour in the text, and its range on the grid gets a fill in the same colour. Equal references share one colour.
+- **Colored references.** Each reference gets a color in the text, and its range on the grid gets a fill in the same color. Equal references share one color.
 
 - **Result preview.** When you stop typing for a moment and the formula has no problem, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
 
@@ -25,7 +25,7 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
 
 The preview evaluates the formula as if it were in the cell you are editing, so `ROW()` and relative references read that cell. It does not change the workbook: referenced formulas give their current results, nothing recalculates, and no undo step or change event follows.
 
-- Functions that only read are previewed, the volatile ones too: `TODAY`, `NOW`, `OFFSET`, `INDIRECT`, `CELL` and `INFO`.
+- Functions that only read are previewed, the volatile ones too, such as `TODAY`, `NOW`, `OFFSET`, `INDIRECT` and `INFO`. `CELL` is previewed as well.
 - `RAND`, `RANDBETWEEN` and [custom functions](/docs/features/formulas/custom-functions/) are never run for a preview, even in a branch that would not be chosen. The line says that the formula has no preview.
 - A formula that reads more than 1,000,000 cells in fast range scans or 50,000 cells one by one, builds an array of more than 10,000 cells, makes more than 50,000 `LAMBDA` calls or builds and reads more than about 1 MB of text in total has no preview. The cell still calculates it in full when you commit.
 - A formula that reads cells that are not loaded yet shows that the preview waits for them.
@@ -51,7 +51,7 @@ Formula help needs `@sheetwrite/core/styles/formula-help.css`. The Explain Formu
 
 ## Keys
 
-**Alt+Enter** inserts a line break at the caret (or replaces selected text), even while the function list is open. The cell editor and formula bar grow to show up to eight lines; longer formulas scroll. Lines do not wrap. Autocomplete, argument guidance and reference colours follow the caret across lines. Plain Enter still accepts a completion or commits the edit.
+**Alt+Enter** inserts a line break at the caret (or replaces selected text), even while the function list is open. The cell editor and formula bar grow to show up to eight lines; longer formulas scroll. Lines do not wrap. Autocomplete, argument guidance and reference colors follow the caret across lines. Plain Enter still accepts a completion or commits the edit.
 
 While the list is open:
 
@@ -74,7 +74,7 @@ While the list is closed, the keys do what the editor does: Enter commits, Tab m
 
 **Formulas › Formula Auditing › Explain Formula** opens a side panel for the formula in the focus cell. The panel shows:
 
-- the formula, with each reference in its colour;
+- the formula, with each reference in its color;
 - each function call, with its signature, its description and the text of each argument;
 - each distinct reference, with its size and its sheet;
 - the problems that formula help finds.
@@ -104,7 +104,7 @@ The result has these fields. Every `from` and `to` is a UTF-16 offset into the t
 
 | Field | Contents |
 | --- | --- |
-| `tokens` | Each token with its kind (`number`, `string`, `function`, `reference`, `operator` and so on), for syntax colours. |
+| `tokens` | Each token with its kind (`number`, `string`, `function`, `reference`, `operator` and so on), for syntax colors. |
 | `references` | Each cell, range, whole-column or whole-row reference: its sheet name as written (or `null` for the formula's own sheet), its 0-based `start` and `end`, and a `colorIndex` that equal references share. |
 | `call` | The innermost function call around the caret: its name, the 0-based `argumentIndex`, and the metadata of the function and of the argument. `null` outside every call. |
 | `completion` | The items that complete the text at the caret, in list order, and the span a chosen item replaces. Each item has a `kind` (`function`, `name`, `table`, `column` or `choice`), the `name` the list shows, the `insert` text, a `description`, and for a function its metadata. `null` when nothing completes. |
@@ -116,5 +116,5 @@ The engine packages export the two reads that `analyzeFormula` uses: `formulaTok
 
 ## Limits
 
-- Reference colours repeat after six distinct references.
-- A reference to a sheet that the workbook does not have gets a colour in the text but no fill on the grid.
+- Reference colors repeat after six distinct references.
+- A reference to a sheet that the workbook does not have gets a color in the text but no fill on the grid.

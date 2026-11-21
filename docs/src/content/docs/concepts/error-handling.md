@@ -131,7 +131,17 @@ snapshots, synchronization and IndexedDB loads.
 - `SyncProtocolError` rejects malformed or resource-violating remote input. Fix the producer; do not replay the same payload.
 - `SyncPendingCapacityError` rejects a new local transaction before it can exceed the durable queue ceiling. Drain or reconcile pending work before retrying.
 
-Worker failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option. `error.context.failure` tells why the worker stopped: `spawn` (the script did not load or start), `crash` (an uncaught error after start), `protocol` (a message that one side cannot read, for example a `workerUrl` copy from another release), `timeout` (no `ready` reply in 10 seconds) or `fatal` (the worker lost its 2D context). The worker requests do not return promises, so no request stays pending after a failure or `destroy()`.
+Worker failures switch to the canvas renderer and emit `renderer-fallback`. Call `grid.rendererKind()` to report the active renderer, not the requested option. `error.context.failure` tells why the worker stopped:
+
+| `failure` | Meaning |
+| --- | --- |
+| `spawn` | The script did not load or start. |
+| `crash` | An uncaught error after start. |
+| `protocol` | A message that one side cannot read, for example a `workerUrl` copy from another release. |
+| `timeout` | No `ready` reply in 10 seconds. |
+| `fatal` | The worker lost its 2D context. |
+
+The worker requests do not return promises, so no request stays pending after a failure or `destroy()`.
 
 ## Engine failure
 
