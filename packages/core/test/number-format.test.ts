@@ -2,11 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
-import {
-  formatGeneral,
-  formatNumber,
-  resetNumberFormatResourcesForTest,
-} from "../src/number-format.js";
+import { formatGeneral } from "../src/general-format.js";
+import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it.each([

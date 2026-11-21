@@ -1,6 +1,7 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { automaticTextColor } from "./color-contrast.js";
-import { formatGeneral, formatNumber, GENERAL_WIDTH, showsGeneral } from "./number-format.js";
+import { formatGeneral, GENERAL_WIDTH, isGeneralCode } from "./general-format.js";
+import { formatNumber } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
@@ -897,7 +898,7 @@ function narrowGeneral(
   locale: string | undefined,
   available: number,
 ): string | null {
-  if (!showsGeneral(format)) return null;
+  if (!isGeneralCode(format)) return null;
   for (let width = GENERAL_WIDTH - 1; width > 0; width--) {
     const text = formatGeneral(value, width, locale);
     if (text === null) return null;
