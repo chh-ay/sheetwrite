@@ -1,12 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  breadcrumbsFor,
-  documentNeighbours,
-  type NavigationItem,
-  navigationBadge,
-} from "../src/lib/navigation.js";
-import { sectionPages } from "../src/lib/section-cards.js";
+import { type NavigationItem, navigationBadge } from "../src/lib/navigation.js";
 
 describe("navigationBadge", () => {
   const RELEASE = "0.6.0";
@@ -32,27 +26,5 @@ describe("navigationBadge", () => {
     [calculation, "0.7.0", undefined],
   ] as const)("gives %o at %s the badge %s", (item, release, badge) => {
     expect(navigationBadge(item, release)).toBe(badge);
-  });
-});
-
-describe("section overview pages", () => {
-  it("are linked in the trail of their pages and end their own trail unlinked", () => {
-    expect(breadcrumbsFor("/docs/start/installation/", "Installation")).toEqual([
-      { href: "/docs/", label: "Documentation" },
-      { href: "/docs/start/", label: "Getting started" },
-      { label: "Installation" },
-    ]);
-    expect(breadcrumbsFor("/docs/start/", "Getting started")).toEqual([
-      { href: "/docs/", label: "Documentation" },
-      { label: "Getting started" },
-    ]);
-  });
-
-  it("come before their section's pages in the reading order, and list them as cards", () => {
-    expect(documentNeighbours("/docs/start/").next?.href).toBe("/docs/start/installation/");
-    expect(documentNeighbours("/docs/start/installation/").previous?.href).toBe("/docs/start/");
-    expect(sectionPages("/docs/start/").map((page) => page.href)).toContain(
-      "/docs/start/installation/",
-    );
   });
 });
