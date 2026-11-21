@@ -50,6 +50,30 @@ describe("renderChartSvg", () => {
     expect(new Set(sizes("bar", "height")).size).toBe(1);
   });
 
+  it("draws each series of a column chart with more categories than pixels as one path of its bars", () => {
+    const values = Array.from({ length: 1_000 }, (_, index) => (index % 7) + 1);
+    const gaps = values.map((value, index) => (index % 2 === 0 ? value : null));
+    const svg = render(
+      chartView("column", [seriesView("Dense", values), seriesView("Gaps", gaps)]),
+    );
+
+    expect(svg.querySelectorAll(".sheetwrite-chart-bar")).toHaveLength(0);
+    const [dense, sparse] = [...svg.querySelectorAll(".sheetwrite-chart-bars")].map((path) => [
+      ...(path.getAttribute("d") ?? "").matchAll(
+        /M(-?[\d.e-]+) (-?[\d.e-]+)h(-?[\d.e-]+)v(-?[\d.e-]+)h(-?[\d.e-]+)Z/g,
+      ),
+    ]);
+    // One closed rectangle per value; a gap draws nothing.
+    expect(dense).toHaveLength(1_000);
+    expect(sparse).toHaveLength(500);
+    // Bars stand on one baseline, as tall as their values, side by side in value order.
+    const height = (index: number) => Number(dense?.[index]?.[4]);
+    const bottom = (index: number) => Number(dense?.[index]?.[2]) + height(index);
+    expect(height(6) / height(0)).toBeCloseTo(7);
+    expect(bottom(6)).toBeCloseTo(bottom(0));
+    expect(Number(dense?.[1]?.[1])).toBeGreaterThan(Number(dense?.[0]?.[1]));
+  });
+
   it("names the chart, describes its series, and draws axis titles and the legend", () => {
     const axes = { xTitle: "Month", yTitle: "Units" };
     const series = [SALES, seriesView("Cost", [1, 2])];
