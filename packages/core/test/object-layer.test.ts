@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { setChartRendererFactory } from "../src/chart-backend.js";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -179,7 +180,7 @@ describe("object layer editing", () => {
     expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
   });
 
-  it("nudges by one pixel or one cell, one undo step per key", () => {
+  it("nudges by one pixel, or one cell with Shift, and leaves the cell selection", () => {
     const grid = mountGrid();
     grid.setChart(chart("c1"), "s1");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
@@ -196,8 +197,10 @@ describe("object layer editing", () => {
     // The keys move the object, not the cell cursor.
     expect(grid.getSelection()).toEqual(selection);
 
+    // An undo restores the old position and keeps the chart selected.
     grid.undo();
     expect(anchorOf(grid, "c1")).toMatchObject({ row: 2, offsetX: 11 });
+    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
     grid.undo();
     expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
   });
@@ -214,18 +217,6 @@ describe("object layer editing", () => {
     grid.undo();
     expect(grid.getCharts()).toEqual([chart("c1")]);
     expect(placement(frameOf(grid, "c1"))).toMatchObject({ x: NAME_WIDTH + 10 });
-  });
-
-  it("keeps the chart selected when an undo restores its old position", () => {
-    const grid = mountGrid();
-    grid.setChart(chart("c1"), "s1");
-    grid.selectChart("c1", "s1");
-    press(frameOf(grid, "c1"), "ArrowRight");
-
-    grid.undo();
-
-    expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
-    expect(frameOf(grid, "c1").getAttribute("aria-current")).toBe("true");
   });
 
   /** The ids of the open top-level context menu's rows, in order. */
@@ -273,7 +264,7 @@ describe("object layer editing", () => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
     focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(document.activeElement).toBe(frame);
+    expectSame(document.activeElement, frame);
 
     press(frame, "ContextMenu");
     expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
@@ -292,7 +283,7 @@ describe("object layer editing", () => {
     expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
 
     press(frame, "Escape");
-    expect(document.activeElement).toBe(hostOf(grid));
+    expectSame(document.activeElement, hostOf(grid));
     expect(frame.classList.contains("sheetwrite-object-selected")).toBe(false);
   });
 });

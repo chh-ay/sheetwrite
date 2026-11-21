@@ -104,6 +104,8 @@ interface Session {
   adapter: MemoryPersistenceAdapter;
   archive: HistoryArchive;
   journal: Journal;
+  /** A client of the author "alice", open on the first version. */
+  alice: Client;
 }
 
 async function session(
@@ -117,7 +119,7 @@ async function session(
   const journal = new Journal(archive);
   adapter.recordHistory(DOCUMENT, journal);
 
-  return { adapter, archive, journal };
+  return { adapter, archive, journal, alice: await client(adapter, "alice") };
 }
 
 interface Client {
@@ -140,6 +142,15 @@ async function client(adapter: MemoryPersistenceAdapter, authorId: string): Prom
   return { grid, sync };
 }
 
+function restore(
+  archive: HistoryArchive,
+  target: Client,
+  versionId: string,
+  scope: Parameters<HistoryArchive["restoreVersion"]>[2],
+) {
+  return archive.restoreVersion(target.grid, versionId, scope, { sync: target.sync });
+}
+
 async function edit(target: Client, patches: DocumentOp[]): Promise<void> {
   const outcome = target.grid.applyTransaction({ patches });
   expect(outcome.status).toBe("applied");
@@ -152,8 +163,7 @@ async function baseline(archive: HistoryArchive): Promise<HistoryVersion> {
 
 describe("restore a range", () => {
   it("restores values, formulas and styles as one undoable change", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     const version = await baseline(archive);
 
     await edit(alice, [set("data", 0, 0, 100), set("data", 1, 1, 7)]);
@@ -168,15 +178,10 @@ describe("restore a range", () => {
     let changes = 0;
     alice.grid.on("change", () => changes++);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      version.id,
-      {
-        kind: "range",
-        range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-      },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, version.id, {
+      kind: "range",
+      range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    });
 
     expect(outcome.status).toBe("applied");
     expect(changes).toBe(1);
@@ -190,31 +195,24 @@ describe("restore a range", () => {
   });
 
   it("rejects a range that cuts a merge without changing the document", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     const version = await baseline(archive);
 
     await edit(alice, [{ op: "addMerge", sheet: "data", merge: { r0: 2, c0: 0, r1: 3, c1: 1 } }]);
 
-    const restore = archive.restoreVersion(
-      alice.grid,
-      version.id,
-      {
-        kind: "range",
-        range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
-      },
-      { sync: alice.sync },
-    );
+    const pending = restore(archive, alice, version.id, {
+      kind: "range",
+      range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+    });
 
-    await expect(restore).rejects.toMatchObject({ code: "invalid-scope" });
+    await expect(pending).rejects.toMatchObject({ code: "invalid-scope" });
     expect(alice.grid.store.getWorkbook().sheets[0]?.merges).toHaveLength(1);
   });
 });
 
 describe("restore a sheet", () => {
   it("restores dimensions in place; a reference into a removed tail becomes #REF! and returns on undo", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
 
     await edit(alice, [{ op: "removeRows", sheet: "data", at: 4, count: 4 }]);
     const small = await archive.saveVersion("Four rows", "alice", 0);
@@ -232,12 +230,7 @@ describe("restore a sheet", () => {
     ]);
     expect(value(alice.grid, "summary", 0, 0)).toBe(80);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      small.id,
-      { kind: "sheet", sheet: "data" },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, small.id, { kind: "sheet", sheet: "data" });
     expect(outcome.status).toBe("applied");
 
     const data = alice.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "data");
@@ -257,17 +250,11 @@ describe("restore a sheet", () => {
 
 describe("restore a sheet named History", () => {
   it("gives the sheet back the name History, which only a user's rename refuses", async () => {
-    const { adapter, archive } = await session(new MemoryHistoryStorage(), "History");
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session(new MemoryHistoryStorage(), "History");
     const named = await archive.saveVersion("Named History", "alice", 0);
     await edit(alice, [{ op: "renameSheet", sheet: "data", name: "Numbers" }]);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      named.id,
-      { kind: "sheet", sheet: "data" },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, named.id, { kind: "sheet", sheet: "data" });
     expect(outcome.status).toBe("applied");
     const data = alice.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "data");
     expect(data?.name).toBe("History");
@@ -276,8 +263,7 @@ describe("restore a sheet named History", () => {
 
 describe("restore the workbook", () => {
   it("re-creates a removed sheet with its ID, removes later sheets and restores names", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     await edit(alice, [
       {
         op: "setNamedRange",
@@ -306,12 +292,7 @@ describe("restore the workbook", () => {
       set("data", 2, 0, 33),
     ]);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      version.id,
-      { kind: "workbook" },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
     expect(outcome.status).toBe("applied");
 
     const workbook = alice.grid.store.getWorkbook();
@@ -327,6 +308,147 @@ describe("restore the workbook", () => {
     ]);
     expect(value(alice.grid, "data", 2, 0)).toBe(33);
   });
+
+  /** A 128-row Data sheet whose row 64 holds 640 in column B, saved as a version. */
+  async function longVersion() {
+    const opened = await session();
+    await edit(opened.alice, [
+      { op: "addRows", sheet: "data", at: 8, count: 120 },
+      set("data", 64, 1, 640),
+    ]);
+    const version = await opened.archive.saveVersion("Long", "alice", 0);
+
+    return { ...opened, version };
+  }
+
+  /** Whether an operation of an applied restore writes `row` of sheet Data. */
+  function writesRow(outcome: Awaited<ReturnType<typeof restore>>, row: number): boolean {
+    const patches = outcome.status === "applied" ? outcome.transaction.patches : [];
+    return patches.some(
+      (patch) =>
+        "range" in patch &&
+        patch.range?.sheet === "data" &&
+        Math.min(patch.range.start.row, patch.range.end.row) <= row &&
+        Math.max(patch.range.start.row, patch.range.end.row) >= row,
+    );
+  }
+
+  it("rewrites only the rows whose cells differ from the version", async () => {
+    const { archive, alice, version } = await longVersion();
+    await edit(alice, [set("data", 2, 0, 33), set("data", 110, 1, 1100)]);
+
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+
+    // Row 64 holds the version's cells already, so no operation of the restore writes it.
+    expect(writesRow(outcome, 64)).toBe(false);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 110, 1)]).toEqual([3, null]);
+    expect(value(alice.grid, "data", 64, 1)).toBe(640);
+  });
+
+  const reshaped: Array<[string, DocumentOp]> = [
+    ["rows were removed", { op: "removeRows", sheet: "data", at: 120, count: 3 }],
+    ["a column changed", { op: "setColumn", sheet: "data", col: 1, patch: { width: 140 } }],
+  ];
+
+  it.each(reshaped)("rewrites the whole sheet when %s since the version", async (_, change) => {
+    const { archive, alice, version } = await longVersion();
+    await edit(alice, [change, set("data", 2, 0, 33)]);
+
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+
+    // Row 64 did not change, but the whole sheet is written again.
+    expect(writesRow(outcome, 64)).toBe(true);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 64, 1)]).toEqual([3, 640]);
+  });
+
+  it("restores the version exactly in every scope when only some rows differ, and undo returns the live cells", async () => {
+    /** Cells and notes of each sheet, cell by cell, inside `rect` when given. */
+    const contents = (book: WorkbookSnapshot, rect?: { r0: number; r1: number }) =>
+      book.sheets.map((sheet) => {
+        const inside = (row: number) => !rect || (row >= rect.r0 && row <= rect.r1);
+        const cells = sheet.cells
+          .flatMap((block) =>
+            block.cells.map((cell) => ({
+              row: block.startRow + cell.rowOffset,
+              col: block.startCol + cell.colOffset,
+              value: cell.value,
+              style: cell.style ?? {},
+            })),
+          )
+          .filter((cell) => inside(cell.row))
+          .sort((a, b) => a.row - b.row || a.col - b.col);
+        const notes = (sheet.notes ?? [])
+          .filter((note) => inside(note.addr.row))
+          .sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
+        return { id: sheet.id, cells, notes };
+      });
+
+    /** Random edits on Data!A1:B200: values, formulas, clears, styles and notes. */
+    const edits = (random: () => number, count: number): DocumentOp[] =>
+      Array.from({ length: count }, (): DocumentOp => {
+        const row = Math.floor(random() * 200);
+        const col = Math.floor(random() * 2);
+        const addr = { sheet: "data", row, col };
+        const range = { sheet: "data", start: { row, col }, end: { row, col } };
+        switch (Math.floor(random() * 6)) {
+          case 0:
+            return set("data", row, col, Math.floor(random() * 5));
+          case 1:
+            return set("data", row, col, String(Math.floor(random() * 5)));
+          case 2:
+            return { op: "set", addr, value: { kind: "formula", src: `=A${1 + (row % 8)}+1` } };
+          case 3:
+            return { op: "clearRange", range, contents: true, style: random() < 0.5 };
+          case 4:
+            return { op: "setRangeStyle", range, style: { bold: random() < 0.5 } };
+          default:
+            return { op: "setNote", addr, text: random() < 0.3 ? null : `n${row % 3}` };
+        }
+      });
+
+    const scopes: Parameters<HistoryArchive["restoreVersion"]>[2][] = [
+      { kind: "workbook" },
+      { kind: "sheet", sheet: "data" },
+      {
+        kind: "range",
+        range: { sheet: "data", start: { row: 30, col: 0 }, end: { row: 170, col: 1 } },
+      },
+    ];
+
+    for (const [index, scope] of scopes.entries()) {
+      let seed = 7 + index;
+      const random = () => {
+        seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+        return seed / 2_147_483_648;
+      };
+
+      const { archive, alice } = await session();
+      await edit(alice, [
+        { op: "addRows", sheet: "data", at: 8, count: 192 },
+        ...edits(random, 120),
+      ]);
+      const version = await archive.saveVersion("Random", "alice", 0);
+      for (let round = 0; round < 6; round++) {
+        await edit(alice, edits(random, 1 + Math.floor(random() * 12)));
+      }
+
+      const live = contents(alice.grid.exportSnapshot());
+      const rect = scope.kind === "range" ? { r0: 30, r1: 170 } : undefined;
+      const outcome = await restore(archive, alice, version.id, scope);
+      expect(outcome.status).toBe("applied");
+
+      const historical = await archive.readVersion(version.id);
+      const restored = contents(alice.grid.exportSnapshot(), rect);
+      expect(restored.find((sheet) => sheet.id === "data")).toEqual(
+        contents(historical, rect).find((sheet) => sheet.id === "data"),
+      );
+
+      alice.grid.undo();
+      expect(contents(alice.grid.exportSnapshot())).toEqual(live);
+    }
+  });
 });
 
 describe("restore external links", () => {
@@ -336,8 +458,7 @@ describe("restore external links", () => {
       target: "Budget.xlsx",
       sheets: [{ name: "Annual", cells: [{ row: 0, col: 0, value }] }],
     });
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     await edit(alice, [
       { op: "setExternalLinks", links: [link(7)] },
       {
@@ -350,12 +471,7 @@ describe("restore external links", () => {
     await edit(alice, [{ op: "setExternalLinks", links: [link(9)] }]);
     expect(value(alice.grid, "data", 2, 0)).toBe(9);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      version.id,
-      { kind: "workbook" },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
     expect(outcome.status).toBe("applied");
     expect(alice.grid.store.getWorkbook().externalLinks).toEqual([link(7)]);
     expect(value(alice.grid, "data", 2, 0)).toBe(7);
@@ -368,8 +484,7 @@ describe("restore external links", () => {
 
 describe("restore through sync", () => {
   it("sends a restore larger than one server version as one atomic batch", async () => {
-    const { adapter, archive, journal } = await session();
-    const alice = await client(adapter, "alice");
+    const { adapter, archive, journal, alice } = await session();
     const rows = 20_000;
     const text = (row: number) => `${row}:${"x".repeat(230)}`;
     const column = (col: number): DocumentOp => ({
@@ -398,7 +513,7 @@ describe("restore through sync", () => {
     bob.grid.on("change", () => changes++);
 
     const scope = { kind: "sheet", sheet: "data" } as const;
-    const outcome = await archive.restoreVersion(bob.grid, version.id, scope, { sync: bob.sync });
+    const outcome = await restore(archive, bob, version.id, scope);
     expect(outcome.status).toBe("applied");
     expect(changes).toBe(1);
     expect(bob.sync.pendingCommits()[0]?.versionOperationCounts?.length).toBeGreaterThan(1);
@@ -410,18 +525,12 @@ describe("restore through sync", () => {
   }, 60_000);
 
   it("records the restorer and the version it restores", async () => {
-    const { adapter, archive, journal } = await session();
-    const alice = await client(adapter, "alice");
+    const { adapter, archive, journal, alice } = await session();
     const version = await baseline(archive);
     await edit(alice, [set("data", 0, 0, 9)]);
 
     const bob = await client(adapter, "bob");
-    await archive.restoreVersion(
-      bob.grid,
-      version.id,
-      { kind: "sheet", sheet: "data" },
-      { sync: bob.sync },
-    );
+    await restore(archive, bob, version.id, { kind: "sheet", sheet: "data" });
     await bob.sync.flush();
 
     const last = journal.commits.at(-1);
@@ -431,8 +540,7 @@ describe("restore through sync", () => {
   });
 
   it("lets only one of two concurrent restores commit; the other must reload", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { adapter, archive, alice } = await session();
     const version = await baseline(archive);
     await edit(alice, [set("data", 0, 0, 9)]);
     const later = await archive.saveVersion("Later", "alice", 0);
@@ -441,8 +549,8 @@ describe("restore through sync", () => {
     const bob = await client(adapter, "bob");
     const carol = await client(adapter, "carol");
 
-    await archive.restoreVersion(bob.grid, version.id, { kind: "workbook" }, { sync: bob.sync });
-    await archive.restoreVersion(carol.grid, later.id, { kind: "workbook" }, { sync: carol.sync });
+    await restore(archive, bob, version.id, { kind: "workbook" });
+    await restore(archive, carol, later.id, { kind: "workbook" });
 
     await bob.sync.flush();
     await carol.sync.flush();
@@ -456,19 +564,13 @@ describe("restore through sync", () => {
   });
 
   it("refuses to restore while local edits are pending", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     const version = await baseline(archive);
     alice.sync.setOnline(false);
     alice.grid.applyTransaction({ patches: [set("data", 0, 0, 5)] });
 
-    const restore = archive.restoreVersion(
-      alice.grid,
-      version.id,
-      { kind: "workbook" },
-      { sync: alice.sync },
-    );
-    await expect(restore).rejects.toMatchObject({ code: "conflict" });
+    const pending = restore(archive, alice, version.id, { kind: "workbook" });
+    await expect(pending).rejects.toMatchObject({ code: "conflict" });
     expect(value(alice.grid, "data", 0, 0)).toBe(5);
   });
 
@@ -485,29 +587,22 @@ describe("restore through sync", () => {
       },
     };
 
-    const { adapter, archive } = await session(storage);
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session(storage);
     const version = await baseline(archive);
 
     pause = Promise.withResolvers<void>();
-    const restore = archive.restoreVersion(
-      alice.grid,
-      version.id,
-      { kind: "workbook" },
-      { sync: alice.sync },
-    );
+    const pending = restore(archive, alice, version.id, { kind: "workbook" });
     alice.grid.applyRemoteOperations([set("data", 3, 0, 44)]);
     pause.resolve();
 
-    await expect(restore).rejects.toMatchObject({ code: "conflict" });
+    await expect(pending).rejects.toMatchObject({ code: "conflict" });
     expect(value(alice.grid, "data", 3, 0)).toBe(44);
   });
 });
 
 describe("restore a dashboard", () => {
   it("restores the items of a dashboard in place, without cell operations on it", async () => {
-    const { adapter, archive } = await session();
-    const alice = await client(adapter, "alice");
+    const { archive, alice } = await session();
     const slicer = {
       id: "region",
       box: { x: 0, y: 0, w: 4, h: 4 },
@@ -541,12 +636,7 @@ describe("restore a dashboard", () => {
       },
     ]);
 
-    const outcome = await archive.restoreVersion(
-      alice.grid,
-      version.id,
-      { kind: "workbook" },
-      { sync: alice.sync },
-    );
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
 
     expect(outcome.status).toBe("applied");
     expect(alice.grid.store.getWorkbook().sheets[2]?.dashboard).toEqual({ items: [slicer] });

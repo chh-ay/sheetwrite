@@ -26,7 +26,11 @@ function textOf(node: Node): string {
 }
 
 /** A result div around a 2×2 table, optionally replacing its final cell value. */
-function resultDiv(properties: Record<string, unknown>, value: Node = text("12")): Node {
+function resultDiv(
+  properties: Record<string, unknown>,
+  value: Node = text("12"),
+  ...extras: Node[]
+): Node {
   return {
     type: "element",
     tagName: "div",
@@ -37,6 +41,7 @@ function resultDiv(properties: Record<string, unknown>, value: Node = text("12")
         cell("thead", cell("tr", cell("th", text("Item")), cell("th", text("Total")))),
         cell("tbody", cell("tr", cell("td", text("Pen")), cell("td", value))),
       ),
+      ...extras,
     ],
   };
 }
@@ -148,6 +153,33 @@ describe("grid result figures", () => {
       "1header",
       "2invoice-1",
     ]);
+  });
+
+  it("puts authored blocks under the sheet, formats their sw-format tokens, and the caption last", () => {
+    const token = (value: string): Node => ({
+      type: "element",
+      tagName: "sw-format",
+      properties: { value, code: "#,##0.00", locale: "de-DE" },
+      children: [],
+    });
+    const legend = cell("dl", cell("dt", text("B2")), cell("dd", token("1234.5")));
+    const menu = cell("div", text("Copy value"));
+    const caption = cell("figcaption", text("Total: "), token("99"));
+    const figure = render(resultDiv({}, undefined, text("\n"), legend, caption, menu));
+
+    expect((figure.children ?? []).map((part) => part.tagName)).toEqual([
+      "div",
+      "dl",
+      "div",
+      "figcaption",
+    ]);
+    expect(figure.children?.[1]?.properties?.className).toEqual(["sw-grid-result__legend"]);
+    const total = `Total: ${formatNumber(99, "#,##0.00", "de-DE")}`;
+    expect(textOf(figure.children?.[1] ?? text(""))).toBe(
+      `B2${formatNumber(1234.5, "#,##0.00", "de-DE")}`,
+    );
+    expect(textOf(figure.children?.[3] ?? text(""))).toBe(total);
+    expect(figure.properties?.ariaLabel).toBe(total);
   });
 
   it("rejects a marker that points outside the table", () => {

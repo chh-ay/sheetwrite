@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { NOTE_HOVER_DELAY_MS } from "../src/note-popover.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -85,13 +86,13 @@ describe("note hover card", () => {
 
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS - 1);
-    expect(noteCard(host)).toBeNull();
+    expectSame(noteCard(host), null);
 
     jest.advanceTimersByTime(1);
-    const card = noteCard(host);
-    expect(card?.textContent).toBe("Check the totals");
-    expect(card?.getAttribute("role")).toBe("tooltip");
-    expect(document.activeElement).toBe(focused);
+    expect(noteCard(host)?.textContent).toBe("Check the totals");
+    expect(noteCard(host)?.getAttribute("role")).toBe("tooltip");
+    // The card does not take the focus.
+    expectSame(document.activeElement, focused);
   });
 
   it.each([
@@ -112,11 +113,11 @@ describe("note hover card", () => {
     const { host, grid: target } = mount();
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS);
-    expect(noteCard(host)).not.toBeNull();
+    expect(noteCard(host) === null).toBe(false);
 
     dismiss(host, target);
 
-    expect(noteCard(host)).toBeNull();
+    expectSame(noteCard(host), null);
   });
 });
 
@@ -126,7 +127,7 @@ describe("note editor", () => {
 
     openEditor(target, NOTED);
     const editor = noteEditor(host);
-    expect(document.activeElement).toBe(editor);
+    expectSame(document.activeElement, editor);
     expect(editor.value).toBe("Check the totals");
 
     editor.value = "Totals checked";
@@ -134,7 +135,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Totals checked");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expectSame(document.activeElement, host);
 
     target.undo();
     expect(target.getNote(NOTED)).toBe("Check the totals");
@@ -161,7 +162,7 @@ describe("note editor", () => {
 
     expect(target.getNote(NOTED)).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-    expect(document.activeElement).toBe(host);
+    expectSame(document.activeElement, host);
   });
 
   it("opens on the focus cell when Shift+F2 is pressed", () => {
@@ -177,21 +178,16 @@ describe("note editor", () => {
 });
 
 describe("deleteNote", () => {
-  it("removes the focus cell's note", () => {
-    const { grid: target } = mount();
-    target.setSelection({ kind: "cell", addr: NOTED });
-
-    target.actions.deleteNote();
-
-    expect(target.getNote(NOTED)).toBeNull();
-  });
-
-  it("keeps the note on a read-only grid", () => {
-    const { grid: target } = mount({ readOnly: true });
-    target.setSelection({ kind: "cell", addr: NOTED });
-
-    target.actions.deleteNote();
-
-    expect(target.getNote(NOTED)).toBe("Check the totals");
-  });
+  it.each([
+    [false, null],
+    [true, "Check the totals"],
+  ] as const)(
+    "removes the focus cell's note unless the grid is read-only (%p)",
+    (readOnly, note) => {
+      const { grid: target } = mount({ readOnly });
+      target.setSelection({ kind: "cell", addr: NOTED });
+      target.actions.deleteNote();
+      expect(target.getNote(NOTED)).toBe(note);
+    },
+  );
 });

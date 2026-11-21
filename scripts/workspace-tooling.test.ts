@@ -23,63 +23,6 @@ import {
 
 const fixtureRoots: string[] = [];
 
-async function graphFixture(extraPackage?: { readonly name: string; readonly build?: boolean }) {
-  const root = await mkdtemp(join(tmpdir(), "sheetwrite-workspace-graph-"));
-  fixtureRoots.push(root);
-  await mkdir(join(root, "packages"), { recursive: true });
-  await mkdir(join(root, "bench"), { recursive: true });
-  await mkdir(join(root, "docs"), { recursive: true });
-  const dependencies: Readonly<Record<string, readonly string[]>> = {
-    "@sheetwrite/wasm": [],
-    "@sheetwrite/formulas": [],
-    "@sheetwrite/core": ["@sheetwrite/wasm"],
-    "@sheetwrite/xlsx": ["@sheetwrite/core"],
-    "@sheetwrite/charts": ["@sheetwrite/core"],
-    "@sheetwrite/react": ["@sheetwrite/core"],
-    "@sheetwrite/vue": ["@sheetwrite/core"],
-    "@sheetwrite/svelte": ["@sheetwrite/core"],
-  };
-  for (const name of PUBLISHABLE_PACKAGE_ORDER) {
-    const directory = name.slice("@sheetwrite/".length);
-    await mkdir(join(root, "packages", directory), { recursive: true });
-    await writeFile(
-      join(root, "packages", directory, "package.json"),
-      `${JSON.stringify({
-        name,
-        publishConfig: { access: "public" },
-        scripts: { build: "build", typecheck: "typecheck" },
-        dependencies: Object.fromEntries(
-          (dependencies[name] ?? []).map((item) => [item, "workspace:*"]),
-        ),
-      })}\n`,
-    );
-  }
-  if (extraPackage) {
-    const directory = extraPackage.name.slice("@sheetwrite/".length);
-    await mkdir(join(root, "packages", directory), { recursive: true });
-    await writeFile(
-      join(root, "packages", directory, "package.json"),
-      `${JSON.stringify({
-        name: extraPackage.name,
-        publishConfig: { access: "public" },
-        scripts: {
-          ...(extraPackage.build === false ? {} : { build: "build" }),
-          typecheck: "typecheck",
-        },
-      })}\n`,
-    );
-  }
-  await writeFile(
-    join(root, "bench/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/bench", scripts: { typecheck: "typecheck" } })}\n`,
-  );
-  await writeFile(
-    join(root, "docs/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/docs", scripts: { typecheck: "typecheck" } })}\n`,
-  );
-  return root;
-}
-
 afterEach(async () => {
   await Promise.all(
     fixtureRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
@@ -87,13 +30,10 @@ afterEach(async () => {
 });
 
 describe("canonical workspace graph", () => {
-  it("rejects an unlisted publishable workspace package", async () => {
-    const root = await graphFixture({ name: "@sheetwrite/new-package" });
-    expect(() => validateWorkspaceGraph(root)).toThrow("missing: @sheetwrite/new-package");
-  });
-
-  it("rejects a dependency order inversion", async () => {
-    const root = await graphFixture();
+  it("rejects an unlisted publishable package and a dependency order inversion", () => {
+    const root = resolve(import.meta.dir, "..");
+    const [first, ...rest] = PUBLISHABLE_PACKAGE_ORDER;
+    expect(() => validateWorkspaceGraph(root, rest)).toThrow(`missing: ${first}`);
     const reversed = [...PUBLISHABLE_PACKAGE_ORDER].reverse();
     expect(() => validateWorkspaceGraph(root, reversed)).toThrow("must run after its dependency");
   });
@@ -195,30 +135,31 @@ describe("canonical workspace graph", () => {
 
   it("runs one cargo build up front for each wasm-pack package build", async () => {
     const root = resolve(import.meta.dir, "..");
-    const wasmPackBuilds: string[] = [];
+    const wasmPackBuilds: [packageName: string, command: string][] = [];
     for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {
       const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+        readonly name: string;
         readonly scripts?: { readonly build?: string };
       };
       for (const command of manifest.scripts?.build?.split("&&") ?? []) {
-        if (command.includes("wasm-pack build")) wasmPackBuilds.push(command.trim());
+        if (command.includes("wasm-pack build")) wasmPackBuilds.push([manifest.name, command]);
       }
     }
 
     expect(BUILD_NODES[0]?.command).toEqual(["bun", "scripts/workspace-tooling.ts", "build-rust"]);
     expect(RUST_BUILD_NODES).toHaveLength(wasmPackBuilds.length);
-    // The full engine's wasm-pack build uses the target directory its cargo build fills.
-    expect(wasmPackBuilds).toContain(
-      "CARGO_TARGET_DIR=../wasm/target/analysis wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis",
+    // The full engine's wasm-pack build reuses the target directory its cargo build fills.
+    const wasmPack = wasmPackBuilds.find(([name]) => name === "@sheetwrite/formulas")?.[1] ?? "";
+    const cargo = RUST_BUILD_NODES.find((node) => node.id === "cargo:@sheetwrite/formulas");
+    if (cargo === undefined) throw new Error("No cargo build for @sheetwrite/formulas");
+    const cargoTargetDir = cargo.command[cargo.command.indexOf("--target-dir") + 1] ?? "";
+    const wasmPackTargetDir = /CARGO_TARGET_DIR=(\S+)/.exec(wasmPack)?.[1] ?? "";
+    expect(resolve(root, "packages/formulas", wasmPackTargetDir)).toBe(
+      resolve(root, cargo.cwd ?? "", cargoTargetDir),
     );
-    const formulas = RUST_BUILD_NODES.find((node) => node.id === "cargo:@sheetwrite/formulas");
-    expect(formulas?.cwd).toBe("packages/wasm");
-    expect(formulas?.command.slice(-4)).toEqual([
-      "--features",
-      "analysis",
-      "--target-dir",
-      "target/analysis",
-    ]);
+    const features = /--features (\S+)/.exec(wasmPack)?.[1] ?? "";
+    expect(features).not.toBe("");
+    expect(cargo.command[cargo.command.indexOf("--features") + 1]).toBe(features);
   });
 });
 
@@ -233,30 +174,21 @@ describe("changeset workspace contract", () => {
     expect(packageSizeHistoryVersionFromHeadRef("automation/package-size-history-next")).toBe(
       undefined,
     );
-    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-history.json"])).toBeTrue();
-    expect(
-      isGeneratedPackageSizeHistoryChange([
-        "scripts/size-history.json",
-        "scripts/size-report.json",
-      ]),
-    ).toBeTrue();
-    expect(
-      isGeneratedPackageSizeHistoryChange(["scripts/changeset-ci.ts", "scripts/size-history.json"]),
-    ).toBeFalse();
-    // The docs build renders the landing data, so a branch committing it needs a changeset.
-    expect(
-      isGeneratedPackageSizeHistoryChange([
-        "docs/src/generated/landing-bench.json",
-        "scripts/size-history.json",
-      ]),
-    ).toBeFalse();
-    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-report.json"])).toBeFalse();
-    expect(
-      isGeneratedPackageSizeHistoryChange([
-        "scripts/size-history.json",
-        "scripts/size-history.json",
-      ]),
-    ).toBeFalse();
+    const history = "scripts/size-history.json";
+    for (const [changes, generated] of [
+      [[history], true],
+      [[history, "scripts/size-report.json"], true],
+      [["scripts/changeset-ci.ts", history], false],
+      // The docs build renders the landing data, so a branch committing it needs a changeset.
+      [["docs/src/generated/landing-bench.json", history], false],
+      [["scripts/size-report.json"], false],
+      [[history, history], false],
+    ] as const) {
+      expect({ changes, generated: isGeneratedPackageSizeHistoryChange(changes) }).toEqual({
+        changes,
+        generated,
+      });
+    }
   });
 
   it("requires every publishable package to match the release branch version", async () => {

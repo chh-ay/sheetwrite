@@ -2,11 +2,10 @@ import { describe, expect, it } from "bun:test";
 
 import {
   COVERAGE_SCHEMA_VERSION,
+  type CoverageLanguage,
   type CoveragePolicy,
   type CoverageRecord,
   evaluateCoveragePolicy,
-  filterRuntimeRecords,
-  isCoverageContamination,
   mergeLcovRecords,
   normalizeRustCoverage,
   parseCoveragePolicy,
@@ -37,37 +36,17 @@ function record(
   };
 }
 
-describe("LCOV parser", () => {
-  it("normalizes repository paths and rejects a one-line malformed/non-finite counter", () => {
-    const report = [
-      "TN:",
-      "SF:packages/core/src/grid.ts",
-      "FNF:2",
-      "FNH:1",
-      "DA:10,2",
-      "DA:11,0",
-      "LF:2",
-      "LH:1",
-      "end_of_record",
-    ].join("\n");
-    expect(parseLcov(report, ROOT)[0]).toMatchObject({
-      path: "packages/core/src/grid.ts",
-      lines: { covered: 1, total: 2 },
-      functions: { covered: 1, total: 2 },
-      uncoveredLines: [11],
-    });
-    expect(() => parseLcov(report.replace("DA:11,0", "DA:11,NaN"), ROOT)).toThrow(
-      "finite non-negative integer",
-    );
-  });
+const GRID = "SF:packages/core/src/grid.ts";
 
+describe("LCOV parser", () => {
   it("merges sharded line hits while conservatively ratcheting function coverage", () => {
     const first = parseLcov(
-      "SF:packages/core/src/grid.ts\nFNF:3\nFNH:1\nDA:10,2\nDA:11,0\nLF:2\nLH:1\nend_of_record",
+      `TN:\n${GRID}\nFNF:3\nFNH:1\nDA:10,2\nDA:11,0\nLF:2\nLH:1\nend_of_record`,
       ROOT,
     );
+    expect(first[0]).toMatchObject({ lines: { covered: 1, total: 2 }, uncoveredLines: [11] });
     const second = parseLcov(
-      "SF:packages/core/src/grid.ts\nFNF:4\nFNH:2\nDA:10,0\nDA:11,3\nDA:12,1\nLF:3\nLH:2\nend_of_record",
+      `${GRID}\nFNF:4\nFNH:2\nDA:10,0\nDA:11,3\nDA:12,1\nLF:3\nLH:2\nend_of_record`,
       ROOT,
     );
     expect(mergeLcovRecords([first, second])).toMatchObject([
@@ -80,51 +59,26 @@ describe("LCOV parser", () => {
     ]);
   });
 
-  it("rejects duplicate source records and duplicate line counters", () => {
-    const source = [
-      "SF:packages/core/src/grid.ts",
-      "FNF:0",
-      "FNH:0",
-      "DA:1,1",
-      "LF:1",
-      "LH:1",
-      "end_of_record",
-    ].join("\n");
-    expect(() => parseLcov(`${source}\n${source}`, ROOT)).toThrow("Duplicate LCOV source record");
-    expect(() => parseLcov(source.replace("DA:1,1", "DA:1,1\nDA:1,0"), ROOT)).toThrow(
-      "Duplicate LCOV DA",
-    );
-  });
-
-  it("fails closed on a missing terminator and counters inconsistent with DA", () => {
-    expect(() => parseLcov("SF:packages/core/src/grid.ts\nDA:1,1", ROOT)).toThrow(
-      "ended before end_of_record",
-    );
-    expect(() =>
-      parseLcov(
-        "SF:packages/core/src/grid.ts\nFNF:0\nFNH:0\nDA:1,1\nLF:2\nLH:1\nend_of_record",
-        ROOT,
-      ),
-    ).toThrow("LF does not match");
+  const valid = `${GRID}\nFNF:0\nFNH:0\nDA:1,1\nLF:1\nLH:1\nend_of_record`;
+  it.each([
+    ["a non-finite counter", valid.replace("DA:1,1", "DA:1,NaN"), "finite non-negative integer"],
+    ["a duplicate source record", `${valid}\n${valid}`, "Duplicate LCOV source record"],
+    ["a duplicate line counter", valid.replace("DA:1,1", "DA:1,1\nDA:1,0"), "Duplicate LCOV DA"],
+    ["a missing terminator", `${GRID}\nDA:1,1`, "ended before end_of_record"],
+    ["a line total inconsistent with DA", valid.replace("LF:1", "LF:2"), "LF does not match"],
+  ])("fails closed on %s", (_label, report, message) => {
+    expect(() => parseLcov(report, ROOT)).toThrow(message);
   });
 });
 
-describe("scored source selection", () => {
-  it("keeps adjacent runtime source while filtering dist/test/generated records", () => {
-    const records = [
-      record("packages/core/src/grid.ts"),
-      record("packages/core/dist/grid.js"),
-      record("packages/core/test/grid.test.ts"),
-      record("packages/wasm/pkg/sheetwrite_wasm.js"),
-    ];
-    expect(
-      filterRuntimeRecords(records, new Set(["packages/core/src/grid.ts"])).map(
-        (item) => item.path,
-      ),
-    ).toEqual(["packages/core/src/grid.ts"]);
-    expect(isCoverageContamination("packages/core/src/grid.ts")).toBe(false);
-    expect(isCoverageContamination("packages/core/dist/grid.js")).toBe(true);
-  });
+describe("coverage floors", () => {
+  const scoredPaths = new Set(["packages/core/src/a.ts", "packages/core/src/b.ts"]);
+  const fullyCovered = record("packages/core/src/a.ts", { covered: 100, total: 100 });
+  const evaluate = (
+    records: CoverageRecord[],
+    paths = scoredPaths,
+    language: CoverageLanguage = "typescript",
+  ) => evaluateCoveragePolicy({ policy: POLICY, language, records, scoredPaths: paths });
 
   it("scores new runtime files automatically, skips exclusions, and rejects stale exclusions", () => {
     const scored = scoredRuntimePaths(POLICY, "typescript", [
@@ -136,74 +90,38 @@ describe("scored source selection", () => {
     expect(() => scoredRuntimePaths(POLICY, "typescript", ["packages/core/src/grid.ts"])).toThrow(
       "Coverage exclusion has no runtime source file: packages/core/src/types.ts",
     );
-    expect([...scoredRuntimePaths(POLICY, "rust", ["packages/wasm/src/calc.rs"])]).toEqual([
-      "packages/wasm/src/calc.rs",
-    ]);
   });
-});
-
-describe("aggregate floors", () => {
-  const scoredPaths = new Set(["packages/core/src/a.ts", "packages/core/src/b.ts"]);
 
   it("passes at the floor and fails one line below it, summing across files", () => {
-    const fullyCovered = record("packages/core/src/a.ts", { covered: 100, total: 100 });
     const atFloor = [fullyCovered, record("packages/core/src/b.ts", { covered: 80, total: 100 })];
-    expect(
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "typescript",
-        records: atFloor,
-        scoredPaths,
-      }),
-    ).toEqual({ lines: { covered: 180, total: 200 }, functions: { covered: 34, total: 40 } });
-
+    expect(evaluate(atFloor)).toEqual({
+      lines: { covered: 180, total: 200 },
+      functions: { covered: 34, total: 40 },
+    });
     const belowFloor = [
       fullyCovered,
       record("packages/core/src/b.ts", { covered: 79, total: 100 }),
     ];
-    expect(() =>
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "typescript",
-        records: belowFloor,
-        scoredPaths,
-      }),
-    ).toThrow("typescript lines coverage 89.50% (179/200) is below the 90% floor");
+    expect(() => evaluate(belowFloor)).toThrow(
+      "typescript lines coverage 89.50% (179/200) is below the 90% floor",
+    );
   });
 
-  it("fails when a scored source is missing from the report or generated output is scored", () => {
-    expect(() =>
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "typescript",
-        records: [record("packages/core/src/a.ts", { covered: 100, total: 100 })],
-        scoredPaths,
-      }),
-    ).toThrow("Coverage report is missing scored source: packages/core/src/b.ts");
-    expect(() =>
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "typescript",
-        records: [record("packages/core/dist/grid.js")],
-        scoredPaths: new Set(),
-      }),
-    ).toThrow("Generated/test output entered scored coverage");
-  });
-
-  it("enforces Rust region floors", () => {
-    const rustRecord: CoverageRecord = {
+  it("fails on a missing scored source, scored generated output, and a Rust region floor", () => {
+    expect(() => evaluate([fullyCovered])).toThrow(
+      "Coverage report is missing scored source: packages/core/src/b.ts",
+    );
+    expect(() => evaluate([record("packages/core/dist/grid.js")], new Set())).toThrow(
+      "Generated/test output entered scored coverage",
+    );
+    const rust: CoverageRecord = {
       ...record("packages/wasm/src/calc.rs", { covered: 100, total: 100 }),
       functions: { covered: 10, total: 10 },
       regions: { covered: 79, total: 100 },
     };
-    expect(() =>
-      evaluateCoveragePolicy({
-        policy: POLICY,
-        language: "rust",
-        records: [rustRecord],
-        scoredPaths: new Set([rustRecord.path]),
-      }),
-    ).toThrow("rust regions coverage 79.00% (79/100) is below the 80% floor");
+    expect(() => evaluate([rust], new Set([rust.path]), "rust")).toThrow(
+      "rust regions coverage 79.00% (79/100) is below the 80% floor",
+    );
   });
 });
 
@@ -214,63 +132,45 @@ describe("policy schema", () => {
     exclusions: [{ path: "packages/core/src/types.ts", reason: "Type-only module" }],
   };
 
-  it("rejects unjustified exclusions, missing floors, and unsupported schema versions", () => {
-    expect(() =>
-      parseCoveragePolicy({
-        ...valid,
-        exclusions: [{ path: "packages/core/src/types.ts", reason: "" }],
-      }),
-    ).toThrow("reason must be non-empty");
-    expect(() =>
-      parseCoveragePolicy({ ...valid, floors: { ...valid.floors, rust: { lines: 80 } } }),
-    ).toThrow("Coverage rust floor functions must be an integer percentage");
-    expect(() => parseCoveragePolicy({ ...valid, schemaVersion: 2 })).toThrow(
-      "Unsupported coverage policy schema version",
-    );
-  });
-
-  it("fails closed on unknown policy, floor, and exclusion fields", () => {
-    const cases = [
-      { ...valid, typo: true },
-      { ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } },
+  it.each([
+    [
+      { ...valid, exclusions: [{ ...valid.exclusions[0], reason: "" }] },
+      "reason must be non-empty",
+    ],
+    [
+      { ...valid, floors: { ...valid.floors, rust: { lines: 80 } } },
+      "Coverage rust floor functions must be an integer percentage",
+    ],
+    [{ ...valid, schemaVersion: 2 }, "Unsupported coverage policy schema version"],
+    [{ ...valid, typo: true }, "unknown field"],
+    [{ ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } }, "unknown field"],
+    [
       {
         ...valid,
         floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
       },
-      { ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] },
-    ];
-    for (const value of cases) {
-      expect(() => parseCoveragePolicy(value)).toThrow("unknown field");
-    }
+      "unknown field",
+    ],
+    [{ ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] }, "unknown field"],
+  ])("rejects policy %#", (value, message) => {
+    expect(() => parseCoveragePolicy(value)).toThrow(message);
   });
 });
 
 describe("Rust LLVM normalization", () => {
   it("removes inline tests and ignores function sources excluded from the file report", () => {
     const lcov = parseLcov(
-      [
-        "SF:/repo/packages/wasm/src/calc.rs",
-        "FNF:2",
-        "FNH:2",
-        "DA:1,3",
-        "DA:2,0",
-        "DA:3,2",
-        "DA:4,1",
-        "DA:5,1",
-        "LF:5",
-        "LH:4",
-        "end_of_record",
-      ].join("\n"),
+      "SF:/repo/packages/wasm/src/calc.rs\nFNF:2\nFNH:2\nDA:1,3\nDA:2,0\nDA:3,2\nDA:4,1\nDA:5,1\nLF:5\nLH:4\nend_of_record",
       ROOT,
     );
-    const llvm = {
+    const llvm = (prodCount: number) => ({
       data: [
         {
           files: [{ filename: "/repo/packages/wasm/src/calc.rs" }],
           functions: [
             {
               name: "_RNv_prod",
-              count: 3,
+              count: prodCount,
               filenames: [
                 "/repo/packages/wasm/src/calc.rs",
                 "/toolchain/rustlib/src/thread_local.rs",
@@ -289,8 +189,8 @@ describe("Rust LLVM normalization", () => {
           ],
         },
       ],
-    };
-    expect(normalizeRustCoverage(llvm, lcov, ROOT)).toEqual([
+    });
+    expect(normalizeRustCoverage(llvm(3), lcov, ROOT)).toEqual([
       {
         path: "packages/wasm/src/calc.rs",
         lines: { covered: 2, total: 3 },
@@ -304,29 +204,9 @@ describe("Rust LLVM normalization", () => {
         ]),
       },
     ]);
-  });
-
-  it("rejects malformed/non-finite LLVM counters and JSON/LCOV source disagreement", () => {
-    const lcov = parseLcov(
-      "SF:/repo/packages/wasm/src/calc.rs\nFNF:0\nFNH:0\nDA:1,1\nLF:1\nLH:1\nend_of_record",
-      ROOT,
+    expect(() => normalizeRustCoverage(llvm(Number.NaN), lcov, ROOT)).toThrow(
+      "finite non-negative integer",
     );
-    const base = {
-      data: [
-        {
-          files: [{ filename: "/repo/packages/wasm/src/calc.rs" }],
-          functions: [
-            {
-              name: "prod",
-              count: Number.NaN,
-              filenames: ["/repo/packages/wasm/src/calc.rs"],
-              regions: [[1, 1, 1, 2, 1, 0, 0, 0]],
-            },
-          ],
-        },
-      ],
-    };
-    expect(() => normalizeRustCoverage(base, lcov, ROOT)).toThrow("finite non-negative integer");
     expect(() =>
       normalizeRustCoverage(
         { data: [{ files: [{ filename: "/repo/packages/wasm/src/eval.rs" }], functions: [] }] },

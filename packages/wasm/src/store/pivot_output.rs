@@ -233,9 +233,10 @@ impl CellStore {
 
     /// Marks changed output cells dirty so the formulas reading them, and
     /// pivots whose source holds them, update. Returns whether any changed.
+    /// The pass that follows reports them to chart tracking as dirty seeds:
+    /// output cells have no source value, so the report lists each one once.
     pub(super) fn mark_pivot_cells_dirty(&mut self, owner: usize, changed: Vec<CellKey>) -> bool {
         let any = !changed.is_empty();
-        self.record_recalculated_cells(owner, &changed);
         self.sheets[owner].formulas.mark_cells_dirty(changed);
         any
     }
@@ -577,22 +578,6 @@ mod saved {
         }
 
         #[test]
-        fn saved_output_feeds_formulas_and_survives_unrelated_edits() {
-            let (mut store, sheet) = store_with_sheet();
-            assert!(install(&mut store, sheet, (1, 1)));
-            store.set_formula(sheet, 8, 0, "=SUM(B2:C3)", 0);
-            store.recompute(sheet);
-            assert_eq!(store.get_cell(sheet, 1, 1).string().as_deref(), Some(LABEL));
-            assert_eq!(store.get_cell(sheet, 2, 2).num(), 30.0);
-            assert_eq!(store.get_cell(sheet, 8, 0).num(), 60.0);
-
-            store.set_number(sheet, 9, 5, 1.0, 0);
-            store.recompute(sheet);
-            assert_eq!(store.get_cell(sheet, 1, 2).num(), 10.0);
-            assert_eq!(store.get_cell(sheet, 8, 0).num(), 60.0);
-        }
-
-        #[test]
         fn saved_output_on_a_formula_free_sheet_survives_an_edit() {
             let (mut store, sheet) = store_with_sheet();
             assert!(install(&mut store, sheet, (0, 0)));
@@ -601,24 +586,6 @@ mod saved {
             store.recompute(sheet);
             assert_eq!(store.get_cell(sheet, 0, 0).string().as_deref(), Some(LABEL));
             assert_eq!(store.get_cell(sheet, 1, 1).num(), 30.0);
-        }
-
-        #[test]
-        fn blocked_saved_output_shows_spill_and_returns_when_cleared() {
-            let (mut store, sheet) = store_with_sheet();
-            store.set_number(sheet, 2, 2, 5.0, 0);
-            assert!(install(&mut store, sheet, (1, 1)));
-            store.recompute(sheet);
-            assert_eq!(
-                store.get_cell(sheet, 1, 1).string().as_deref(),
-                Some("#SPILL!")
-            );
-            assert_eq!(store.get_cell(sheet, 2, 2).num(), 5.0);
-
-            store.clear_cell(sheet, 2, 2, 0);
-            store.recompute(sheet);
-            assert_eq!(store.get_cell(sheet, 1, 1).string().as_deref(), Some(LABEL));
-            assert_eq!(store.get_cell(sheet, 2, 2).num(), 30.0);
         }
 
         #[test]

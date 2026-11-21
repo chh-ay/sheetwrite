@@ -374,7 +374,7 @@ const LAMBDA_ARGUMENT = /lambda\(([^()]*)\)/g;
  * The arguments of a syntax line that are not argument names: example values
  * such as numbers, quoted text or cell references, and prompt text.
  */
-function syntaxLiterals(argumentsText: string): string[] {
+export function syntaxLiterals(argumentsText: string): string[] {
   const names = argumentsText
     .replace(LAMBDA_ARGUMENT, (_, inner: string) => `lambda, ${inner}`)
     .split(/[,[\]]/)

@@ -115,30 +115,19 @@ describe("immutable release consumer locks", () => {
       };
       const lockPath = join(root, "package-lock.json");
       const tarballPath = join(root, "sheetwrite-core-0.2.0.tgz");
+      const copied = "file:artifacts/sheetwrite-core-0.1.0.tgz";
+      const dependencies = { "@sheetwrite/core": copied, react: "19.1.0" };
       await writeFile(tarballPath, "canonical bytes");
-      await writeFile(
-        join(root, "package.json"),
-        `${JSON.stringify({
-          dependencies: {
-            "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
-            react: "19.1.0",
-          },
-        })}\n`,
-      );
+      await writeFile(join(root, "package.json"), `${JSON.stringify({ dependencies })}\n`);
       await writeFile(
         lockPath,
         `${JSON.stringify({
           lockfileVersion: 3,
           packages: {
-            "": {
-              dependencies: {
-                "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
-                react: "19.1.0",
-              },
-            },
+            "": { dependencies },
             "node_modules/@sheetwrite/core": {
               version: "0.1.0",
-              resolved: "file:artifacts/sheetwrite-core-0.1.0.tgz",
+              resolved: copied,
               integrity: "sha512-stale",
             },
             "node_modules/react": registryEntry,
@@ -150,20 +139,18 @@ describe("immutable release consumer locks", () => {
       const reboundManifest = JSON.parse(
         await readFile(join(root, "package.json"), "utf8"),
       ) as FixtureManifest;
-      const expectedIntegrity = `sha512-${createHash("sha512").update("canonical bytes").digest("base64")}`;
-      expect(reboundManifest.dependencies?.["@sheetwrite/core"]).toEndWith(
-        "sheetwrite-core-0.2.0.tgz",
-      );
-      expect(rebound.packages?.[""]?.dependencies?.["@sheetwrite/core"]).toEndWith(
-        "sheetwrite-core-0.2.0.tgz",
-      );
-      expect(rebound.packages?.["node_modules/@sheetwrite/core"]).toMatchObject({
+      const reboundCore = rebound.packages?.["node_modules/@sheetwrite/core"];
+      for (const reference of [
+        reboundManifest.dependencies?.["@sheetwrite/core"],
+        rebound.packages?.[""]?.dependencies?.["@sheetwrite/core"],
+        reboundCore?.resolved,
+      ]) {
+        expect(reference).toEndWith("sheetwrite-core-0.2.0.tgz");
+      }
+      expect(reboundCore).toMatchObject({
         version: "0.2.0",
-        integrity: expectedIntegrity,
+        integrity: `sha512-${createHash("sha512").update("canonical bytes").digest("base64")}`,
       });
-      expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.resolved).toEndWith(
-        "sheetwrite-core-0.2.0.tgz",
-      );
       expect(rebound.packages?.["node_modules/react"]).toEqual(registryEntry);
     } finally {
       await rm(root, { recursive: true, force: true });

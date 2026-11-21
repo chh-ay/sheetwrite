@@ -259,6 +259,8 @@ function classifyEntry(
     return "internal";
   // `@sheetwrite/core/history` loads the diff kernel; hosts only point at its WASM asset.
   if (packageName === "@sheetwrite/wasm" && subpath === "./history") return "internal";
+  // Sheetwrite's own codecs reach core's codec plumbing here; applications do not.
+  if (packageName === "@sheetwrite/core" && subpath === "./codec") return "internal";
   if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
   return undefined;
 }

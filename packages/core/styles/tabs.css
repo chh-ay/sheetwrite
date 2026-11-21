@@ -79,6 +79,7 @@
 .sheetwrite-tab:focus,
 .sheetwrite-tab-options-button:focus,
 .sheetwrite-tab-add:focus,
+.sheetwrite-tab-scroll:focus,
 .sheetwrite-tab-menu-item:focus,
 .sheetwrite-tab-unhide > button:focus {
   outline: none;
@@ -92,6 +93,7 @@
 
 .sheetwrite-tab-options-button:focus-visible,
 .sheetwrite-tab-add:focus-visible,
+.sheetwrite-tab-scroll:focus-visible,
 .sheetwrite-tab-menu-item:focus-visible,
 .sheetwrite-tab-unhide > button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
@@ -120,11 +122,13 @@
   z-index: 3;
 }
 
+/* The icons sit in a line of the bar's text, as the tab labels do, so their
+   centres meet the labels' optical centre (the middle of the x-height), not
+   the middle of the button box. */
 .sheetwrite-tab-options-button,
-.sheetwrite-tab-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.sheetwrite-tab-add,
+.sheetwrite-tab-scroll {
+  display: inline-block;
   flex: none;
   height: calc(100% - 6px);
   border: 1px solid transparent;
@@ -133,19 +137,39 @@
   color: var(--sheetwrite-tab-fg, #5f6368);
   cursor: pointer;
   font: inherit;
+  text-align: center;
 }
 
 .sheetwrite-tab-icon {
-  display: block;
+  /* The icon's centre sits half an x-height above the line's baseline: the
+     tab labels' optical centre. The negative margins keep the icon from
+     growing the line box, so the baseline sits where the labels' does. */
+  display: inline-block;
+  margin-block: -1em;
+  vertical-align: middle;
   /* 16 px at a 13 px font: the + and ⋯ icons grow with the bar's text. */
   width: calc(16em / 13);
   height: calc(16em / 13);
+  /* Where round() works, the icon is a whole number of pixels high and a
+     whole number of pixels from the baseline, so it snaps to the pixel grid
+     as the text does. The bottom margin edge sits 0.5ex + 1em - height / 2
+     above the baseline, which puts the centre at baseline - 0.5ex. */
+  width: round(calc(16em / 13), 1px);
+  height: round(calc(16em / 13), 1px);
+  vertical-align: round(calc(0.5ex + 1em - round(calc(16em / 13), 1px) / 2), 1px);
   pointer-events: none;
+}
+
+/* Two device pixels to the CSS pixel: half pixels are whole device pixels. */
+@media (min-resolution: 2dppx) {
+  .sheetwrite-tab-icon {
+    vertical-align: round(calc(0.5ex + 1em - round(calc(16em / 13), 1px) / 2), 0.5px);
+  }
 }
 
 .sheetwrite-tab-options-button {
   min-width: 30px;
-  padding: 0 6px 2px;
+  padding: 0 6px;
   line-height: 1;
 }
 
@@ -159,19 +183,93 @@
 .sheetwrite-tab-add {
   width: 32px;
   padding: 0;
+  /* Centred on the bar like the tabs, also in the shell's row, which
+     stretches its items. */
+  align-self: center;
   font-weight: 650;
   line-height: 1;
-  /* When the tabs overflow the strip, the strip scrolls and + stays in view
-     at its right edge, over the tabs scrolled under it. */
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+}
+
+/* The trailing scroll arrow and +. When the tabs overflow, the strip scrolls
+   and these stay in view at its right edge, over the tabs scrolled under
+   them. */
+.sheetwrite-tab-end {
   position: sticky;
   right: 0;
   z-index: 1;
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: center;
+  gap: 3px;
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+}
+
+/* Excel's tab scroll arrows: shown while the tabs overflow (sheet-tabs.ts);
+   the one at the end reached is dimmed. */
+.sheetwrite-tab-scroll {
+  width: 24px;
+  /* A touch target: at least 24 px, also where the bar's height rounds down. */
+  min-height: 24px;
+  padding: 0;
+  align-self: center;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff)));
+  line-height: 1;
+}
+
+.sheetwrite-tab-scroll-previous {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.sheetwrite-tab-scroll[hidden] {
+  display: none;
+}
+
+.sheetwrite-tab-scroll[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* While an edge of the strip hides tabs, the cut tab text fades out over
+   16 px before that edge's arrow, then a 4 px gap of the bar's background
+   (sheet-tabs.ts sets the data attributes). */
+:is(
+  [data-tabs-cut-start] > .sheetwrite-tab-scroll-previous,
+  [data-tabs-cut-end] > .sheetwrite-tab-end
+)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+}
+
+[data-tabs-cut-start] > .sheetwrite-tab-scroll-previous::before {
+  left: 100%;
+  background: linear-gradient(
+    to left,
+    transparent,
+    var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff))) 16px
+  );
+}
+
+[data-tabs-cut-end] > .sheetwrite-tab-end::before {
+  right: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--sheetwrite-tab-bg, var(--sheetwrite-bg, var(--sheetwrite-widget-bg, #ffffff))) 16px
+  );
 }
 
 .sheetwrite-tab-options-button:hover,
 .sheetwrite-tab-options-button[aria-expanded="true"],
-.sheetwrite-tab-add:hover {
+.sheetwrite-tab-add:hover,
+.sheetwrite-tab-scroll:not([aria-disabled="true"]):hover {
   border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
   background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
@@ -270,7 +368,7 @@
   cursor: pointer;
 }
 
-.sheetwrite-tab-unhide-menu {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) {
   position: absolute;
   z-index: 6;
   right: 0;
@@ -286,18 +384,18 @@
   box-shadow: var(--sheetwrite-menu-shadow, 0 8px 24px rgb(60 64 67 / 20%));
 }
 
-.sheetwrite-tab-unhide-menu[popover] {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[popover] {
   position: fixed;
   right: auto;
   bottom: auto;
   margin: 0;
 }
 
-.sheetwrite-tab-unhide-menu[hidden] {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[hidden] {
   display: none;
 }
 
-.sheetwrite-tab-unhide-menu button {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button {
   padding: 0.45rem 0.55rem;
   border: 0;
   border-radius: 4px;
@@ -309,8 +407,49 @@
   cursor: pointer;
 }
 
-.sheetwrite-tab-unhide-menu button:is(:hover, :focus-visible) {
+:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button:is(:hover, :focus-visible) {
   background: var(--sheetwrite-menu-hover, #f1f3f4);
+}
+
+/* The active sheet in the list of all sheets. */
+/* The list's frame keeps its border and shadow; the choices scroll inside it,
+   and a cut edge fades out so the list shows it scrolls (sheet-tabs.ts sets
+   the data attributes and the height). */
+.sheetwrite-tab-list {
+  display: block;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+}
+
+.sheetwrite-tab-list-items {
+  display: grid;
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.sheetwrite-tab-list-items[data-more-below] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+.sheetwrite-tab-list-items[data-more-above] {
+  mask-image: linear-gradient(to top, #000 calc(100% - 28px), transparent);
+}
+
+.sheetwrite-tab-list-items[data-more-above][data-more-below] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent
+  );
+}
+
+.sheetwrite-tab-list button[aria-current="true"] {
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+  font-weight: 680;
 }
 
 .sheetwrite-tab-error {
@@ -397,6 +536,7 @@
 
   .sheetwrite-tab-options-button,
   .sheetwrite-tab-add,
+  .sheetwrite-tab-scroll,
   .sheetwrite-tab-unhide {
     height: 100%;
   }

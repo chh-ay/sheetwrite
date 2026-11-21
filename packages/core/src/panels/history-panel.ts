@@ -98,6 +98,7 @@ class HistoryPanel {
     this.comparison?.abort();
     this.preview?.destroy();
     this.disposeSync?.();
+    this.options.archive.releaseMemory?.();
     this.body.classList.remove("sheetwrite-history");
   }
 
@@ -497,5 +498,6 @@ export function historyPanel(grid: Grid, options: HistoryAddonOptions, save = fa
       const panel = new HistoryPanel(grid, options, body, save);
       return () => panel.close();
     },
+    trimMemory: () => options.archive.releaseMemory?.(),
   };
 }

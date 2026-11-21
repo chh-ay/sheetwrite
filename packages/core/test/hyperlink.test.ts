@@ -15,7 +15,7 @@ import {
 } from "../src/hyperlink.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellHyperlink, Workbook } from "../src/types.js";
+import type { CellHyperlink, GridOptions, Workbook } from "../src/types.js";
 import { makeWorkbook, mountHost } from "./fixtures.js";
 
 function externalLink(url = "https://example.com/report?q=1"): CellHyperlink {
@@ -38,10 +38,20 @@ beforeEach(() => {
   restoreCanvas = installCanvasTestStubs();
 });
 
+const grids: GridImpl[] = [];
+
 afterEach(() => {
+  for (const grid of grids.splice(0)) grid.destroy();
   restoreCanvas();
   document.body.replaceChildren();
 });
+
+function mountGrid(options: GridOptions & { workbook: Workbook }) {
+  const store = new SheetwriteStore(options.workbook);
+  const grid = new GridImpl(mountHost(), options, store);
+  grids.push(grid);
+  return { grid, store };
+}
 
 describe("hyperlink policy", () => {
   it("admits only bounded absolute HTTPS and mailto targets", () => {
@@ -77,15 +87,12 @@ describe("hyperlink policy", () => {
       fontSize: 16,
       border: { bottom: { color: "#654321", width: 2, style: "solid" } },
     });
-    expect(sanitizeCellStyle({ fontSize: Number.POSITIVE_INFINITY })).toBeNull();
-    expect(sanitizeCellStyle({ fontSize: MAX_CELL_FONT_SIZE })).toEqual({
-      fontSize: MAX_CELL_FONT_SIZE,
-    });
-    expect(sanitizeCellStyle({ fontSize: 546 })).toBeNull();
-    expect(sanitizeCellStyle({ fontSize: MIN_CELL_FONT_SIZE })).toEqual({
-      fontSize: MIN_CELL_FONT_SIZE,
-    });
-    expect(sanitizeCellStyle({ fontSize: 1 })).toBeNull();
+    for (const fontSize of [MIN_CELL_FONT_SIZE, MAX_CELL_FONT_SIZE]) {
+      expect(sanitizeCellStyle({ fontSize })).toEqual({ fontSize });
+    }
+    for (const fontSize of [Number.POSITIVE_INFINITY, 546, 1]) {
+      expect(sanitizeCellStyle({ fontSize })).toBeNull();
+    }
     expect(sanitizeCellStyle({ color: "x".repeat(1_000_000) })).toBeNull();
     expect(sanitizeCellStyle({ unknown: { deep: { graph: new Array(10_000) } } })).toBeNull();
 
@@ -133,13 +140,9 @@ describe("hyperlink policy", () => {
       address: { sheet: "destination", row: 1, col: 1 },
     });
     workbook.sheets.splice(1, 1);
-    expect(() => resolveHyperlinkTarget(workbook, target)).toThrow(SheetwriteError);
-    try {
-      resolveHyperlinkTarget(workbook, target);
-    } catch (error) {
-      expect((error as SheetwriteError).code).toBe("unsafe-hyperlink");
-      expect((error as SheetwriteError).operation).toBe("hyperlink-activate");
-    }
+    expect(() => resolveHyperlinkTarget(workbook, target)).toThrow(
+      expect.objectContaining({ code: "unsafe-hyperlink", operation: "hyperlink-activate" }),
+    );
   });
 
   it("fails closed with a public error for malformed runtime targets and range ends", () => {
@@ -186,11 +189,9 @@ describe("hyperlink policy", () => {
 
   it("rejects unsafe mutations before document state changes", () => {
     const workbook = makeWorkbook(2);
-    const store = new SheetwriteStore(workbook);
-    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const { grid, store } = mountGrid({ workbook });
     expect(grid.setHyperlink(externalLink("javascript:alert(1)")).status).toBe("rejected");
     expect(store.getWorkbook().sheets[0]!.hyperlinks).toBeUndefined();
-    grid.destroy();
   });
 
   it("persists hyperlink operations through history, snapshots, structure, and sheet removal", () => {
@@ -201,8 +202,7 @@ describe("hyperlink policy", () => {
       rowCount: 3,
       columns: workbook.sheets[0]!.columns.map((column) => ({ ...column })),
     });
-    const store = new SheetwriteStore(workbook);
-    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const { grid, store } = mountGrid({ workbook });
     const hyperlink: CellHyperlink = {
       id: "internal",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
@@ -256,14 +256,12 @@ describe("hyperlink policy", () => {
     expect(store.getWorkbook().sheets[0]!.hyperlinks).toEqual([]);
     grid.undo();
     expect(store.getWorkbook().sheets[0]!.hyperlinks).toHaveLength(1);
-    grid.destroy();
   });
 
   it("emits a validated host event without opening external URLs", () => {
     const workbook = makeWorkbook(2);
     workbook.sheets[0]!.hyperlinks = [externalLink()];
-    const store = new SheetwriteStore(workbook);
-    const grid = new GridImpl(mountHost(), { workbook, hyperlinkActivation: "event-only" }, store);
+    const { grid } = mountGrid({ workbook, hyperlinkActivation: "event-only" });
     const events: unknown[] = [];
     grid.on("hyperlink-activate", (event) => events.push(event));
 
@@ -275,14 +273,12 @@ describe("hyperlink policy", () => {
         target: { kind: "external", href: "https://example.com/report?q=1" },
       },
     ]);
-    grid.destroy();
   });
 
   it("revalidates after host mutation and emits nothing for an unsafe target", () => {
     const workbook: Workbook = makeWorkbook(2);
     workbook.sheets[0]!.hyperlinks = [externalLink()];
-    const store = new SheetwriteStore(workbook);
-    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const { grid } = mountGrid({ workbook });
     let emitted = false;
     grid.on("hyperlink-activate", () => {
       emitted = true;
@@ -294,7 +290,6 @@ describe("hyperlink policy", () => {
 
     expect(grid.activateHyperlink({ sheet: "s1", row: 0, col: 0 })).toBe(false);
     expect(emitted).toBe(false);
-    grid.destroy();
   });
 
   it("returns cloned metadata from range lookup", () => {

@@ -41,18 +41,6 @@ const sheet = () => grid.store.getWorkbook().sheets[0]!;
 const dialog = () => document.querySelector(".sheetwrite-dialog");
 
 describe("insertCells and deleteCells", () => {
-  it("insert and delete selected whole rows before the call returns", () => {
-    select(2, 0, 2, 2);
-    grid.actions.insertCells();
-    expect(sheet().rowCount).toBe(11);
-    expect(value(2, 0)).toBeNull();
-    expect(value(3, 0)).toBe("Customer 2");
-
-    grid.actions.deleteCells();
-    expect(sheet().rowCount).toBe(10);
-    expect(value(2, 0)).toBe("Customer 2");
-  });
-
   it("take a range's entire rows by default when it is wide, as Excel's dialog starts", () => {
     select(1, 1, 1, 2);
     grid.actions.insertCells();

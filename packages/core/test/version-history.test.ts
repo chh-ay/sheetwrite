@@ -9,6 +9,7 @@ import {
   HistoryArchive,
   HistoryError,
   MemoryHistoryStorage,
+  type HistoryGetRequest,
   type HistoryLimits,
   type HistoryStorageAdapter,
 } from "../src/history-archive.js";
@@ -109,6 +110,27 @@ function open(storage: HistoryStorageAdapter, limits?: Partial<HistoryLimits>) {
   return HistoryArchive.open({ documentId: "budget", storage, limits });
 }
 
+/** An archive whose baseline is `snapshot()` at version 0. */
+async function initialized(storage: HistoryStorageAdapter, limits?: Partial<HistoryLimits>) {
+  const archive = await open(storage, limits);
+  await archive.initialize(snapshot(), 0);
+  return archive;
+}
+
+/** Memory storage that counts the cell pages it hands out. */
+class PageCountingStorage extends MemoryHistoryStorage {
+  cellPageReads = 0;
+
+  override async get(request: HistoryGetRequest) {
+    const response = await super.get(request);
+    if ("bytes" in response && response.kind === "cells") {
+      this.cellPageReads += 1;
+    }
+
+    return response;
+  }
+}
+
 for (const backend of ["memory", "indexeddb"] as const) {
   describe(`${backend} version history`, () => {
     function storage(): HistoryStorageAdapter {
@@ -151,8 +173,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
 
     it("rejects stale writers and invalid revisions without publishing a partial version", async () => {
       const adapter = storage();
-      const first = await open(adapter);
-      await first.initialize(snapshot(), 0);
+      const first = await initialized(adapter);
       const stale = await open(adapter);
 
       await first.record(change(1));
@@ -166,8 +187,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
     });
 
     it("pages version metadata and keeps pinned named versions while pruning old automatic chains", async () => {
-      const archive = await open(storage());
-      await archive.initialize(snapshot(), 0);
+      const archive = await initialized(storage());
       const named = await archive.saveVersion("Keep", "alice", 0);
       for (let revision = 1; revision <= 20; revision++) {
         await archive.record(change(revision));
@@ -191,8 +211,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
     });
 
     it("rejects an aborted save and a pinned-capacity overflow without losing durable content", async () => {
-      const archive = await open(storage(), { maxNamedVersions: 1 });
-      await archive.initialize(snapshot(), 0);
+      const archive = await initialized(storage(), { maxNamedVersions: 1 });
       const named = await archive.saveVersion("Keep", "alice", 0);
 
       const controller = new AbortController();
@@ -211,8 +230,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
     it("replays transactions across bounded log segments and lists metadata without cell payloads", async () => {
       const adapter = storage();
       const limits = { ...DEFAULT_HISTORY_LIMITS, maxSegmentBytes: 64 };
-      const archive = await open(adapter, limits);
-      await archive.initialize(snapshot(), 0);
+      const archive = await initialized(adapter, limits);
 
       const text = "Forecast ".repeat(100);
       await archive.record(change(1, text));
@@ -234,8 +252,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
     it("keeps a reader's immutable chunks alive during concurrent marker deletion", async () => {
       const adapter = storage();
       const limits = { ...DEFAULT_HISTORY_LIMITS, checkpointTransactions: 1 };
-      const archive = await open(adapter, limits);
-      await archive.initialize(snapshot(), 0);
+      const archive = await initialized(adapter, limits);
       const version = await archive.saveVersion("Reading", "alice", 0);
 
       const lease = { documentId: "budget", limits, token: "reader", versionId: version.id };
@@ -265,8 +282,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
 
     it("rolls back a byte-capacity failure and preserves the previously named revision", async () => {
       const adapter = storage();
-      const archive = await open(adapter);
-      await archive.initialize(snapshot(), 0);
+      const archive = await initialized(adapter);
       const version = await archive.saveVersion("Safe", "alice", 0);
       const usage = await archive.storageUsage();
 
@@ -281,8 +297,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
 
 describe("history replay memory", () => {
   it("replays a structural edit and the edits after it in commit order", async () => {
-    const archive = await open(new MemoryHistoryStorage());
-    await archive.initialize(snapshot(), 0);
+    const archive = await initialized(new MemoryHistoryStorage());
 
     await archive.record({
       ...change(1),
@@ -331,6 +346,21 @@ describe("history replay memory", () => {
     expect(cells?.[0]?.value).toEqual({ kind: "literal", value: 1 });
     expect(getEngine().getMemory().buffer.byteLength).toBe(documentBytes);
   });
+
+  it("rebuilds a version once for the reads that follow, and again after the head moves", async () => {
+    const storage = new PageCountingStorage();
+    const archive = await initialized(storage);
+    await archive.record(change(1));
+
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    storage.cellPageReads = 0;
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    expect(storage.cellPageReads).toBe(0);
+
+    // Another tab moves the head through the same storage.
+    await (await open(storage)).record(change(2));
+    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 2 });
+  });
 });
 
 describe("history trust and cancellation", () => {
@@ -339,8 +369,7 @@ describe("history trust and cancellation", () => {
       databaseName: "history-quota",
       indexedDB: new IDBFactory(),
     });
-    const archive = await open(storage);
-    await archive.initialize(snapshot(), 0);
+    const archive = await initialized(storage);
     const version = await archive.saveVersion("Safe", "alice", 0);
     const before = await archive.storageUsage();
 
@@ -381,8 +410,7 @@ describe("history trust and cancellation", () => {
       },
     };
 
-    const archive = await open(storage);
-    await archive.initialize(snapshot(), 0);
+    const archive = await initialized(storage);
     const version = await archive.saveVersion("Safe", "alice", 0);
     const before = await archive.storageUsage();
 
@@ -395,8 +423,7 @@ describe("history trust and cancellation", () => {
   });
 
   it("bounds metadata pages and invalidates cursors after a new publication", async () => {
-    const archive = await open(new MemoryHistoryStorage());
-    await archive.initialize(snapshot(), 0);
+    const archive = await initialized(new MemoryHistoryStorage());
     await archive.saveVersion("One", "alice", 0);
     await archive.saveVersion("Two", "bob", 1);
 
@@ -450,8 +477,7 @@ describe("checkpoint content addressing", () => {
   });
 
   it("requires a complete, correctly versioned checkpoint before advancing its durable head", async () => {
-    const archive = await open(new MemoryHistoryStorage(), { checkpointTransactions: 1 });
-    await archive.initialize(snapshot(), 0);
+    const archive = await initialized(new MemoryHistoryStorage(), { checkpointTransactions: 1 });
 
     await expect(archive.record(change(1))).rejects.toBeInstanceOf(HistoryError);
 

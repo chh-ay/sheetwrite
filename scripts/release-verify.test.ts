@@ -83,29 +83,15 @@ describe("canonical artifact consumer graph", () => {
       expect(events[events.indexOf(consumer) + 1]).toEqual({ kind: "verify", root: artifactRoot });
     }
 
-    const capabilityRuns: Record<string, number> = {
-      "release audit": 0,
-      "packed consumer": 0,
-      "bundler consumer": 0,
-      "delivery size": 0,
-    };
-    for (const { command } of consumers) {
-      if (command.includes("scripts/release-audit.ts"))
-        capabilityRuns["release audit"] = (capabilityRuns["release audit"] ?? 0) + 1;
-      else if (command.includes("scripts/verify-packed-consumer.ts"))
-        capabilityRuns["packed consumer"] = (capabilityRuns["packed consumer"] ?? 0) + 1;
-      else if (command.includes("test/bundler-fixtures/run.mjs"))
-        capabilityRuns["bundler consumer"] = (capabilityRuns["bundler consumer"] ?? 0) + 1;
-      else if (command.includes("scripts/size-report.ts"))
-        capabilityRuns["delivery size"] = (capabilityRuns["delivery size"] ?? 0) + 1;
-      else throw new Error(`unknown delivery capability: ${command.join(" ")}`);
-    }
-    expect(capabilityRuns).toEqual({
-      "release audit": 1,
-      "packed consumer": 1,
-      "bundler consumer": 1,
-      "delivery size": 1,
-    });
+    const scripts = [
+      "scripts/release-audit.ts",
+      "scripts/size-report.ts",
+      "scripts/verify-packed-consumer.ts",
+      "test/bundler-fixtures/run.mjs",
+    ];
+    expect(
+      consumers.map(({ command }) => scripts.find((script) => command.includes(script))).sort(),
+    ).toEqual(scripts);
   });
 
   it("stops at the first consumer that changes the verified artifacts", async () => {

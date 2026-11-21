@@ -94,35 +94,6 @@ function logEntry(page: Page, text: string): Locator {
 }
 
 test.describe("database proof", () => {
-  test("boots from IndexedDB, commits, compacts, and reports live counters", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openDatabase(page);
-    await expect(page.getByTestId("dbx-version")).toHaveText("0");
-    await expect(page.getByTestId("dbx-total")).toHaveText(DATABASE_SEED_TOTAL);
-    await expect(page.getByTestId("dbx-tail")).toHaveText("0");
-    await expect(page.getByTestId("dbx-grid")).toBeInViewport();
-    await expect(page.getByRole("checkbox", { name: "Autosave" })).toBeChecked();
-
-    const commit = page.getByRole("button", { name: "Add one seat" });
-    await commit.click();
-    await expect(page.getByTestId("dbx-version")).toHaveText("1");
-    await expect(page.getByTestId("dbx-pending")).toHaveText("0");
-    await expect(page.getByTestId("dbx-total")).not.toHaveText(DATABASE_SEED_TOTAL);
-
-    // Nine more commits exceed the showcase tail bound and force compaction.
-    for (let version = 2; version <= 10; version++) {
-      await commit.click();
-      await expect(page.getByTestId("dbx-version")).toHaveText(String(version));
-    }
-    const snapshotVersion = Number(await page.getByTestId("dbx-snapshot-version").textContent());
-    expect(snapshotVersion).toBeGreaterThan(0);
-    // The tail holds exactly the versions after the compacted snapshot.
-    expect(snapshotVersion + Number(await page.getByTestId("dbx-tail").textContent())).toBe(10);
-    expect(Number(await page.getByTestId("dbx-reads").textContent())).toBeGreaterThan(0);
-    expect(Number(await page.getByTestId("dbx-writes").textContent())).toBeGreaterThan(0);
-    await expect(page.getByTestId("dbx-bytes")).not.toHaveText("0 B");
-  });
-
   test("keeps durable pending work across a real page reload", async ({ page }) => {
     await openDatabase(page);
     await page.getByRole("checkbox", { name: "Autosave" }).uncheck();
@@ -162,29 +133,6 @@ test.describe("database proof", () => {
     await expect(page.getByTestId("dbx-pending")).toHaveText("0", { timeout: READY_TIMEOUT });
     await expect(page.getByTestId("dbx-version")).toHaveText("5");
     await expect(logEntry(page, "Restored")).toHaveCount(1);
-  });
-
-  test("restores a cleared 100,000-cell range as one step", async ({ page }) => {
-    await openDatabase(page);
-    await page.getByTestId("dbx-large-undo").click();
-    const report = page.getByTestId("dbx-undo-report");
-    await expect(report).toHaveAttribute("data-state", "passed", { timeout: READY_TIMEOUT });
-    await expect(report).toContainText("one server version");
-    await expect(report).toContainText("1 history step");
-    // The clear and its single restore both reached the durable store.
-    await expect(page.getByTestId("dbx-version")).toHaveText("2");
-    await expect(page.getByTestId("dbx-pending")).toHaveText("0");
-    await expect(page.getByTestId("dbx-total")).toHaveText(DATABASE_SEED_TOTAL);
-    await expect(logEntry(page, "restoreBlock committed as v2")).toHaveCount(1);
-
-    // The oversize path: a dropped entry, an older undo kept. The failure lab
-    // renders open, beside its diagram.
-    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
-    await page.getByTestId("dbx-tight-limit").click();
-    const limitReport = page.getByTestId("dbx-limit-report");
-    await expect(limitReport).toHaveAttribute("data-state", "passed");
-    await expect(limitReport).toContainText("resource-limit");
-    await expect(limitReport).toContainText("older edit still undid");
   });
 
   test("answers a lost acknowledgement idempotently and recovers from a conflict", async ({

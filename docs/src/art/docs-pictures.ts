@@ -123,7 +123,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "context-menu",
         size: "panel",
-        alt: "The right-click menu open over a Region cell of the Orders sheet: Cut, Copy and Paste, Insert, Delete and Clear contents, the Row, Column and Merge submenus, and New note.",
+        alt: "The right-click menu open over a Region cell of the Orders sheet: Cut and Copy, the Paste Options and Paste Special, Insert, Delete and Clear contents, the Row, Column, Filter and Merge submenus, Format cells, Pick from drop-down list, and New note.",
         caption: "Right-clicking a cell opens the bundled menu at the pointer.",
       },
     },
@@ -225,6 +225,18 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/features/formulas/custom-functions/": [
     { after: "registration", picture: "custom-functions" },
   ],
+  "/docs/features/formulas/formula-assist/": [
+    {
+      after: AFTER_LEAD,
+      shot: {
+        name: "formula-assist",
+        size: "panel",
+        alt: "An equals sign typed in the formula bar for March's total, with the rest of a SUM over the March column shown dimmed after the caret, and that column faintly filled in the grid.",
+        caption:
+          "The suggestion shows dimmed after the caret, and the range it names is filled on the grid. Tab takes it.",
+      },
+    },
+  ],
   "/docs/features/formulas/formula-help/": [
     { after: AFTER_LEAD, picture: "formula-help" },
     {
@@ -274,6 +286,13 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/reference/compatibility-limits/": [{ after: AT_START, picture: "limits" }],
   "/docs/reference/document-operations/": [{ after: "snapshots-and-rebase", picture: "rebase" }],
   "/docs/reference/events/": [{ after: "event-direction", picture: "event-direction" }],
+  "/docs/performance/benchmark-protocol/": [
+    { after: "matched-local-regression-check", picture: "regression-check" },
+  ],
+  "/docs/performance/memory/": [
+    { after: "release-retained-engine-memory", picture: "engine-memory-release" },
+  ],
+  "/docs/releases/": [{ after: AFTER_LEAD, picture: "releases" }],
   "/docs/releases/0.5.0/": [{ after: AFTER_LEAD, picture: "release-0.5.0" }],
   "/docs/releases/0.5.1/": [{ after: AFTER_LEAD, picture: "release-0.5.1" }],
   "/docs/releases/0.5.2/": [{ after: AFTER_LEAD, picture: "release-0.5.2" }],
@@ -325,7 +344,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "number-formats",
         size: "panel",
-        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage and Scientific.",
+        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage, Fraction, Scientific and Text.",
         caption: "Numbers in dollars and percentages, and the ribbon's list of number formats.",
       },
     },

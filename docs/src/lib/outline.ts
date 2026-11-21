@@ -16,7 +16,7 @@ export interface OutlineItem {
 export const MIN_OUTLINE_ENTRIES = 2;
 
 /** The hast node shape the outline reads. */
-export interface HastElement {
+interface HastElement {
   type: string;
   tagName?: string;
   value?: string;
@@ -65,7 +65,7 @@ function findElement(
  * group headings, Properties and Methods, stand in for them); a member's
  * inner headings and search anchors are left out.
  */
-export function collectOutline(tree: HastElement): OutlineItem[] {
+function collectOutline(tree: HastElement): OutlineItem[] {
   const listsMembers =
     findElement(tree, (node) => hasClass(node, "api-member-index")) === undefined;
   const collected: OutlineItem[] = [];

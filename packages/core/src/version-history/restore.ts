@@ -17,9 +17,26 @@ import type {
 } from "../types/document.js";
 import type { Store } from "../types/store.js";
 import { HistoryError } from "./codec.js";
+import type { HistoryDiffRequest } from "./diff.js";
+import type { RowComparer } from "./row-compare.js";
 
 /** Cells captured per restore block: large enough to amortize capture, small enough to band. */
 const BAND_CELLS = 65_536;
+
+/**
+ * Changed rows this close share one rewritten band: one clear and one block
+ * write cost more than writing a few unchanged rows again.
+ */
+const BAND_GAP_ROWS = 16;
+
+/**
+ * The rows of `rect` on `sheet` whose live cells differ from the historical
+ * ones in source or style, sorted; `undefined` to rewrite the whole rectangle.
+ */
+type CellRewrite = (sheet: SheetId, rect: Rect) => readonly number[] | undefined;
+
+/** Rewrite every cell of the scope, as when the live cells cannot be compared. */
+const REWRITE_ALL: CellRewrite = () => undefined;
 
 /** What a restore covers. */
 export type HistoryRestoreScope =
@@ -33,6 +50,12 @@ export interface HistoryRestoreOptions {
   sync?: SyncCoordinator;
   /** Stops the restore before it changes the grid; the call then rejects. */
   signal?: AbortSignal;
+  /**
+   * Where the history kernel WASM comes from, as `HistoryDiffRequest.kernel`.
+   * The restore compares the live cells with the version's on it, so it
+   * writes only the rows that differ.
+   */
+  kernel?: HistoryDiffRequest["kernel"];
 }
 
 /**
@@ -232,12 +255,16 @@ function occupiedRows(sheet: SheetSnapshot, rect: Rect): number[] {
 
 /**
  * Historical cells of `rect` as `setBlock` operations, captured in row bands
- * that hold cells, so a sparse sheet does not produce blocks of empty rows.
- * The capture is the engine's undo capture: formula sources, references and
- * styles come back exactly.
+ * over `rows`, the sorted rows of `rect` that hold cells, so a sparse sheet
+ * does not produce blocks of empty rows. The capture is the engine's undo
+ * capture: formula sources, references and styles come back exactly.
  */
-function cellBands(store: SheetwriteStore, sheet: SheetSnapshot, rect: Rect): DocumentOp[] {
-  const rows = occupiedRows(sheet, rect);
+function cellBands(
+  store: SheetwriteStore,
+  sheet: SheetId,
+  rect: Rect,
+  rows: readonly number[],
+): DocumentOp[] {
   const width = rect.c1 - rect.c0 + 1;
   const bandRows = Math.max(1, Math.floor(BAND_CELLS / width));
 
@@ -253,7 +280,7 @@ function cellBands(store: SheetwriteStore, sheet: SheetSnapshot, rect: Rect): Do
       index++;
     }
 
-    const range = rectRange(sheet.id, { r0: start, c0: rect.c0, r1: end, c1: rect.c1 });
+    const range = rectRange(sheet, { r0: start, c0: rect.c0, r1: end, c1: rect.c1 });
     const capture = store.captureRangeHistory(range);
     if (!capture) {
       throw new HistoryError("integrity", "Historical cells could not be read");
@@ -267,6 +294,70 @@ function cellBands(store: SheetwriteStore, sheet: SheetSnapshot, rect: Rect): Do
   }
 
   return operations;
+}
+
+/** First index of `rows` (sorted) at or after `row`. */
+function lowerBound(rows: readonly number[], row: number): number {
+  let low = 0;
+  let high = rows.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if ((rows[middle] ?? 0) < row) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  return low;
+}
+
+/**
+ * Bands of `rect` around `rows`, the sorted rows that differ: rows closer than
+ * `BAND_GAP_ROWS` share one band, so scattered edits make few operations and
+ * a large change makes one band.
+ */
+function differingBands(rect: Rect, rows: readonly number[]): Rect[] {
+  const bands: Rect[] = [];
+  for (const row of rows) {
+    const last = bands[bands.length - 1];
+    if (last && row - last.r1 <= BAND_GAP_ROWS) {
+      last.r1 = row;
+    } else {
+      bands.push({ r0: row, c0: rect.c0, r1: row, c1: rect.c1 });
+    }
+  }
+
+  return bands;
+}
+
+/**
+ * Clear and write again the historical cells of `rect`: the whole rectangle,
+ * or only the bands of rows that `rewrite` says differ from the live cells.
+ * Rows outside those bands already hold the historical sources and styles.
+ */
+function rewriteCells(
+  plan: RestorePlan,
+  store: SheetwriteStore,
+  historical: SheetSnapshot,
+  rect: Rect,
+  rewrite: CellRewrite,
+): void {
+  const id = historical.id;
+  const differing = rewrite(id, rect);
+  const bands = differing ? differingBands(rect, differing) : [rect];
+  const occupied = occupiedRows(historical, rect);
+
+  for (const band of bands) {
+    plan.content.push({
+      op: "clearRange",
+      range: rectRange(id, band),
+      contents: true,
+      style: true,
+    });
+    const rows = occupied.slice(lowerBound(occupied, band.r0), lowerBound(occupied, band.r1 + 1));
+    plan.content.push(...cellBands(store, id, band, rows));
+  }
 }
 
 function currentRowMeta(sheet: Sheet): number[] {
@@ -380,6 +471,7 @@ function planSheetInPlace(
   historical: SheetSnapshot,
   store: SheetwriteStore,
   plan: RestorePlan,
+  rewrite: CellRewrite,
 ): void {
   const id = current.id;
 
@@ -509,7 +601,9 @@ function planSheetInPlace(
     });
   }
 
-  // Cells: clear the restored extent, then write the historical cells.
+  // Cells: clear the restored extent, or the rows of it that differ, then
+  // write the historical cells. A sheet that changes size or columns is
+  // rewritten whole, so its cells follow the new shape.
   const extent: Rect = {
     r0: 0,
     c0: 0,
@@ -520,13 +614,9 @@ function planSheetInPlace(
   if (historical.rowCount > 0) {
     const notes = noteOperations(id, current.notes ?? [], historical.notes ?? [], extent);
     plan.content.push(...notes.clear);
-    plan.content.push({
-      op: "clearRange",
-      range: rectRange(id, extent),
-      contents: true,
-      style: true,
-    });
-    plan.content.push(...cellBands(store, historical, extent));
+    const sameShape =
+      current.rowCount === historical.rowCount && same(current.columns, historical.columns);
+    rewriteCells(plan, store, historical, extent, sameShape ? rewrite : REWRITE_ALL);
     plan.content.push(...notes.set);
   }
 
@@ -575,6 +665,7 @@ function planSheet(
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
   sheetId: SheetId,
+  rewrite: CellRewrite,
 ): RestorePlan {
   const target = historical.sheets.find((sheet) => sheet.id === sheetId);
   if (!target) {
@@ -603,7 +694,7 @@ function planSheet(
     plan.sheets.push({ op: "renameSheet", sheet: sheetId, name: target.name });
   }
 
-  planSheetInPlace(live, target, store, plan);
+  planSheetInPlace(live, target, store, plan, rewrite);
 
   return plan;
 }
@@ -617,6 +708,7 @@ function planWorkbook(
   current: Workbook,
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
+  rewrite: CellRewrite,
 ): RestorePlan {
   const plan = emptyPlan();
   const historicalIds = new Set(historical.sheets.map((sheet) => sheet.id));
@@ -690,7 +782,7 @@ function planWorkbook(
   for (const target of historical.sheets) {
     const live = current.sheets.find((sheet) => sheet.id === target.id);
     if (live) {
-      planSheetInPlace(live, target, store, plan);
+      planSheetInPlace(live, target, store, plan, rewrite);
     }
   }
 
@@ -774,6 +866,7 @@ function planRange(
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
   range: Range,
+  rewrite: CellRewrite,
 ): RestorePlan {
   const live = current.sheets.find((sheet) => sheet.id === range.sheet);
   const target = historical.sheets.find((sheet) => sheet.id === range.sheet);
@@ -820,8 +913,7 @@ function planRange(
 
   const notes = noteOperations(id, live.notes ?? [], target.notes ?? [], rect);
   plan.content.push(...notes.clear);
-  plan.content.push({ op: "clearRange", range: rectRange(id, rect), contents: true, style: true });
-  plan.content.push(...cellBands(store, target, rect));
+  rewriteCells(plan, store, target, rect, rewrite);
   plan.content.push(...notes.set);
 
   for (const { rect: area, merge } of historicalMerges) {
@@ -846,24 +938,79 @@ export interface RestoreCommit {
 }
 
 /**
+ * Whether the scope's cells can be compared with the live cells and only the
+ * rows that differ rewritten. Removed, added or renamed sheets, a sheet that
+ * loses rows or columns, and changed tables, pivots or table relationships
+ * can rewrite formula sources outside their own cells, so the restore then
+ * rewrites every cell of the scope, after them, from the version.
+ */
+function cellsRestoreAlone(
+  current: Workbook,
+  historical: WorkbookSnapshot,
+  scope: HistoryRestoreScope,
+): boolean {
+  if (scope.kind === "range") {
+    return true;
+  }
+
+  const targets =
+    scope.kind === "workbook"
+      ? historical.sheets
+      : historical.sheets.filter((sheet) => sheet.id === scope.sheet);
+  if (scope.kind === "workbook") {
+    const sameSheets =
+      targets.length === current.sheets.length &&
+      same(historical.workbook.dataModel ?? null, current.dataModel ?? null);
+    if (!sameSheets) {
+      return false;
+    }
+  }
+
+  return targets.every((target) => {
+    const live = current.sheets.find((sheet) => sheet.id === target.id);
+    return (
+      live !== undefined &&
+      live.name === target.name &&
+      target.rowCount >= live.rowCount &&
+      target.columns.length >= live.columns.length &&
+      same(live.tables ?? [], target.tables ?? []) &&
+      same(live.pivots ?? [], target.pivots ?? [])
+    );
+  });
+}
+
+/**
  * Operations that bring `current` to the historical document in `store` for
  * `scope`. They use the ordinary document operations, so the grid's undo,
- * policy and sync apply to them unchanged.
+ * policy and sync apply to them unchanged. `compareRows` finds the rows whose
+ * live cells differ from the version's, so unchanged rows are not written.
  */
 export function planRestore(
   live: Store,
   store: SheetwriteStore,
   scope: HistoryRestoreScope,
+  compareRows: RowComparer,
 ): RestoreCommit {
   const current = live.getWorkbook();
   const historical = store.exportSnapshot();
+  const liveEngine = storeEngine(live);
+  const versionEngine = storeEngine(store);
+
+  const rewrite: CellRewrite =
+    liveEngine && versionEngine && cellsRestoreAlone(current, historical, scope)
+      ? (sheet, rect) =>
+          // A paged datasource sheet can hold cells that are not loaded.
+          liveEngine.isPaged(sheet)
+            ? undefined
+            : compareRows(liveEngine, versionEngine, sheet, rect)
+      : REWRITE_ALL;
 
   const plan =
     scope.kind === "workbook"
-      ? planWorkbook(current, historical, store)
+      ? planWorkbook(current, historical, store, rewrite)
       : scope.kind === "sheet"
-        ? planSheet(current, historical, store, scope.sheet)
-        : planRange(current, historical, store, scope.range);
+        ? planSheet(current, historical, store, scope.sheet, rewrite)
+        : planRange(current, historical, store, scope.range, rewrite);
 
   return {
     operations: flatten(plan),

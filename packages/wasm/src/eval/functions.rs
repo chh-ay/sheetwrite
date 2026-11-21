@@ -92,11 +92,6 @@ impl FuncAccumulator {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub(super) fn finish_arg(&mut self, rows: usize, cols: usize) -> Result<(), FormulaError> {
-        self.finish_arg_with_missing(rows, cols, false)
-    }
-
     pub(super) fn finish_arg_with_missing(
         &mut self,
         rows: usize,

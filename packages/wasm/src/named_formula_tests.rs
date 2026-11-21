@@ -3,17 +3,11 @@
 //! <https://support.microsoft.com/en-us/office/define-and-use-names-in-formulas-4d0f13ac-53b7-422e-afd2-abd7ff379c64>
 //! <https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67>
 
-use std::time::{Duration, Instant};
+use std::cell::Cell;
 
+use crate::store::names::NAME_READS;
 use crate::store::CellStore;
-
-fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
-    store.get_cell(sheet, row, col).num()
-}
-
-fn text(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<String> {
-    store.get_cell(sheet, row, col).string()
-}
+use crate::tests::support::{number, string as text, tree_address};
 
 /// A store with one sheet, `Data`, holding 1, 2, 3 in A1:A3 and 10, 20, 30
 /// in B1:B3.
@@ -42,21 +36,29 @@ fn a_dynamic_name_reads_the_range_its_formula_returns() {
 }
 
 /// Excel keeps a name's relative references relative to A1 and moves them
-/// to the cell that uses the name, wrapping past the last column, so
-/// `=Data!XFD1` reads the cell to the left of each cell that uses it.
+/// to the cell that uses the name, wrapping past the last column and row, so
+/// `=Data!XFD1` reads the cell to the left of each cell that uses it, and
+/// `$A1048575:$A1` is the two rows above a cell and the cell itself.
 #[test]
 fn relative_references_in_a_name_follow_the_cell_that_uses_it() {
     let (mut store, sheet) = data_store();
     assert!(store.set_named_formula("SameRow", -1, "=Data!$A1"));
     assert!(store.set_named_formula("Left", -1, "=Data!XFD1"));
+    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!$A1048575:$A1)"));
     store.set_formula(sheet, 1, 3, "=SameRow*100", 0);
     store.set_formula(sheet, 2, 3, "=SameRow*100", 0);
     store.set_formula(sheet, 2, 2, "=Left+1", 0);
+    store.set_formula(sheet, 2, 4, "=LastThree", 0);
     store.recompute(sheet);
 
     assert_eq!(number(&store, sheet, 1, 3), 200.0);
     assert_eq!(number(&store, sheet, 2, 3), 300.0);
     assert_eq!(number(&store, sheet, 2, 2), 31.0);
+    assert_eq!(
+        number(&store, sheet, 2, 4),
+        6.0,
+        "LastThree in row 3 is A1:A3"
+    );
 }
 
 /// A relative name is read in place, its references moved by the reading
@@ -85,18 +87,6 @@ fn a_formula_a_relative_name_reads_first_reads_its_own_cells() {
     assert_eq!(number(&store, sheet, 2, 0), 42.0, "A3 spills B2*2");
 }
 
-/// `$A1048575:$A1`, relative to A1, is the two rows above a cell and the
-/// cell itself in column A; used in row 3 it wraps to A1:A3.
-#[test]
-fn a_relative_range_in_a_name_wraps_past_the_last_row() {
-    let (mut store, sheet) = data_store();
-    assert!(store.set_named_formula("LastThree", -1, "=SUM(Data!$A1048575:$A1)"));
-    store.set_formula(sheet, 2, 3, "=LastThree", 0);
-    store.recompute(sheet);
-
-    assert_eq!(number(&store, sheet, 2, 3), 6.0);
-}
-
 #[test]
 fn a_chain_of_names_that_doubles_at_each_step_is_bounded() {
     let (mut store, sheet) = data_store();
@@ -113,39 +103,70 @@ fn a_chain_of_names_that_doubles_at_each_step_is_bounded() {
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
 }
 
-/// Most time a formula may take to bind to a chain of 22 names. Expanding
-/// each name once per formula takes milliseconds; expanding it once per use
-/// takes 2^21 expansions, which is minutes in a debug build.
-const CHAIN_BIND_LIMIT: Duration = Duration::from_secs(1);
+/// The name reads ([`NAME_READS`]) `run` takes on this thread.
+fn name_reads(run: impl FnOnce()) -> usize {
+    let before = NAME_READS.with(Cell::get);
+    run();
+    NAME_READS.with(Cell::get) - before
+}
 
-/// A name over a sheet's own name reads differently on that sheet, so it is
-/// expanded where it is used. Each name of a chain is still expanded once per
-/// formula, not once per use.
-#[test]
-fn a_chain_of_names_over_a_sheets_own_name_binds_in_linear_time() {
+/// Define `Rate` for the workbook as 1, and with `sheet_rate` for the sheet
+/// `Other` as 2 too; then a chain of 22 names over it, each using the next
+/// twice, and formulas over the chain on both sheets. Returns the name reads
+/// that defining the chain and binding and calculating the formulas take.
+fn chain_over_rate(sheet_rate: bool) -> usize {
     let (mut store, sheet) = data_store();
     let other = store.add_sheet(2, 2);
     store.set_sheet_name(other, "other", "Other");
-    assert!(store.set_named_formula("Rate", -1, "=1"));
-    assert!(store.set_named_formula("Rate", other as i32, "=2"));
-    assert!(store.set_named_formula("Step_22", -1, "=Rate"));
-    for step in 1..22 {
-        let source = format!("=Step_{next}+Step_{next}", next = step + 1);
-        assert!(store.set_named_formula(&format!("Step_{step}"), -1, &source));
+    assert!(store.set_named_formula("Rate", -1, "=1"), "define Rate");
+    if sheet_rate {
+        assert!(
+            store.set_named_formula("Rate", other as i32, "=2"),
+            "define Other's Rate"
+        );
     }
+    let reads = name_reads(|| {
+        assert!(
+            store.set_named_formula("Step_22", -1, "=Rate"),
+            "define Step_22"
+        );
+        for step in 1..22 {
+            let source = format!("=Step_{next}+Step_{next}", next = step + 1);
+            assert!(
+                store.set_named_formula(&format!("Step_{step}"), -1, &source),
+                "define Step_{step}"
+            );
+        }
+        store.set_formula(sheet, 0, 3, "=Step_1", 0);
+        store.set_formula(sheet, 1, 3, "=Step_13", 0);
+        store.set_formula(other, 0, 0, "=Step_13", 0);
+        store.recompute(sheet);
+        store.recompute(other);
+    });
 
-    let started = Instant::now();
-    store.set_formula(sheet, 0, 3, "=Step_1", 0);
-    let elapsed = started.elapsed();
-    store.set_formula(sheet, 1, 3, "=Step_13", 0);
-    store.set_formula(other, 0, 0, "=Step_13", 0);
-    store.recompute(sheet);
-    store.recompute(other);
+    assert_eq!(
+        text(&store, sheet, 0, 3).as_deref(),
+        Some("#NUM!"),
+        "Step_1 is past the expansion bound"
+    );
+    assert_eq!(number(&store, sheet, 1, 3), 512.0, "Step_13 on Data");
+    let on_other = if sheet_rate { 1024.0 } else { 512.0 };
+    assert_eq!(number(&store, other, 0, 0), on_other, "Step_13 on Other");
+    reads
+}
 
-    assert!(elapsed < CHAIN_BIND_LIMIT, "binding took {elapsed:?}");
-    assert_eq!(text(&store, sheet, 0, 3).as_deref(), Some("#NUM!"));
-    assert_eq!(number(&store, sheet, 1, 3), 512.0);
-    assert_eq!(number(&store, other, 0, 0), 1024.0);
+/// A sheet's own name changes what the names over it read on that sheet,
+/// not how often they are read: a chain over it is read about as often as
+/// a chain over a workbook name, not once per path through the chain
+/// (#1060).
+#[test]
+fn a_chain_of_names_over_a_sheets_own_name_reads_as_often_as_over_a_workbook_name() {
+    let workbook = chain_over_rate(false);
+    let sheet = chain_over_rate(true);
+    assert!(
+        sheet <= 2 * workbook,
+        "{sheet} name reads over a sheet's own name, {workbook} over a workbook name"
+    );
 }
 
 #[test]
@@ -342,20 +363,6 @@ fn recursion_past_the_call_limit_is_a_num_error() {
 
     assert_eq!(number(&store, sheet, 0, 3), 55.0);
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
-}
-
-/// The tree of the formula at (`row`, `col`), as an address that changes
-/// when the formula is bound again.
-fn tree_address(
-    store: &CellStore,
-    sheet: usize,
-    row: u32,
-    col: u32,
-) -> Option<*const crate::calc::Ast> {
-    let entry = store.sheets[sheet]
-        .formulas
-        .get((row, col), &store.formula_slots)?;
-    entry.ast.as_ref().map(std::ptr::from_ref)
 }
 
 /// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3 and `=Ratio+1`

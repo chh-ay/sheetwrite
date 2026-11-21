@@ -22,7 +22,7 @@ import {
   workbookCalculation,
   extendSheet,
 } from "./reader-workbook.js";
-import { boundedErrorText, validateCodecSnapshot, type XlsxCodecContext } from "./resources.js";
+import { boundedErrorText, validateReadSnapshot, type XlsxCodecContext } from "./resources.js";
 import { expandSharedFormulas, type SharedFormulaGroup } from "./shared-formula.js";
 import { xmlChild } from "./xml.js";
 
@@ -200,7 +200,7 @@ export async function readWorkbook(
 
   await loadWorkbookObjects(loaded, snapshot, sourceReferences, metadata, context, readOptions);
 
-  const checked = validateCodecSnapshot(snapshot, context);
+  const checked = validateReadSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
       boundedErrorText(

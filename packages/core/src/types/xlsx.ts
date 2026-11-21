@@ -130,6 +130,16 @@ export interface XlsxWorkbookOptions {
    * unchanged since import.
    */
   powerQuery?: PowerQueryCodec;
+  /**
+   * How export compresses the parts of the file; import ignores it.
+   * `"deterministic"`, the default, uses the bundled `fflate` codec, so one
+   * workbook gives the same bytes in every runtime. `"native"` uses the
+   * runtime's `CompressionStream` where it has one, and `fflate` elsewhere.
+   * It is faster, but the compressed bytes differ between runtimes and can
+   * change when the runtime is updated. The parts of the file, and what Excel
+   * reads from them, are the same.
+   */
+  compression?: "deterministic" | "native";
 }
 
 /** @internal One installed spill and the values it shows now. */
