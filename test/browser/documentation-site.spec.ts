@@ -108,6 +108,33 @@ test("documentation pages render one heading and a canonical URL", async ({ page
   }
 });
 
+test("a code-name title wraps between its words, never inside one", async ({ page }) => {
+  for (const [width, route] of [
+    [1440, "api/react-styles-dashboard-css/"],
+    [390, "api/core-browser/indexed-db-pending-commit-storage-error-code/"],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/docs/${route}`);
+    // Each run of the title's text between break points sits on one line.
+    const splitRuns = await page
+      .locator("main h1 > span")
+      .first()
+      .evaluate((title) =>
+        [...title.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+          .filter((node) => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return (
+              new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size > 1
+            );
+          })
+          .map((node) => node.textContent),
+      );
+    expect(splitRuns, `${route} at ${width} px`).toEqual([]);
+  }
+});
+
 test("framework tabs synchronize and persist across guides", async ({ page }) => {
   await page.goto("/docs/start/installation/");
   await waitForHydration(page);
