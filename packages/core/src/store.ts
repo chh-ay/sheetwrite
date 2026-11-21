@@ -627,8 +627,9 @@ export class SheetwriteStore implements Store {
     sheet: SheetId,
     viewRows: { start: number; end: number },
     cols: readonly number[],
+    options?: { readonly dataRows?: boolean },
   ): ClipboardWindowView {
-    return this.engine.getClipboardWindow(sheet, viewRows, cols);
+    return this.engine.getClipboardWindow(sheet, viewRows, cols, options);
   }
 
   /**
