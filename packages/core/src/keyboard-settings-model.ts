@@ -366,6 +366,9 @@ export function refusedKeys(
   if (bare && !parsed.shift && (parsed.key === "f2" || parsed.key === "f4")) {
     return `${keysLabel(shortcut)} edits the active cell, as in Excel, so it can't be assigned.`;
   }
+  if (bare && parsed.key === "f6") {
+    return `${keysLabel(shortcut)} moves the focus between the parts of the window and out of the grid, as in Excel, so it can't be assigned.`;
+  }
   return reservedReason(parsed, environment);
 }
 
