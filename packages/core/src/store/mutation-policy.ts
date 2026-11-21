@@ -14,6 +14,7 @@ import type {
 } from "../types/document.js";
 import type { PivotDefinition } from "../types/pivot.js";
 import {
+  ValidationBudgetError,
   validationAccepts,
   validationIssueMessage,
   type ValidationReads,
@@ -47,7 +48,42 @@ export class StoreMutationPolicy {
     private readonly reads?: ValidationReads,
   ) {}
 
+  /**
+   * The transaction's operations that may apply, and the issues they raise.
+   * Its validation is one check of {@link ValidationReads}: each list source
+   * is read once, and when the check runs out of its budget the whole
+   * transaction is refused with a `resource-limit` issue.
+   */
   evaluate(
+    patches: readonly DocumentOp[],
+    commitReason: CommitReason,
+    resolver: ProtectionResolver | undefined,
+    mode: MutationPolicyMode,
+  ): MutationPolicyResult {
+    const reads = this.reads;
+    if (!reads) return this.evaluateChecked(patches, commitReason, resolver, mode);
+    try {
+      return reads.check(() => this.evaluateChecked(patches, commitReason, resolver, mode));
+    } catch (error) {
+      if (!(error instanceof ValidationBudgetError)) throw error;
+      return {
+        patches: [],
+        warnings: [],
+        rejections: [
+          {
+            kind: "resource-limit",
+            severity: "error",
+            resource: "validation-checks",
+            actual: error.spent,
+            max: error.budget,
+            message: "Data validation of this change needs too much work; nothing was changed",
+          },
+        ],
+      };
+    }
+  }
+
+  private evaluateChecked(
     patches: readonly DocumentOp[],
     commitReason: CommitReason,
     resolver: ProtectionResolver | undefined,
@@ -107,11 +143,13 @@ export class StoreMutationPolicy {
 
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
-      const patchIssues: MutationIssue[] = [];
+      // A fill under many rules can raise millions of issues: they are joined
+      // and copied without spreading them into arguments, which overflows the stack.
+      let patchIssues: MutationIssue[] = [];
       const sheetId = patchSheetId(patch);
       if (sheetId) {
-        patchIssues.push(
-          ...this.protectionIssues(
+        patchIssues = patchIssues.concat(
+          this.protectionIssues(
             patch,
             operationIndex,
             commitReason,
@@ -121,10 +159,10 @@ export class StoreMutationPolicy {
           // A paste lands its values as in Excel, whose validation checks
           // typed entries only (`paste.keepValidation` checks in the grid),
           // and undo and redo return to a document that was already allowed.
-          ...(commitReason === "paste" || commitReason === "undo" || commitReason === "redo"
+          commitReason === "paste" || commitReason === "undo" || commitReason === "redo"
             ? []
-            : this.validationIssues(patch, operationIndex, rulesFor(sheetId))),
-          ...this.pivotOutputIssues(
+            : this.validationIssues(patch, operationIndex, rulesFor(sheetId)),
+          this.pivotOutputIssues(
             patch,
             operationIndex,
             commitReason,
@@ -135,12 +173,16 @@ export class StoreMutationPolicy {
         );
       }
 
-      warnings.push(...patchIssues.filter((issue) => issue.severity === "warning"));
-      const errors = patchIssues.filter((issue) => issue.severity === "error");
-      if (errors.length > 0) {
-        rejections.push(...errors);
-        continue;
+      let rejected = false;
+      for (const issue of patchIssues) {
+        if (issue.severity === "warning") {
+          warnings.push(issue);
+        } else {
+          rejections.push(issue);
+          rejected = true;
+        }
       }
+      if (rejected) continue;
 
       allowed.push(patch);
 

@@ -37,12 +37,13 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
     let mut slots = crate::formula_slots::FormulaStore::default();
-    assert!(dense.insert_rows(0, 1, 0, &mut slots).is_ok());
-    assert!(dense.delete_rows(0, 2, 1, &mut slots).is_ok());
-    assert!(dense.delete_rows(0, 0, 0, &mut slots).is_ok());
-    assert!(dense.insert_cols(0, 1, 0, &mut slots).is_ok());
-    assert!(dense.delete_cols(0, 2, 1, &mut slots).is_ok());
-    assert!(dense.delete_cols(0, 0, 0, &mut slots).is_ok());
+    let names = bounded_store.name_scope(0);
+    assert!(dense.insert_rows(names, 1, 0, &mut slots).is_ok());
+    assert!(dense.delete_rows(names, 2, 1, &mut slots).is_ok());
+    assert!(dense.delete_rows(names, 0, 0, &mut slots).is_ok());
+    assert!(dense.insert_cols(names, 1, 0, &mut slots).is_ok());
+    assert!(dense.delete_cols(names, 2, 1, &mut slots).is_ok());
+    assert!(dense.delete_cols(names, 0, 0, &mut slots).is_ok());
     assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
     dense.formulas.clear_dirty();

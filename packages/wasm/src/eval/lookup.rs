@@ -1240,7 +1240,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<LookupArg, FormulaError> {
-        if let Some(range) = range_from_ast(ast, sheet) {
+        if let Some(range) = range_from_ast(ast, self.name_scope(sheet)) {
             let shared = self
                 .graph
                 .index()

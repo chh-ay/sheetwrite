@@ -134,6 +134,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   ],
   "/docs/features/grid/editing-and-clipboard/": [
     { after: "clipboard-interoperability", picture: "paste-formats" },
+    { after: "paste-special", picture: "paste-special" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -171,6 +172,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   ],
   "/docs/features/grid/search/": [
     { after: "options-and-result", picture: "search-steps" },
+    { after: "options-and-find-all-in-the-find-bar", picture: "find-all" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -405,6 +407,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/features/grid/keyboard-shortcuts/": [{ after: AFTER_LEAD, picture: "keyboard-shortcuts" }],
   "/docs/features/data/validation-protection-and-notes/": [
     { after: "validation", picture: "write-checks" },
+    { after: "error-alerts-and-input-messages", picture: "validation-alerts" },
     {
       after: AFTER_LEAD,
       shot: {

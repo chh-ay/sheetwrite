@@ -8,6 +8,7 @@ use super::super::EvalPass;
 use super::super::Shapes;
 use super::lambda::Slot;
 use crate::calc::{parse, Ast, Func};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL};
@@ -66,7 +67,8 @@ impl Context<'_, '_> {
     }
 
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
+        let names = self.store.name_scope(self.sheet);
+        if !super::super::array::ast_produces_array(expression, self.pass.shapes(names)) {
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
         }
         self.store
@@ -340,10 +342,18 @@ struct Aggregator {
 }
 
 impl Aggregator {
-    fn resolve(written: &Ast) -> Result<Self, FormulaError> {
-        let expression = written.bound_value();
-        if let Ast::Name(name) = expression {
-            let label = name.to_ascii_uppercase();
+    fn resolve(written: &Ast, names: NameScope<'_>) -> Result<Self, FormulaError> {
+        let expression = names.bound_value(written);
+        // A function name such as `SUM` binds as a defined name that nothing
+        // defines.
+        let written_name = if let Ast::Name(name) = expression {
+            Some(name.to_ascii_uppercase())
+        } else if let Ast::DefinedName(id, _) = expression {
+            Some(names.spelling(*id).to_ascii_uppercase())
+        } else {
+            None
+        };
+        if let Some(label) = written_name {
             if !AGGREGATORS.contains(&label.as_str()) {
                 return Err(FormulaError::Value);
             }
@@ -373,7 +383,7 @@ impl Aggregator {
             });
         }
         if let Ast::Lambda(_) = expression {
-            let arity = super::lambda::parameter_count(expression)?;
+            let arity = super::lambda::parameter_count(expression, names)?;
             if !(1..=2).contains(&arity) {
                 return Err(FormulaError::Value);
             }
@@ -467,7 +477,10 @@ pub(crate) fn bound(
         return Err(FormulaError::Value);
     }
     let mut extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
-        if !super::super::array::ast_produces_array(expression, pass.shapes()) {
+        if !super::super::array::ast_produces_array(
+            expression,
+            pass.shapes(store.name_scope(sheet)),
+        ) {
             return Ok((1, 1));
         }
         let (rows, cols, cells) = store.matrix_shape(expression, sheet, pass)?;
@@ -624,7 +637,10 @@ pub(crate) fn evaluate_matrix(
     {
         return Err(FormulaError::Value);
     }
-    let aggregator = Aggregator::resolve(&arguments[required - 1])?;
+    let aggregator = Aggregator::resolve(
+        &arguments[required - 1],
+        context.store.name_scope(context.sheet),
+    )?;
     let headers = context.option(arguments, required, -1)?;
     if !(-1..=3).contains(&headers) {
         return Err(FormulaError::Value);
