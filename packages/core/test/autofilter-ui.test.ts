@@ -301,6 +301,38 @@ describe("AutoFilter in the grid", () => {
     expect(notice()?.hidden).toBe(true);
   });
 
+  it("pastes a block over a filtered range into the hidden rows too, as Excel does, and says so", async () => {
+    let clipboardText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([]),
+        readText: () => Promise.resolve(clipboardText),
+      },
+    });
+    const { grid, store } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+
+    // Three copied rows on B2 land on sheet rows 2 to 4, the hidden B3 included.
+    clipboardText = "10\n20\n30";
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
+    expect(notice()?.textContent).toBe("This paste wrote into 1 hidden row. Show them");
+
+    // One copied value over a filtered selection fills its shown cells only, as in Excel.
+    clipboardText = "5";
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+    });
+    expect(await grid.actions.paste()).toBe("done");
+    expect([1, 2, 3].map(qty)).toEqual([5, 20, 5]);
+  });
+
   it("reports the sheet address of edited and selected cells under a filter", () => {
     const { grid } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });

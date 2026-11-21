@@ -979,6 +979,7 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
@@ -992,11 +993,16 @@ export class GridImpl implements Grid {
         this.validationRefusedNotice(refused, warned);
       },
       validationReads: () => storeEngine(this.store)?.validationReads,
-      // Excel's cut moves the rows a filter hides without a word; say so.
+      // Excel's cut moves, and its paste writes into, the rows a filter hides
+      // without a word; say so.
       onHiddenRowsMoved: (count, step) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
         this.actionFeedback.show(
-          step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
+          step === "cut"
+            ? `This cut includes ${rows}.`
+            : step === "paste"
+              ? `This paste moved ${rows}.`
+              : `This paste wrote into ${rows}.`,
           {
             label: "Show them",
             run: () => this.actions.clearFilters(),

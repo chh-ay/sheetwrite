@@ -86,6 +86,7 @@ function cutHarness() {
     readOnly: () => false,
     mergeAnchorAt: () => null,
     toDataRow: (row) => row,
+    toViewRow: (row) => row,
     commit: (patches, reason) => {
       document.commit(patches, reason);
     },

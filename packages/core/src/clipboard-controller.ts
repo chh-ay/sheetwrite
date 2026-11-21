@@ -63,6 +63,8 @@ export interface ClipboardControllerDeps {
   readOnly: () => boolean;
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
+  /** The view row of a sheet row; `null` when a filter or the user hides it. */
+  toViewRow: (dataRow: number) => number | null;
   commit: (patches: DocumentOp[], reason: CommitReason) => void;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
@@ -84,9 +86,11 @@ export interface ClipboardControllerDeps {
   validationReads?: () => ValidationReads | undefined;
   /**
    * Called when a cut, then its paste, moves `count` rows that a filter or
-   * the user hides, which the selection did not show.
+   * the user hides, which the selection did not show (`cut`, `paste`), and
+   * when a pasted block writes into `count` hidden rows of its target, as
+   * Excel's paste does (`write`).
    */
-  onHiddenRowsMoved?: (count: number, step: "cut" | "paste") => void;
+  onHiddenRowsMoved?: (count: number, step: "cut" | "paste" | "write") => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -1119,8 +1123,10 @@ export class ClipboardController {
    * The cells, in data rows and columns, that a paste of a `rows` × `cols`
    * block (after a transpose) fills at `target`: the selection when it is a
    * whole multiple of the block, which then repeats, as cells do. Null when a
-   * sorted view or hidden columns split them, or they pass the sheet's end:
-   * notes and rules then stay as they are.
+   * repeated block's shown rows are apart, a sorted view or hidden columns
+   * split them, or they pass the sheet's end: notes and rules then stay as
+   * they are. A block pasted once fills consecutive sheet rows, hidden ones
+   * included, as its cells do ({@link pastesOverHiddenRows}).
    */
   private pasteArea(
     target: PasteTarget,
@@ -1133,10 +1139,14 @@ export class ClipboardController {
     const filledRows = repeat ? target.rows : rows;
     const filledCols = repeat ? target.cols : cols;
     const sheet = this.deps.activeSheet();
-    if (target.row + filledRows > this.deps.store.viewRowCount(sheet)) return null;
     const first = this.deps.toDataRow(target.row);
-    for (let row = 1; row < filledRows; row++) {
-      if (this.deps.toDataRow(target.row + row) !== first + row) return null;
+    if (filledRows === rows && filledCols === cols && this.pastesOverHiddenRows()) {
+      if (first + filledRows > this.deps.sheet().rowCount) return null;
+    } else {
+      if (target.row + filledRows > this.deps.store.viewRowCount(sheet)) return null;
+      for (let row = 1; row < filledRows; row++) {
+        if (this.deps.toDataRow(target.row + row) !== first + row) return null;
+      }
     }
     const visible = this.deps.colIndices();
     const at = visible.indexOf(target.col);
@@ -1371,9 +1381,11 @@ export class ClipboardController {
         widthAt,
         (r, c, targetCol) => cellAt(r, c, targetCol, { row: 0, col: 0 }),
         extraPatches,
+        this.pastesOverHiddenRows(),
       );
       return;
     }
+    // A block repeated over the selection fills its shown cells, as in Excel.
     this.writeBlock(
       target,
       height * repeats.rows,
@@ -1385,9 +1397,19 @@ export class ClipboardController {
   }
 
   /**
+   * Whether a block pastes into consecutive sheet rows, the rows a filter or
+   * the user hides included, as Excel's paste does. Under a view sort the
+   * sheet rows are not in view order, so the block takes the shown rows.
+   */
+  private pastesOverHiddenRows(): boolean {
+    return (this.deps.sheet().sortKeys?.length ?? 0) === 0;
+  }
+
+  /**
    * Walk a `height`×`widthAt(r)` block anchored at `focus`, resolving each cell to
    * a `set` patch via `cellAt`. Honors the view-row mapping, the visible-column
    * order, the row limit, and merge-anchor skipping, then commits one transaction.
+   * With `sheetRows`, row `r` is the sheet row `r` below the focus's, shown or not.
    * A paste that keeps the target's validation rules checks its cells and
    * commits them in one check, so each list source is read once.
    */
@@ -1397,12 +1419,13 @@ export class ClipboardController {
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
     extraPatches: DocumentOp[] = [],
+    sheetRows = false,
   ): void {
     const reads = this.deps.keepValidation?.() ? this.deps.validationReads?.() : undefined;
     if (reads) {
-      reads.check(() => this.writeCells(focus, height, widthAt, cellAt, extraPatches));
+      reads.check(() => this.writeCells(focus, height, widthAt, cellAt, extraPatches, sheetRows));
     } else {
-      this.writeCells(focus, height, widthAt, cellAt, extraPatches);
+      this.writeCells(focus, height, widthAt, cellAt, extraPatches, sheetRows);
     }
   }
 
@@ -1413,38 +1436,46 @@ export class ClipboardController {
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
     extraPatches: DocumentOp[] = [],
+    sheetRows = false,
   ): void {
     const activeSheet = this.deps.activeSheet();
+    const firstDataRow = this.deps.toDataRow(focus.row);
+    const dataRowAt = sheetRows
+      ? (r: number) => firstDataRow + r
+      : (r: number) => this.deps.toDataRow(focus.row + r);
+    // The view row of block row `r`; `null` for a hidden sheet row.
+    const viewRowAt = sheetRows
+      ? (r: number) => this.deps.toViewRow(firstDataRow + r)
+      : (r: number) => focus.row + r;
     // With `paste.keepValidation`, a value a reject rule refuses is not pasted.
     const check = this.deps.keepValidation?.() ? this.validationCheck() : null;
     const writeAt = check
       ? (r: number, c: number, targetCol: number): CellWrite | null => {
           const write = cellAt(r, c, targetCol);
-          const addr = {
-            sheet: activeSheet,
-            row: this.deps.toDataRow(focus.row + r),
-            col: targetCol,
-          };
+          const addr = { sheet: activeSheet, row: dataRowAt(r), col: targetCol };
           return write && check.admits(write, addr) ? write : null;
         }
       : cellAt;
-    const rowLimit = this.deps.store.viewRowCount(activeSheet);
     const colIndices = this.deps.colIndices();
     const startPos = colIndices.indexOf(focus.col);
     if (startPos < 0) return;
 
-    const availableRows = Math.min(height, rowLimit - focus.row);
+    const availableRows = Math.min(
+      height,
+      sheetRows
+        ? this.deps.sheet().rowCount - firstDataRow
+        : this.deps.store.viewRowCount(activeSheet) - focus.row,
+    );
+    const hiddenRows = sheetRows ? this.hiddenRowsIn(firstDataRow, availableRows) : 0;
     const width = availableRows > 0 ? widthAt(0) : 0;
     const targetCols = colIndices.slice(startPos, startPos + width);
-    const firstDataRow = availableRows > 0 ? this.deps.toDataRow(focus.row) : -1;
     const rectangular =
       availableRows > 0 &&
       width > 0 &&
       targetCols.length === width &&
       targetCols.every((col, index) => col === focus.col + index) &&
       Array.from({ length: availableRows }, (_, row) => row).every(
-        (row) =>
-          widthAt(row) === width && this.deps.toDataRow(focus.row + row) === firstDataRow + row,
+        (row) => widthAt(row) === width && dataRowAt(row) === firstDataRow + row,
       );
     if (rectangular) {
       const values: CellScalar[] = new Array(availableRows * width);
@@ -1460,9 +1491,9 @@ export class ClipboardController {
       let canPack = true;
       for (let row = 0; row < availableRows && canPack; row++) {
         for (let col = 0; col < width; col++) {
-          const targetRow = focus.row + row;
+          const viewRow = viewRowAt(row);
           const targetCol = targetCols[col]!;
-          if (this.deps.mergeAnchorAt(targetRow, targetCol)) {
+          if (viewRow !== null && this.deps.mergeAnchorAt(viewRow, targetCol)) {
             canPack = false;
             break;
           }
@@ -1531,6 +1562,7 @@ export class ClipboardController {
           "paste",
         );
         check?.report();
+        if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write");
         return;
       }
     }
@@ -1539,18 +1571,18 @@ export class ClipboardController {
     for (let r = 0; r < height; r++) {
       const width = widthAt(r);
       for (let c = 0; c < width; c++) {
-        const targetRow = focus.row + r;
         const targetCol = colIndices[startPos + c];
-        if (targetRow >= rowLimit || targetCol === undefined) continue;
+        if (r >= availableRows || targetCol === undefined) continue;
 
-        const merge = this.deps.mergeAnchorAt(targetRow, targetCol);
-        if (merge && (merge.r0 !== targetRow || merge.c0 !== targetCol)) continue;
+        const viewRow = viewRowAt(r);
+        const merge = viewRow === null ? null : this.deps.mergeAnchorAt(viewRow, targetCol);
+        if (merge && (merge.r0 !== viewRow || merge.c0 !== targetCol)) continue;
 
         const write = writeAt(r, c, targetCol);
         if (!write) continue;
         patches.push({
           op: "set",
-          addr: { sheet: activeSheet, row: this.deps.toDataRow(targetRow), col: targetCol },
+          addr: { sheet: activeSheet, row: dataRowAt(r), col: targetCol },
           value: write.value,
           style: write.style,
         });
@@ -1559,6 +1591,16 @@ export class ClipboardController {
 
     this.deps.commit([...patches, ...extraPatches], "paste");
     check?.report();
+    if (hiddenRows > 0) this.deps.onHiddenRowsMoved?.(hiddenRows, "write");
+  }
+
+  /** How many of the `count` sheet rows from `first` a filter or the user hides. */
+  private hiddenRowsIn(first: number, count: number): number {
+    let hidden = 0;
+    for (let row = first; row < first + count; row++) {
+      if (this.deps.toViewRow(row) === null) hidden += 1;
+    }
+    return hidden;
   }
 
   /**

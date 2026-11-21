@@ -766,6 +766,7 @@ the sort on the table's header buttons.
 | Column filters keep through inserted and deleted rows, and move with their columns. In 0.6 any row or column edit cleared them. | Nothing. |
 | XLSX import turns rows an Excel AutoFilter hid into filtered rows, not hidden rows. | Nothing. Clearing the filter shows them, as in Excel. |
 | A cut over a filtered range moves the rows the filter hides too, as in Excel. Copy, delete, formatting and the fill handle still act only on the rows the filter shows. | Nothing. |
+| A pasted block over a filtered range writes into consecutive sheet rows, the rows the filter hides included, as in Excel, and says "This paste wrote into N hidden rows". In 0.6 it wrote only into the shown rows. One copied value pasted over a filtered selection still fills only the shown cells. | Nothing. Under a view sort a block still takes the shown rows. |
 | New sheets from the + button, Insert and Shift+F11 start with columns A to Z and 1,000 rows, instead of one column and 100 rows. The + button adds the sheet after the active one. | Nothing. A sheet added with `addSheet` without `columns` fills the grid's width with empty columns. |
 
 ### setBlock cell arrays
