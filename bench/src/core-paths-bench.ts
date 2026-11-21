@@ -6,10 +6,11 @@
  * identity array, command-state derivation for a large selection, commit
  * admission and change capture for one large block, the offline commit queue,
  * remote versions applied to a sheet of formulas, one local transaction of
- * scattered cell edits on that sheet, offline rebase, validation lookups, CSV
- * import, undo of a large clear, a paged revisiting round-trip after
- * eviction, cold WASM initialization in Node, and a row-border drag that
- * resizes one row of a 100-, 100,000- or 1,000,000-row sheet.
+ * scattered cell edits on that sheet, new values for linked workbooks that
+ * formulas read, offline rebase, validation lookups, CSV import, undo of a
+ * large clear, a paged revisiting round-trip after eviction, cold WASM
+ * initialization in Node, and a row-border drag that resizes one row of a
+ * 100-, 100,000- or 1,000,000-row sheet.
  *
  * Each scenario validates its own result before the sample is accepted, so a
  * fast scenario that computes the wrong answer fails the run instead of
@@ -47,6 +48,7 @@ import {
   DEFAULT_THEME,
   type DocumentOp,
   type DocumentRebaseResult,
+  type ExternalLink,
   fromCsv,
   type Grid,
   type GridCommandStateChangeEvent,
@@ -118,6 +120,7 @@ export const CORE_PATH_SCENARIOS = [
   "sync-offline-queue",
   "sync-remote-versions",
   "local-scattered-edits",
+  "external-links-refresh",
   "rebase-large",
   "validation-sparse",
   "csv-import",
@@ -157,6 +160,12 @@ interface CorePathScale {
   readonly offlineCommits: number;
   /** Rows of the row-sum sheet, each with one SUM formula. */
   readonly remoteRows: number;
+  /** Rows of the linked-workbook sheet, each with one local SUM formula. */
+  readonly linkRows: number;
+  /** Linked workbooks, each with one sheet of `linkCells` cached values. */
+  readonly links: number;
+  /** Cached values of each linked sheet; a formula reads each one. */
+  readonly linkCells: number;
   readonly rebaseBlockRows: number;
   readonly rebaseBlockColumns: number;
   readonly rebaseInsertOperations: number;
@@ -178,6 +187,9 @@ const FULL_SCALE: CorePathScale = {
   blockColumns: 1_000,
   offlineCommits: 5_000,
   remoteRows: 10_000,
+  linkRows: 50_000,
+  links: 10,
+  linkCells: 1_000,
   rebaseBlockRows: 1_000,
   rebaseBlockColumns: 100,
   rebaseInsertOperations: 50,
@@ -200,6 +212,9 @@ const SMOKE_SCALE: CorePathScale = {
   blockColumns: 100,
   offlineCommits: 200,
   remoteRows: 200,
+  linkRows: 2_000,
+  links: 3,
+  linkCells: 100,
   rebaseBlockRows: 100,
   rebaseBlockColumns: 100,
   rebaseInsertOperations: 10,
@@ -236,6 +251,8 @@ function samplePlan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
       return { warmup: smoke ? 2 : 20, iters: smoke ? 20 : 200, gcBetween: false };
     case "local-scattered-edits":
       return { warmup: 2, iters: smoke ? 5 : 21, gcBetween: false };
+    case "external-links-refresh":
+      return { warmup: 2, iters: smoke ? 5 : 15, gcBetween: false };
     case "rebase-large":
       return { warmup: 1, iters: 3, gcBetween: false };
     case "validation-sparse":
@@ -977,6 +994,88 @@ function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathSc
     samplesMs,
     { editedCells: cells, formulas: rows },
     "the first and last edited rows of the last transaction sum their new values",
+  );
+}
+
+/**
+ * New values for every linked workbook, applied as one `setExternalLinks`
+ * change, as Edit Links' Update All does. Each link has one sheet of
+ * `linkCells` cached values in column A; a formula reads each value, and every
+ * row of the sheet also sums its own cells, so most formulas read no link.
+ */
+function refreshExternalLinks(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const rows = scale.linkRows;
+  const book = (link: number): string => `Book${link}.xlsx`;
+  const linkValue = (generation: number, link: number, row: number): number =>
+    generation * 100_000 + link * 1_000 + row;
+  const links = (generation: number): ExternalLink[] =>
+    Array.from({ length: scale.links }, (_, link) => ({
+      book: book(link),
+      target: `https://files.example/${book(link)}`,
+      sheets: [
+        {
+          name: "Data",
+          cells: Array.from({ length: scale.linkCells }, (_, row) => ({
+            row,
+            col: 0,
+            value: linkValue(generation, link, row),
+          })),
+        },
+      ],
+    }));
+  const columns = numberColumns(4);
+  const mounted = mountGrid({
+    workbook: { ...workbook(rows, columns), externalLinks: links(0) },
+    transactionResourceLimits: { maxEncodedBytes: BLOCK_ENCODED_BYTES },
+  });
+  const { grid } = mounted;
+  const readers = Math.min(rows, scale.links * scale.linkCells);
+  const values = new Array<CellScalar>(rows * 4).fill(null);
+  const formulas: Array<[number, string]> = [];
+  for (let row = 0; row < rows; row += 1) {
+    values[row * 4] = row;
+    values[row * 4 + 1] = row * 2;
+    formulas.push([row * 4 + 2, `=A${row + 1}+B${row + 1}`]);
+    if (row < readers) {
+      const source = `[${book(row % scale.links)}]Data!A${1 + Math.floor(row / scale.links)}`;
+      formulas.push([row * 4 + 3, `=${source}*2`]);
+    }
+  }
+  const block: PackedCellBlock = { rowCount: rows, colCount: 4, values, formulas };
+  assertApplied(
+    grid.applyTransaction({ patches: [{ op: "setBlock", range: sheetRange(rows, 4), block }] })
+      .status,
+    "linked-workbook sheet setup",
+  );
+
+  let generation = 0;
+  let patch: DocumentOp = { op: "setExternalLinks", links: [] };
+  const samplesMs = collect(
+    () => assertApplied(grid.applyTransaction({ patches: [patch] }).status, "link refresh"),
+    {
+      warmup: plan.warmup,
+      iters: plan.iters,
+      before: () => {
+        generation += 1;
+        patch = { op: "setExternalLinks", links: links(generation) };
+      },
+    },
+  );
+
+  for (const row of [0, readers - 1]) {
+    const expected = linkValue(generation, row % scale.links, Math.floor(row / scale.links)) * 2;
+    if (resolvedCell(grid, row, 3) !== expected) {
+      fail(`row ${row} does not read the last link values`);
+    }
+  }
+  mounted.destroy();
+
+  return scenarioResult(
+    "external-links-refresh",
+    `one change that gives ${scale.links} linked workbooks new values, read by ${readers.toLocaleString("en-US")} formulas`,
+    samplesMs,
+    { links: scale.links, linkCells: scale.links * scale.linkCells, formulas: rows + readers },
+    "the first and last formulas that read a link show the last values",
   );
 }
 
@@ -1758,6 +1857,7 @@ export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   "sync-offline-queue": queueOfflineCommits,
   "sync-remote-versions": applyRemoteVersions,
   "local-scattered-edits": applyScatteredEdits,
+  "external-links-refresh": refreshExternalLinks,
   "rebase-large": rebaseBlockAcrossInserts,
   "validation-sparse": writeSparseRangeWithRules,
   "csv-import": importCsvText,

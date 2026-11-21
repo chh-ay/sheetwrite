@@ -1,10 +1,7 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, expect, it } from "bun:test";
 
 import {
   blitScroll,
-  filterButtonHitRect,
-  filterButtonRect,
-  filterTextRight,
   fontFor,
   getMergeIndexResourceStatsForTest,
   layoutTextLines,
@@ -13,67 +10,23 @@ import {
   sidewaysBlitSafe,
 } from "../src/canvas-paint.js";
 import { contrastRatio, parseRgbColor, relativeLuminance } from "../src/color-contrast.js";
-import { dateToSerial } from "../src/date-serial.js";
-import { initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
-// jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
-// (modelled on the one in grid.test.ts, extended to capture the geometry of each
-// draw call) and read back the rectangles/text/lines `paintFrame` emitted.
-interface FillRectCall {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fillStyle: string;
-}
-
-interface FillTextCall {
-  text: string;
-  x: number;
-  y: number;
-  fillStyle: string;
-  font: string;
-  maxWidth?: number;
-  /** Clip rectangles in effect when the text was drawn (all apply at once). */
-  clips: ClipRectCall[];
-}
-
-interface MoveToCall {
-  x: number;
-  y: number;
-}
-interface LineSegment {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-interface StrokeCall {
-  style: string;
-  segments: LineSegment[];
-}
-
-interface ClipRectCall {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+// happy-dom has no 2D canvas context, so paint against a recording stub and
+// read back the rectangles, text and stroked lines `paintFrame` emitted.
+type Rect = { x: number; y: number; w: number; h: number };
+type LineSegment = { x0: number; y0: number; x1: number; y1: number };
 
 interface RecordingCtx {
   fillStyle: string;
   strokeStyle: string;
-  font: string;
-  textAlign: string;
-  textBaseline: string;
-  lineWidth: number;
-  fillRects: FillRectCall[];
-  fillTexts: FillTextCall[];
-  clipRects: ClipRectCall[];
-  segments: LineSegment[];
-  strokes: StrokeCall[];
+  fillRects: (Rect & { fillStyle: string })[];
+  /** Each text with the clip rectangles in effect when it was drawn (all apply at once). */
+  fillTexts: { text: string; x: number; y: number; fillStyle: string; clips: Rect[] }[];
+  clipRects: Rect[];
+  strokes: { style: string; segments: LineSegment[] }[];
   [op: string]: unknown;
 }
 
@@ -81,82 +34,46 @@ function makeRecordingCtx(): RecordingCtx {
   const ctx: RecordingCtx = {
     fillStyle: "",
     strokeStyle: "",
-    font: "",
-    textAlign: "",
-    textBaseline: "",
-    lineWidth: 1,
     fillRects: [],
     fillTexts: [],
     clipRects: [],
-    segments: [],
     strokes: [],
   };
-
   // Capture the live `fillStyle` at call time, since it mutates between draws.
-  ctx.fillRect = (x: number, y: number, w: number, h: number) => {
+  ctx.fillRect = (x: number, y: number, w: number, h: number) =>
     ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
-  };
   // Track the clip stack across save/restore so each draw knows its clips.
-  let activeClips: ClipRectCall[] = [];
-  const savedClips: ClipRectCall[][] = [];
-  ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
-    ctx.fillTexts.push({
-      text,
-      x,
-      y,
-      maxWidth,
-      fillStyle: ctx.fillStyle,
-      font: ctx.font,
-      clips: [...activeClips],
-    });
-  };
-  let segmentStart: MoveToCall | undefined;
-  let pathStart = 0;
-  ctx.moveTo = (x: number, y: number) => {
-    segmentStart = { x, y };
-  };
+  let activeClips: Rect[] = [];
+  const savedClips: Rect[][] = [];
+  ctx.fillText = (text: string, x: number, y: number) =>
+    ctx.fillTexts.push({ text, x, y, fillStyle: ctx.fillStyle, clips: [...activeClips] });
+  let segments: LineSegment[] = [];
+  let at: { x: number; y: number } | undefined;
+  ctx.moveTo = (x: number, y: number) => (at = { x, y });
   ctx.lineTo = (x: number, y: number) => {
-    if (segmentStart) {
-      ctx.segments.push({ x0: segmentStart.x, y0: segmentStart.y, x1: x, y1: y });
-      segmentStart = { x, y };
-    }
+    if (!at) return;
+    segments.push({ x0: at.x, y0: at.y, x1: x, y1: y });
+    at = { x, y };
   };
-  // paintFrame measures the drawn run to size text decorations; approximate a
-  // monospace-ish width so the recording ctx has a deterministic run length.
+  ctx.beginPath = () => (segments = []);
+  ctx.stroke = () => ctx.strokes.push({ style: ctx.strokeStyle, segments: [...segments] });
+  // A deterministic run width, 7 px per code unit.
   ctx.measureText = (text: string) => ({ width: text.length * 7 });
-
-  let pendingRect: ClipRectCall | undefined;
-  ctx.rect = (x: number, y: number, w: number, h: number) => {
-    pendingRect = { x, y, w, h };
-  };
+  let pendingRect: Rect | undefined;
+  ctx.rect = (x: number, y: number, w: number, h: number) => (pendingRect = { x, y, w, h });
   ctx.clip = () => {
-    if (pendingRect) {
-      ctx.clipRects.push(pendingRect);
-      activeClips = [...activeClips, pendingRect];
-    }
+    if (!pendingRect) return;
+    ctx.clipRects.push(pendingRect);
+    activeClips = [...activeClips, pendingRect];
   };
-  ctx.save = () => {
-    savedClips.push(activeClips);
-  };
-  ctx.restore = () => {
-    activeClips = savedClips.pop() ?? [];
-  };
-  ctx.beginPath = () => {
-    pathStart = ctx.segments.length;
-  };
-  ctx.stroke = () => {
-    ctx.strokes.push({ style: ctx.strokeStyle, segments: ctx.segments.slice(pathStart) });
-  };
-
+  ctx.save = () => savedClips.push(activeClips);
+  ctx.restore = () => (activeClips = savedClips.pop() ?? []);
   for (const op of ["setTransform", "setLineDash"]) {
     ctx[op] = () => {};
   }
-
   return ctx;
 }
 
-// Custom (function) renderers are never exercised here; `paintFrame` takes a
-// `ReadonlyMap`, so an empty map (not a lookup record) is the right shape.
 const NO_RENDERERS = new Map<string, never>();
 
 beforeAll(async () => {
@@ -169,19 +86,13 @@ it("paints virtual columns without borrowing the first real cell's fill or borde
   const paintedColumnCount = 7;
   const fill = "#ffc000";
   const border = "#123456";
-  const columns = Array.from({ length: paintedColumnCount }, (_, col) => ({
-    key: `c${col}`,
-    header: `C${col}`,
-    type: "text" as const,
-    width: columnWidth,
-  }));
-  const workbook = {
+  const columns = textColumns(Array<number>(paintedColumnCount).fill(columnWidth));
+  const store = new SheetwriteStore({
     activeSheet: "s1",
     sheets: [
       { id: "s1", name: "Sheet", rowCount: 3, columns: columns.slice(0, storedColumnCount) },
     ],
-  };
-  const store = new SheetwriteStore(workbook);
+  });
   store.applyTransaction({
     patches: [
       {
@@ -191,18 +102,9 @@ it("paints virtual columns without borrowing the first real cell's fill or borde
       },
     ],
   });
-  const view = store.getVisibleWindow(
-    "s1",
-    { start: 0, end: 3 },
-    columns.map((_, col) => col),
-  );
-  const ctx = render(view, makeLayout(columns), {
-    width: paintedColumnCount * columnWidth,
-    height: HEADER_HEIGHT + 3 * ROW_HEIGHT,
-    scrollTop: 0,
-    scrollLeft: 0,
-  });
-
+  const view = store.getVisibleWindow("s1", { start: 0, end: 3 }, [...columns.keys()]);
+  const width = paintedColumnCount * columnWidth;
+  const ctx = render(view, makeLayout(columns), { ...UNIFORM_VIEWPORT, width });
   expect(ctx.fillRects.filter((rect) => rect.fillStyle === fill)).toEqual([
     { x: 0, y: HEADER_HEIGHT, w: columnWidth, h: ROW_HEIGHT, fillStyle: fill },
   ]);
@@ -217,23 +119,8 @@ const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 20;
 
 function makeTheme(overrides: Partial<Theme> = {}): Theme {
-  return {
-    font: "12px sans-serif",
-    bg: "#ffffff",
-    fg: "#000000",
-    gridLine: "#dddddd",
-    headerBg: "#f0f0f0",
-    headerFg: "#333333",
-    selection: "#cceeff",
-    selectionBorder: "#3388ff",
-    rowHeight: ROW_HEIGHT,
-    headerHeight: HEADER_HEIGHT,
-    rowHeaderWidth: 0,
-    searchMatch: "#ffff00",
-    searchActiveMatch: "#ffaa00",
-    highlight: "#ccffcc",
-    ...overrides,
-  };
+  const sizes = { rowHeight: ROW_HEIGHT, headerHeight: HEADER_HEIGHT, rowHeaderWidth: 0 };
+  return { ...DEFAULT_THEME, ...sizes, ...overrides };
 }
 
 function makeLayout(
@@ -241,6 +128,14 @@ function makeLayout(
   merges?: RenderLayout["merges"],
 ): RenderLayout {
   return { columns, rowHeight: ROW_HEIGHT, headerHeight: HEADER_HEIGHT, totalRows: 3, merges };
+}
+
+/** Text columns A, B, C, ... of the given widths. */
+function textColumns(widths: number[]): RenderLayout["columns"] {
+  return widths.map((width, col) => {
+    const header = String.fromCharCode(65 + col);
+    return { key: header, header, width, type: "text" };
+  });
 }
 
 function makeView(
@@ -263,596 +158,411 @@ function render(
   damage?: { x: number; y: number; w: number; h: number },
 ): RecordingCtx {
   const ctx = makeRecordingCtx();
-  paintFrame(
-    ctx as unknown as CanvasRenderingContext2D,
-    view,
-    layout,
-    theme,
-    viewport,
-    1,
-    NO_RENDERERS,
-    damage,
-  );
+  const canvas = ctx as unknown as CanvasRenderingContext2D;
+  paintFrame(canvas, view, layout, theme, viewport, 1, NO_RENDERERS, damage);
   return ctx;
 }
 
-// Shared viewports. `paintFrame` only reads them, so the constants are reusable.
 const UNIFORM_VIEWPORT: Viewport = { scrollTop: 0, scrollLeft: 0, width: 400, height: 300 };
 
-describe("fontFor", () => {
-  it("puts a cell font family first and keeps the theme families as fallbacks", () => {
-    const theme = makeTheme({ font: 'normal 450 13px "Inter Variable", sans-serif' });
-    expect(fontFor(theme, { fontFamily: "Calibri" })).toBe(
-      '450 13px "Calibri", "Inter Variable", sans-serif',
-    );
-    expect(fontFor(theme, { fontFamily: "Times New Roman", bold: true, fontSize: 16 })).toBe(
-      'bold 16px "Times New Roman", "Inter Variable", sans-serif',
-    );
-  });
+/** Paint one column with a row per style, row `i` holding `values[i]` in `styles[i]`. */
+function paintColumn(
+  styles: readonly CellStyle[],
+  values: VisibleWindowView["values"] = styles.map((_, row) => `r${row}`),
+  {
+    theme = makeTheme(),
+    ...column
+  }: Partial<RenderLayout["columns"][number]> & { theme?: Theme } = {},
+): RecordingCtx {
+  const view: VisibleWindowView = {
+    sheet: "s1",
+    stringPoolEpoch: 0,
+    rows: { start: 0, end: styles.length },
+    cols: [0],
+    values,
+    styleIds: Uint32Array.from(styles, (_, row) => row),
+    styles,
+  };
+  const layout: RenderLayout = {
+    ...makeLayout([{ key: "a", header: "A", width: 100, type: "text", ...column }]),
+    totalRows: styles.length,
+  };
+  return render(view, layout, { ...UNIFORM_VIEWPORT, height: 1_000 }, theme);
+}
+
+it("puts a cell font family first and keeps the theme families as fallbacks", () => {
+  const theme = makeTheme({ font: 'normal 450 13px "Inter Variable", sans-serif' });
+  expect(fontFor(theme, { fontFamily: "Calibri" })).toBe(
+    '450 13px "Calibri", "Inter Variable", sans-serif',
+  );
+  expect(fontFor(theme, { fontFamily: "Times New Roman", bold: true, fontSize: 16 })).toBe(
+    'bold 16px "Times New Roman", "Inter Variable", sans-serif',
+  );
 });
 
-describe("paintFrame number formats", () => {
-  it("lets a cell number format override the column, and General opt out of it", () => {
-    const layout = makeLayout([
-      { key: "amount", header: "Amount", width: 150, type: "number", numberFormat: "$#,##0" },
-    ]);
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows: { start: 0, end: 3 },
-      cols: [0],
-      values: [0.5, 0.5, 0.5],
-      styleIds: Uint32Array.from([0, 1, 2]),
-      styles: [{}, { numberFormat: "0.0%" }, { numberFormat: "General" }],
-    };
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
-      ["$1", "50.0%", "0.5"],
-    );
-  });
-
-  it("narrows a General number to a narrow cell as Excel does, and fills a fixed format with #", () => {
+it.each([
+  {
+    name: "lets a cell number format override the column, and General opt out of it",
+    column: { width: 150, type: "number" as const, numberFormat: "$#,##0" },
+    values: [0.5, 0.5, 0.5],
+    styles: [{}, { numberFormat: "0.0%" }, { numberFormat: "General" }],
+    painted: ["$1", "50.0%", "0.5"],
+  },
+  {
     // 60 px wide: 48 px for text, 6 characters at the stub's 7 px each.
-    const layout = makeLayout([{ key: "n", header: "N", width: 60, type: "general" }]);
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows: { start: 0, end: 3 },
-      cols: [0],
-      values: [1234.5678, 123456789012, 1234567],
-      styleIds: Uint32Array.from([0, 0, 1]),
-      styles: [{}, { numberFormat: "#,##0" }],
-    };
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
-      ["1234.6", "1E+11", "######"],
-    );
-  });
+    name: "narrows a General number to a narrow cell as Excel does, and fills a fixed format with #",
+    column: { width: 60, type: "general" as const },
+    values: [1234.5678, 123456789012, 1234567],
+    styles: [{}, {}, { numberFormat: "#,##0" }],
+    painted: ["1234.6", "1E+11", "######"],
+  },
+])("$name", ({ column, values, styles, painted }) => {
+  const ctx = paintColumn(styles, values, column);
+  const texts = ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text);
+  expect(texts).toEqual([...painted]);
 });
 
-describe("paintFrame variable row heights", () => {
-  it("examines only visible merge intersections with thousands offscreen", () => {
-    const merges = Array.from({ length: 10_000 }, (_, index) => ({
-      r0: 10_000 + index * 2,
-      c0: 0,
-      r1: 10_000 + index * 2,
-      c1: 1,
-    }));
-    merges.push({ r0: 0, c0: 0, r1: 1, c1: 1 });
-    const layout = makeLayout(
-      [
-        { key: "a", header: "A", width: 100, type: "text" },
-        { key: "b", header: "B", width: 100, type: "text" },
-      ],
-      merges,
-    );
-    const view = makeView(new Uint32Array(6), [{}]);
-    resetMergeIndexResourceStatsForTest();
-
-    render(view, layout, UNIFORM_VIEWPORT);
-
-    expect(getMergeIndexResourceStatsForTest()).toMatchObject({
-      indexConstructions: 1,
-    });
-    expect(getMergeIndexResourceStatsForTest().candidatesExamined).toBeLessThanOrEqual(20);
-  });
+it("examines only visible merge intersections with thousands offscreen", () => {
+  const merges = Array.from({ length: 10_000 }, (_, index) => ({
+    r0: 10_000 + index * 2,
+    c0: 0,
+    r1: 10_000 + index * 2,
+    c1: 1,
+  }));
+  merges.push({ r0: 0, c0: 0, r1: 1, c1: 1 });
+  const layout = makeLayout(textColumns([100, 100]), merges);
+  const view = makeView(new Uint32Array(6), [{}]);
+  resetMergeIndexResourceStatsForTest();
+  render(view, layout, UNIFORM_VIEWPORT);
+  const stats = getMergeIndexResourceStatsForTest();
+  expect(stats.indexConstructions).toBe(1);
+  expect(stats.candidatesExamined).toBeLessThanOrEqual(20);
 });
 
-describe("paintFrame column styles", () => {
-  it("lets a per-cell style override the column cellStyle", () => {
-    const COL_FILL = "#ff0000";
-    const CELL_FILL = "#0000ff";
-    const layout = makeLayout([
-      { key: "a", header: "A", width: 100, type: "text", cellStyle: { backgroundColor: COL_FILL } },
-    ]);
-
-    // View-row 0 overrides the column fill with its own background.
-    const styleIds = new Uint32Array(3);
-    styleIds[0] = 1;
-    const view = makeView(styleIds, [{}, { backgroundColor: CELL_FILL }], [0]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    // Row 0 (y = 20) wins with its per-cell blue; rows 1-2 keep the column red.
-    const row0 = ctx.fillRects.find((r) => r.y === 20);
-    expect(row0?.fillStyle).toBe(CELL_FILL);
-    expect(ctx.fillRects.filter((r) => r.fillStyle === COL_FILL).length).toBe(2);
-  });
-
-  it("applies Column.headerStyle over the header defaults", () => {
-    const HEADER_BG = "#112233";
-    const HEADER_FG = "#ffcc00";
-    const theme = makeTheme();
-    const layout = makeLayout([
-      { key: "a", header: "A", width: 100, type: "text" },
-      {
-        key: "b",
-        header: "B",
-        width: 80,
-        type: "text",
-        headerStyle: { backgroundColor: HEADER_BG, color: HEADER_FG },
-      },
-    ]);
-
-    const view = makeView(new Uint32Array(6), [{}]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT, theme);
-
-    // Column B's header gets its own background fill at the column's position.
-    const bg = ctx.fillRects.find((r) => r.fillStyle === HEADER_BG);
-    expect(bg?.x).toBe(100);
-    expect(bg?.w).toBe(80);
-    expect(bg?.h).toBe(theme.headerHeight);
-
-    // Column B's label uses the headerStyle foreground; column A keeps the theme's.
-    expect(ctx.fillTexts.find((t) => t.text === "B")?.fillStyle).toBe(HEADER_FG);
-    expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
-  });
-
-  it("lets text spill through empty cells but stops before occupied neighbours", () => {
-    const layout = makeLayout([
-      { key: "a", header: "A", width: 20, type: "text" },
-      { key: "b", header: "B", width: 24, type: "text" },
-      { key: "c", header: "C", width: 30, type: "text" },
-    ]);
-    const view = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
-    (view.values as string[]).splice(0, 3, "Long label", "", "occupied");
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    expect(ctx.clipRects).toContainEqual({
-      x: 0,
-      y: HEADER_HEIGHT,
-      w: 44,
-      h: ROW_HEIGHT,
-    });
-  });
+it("lets a per-cell style override the column cellStyle", () => {
+  const layout = makeLayout([
+    { key: "a", header: "A", width: 100, type: "text", cellStyle: { backgroundColor: "#ff0000" } },
+  ]);
+  // Row 0 overrides the column fill with its own; rows 1-2 keep the column's.
+  const view = makeView(Uint32Array.from([1, 0, 0]), [{}, { backgroundColor: "#0000ff" }], [0]);
+  const ctx = render(view, layout, UNIFORM_VIEWPORT);
+  expect(ctx.fillRects.find((r) => r.y === HEADER_HEIGHT)?.fillStyle).toBe("#0000ff");
+  expect(ctx.fillRects.filter((r) => r.fillStyle === "#ff0000").length).toBe(2);
 });
 
-describe("paintFrame AutoFilter header text", () => {
-  it("lays out header text before the filter button for every alignment, as Excel does", () => {
-    const layout = makeLayout(
-      ["a", "b", "c", "d"].map((key) => ({ key, header: key, width: 100, type: "text" as const })),
-    );
-    const styleIds = new Uint32Array(12);
-    styleIds[0] = 1;
-    styleIds[1] = 2;
-    const view = makeView(styleIds, [{}, { align: "right" }, { align: "center" }], [0, 1, 2, 3]);
-    (view.values as string[]).splice(0, 4, "Revenue", "Units", "Region of sale", "");
-
-    const ctx = render(view, layout, {
-      ...UNIFORM_VIEWPORT,
-      filterHeader: { row: 0, start: 0, end: 3 },
-    });
-
-    // Each 100 px cell's 16 px button sits 6 px from the right gridline, at
-    // 78 px, and its text box ends 6 px before it, at 72 px.
-    const text = (label: string) => ctx.fillTexts.find((call) => call.text === label);
-    expect(text("Revenue")?.x).toBe(72);
-    expect(text("Units")?.x).toBe(100 + (6 + 72) / 2);
-    // Left-aligned text clips at its text box, not under the button or in the empty cell beside.
-    expect(text("Region of sale")?.clips).toContainEqual({
-      x: 200,
-      y: HEADER_HEIGHT,
-      w: 72,
-      h: ROW_HEIGHT,
-    });
-  });
-
-  it("insets the filter button from the gridline by the text padding, at any row height", () => {
-    for (const h of [20, 24, 32]) {
-      const cell = { x: 0, y: 0, w: 100, h };
-      const button = filterButtonRect(cell);
-      // As much room right of the button as left of the text, and centred in the row.
-      expect(button).toEqual({ x: 100 - 6 - 16, y: (h - 16) / 2, w: 16, h: 16 });
-      // The text box ends that much room again before the button.
-      expect(filterTextRight(cell)).toBe(button.x - 6);
-      // A touch opens the dropdown 24 px wide, over the inset to the gridline.
-      const hit = filterButtonHitRect(cell);
-      expect([hit.x, hit.w, hit.y, hit.h]).toEqual([
-        76,
-        24,
-        Math.max(0, h / 2 - 12),
-        Math.min(h, 24),
-      ]);
-    }
-  });
+it("lets text spill through empty cells but stops before occupied neighbours", () => {
+  const view = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
+  (view.values as string[]).splice(0, 3, "Long label", "", "occupied");
+  const ctx = render(view, makeLayout(textColumns([20, 24, 30])), UNIFORM_VIEWPORT);
+  expect(ctx.clipRects).toContainEqual({ x: 0, y: HEADER_HEIGHT, w: 44, h: ROW_HEIGHT });
 });
 
-describe("layoutTextLines", () => {
-  // One width unit per character, so expected breaks can be worked out by hand.
-  const monospace = {
-    measureText: (text: string) => ({ width: text.length }),
-  } as unknown as Parameters<typeof layoutTextLines>[0];
+it("lays out header text before the filter button for every alignment, as Excel does", () => {
+  const layout = makeLayout(textColumns([100, 100, 100, 100]));
+  const styleIds = Uint32Array.from({ length: 12 }, (_, cell) => (cell < 2 ? cell + 1 : 0));
+  const view = makeView(styleIds, [{}, { align: "right" }, { align: "center" }], [0, 1, 2, 3]);
+  (view.values as string[]).splice(0, 4, "Revenue", "Units", "Region of sale", "");
+  const filterHeader = { row: 0, start: 0, end: 3 };
+  const ctx = render(view, layout, { ...UNIFORM_VIEWPORT, filterHeader });
 
-  it.each([
-    ["breaks after the last whitespace", "aa bb cc", 4, ["aa ", "bb ", "cc"]],
-    ["keeps a whitespace that overflows on its line", "aa bb cc", 5, ["aa bb ", "cc"]],
-    ["breaks a word with no whitespace mid-word", "abcdef", 4, ["abcd", "ef"]],
-    ["gives a too-wide first character its own line", "ab", 0.5, ["a", "b"]],
-    ["keeps empty paragraphs", "a\n\nb", 4, ["a", "", "b"]],
-    [
-      "wraps a long paragraph line by line",
-      "word ".repeat(6).trim(),
-      12,
-      ["word word ", "word word ", "word word"],
-    ],
-    // The fake measure counts code units, so a cluster is wider than the cell.
-    ["keeps an emoji ZWJ sequence whole", "ab 👨‍👩‍👧‍👦 cd", 4, ["ab ", "👨‍👩‍👧‍👦", " cd"]],
-    ["keeps a combining mark with its letter", "cafe\u0301s", 4, ["caf", "e\u0301s"]],
-    [
-      "ends a clustered paragraph whose last line fills the cell",
-      "e\u0301".repeat(6),
-      4,
-      ["e\u0301e\u0301", "e\u0301e\u0301", "e\u0301e\u0301"],
-    ],
-    [
-      "breaks a clustered paragraph after its last whitespace",
-      "e\u0301e\u0301 e\u0301e\u0301 e\u0301",
-      10,
-      ["e\u0301e\u0301 e\u0301e\u0301 ", "e\u0301"],
-    ],
-  ])("%s", (_, text, width, expected) => {
-    expect(layoutTextLines(monospace, text, width)).toEqual(expected);
-  });
+  // Each 100 px cell's 16 px button starts at 82 px, and its text box ends there.
+  const text = (label: string) => ctx.fillTexts.find((call) => call.text === label);
+  expect(text("Revenue")?.x).toBe(82 - 6);
+  expect(text("Units")?.x).toBe(100 + 82 / 2);
+  // Left-aligned text clips at its own button, not under it in the empty cell beside.
+  const clip = { x: 200, y: HEADER_HEIGHT, w: 82, h: ROW_HEIGHT };
+  expect(text("Region of sale")?.clips).toContainEqual(clip);
 });
 
-describe("paintFrame typography and wrapping", () => {
-  it("breaks an overlong token at character boundaries", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
-    const styleIds = Uint32Array.from([1, 0, 0]);
-    const view = makeView(styleIds, [{}, { wrap: true }], [0]);
-    (view.values as string[])[0] = "abcdef";
-    const viewport = {
-      ...UNIFORM_VIEWPORT,
-      rowTops: Float64Array.from([0, 48, 72]),
-      rowHeights: Float64Array.from([48, 24, 24]),
-    };
+// One width unit per character, so expected breaks can be worked out by hand.
+const monospace = {
+  measureText: (text: string) => ({ width: text.length }),
+} as unknown as Parameters<typeof layoutTextLines>[0];
 
-    const ctx = render(view, layout, viewport);
-    const painted = ctx.fillTexts.filter(
-      (call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48,
-    );
-    expect(painted.map((call) => call.text).join("")).toBe("abcdef");
-    expect(painted.length).toBeGreaterThan(1);
-    expect(painted.every((call) => call.x >= 0 && call.x < 26)).toBe(true);
-  });
-
-  it("paints the first lines of a long clustered paragraph without splitting a cluster", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 40, type: "text" }]);
-    const styleIds = Uint32Array.from([1, 0, 0]);
-    const view = makeView(styleIds, [{}, { wrap: true }], [0]);
-    (view.values as string[])[0] = "e\u0301".repeat(20_000);
-    const viewport = {
-      ...UNIFORM_VIEWPORT,
-      rowTops: Float64Array.from([0, 48, 72]),
-      rowHeights: Float64Array.from([48, 24, 24]),
-    };
-
-    const ctx = render(view, layout, viewport);
-    const painted = ctx.fillTexts
-      .filter((call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48)
-      .map((call) => call.text);
-    expect(painted.length).toBeGreaterThan(1);
-    expect(painted.length).toBeLessThan(5);
-    expect(painted.every((line) => /^(?:e\u0301)+$/u.test(line))).toBe(true);
-  });
+it.each([
+  ["breaks after the last whitespace", "aa bb cc", 4, ["aa ", "bb ", "cc"]],
+  ["keeps a whitespace that overflows on its line", "aa bb cc", 5, ["aa bb ", "cc"]],
+  ["breaks a word with no whitespace mid-word", "abcdef", 4, ["abcd", "ef"]],
+  ["gives a too-wide first character its own line", "ab", 0.5, ["a", "b"]],
+  ["keeps empty paragraphs", "a\n\nb", 4, ["a", "", "b"]],
+  [
+    "wraps a long paragraph line by line",
+    "word ".repeat(6).trim(),
+    12,
+    ["word word ", "word word ", "word word"],
+  ],
+  // The fake measure counts code units, so a cluster is wider than the cell.
+  ["keeps an emoji ZWJ sequence whole", "ab 👨‍👩‍👧‍👦 cd", 4, ["ab ", "👨‍👩‍👧‍👦", " cd"]],
+  ["keeps a combining mark with its letter", "cafe\u0301s", 4, ["caf", "e\u0301s"]],
+  [
+    "ends a clustered paragraph whose last line fills the cell",
+    "e\u0301".repeat(6),
+    4,
+    ["e\u0301e\u0301", "e\u0301e\u0301", "e\u0301e\u0301"],
+  ],
+  [
+    "breaks a clustered paragraph after its last whitespace",
+    "e\u0301e\u0301 e\u0301e\u0301 e\u0301",
+    10,
+    ["e\u0301e\u0301 e\u0301e\u0301 ", "e\u0301"],
+  ],
+])("%s", (_, text, width, expected) => {
+  expect(layoutTextLines(monospace, text, width)).toEqual(expected);
 });
 
-describe("paintFrame compiled number formats", () => {
-  it("paints fixed-decimal and named-date values consistently across cells", () => {
-    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows: { start: 0, end: 3 },
-      cols: [0, 1],
-      values: [1234.5, serial, 1234.5, serial, 1234.5, serial],
-      styleIds: new Uint32Array(6),
-      styles: [{}],
-    };
-    const layout = makeLayout([
-      {
-        key: "amount",
-        header: "Amount",
-        width: 120,
-        type: "number",
-        numberFormat: "#,##0.00",
-        numberLocale: "en-US",
-      },
-      {
-        key: "date",
-        header: "Date",
-        width: 120,
-        type: "date",
-        numberFormat: "mmmm d",
-        numberLocale: "en-US",
-      },
-    ]);
+/** Paint `text` wrapped in a `width` px cell 48 px tall and return the lines drawn inside it. */
+function paintWrapped(text: string, width: number): RecordingCtx["fillTexts"] {
+  const layout = makeLayout([{ key: "a", header: "A", width, type: "text" }]);
+  const view = makeView(Uint32Array.from([1, 0, 0]), [{}, { wrap: true }], [0]);
+  (view.values as string[])[0] = text;
+  const viewport = {
+    ...UNIFORM_VIEWPORT,
+    rowTops: Float64Array.from([0, 48, 72]),
+    rowHeights: Float64Array.from([48, 24, 24]),
+  };
+  return render(view, layout, viewport).fillTexts.filter(
+    (call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48,
+  );
+}
 
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-    expect(ctx.fillTexts.filter((call) => call.text === "1,234.50")).toHaveLength(3);
-    expect(ctx.fillTexts.filter((call) => call.text === "July 4")).toHaveLength(3);
-  });
+it("breaks an overlong token at character boundaries", () => {
+  const painted = paintWrapped("abcdef", 26);
+  expect(painted.map((call) => call.text).join("")).toBe("abcdef");
+  expect(painted.length).toBeGreaterThan(1);
 });
 
-describe("scroll blit and damage-band integrity", () => {
-  const blitViewport = (at: Partial<Viewport>): Viewport => ({
-    scrollTop: 0,
-    scrollLeft: 0,
-    width: 400,
-    height: 300,
-    contentRevision: 7,
-    ...at,
-  });
-
-  function runBlit(prev: Partial<Viewport>, next: Partial<Viewport>, dpr = 1, sidewaysSafe = true) {
-    const ctx = makeRecordingCtx();
-    const draws: unknown[][] = [];
-    ctx.drawImage = (...args: unknown[]) => {
-      draws.push(args);
-    };
-    const damage = blitScroll(
-      ctx as unknown as CanvasRenderingContext2D,
-      {} as HTMLCanvasElement,
-      makeTheme(),
-      blitViewport(prev),
-      blitViewport(next),
-      dpr,
-      dpr,
-      sidewaysSafe,
-    );
-    return { damage, draws };
-  }
-
-  it("refuses fractional device-pixel shifts instead of stranding stale glyphs", () => {
-    // A rounded copy plus an exact-offset repaint leaves sub-pixel-shifted
-    // glyph slices that accumulate into ghosting on touchpad scrolls.
-    const { damage, draws } = runBlit({ scrollTop: 100 }, { scrollTop: 100.4 });
-    expect(damage).toBeUndefined();
-    expect(draws).toHaveLength(0);
-  });
-
-  it("still blits exact device-pixel shifts", () => {
-    const { damage, draws } = runBlit({ scrollTop: 100 }, { scrollTop: 103 });
-    expect(draws).toHaveLength(1);
-    expect(damage).toEqual({ x: 0, y: 297, w: 400, h: 3 });
-  });
-
-  it("blits a sideways scroll and leaves only the exposed columns to paint", () => {
-    const right = runBlit({ scrollLeft: 100 }, { scrollLeft: 130 });
-    expect(right.draws).toHaveLength(1);
-    expect(right.damage).toEqual({ x: 370, y: 0, w: 30, h: 300 });
-    const left = runBlit({ scrollLeft: 130 }, { scrollLeft: 100 });
-    expect(left.damage).toEqual({ x: 0, y: 0, w: 30, h: 300 });
-  });
-
-  it("repaints a sideways scroll in full when text can spill or a border shows", () => {
-    const layout = makeLayout(
-      ["A", "B", "C"].map((header) => ({ key: header, header, width: 100, type: "text" as const })),
-    );
-    const dense = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
-    expect(sidewaysBlitSafe(dense, layout)).toBe(true);
-    // Text beside an empty cell spills only as far as the painted window
-    // reaches, so shifted pixels need not match the next full repaint.
-    const values = Array.from(dense.values);
-    values[4] = null;
-    expect(sidewaysBlitSafe({ ...dense, values }, layout)).toBe(false);
-    // Not beside it when the empty cell's column is not the next one.
-    expect(sidewaysBlitSafe({ ...dense, cols: [0, 2, 4], values }, layout)).toBe(true);
-    const bordered = makeView(
-      new Uint32Array(9).fill(1),
-      [{}, { border: { all: { color: "#000000" } } }],
-      [0, 1, 2],
-    );
-    expect(sidewaysBlitSafe(bordered, layout)).toBe(false);
-
-    const sideways = runBlit({ scrollLeft: 100 }, { scrollLeft: 130 }, 1, false);
-    expect(sideways.damage).toBeUndefined();
-    expect(sideways.draws).toHaveLength(0);
-    const vertical = runBlit({ scrollTop: 100 }, { scrollTop: 103 }, 1, false);
-    expect(vertical.draws).toHaveLength(1);
-  });
-
-  it("paints only the cells and header labels inside a sideways strip", () => {
-    const layout = makeLayout(
-      ["A", "B", "C", "D"].map((header) => ({
-        key: header,
-        header,
-        width: 100,
-        type: "text" as const,
-      })),
-    );
-    const view = makeView(new Uint32Array(12), [{}], [0, 1, 2, 3]);
-    // Column D spans x in [300, 400), the strip a sideways blit left.
-    const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme(), {
-      x: 300,
-      y: 0,
-      w: 100,
-      h: 300,
-    });
-    expect(ctx.fillTexts.map((call) => call.text).filter((text) => text !== "x")).toEqual(["D"]);
-    expect(ctx.fillTexts.filter((call) => call.text === "x")).toHaveLength(3);
-  });
-
-  it("paints a row label whose band overlaps the damage strip but whose center does not", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
-    const view = makeView(new Uint32Array(3), [{}], [0]);
-    const theme = makeTheme({ rowHeaderWidth: 40 });
-    // Row 1 band: y in [44, 68), center 56. Strip covers only its lower
-    // quarter [62, 80): center-point culling would skip the label and let the
-    // strip's background erase the glyph half inside it - sliced digits.
-    const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
-    const label = ctx.fillTexts.find((call) => call.text === "2");
-    expect(label?.y).toBe(56);
-  });
+it("paints the first lines of a long clustered paragraph inside its cell, whole clusters only", () => {
+  const painted = paintWrapped("e\u0301".repeat(20_000), 40);
+  expect(painted.length).toBeGreaterThan(1);
+  expect(painted.length).toBeLessThan(5);
+  expect(painted.every((call) => /^(?:e\u0301)+$/u.test(call.text))).toBe(true);
+  expect(painted.every((call) => call.x >= 0 && call.x < 40)).toBe(true);
 });
 
-describe("paintFrame automatic text colour on fills", () => {
-  const LIGHT = makeTheme({
-    fg: "#1f2328",
-    bg: "#ffffff",
-    headerFg: "#1f2328",
-    headerBg: "#f6f8fa",
-  });
-  const DARK = makeTheme({
-    fg: "#e6edf3",
-    bg: "#0d1117",
-    headerFg: "#e6edf3",
-    headerBg: "#161b22",
-  });
-  // Black to white, the #706 repro fill, saturated fills and a translucent fill.
-  const FILLS = [
-    "#000000",
-    "#1e293b",
-    "#475569",
-    "#7f7f7f",
-    "#94a3b8",
-    "#cbd5e1",
-    "#e6f2ec",
-    "#ffffff",
-    "#1d4ed8",
-    "#fde047",
-    "#dc2626",
-    "rgba(0, 0, 0, 0.1)",
-  ];
+const blitViewport = (at: Partial<Viewport>): Viewport => ({
+  scrollTop: 0,
+  scrollLeft: 0,
+  width: 400,
+  height: 300,
+  contentRevision: 7,
+  ...at,
+});
 
-  function paintFills(theme: Theme, styles: readonly CellStyle[]): RecordingCtx {
-    const rows = { start: 0, end: styles.length };
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows,
-      cols: [0],
-      values: styles.map((_, row) => `r${row}`),
-      styleIds: Uint32Array.from(styles, (_, row) => row),
-      styles,
-    };
-    const layout: RenderLayout = {
-      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
-      totalRows: styles.length,
-    };
-    return render(view, layout, { ...UNIFORM_VIEWPORT, height: 1_000 }, theme);
-  }
+function runBlit(prev: Partial<Viewport>, next: Partial<Viewport>, sidewaysSafe = true) {
+  const ctx = makeRecordingCtx();
+  const draws: unknown[][] = [];
+  ctx.drawImage = (...args: unknown[]) => {
+    draws.push(args);
+  };
+  const damage = blitScroll(
+    ctx as unknown as CanvasRenderingContext2D,
+    {} as HTMLCanvasElement,
+    makeTheme(),
+    blitViewport(prev),
+    blitViewport(next),
+    1,
+    1,
+    sidewaysSafe,
+  );
+  return { damage, draws };
+}
 
-  function luminanceOf(css: string): number {
-    const color = parseRgbColor(css);
-    if (!color) throw new Error(`unparsed colour ${css}`);
-    return relativeLuminance(color);
-  }
+// A rounded copy plus an exact-offset repaint leaves sub-pixel-shifted glyph
+// slices that accumulate into ghosting on touchpad scrolls.
+it.each([
+  ["refuses a fractional device-pixel shift", { scrollTop: 100 }, { scrollTop: 100.4 }, undefined],
+  [
+    "blits an exact device-pixel shift",
+    { scrollTop: 100 },
+    { scrollTop: 103 },
+    { x: 0, y: 297, w: 400, h: 3 },
+  ],
+  [
+    "blits a scroll right, leaving the exposed columns",
+    { scrollLeft: 100 },
+    { scrollLeft: 130 },
+    { x: 370, y: 0, w: 30, h: 300 },
+  ],
+  [
+    "blits a scroll left, leaving the exposed columns",
+    { scrollLeft: 130 },
+    { scrollLeft: 100 },
+    { x: 0, y: 0, w: 30, h: 300 },
+  ],
+])("%s", (_, prev, next, damage) => {
+  const blit = runBlit(prev, next);
+  expect(blit.damage).toEqual(damage);
+  expect(blit.draws).toHaveLength(damage ? 1 : 0);
+});
 
-  for (const [name, theme] of [
-    ["light", LIGHT],
-    ["dark", DARK],
-  ] as const) {
-    it(`contrasts automatic text with each fill in the ${name} theme`, () => {
-      const ctx = paintFills(
-        theme,
-        FILLS.map((backgroundColor) => ({ backgroundColor })),
+it("repaints a sideways scroll in full when text can spill or a border shows", () => {
+  const layout = makeLayout(textColumns([100, 100, 100]));
+  const dense = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
+  expect(sidewaysBlitSafe(dense, layout)).toBe(true);
+  // Text beside an empty cell spills only as far as the painted window
+  // reaches, so shifted pixels need not match the next full repaint.
+  const values = Array.from(dense.values);
+  values[4] = null;
+  expect(sidewaysBlitSafe({ ...dense, values }, layout)).toBe(false);
+  // Not beside it when the empty cell's column is not the next one.
+  expect(sidewaysBlitSafe({ ...dense, cols: [0, 2, 4], values }, layout)).toBe(true);
+  const bordered = makeView(
+    new Uint32Array(9).fill(1),
+    [{}, { border: { all: { color: "#000000" } } }],
+    [0, 1, 2],
+  );
+  expect(sidewaysBlitSafe(bordered, layout)).toBe(false);
+
+  const sideways = runBlit({ scrollLeft: 100 }, { scrollLeft: 130 }, false);
+  expect(sideways.damage).toBeUndefined();
+  expect(sideways.draws).toHaveLength(0);
+  const vertical = runBlit({ scrollTop: 100 }, { scrollTop: 103 }, false);
+  expect(vertical.draws).toHaveLength(1);
+});
+
+it("paints only the cells and header labels inside a sideways strip", () => {
+  const layout = makeLayout(textColumns([100, 100, 100, 100]));
+  const view = makeView(new Uint32Array(12), [{}], [0, 1, 2, 3]);
+  // Column D spans x in [300, 400), the strip a sideways blit left.
+  const strip = { x: 300, y: 0, w: 100, h: 300 };
+  const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme(), strip);
+  expect(ctx.fillTexts.map((call) => call.text).filter((text) => text !== "x")).toEqual(["D"]);
+  expect(ctx.fillTexts.filter((call) => call.text === "x")).toHaveLength(3);
+});
+
+it("paints a row label whose band overlaps the damage strip but whose center does not", () => {
+  const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+  const view = makeView(new Uint32Array(3), [{}], [0]);
+  const theme = makeTheme({ rowHeaderWidth: 40 });
+  // Row 1 band: y in [44, 68), center 56. Strip covers only its lower
+  // quarter [62, 80): center-point culling would skip the label and let the
+  // strip's background erase the glyph half inside it - sliced digits.
+  const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
+  const label = ctx.fillTexts.find((call) => call.text === "2");
+  expect(label?.y).toBe(56);
+});
+
+const LIGHT = makeTheme({
+  fg: "#1f2328",
+  bg: "#ffffff",
+  headerFg: "#1f2328",
+  headerBg: "#f6f8fa",
+});
+const DARK = makeTheme({
+  fg: "#e6edf3",
+  bg: "#0d1117",
+  headerFg: "#e6edf3",
+  headerBg: "#161b22",
+});
+// Black to white, the #706 repro fill, saturated fills and a translucent fill.
+const FILLS = [
+  "#000000",
+  "#1e293b",
+  "#475569",
+  "#7f7f7f",
+  "#94a3b8",
+  "#cbd5e1",
+  "#e6f2ec",
+  "#ffffff",
+  "#1d4ed8",
+  "#fde047",
+  "#dc2626",
+  "rgba(0, 0, 0, 0.1)",
+];
+
+function luminanceOf(css: string): number {
+  const color = parseRgbColor(css);
+  if (!color) throw new Error(`unparsed colour ${css}`);
+  return relativeLuminance(color);
+}
+
+for (const [name, theme] of [
+  ["light", LIGHT],
+  ["dark", DARK],
+] as const) {
+  it(`contrasts automatic text with each fill in the ${name} theme`, () => {
+    const ctx = paintColumn(
+      FILLS.map((backgroundColor) => ({ backgroundColor })),
+      undefined,
+      { theme },
+    );
+    FILLS.forEach((fill, row) => {
+      const text = ctx.fillTexts.find((call) => call.text === `r${row}`);
+      if (!text) throw new Error(`row ${row} painted no text`);
+      // Judged over the theme background, as the fill is painted.
+      const fillLuminance = fill.startsWith("rgba")
+        ? luminanceOf(name === "light" ? "#e6e6e6" : "#0c0f15")
+        : luminanceOf(fill);
+      const textLuminance = luminanceOf(text.fillStyle);
+      const darkText = textLuminance < 0.2;
+      // Dark text on light fills, light text on dark fills.
+      expect({ fill, darkText }).toEqual({ fill, darkText: fillLuminance > 0.18 });
+      expect([theme.fg, invert(theme.fg)]).toContain(text.fillStyle);
+      expect(contrastRatio(textLuminance, fillLuminance)).toBeGreaterThanOrEqual(
+        contrastRatio(
+          luminanceOf(text.fillStyle === theme.fg ? invert(theme.fg) : theme.fg),
+          fillLuminance,
+        ),
       );
-      FILLS.forEach((fill, row) => {
-        const text = ctx.fillTexts.find((call) => call.text === `r${row}`);
-        if (!text) throw new Error(`row ${row} painted no text`);
-        // Judged over the theme background, as the fill is painted.
-        const fillLuminance = fill.startsWith("rgba")
-          ? luminanceOf(name === "light" ? "#e6e6e6" : "#0c0f15")
-          : luminanceOf(fill);
-        const textLuminance = luminanceOf(text.fillStyle);
-        const darkText = textLuminance < 0.2;
-        // Dark text on light fills, light text on dark fills.
-        expect({ fill, darkText }).toEqual({ fill, darkText: fillLuminance > 0.18 });
-        expect([theme.fg, invert(theme.fg)]).toContain(text.fillStyle);
-        expect(contrastRatio(textLuminance, fillLuminance)).toBeGreaterThanOrEqual(
-          contrastRatio(
-            luminanceOf(text.fillStyle === theme.fg ? invert(theme.fg) : theme.fg),
-            fillLuminance,
-          ),
-        );
-      });
     });
-  }
-
-  it("keeps the theme foreground without a fill and an explicit text colour on a fill", () => {
-    const ctx = paintFills(DARK, [
-      {},
-      { backgroundColor: "#e6f2ec", color: "#ff00ff" },
-      { bold: true },
-    ]);
-    expect(ctx.fillTexts.find((call) => call.text === "r0")?.fillStyle).toBe(DARK.fg);
-    expect(ctx.fillTexts.find((call) => call.text === "r1")?.fillStyle).toBe("#ff00ff");
-    expect(ctx.fillTexts.find((call) => call.text === "r2")?.fillStyle).toBe(DARK.fg);
   });
+}
 
-  it("contrasts a header label with its own fill", () => {
-    const layout = makeLayout([
-      {
-        key: "a",
-        header: "A",
-        width: 100,
-        type: "text",
-        headerStyle: { backgroundColor: "#fde047" },
-      },
-      { key: "b", header: "B", width: 100, type: "text" },
-    ]);
-    const ctx = render(makeView(new Uint32Array(6), [{}]), layout, UNIFORM_VIEWPORT, DARK);
-    expect(ctx.fillTexts.find((call) => call.text === "A")?.fillStyle).toBe(invert(DARK.headerFg));
-    expect(ctx.fillTexts.find((call) => call.text === "B")?.fillStyle).toBe(DARK.headerFg);
+it("keeps the theme foreground without a fill and an explicit text colour on a fill", () => {
+  const ctx = paintColumn([{}, { backgroundColor: "#e6f2ec", color: "#ff00ff" }], undefined, {
+    theme: DARK,
   });
+  expect(ctx.fillTexts.find((call) => call.text === "r0")?.fillStyle).toBe(DARK.fg);
+  expect(ctx.fillTexts.find((call) => call.text === "r1")?.fillStyle).toBe("#ff00ff");
 });
 
-describe("paintFrame number-format colors", () => {
-  // Excel paints a number in its format section's color, over the cell's font color.
-  it("paints a number in its section's color, over the font color", () => {
-    const styles: CellStyle[] = [
-      { numberFormat: "#,##0;[Red]-#,##0" },
-      { numberFormat: "#,##0;[Red]-#,##0" },
-      { numberFormat: "[Blue]0", color: "#123456" },
-      { numberFormat: "0", color: "#123456" },
-    ];
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows: { start: 0, end: styles.length },
-      cols: [0],
-      values: [-1200, 1200, 7, 8],
-      styleIds: Uint32Array.from(styles, (_, row) => row),
-      styles,
-    };
-    const layout: RenderLayout = {
-      ...makeLayout([{ key: "a", header: "A", width: 100, type: "number" }]),
-      totalRows: styles.length,
-    };
-    const ctx = render(view, layout, { ...UNIFORM_VIEWPORT, height: 1_000 });
-    const colorOf = (text: string) => ctx.fillTexts.find((call) => call.text === text)?.fillStyle;
-    expect([colorOf("-1,200"), colorOf("7"), colorOf("8")]).toEqual([
-      "#ff0000",
-      "#0000ff",
-      "#123456",
-    ]);
-    expect(colorOf("1,200")).not.toBe("#ff0000");
-  });
+it("applies Column.headerStyle, contrasting a label with its own fill", () => {
+  const layout = makeLayout([
+    {
+      key: "a",
+      header: "A",
+      width: 100,
+      type: "text",
+      headerStyle: { backgroundColor: "#fde047" },
+    },
+    {
+      key: "b",
+      header: "B",
+      width: 80,
+      type: "text",
+      headerStyle: { backgroundColor: "#112233", color: "#ffcc00" },
+    },
+    { key: "c", header: "C", width: 100, type: "text" },
+  ]);
+  const view = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
+  const ctx = render(view, layout, UNIFORM_VIEWPORT, DARK);
+  const labelColor = (text: string) => ctx.fillTexts.find((call) => call.text === text)?.fillStyle;
+  expect([labelColor("A"), labelColor("B"), labelColor("C")]).toEqual([
+    invert(DARK.headerFg),
+    "#ffcc00",
+    DARK.headerFg,
+  ]);
+  // Column B's header gets its own background fill at the column's position.
+  const bg = ctx.fillRects.find((r) => r.fillStyle === "#112233");
+  expect(bg && { x: bg.x, w: bg.w, h: bg.h }).toEqual({ x: 100, w: 80, h: HEADER_HEIGHT });
+});
+
+// Excel paints a number in its format section's color, over the cell's font color.
+it("paints a number in its section's color, over the font color", () => {
+  const styles: CellStyle[] = [
+    { numberFormat: "#,##0;[Red]-#,##0" },
+    { numberFormat: "#,##0;[Red]-#,##0" },
+    { numberFormat: "[Blue]0", color: "#123456" },
+    { numberFormat: "0", color: "#123456" },
+  ];
+  const ctx = paintColumn(styles, [-1200, 1200, 7, 8], { type: "number" });
+  const colorOf = (text: string) => ctx.fillTexts.find((call) => call.text === text)?.fillStyle;
+  expect([colorOf("-1,200"), colorOf("7"), colorOf("8")]).toEqual([
+    "#ff0000",
+    "#0000ff",
+    "#123456",
+  ]);
+  expect(colorOf("1,200")).not.toBe("#ff0000");
 });
 
 function invert(css: string): string {

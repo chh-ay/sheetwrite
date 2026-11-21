@@ -51,7 +51,11 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
-import { installExternalLinks, removeExternalLinks } from "../external-link.js";
+import {
+  installExternalLinks,
+  removeExternalLinks,
+  replaceExternalLinks,
+} from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -4057,10 +4061,11 @@ export class StoreDataEngine {
       case "setExternalLinks": {
         // The engine turns references to a removed link sheet back into
         // unresolved references and re-resolves them when it is added, so
-        // replacing the links never changes formula text.
+        // replacing the links never changes formula text. A link that keeps
+        // its sheets and their extents keeps its engine sheets, and only its
+        // changed values are written.
         const previous = this.workbook.externalLinks ?? [];
-        removeExternalLinks(this.wasm, previous);
-        if (!installExternalLinks(this.wasm, patch.links)) {
+        if (!replaceExternalLinks(this.wasm, previous, patch.links)) {
           removeExternalLinks(this.wasm, patch.links);
           installExternalLinks(this.wasm, previous);
           return false;

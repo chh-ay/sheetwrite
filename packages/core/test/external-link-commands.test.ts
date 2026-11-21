@@ -159,4 +159,73 @@ describe("external link commands", () => {
     expect(shown(grid, 2)).toBe(4);
     expect(grid.store.getFormula(at(2))).toBe("=[New.xlsx]Annual!A1+1");
   });
+
+  it("gives a refreshed link new, cleared and error values, and undoes them", () => {
+    const grid = linkedGrid();
+    const sales = link("Sales.xlsx", 5);
+    const budget = (
+      cells: Array<[number, ExternalLink["sheets"][number]["cells"][number]["value"]]>,
+    ) => ({
+      ...link("Budget.xlsx", 0),
+      sheets: [{ name: "Annual", cells: cells.map(([row, value]) => ({ row, col: 0, value })) }],
+    });
+    const refresh = (links: ExternalLink[]) =>
+      grid.applyTransaction({ patches: [{ op: "setExternalLinks", links }] }).status;
+    expect(
+      refresh([
+        budget([
+          [0, 7],
+          [1, 8],
+          [2, 9],
+        ]),
+        sales,
+      ]),
+    ).toBe("applied");
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: at(2), value: { kind: "formula", src: "=[Budget.xlsx]Annual!A2" } },
+        { op: "set", addr: at(3), value: { kind: "formula", src: "=[Budget.xlsx]Annual!A3" } },
+      ],
+    });
+    expect([shown(grid, 0), shown(grid, 2), shown(grid, 3)]).toEqual([7, 8, 9]);
+
+    // Same sheets and extent: A1 becomes an error, A2 is left out, A3 changes.
+    expect(
+      refresh([
+        budget([
+          [0, { error: "#N/A" }],
+          [2, 19],
+        ]),
+        sales,
+      ]),
+    ).toBe("applied");
+    expect([shown(grid, 0), shown(grid, 2), shown(grid, 3), shown(grid, 1)]).toEqual([
+      "#N/A",
+      null,
+      19,
+      10,
+    ]);
+
+    grid.undo();
+    expect([shown(grid, 0), shown(grid, 2), shown(grid, 3)]).toEqual([7, 8, 9]);
+  });
+
+  it("reads a refreshed link whose values reach past its old extent", () => {
+    const grid = linkedGrid();
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: at(2), value: { kind: "formula", src: "=[Budget.xlsx]Annual!A3" } },
+      ],
+    });
+    expect(shown(grid, 2)).toBe("#REF!");
+
+    const links = grid.store.getWorkbook().externalLinks ?? [];
+    const grown = links.map((entry) =>
+      entry.book === "Budget.xlsx"
+        ? { ...entry, sheets: [{ name: "Annual", cells: [{ row: 2, col: 0, value: 4 }] }] }
+        : entry,
+    );
+    grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: grown }] });
+    expect([shown(grid, 0), shown(grid, 2)]).toEqual([null, 4]);
+  });
 });
