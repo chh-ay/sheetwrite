@@ -1,0 +1,18 @@
+PAGES 96; by kind: feature 46, concept 5, guide 36, release 9
+NO FIGURE 6:
+  feature	/docs/features/formulas/formula-assist/
+  guide	/docs/performance/benchmark-protocol/
+  guide	/docs/performance/delivery-size/
+  guide	/docs/performance/memory/
+  guide	/docs/performance/release-comparison/
+  release	/docs/releases/
+WITH FIGURE 90
+IMAGES 102; formats: avif 102
+IMAGES FAILING format/size/alt-attribute 0:
+IMAGES WITH EMPTY alt 0:
+SITE-WIDE <main> IMAGES 106 {"avif":102,"webp":4}
+FAILING 4
+  showcases/formula-assist/index.html /media/formula-assist/wide-poster.webp w=960 h=540 alt=MISSING
+  showcases/formula-assist/index.html /media/formula-assist/wide-dark-poster.webp w=960 h=540 alt=MISSING
+  showcases/formula-assist/index.html /media/formula-assist/narrow-poster.webp w=390 h=700 alt=MISSING
+  showcases/formula-assist/index.html /media/formula-assist/narrow-dark-poster.webp w=390 h=700 alt=MISSING
