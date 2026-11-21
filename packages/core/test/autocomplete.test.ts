@@ -272,6 +272,10 @@ describe("AutoComplete's list", () => {
   });
 
   it("reads the column at the first typed key: text pasted before it lists nothing", async () => {
+    const listed = () =>
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
+        (option) => option.textContent,
+      );
     mount(["North", "Northeast"]);
     at(2);
     key("F2");
@@ -281,14 +285,10 @@ describe("AutoComplete's list", () => {
     field.value = "Nor";
     field.setSelectionRange(3, 3);
     field.dispatchEvent(new InputEvent("input", { inputType: "insertFromPaste", bubbles: true }));
-    expect(host.querySelector(".sheetwrite-entry-list")).toBeNull();
+    expect(listed()).toEqual([]);
 
     await type("t");
-    expect(
-      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
-        (option) => option.textContent,
-      ),
-    ).toEqual(["North", "Northeast"]);
+    expect(listed()).toEqual(["North", "Northeast"]);
   });
 });
 
