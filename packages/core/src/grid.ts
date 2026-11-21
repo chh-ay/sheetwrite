@@ -1325,6 +1325,7 @@ export class GridImpl implements Grid {
       readOnly: this.readOnly,
       presentation: this.presentation,
       columnHeader: (col) => this.columnHeader(col),
+      column: (col) => this.sheet().columns[col],
       focusCell: () => this.selection.focusCell,
       descriptionAt: (row, col) => this.cellDescription(row, col),
       selection: () => this.selection.toSelection(this.activeSheet),

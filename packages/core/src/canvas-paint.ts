@@ -1,7 +1,7 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { automaticTextColor } from "./color-contrast.js";
 import { formatGeneral, GENERAL_WIDTH, isGeneralCode } from "./general-format.js";
-import { formatNumber, numberFormatColor } from "./number-format.js";
+import { cellDisplayText, numberFormatColor } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
@@ -996,14 +996,7 @@ function paintCell(
           (column?.type === "general" && typeof value === "number")
         ? "right"
         : "left");
-  let text =
-    typeof value === "boolean"
-      ? value
-        ? "TRUE"
-        : "FALSE"
-      : numeric
-        ? formatNumber(value, numberFormat, column?.numberLocale)
-        : value;
+  let text = cellDisplayText(value, numberFormat, column?.numberLocale);
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
