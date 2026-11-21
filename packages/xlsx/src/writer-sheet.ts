@@ -255,21 +255,36 @@ function indexSheetRows(sheet: SheetSnapshot) {
 
 /**
  * Add the values each spill shows in the cells it covers, which Excel files
- * keep there. A covered cell with only a style keeps its style.
+ * keep there. A covered cell with only a style keeps its style. Each row's
+ * column index is built once and kept up to date, so many spills on one row
+ * cost no more than their cells.
  */
 function addSpillValues(
   sheet: SheetSnapshot,
   byRow: Map<number, AbsoluteCell[]>,
   spills: readonly SpillOutput[],
+  context: XlsxCodecContext,
 ): void {
+  const columnIndexes = new Map<number, Map<number, number>>();
+  let written = 0;
   for (const spill of spills) {
     const rowEnd = Math.min(spill.row + spill.rows, sheet.rowCount);
     const colEnd = Math.min(spill.col + spill.cols, sheet.columns.length);
     for (let row = spill.row; row < rowEnd; row++) {
-      const cells = byRow.get(row) ?? [];
-      const indexByCol = new Map(cells.map((cell, index) => [cell.col, index]));
+      let cells = byRow.get(row);
+      if (cells === undefined) {
+        cells = [];
+        byRow.set(row, cells);
+      }
+      let indexByCol = columnIndexes.get(row);
+      if (indexByCol === undefined) {
+        indexByCol = new Map(cells.map((cell, index) => [cell.col, index]));
+        columnIndexes.set(row, indexByCol);
+      }
       for (let col = spill.col; col < colEnd; col++) {
         if (row === spill.row && col === spill.col) continue;
+        written += 1;
+        if ((written & 4_095) === 0) checkAbort(context);
         const value = spill.values[(row - spill.row) * spill.cols + col - spill.col] ?? null;
         const index = indexByCol.get(col);
         const existing = index === undefined ? undefined : cells[index];
@@ -279,6 +294,7 @@ function addSpillValues(
             source: { ...existing.source, value: { kind: "literal", value } },
           };
         } else if (value !== null) {
+          indexByCol.set(col, cells.length);
           cells.push({
             row,
             col,
@@ -286,9 +302,10 @@ function addSpillValues(
           });
         }
       }
-      if (cells.length > 0) byRow.set(row, cells);
     }
   }
+  // A row the spills only passed with empty values writes no `<row>`.
+  for (const row of columnIndexes.keys()) if (byRow.get(row)?.length === 0) byRow.delete(row);
 }
 
 interface WorksheetOutlines {
@@ -668,7 +685,7 @@ export function* writeSheet(
   spills: readonly SpillOutput[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = indexSheetRows(sheet);
-  addSpillValues(sheet, byRow, spills);
+  addSpillValues(sheet, byRow, spills, context);
   const arrays: SheetDynamicArrays = {
     spills: new Map(spills.map((spill) => [spillKey(spill.row, spill.col), spill])),
     written: false,

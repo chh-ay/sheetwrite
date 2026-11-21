@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
+  cellA1,
   fromXlsxWorkbook,
   initSheetwrite,
   SheetwriteStore,
@@ -14,6 +15,7 @@ import {
   book,
   cellsOf,
   collectWarnings,
+  columns,
   formula,
   partNames,
   partText,
@@ -27,6 +29,24 @@ const EXCEL_METADATA =
 /** A1 spills `=SEQUENCE(3)` down to A3; B1 holds one value. */
 const spillBook = () =>
   book([sheet("s1", "Spill", [[formula("=SEQUENCE(3)"), formula("=SUM(1,2)")]], { rowCount: 4 })]);
+
+/** A one-sheet file with Excel's dynamic-array metadata; parts are stored, so repeated XML passes the compression-ratio limit. */
+const dynamicArrayFile = (sheetData: string) =>
+  rawXlsx({
+    sheets: [{ xml: worksheet(`<sheetData>${sheetData}</sheetData>`) }],
+    workbookRelationships: `<Relationship Id="rId2" Type="${TRANSITIONAL_REL}/sheetMetadata" Target="metadata.xml"/>`,
+    extraFiles: { "xl/metadata.xml": EXCEL_METADATA },
+    extraOverrides: [
+      '<Override PartName="/xl/metadata.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"/>',
+    ],
+    compressionLevel: 0,
+  });
+
+/** The non-empty cells of a snapshot's first sheet, by position. */
+const filledCells = (snapshot: Parameters<typeof cellsOf>[0]) =>
+  cellsOf(snapshot)
+    .filter(({ value }) => value.kind !== "literal" || value.value !== null)
+    .map(({ row, col, value }) => ({ row, col, value }));
 
 beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
@@ -112,4 +132,70 @@ describe("dynamic arrays in XLSX", () => {
       ["C1", "Excel array formula was neutralized because its range semantics are unsupported"],
     ]);
   });
+
+  it("refuses a dynamic array that overlaps another, with a warning, and keeps its saved values", async () => {
+    const bytes = dynamicArrayFile(
+      '<row r="1"><c r="A1" cm="1"><f t="array" ref="A1:A3">_xlfn.SEQUENCE(3)</f><v>1</v></c></row>' +
+        '<row r="2"><c r="A2" cm="1"><f t="array" ref="A2:A4">_xlfn.SEQUENCE(3)</f><v>1</v></c></row>' +
+        '<row r="3"><c r="A3"><v>2</v></c></row><row r="4"><c r="A4"><v>3</v></c></row>',
+    );
+    const { warnings, onWarning } = collectWarnings();
+
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, { onWarning });
+
+    expect(filledCells(imported)).toEqual([
+      { row: 0, col: 0, value: formula("=SEQUENCE(3)") },
+      { row: 1, col: 0, value: formula("=SEQUENCE(3)") },
+      { row: 3, col: 0, value: { kind: "literal", value: 3 } },
+    ]);
+    expect(warnings.map((warning) => [warning.cell, warning.message])).toEqual([
+      ["A2", "Dynamic array overlaps another spill; the values saved in its cells were kept"],
+    ]);
+  });
+
+  // Security review of #914, finding 2: a spill area that is not the formula's own
+  // was kept for every later row and scanned for every value cell.
+  it("reads a file whose dynamic arrays claim other cells' areas in linear time", async () => {
+    const rows = 100_000;
+    const parts: string[] = [];
+    for (let row = 1; row <= rows; row++) {
+      parts.push(
+        `<row r="${row}"><c r="A${row}" cm="1"><f t="array" ref="A1:A1048576">1</f></c><c r="B${row}"><v>1</v></c></row>`,
+      );
+    }
+    const bytes = dynamicArrayFile(parts.join(""));
+
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+
+    const column = cellsOf(imported).filter((cell) => cell.col === 1);
+    expect(column.length).toBe(rows);
+    expect(column.every((cell) => cell.value.kind === "literal" && cell.value.value === 1)).toBe(
+      true,
+    );
+  }, 20_000);
+
+  // Security review of #914, finding 3: each spill rebuilt a column map of its whole row.
+  it("writes a row of many spills in linear time", async () => {
+    const width = 4_096;
+    const height = 30;
+    const snapshot = book([
+      sheet("s1", "Wide", [Array.from({ length: width }, () => formula(`=SEQUENCE(${height})`))], {
+        rowCount: height + 1,
+        columns: columns(width),
+      }),
+    ]);
+    const values = Array.from({ length: height }, (_, index) => index + 1);
+    const spills = new Map([
+      [
+        "s1",
+        Array.from({ length: width }, (_, col) => ({ row: 0, col, rows: height, cols: 1, values })),
+      ],
+    ]);
+
+    const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot, undefined, { spills });
+
+    const xml = partText(bytes, "xl/worksheets/sheet1.xml");
+    const last = cellA1(height - 1, width - 1);
+    expect(xml).toContain(`<c r="${last}"><v>${height}</v></c>`);
+  }, 20_000);
 });

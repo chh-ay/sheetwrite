@@ -2,11 +2,12 @@ import type { CellValue, SheetSnapshot, SnapshotCell } from "@sheetwrite/core";
 import { cellA1 } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
-import { type CellRect, parseCellRect, parseCellReference } from "./cell-reference.js";
+import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { linkedFormula } from "./external-links.js";
 import { MAIN_NAMESPACES, META_MARKER, META_STEM } from "./format.js";
 import { OpcPackage } from "./opc.js";
 import { lastColumnDeclarations } from "./reader-columns.js";
+import { SpillAreas } from "./reader-spill-areas.js";
 import type { WorkbookSheetReference, ReaderResourceUsage, ColumnCells } from "./reader-types.js";
 import { CellStyleIndices } from "./reader-types.js";
 import { readerFailure, parseUnsigned, literalFromCell } from "./reader-values.js";
@@ -111,7 +112,7 @@ export async function ingestWorksheetRows(
   const inheritedColumnStyles = new Map<number, string>();
   // The areas of the dynamic arrays read so far that reach the current row:
   // Sheetwrite computes the values Excel saved in their covered cells.
-  let spillAreas: CellRect[] = [];
+  let spillAreas: SpillAreas | undefined;
   let columnStylesRead = false;
   let columnsPrecedeRows = false;
   const cellsBeforeSheet = usage.cells;
@@ -180,7 +181,7 @@ export async function ingestWorksheetRows(
     const rowStyle = xmlBoolean(xmlAttribute(rowElement, "customFormat"))
       ? xmlAttribute(rowElement, "s")
       : undefined;
-    if (spillAreas.length > 0) spillAreas = spillAreas.filter((area) => area.r1 >= row);
+    spillAreas?.expire(row);
     let inferredCol = 0;
     for (const cellElement of xmlChildren(rowElement, "c")) {
       const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
@@ -208,8 +209,28 @@ export async function ingestWorksheetRows(
           formulaType === "array" &&
           cellMetadata !== undefined &&
           context.dynamicArrayMetadata?.has(cellMetadata) === true;
-        const spillArea = dynamicArray && parseCellRect(xmlAttribute(formulaElement, "ref") ?? "");
-        if (spillArea) spillAreas.push(spillArea);
+        const spillArea = dynamicArray
+          ? parseCellRect(xmlAttribute(formulaElement, "ref") ?? "")
+          : undefined;
+        // Excel writes a spill's area from its formula's cell; another area
+        // is not this formula's, and its covered cells keep their values.
+        if (spillArea && spillArea.r0 === address.row && spillArea.c0 === address.col) {
+          spillAreas ??= new SpillAreas(context.limits.maxColumnsPerSheet);
+          const admitted = spillAreas.add({
+            ...spillArea,
+            r1: Math.min(spillArea.r1, context.limits.maxRowsPerSheet - 1),
+            c1: Math.min(spillArea.c1, context.limits.maxColumnsPerSheet - 1),
+          });
+          if (!admitted) {
+            emitWarning(rowContext, {
+              code: "unsupported-feature",
+              message:
+                "Dynamic array overlaps another spill; the values saved in its cells were kept",
+              sheet: reference.name,
+              cell: addressText,
+            });
+          }
+        }
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
           if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
@@ -247,15 +268,7 @@ export async function ingestWorksheetRows(
         } else {
           value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
         }
-      } else if (
-        spillAreas.some(
-          (area) =>
-            address.col >= area.c0 &&
-            address.col <= area.c1 &&
-            address.row >= area.r0 &&
-            (address.row > area.r0 || address.col > area.c0),
-        )
-      ) {
+      } else if (spillAreas?.covers(address.row, address.col)) {
         value = null;
       } else {
         value = literalFromCell(
