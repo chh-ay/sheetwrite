@@ -248,18 +248,26 @@ function syncStorageFailure(error: unknown, context?: SheetwriteErrorContext): S
 }
 
 const MUTATION_ID_RANDOM_BYTES = 16;
+const BYTE_VALUES = 256;
+
+/** Two lowercase hex digits per byte value, made at the first default mutation ID. */
+let hexByteDigits: readonly string[] | undefined;
 
 /**
  * Random default mutation ID. Servers deduplicate by this ID, so two clients
  * must never produce the same one; a clock and a per-page counter can collide.
- * `getRandomValues` also works on pages without a secure context.
+ * `getRandomValues` also works on pages without a secure context. Every commit
+ * makes one, so the digits come from a table instead of formatting each byte.
  */
 function createDefaultMutationId(): string {
   const bytes = new Uint8Array(MUTATION_ID_RANDOM_BYTES);
   globalThis.crypto.getRandomValues(bytes);
+  hexByteDigits ??= Array.from({ length: BYTE_VALUES }, (_, byte) =>
+    byte.toString(16).padStart(2, "0"),
+  );
 
   let id = "sheetwrite-";
-  for (const byte of bytes) id += byte.toString(16).padStart(2, "0");
+  for (const byte of bytes) id += hexByteDigits[byte] ?? "";
   return id;
 }
 
@@ -563,7 +571,7 @@ export class SyncCoordinator {
     if (!record || record.status === "conflicted" || record.status === "sending") return null;
     this.queue.setStatus(record, "sending");
     this.emitState();
-    this.emit({ type: "sending", mutation: cloneRecord(record) });
+    this.emitMutation("sending", record);
     const controller = new AbortController();
     this.activeSends.set(clientMutationId, controller);
 
@@ -1234,12 +1242,12 @@ export class SyncCoordinator {
 
       if (this.options.pendingStorage) {
         this.emitState();
-        this.emit({ type: "persisting", mutation: cloneRecord(record) });
+        this.emitMutation("persisting", record);
         const pending = this.schedulePersistence(record);
         this.persistence.set(record.clientMutationId, pending);
       } else {
         this.emitState();
-        this.emit({ type: "pending", mutation: cloneRecord(record) });
+        this.emitMutation("pending", record);
       }
     }
   }
@@ -1572,7 +1580,7 @@ export class SyncCoordinator {
       if (this.destroyed || !this.queue.has(record.clientMutationId)) return;
       this.queue.setStatus(record, "pending");
       this.emitState();
-      this.emit({ type: "pending", mutation: cloneRecord(record) });
+      this.emitMutation("pending", record);
     } catch (error) {
       if (this.destroyed) return;
       const failure = syncStorageFailure(error, {
@@ -2012,7 +2020,20 @@ export class SyncCoordinator {
   }
 
   private emitState(): void {
+    if (this.listeners.size === 0) return;
     this.emit({ type: "state", state: this.state });
+  }
+
+  /**
+   * Announce `record` as `type`. Listeners get a copy, made only when someone
+   * listens: a queue without listeners copies nothing per commit.
+   */
+  private emitMutation(
+    type: "persisting" | "pending" | "sending",
+    record: SyncMutationRecord,
+  ): void {
+    if (this.listeners.size === 0) return;
+    this.emit({ type, mutation: cloneRecord(record) });
   }
 
   private emit(event: SyncCoordinatorEvent): void {
