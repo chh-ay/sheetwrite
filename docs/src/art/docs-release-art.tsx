@@ -1,5 +1,6 @@
 // The visual summary of each release post: one tile per highlight, led by its
-// number or its one-word change. Every number and claim comes from that
+// number or its one-word change, and for the Releases index one tile per
+// release with its first highlight. Every number and claim comes from that
 // release's Highlights and Changes sections.
 import type { JSX } from "solid-js";
 
@@ -123,10 +124,42 @@ const RELEASES: readonly Release[] = [
   },
 ];
 
-/** Release summaries by the name a placement uses: `release-<version>`. */
-export const RELEASE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = Object.fromEntries(
-  RELEASES.map((release) => [
-    `release-${release.version}`,
-    () => <ReleaseSummary release={release} />,
-  ]),
-);
+/** The Releases index: one tile per release, newest first, with its first highlight. */
+function ReleaseHeadlines() {
+  const newestFirst = [...RELEASES].reverse();
+  const headline = (release: Release) => {
+    const [first] = release.highlights;
+    if (first === undefined) throw new Error(`Release ${release.version} has no highlights`);
+    return first;
+  };
+  return (
+    <TileFigure
+      columns={4}
+      narrowColumns={2}
+      text={{
+        title: "The headline of each release",
+        description: newestFirst
+          .map((release) => {
+            const [lead, title, lines] = headline(release);
+            return `${release.version}: ${title}, ${lead}. ${lines.join(" ")}`;
+          })
+          .join(" "),
+      }}
+      tiles={newestFirst.map((release) => {
+        const [, title, lines] = headline(release);
+        return { eyebrow: release.version, title, lines };
+      })}
+    />
+  );
+}
+
+/** Release summaries by the name a placement uses: `release-<version>`, and `releases` for the index. */
+export const RELEASE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
+  ...Object.fromEntries(
+    RELEASES.map((release) => [
+      `release-${release.version}`,
+      () => <ReleaseSummary release={release} />,
+    ]),
+  ),
+  releases: ReleaseHeadlines,
+};
