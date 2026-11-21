@@ -575,12 +575,13 @@ impl CellStore {
             Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
             Ast::Func(Func::TrimRange, args) => self.eval_trim_range(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Choose, _) => self.eval_branches_family(ast, sheet, pass, depth + 1),
-            Ast::Func(Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch, _)
-                if ast_produces_array(ast, pass.shapes(self.name_scope(sheet))) =>
-            {
-                self.eval_branches_family(ast, sheet, pass, depth + 1)
-            }
+            // One out-of-line call: the check that IF and the other branch
+            // functions produce an array stays in the family, out of the
+            // evaluator this dispatch is inlined into.
+            Ast::Func(
+                Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
+                _,
+            ) => self.eval_branches_family(ast, sheet, pass, depth + 1)?,
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }

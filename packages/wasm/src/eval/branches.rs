@@ -198,12 +198,31 @@ struct LiftedCall<'a> {
 type ArrayShape = (usize, usize, usize);
 
 impl CellStore {
-    /// An IF, IFERROR, IFNA, IFS, SWITCH or CHOOSE `call` as an array: the
-    /// argument it takes, or the lifted call when a selecting argument is
-    /// an array. Any other node is #VALUE!. Out of line, like every
-    /// `*_family` handler, so the array path adds nothing to `eval_ast`.
+    /// An IF, IFERROR, IFNA, IFS, SWITCH or CHOOSE `call` as an array, or
+    /// `None` when it is a scalar expression. CHOOSE always answers, so
+    /// `ROWS(CHOOSE(1,5))` is 1. Out of line, like every `*_family` handler,
+    /// so neither the shape check nor the array path adds to the evaluator
+    /// the array dispatch is inlined into.
     #[inline(never)]
     pub(super) fn eval_branches_family(
+        &self,
+        call: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<Result<EvalMatrix, FormulaError>> {
+        if !matches!(call, Ast::Func(Func::Choose, _))
+            && !ast_produces_array(call, pass.shapes(self.name_scope(sheet)))
+        {
+            return None;
+        }
+        Some(self.eval_branches(call, sheet, pass, depth))
+    }
+
+    /// A branching `call` as an array: the argument it takes, or the lifted
+    /// call when a selecting argument is an array. Any other node is
+    /// #VALUE!.
+    fn eval_branches(
         &self,
         call: &Ast,
         sheet: usize,
