@@ -920,8 +920,8 @@ export interface GridConfig {
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
   /**
    * Let the user change the built-in keys in a Keyboard shortcuts panel
-   * (default false). It opens from File › Options in the ribbon, from the gear
-   * of the compact ribbon, and from `grid.openKeyboardSettings()`. Pass an
+   * (default false). It opens from File › Options in the ribbon, from Shortcuts
+   * in the compact ribbon's tab row, and from `grid.openKeyboardSettings()`. Pass an
    * object to lock some actions. See {@link KeyboardSettingsOptions}.
    */
   keyboardSettings?: boolean | KeyboardSettingsOptions;

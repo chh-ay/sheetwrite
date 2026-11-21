@@ -14,18 +14,20 @@ export interface PopupPlacement {
 /**
  * Viewport position of a popup of `size` anchored to `anchor`. The popup is
  * left-aligned with its anchor, sits on `placement.side` when it fits there,
- * and stays `POPUP_VIEWPORT_MARGIN` inside the viewport.
+ * and stays `POPUP_VIEWPORT_MARGIN` inside the viewport's visible area, which
+ * leaves out the page's scrollbars.
  */
 export function popupPosition(
   anchor: Pick<DOMRectReadOnly, "left" | "top" | "bottom">,
   size: Pick<DOMRectReadOnly, "width" | "height">,
   placement: PopupPlacement,
 ): { left: number; top: number } {
-  const maxLeft = window.innerWidth - size.width - POPUP_VIEWPORT_MARGIN;
+  const { clientWidth, clientHeight } = document.documentElement;
+  const maxLeft = clientWidth - size.width - POPUP_VIEWPORT_MARGIN;
   const left = Math.max(POPUP_VIEWPORT_MARGIN, Math.min(anchor.left, maxLeft));
   const below = anchor.bottom + placement.gap;
   const above = anchor.top - size.height - placement.gap;
-  const fitsBelow = below + size.height <= window.innerHeight - POPUP_VIEWPORT_MARGIN;
+  const fitsBelow = below + size.height <= clientHeight - POPUP_VIEWPORT_MARGIN;
   const fitsAbove = above >= POPUP_VIEWPORT_MARGIN;
   const preferBelow =
     placement.side === "below" ? fitsBelow || !fitsAbove : !fitsAbove && fitsBelow;

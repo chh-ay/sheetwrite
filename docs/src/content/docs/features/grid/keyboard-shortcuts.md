@@ -3,7 +3,7 @@ title: Keyboard shortcuts panel
 description: Let users change the grid's keys in a Keyboard shortcuts panel, and store their choice.
 ---
 
-The Keyboard shortcuts panel lets the user change the keys of the grid's built-in commands. It opens from File › Options in the ribbon, from the gear of the compact ribbon, or from your own menu. Excel's keys stay the defaults: a user who changes nothing gets exactly the keys on [Selection and keyboard](/docs/features/grid/selection-and-keyboard/#keyboard-navigation).
+The Keyboard shortcuts panel lets the user change the keys of the grid's built-in commands. It opens from File › Options in the ribbon, from **Shortcuts** in the compact ribbon's tab row, or from your own menu. Excel's keys stay the defaults: a user who changes nothing gets exactly the keys on [Selection and keyboard](/docs/features/grid/selection-and-keyboard/#keyboard-navigation).
 
 Shortcuts are a user preference, not part of the workbook. The grid applies each change at once and emits `key-bindings-change`; you store the bindings and pass them back through `config.keyboard.bindings`.
 

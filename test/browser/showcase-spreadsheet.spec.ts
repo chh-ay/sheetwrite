@@ -160,17 +160,20 @@ test("Tab stays in the sheet and F6 cycles the shell's parts; the ribbon layout 
   expect(await panel.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(
     fullHeight,
   );
-  // At this width groups fold into dropdowns, and all of them stay on one row.
+  // At this width groups fold into dropdowns, and all those shown stay on one
+  // row (any that still do not fit fold into More).
   await expect(editing).toHaveAttribute("data-size", "collapsed");
   const rows = await panel.locator(".sheetwrite-ribbon-group").evaluateAll((elements) =>
-    elements.map((element) => {
+    elements.flatMap((element) => {
       const box = element.getBoundingClientRect();
-      return Math.round(box.top + box.height / 2);
+      return box.height === 0 ? [] : [Math.round(box.top + box.height / 2)];
     }),
   );
   expect(rows.length).toBeGreaterThan(0);
   expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(2);
-  await editing.getByRole("button", { name: /Editing/ }).click();
+  // Editing, the last group, is one of those folded into More.
+  await expect(editing).toHaveAttribute("data-overflow", "");
+  await panel.getByRole("button", { name: "More groups" }).click();
   await expect(page.getByRole("button", { name: "AutoSum" })).toBeVisible();
 
   await page.getByRole("button", { name: "Wide" }).click();
