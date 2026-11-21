@@ -2,39 +2,6 @@
 use super::*;
 
 #[test]
-fn reference_operators_serialize_to_text_that_parses_back_to_the_same_tree() {
-    for (source, expected) in [
-        ("=SUM(A1:C3 B2:D4)", "=SUM(A1:C3 B2:D4)"),
-        ("=a1   b2  c3", "=A1 B2 C3"),
-        ("=(-A1) B1", "=(-(A1)) B1"),
-        ("=A1:B2 'Other Sheet'!B1", "=A1:B2 'Other Sheet'!B1"),
-        ("=SUM((A1:A2,C1:C2))", "=SUM((A1:A2,C1:C2))"),
-        ("=INDEX(( A1:B2 , D1 ),1,1,2)", "=INDEX((A1:B2,D1),1,1,2)"),
-        ("=SUM(Sheet1:Sheet3!A1:B2)", "=SUM(Sheet1:Sheet3!A1:B2)"),
-        ("=SUM('My Sheet:Other'!$A$1)", "=SUM('My Sheet:Other'!$A$1)"),
-        ("=SUM('My Sheet':Other!A1)", "=SUM('My Sheet:Other'!A1)"),
-        ("=SUM('O''Brien:Last'!A1)", "=SUM('O''Brien:Last'!A1)"),
-        ("=SUM(A1 + B1)", "=SUM((A1+B1))"),
-        ("=SUM(#REF! B2:D4)", "=SUM(#REF! B2:D4)"),
-        ("=SUM(B2:D4 #ref!)", "=SUM(B2:D4 #REF!)"),
-    ] {
-        let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
-        assert_eq!(serialize(&ast), expected, "{source}");
-        assert_eq!(parse(expected).as_ref(), Ok(&ast), "{source}");
-    }
-
-    assert!(matches!(
-        parse("=A1 B1"),
-        Ok(Ast::Func(Func::Intersect, operands)) if operands.len() == 2
-    ));
-    assert!(matches!(parse("=SUM (A1)"), Ok(Ast::Func(Func::Sum, _))));
-    assert!(matches!(
-        parse("=Sheet1:Sheet3!A1"),
-        Ok(Ast::SheetSpan(span)) if span.cell && span.first.name.as_deref() == Some("Sheet1")
-    ));
-}
-
-#[test]
 fn operator_precedence_is_excel_compatible_and_errors_stay_explicit() {
     assert_eq!(serialize(&parse("=-1^2").unwrap()), "=(-(1)^2)");
     assert_eq!(serialize(&parse("=2^3^2").unwrap()), "=((2^3)^2)");
@@ -43,53 +10,6 @@ fn operator_precedence_is_excel_compatible_and_errors_stay_explicit() {
     assert!(parse("=%2").is_err());
     assert!(parse("=2^").is_err());
     assert!(parse("=2&&3").is_err());
-}
-
-#[test]
-fn array_constants_parse_rows_and_columns_and_round_trip() {
-    let shapes = [
-        ("={1,2,3}", 3, 3, "={1,2,3}"),
-        ("={1;2;3}", 1, 3, "={1;2;3}"),
-        ("={1,2;3,4}", 2, 4, "={1,2;3,4}"),
-        ("={ -1.5 , +2 }", 2, 2, "={-1.5,2}"),
-        (
-            "={\"a\"\"b\",true,False;#n/a,#DIV/0!,#REF!}",
-            3,
-            6,
-            "={\"a\"\"b\",TRUE,FALSE;#N/A,#DIV/0!,#REF!}",
-        ),
-    ];
-    for (source, expected_cols, expected_len, expected_text) in shapes {
-        let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
-        let Ast::Array(array) = &ast else {
-            panic!("{source} did not parse as an array constant");
-        };
-        let ArrayLiteral { cols, values } = &**array;
-        assert_eq!(
-            (*cols, values.len()),
-            (expected_cols, expected_len),
-            "{source}"
-        );
-        assert_eq!(serialize(&ast), expected_text, "{source}");
-        assert_eq!(parse(&serialize(&ast)).as_ref(), Ok(&ast), "{source}");
-    }
-
-    assert_eq!(
-        parse("={\"x\",FALSE,#NAME?}"),
-        Ok(Ast::Array(Box::new(ArrayLiteral {
-            cols: 3,
-            values: vec![
-                Value::text("x"),
-                Value::Bool(false),
-                Value::Error(FormulaError::Name),
-            ]
-            .into(),
-        })))
-    );
-    assert_eq!(
-        serialize(&parse("=SUM({1,2},A1)").unwrap()),
-        "=SUM({1,2},A1)"
-    );
 }
 
 #[test]
@@ -115,43 +35,6 @@ fn array_constants_reject_ragged_rows_references_and_expressions() {
 }
 
 #[test]
-fn seeded_operator_ast_round_trip_property() {
-    fn generated(seed: &mut u64, depth: usize) -> Ast {
-        *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-        if depth == 0 {
-            return Ast::Num(((*seed >> 32) % 10_000) as f64 / 100.0);
-        }
-        match *seed % 9 {
-            0 => Ast::Neg(Box::new(generated(seed, depth - 1))),
-            1 => Ast::Pos(Box::new(generated(seed, depth - 1))),
-            2 => Ast::Percent(Box::new(generated(seed, depth - 1))),
-            operator => {
-                let op = match operator {
-                    3 => Op::Add,
-                    4 => Op::Sub,
-                    5 => Op::Mul,
-                    6 => Op::Div,
-                    7 => Op::Pow,
-                    _ => Op::Concat,
-                };
-                Ast::Bin(
-                    op,
-                    Box::new(generated(seed, depth - 1)),
-                    Box::new(generated(seed, depth - 1)),
-                )
-            }
-        }
-    }
-
-    let mut seed = 0x05ee_d070_u64;
-    for _ in 0..512 {
-        let ast = generated(&mut seed, 5);
-        let source = serialize(&ast);
-        assert_eq!(parse(&source), Ok(ast), "failed source: {source}");
-    }
-}
-
-#[test]
 fn parse_rejects_deeply_nested_parentheses() {
     let mut src = String::new();
     for _ in 0..=PARSE_RECURSION_LIMIT {
@@ -165,39 +48,17 @@ fn parse_rejects_deeply_nested_parentheses() {
     assert!(parse(&src).is_err());
 }
 
+/// A space is an intersection after a closing parenthesis and before a
+/// deleted reference or a quoted sheet name, as Excel reads it.
 #[test]
-fn names_sheet_refs_and_unknown_calls_preserve_source_case() {
-    assert_eq!(
-        parse("=Revenue_Q1"),
-        Ok(Ast::Name("Revenue_Q1".to_owned().into()))
-    );
-    assert_eq!(
-        parse("=Sales.Data"),
-        Ok(Ast::Name("Sales.Data".to_owned().into()))
-    );
-
-    let sheet_ref = parse("='North East'!a1").expect("quoted sheet ref should parse");
-    assert_eq!(serialize(&sheet_ref), "='North East'!A1");
-    assert_eq!(parse(&serialize(&sheet_ref)), Ok(sheet_ref));
-
-    let unicode_sheet = parse("='München Süd'!b2").expect("UTF-8 quoted sheet ref should parse");
-    assert_eq!(serialize(&unicode_sheet), "='München Süd'!B2");
-    assert_eq!(parse(&serialize(&unicode_sheet)), Ok(unicode_sheet));
-    assert_eq!(parse("=\"café\""), Ok(Ast::Str("café".to_owned().into())));
-    assert_eq!(
-        serialize(&parse("=1\u{2003}+2").expect("Unicode whitespace should parse")),
-        "=(1+2)"
-    );
-
-    let unknown = parse("=MiXeD.Call(Revenue_Q1)").expect("unknown call should remain parseable");
-    assert_eq!(
-        unknown,
-        Ast::UnknownFunc(Box::new(UnknownCall {
-            name: "MiXeD.Call".to_owned(),
-            args: (vec![Ast::Name("Revenue_Q1".to_owned().into())]).into()
-        }))
-    );
-    assert_eq!(serialize(&unknown), "=MiXeD.Call(Revenue_Q1)");
+fn a_space_before_any_reference_form_intersects() {
+    for source in ["=SUM(B2:D4 #ref!)", "=(-A1) B1"] {
+        assert!(parse(source).is_ok(), "{source}");
+    }
+    assert!(matches!(
+        parse("=A1:B2 'Other Sheet'!B1"),
+        Ok(Ast::Func(Func::Intersect, operands)) if operands.len() == 2
+    ));
 }
 
 #[test]

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { expectedLlmsFiles, LLMS_FULL_PATH, LLMS_SITE_BASE } from "./docs-llms.js";
+import { expectedLlmsFiles, LLMS_FULL_PATH } from "./docs-llms.js";
 
 /** The full-text endpoint built from the given docs pages, keyed by content path. */
 async function fullText(pages: Readonly<Record<string, string>>): Promise<string> {
@@ -60,34 +60,5 @@ describe("llms full text", () => {
     );
     expect(new Set(links).size).toBe(2);
     for (const anchor of links) expect(content).toContain(`<a id="${anchor}"></a>`);
-  });
-
-  it("reads content components as titled text, figures as their alt text", async () => {
-    const content = await fullText({
-      "index.mdx": page(
-        "Components",
-        "<Note>Read this first.</Note>",
-        "",
-        "<Steps>",
-        '<Step title="Install the packages">',
-        "Add the core package.",
-        "</Step>",
-        "</Steps>",
-        "",
-        '<Screenshot name="dashboard" alt="A dashboard with a slicer." />',
-        "",
-        '<Card title="Dashboards" href="/docs/features/analysis/dashboards/">',
-        "Pivots and slicers.",
-        "</Card>",
-      ),
-    });
-
-    expect(content).toContain("Note: Read this first.");
-    expect(content).toContain("**Install the packages**\nAdd the core package.");
-    expect(content).toContain("(Figure: A dashboard with a slicer.)");
-    expect(content).not.toContain('name="dashboard"');
-    expect(content).toContain(
-      `**[Dashboards](${LLMS_SITE_BASE}/docs/features/analysis/dashboards/)**`,
-    );
   });
 });

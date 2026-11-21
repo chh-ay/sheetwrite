@@ -13,13 +13,13 @@ import {
   toXlsxWorkbookStream,
   type Workbook,
 } from "@sheetwrite/core";
-import { deflateSync, strToU8, unzipSync } from "fflate";
+import { deflateSync, strToU8, unzipSync, Zip, ZipDeflate, type ZipInputFile } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
-import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
-import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
+import { storedEntryFromBytes, validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
+import { FIXED_ZIP_TIME, rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 import { book, cellsOf, patchEntries, sheet, sheetAt } from "./workbook-fixtures.js";
 
 beforeAll(async () => {
@@ -296,7 +296,7 @@ const LOCAL_UNCOMPRESSED_SIZE = 22;
 const ZIP64_SENTINEL = 0xffffffff;
 
 describe("ZIP raw entries", () => {
-  it("rejects forged retained metadata before emitting archive bytes", () => {
+  it("rejects forged retained metadata before emitting archive bytes", async () => {
     const context = createCodecContext("export");
     const data = deflateSync(strToU8("hello"));
     const forged = {
@@ -307,9 +307,9 @@ describe("ZIP raw entries", () => {
       data,
     };
     expect(() => validateStoredEntry(forged, context)).toThrow(/CRC/);
-    expect(() =>
+    await expect(
       writeZip([{ name: "x.bin", stored: { ...forged, uncompressedSize: 4 } }], context),
-    ).toThrow(/size/);
+    ).rejects.toThrow(/size/);
   });
 
   it("reports ZIP64 size sentinels as unsupported and checks declared ratios before any local header", async () => {
@@ -333,6 +333,180 @@ describe("ZIP raw entries", () => {
         createCodecContext("import", { resourceLimits: { maxCompressionRatio: 2 } }),
       ),
     ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
+  });
+});
+
+/** A ZIP with one deflate entry `a.xml` whose compressed bytes are `payload`, declared as `content`. */
+function deflateEntryZip(payload: Uint8Array<ArrayBuffer>, content: Uint8Array): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const archive = new Zip((error, chunk) => {
+    if (error) throw error;
+    chunks.push(chunk);
+  });
+  const file: ZipInputFile = {
+    filename: "a.xml",
+    compression: 8,
+    size: content.length,
+    crc: Bun.hash.crc32(content),
+    mtime: FIXED_ZIP_TIME,
+  };
+  archive.add(file);
+  file.ondata?.(null, payload, true);
+  archive.end();
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+async function readEntry(archive: Uint8Array): Promise<Uint8Array> {
+  return (await ZipReader.open(archive, createCodecContext("import"))).read("a.xml");
+}
+
+describe("ZIP inflate", () => {
+  // Many codec input slices, so zlib produces output before it fails.
+  const content = strToU8(letters(300_000));
+  const stream = deflateSync(content);
+
+  it("inflates deflate entries with the runtime DecompressionStream", async () => {
+    const runtime = globalThis.DecompressionStream;
+    const formats: string[] = [];
+    globalThis.DecompressionStream = class extends runtime {
+      constructor(format: CompressionFormat) {
+        formats.push(format);
+        super(format);
+      }
+    };
+    try {
+      expect(await readEntry(deflateEntryZip(stream, content))).toEqual(content);
+    } finally {
+      globalThis.DecompressionStream = runtime;
+    }
+    expect(formats).toContain("deflate-raw");
+  });
+
+  it("accepts and rejects deflate streams as fflate does", async () => {
+    // zlib rejects bytes after the final block; fflate ignores them.
+    const trailing = new Uint8Array(stream.length + 3);
+    trailing.set(stream);
+    trailing.set([1, 2, 3], stream.length);
+    expect(await readEntry(deflateEntryZip(trailing, content))).toEqual(content);
+    // An empty payload is no valid deflate stream, but fflate reads it as no bytes.
+    const empty = new Uint8Array(0);
+    expect(await readEntry(deflateEntryZip(empty, empty))).toEqual(empty);
+    await expect(readEntry(deflateEntryZip(stream.subarray(0, -16), content))).rejects.toThrow(
+      "Sheetwrite: invalid XLSX ZIP: deflate stream for a.xml is corrupt",
+    );
+  });
+
+  it("computes the zlib CRC-32 at every tail length", () => {
+    for (let length = 0; length <= 24; length++) {
+      const bytes = content.subarray(0, length);
+      expect(storedEntryFromBytes(bytes).crc32).toBe(Bun.hash.crc32(bytes));
+    }
+    expect(storedEntryFromBytes(content).crc32).toBe(Bun.hash.crc32(content));
+  });
+});
+
+/**
+ * The archive that fflate's own ZIP deflate writes for `parts`, in the order given, with the
+ * writer's 64 KiB pushes.
+ */
+function fflateArchive(parts: Readonly<Record<string, Uint8Array>>): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const archive = new Zip((error, chunk) => {
+    if (error) throw error;
+    chunks.push(chunk);
+  });
+  for (const [name, data] of Object.entries(parts)) {
+    const file = new ZipDeflate(name, { level: 6 });
+    file.mtime = FIXED_ZIP_TIME;
+    archive.add(file);
+    for (let offset = 0; offset < data.length; offset += 64 * 1024) {
+      file.push(data.subarray(offset, offset + 64 * 1024));
+    }
+    file.push(new Uint8Array(0), true);
+  }
+  archive.end();
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+/**
+ * Each entry's local header and central record, with the two fields that depend on the deflate
+ * codec cleared: the compressed size and the local header offset.
+ */
+function entryHeaders(bytes: Uint8Array): Uint8Array[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = bytes.length - 22;
+  const headers: Uint8Array[] = [];
+  let offset = view.getUint32(eocd + 16, true);
+  for (let index = 0; index < view.getUint16(eocd + 10, true); index++) {
+    const nameLength = view.getUint16(offset + 28, true);
+    const end =
+      offset +
+      46 +
+      nameLength +
+      view.getUint16(offset + 30, true) +
+      view.getUint16(offset + 32, true);
+    const central = bytes.slice(offset, end);
+    const local = view.getUint32(offset + 42, true);
+    new DataView(central.buffer).setUint32(20, 0, true);
+    new DataView(central.buffer).setUint32(42, 0, true);
+    headers.push(bytes.slice(local, local + 30 + nameLength), central);
+    offset = end;
+  }
+  return headers;
+}
+
+describe("ZIP deflate", () => {
+  const parts: Record<string, Uint8Array> = {
+    "[Content_Types].xml": strToU8('<?xml version="1.0"?><Types/>'),
+    "docProps/empty.xml": new Uint8Array(0),
+    "xl/worksheets/sheet1.xml": strToU8(letters(300_000)),
+  };
+  // writeZip sorts the parts by name, so it gets them in another order.
+  const unsorted = Object.entries(parts)
+    .reverse()
+    .map(([name, data]) => ({ name, data }));
+  const native = () => createCodecContext("export", { compression: "native" });
+
+  it("writes fflate's bytes by default, also where the runtime has CompressionStream", async () => {
+    expect(typeof CompressionStream).toBe("function");
+    expect(await writeZip(unsorted, createCodecContext("export"))).toEqual(fflateArchive(parts));
+  });
+
+  it("deflates with the runtime CompressionStream for native compression", async () => {
+    const runtime = globalThis.CompressionStream;
+    const formats: string[] = [];
+    globalThis.CompressionStream = class extends runtime {
+      constructor(format: CompressionFormat) {
+        formats.push(format);
+        super(format);
+      }
+    };
+    try {
+      await writeZip(unsorted, native());
+    } finally {
+      globalThis.CompressionStream = runtime;
+    }
+    expect(formats).toContain("deflate-raw");
+  });
+
+  it("writes the parts and ZIP headers of the fflate archive for native compression", async () => {
+    const written = await writeZip(unsorted, native());
+    const reference = fflateArchive(parts);
+    expect(entryHeaders(written)).toEqual(entryHeaders(reference));
+    // fflate reads every part of both archives, and so does this package's reader.
+    expect(unzipSync(written)).toEqual(unzipSync(reference));
+    const reader = await ZipReader.open(written, createCodecContext("import"));
+    for (const [name, data] of Object.entries(parts)) expect(await reader.read(name)).toEqual(data);
+  });
+
+  it("writes fflate's bytes for native compression where the runtime has no CompressionStream", async () => {
+    const runtime = globalThis.CompressionStream;
+    Reflect.deleteProperty(globalThis, "CompressionStream");
+    try {
+      expect(await writeZip(unsorted, native())).toEqual(fflateArchive(parts));
+    } finally {
+      globalThis.CompressionStream = runtime;
+    }
   });
 });
 

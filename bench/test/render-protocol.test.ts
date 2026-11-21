@@ -89,7 +89,7 @@ test("requires a semantic version for each render engine", () => {
     expectRejections(
       () => mutableCopy(artifact()),
       parseRenderArtifact,
-      [undefined, "", "18", "^18.1.2", "01.2.3"].map((version) => [
+      [undefined, "", "18", "0.4", "^18.1.2", "01.2.3"].map((version) => [
         (value) => Reflect.set(value.metadata.engineVersions, engine, version),
         `engineVersions.${engine}`,
       ]),

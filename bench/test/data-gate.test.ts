@@ -1,11 +1,13 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 
+import { SheetwriteStore } from "../../packages/core/src/index.js";
 import {
   type DataBenchmarkResult,
   type DataStat,
   type EngineResult,
   QUERY_FIXTURES,
   QUERY_SCENARIOS,
+  runSheetwriteDataBench,
   validateDataBenchmark,
   WORKLOADS,
 } from "../src/data-bench.js";
@@ -74,26 +76,40 @@ const sheetwriteRow = (result: DeepMutable<DataBenchmarkResult>) =>
 test("rejects drifted identity, metadata, matrix cells and query resources", () => {
   expect(() => validate(smokeFixture())).not.toThrow();
   expectRejections(smokeFixture, validate, [
-    [
-      (result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18.1.2"),
-      "engineVersions.handsontable",
-    ],
+    ...(["sheetwrite", "handsontable"] as const).map(
+      (engine) =>
+        [
+          (result: DeepMutable<DataBenchmarkResult>) =>
+            Reflect.set(result.meta.engineVersions, engine, "^18.1.2"),
+          `engineVersions.${engine}`,
+        ] as const,
+    ),
     [
       (result) => Reflect.set(result, "protocolVersion", PERFORMANCE_GATE_PROTOCOL_VERSION),
       "data stale protocol: expected 2, observed 1",
     ],
     // A v1 artifact keeps its old matrix id; it was sampled without the GC.
     [(result) => (result.matrixId = "data-smoke-v1"), "data stale matrix"],
-    ...(["gcBetweenSamples", "freshDocumentBetweenIngestSamples"] as const).map(
-      (field) =>
-        [
-          (result: DeepMutable<DataBenchmarkResult>) => Reflect.set(result.meta, field, false),
-          `data metadata.${field} must be true`,
-        ] as const,
+    ...(["gcBetweenSamples", "freshDocumentBetweenIngestSamples"] as const).flatMap((field) =>
+      [false, undefined].map(
+        (value) =>
+          [
+            (result: DeepMutable<DataBenchmarkResult>) => Reflect.set(result.meta, field, value),
+            `data metadata.${field} must be true`,
+          ] as const,
+      ),
     ),
     [
       (result) => (result.sheetwrite["01000"] = sheetwriteRow(result)),
       `duplicate ${KEY};metric=ingest`,
+    ],
+    [
+      (result) =>
+        Reflect.set(sheetwriteRow(result).stats, "notDeclared", {
+          ...summarize([1]),
+          samples: [1],
+        }),
+      `unexpected ${KEY};metric=notDeclared`,
     ],
     [
       (result) => (sheetwriteRow(result).stats.ingest.median = 4),
@@ -113,6 +129,36 @@ test("rejects drifted identity, metadata, matrix cells and query resources", () 
       "query resource counters violate structural bounds",
     ],
   ]);
+});
+
+test("collects after every Sheetwrite sample and disposes each ingest store first", async () => {
+  const disposalsAtCollection: number[] = [];
+  const dispose = spyOn(SheetwriteStore.prototype, "dispose");
+  const gc = spyOn(Bun, "gc").mockImplementation((full) => {
+    expect(full).toBe(true);
+    disposalsAtCollection.push(dispose.mock.calls.length);
+    return 0;
+  });
+
+  try {
+    const result = must((await runSheetwriteDataBench([ROWS], "smoke")).get(ROWS), "row size");
+    const allStats = [...Object.values(result.stats), ...Object.values(result.queries ?? {})];
+    // Each workload collects after its final warm-up and every timed sample;
+    // one more GC runs once all of this engine's stores have been released.
+    const expectedCollections = allStats.reduce((count, stat) => count + stat.iters + 1, 1);
+    expect(gc).toHaveBeenCalledTimes(expectedCollections);
+
+    // The first eight collections follow the warm-up and seven ingests. Each
+    // ingest store must be disposed before that sample's GC, rather than left
+    // alive until the next iteration or workload starts.
+    const firstDisposals = must(disposalsAtCollection[0], "post-warm-up collection");
+    expect(disposalsAtCollection.slice(0, 8)).toEqual(
+      Array.from({ length: 8 }, (_, index) => firstDisposals + index),
+    );
+  } finally {
+    gc.mockRestore();
+    dispose.mockRestore();
+  }
 });
 
 test("the public document reset gives the next grid a fresh usable owner", async () => {

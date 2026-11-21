@@ -21,6 +21,10 @@ interface MutableXmlElement {
   attributes: Record<string, string>;
   children: MutableXmlElement[];
   text: string;
+  /**
+   * Exact UTF-8 bytes of `text`, or -1 while `text` is too short to pass
+   * `maxXmlTextBytes`: UTF-8 takes at most three bytes per UTF-16 unit.
+   */
   textBytes: number;
 }
 
@@ -67,8 +71,36 @@ function utf8Length(value: string): number {
   return bytes;
 }
 
+/** Append `decoded` to the text of `element`, failing once the text passes `maxXmlTextBytes`. */
+function appendElementText(
+  element: MutableXmlElement,
+  decoded: string,
+  context: XlsxCodecContext,
+): void {
+  element.text += decoded;
+  if (element.textBytes >= 0) element.textBytes += utf8Length(decoded);
+  else if (element.text.length * 3 > context.limits.maxXmlTextBytes) {
+    // Appended pieces never split a surrogate pair, so one count of the
+    // whole text equals the sum of the pieces' counts.
+    element.textBytes = utf8Length(element.text);
+  } else return;
+  assertResource(context, "maxXmlTextBytes", element.textBytes);
+}
+
+/** An `&` that does not start one of the five predefined entities. */
+const OTHER_ENTITY = /&(?!(?:amp|lt|gt|quot|apos);)/;
+
 function decodeXmlEntities(value: string, part: string): string {
   if (!value.includes("&")) return value;
+  if (!OTHER_ENTITY.test(value)) {
+    // `&amp;` goes last, so the text it frees (`&amp;lt;` → `&lt;`) stays as written.
+    return value
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      .replaceAll("&quot;", '"')
+      .replaceAll("&apos;", "'")
+      .replaceAll("&amp;", "&");
+  }
   let output = "";
   let cursor = 0;
   while (cursor < value.length) {
@@ -125,6 +157,8 @@ const CODE_APOSTROPHE = 0x27;
 const CODE_GREATER_THAN = 0x3e;
 const CODE_SLASH = 0x2f;
 const CODE_EQUALS = 0x3d;
+const CODE_EXCLAMATION = 0x21;
+const CODE_QUESTION = 0x3f;
 
 /** Same set as `/\s/.test(char)`; NaN (past the end) is not space. */
 function isXmlSpace(code: number): boolean {
@@ -167,6 +201,12 @@ function findTagEnd(xml: string, start: number, part: string): number {
     else if (code === CODE_GREATER_THAN) return index;
   }
   return xmlFailure(part, "unterminated tag");
+}
+
+/** Whether `source` from `start` to `end`, trimmed, is `name`; the usual exact case needs no slice. */
+function closingNameMatches(source: string, start: number, end: number, name: string): boolean {
+  if (end - start === name.length && source.startsWith(name, start)) return true;
+  return source.slice(start, end).trim() === name;
 }
 
 function parseStartTag(
@@ -214,7 +254,10 @@ function parseStartTag(
     attributeCount += 1;
     assertResource(context, "maxXmlAttributesPerElement", attributeCount);
     const attributeValue = decodeXmlEntities(source.slice(offset + 1, end), part);
-    assertResource(context, "maxXmlTextBytes", utf8Length(attributeValue));
+    // UTF-8 takes at most three bytes per UTF-16 unit, so a short value needs no count.
+    if (attributeValue.length * 3 > context.limits.maxXmlTextBytes) {
+      assertResource(context, "maxXmlTextBytes", utf8Length(attributeValue));
+    }
     attributes[attributeName] = attributeValue;
     offset = end + 1;
   }
@@ -249,14 +292,11 @@ export function parseXml(
     if (raw.length === 0) return;
     const current = stack.at(-1);
     const decoded = cdata ? raw : decodeXmlEntities(raw, part);
-    const decodedBytes = utf8Length(decoded);
     if (!current) {
       if (decoded.trim().length > 0) xmlFailure(part, "text exists outside the root element");
       return;
     }
-    current.textBytes += decodedBytes;
-    assertResource(context, "maxXmlTextBytes", current.textBytes);
-    current.text += decoded;
+    appendElementText(current, decoded, context);
   };
 
   const deliverStreamedChild = (element: MutableXmlElement, sink: XmlChildStream): void => {
@@ -318,7 +358,7 @@ export function parseXml(
       attributes: parsed.attributes,
       children: [],
       text: "",
-      textBytes: 0,
+      textBytes: -1,
     };
     const parent = stack.at(-1);
     const depth = stack.length + 1;
@@ -419,9 +459,7 @@ export async function parseXmlChunks(
       if (decoded.trim()) xmlFailure(part, "text exists outside the root element");
       return;
     }
-    current.textBytes += utf8Length(decoded);
-    assertResource(context, "maxXmlTextBytes", current.textBytes);
-    current.text += decoded;
+    appendElementText(current, decoded, context);
   };
   const deliver = (element: MutableXmlElement): void => {
     const root = roots[0];
@@ -480,23 +518,27 @@ export async function parseXmlChunks(
         );
         if (ambiguous) break;
       }
-      if (pending.startsWith("<!--", cursor)) {
-        ignored = "comment";
-        cursor += 4;
-        continue;
+      const second = pending.charCodeAt(cursor + 1);
+      // Only `<!` and `<?` start markup other than tags; element tags skip these checks.
+      if (second === CODE_EXCLAMATION || second === CODE_QUESTION) {
+        if (pending.startsWith("<!--", cursor)) {
+          ignored = "comment";
+          cursor += 4;
+          continue;
+        }
+        if (pending.startsWith("<![CDATA[", cursor)) {
+          ignored = "cdata";
+          cursor += 9;
+          continue;
+        }
+        if (second === CODE_QUESTION) {
+          ignored = "instruction";
+          cursor += 2;
+          continue;
+        }
+        xmlFailure(part, "unsupported declaration");
       }
-      if (pending.startsWith("<![CDATA[", cursor)) {
-        ignored = "cdata";
-        cursor += 9;
-        continue;
-      }
-      if (pending.startsWith("<?", cursor)) {
-        ignored = "instruction";
-        cursor += 2;
-        continue;
-      }
-      if (pending.startsWith("<!", cursor)) xmlFailure(part, "unsupported declaration");
-      const closing = pending.startsWith("</", cursor);
+      const closing = second === CODE_SLASH;
       let end = cursor + (closing ? 2 : 1);
       let quote = 0;
       for (; end < pending.length; end++) {
@@ -515,10 +557,10 @@ export async function parseXmlChunks(
         break;
       }
       if (closing) {
-        const name = pending.slice(cursor + 2, end).trim();
         const current = stack.pop();
-        if (!current || current.name !== name)
-          xmlFailure(part, `closing tag ${name} does not match`);
+        if (!current || !closingNameMatches(pending, cursor + 2, end, current.name)) {
+          xmlFailure(part, `closing tag ${pending.slice(cursor + 2, end).trim()} does not match`);
+        }
         if (streamedChild === current) {
           deliver(current);
           streamedChild = undefined;
@@ -533,7 +575,7 @@ export async function parseXmlChunks(
           attributes: parsed.attributes,
           children: [],
           text: "",
-          textBytes: 0,
+          textBytes: -1,
         };
         const parent = stack.at(-1);
         const depth = stack.length + 1;
@@ -686,36 +728,52 @@ export function decodeXstring(value: string): string {
   return output;
 }
 
-/** Encode XML-forbidden UTF-16 units and literal escape-looking text as ST_Xstring. */
+/** The rest of a literal `_xHHHH_` after its `_`, which ST_Xstring would decode. */
+const XSTRING_ESCAPE_TAIL = /x[\da-f]{4}_/iy;
+
+/** A UTF-16 unit XML cannot hold; a surrogate here is one without its pair. */
+function forbiddenXmlUnit(code: number): boolean {
+  return (
+    code <= 0x8 ||
+    code === 0xb ||
+    code === 0xc ||
+    (code >= 0xe && code <= 0x1f) ||
+    (code >= 0xd800 && code <= 0xdfff) ||
+    code === 0xfffe ||
+    code === 0xffff
+  );
+}
+
+/**
+ * Encode XML-forbidden UTF-16 units and literal escape-looking text as ST_Xstring.
+ * Text that needs no encoding is returned unchanged.
+ */
 export function encodeXstring(value: string): string {
   let output = "";
+  let copied = 0;
   for (let index = 0; index < value.length; index++) {
     const code = value.charCodeAt(index);
-    if (code === 0x5f && /^x[\da-f]{4}_/i.test(value.slice(index + 1))) {
-      output += "_x005F_";
-    } else if (
-      code <= 0x8 ||
-      code === 0xb ||
-      code === 0xc ||
-      (code >= 0xe && code <= 0x1f) ||
-      code === 0xfffe ||
-      code === 0xffff ||
-      (code >= 0xd800 &&
-        code <= 0xdfff &&
-        !(
-          code <= 0xdbff &&
-          index + 1 < value.length &&
-          value.charCodeAt(index + 1) >= 0xdc00 &&
-          value.charCodeAt(index + 1) <= 0xdfff
-        ))
-    ) {
-      output += `_x${code.toString(16).toUpperCase().padStart(4, "0")}_`;
+    let encoded: string;
+    if (code === 0x5f) {
+      XSTRING_ESCAPE_TAIL.lastIndex = index + 1;
+      if (!XSTRING_ESCAPE_TAIL.test(value)) continue;
+      encoded = "_x005F_";
+    } else if (code >= 0xd800 && code <= 0xdbff && isLowSurrogate(value.charCodeAt(index + 1))) {
+      index += 1;
+      continue;
+    } else if (forbiddenXmlUnit(code)) {
+      encoded = `_x${code.toString(16).toUpperCase().padStart(4, "0")}_`;
     } else {
-      output += value.charAt(index);
-      if (code >= 0xd800 && code <= 0xdbff) output += value.charAt(++index);
+      continue;
     }
+    output += value.slice(copied, index) + encoded;
+    copied = index + 1;
   }
-  return output;
+  return copied === 0 ? value : output + value.slice(copied);
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
 }
 
 /** True when the element is the expected OOXML root in an allowed namespace. */
@@ -746,13 +804,27 @@ export function assertXmlRoot(
   }
 }
 
+/** The entity for a character XML text and attributes must escape, if any. */
+function xmlEscape(code: number): string | undefined {
+  if (code === 0x26) return "&amp;";
+  if (code === 0x3c) return "&lt;";
+  if (code === 0x3e) return "&gt;";
+  if (code === 0x22) return "&quot;";
+  if (code === 0x27) return "&apos;";
+  return undefined;
+}
+
+/** Escape `&<>"'` for XML text and attributes; text without them is returned unchanged. */
 export function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+  let output = "";
+  let copied = 0;
+  for (let index = 0; index < value.length; index++) {
+    const entity = xmlEscape(value.charCodeAt(index));
+    if (entity === undefined) continue;
+    output += value.slice(copied, index) + entity;
+    copied = index + 1;
+  }
+  return copied === 0 ? value : output + value.slice(copied);
 }
 
 const XML_OUTPUT_CHUNK_BYTES = 64 * 1024;

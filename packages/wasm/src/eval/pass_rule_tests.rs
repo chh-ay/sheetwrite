@@ -6,7 +6,7 @@
 //! formula cell's shown value after the first recalculation and after an edit.
 
 use crate::store::CellStore;
-use crate::tests::support::shown;
+use crate::tests::support::{evaluations, shown};
 
 /// Columns A-H, rows 1-12 of one sheet.
 const COLS: usize = 8;
@@ -59,14 +59,6 @@ fn run(scenario: &Scenario) -> String {
         "{first} #{first_evaluations}|{} #{edit_evaluations}",
         snapshot(&store, sheet, scenario.shown)
     )
-}
-
-/// Formula evaluations that `recalculate` runs: each selected formula once,
-/// even when another formula pulls it before its turn.
-fn evaluations(recalculate: impl FnOnce()) -> usize {
-    super::FORMULA_EVALUATIONS.with(|count| count.set(0));
-    recalculate();
-    super::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
 }
 
 fn snapshot(store: &CellStore, sheet: usize, cells: &[&str]) -> String {

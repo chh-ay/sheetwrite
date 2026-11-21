@@ -107,6 +107,11 @@ function samples(startMs: number, url: string, count: number, tid = 1): TraceEve
 
 test.each([
   [
+    "charges a long task that mostly runs package frames to Sheetwrite",
+    [task(0, 60), samples(1, PACKAGE_URL, 50), samples(51, SHELL_URL, 5)],
+    { ownedMs: 60, unattributedMs: 0 },
+  ],
+  [
     "reports a long task that mostly runs other code as unattributed",
     [task(0, 60), samples(1, PACKAGE_URL, 20), samples(21, SHELL_URL, 40)],
     { ownedMs: 0, unattributedMs: 60 },
