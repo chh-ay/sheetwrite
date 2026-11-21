@@ -94,11 +94,11 @@ The built-in action names are:
 
 The default menu has these groups, in this order:
 
-- Cut, Copy, the Paste Options row (Paste, Values, Formulas, Transpose, Formatting, Paste Link, and Paste into visible rows only after a paste over hidden rows) and Paste Special….
+- Cut, Copy, the Paste Options row (Paste, Values, Formulas, Transpose, Formatting, Paste Link, and Paste into visible rows only after a paste over hidden rows), and **Paste Special…**
 - Insert and Delete submenus (Cells…, which opens Excel's Insert or Delete dialog, rows and columns), and Clear contents.
 - Row and Column submenus: hide, show all and auto-fit. The Column submenu also sorts in place and sorts the view.
 - A Filter submenu: filter by the selected cell's value, reapply, and clear the column's filter.
-- A Merge submenu, Format Cells… and Pick From Drop-down List….
+- A Merge submenu, **Format Cells…** and **Pick From Drop-down List…**
 - PivotTable Fields, in a pivot table only.
 - New note, or Edit note and Delete note on a cell that has a note.
 
