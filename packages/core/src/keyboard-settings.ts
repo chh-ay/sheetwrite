@@ -27,7 +27,7 @@ import {
   withBindings,
   withKeys,
 } from "./keyboard-settings-model.js";
-import { DEFAULT_BINDINGS } from "./keymap.js";
+import { defaultKeys } from "./keymap.js";
 import { checkStylePart } from "./style-parts.js";
 import type { Grid, GridConfig, KeyBindings, KeyboardAction, KeyShortcut } from "./types/grid.js";
 
@@ -159,7 +159,7 @@ class KeyboardSettingsPanel {
       "sheetwrite-keys-hint",
       this.fixed
         ? "Your app handles the keys itself, so they can't be changed here."
-        : "Type a name or keys, or press keys to find the command that uses them. Excel's keys are the defaults.",
+        : "Type a name or keys, or press keys to find the command that uses them. Excel's keys are the defaults. F6 and Shift+F6 always move to the next or previous part of the window, and out of the grid.",
     );
     hint.id = `${id}-hint`;
 
@@ -340,7 +340,7 @@ class KeyboardSettingsPanel {
     const defaults = element(
       "td",
       "sheetwrite-keys-default",
-      DEFAULT_BINDINGS[action].map(keysLabel).join(", ") || "None",
+      defaultKeys(action).map(keysLabel).join(", ") || "None",
     );
     defaults.dataset.default = "";
 

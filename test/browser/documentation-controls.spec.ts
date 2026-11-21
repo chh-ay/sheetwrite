@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { waitForHydration } from "./fixtures.js";
 import { siteUrl } from "./playwright.config.js";
 
 // Browser contracts for shared documentation controls: framework tabs, the
@@ -22,11 +23,6 @@ function collectErrors(page: Page): PageErrors {
   });
   page.on("pageerror", (error) => errors.page.push(error.message));
   return errors;
-}
-
-/** Interactive steps need attached listeners; the root component marks hydration. */
-async function waitForHydration(page: Page): Promise<void> {
-  await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
 }
 
 async function blurFocus(page: Page): Promise<void> {
@@ -115,6 +111,32 @@ test("copied feedback belongs to the command that was copied", async ({ page }) 
   await terminal.getByRole("tab", { name: "pnpm", exact: true }).click();
   await expect(terminal.locator(".sw-terminal__copy")).toHaveText("Copy");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("npm install");
+});
+
+test("the package command and the code block below it share one copy button", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(INSTALLATION_URL);
+  await waitForHydration(page);
+  const tab = page.getByRole("tabpanel").filter({ visible: true }).first();
+  const commandCopy = tab.locator(".sw-terminal__copy");
+  const blockCopy = tab.locator(".expressive-code .copy button").first();
+  await tab.locator(".expressive-code .frame").first().hover();
+
+  const [command, block] = await Promise.all([commandCopy.boundingBox(), blockCopy.boundingBox()]);
+  if (command === null || block === null) throw new Error("A copy button has no box.");
+  expect(command.width).toBe(block.width);
+  expect(command.height).toBe(block.height);
+  // Both show only the icon; the label is for screen readers.
+  const visibleLabelWidth = await commandCopy
+    .locator("span")
+    .evaluate((label) => label.getBoundingClientRect().width);
+  expect(visibleLabelWidth).toBeLessThanOrEqual(1);
+  const [commandRadius, blockRadius] = await Promise.all(
+    [commandCopy, blockCopy].map((button) =>
+      button.evaluate((element) => getComputedStyle(element).borderTopLeftRadius),
+    ),
+  );
+  expect(commandRadius).toBe(blockRadius);
 });
 
 test("a malformed fragment is ignored", async ({ page }) => {
@@ -301,10 +323,15 @@ const POPOVER_GAP_PX = 8;
 const POPOVER_GAP_TOLERANCE_PX = 1;
 /** The panel's width cap: 35rem at the 16 px root size. */
 const POPOVER_MAX_WIDTH_PX = 560;
+/** How far from the scrolled code panel's left edge the 390 px run brings the symbol. */
+const SCROLLED_SYMBOL_INSET_PX = 16;
 
-for (const viewport of [
-  { width: 1440, height: 900 },
-  { width: 834, height: 1112 },
+// Below 48rem code lines do not wrap: the code panel scrolls, and the 390 px
+// run scrolls it so the symbol sits past the panel's scrolled-off start.
+for (const { scrolled, ...viewport } of [
+  { width: 1440, height: 900, scrolled: false },
+  { width: 834, height: 1112, scrolled: false },
+  { width: 390, height: 844, scrolled: true },
 ]) {
   test(`at ${viewport.width} px a code popover opens 8 px from its symbol and inside the viewport`, async ({
     page,
@@ -317,6 +344,32 @@ for (const viewport of [
     const panel = page.locator(
       `[id="${await trigger.getAttribute("data-sw-code-popover-trigger")}"]`,
     );
+
+    if (scrolled) {
+      const scroll = await trigger.evaluate((symbol, inset) => {
+        const code = symbol.closest("pre");
+        if (code === null) throw new Error("The symbol is not in a code panel.");
+        const before = { scrollWidth: code.scrollWidth, clientWidth: code.clientWidth };
+        code.scrollLeft +=
+          symbol.getBoundingClientRect().left - code.getBoundingClientRect().left - inset;
+        const shown = symbol.getBoundingClientRect();
+        const panelBox = code.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          shown.left + shown.width / 2,
+          shown.top + shown.height / 2,
+        );
+        return {
+          ...before,
+          scrollLeft: code.scrollLeft,
+          insidePanel: shown.left >= panelBox.left && shown.right <= panelBox.right,
+          symbolOnTop: hit !== null && symbol.contains(hit),
+        };
+      }, SCROLLED_SYMBOL_INSET_PX);
+      expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
+      expect(scroll.scrollLeft).toBeGreaterThan(0);
+      expect(scroll.insidePanel).toBe(true);
+      expect(scroll.symbolOnTop).toBe(true);
+    }
 
     await trigger.hover();
     await expect(panel).toBeVisible();

@@ -22,7 +22,7 @@ const CARD_ART_BY_HREF = {
 
 /** Per page: what it gets. `after` is a heading id, "lead" (the first paragraph), or a selector. */
 const PAGES = [
-  { id: "overview", path: "/docs/", cards: true, mark: "guides" },
+  { id: "overview", path: "/docs/", cards: true },
   { id: "start", path: "/docs/start/", section: "getting-started" },
   { id: "concepts", path: "/docs/concepts/", section: "concepts" },
   { id: "features", path: "/docs/features/", section: "features" },
@@ -88,9 +88,6 @@ const PAGES = [
     diagram: "version-archive",
     after: "opt-in-version-archives",
   },
-  { id: "api", path: "/docs/api/", mark: "api" },
-  { id: "formulas", path: "/docs/reference/formula-functions/", mark: "formulas" },
-  { id: "releases", path: "/docs/releases/", mark: "changelog" },
 ].filter(
   (page) => !process.env.DOCMK_PAGES || process.env.DOCMK_PAGES.split(",").includes(page.id),
 );
@@ -113,7 +110,6 @@ function plan(page) {
   const adds = [];
   if (page.cards)
     for (const art of Object.values(CARD_ART_BY_HREF)) adds.push(parts[`card:${art}`]);
-  if (page.mark) adds.push(parts[`mark:${page.mark}`]);
   if (page.section) adds.push(`<div class="mk-section-art">${parts[`card:${page.section}`]}</div>`);
   if (page.diagram)
     adds.push(`<figure class="mk-doc-figure">${parts[`diagram:${page.diagram}`]}</figure>`);
@@ -137,7 +133,6 @@ function transform({ page, parts, cardArtByHref }) {
     }
   }
   const header = document.querySelector(".sw-document__header");
-  if (page.mark && header) header.prepend(fromHtml(parts[`mark:${page.mark}`]));
   if (page.section && header)
     header.append(fromHtml(`<div class="mk-section-art">${parts[`card:${page.section}`]}</div>`));
   if (page.diagram) {

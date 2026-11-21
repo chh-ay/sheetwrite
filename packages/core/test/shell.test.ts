@@ -628,3 +628,39 @@ describe("createSpreadsheetShell", () => {
     shell.destroy();
   });
 });
+
+describe("the formula bar's formula help", () => {
+  it("takes the grid's theme colours", async () => {
+    // The core stylesheet's dark palette (`styles/grid.css`), which differs from the defaults.
+    const theme = { bg: "#0b0b0c", fg: "#e7e7e7" };
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, theme }, store);
+    const piece = createFormulaBar(host, grid, {});
+    const input = piece.element;
+    if (!(input instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
+
+    input.focus();
+    input.value = "=SUM(";
+    input.dispatchEvent(new Event("input"));
+    // The help loads its chunk on the first formula, then adds its layer.
+    const findLayer = () => document.querySelector<HTMLElement>(".sheetwrite-formula-help");
+    const { promise: added, resolve } = Promise.withResolvers<HTMLElement>();
+    const observer = new MutationObserver(() => {
+      const layer = findLayer();
+      if (layer !== null) resolve(layer);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const layer = findLayer() ?? (await added);
+    observer.disconnect();
+
+    const background = layer.style.getPropertyValue("--sheetwrite-assist-bg");
+    const text = layer.style.getPropertyValue("--sheetwrite-assist-fg");
+    expect([background, text]).toEqual([theme.bg, theme.fg]);
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+});

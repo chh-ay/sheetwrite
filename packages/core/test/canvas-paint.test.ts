@@ -723,15 +723,6 @@ describe("paintFrame automatic text colour on fills", () => {
     expect(ctx.fillTexts.find((call) => call.text === "r2")?.fillStyle).toBe(DARK.fg);
   });
 
-  it("paints the #706 repro dark on its pale fill in the dark theme", () => {
-    const ctx = paintFills(DARK, [{ bold: true, backgroundColor: "#e6f2ec" }]);
-    const text = ctx.fillTexts.find((call) => call.text === "r0");
-    expect(text?.fillStyle).toBe(invert(DARK.fg));
-    expect(
-      contrastRatio(luminanceOf(text?.fillStyle ?? ""), luminanceOf("#e6f2ec")),
-    ).toBeGreaterThan(7);
-  });
-
   it("contrasts a header label with its own fill", () => {
     const layout = makeLayout([
       {

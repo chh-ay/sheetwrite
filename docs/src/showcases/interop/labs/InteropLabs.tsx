@@ -1,4 +1,4 @@
-import { createSignal, For, type JSX, onMount } from "solid-js";
+import { createSignal, For, type JSX, onCleanup, onMount } from "solid-js";
 
 import { Icon, type IconName } from "../../../components/Icon.js";
 import { ADVERSARIAL_FIXTURES, POSITIVE_FIXTURES } from "../../scenarios/interop-fixtures.js";
@@ -119,15 +119,29 @@ const LABS: readonly Lab[] = [
 
 /**
  * The Evidence and labs section: six question tiles as tabs, one lab open
- * below them. `?compatibility=<record id>` opens the vault, which shows the
+ * below them. `#<lab id>` (for example `#delimited`) opens that lab and
+ * scrolls to it; `?compatibility=<record id>` opens the vault, which shows the
  * record.
  */
 export function InteropLabs() {
   const [selected, setSelected] = createSignal("vault");
   const tabs: HTMLButtonElement[] = [];
+  let section: HTMLElement | undefined;
+
+  const openFromHash = () => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!LABS.some((lab) => lab.id === id)) return;
+    setSelected(id);
+    section?.scrollIntoView({ block: "start" });
+  };
 
   onMount(() => {
     if (new URLSearchParams(window.location.search).has("compatibility")) setSelected("vault");
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    onCleanup(() => {
+      window.removeEventListener("hashchange", openFromHash);
+    });
   });
 
   const focusTab = (index: number) => {
@@ -139,7 +153,14 @@ export function InteropLabs() {
   };
 
   return (
-    <section aria-labelledby="interop-labs-title" class="sw-labs" data-testid="interop-labs">
+    <section
+      aria-labelledby="interop-labs-title"
+      class="sw-labs"
+      data-testid="interop-labs"
+      ref={(element) => {
+        section = element;
+      }}
+    >
       <h2 class="sw-showcase__section-title" id="interop-labs-title">
         Evidence and labs
       </h2>

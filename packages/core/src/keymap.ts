@@ -9,14 +9,18 @@ import type {
   KeyShortcut,
 } from "./types/grid.js";
 
-/** Excel's keys for each built-in action: the defaults a binding override replaces. */
+/**
+ * Excel's keys for each built-in action on every platform: the defaults a
+ * binding override replaces. `defaultKeys` adds the macOS-only ones.
+ */
 export const DEFAULT_BINDINGS: Readonly<Record<KeyboardAction, readonly KeyShortcut[]>> = {
   copy: ["Mod+C"],
   cut: ["Mod+X"],
   paste: ["Mod+V"],
   pasteValues: ["Mod+Shift+V"],
-  // Excel's Paste Special: Ctrl+Alt+V, and Ctrl+Cmd+V in Excel for Mac.
-  pasteSpecial: ["Mod+Alt+V", "Ctrl+Meta+V"],
+  // Excel's Paste Special: Ctrl+Alt+V, and Cmd+Option+V or Ctrl+Option+V in
+  // Excel for Mac (`Mod` accepts either).
+  pasteSpecial: ["Mod+Alt+V"],
   undo: ["Mod+Z"],
   redo: ["Mod+Shift+Z", "Mod+Y"],
   find: ["Mod+F"],
@@ -67,6 +71,22 @@ export const DEFAULT_BINDINGS: Readonly<Record<KeyboardAction, readonly KeyShort
   // Ctrl+1 opens Format Cells.
   formatCells: ["Mod+1"],
 };
+
+/**
+ * Excel for Mac's defaults where they add keys. They hold Ctrl with Cmd,
+ * which elsewhere is Ctrl with the Windows or Super key: the operating system
+ * keeps those, so the page would never receive them.
+ */
+const MAC_DEFAULT_BINDINGS: Readonly<Partial<Record<KeyboardAction, readonly KeyShortcut[]>>> = {
+  // Excel for Mac also opens Paste Special with Ctrl+Cmd+V.
+  pasteSpecial: ["Mod+Alt+V", "Ctrl+Meta+V"],
+};
+
+/** Excel's keys for `action` on this platform. */
+export function defaultKeys(action: KeyboardAction): readonly KeyShortcut[] {
+  return (isMac() ? MAC_DEFAULT_BINDINGS[action] : undefined) ?? DEFAULT_BINDINGS[action];
+}
+
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;
 
@@ -226,7 +246,7 @@ function bindingsFor(
   options?: KeyboardOptions,
 ): KeyShortcut | readonly KeyShortcut[] | null {
   return options?.bindings?.[action] === undefined
-    ? DEFAULT_BINDINGS[action]
+    ? defaultKeys(action)
     : (options.bindings[action] ?? null);
 }
 

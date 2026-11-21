@@ -1,4 +1,6 @@
+import { cellDisplayText } from "./canvas-paint.js";
 import type { CellRef } from "./selection.js";
+import type { Column } from "./types/cell.js";
 import type { Selection } from "./types/coordinates.js";
 import type { VisibleWindowView } from "./types/store.js";
 
@@ -105,6 +107,8 @@ export interface AriaMirrorDeps {
   readOnly: boolean;
   presentation: "spreadsheet" | "data-grid";
   columnHeader: (col: number) => string;
+  /** The sheet's column `col`, for its number format and locale. */
+  column: (col: number) => Column | undefined;
   focusCell: () => CellRef | null;
   /** The description of the cell at view `row`, `col`: its note and input message. */
   descriptionAt: (row: number, col: number) => string | null;
@@ -114,6 +118,11 @@ export interface AriaMirrorDeps {
 /**
  * Keeps a compact, screen-reader-visible mirror of the rendered window while the
  * canvas and overlay remain hidden from assistive technology.
+ *
+ * The mirror itself is the `grid`: it owns only rows and cells. The host
+ * holds the grid's chrome (toolbar, sheet tabs, panels, find bar) as well,
+ * so it is a labelled `group` that keeps the focus and points
+ * `aria-activedescendant` at the active cell when the mirror shows it.
  *
  * A paint only captures the mirror's content (`update`, `setRowCount`); the
  * paint's last step, `flush`, writes the DOM, after the paint's layout reads.
@@ -126,6 +135,9 @@ export class AriaMirror {
   private readonly focusCell: () => CellRef | null;
   private readonly descriptionAt: (row: number, col: number) => string | null;
   private readonly columnHeader: (col: number) => string;
+  private readonly column: (col: number) => Column | undefined;
+  /** The painted window's columns, parallel to `cols`. */
+  private readonly columns: (Column | undefined)[] = [];
   private readonly selection: () => Selection | null;
   private key = "";
   private version = 0;
@@ -160,12 +172,13 @@ export class AriaMirror {
     this.focusCell = deps.focusCell;
     this.descriptionAt = deps.descriptionAt;
     this.columnHeader = deps.columnHeader;
+    this.column = deps.column;
     this.selection = deps.selection;
 
     const aria = document.createElement("div");
     aria.className = "sheetwrite-aria";
     aria.id = `sheetwrite-grid-${++ariaSeq}`;
-    aria.setAttribute("role", "rowgroup");
+    aria.setAttribute("role", "grid");
     // `contain: strict` keeps the mirror's changes in every frame of a scroll
     // from laying out and restyling the page around it; in Firefox that cut
     // the layout and style time of a sideways scroll by a third. Screen
@@ -176,11 +189,11 @@ export class AriaMirror {
     this.aria = aria;
 
     this.rowCountValue = String(deps.rowCount + 1);
-    deps.host.setAttribute("role", "grid");
-    deps.host.setAttribute("aria-multiselectable", "true");
-    deps.host.setAttribute("aria-rowcount", this.rowCountValue);
-    deps.host.setAttribute("aria-colcount", String(deps.colCount));
-    if (deps.readOnly) deps.host.setAttribute("aria-readonly", "true");
+    aria.setAttribute("aria-multiselectable", "true");
+    aria.setAttribute("aria-rowcount", this.rowCountValue);
+    aria.setAttribute("aria-colcount", String(deps.colCount));
+    if (deps.readOnly) aria.setAttribute("aria-readonly", "true");
+    deps.host.setAttribute("role", "group");
     if (!deps.host.hasAttribute("aria-label")) {
       deps.host.setAttribute(
         "aria-label",
@@ -197,8 +210,13 @@ export class AriaMirror {
   }
 
   setColumnCount(count: number): void {
-    this.host.setAttribute("aria-colcount", String(count));
+    this.aria.setAttribute("aria-colcount", String(count));
     this.bumpVersion();
+  }
+
+  setReadOnly(readOnly: boolean): void {
+    if (readOnly) this.aria.setAttribute("aria-readonly", "true");
+    else this.aria.removeAttribute("aria-readonly");
   }
 
   /** Displayed data rows; the header row adds one to `aria-rowcount`. */
@@ -217,7 +235,6 @@ export class AriaMirror {
     const selection = this.selection();
     const nCols = view.cols.length;
     const nRows = view.rows.end - view.rows.start;
-    this.focusId = focusId;
     this.focusRow = focus?.row ?? -1;
     this.focusCol = focus?.col ?? -1;
     this.selectedColumn = selection?.kind === "column" ? selection.col : null;
@@ -226,13 +243,22 @@ export class AriaMirror {
     this.rowCount = nRows;
     this.cols.length = nCols;
     this.headerTexts.length = nCols;
+    let focusColShown = false;
+    this.columns.length = nCols;
     for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
       const col = view.cols[columnIndex];
       if (col === undefined) throw new Error("ARIA header has no visible column");
 
       this.cols[columnIndex] = col;
       this.headerTexts[columnIndex] = this.columnHeader(col);
+      if (col === this.focusCol) focusColShown = true;
+      this.columns[columnIndex] = this.column(col);
     }
+    // The active cell can lie outside the mirrored window (scrolled away, or
+    // hidden); `aria-activedescendant` then names nothing rather than a
+    // missing id.
+    const focusRowShown = this.focusRow >= view.rows.start && this.focusRow < view.rows.end;
+    this.focusId = focusRowShown && focusColShown ? focusId : "";
     const cells = nRows * nCols;
     this.cellTexts.length = cells;
     this.cellDescriptions.length = cells;
@@ -241,7 +267,14 @@ export class AriaMirror {
       for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
         const index = rowIndex * nCols + columnIndex;
         const value = view.values[index] ?? null;
-        this.cellTexts[index] = value !== null ? String(value) : "";
+        // The text the canvas paints, in the cell's number format: a date, not its serial.
+        const column = this.columns[columnIndex];
+        const format =
+          view.styles[view.styleIds[index] ?? 0]?.numberFormat ??
+          column?.cellStyle?.numberFormat ??
+          column?.numberFormat;
+        this.cellTexts[index] =
+          value === null ? "" : cellDisplayText(value, format, column?.numberLocale);
         this.cellDescriptions[index] = this.descriptionAt(row, this.cols[columnIndex] ?? -1);
       }
     }
@@ -251,8 +284,8 @@ export class AriaMirror {
   /** Write the captured content to the mirror and the host. */
   flush(): void {
     if (this.destroyed) return;
-    if (this.host.getAttribute("aria-rowcount") !== this.rowCountValue) {
-      this.host.setAttribute("aria-rowcount", this.rowCountValue);
+    if (this.aria.getAttribute("aria-rowcount") !== this.rowCountValue) {
+      this.aria.setAttribute("aria-rowcount", this.rowCountValue);
     }
     if (!this.contentPending) return;
     this.contentPending = false;
@@ -265,7 +298,8 @@ export class AriaMirror {
 
   private writeActiveDescendant(focusId: string): void {
     if (focusId === this.lastFocusId) return;
-    this.host.setAttribute("aria-activedescendant", focusId);
+    if (focusId === "") this.host.removeAttribute("aria-activedescendant");
+    else this.host.setAttribute("aria-activedescendant", focusId);
     this.lastFocusId = focusId;
   }
 
@@ -368,16 +402,8 @@ export class AriaMirror {
   destroy(): void {
     this.destroyed = true;
     this.aria.remove();
-    for (const attr of [
-      "role",
-      "aria-multiselectable",
-      "aria-rowcount",
-      "aria-colcount",
-      "aria-readonly",
-      "aria-activedescendant",
-    ]) {
-      this.host.removeAttribute(attr);
-    }
+    this.host.removeAttribute("role");
+    this.host.removeAttribute("aria-activedescendant");
   }
 
   get element(): HTMLDivElement {

@@ -103,7 +103,7 @@ test.describe("database proof", () => {
     await expect(page.getByTestId("dbx-grid")).toBeInViewport();
     await expect(page.getByRole("checkbox", { name: "Autosave" })).toBeChecked();
 
-    const commit = page.getByRole("button", { name: "Commit sample edit" });
+    const commit = page.getByRole("button", { name: "Add one seat" });
     await commit.click();
     await expect(page.getByTestId("dbx-version")).toHaveText("1");
     await expect(page.getByTestId("dbx-pending")).toHaveText("0");
@@ -126,7 +126,7 @@ test.describe("database proof", () => {
   test("keeps durable pending work across a real page reload", async ({ page }) => {
     await openDatabase(page);
     await page.getByRole("checkbox", { name: "Autosave" }).uncheck();
-    const commit = page.getByRole("button", { name: "Commit sample edit" });
+    const commit = page.getByRole("button", { name: "Add one seat" });
     await commit.click();
     await commit.click();
     await expect(page.getByTestId("dbx-pending")).toHaveText("2");
@@ -192,7 +192,7 @@ test.describe("database proof", () => {
   }) => {
     await openDatabase(page);
     await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
-    const commit = page.getByRole("button", { name: "Commit sample edit" });
+    const commit = page.getByRole("button", { name: "Add one seat" });
 
     // The server stores v1 but the acknowledgement never arrives. Autosave must
     // resend the durable record with its mutation id, and the retry must not
@@ -378,7 +378,7 @@ test("a manual retry of a commit whose acknowledgement was lost applies it once"
   // The server stores v1 but the client keeps the commit pending; the retry
   // with the same mutation id must not apply it twice.
   await page.getByRole("button", { name: "Lose next acknowledgement" }).click();
-  await page.getByRole("button", { name: "Commit sample edit" }).click();
+  await page.getByRole("button", { name: "Add one seat" }).click();
   await expect(page.getByTestId("dbx-pending")).toHaveText("1");
   await expect(page.getByTestId("dbx-version")).toHaveText("1");
   const committedTotal = (await page.getByTestId("dbx-total").textContent()) ?? "";

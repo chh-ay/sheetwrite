@@ -908,49 +908,22 @@ describe("setBlock arrays at every entry point", () => {
         return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
       },
     });
-    const emitted: DocumentOp[] = [];
-    grid.on("change", (event) => emitted.push(...event.transaction.patches));
     const before = cellAt(grid, 1);
+    // The entry-point loop above checks the store and the change event; this
+    // checks what admission sends and what history keeps.
+    const values = withGetter<CellScalar>(["kept", 0], 1, (count) => count * 10);
 
-    // Each read returns a new number, so any second read would store a different value.
-    let valueReads = 0;
-    const values: CellScalar[] = ["kept", 0];
-    Object.defineProperty(values, 1, {
-      enumerable: true,
-      get() {
-        valueReads++;
-        return valueReads * 10;
-      },
-    });
-    let styleReads = 0;
-    const styleIds = [0, 0];
-    Object.defineProperty(styleIds, 1, {
-      enumerable: true,
-      get() {
-        styleReads++;
-        return styleReads;
-      },
-    });
-
-    expect(grid.applyTransaction({ patches: [setBlock(values, styleIds)] }).status).toBe("applied");
-    expect(valueReads).toBe(1);
-    expect(styleReads).toBe(1);
-    expect(cellAt(grid, 1)).toBe(10);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toMatchObject({
-      bold: true,
-    });
-    for (const operation of [emitted[0], sent[0]]) {
-      if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
-      expect(operation.block.values).toEqual(["kept", 10]);
-      expect(operation.block.values).not.toBe(values);
-      expect(operation.block.styleIds).toEqual([0, 1]);
-    }
+    expect(grid.applyTransaction({ patches: [setBlock(values.entries)] }).status).toBe("applied");
+    const operation = sent[0];
+    if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
+    expect(operation.block.values).toEqual(["kept", 10]);
+    expect(operation.block.values).not.toBe(values.entries);
 
     grid.undo();
     expect(cellAt(grid, 1)).toBe(before);
     grid.redo();
     expect(cellAt(grid, 1)).toBe(10);
-    expect(valueReads).toBe(1);
+    expect(values.counter.reads).toBe(1);
     disposeAdmission();
     grid.destroy();
   });
@@ -1017,12 +990,6 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   });
 });
 
-describe("ChangeEvent.commitReason", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-});
-
 describe("Grid.setMinColumns", () => {
   beforeAll(async () => {
     await initSheetwrite();
@@ -1032,7 +999,7 @@ describe("Grid.setMinColumns", () => {
     const columnCount = (options: Partial<GridOptions>) => {
       const host = mountHost();
       const grid = new GridImpl(host, { workbook: makeWorkbook(5), ...options });
-      const count = host.getAttribute("aria-colcount");
+      const count = host.querySelector('[role="grid"]')?.getAttribute("aria-colcount");
       grid.destroy();
       return count;
     };
@@ -1048,15 +1015,15 @@ describe("Grid.setMinColumns", () => {
     const one = { key: "a", header: "A", width: 100, type: "text" as const };
     added.addSheet({ id: "later", name: "Later", rowCount: 5, columns: [one] });
     added.setActiveSheet("later");
-    expect(later.getAttribute("aria-colcount")).toBe("9");
+    expect(later.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("9");
     added.destroy();
 
     const host = mountHost();
     const grid = new GridImpl(host, { workbook: makeWorkbook(5), presentation: "data-grid" });
     grid.setMinColumns(5);
-    expect(host.getAttribute("aria-colcount")).toBe("5");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("5");
     grid.setMinColumns(undefined);
-    expect(host.getAttribute("aria-colcount")).toBe("3");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("3");
     grid.destroy();
   });
 

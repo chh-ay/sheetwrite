@@ -670,6 +670,8 @@ export interface NavigationLocation {
   section: string;
   /** The section's overview page, when it has one. */
   sectionHref?: string;
+  /** The icon of the section's overview row, when it has one. */
+  sectionIcon?: IconName;
   /** Groups between the section and the page, outermost first. */
   ancestors: readonly NavigationItem[];
   label: string;
@@ -698,6 +700,7 @@ export function nearestNavigationItem(
         nearest = {
           section: section.label,
           sectionHref: section.href,
+          sectionIcon: section.icon,
           ancestors: [...ancestors],
           label: item.label,
           href,
@@ -716,6 +719,7 @@ export function nearestNavigationItem(
       return {
         section: section.label,
         sectionHref: section.href,
+        sectionIcon: section.icon,
         ancestors: [],
         label: section.label,
         href: section.href,

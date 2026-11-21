@@ -5,7 +5,6 @@
 // headers). Pages not listed get no art: API symbol and formula function pages
 // carry none.
 import type { FramedCrop, ShotSize } from "../lib/content-components.js";
-import type { SectionMarkName } from "./section-marks.js";
 
 /**
  * A screenshot from the capture script (figures/capture.ts), framed with its
@@ -483,20 +482,11 @@ export const SECTION_HEADER_ART: Readonly<Record<string, string>> = {
   "/docs/performance/": "performance",
 };
 
-/** The tabs' landing pages: a section mark above the eyebrow. */
-export const SECTION_MARKS: Readonly<Record<string, SectionMarkName>> = {
-  "/docs/": "guides",
-  "/docs/api/": "api",
-  "/docs/reference/formula-functions/": "formulas",
-  "/docs/releases/": "changelog",
-};
-
 /** Whether a page shows any art, so its head links the art stylesheet; screenshots aren't art. */
 export function pageHasArt(href: string): boolean {
   return (
     (DOCS_PICTURE_PLACEMENTS[href] ?? []).some((placement) => "picture" in placement) ||
     href in SECTION_HEADER_ART ||
-    href in SECTION_MARKS ||
     href === "/docs/start/choose-an-engine/"
   );
 }

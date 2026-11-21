@@ -37,6 +37,18 @@ function cell(page: Page, sheet: string, row: number, col: number) {
   );
 }
 
+test("File › Keyboard Shortcuts opens the shortcuts panel", async ({ page }) => {
+  await open(page);
+  await page.getByRole("tab", { name: "File", exact: true }).click();
+  await page.getByRole("button", { name: "Keyboard Shortcuts" }).click();
+  const panel = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(panel).toBeVisible();
+  await panel
+    .getByRole("searchbox", { name: "Search commands or press keys" })
+    .fill("paste special");
+  await expect(panel).toContainText("Paste Special");
+});
+
 test("ribbon commands edit the workbook and AutoSum totals the ledger", async ({ page }) => {
   await open(page);
   const ribbon = page.getByRole("region", { name: "Ribbon" });
@@ -175,6 +187,96 @@ test("at 320 px the tabs scroll beside the layout buttons instead of under them 
   expect(await fitsViewport(page)).toBe(true);
 });
 
+test("the Data tab's large Sort labels break between whole phrases @portability", async ({
+  page,
+}) => {
+  await open(page, 1_440, 900);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await ribbon.getByRole("tab", { name: "Data", exact: true }).click();
+  for (const name of ["Sort A to Z", "Sort Z to A"]) {
+    const label = ribbon
+      .getByRole("button", { name, exact: true })
+      .locator(".sheetwrite-ribbon-label");
+    // The label's text, line by line, from where each character is drawn.
+    const lines = await label.evaluate((element) => {
+      const text = element.firstChild;
+      const content = text?.textContent ?? "";
+      const range = document.createRange();
+      const byTop = new Map<number, string>();
+      for (let index = 0; index < content.length && text !== null; index += 1) {
+        range.setStart(text, index);
+        range.setEnd(text, index + 1);
+        const top = Math.round(range.getBoundingClientRect().top);
+        byTop.set(top, (byTop.get(top) ?? "") + (content[index] ?? ""));
+      }
+      return [...byTop.values()].map((line) => line.replaceAll("\u00a0", " ").trim());
+    });
+    expect(lines).toEqual(["Sort", name.slice("Sort ".length)]);
+  }
+});
+
+for (const width of [390, 320]) {
+  test(`at ${width} px the full ribbon names a folded group on two lines at most, clear of every caption @portability`, async ({
+    page,
+  }) => {
+    await open(page, width, 844);
+    const ribbon = page.getByRole("region", { name: "Ribbon" });
+    const switcher = ribbon.getByRole("button", { name: "Compact ribbon" });
+    if ((await switcher.getAttribute("aria-pressed")) === "true") await switcher.click();
+    await expect(ribbon).toHaveAttribute("data-mode", "full");
+    const data = ribbon.getByRole("tab", { name: "Data", exact: true });
+    if (!(await data.isVisible())) {
+      await ribbon.getByRole("button", { name: "More tabs" }).click();
+      await page.getByRole("menuitem", { name: "Data", exact: true }).click();
+    }
+    await expect(data).toHaveAttribute("aria-selected", "true");
+    await nextFrames(page);
+
+    const problems = await ribbon.evaluate((element) => {
+      const panel = element.querySelector<HTMLElement>(".sheetwrite-ribbon-panel:not([hidden])");
+      if (panel === null) return ["no panel"];
+      const shown = (node: Element) => node.getClientRects().length > 0;
+      const folded = [
+        ...panel.querySelectorAll('[data-size="collapsed"] > .sheetwrite-ribbon-group-button'),
+      ];
+      const captions = [...panel.querySelectorAll(".sheetwrite-ribbon-group-label")].filter(shown);
+      const found: string[] = [];
+      if (folded.length === 0) found.push("no folded group");
+      for (const button of folded) {
+        const name =
+          button.getAttribute("aria-label") ??
+          button.parentElement?.getAttribute("aria-label") ??
+          "";
+        const label = button.querySelector(".sheetwrite-ribbon-label")?.firstChild;
+        const range = document.createRange();
+        const tops = new Set<number>();
+        const text = label?.textContent ?? "";
+        for (let index = 0; index < text.length && label; index += 1) {
+          if (/\s/.test(text[index] ?? "")) continue;
+          range.setStart(label, index);
+          range.setEnd(label, index + 1);
+          tops.add(Math.round(range.getBoundingClientRect().top));
+        }
+        if (tops.size > 2) found.push(`${name}: ${tops.size} lines`);
+        const box = button.getBoundingClientRect();
+        for (const caption of captions) {
+          const other = caption.getBoundingClientRect();
+          const overlap =
+            Math.min(box.right, other.right) - Math.max(box.left, other.left) > 0.5 &&
+            Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 0.5;
+          if (overlap) found.push(`${name} overlaps the caption ${caption.textContent}`);
+        }
+        const group = button.parentElement?.querySelector(".sheetwrite-ribbon-group-label");
+        if (group && shown(group)) found.push(`${name} still shows its caption`);
+        if (box.bottom > panel.getBoundingClientRect().bottom + 0.5)
+          found.push(`${name} runs past the panel`);
+      }
+      return found;
+    });
+    expect(problems).toEqual([]);
+  });
+}
+
 for (const mode of ["full", "compact"] as const) {
   test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
     page,
@@ -197,7 +299,12 @@ for (const mode of ["full", "compact"] as const) {
     await expect(insert).toBeFocused();
     await expect(insert).toHaveAttribute("aria-selected", "true");
     await insert.press("Home");
+    // The tab list's Home key goes to its first tab, File.
+    const file = ribbon.getByRole("tab", { name: "File", exact: true });
+    await expect(file).toBeFocused();
+    await file.press("ArrowRight");
     await expect(home).toBeFocused();
+    await expect(home).toHaveAttribute("aria-selected", "true");
 
     await select(page, "B2");
     const bold = ribbon.getByRole("button", { name: "Bold", exact: true });

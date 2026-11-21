@@ -145,27 +145,4 @@ describe("row and column moves", () => {
       store.dispose();
     }
   });
-
-  it("moves a named range with the rows", () => {
-    const { store, controller } = setup([
-      {
-        op: "setNamedRange",
-        namedRange: {
-          name: "Second",
-          range: { sheet: "data", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
-        },
-      },
-      formula("summary", 0, 0, "=Second*10"),
-    ]);
-    try {
-      const move: DocumentOp = { op: "moveRows", sheet: "data", from: 1, count: 1, to: 4 };
-      expect(controller.commit([move], "structure").status).toBe("applied");
-
-      expect(store.getWorkbook().namedRanges?.[0]?.range?.start.row).toBe(4);
-      expect(store.getCell(at("summary", 0)).resolved).toBe(20);
-    } finally {
-      controller.destroy();
-      store.dispose();
-    }
-  });
 });

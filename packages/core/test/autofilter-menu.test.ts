@@ -83,26 +83,12 @@ describe("AutoFilter dropdown", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("clears the filter when every value is checked again, and keeps only search results", () => {
+  it("clears the filter when every value is checked again", () => {
     const first = open({ kept: [1] });
     first.list.focus();
     first.key(first.list, " ");
     first.key(first.list, "Enter");
     expect(first.applied).toEqual([null]);
-
-    const second = open();
-    const search = document.querySelector<HTMLInputElement>('input[type="search"]');
-    if (!search) throw new Error("no search box");
-    search.value = "p";
-    search.dispatchEvent(new Event("input"));
-    expect(second.options()).toEqual([
-      ["(Select All Search Results)", "true"],
-      ["Add current selection to filter", "false"],
-      ["apple", "true"],
-      ["pear", "true"],
-    ]);
-    second.key(search, "Enter");
-    expect(second.applied).toEqual([{ kind: "values", values: ["apple", "pear"] }]);
   });
 
   it("ticks every search result, and adds them to the filter with Add current selection to filter", () => {

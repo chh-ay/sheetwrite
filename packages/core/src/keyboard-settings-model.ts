@@ -7,7 +7,7 @@ import { SheetwriteError } from "./errors.js";
 import {
   bindingIdentities,
   codeKey,
-  DEFAULT_BINDINGS,
+  defaultKeys,
   formatShortcut,
   isKeyboardAction,
   isMac,
@@ -109,7 +109,7 @@ export function commandLabel(action: KeyboardAction): string {
 /** The keys `action` has under `bindings`: Excel's defaults unless the bindings change them. */
 export function keysOf(action: KeyboardAction, bindings: KeyBindings): readonly KeyShortcut[] {
   const own = bindings[action];
-  if (own === undefined) return DEFAULT_BINDINGS[action];
+  if (own === undefined) return defaultKeys(action);
   if (own === null) return [];
   return typeof own === "string" || "key" in own ? [own] : own;
 }
@@ -134,7 +134,7 @@ function overlaps(a: KeyShortcut, b: KeyShortcut): boolean {
 
 /** Whether the user changed `action`'s keys from Excel's defaults. */
 export function isChanged(action: KeyboardAction, bindings: KeyBindings): boolean {
-  return !sameKeys(keysOf(action, bindings), DEFAULT_BINDINGS[action]);
+  return !sameKeys(keysOf(action, bindings), defaultKeys(action));
 }
 
 /** Only the actions that differ from Excel's defaults, each as a list of keys or `null`. */
@@ -256,7 +256,7 @@ export function matchesQuery(
     commandLabel(action),
     group,
     ...keysOf(action, bindings).map(searchText),
-    ...DEFAULT_BINDINGS[action].map(searchText),
+    ...defaultKeys(action).map(searchText),
   ]
     .join(" ")
     .toLowerCase();
@@ -365,6 +365,9 @@ export function refusedKeys(
   }
   if (bare && !parsed.shift && (parsed.key === "f2" || parsed.key === "f4")) {
     return `${keysLabel(shortcut)} edits the active cell, as in Excel, so it can't be assigned.`;
+  }
+  if (bare && parsed.key === "f6") {
+    return `${keysLabel(shortcut)} moves the focus between the parts of the window and out of the grid, as in Excel, so it can't be assigned.`;
   }
   return reservedReason(parsed, environment);
 }
