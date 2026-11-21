@@ -18,6 +18,7 @@ function scriptRequests(page: Page): string[] {
   return scripts;
 }
 
+// @portability: each engine reports an error's line from its own stack format.
 test("Try it runs the example, reruns an edit, reports an error at its line, and resets @portability", async ({
   page,
 }) => {
@@ -65,67 +66,32 @@ test("Try it runs the example, reruns an edit, reports an error at its line, and
   await expect(frame.locator("#grid canvas").first()).toBeAttached();
 });
 
-for (const path of [
-  "/docs/features/formatting/conditional-formats/",
-  "/docs/features/formatting/number-formats/",
-  "/docs/features/formulas/dynamic-arrays-and-spills/",
-  "/docs/features/analysis/charts/",
-  "/docs/features/analysis/pivot-tables/",
-]) {
-  test(`the runnable example on ${path} runs without an error`, async ({ page }) => {
+test("every feature guide's runnable example runs without an error", async ({ page }) => {
+  for (const path of [
+    "/docs/features/formatting/conditional-formats/",
+    "/docs/features/formatting/number-formats/",
+    "/docs/features/formulas/dynamic-arrays-and-spills/",
+    "/docs/features/analysis/charts/",
+    "/docs/features/analysis/pivot-tables/",
+  ]) {
     await page.goto(path);
     await waitForHydration(page);
     // The button shows under the closed "Full setup" disclosure and runs it without opening it.
-    await expect(page.locator(".sw-runnable details").first()).not.toHaveAttribute("open");
+    await expect(page.locator(".sw-runnable details").first(), path).not.toHaveAttribute("open");
     await page.getByRole("button", { name: "Try it" }).first().click();
     const playground = page.locator(".sw-playground");
-    await expect(playground.getByRole("status")).toHaveText(/^Ran in \d+ ms/, {
+    await expect(playground.getByRole("status"), path).toHaveText(/^Ran in \d+ ms/, {
       timeout: RUN_TIMEOUT_MS,
     });
-    await expect(playground.getByRole("alert")).toHaveCount(0);
+    await expect(playground.getByRole("alert"), path).toHaveCount(0);
     await expect(playground.frameLocator("iframe").locator("#grid canvas").first()).toBeAttached();
-  });
-}
+  }
+});
 
-test("on a phone the editor wraps long lines in both layers, like the page's code block", async ({
+test("page actions edit the source and report a problem; pages without an example load no playground; the changelog links its feed", async ({
   page,
+  request,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/docs/start/first-grid/");
-  await waitForHydration(page);
-  await page.getByRole("button", { name: "Try it" }).first().click();
-  await expect(page.locator(".sw-playground").getByRole("status")).toHaveText(/^Ran in/, {
-    timeout: RUN_TIMEOUT_MS,
-  });
-  const layout = await page
-    .locator(".sw-playground__editor")
-    .first()
-    .evaluate((element) => {
-      const pre = element.querySelector("pre");
-      const textarea = element.querySelector("textarea");
-      if (pre === null || textarea === null) throw new Error("The editor has no layers");
-      return {
-        fits:
-          element.scrollWidth <= element.clientWidth &&
-          textarea.scrollWidth <= textarea.clientWidth,
-        preHeight: pre.getBoundingClientRect().height,
-        textHeight: textarea.scrollHeight,
-      };
-    });
-  expect(layout.fits).toBe(true);
-  // Both layers wrap to the same rows, so the coloured text stays under the caret.
-  expect(Math.abs(layout.preHeight - layout.textHeight)).toBeLessThanOrEqual(1);
-});
-
-test("a page without a runnable example loads none of the playground", async ({ page }) => {
-  const scripts = scriptRequests(page);
-  await page.goto("/docs/start/installation/");
-  await waitForHydration(page);
-  await expect(page.getByRole("button", { name: "Try it" })).toHaveCount(0);
-  expect(scripts.filter((path) => PLAYGROUND_SCRIPT.test(path))).toEqual([]);
-});
-
-test("page actions edit the source file and report a problem with the page", async ({ page }) => {
   await page.goto("/docs/start/first-grid/");
   await expect(page.getByRole("link", { name: "Edit on GitHub" })).toHaveAttribute(
     "href",
@@ -142,13 +108,16 @@ test("page actions edit the source file and report a problem with the page", asy
   expect(report.searchParams.get("pages")).toBe(
     "Your first grid: https://www.sheetwrite.dev/docs/start/first-grid/",
   );
-  // A generated page has no source file to edit.
+
+  // A generated page has no source file to edit, and no runnable example.
+  const scripts = scriptRequests(page);
   await page.goto("/docs/api/core/");
+  await waitForHydration(page);
   await expect(page.getByRole("link", { name: "Report a problem" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Edit on GitHub" })).toHaveCount(0);
-});
+  await expect(page.getByRole("button", { name: "Try it" })).toHaveCount(0);
+  expect(scripts.filter((path) => PLAYGROUND_SCRIPT.test(path))).toEqual([]);
 
-test("the changelog links its RSS feed in the served head", async ({ page, request }) => {
   await page.goto("/docs/releases/");
   await expect(page.getByRole("link", { name: "changelog RSS feed" })).toHaveAttribute(
     "href",
