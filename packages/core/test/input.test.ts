@@ -546,6 +546,44 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
+  it("clears contents with Delete and keeps the cells' formats, as Excel does, in a merge too", () => {
+    const { grid, store, host } = makeGrid();
+    const cell = (row: number, col: number) => ({ sheet: "s1", row, col });
+    const style = { numberFormat: "0%", bold: true };
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: cell(1, 1), value: { kind: "literal", value: 0.15 }, style },
+        { op: "set", addr: cell(4, 1), value: { kind: "literal", value: 0.5 }, style },
+        { op: "addMerge", sheet: "s1", merge: { r0: 4, c0: 1, r1: 5, c1: 2 } },
+      ],
+    });
+    const press = (): void => {
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Delete", bubbles: true, cancelable: true }),
+      );
+    };
+
+    grid.setSelection({ kind: "cell", addr: cell(1, 1) });
+    press();
+    expect(store.getCell(cell(1, 1))).toMatchObject({ resolved: null, style });
+
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 3, col: 1 }, end: { row: 5, col: 2 } },
+    });
+    press();
+    expect(store.getCell(cell(4, 1))).toMatchObject({ resolved: null, style });
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: cell(1, 1), value: { kind: "literal", value: 7 }, style }],
+    });
+    grid.setSelection({ kind: "cell", addr: cell(1, 1) });
+    grid.actions.clearContents();
+    expect(store.getCell(cell(1, 1))).toMatchObject({ resolved: null, style });
+    grid.destroy();
+    store.dispose();
+  });
+
   it("copies the top row and its format into the selection with Ctrl+D", () => {
     const { grid, store, host } = makeGrid();
     store.applyTransaction({
