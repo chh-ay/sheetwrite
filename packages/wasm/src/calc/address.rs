@@ -24,35 +24,40 @@ pub(super) fn parse_col(letters: &str) -> Option<u32> {
 }
 
 /// Parse an A1 token like `B12` or `$B$12`, preserving absolute markers.
+/// Every name token of a formula passes through here, so it reads bytes and
+/// builds the column and row in the same pass that checks them.
 pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
-    let col_abs = token.starts_with('$');
-    let unmarked = token.strip_prefix('$').unwrap_or(token);
+    let bytes = token.as_bytes();
+    let col_abs = bytes.first() == Some(&b'$');
+    let unmarked = bytes.get(usize::from(col_abs)..)?;
+    let letters_end = unmarked
+        .iter()
+        .position(|byte| !byte.is_ascii_alphabetic())
+        .unwrap_or(unmarked.len());
+    let (letters, row_token) = unmarked.split_at(letters_end);
+    let row_abs = row_token.first() == Some(&b'$');
+    let digits = row_token.get(usize::from(row_abs)..)?;
+    if letters.is_empty() || digits.is_empty() {
+        return None;
+    }
 
-    let mut letters_end = 0;
-
-    for (idx, ch) in unmarked.char_indices() {
-        if !ch.is_ascii_alphabetic() {
-            break;
+    let mut col_number: u32 = 0;
+    for letter in letters {
+        col_number = col_number
+            .checked_mul(26)?
+            .checked_add(u32::from(letter.to_ascii_uppercase() - b'A') + 1)?;
+    }
+    let mut row_number: u32 = 0;
+    for digit in digits {
+        if !digit.is_ascii_digit() {
+            return None;
         }
-
-        letters_end = idx + ch.len_utf8();
+        row_number = row_number
+            .checked_mul(10)?
+            .checked_add(u32::from(digit - b'0'))?;
     }
-
-    if letters_end == 0 {
-        return None;
-    }
-
-    let letters = &unmarked[..letters_end];
-    let row_token = &unmarked[letters_end..];
-    let row_abs = row_token.starts_with('$');
-    let digits = row_token.strip_prefix('$').unwrap_or(row_token);
-
-    if digits.is_empty() || !digits.chars().all(|ch| ch.is_ascii_digit()) {
-        return None;
-    }
-
-    let col = parse_col(letters)?;
-    let row = row_index(digits.parse().ok()?)?;
+    let col = col_number - 1;
+    let row = row_index(row_number)?;
 
     (col < SHEET_COLS).then_some((row, col, RefFlags::new(row_abs, col_abs)))
 }

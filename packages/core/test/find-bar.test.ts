@@ -1,12 +1,14 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { FindBar } from "../src/find-bar.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { SearchResult } from "../src/types.js";
+import type { ColumnarData, Grid, Workbook } from "../src/types.js";
 import { makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
+const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -17,91 +19,98 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
   restoreCanvasStubs();
   document.body.innerHTML = "";
 });
 
+const PEOPLE: ColumnarData = {
+  rowCount: 3,
+  columns: { name: ["Ada", "Bob", "Ada"], amount: [1, 2, 3], city: ["London", "Paris", "Rome"] },
+};
+const A = (row: number, col: number) => ({ sheet: "s1", row, col });
+
+/** A grid without its own find bar, and a FindBar over it. */
+function mount(data: ColumnarData, workbook: Workbook = makeWorkbook(data.rowCount)) {
+  const host = mountHost();
+  const grid = createGrid(host, {
+    workbook,
+    data,
+    config: { find: false, contextMenu: false, toolbar: false },
+  });
+  const bar = new FindBar(host, DEFAULT_THEME, grid);
+  cleanups.push(
+    () => bar.destroy(),
+    () => grid.destroy(),
+  );
+  const field = (name: string) => host.querySelector<HTMLInputElement>(`.sheetwrite-find-${name}`)!;
+  const click = (name: string) =>
+    host.querySelector<HTMLButtonElement>(`.sheetwrite-find-${name}`)!.click();
+  const typeInto = (input: HTMLInputElement, text: string) => {
+    input.value = text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  return { host, grid, bar, field, click, typeInto };
+}
+
+const value = (grid: Grid, row: number, col = 0) => grid.store.getCell(A(row, col)).resolved;
+
 describe("FindBar", () => {
   it("searches and replaces live cells without leaking field keystrokes", async () => {
-    const host = mountHost();
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: {
-        rowCount: 3,
-        columns: {
-          name: ["Ada", "Bob", "Ada"],
-          amount: [1, 2, 3],
-          city: ["London", "Paris", "Rome"],
-        },
-      },
-      config: { find: false, contextMenu: false, toolbar: false },
-    });
-    const searchEvents: SearchResult[] = [];
+    const { host, grid, bar, field, click, typeInto } = mount(PEOPLE);
+    bar.open();
+    const count = () => host.querySelector(".sheetwrite-find-count")?.textContent?.match(/\d+/g);
+    typeInto(field("input"), "Ada");
+    expect(count()).toEqual(["1", "2"]);
+    click("next");
+    expect(count()).toEqual(["2", "2"]);
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(2, 0) });
+
+    // A press on a button keeps the focus in the field.
+    const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    host.querySelector(".sheetwrite-find-next")!.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(true);
+    click("prev");
+    expect(count()).toEqual(["1", "2"]);
+    click("next");
+
+    field("input").dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
+    expect([value(grid, 0), value(grid, 2)]).toEqual(["Ada", "Ada"]);
+
     let changes = 0;
-    grid.on("search", (event) => searchEvents.push(event));
     grid.on("change", () => {
       changes += 1;
     });
-    const bar = new FindBar(host, DEFAULT_THEME, grid);
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-
-    bar.open();
-    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
-    const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
-    const count = host.querySelector<HTMLElement>(".sheetwrite-find-count")!;
-    input.value = "Ada";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "2"]);
-    let latest = searchEvents.at(-1)!;
-    expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 0, col: 0 });
-
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
-    expect(count.textContent?.match(/\d+/g)).toEqual(["2", "2"]);
-    latest = searchEvents.at(-1)!;
-    expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 2, col: 0 });
-
-    const buttonMouseDown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.dispatchEvent(buttonMouseDown);
-    expect(buttonMouseDown.defaultPrevented).toBe(true);
-
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-prev")!.click();
-    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "2"]);
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
-
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
-    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Ada");
-
-    replacement.value = "Grace";
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace")!.click();
-    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
+    field("replace-input").value = "Grace";
+    click("replace");
+    expect(value(grid, 2)).toBe("Grace");
     expect(changes).toBe(1);
-    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "1"]);
+    expect(count()).toEqual(["1", "1"]);
     await Promise.resolve();
 
-    replacement.value = "Lovelace";
-    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Lovelace");
+    field("replace-input").value = "Lovelace";
+    field("replace-input").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    expect(value(grid, 0)).toBe("Lovelace");
 
-    input.value = "Grace";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    replacement.value = "All";
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
-    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("All");
+    typeInto(field("input"), "Grace");
+    field("replace-input").value = "All";
+    click("replace-all");
+    expect(value(grid, 2)).toBe("All");
 
-    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    field("replace-input").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
     expect(bar.isOpen).toBe(false);
     bar.open();
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-close")!.click();
+    click("close");
     expect(bar.isOpen).toBe(false);
     bar.open();
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    field("input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(bar.isOpen).toBe(false);
-    expect(document.activeElement).toBe(host);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Lovelace");
-
-    bar.destroy();
-    grid.destroy();
+    expectSame(document.activeElement, host);
+    expect(value(grid, 0)).toBe("Lovelace");
   });
 });
 
@@ -179,43 +188,18 @@ describe("FindBar Replace all preview", () => {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
 
   it("shows what Replace all will change before it applies, as one undo step", async () => {
-    const host = mountHost();
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: {
-        rowCount: 3,
-        columns: {
-          name: ["Ada", "Bob", "Ada"],
-          amount: [1, 2, 3],
-          city: ["London", "Paris", "Rome"],
-        },
-      },
-      config: { find: false, contextMenu: false, toolbar: false },
-    });
+    const { host, grid, bar, field, click, typeInto } = mount(PEOPLE);
     grid.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 2 },
-          value: { kind: "formula", src: '="Ada"' },
-        },
-      ],
+      patches: [{ op: "set", addr: A(1, 2), value: { kind: "formula", src: '="Ada"' } }],
     });
-    const bar = new FindBar(host, DEFAULT_THEME, grid);
     bar.open({ replace: true });
-    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
-    const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
     const preview = host.querySelector<HTMLElement>(".sheetwrite-find-preview")!;
-    input.value = "Ada";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    replacement.value = "Grace";
-    replacement.dispatchEvent(new Event("input", { bubbles: true }));
+    const status = () => preview.querySelector(".sheetwrite-find-results-status")!.textContent;
+    typeInto(field("input"), "Ada");
+    typeInto(field("replace-input"), "Grace");
     await settle();
 
-    expect(preview.hidden).toBe(false);
-    expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
-      "3 cells, 1 of them a formula",
-    );
+    expect(status()).toBe("3 cells, 1 of them a formula");
     const rows = [
       ...preview.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
     ];
@@ -224,29 +208,21 @@ describe("FindBar Replace all preview", () => {
       ["Sheet 1", "$C$2", '="Ada"', '="Grace"'],
       ["Sheet 1", "$A$3", "Ada", "Grace"],
     ]);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
+    expect(value(grid, 0)).toBe("Ada");
 
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
-    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
-    expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Grace"');
+    click("replace-all");
+    expect(grid.store.getFormula(A(1, 2))).toBe('="Grace"');
     await settle();
-    expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
-      "Nothing to replace",
-    );
+    expect(status()).toBe("Nothing to replace");
     grid.actions.undo();
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
-    expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Ada"');
-
-    bar.destroy();
-    grid.destroy();
+    expect(value(grid, 0)).toBe("Ada");
+    expect(grid.store.getFormula(A(1, 2))).toBe('="Ada"');
   });
 
   it("plans the preview once typing pauses, not on every key", async () => {
-    const host = mountHost();
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(2),
-      data: { rowCount: 2, columns: { name: ["Ada", "Bob"], amount: [1, 2], city: ["", ""] } },
-      config: { find: false, contextMenu: false, toolbar: false },
+    const { grid, bar, field, typeInto } = mount({
+      rowCount: 2,
+      columns: { name: ["Ada", "Bob"], amount: [1, 2], city: ["", ""] },
     });
     let plans = 0;
     const preview = grid.previewReplaceAll.bind(grid);
@@ -254,27 +230,17 @@ describe("FindBar Replace all preview", () => {
       plans += 1;
       return preview(replacement);
     };
-    const bar = new FindBar(host, DEFAULT_THEME, grid);
     bar.open({ replace: true });
-    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
-    const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
-    input.value = "Ada";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    for (const text of ["G", "Gr", "Gra"]) {
-      replacement.value = text;
-      replacement.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+    typeInto(field("input"), "Ada");
+    for (const text of ["G", "Gr", "Gra"]) typeInto(field("replace-input"), text);
     expect(plans).toBe(0);
     await settle();
     expect(plans).toBe(1);
-    bar.destroy();
-    grid.destroy();
   });
 });
 
 describe("Find in numbers with a number format", () => {
   it("matches the formula bar's text or the shown text, as Excel's Look in does", () => {
-    const host = mountHost();
     const workbook = makeWorkbook(4);
     workbook.sheets[0]!.columns[1] = {
       key: "amount",
@@ -282,9 +248,8 @@ describe("Find in numbers with a number format", () => {
       width: 120,
       type: "general",
     };
-    const grid = createGrid(host, {
-      workbook,
-      data: {
+    const { grid } = mount(
+      {
         rowCount: 4,
         columns: {
           name: ["a", "b", "c", "d"],
@@ -292,17 +257,19 @@ describe("Find in numbers with a number format", () => {
           city: ["", "", "", ""],
         },
       },
-      config: { find: false, contextMenu: false, toolbar: false },
-    });
-    const cell = (row: number) => ({ sheet: "s1", row, col: 1 });
-    const formats = ["m/d/yyyy", "0%", "$#,##0.00"];
-    grid.applyTransaction({
-      patches: formats.map((numberFormat, row) => ({
-        op: "setRangeStyle" as const,
-        range: { sheet: "s1", start: cell(row), end: cell(row) },
-        style: { numberFormat },
-      })),
-    });
+      workbook,
+    );
+    const format = (row: number, numberFormat: string) =>
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "setRangeStyle",
+            range: { sheet: "s1", start: A(row, 1), end: A(row, 1) },
+            style: { numberFormat },
+          },
+        ],
+      });
+    ["m/d/yyyy", "0%", "$#,##0.00"].forEach((numberFormat, row) => format(row, numberFormat));
     const rows = (query: string, lookIn: "formulas" | "values") =>
       grid.search(query, { lookIn }).matches.map((match) => match.row);
 
@@ -317,25 +284,18 @@ describe("Find in numbers with a number format", () => {
     // Replace rewrites the text Find read, and the cell keeps its format.
     grid.search("1/15", { lookIn: "formulas" });
     expect(grid.replaceAll("1/16").replaced).toBe(1);
-    expect(grid.store.getCell(cell(0))).toMatchObject({
+    expect(grid.store.getCell(A(0, 1))).toMatchObject({
       resolved: 46038,
       style: { numberFormat: "m/d/yyyy" },
     });
 
     // A number format given to a found cell takes it out of the open search.
     expect(rows("4.5", "formulas")).toEqual([2]);
-    const events: SearchResult[] = [];
-    grid.on("search", (event) => events.push(event));
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "setRangeStyle",
-          range: { sheet: "s1", start: cell(2), end: cell(2) },
-          style: { numberFormat: "0.0%" },
-        },
-      ],
+    let latest: number[] | undefined;
+    grid.on("search", (event) => {
+      latest = event.matches.map((match) => match.row);
     });
-    expect(events.at(-1)?.matches).toEqual([]);
-    grid.destroy();
+    format(2, "0.0%");
+    expect(latest).toEqual([]);
   });
 });

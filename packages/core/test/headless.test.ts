@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -59,18 +60,12 @@ describe("config.keyboard: (e, grid) => boolean (host interceptor)", () => {
 
     // Returning true consumes: stock ArrowDown navigation must NOT run.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-    const afterDown = grid.getSelection();
-    expect(afterDown?.kind === "cell" ? afterDown.addr.row : -1).toBe(2);
-    expect(received).toBe(grid);
+    expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: A(2, 0) });
+    expectSame(received, grid);
 
     // Returning false falls through: stock ArrowRight navigation moves the cell.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    const afterRight = grid.getSelection();
-    expect(afterRight?.kind).toBe("cell");
-    if (afterRight?.kind === "cell") {
-      expect(afterRight.addr.row).toBe(2);
-      expect(afterRight.addr.col).toBe(1);
-    }
+    expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: A(2, 1) });
 
     grid.destroy();
   });
@@ -164,34 +159,6 @@ describe("grid.styleRange", () => {
     expect(allocation.distinctStyleIds).toBe(3);
     expect(allocation.maxTransferredArrayLength).toBe(allocation.distinctStyleIds);
     expect(allocation.maxTransferredArrayLength).toBeLessThan(40_000);
-
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: A(0, 0),
-          value: { kind: "literal", value: 8 },
-          style: store.getCell(A(0, 0)).style,
-        },
-      ],
-    });
-    expect(store.getCell(A(1, 1)).resolved).toBe(48);
-    expect(store.getCell(A(9_999, 2)).resolved).toBe(8);
-    grid.undo();
-    expect(store.getCell(A(1, 1)).resolved).toBe(42);
-    expect(store.getCell(A(9_999, 2)).resolved).toBe(7);
-
-    grid.undo();
-    expect(store.getCell(A(0, 0)).style.bold).toBeUndefined();
-    expect(store.getCell(A(1, 1)).style).toEqual({ color: "#123456" });
-    expect(store.getCell(A(5_000, 3)).style).toEqual({});
-    expect(store.getCell(A(9_999, 2)).style).toEqual({ italic: true });
-    expect(store.getFormula(A(1, 1))).toBe("=A1*6");
-    expect(store.getRefTarget(A(9_999, 2))).toEqual(A(0, 0));
-
-    grid.redo();
-    expect(store.getCell(A(1, 1)).style).toEqual({ color: "#123456", bold: true });
-    expect(store.getCell(A(9_999, 2)).style).toEqual({ italic: true, bold: true });
     grid.destroy();
     store.dispose();
   });

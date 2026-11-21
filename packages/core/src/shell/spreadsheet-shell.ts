@@ -258,11 +258,29 @@ export function createSpreadsheetShell(
   let tabHost: HTMLDivElement | null = null;
   let tabs: SheetTabs | null = null;
   lifetime.add(() => tabs?.destroy());
+  // The tab strip's own width sets its floor beside the status (shell.css):
+  // half the row, or its own width if that is less. Measured once a frame at
+  // most, after the tabs change or the strip is resized.
+  let measureFrame = 0;
+  const measureTabs = (): void => {
+    measureFrame = 0;
+    tabHost?.style.setProperty("--sheetwrite-shell-tabs-width", `${tabHost.scrollWidth}px`);
+  };
+  const scheduleMeasure = (): void => {
+    if (measureFrame === 0) measureFrame = requestAnimationFrame(measureTabs);
+  };
+  lifetime.add(() => {
+    if (measureFrame !== 0) cancelAnimationFrame(measureFrame);
+  });
+  const tabsResized =
+    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasure);
+  lifetime.add(() => tabsResized?.disconnect());
   const createTabs = (): void => {
     if (!tabsEnabled || tabs) return;
     tabHost = document.createElement("div");
     tabHost.className = "sheetwrite-shell-tabs";
     bottomRow.prepend(tabHost);
+    tabsResized?.observe(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
       focusSheet: focusGrid,
@@ -291,6 +309,7 @@ export function createSpreadsheetShell(
     }
     createTabs();
     tabs?.update(grid.store.getWorkbook().sheets, grid.getActiveSheet());
+    scheduleMeasure();
   };
   refreshTabs();
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
@@ -162,8 +163,8 @@ describe("retained DOM cell renderer overlay", () => {
         },
       ],
     });
-    expect(cell(host, 20, 1)).toBe(anchor);
-    expect(anchor.querySelector("button")).toBe(node);
+    expectSame(cell(host, 20, 1), anchor);
+    expectSame(anchor.querySelector("button"), node);
     expect(node?.textContent).toBe("tall:off-window-edit");
     expect(node?.dataset.color).toBe("#123456");
     expect(host.querySelectorAll('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toHaveLength(

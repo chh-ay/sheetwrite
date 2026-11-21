@@ -10,7 +10,16 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
+const ROWS = 6;
+/** Row 1 is the only row that is not hidden, not in the collapsed group and is in Tokyo. */
+const VISIBLE_ROW = 1;
+
 const stores: SheetwriteStore[] = [];
+
+function keep(store: SheetwriteStore): SheetwriteStore {
+  stores.push(store);
+  return store;
+}
 
 afterEach(() => {
   for (const store of stores.splice(0)) store.dispose();
@@ -20,7 +29,7 @@ afterEach(() => {
  * Sheet 1 holds the fixture rows (amounts 0.5, 10.5, … 50.5; cities Phnom
  * Penh, Tokyo, Berlin repeating); sheet s2 holds the subtotals over them.
  */
-function storeWithSubtotals(workbook: Workbook = makeWorkbook(6)): SheetwriteStore {
+function storeWithSubtotals(workbook: Workbook = makeWorkbook(ROWS)): SheetwriteStore {
   workbook.sheets.push(sheet("s2", 2));
   const store = new SheetwriteStore(workbook, makeColumnarData(workbook.sheets[0]?.rowCount));
   stores.push(store);
@@ -39,6 +48,27 @@ function storeWithSubtotals(workbook: Workbook = makeWorkbook(6)): SheetwriteSto
     ],
   });
   return store;
+}
+
+/** Tokyo rows 1 and 4 pass the filter; row 0 is hidden and rows 4-5 are a collapsed group. */
+function workbookWithSavedView(): Workbook {
+  const workbook = makeWorkbook(ROWS);
+  const [data] = workbook.sheets;
+  if (!data) throw new Error("fixture has a first sheet");
+
+  data.hiddenRows = new Set([0]);
+  data.rowGroups = [{ start: 4, end: 5, collapsed: true }];
+  data.filters = [[2, { kind: "values", values: ["Tokyo"] }]];
+  return workbook;
+}
+
+function visibleDataRows(store: SheetwriteStore, sheetId: string): number[] {
+  const rows: number[] = [];
+  for (let row = 0; row < ROWS; row++) {
+    if (store.viewRowOf(sheetId, row) !== null) rows.push(row);
+  }
+
+  return rows;
 }
 
 function subtotals(store: SheetwriteStore): unknown[] {
@@ -67,14 +97,8 @@ describe("SUBTOTAL over hidden rows", () => {
     expect(subtotals(store)).toEqual([153, 153]);
   });
 
-  it("reads the hidden rows that the workbook was loaded with", () => {
-    const workbook = makeWorkbook(6);
-    const [data] = workbook.sheets;
-    if (!data) throw new Error("fixture has a first sheet");
-    data.hiddenRows = new Set([0]);
-    data.rowGroups = [{ start: 4, end: 5, collapsed: true }];
-
-    expect(subtotals(storeWithSubtotals(workbook))).toEqual([153, 61.5]);
+  it("reads the hidden rows and filters that the workbook was loaded with", () => {
+    expect(subtotals(storeWithSubtotals(workbookWithSavedView()))).toEqual([51, 10.5]);
   });
 
   it("closes the mutation when the engine rejects the hidden rows", () => {
@@ -99,5 +123,38 @@ describe("SUBTOTAL over hidden rows", () => {
     } finally {
       setHiddenRows.mockRestore();
     }
+  });
+});
+
+describe("saved view state at load", () => {
+  it("applies saved hidden rows, collapsed groups and filters when the store is built", () => {
+    const store = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+
+    expect(store.hasView("s1")).toBe(true);
+    expect(store.viewRowCount("s1")).toBe(1);
+    expect(visibleDataRows(store, "s1")).toEqual([VISIBLE_ROW]);
+  });
+
+  it("applies the saved view of a snapshot after its cells load", () => {
+    const source = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+    const loaded = keep(SheetwriteStore.fromSnapshot(source.exportSnapshot()));
+
+    expect(loaded.hasView("s1")).toBe(true);
+    expect(visibleDataRows(loaded, "s1")).toEqual([VISIBLE_ROW]);
+  });
+
+  it("applies the saved view of a sheet added from a snapshot", () => {
+    const source = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+    const [saved] = source.exportSnapshot().sheets;
+    if (!saved) throw new Error("snapshot has a first sheet");
+
+    const store = keep(new SheetwriteStore(makeWorkbook(ROWS), makeColumnarData(ROWS)));
+    const outcome = store.applyTransaction({
+      patches: [{ op: "addSheet", sheet: { ...saved, id: "s2", name: "Copy", order: 1 } }],
+    });
+
+    expect(outcome.status).toBe("applied");
+    expect(store.hasView("s2")).toBe(true);
+    expect(visibleDataRows(store, "s2")).toEqual([VISIBLE_ROW]);
   });
 });

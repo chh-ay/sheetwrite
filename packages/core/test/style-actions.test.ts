@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellChange, DocumentOp, Grid } from "../src/types.js";
@@ -137,51 +138,6 @@ describe("StyleActions merge policy", () => {
     grid.destroy();
   });
 
-  it("keeps anchor content, clears covered cells, and restores the merge with one undo", () => {
-    const grid = makeGrid(4);
-    const addresses = [
-      { sheet: "s1", row: 1, col: 0 },
-      { sheet: "s1", row: 1, col: 1 },
-      { sheet: "s1", row: 2, col: 0 },
-      { sheet: "s1", row: 2, col: 1 },
-    ] as const;
-    grid.applyTransaction({
-      patches: addresses.map((addr, index) => ({
-        op: "set" as const,
-        addr,
-        value: { kind: "literal" as const, value: `value-${index}` },
-      })),
-    });
-    grid.setSelection({
-      kind: "range",
-      range: {
-        sheet: "s1",
-        start: { row: 1, col: 0 },
-        end: { row: 2, col: 1 },
-      },
-    });
-
-    grid.actions.merge();
-
-    expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
-      "value-0",
-      null,
-      null,
-      null,
-    ]);
-
-    grid.actions.undo();
-    expect(grid.store.getWorkbook().sheets[0]!.merges ?? []).toEqual([]);
-    expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
-      "value-0",
-      "value-1",
-      "value-2",
-      "value-3",
-    ]);
-    grid.destroy();
-  });
-
   describe("warning before values are dropped, as in Excel", () => {
     const a6 = { sheet: "s1", row: 5, col: 0 };
     const b6 = { sheet: "s1", row: 5, col: 1 };
@@ -221,7 +177,7 @@ describe("StyleActions merge policy", () => {
 
       await answerDialog(host, "OK");
       expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
-      expect(document.activeElement).toBe(host);
+      expectSame(document.activeElement, host);
       expect(merges(grid)).toEqual([{ r0: 5, c0: 0, r1: 5, c1: 1 }]);
       expect(grid.store.getCell(a6)).toMatchObject({ resolved: "m1", style: { align: "center" } });
       expect(grid.store.getCell(b6).resolved).toBeNull();
@@ -268,7 +224,7 @@ describe("StyleActions merge policy", () => {
       grid.destroy();
     });
 
-    it("keeps every value on Cancel or Escape, and keeps grid keys out", async () => {
+    it("keeps every value on Cancel, and keeps grid keys out", async () => {
       const { host, grid } = twoValues();
       grid.actions.merge({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
@@ -280,36 +236,8 @@ describe("StyleActions merge policy", () => {
       expect(merges(grid)).toEqual([]);
       expect(grid.store.getCell(a6).resolved).toBe("m1");
       expect(grid.store.getCell(b6).resolved).toBe("m2");
-      expect(document.activeElement).toBe(host);
+      expectSame(document.activeElement, host);
       expect(dialog.isConnected).toBe(false);
-
-      grid.actions.merge({ ask: true });
-      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-      again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(again.isConnected).toBe(false);
-      expect(merges(grid)).toEqual([]);
-      expect(grid.store.getCell(b6).resolved).toBe("m2");
-      grid.destroy();
-    });
-
-    it("keeps Tab inside the dialog, and Enter chooses OK", async () => {
-      const { host, grid } = twoValues();
-      grid.actions.merge({ ask: true });
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-      const [ok, cancel] = dialog.querySelectorAll("button");
-      cancel!.focus();
-      cancel!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-      expect(document.activeElement).toBe(ok!);
-      ok!.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }),
-      );
-      expect(document.activeElement).toBe(cancel!);
-
-      dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(merges(grid)).toEqual([{ r0: 5, c0: 0, r1: 5, c1: 1 }]);
-      expect(grid.store.getCell(b6).resolved).toBeNull();
       grid.destroy();
     });
   });

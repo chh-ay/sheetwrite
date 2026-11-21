@@ -10,6 +10,7 @@ import {
   runSharedAdapterLifecycleContract,
   runSimpleAdapterSizeContract,
 } from "../../../test/adapter-lifecycle-contract.js";
+import { expectDifferent, expectSame } from "../../../test/expect-same.js";
 import { Sheetwrite, SheetwriteGrid } from "../src/index.js";
 import { mountReact, renderReactSimple } from "./mount.js";
 
@@ -85,7 +86,7 @@ describe("SheetwriteGrid React lifecycle", () => {
       await Promise.resolve();
     });
     expect(suspendedRenders).toBeGreaterThan(0);
-    expect(gridRef.current).toBe(committedGrid);
+    expectSame(gridRef.current, committedGrid);
     calls.length = 0;
     committedGrid.refresh();
     expect(calls).toContain("committed");
@@ -130,7 +131,7 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(firstRows[0]?.name).toBe("Notebook");
 
     await render([{ name: "Pen", price: 2.25 }]);
-    expect(gridRef.current).not.toBe(first);
+    expectDifferent(gridRef.current, first);
     expect(gridRef.current?.store.getCell({ sheet: "sheet1", row: 0, col: 0 }).resolved).toBe(
       "Pen",
     );

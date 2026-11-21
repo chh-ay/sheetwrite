@@ -3,15 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type {
-  DocumentOp,
-  PanePaint,
-  Renderer,
-  RenderLayout,
-  Theme,
-  Viewport,
-  VisibleWindowView,
-} from "../src/types.js";
+import type { DocumentOp, Renderer, Viewport, VisibleWindowView } from "../src/types.js";
 import {
   makeColumnarData,
   makeWorkbook,
@@ -42,38 +34,19 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originalRaf;
 });
 
-// A renderer that records the frame contracts each test inspects: plain paints
-// (with a snapshot of the frame's row geometry, since Viewport.rowHeights aliases
-// a reused scratch buffer), frozen-pane frames, layouts, and themes.
-interface PaintCapture {
-  view: VisibleWindowView;
-  rowHeights: number[] | null;
-}
+// A renderer that records each paint with a snapshot of the frame's row
+// geometry, since Viewport.rowHeights aliases a reused scratch buffer.
 interface Recorder extends Renderer {
-  readonly paints: PaintCapture[];
-  readonly paneFrames: Array<{
-    panes: readonly PanePaint[];
-    divider: { x: number | null; y: number | null };
-  }>;
-  readonly layouts: RenderLayout[];
-  readonly themes: Theme[];
+  readonly paints: Array<{ view: VisibleWindowView; rowHeights: number[] | null }>;
 }
 
 function makeRecorder(): Recorder {
-  const paints: PaintCapture[] = [];
-  const paneFrames: Recorder["paneFrames"] = [];
-  const layouts: RenderLayout[] = [];
-  const themes: Theme[] = [];
+  const paints: Recorder["paints"] = [];
   let lastViewport: Viewport | null = null;
-  const rec: Recorder = {
+  return {
     paints,
-    paneFrames,
-    layouts,
-    themes,
     mount() {},
-    setLayout(layout: RenderLayout) {
-      layouts.push(layout);
-    },
+    setLayout() {},
     setViewport(viewport: Viewport) {
       lastViewport = viewport;
     },
@@ -83,16 +56,10 @@ function makeRecorder(): Recorder {
         rowHeights: lastViewport?.rowHeights ? Array.from(lastViewport.rowHeights) : null,
       });
     },
-    setTheme(theme: Theme) {
-      themes.push(theme);
-    },
+    setTheme() {},
     setRenderers() {},
     destroy() {},
   };
-  rec.paintPanes = (panes, divider) => {
-    paneFrames.push({ panes, divider });
-  };
-  return rec;
 }
 
 describe("view composition", () => {

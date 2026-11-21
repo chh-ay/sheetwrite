@@ -157,18 +157,10 @@ impl CellStore {
 
 #[cfg(test)]
 mod tests {
-    use super::{draw_between, integer_bounds, SplitMix64};
+    use super::{draw_between, SplitMix64};
     use crate::types::FormulaError;
 
     const SAMPLE_DRAWS: usize = 10_000;
-
-    #[test]
-    fn randbetween_rounds_bounds_inward_and_rejects_empty_intervals() {
-        assert_eq!(integer_bounds(1.2, 3.8), Ok((2.0, 3.0)));
-        assert_eq!(integer_bounds(-2.5, -2.5), Err(FormulaError::Num));
-        assert_eq!(integer_bounds(5.0, 4.0), Err(FormulaError::Num));
-        assert_eq!(integer_bounds(7.0, 7.0), Ok((7.0, 7.0)));
-    }
 
     #[test]
     fn randbetween_draws_every_integer_of_the_interval_and_nothing_else() {

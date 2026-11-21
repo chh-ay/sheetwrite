@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
@@ -180,7 +181,7 @@ describe("createToolbar", () => {
       piece.element.dispatchEvent(
         new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
       );
-      expect(document.activeElement, key).toBe(controls[expected]!);
+      expectSame(document.activeElement, controls[expected]!, key);
     }
     expect(piece.element.getAttribute("role")).toBe("toolbar");
     expect(piece.element.getAttribute("aria-label")).toBe("Editing");
@@ -274,7 +275,7 @@ describe("createNameBox", () => {
 
     // Typing on the grid edits the cell in the formula bar; Enter stores it.
     press(host, "x");
-    expect(document.activeElement).toBe(field);
+    expectSame(document.activeElement, field);
     expect(field.value).toBe("x");
     press(field, "Enter");
     expect(store.getCell(a3).resolved).toBe("x");
@@ -400,7 +401,7 @@ describe("createFormulaBar", () => {
       bar.focus();
       type(bar, "Typed");
       expect(cellEditor()?.value).toBe("Typed");
-      expect(document.activeElement).toBe(bar);
+      expectSame(document.activeElement, bar);
       type(bar, "Typed in bar", "insertFromPaste");
       expect(cellEditor()?.value).toBe("Typed in bar");
       bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
@@ -426,7 +427,7 @@ describe("createFormulaBar", () => {
       if (!editor) throw new Error("the cell editor did not open");
       type(editor, "ab");
       bar.focus();
-      expect(cellEditor()).toBe(editor);
+      expectSame(cellEditor(), editor);
       type(bar, "abc");
       expect(editor.value).toBe("abc");
       editor.focus();

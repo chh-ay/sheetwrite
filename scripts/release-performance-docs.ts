@@ -686,6 +686,24 @@ export function renderReleaseComparisonSection(
   );
   const { base, candidate, candidateLine } = evidence.releases;
   const header = `| Measurement | ${base} median / p95 | ${candidate} median / p95 | Change | Result |`;
+  // Each suite's spread of time changes: the lowest and highest median ratio
+  // among Sheetwrite's own timed rows, the same Change values its table lists.
+  const timeLanes = evidence.suites.flatMap((suite) => {
+    const ratios = suite.metrics
+      .filter(
+        (metric) =>
+          (metric.unit === "ms" || metric.unit === "ns") &&
+          metric.medianRatio !== null &&
+          !isControlOrRepeat(metric.key),
+      )
+      .map((metric) => (metric.medianRatio ?? Number.NaN).toFixed(2));
+    if (ratios.length === 0) return [];
+    const sorted = [...new Set(ratios)].sort((left, right) => Number(left) - Number(right));
+    const low = sorted[0];
+    const high = sorted.at(-1);
+    const words = low === high ? `${low} of the time` : `${low}–${high} of the time`;
+    return [`${suiteName(suite.artifact)} · ${ratios.length} timed rows | Linux: ${words}`];
+  });
 
   return [
     "## Release comparison",
@@ -703,6 +721,16 @@ export function renderReleaseComparisonSection(
         `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "new-only")} | ${count(suite, "regression")} | ${others(suite)} |`,
     ),
     "",
+    ...(timeLanes.length === 0
+      ? []
+      : [
+          `Each suite's timed rows changed by the range below: the lowest and the highest median ratio of ${candidate} to ${base}, as its table lists them.`,
+          "",
+          `\`\`\`perf-lanes diagram title="Median time of ${candidate} against ${base}, lowest to highest row per suite" base="${base}"`,
+          ...timeLanes,
+          "```",
+          "",
+        ]),
     "### Flagged rows",
     "",
     `${flags.length} rows exceed their suite's budget or noise test. They stay listed here, not removed or adjusted against a control. A flag compares one capture of each release; it is not a controlled gate verdict.`,

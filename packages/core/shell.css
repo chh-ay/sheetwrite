@@ -105,17 +105,30 @@
   font: var(--sheetwrite-tab-font, 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
 }
 
-/* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css. */
+/* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css.
+   When the row is too narrow, the tab strip gives way first and scrolls, down
+   to half the row (or its own width, if less); only then does the status
+   drop parts. spreadsheet-shell.ts measures the strip's own width into
+   --sheetwrite-shell-tabs-width. */
 .sheetwrite-shell-tabs {
   display: flex;
+  flex: 0 1000 auto;
   align-items: stretch;
   height: 30px;
   overflow-x: auto;
-  min-width: 0;
+  min-width: min(50%, var(--sheetwrite-shell-tabs-width, 0px));
 }
 
 .sheetwrite-shell-status {
-  flex: none;
+  /* Once the tab strip is at its floor, the status narrows, down to its cell
+     mode and no further: its parts drop out whole instead, Sum last. It never
+     runs under the tabs or out of the row. */
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  /* selection-status.ts sets the least width: its cell mode. */
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   color: var(
     --sheetwrite-widget-muted,
@@ -125,5 +138,37 @@
 }
 
 .sheetwrite-shell-mode {
+  flex: none;
   margin-right: 12px;
+}
+
+.sheetwrite-shell-status-parts {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sheetwrite-shell-status-part {
+  flex: none;
+}
+
+.sheetwrite-shell-status-parts[hidden],
+.sheetwrite-shell-status-part[hidden],
+.sheetwrite-shell-status-dropped {
+  display: none;
+}
+
+.sheetwrite-shell-status-part:not([hidden], .sheetwrite-shell-status-dropped)
+  ~ .sheetwrite-shell-status-part:not([hidden], .sheetwrite-shell-status-dropped)::before {
+  content: " · ";
+  white-space: pre;
+}
+
+/* The whole line, for screen readers, which skip the drawn parts. */
+.sheetwrite-shell-status-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
