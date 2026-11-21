@@ -84,7 +84,7 @@ pub(crate) fn write_cells(store: &mut CellStore, sheet: usize, data: &[&[&str]])
 /// Evaluates each `(formula, expected)` case in its own row of column `col`
 /// and reports every mismatch at once. `expected` is the text the cell
 /// shows; `~x` is a number within one unit in the last digit of `x`, for
-/// results that are published rounded.
+/// results that are published rounded, and `x±t` a number within `t` of `x`.
 pub(crate) fn assert_formulas<F: AsRef<str>>(
     store: &mut CellStore,
     sheet: usize,
@@ -112,6 +112,16 @@ pub(crate) fn assert_formulas<F: AsRef<str>>(
 }
 
 fn shows(actual: &str, expected: &str) -> bool {
+    if let Some((center_text, tolerance_text)) = expected.split_once('±') {
+        let (Ok(center), Ok(tolerance)) =
+            (center_text.parse::<f64>(), tolerance_text.parse::<f64>())
+        else {
+            return false;
+        };
+        return actual
+            .parse::<f64>()
+            .is_ok_and(|number| (number - center).abs() <= tolerance);
+    }
     let Some(published) = expected.strip_prefix('~') else {
         return actual == expected;
     };

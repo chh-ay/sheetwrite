@@ -826,3 +826,23 @@ pub(super) fn negative_binomial_mass(failures: f64, successes: f64, probability:
         + failures * (-probability).ln_1p())
     .exp()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::NAMES;
+    use crate::eval::excel_results_tests::DISTRIBUTION_EXAMPLES;
+
+    /// A function added to this family needs its published example too.
+    #[test]
+    fn every_function_has_a_published_example() {
+        for name in NAMES {
+            let call = format!("={name}(");
+            assert!(
+                DISTRIBUTION_EXAMPLES
+                    .iter()
+                    .any(|(formula, _)| formula.starts_with(&call)),
+                "{name} has no example"
+            );
+        }
+    }
+}
