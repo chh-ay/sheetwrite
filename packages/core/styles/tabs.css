@@ -120,11 +120,12 @@
   z-index: 3;
 }
 
+/* The icons sit in a line of the bar's text, as the tab labels do, so their
+   centres meet the labels' optical centre (the middle of the x-height), not
+   the middle of the button box. */
 .sheetwrite-tab-options-button,
 .sheetwrite-tab-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   flex: none;
   height: calc(100% - 6px);
   border: 1px solid transparent;
@@ -133,19 +134,39 @@
   color: var(--sheetwrite-tab-fg, #5f6368);
   cursor: pointer;
   font: inherit;
+  text-align: center;
 }
 
 .sheetwrite-tab-icon {
-  display: block;
+  /* The icon's centre sits half an x-height above the line's baseline: the
+     tab labels' optical centre. The negative margins keep the icon from
+     growing the line box, so the baseline sits where the labels' does. */
+  display: inline-block;
+  margin-block: -1em;
+  vertical-align: middle;
   /* 16 px at a 13 px font: the + and ⋯ icons grow with the bar's text. */
   width: calc(16em / 13);
   height: calc(16em / 13);
+  /* Where round() works, the icon is a whole number of pixels high and a
+     whole number of pixels from the baseline, so it snaps to the pixel grid
+     as the text does. The bottom margin edge sits 0.5ex + 1em - height / 2
+     above the baseline, which puts the centre at baseline - 0.5ex. */
+  width: round(calc(16em / 13), 1px);
+  height: round(calc(16em / 13), 1px);
+  vertical-align: round(calc(0.5ex + 1em - round(calc(16em / 13), 1px) / 2), 1px);
   pointer-events: none;
+}
+
+/* Two device pixels to the CSS pixel: half pixels are whole device pixels. */
+@media (min-resolution: 2dppx) {
+  .sheetwrite-tab-icon {
+    vertical-align: round(calc(0.5ex + 1em - round(calc(16em / 13), 1px) / 2), 0.5px);
+  }
 }
 
 .sheetwrite-tab-options-button {
   min-width: 30px;
-  padding: 0 6px 2px;
+  padding: 0 6px;
   line-height: 1;
 }
 
@@ -159,6 +180,9 @@
 .sheetwrite-tab-add {
   width: 32px;
   padding: 0;
+  /* Centred on the bar like the tabs, also in the shell's row, which
+     stretches its items. */
+  align-self: center;
   font-weight: 650;
   line-height: 1;
   /* When the tabs overflow the strip, the strip scrolls and + stays in view

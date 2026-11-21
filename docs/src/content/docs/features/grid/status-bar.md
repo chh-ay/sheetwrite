@@ -114,6 +114,8 @@ The totals and the size are joined with ` · `, after the cell mode.
 
 As in Excel, Average and Sum show in the number format of the active cell, so a selection that starts on a `$#,##0` cell shows `Sum: $736,610`. Without a format they show as Excel's General format shows a number, such as `Average: 61384.16667`. Count is a plain count.
 
+When the row is too narrow for the whole line, the status bar drops whole parts: the selection size first, then the records found and the undo step, then Count, then Average. Sum, the total people read most, stays longest, and the cell mode always stays. In the shell, the sheet tabs give way first: the tab strip narrows and scrolls, down to half the row (or its own width, if less), and only then does the status drop parts. Screen readers still hear every part.
+
 The status bar updates on each `selection`, `change`, `history-step` and `cell-mode` event. It is a polite live region, so screen readers announce changes without interrupting the user.
 
 Excel changes the cells of an undo silently. Here the step's name says what was undone, and the changed cells also flash in the grid for a moment, so a change spread over many cells, or one that started out of view, is easy to check. The grid reports each step with the `history-step` event, `{ direction, step, range }`, so a status bar of your own can show it too.

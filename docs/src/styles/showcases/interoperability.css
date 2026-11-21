@@ -702,8 +702,6 @@
 
 /* The add-sheet control is a chip on the tab bar, not a stray glyph. */
 .sw-si-workbench :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add) {
-  display: grid;
-  place-items: center;
   width: 1.75rem;
   height: 100%;
   padding: 0;
