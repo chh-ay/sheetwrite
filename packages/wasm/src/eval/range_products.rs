@@ -46,7 +46,8 @@ impl CellStore {
         let mut shape = None;
 
         for arg in args {
-            let reader = RangeView::clipped(self, written_range(arg, sheet)?, depth).ok()?;
+            let range = written_range(arg, self.name_scope(sheet))?;
+            let reader = RangeView::clipped(self, range, depth).ok()?;
             let (rows, cols) = reader.shape();
             if (rows as u64).saturating_mul(cols as u64) > crate::types::RANGE_CELL_LIMIT {
                 return None;

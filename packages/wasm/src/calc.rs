@@ -689,6 +689,8 @@ pub(crate) struct SheetSpanRef {
     pub cell: bool,
 }
 
+/// A named range as the store defines it: `name` is the definition's
+/// spelling, which formulas that use it write back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NamedRangeRef {
     pub name: String,
@@ -700,28 +702,28 @@ pub(crate) struct NamedRangeRef {
     pub col_end: u32,
 }
 
-/// A use of a defined name that holds a formula: the name, for writing the
-/// formula back, and the name's formula expanded for the formula that uses
-/// it. Formulas share one expansion when it does not depend on where they
-/// are; see `CellStore::name_target`.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct NamedFormulaRef {
-    pub name: String,
-    pub expression: Ast,
-    /// Nodes of `expression`, counting each name in it at its own count:
-    /// what one walk over the expansion visits.
-    pub nodes: usize,
-}
+/// A defined name's index in the store's name table, which holds one entry
+/// per name without case and that name's definition in each scope. A
+/// formula that uses the name holds its id ([`Ast::DefinedName`]) and reads
+/// the definition for its own sheet through the table, so a definition
+/// change rewrites no formula.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct NameId(std::num::NonZeroU32);
 
-/// What a defined name stands for in one formula.
-#[derive(Clone)]
-pub(crate) enum NameTarget {
-    Range(NamedRangeRef),
-    Formula(std::rc::Rc<NamedFormulaRef>),
-    /// A reference with no sheet inside another name's expansion. It is
-    /// placed in the expansion as it is, so it reads the sheet of the formula
-    /// that evaluates it and the expansion does not depend on that sheet.
-    Reference(Ast),
+impl NameId {
+    /// The id of the table entry at `index`; `None` past `u32::MAX - 1`.
+    pub(crate) fn at(index: usize) -> Option<Self> {
+        u32::try_from(index)
+            .ok()
+            .and_then(|narrow| narrow.checked_add(1))
+            .and_then(std::num::NonZeroU32::new)
+            .map(Self)
+    }
+
+    /// The table entry's index.
+    pub(crate) const fn index(self) -> usize {
+        (self.0.get() - 1) as usize
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -851,11 +853,15 @@ pub(crate) enum Ast {
         reason = "shared patterns are not part of the public AST API"
     )]
     RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
+    /// A name the store does not bind: as parsed, a LET or LAMBDA name, or
+    /// a defined name before binding.
     Name(Box<str>),
-    NamedRange(Box<NamedRangeRef>),
-    /// A defined name that holds a formula. Shared, because one name can be
-    /// used by many formulas; never mutated in place.
-    NamedFormula(std::rc::Rc<NamedFormulaRef>),
+    /// A use of a defined name, bound to its id in the store's name table.
+    /// It reads the name's definition for its formula's sheet through the
+    /// table (`NameScope::read`), defined yet or not. The flag records
+    /// whether the name evaluates to an array there, so shape checks need no
+    /// name table (`store::names::shapes`).
+    DefinedName(NameId, bool),
     UnresolvedStructured(Box<UnresolvedStructuredRef>),
     Structured(StructuredRef),
     Cell(u32, u32, RefFlags),
@@ -906,55 +912,12 @@ const _: () = assert!(
 );
 
 impl Ast {
-    /// The expression that a LET binding's use or a defined name stands
-    /// for, through any number of them: what a function argument such as
-    /// `MAP(A1:A3,MYFN)` passes.
-    #[cfg(feature = "analysis")]
-    pub(crate) fn bound_value(&self) -> &Self {
-        let mut expression = self;
-        loop {
-            expression = match expression {
-                Self::LetSlot {
-                    expression: bound, ..
-                } => bound,
-                Self::NamedFormula(named) => &named.expression,
-                Self::Num(_)
-                | Self::Str(_)
-                | Self::Bool(_)
-                | Self::Missing
-                | Self::Parameter { .. }
-                | Self::Lambda(_)
-                | Self::RegexPattern(_)
-                | Self::Name(_)
-                | Self::NamedRange(_)
-                | Self::UnresolvedStructured(_)
-                | Self::Structured(_)
-                | Self::Cell(..)
-                | Self::SheetCell(..)
-                | Self::AbsCell(..)
-                | Self::Range(..)
-                | Self::SheetRange(..)
-                | Self::AbsRange(..)
-                | Self::SheetSpan(_)
-                | Self::InvalidRef
-                | Self::Func(..)
-                | Self::UnknownFunc(..)
-                | Self::Bin(..)
-                | Self::Cmp(..)
-                | Self::Neg(_)
-                | Self::Pos(_)
-                | Self::Percent(_)
-                | Self::LetName { .. }
-                | Self::Array { .. } => return expression,
-            };
-        }
-    }
-
     /// Whether `test` holds for a direct child expression: a function
-    /// argument, an operand, or the expression a LET use stands for. A named
-    /// formula's expression is its own definition, not a child; a walker that
-    /// follows names matches `Ast::NamedFormula` itself. Every node kind is
-    /// listed, so a new kind must say whether it has children.
+    /// argument, an operand, or the expression a LET use stands for. A
+    /// defined name's formula lives in the store's name table, not in the
+    /// tree; a walker that follows names reads it there
+    /// (`NameScope::read`). Every node kind is listed, so a new kind
+    /// must say whether it has children.
     pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Self) -> bool) -> bool {
         match self {
             Self::Func(_, args) => args.iter().any(test),
@@ -977,8 +940,7 @@ impl Ast {
             | Self::Bool(_)
             | Self::Missing
             | Self::Name(_)
-            | Self::NamedRange(_)
-            | Self::NamedFormula(_)
+            | Self::DefinedName(..)
             | Self::UnresolvedStructured(_)
             | Self::Structured(_)
             | Self::Cell(..)
@@ -1024,8 +986,7 @@ impl Ast {
             | Self::Bool(_)
             | Self::Missing
             | Self::Name(_)
-            | Self::NamedRange(_)
-            | Self::NamedFormula(_)
+            | Self::DefinedName(..)
             | Self::UnresolvedStructured(_)
             | Self::Structured(_)
             | Self::Cell(..)
@@ -1067,20 +1028,8 @@ impl Ast {
             }
             Self::Name(value) => out.add_payload(value.len(), value.len()),
             Self::LetName { name, .. } => out.add_payload(name.len(), name.len()),
-            Self::NamedRange(value) => {
-                let bytes = std::mem::size_of::<NamedRangeRef>();
-                out.add_payload(bytes, bytes);
-                add_string_memory(&value.name, out);
-            }
-            // A shared expansion is counted once, by the store's cache that
-            // also holds it; an expansion only this formula holds is its own.
-            Self::NamedFormula(value) if std::rc::Rc::strong_count(value) == 1 => {
-                let bytes = std::mem::size_of::<NamedFormulaRef>();
-                out.add_payload(bytes, bytes);
-                add_string_memory(&value.name, out);
-                value.expression.heap_memory_stats(out);
-            }
-            Self::NamedFormula(_) => {}
+            // The store's name table holds the name's definitions.
+            Self::DefinedName(..) => {}
             Self::UnresolvedStructured(value) => {
                 let bytes = std::mem::size_of::<UnresolvedStructuredRef>();
                 out.add_payload(bytes, bytes);
@@ -2666,8 +2615,8 @@ pub(crate) fn bind_sheet_refs(
     resolve: &SheetResolver<'_>,
     place_span: &SpanPlacer<'_>,
 ) -> bool {
-    // Every node other than a sheet reference or a defined name's formula
-    // binds through its children.
+    // Every node other than a sheet reference binds through its children. A
+    // defined name's formula binds its sheets when it is defined.
     if let Ast::SheetCell(reference) = ast {
         let Some(handle) = resolve(&reference.sheet.name) else {
             return false;
@@ -2710,13 +2659,6 @@ pub(crate) fn bind_sheet_refs(
         }
         return changed;
     }
-    if let Ast::NamedFormula(named) = ast {
-        return bind_sheet_refs(
-            &mut std::rc::Rc::make_mut(named).expression,
-            resolve,
-            place_span,
-        );
-    }
     ast.fold_children_mut(&mut |child| bind_sheet_refs(child, resolve, place_span))
 }
 
@@ -2730,9 +2672,6 @@ pub(crate) fn has_unresolved_local_sheets(ast: &Ast) -> bool {
     }
     if let Ast::SheetSpan(span) = ast {
         return span.first.name.is_some() || span.last.name.is_some();
-    }
-    if let Ast::NamedFormula(named) = ast {
-        return has_unresolved_local_sheets(&named.expression);
     }
     ast.any_child(&mut has_unresolved_local_sheets)
 }
@@ -2749,8 +2688,6 @@ pub(crate) fn unresolved_sheet_names(ast: &Ast, out: &mut Vec<String>) {
                 out.push(sheet_name_key(name));
             }
         }
-    } else if let Ast::NamedFormula(named) = ast {
-        unresolved_sheet_names(&named.expression, out);
     } else {
         ast.any_child(&mut |child| {
             unresolved_sheet_names(child, out);
@@ -2810,8 +2747,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -2880,179 +2816,91 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
     Some(true)
 }
 
-/// Resolve workbook/sheet-scoped defined names after sheet references have
-/// stable handles. A LET or LAMBDA name shadows a defined name in its scope.
-pub(crate) fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
-where
-    F: Fn(&str, u32) -> Option<NameTarget>,
-{
-    resolve_named_ranges_inner(ast, formula_sheet, resolve, &[])
+/// Gives a name of a formula what it binds to: `call` says the name is
+/// called (`MYFN(A1)`). `None` leaves the name as written.
+pub(crate) type NameBinder<'a> = dyn FnMut(&str, bool) -> Option<Ast> + 'a;
+
+/// Bind the defined names of a parsed formula in place, after its sheet
+/// references have stable handles: each name becomes what `resolve` gives
+/// it, and on the full engine a call of a name that `resolve` binds becomes
+/// a call of the name's value. A LET or LAMBDA name shadows a defined name
+/// in its scope and stays as written.
+pub(crate) fn bind_defined_names(mut ast: Ast, resolve: &mut NameBinder<'_>) -> Ast {
+    bind_names_in(&mut ast, resolve, &mut Vec::new());
+    ast
 }
 
-fn resolve_named_ranges_inner<F>(
-    ast: Ast,
-    formula_sheet: u32,
-    resolve: &F,
-    locals: &[String],
-) -> Ast
-where
-    F: Fn(&str, u32) -> Option<NameTarget>,
-{
+fn is_local(locals: &[Box<str>], name: &str) -> bool {
+    locals.iter().any(|local| local.eq_ignore_ascii_case(name))
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node binds through its children"
+)]
+fn bind_names_in(ast: &mut Ast, resolve: &mut NameBinder<'_>, locals: &mut Vec<Box<str>>) {
     match ast {
-        Ast::Name(name) if locals.iter().any(|local| local.eq_ignore_ascii_case(&name)) => {
-            Ast::Name(name)
-        }
-        Ast::Name(name) => match resolve(&name, formula_sheet) {
-            Some(NameTarget::Range(range)) => Ast::NamedRange(Box::new(range)),
-            Some(NameTarget::Formula(formula)) => Ast::NamedFormula(formula),
-            Some(NameTarget::Reference(reference)) => reference,
-            None => Ast::Name(name),
-        },
-        Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {
-            let mut scoped = locals.to_vec();
-            let mut resolved = Vec::with_capacity(args.len());
-            let last = args.len() - 1;
-            for (index, arg) in args.into_vec().into_iter().enumerate() {
-                if index == last {
-                    resolved.push(resolve_named_ranges_inner(
-                        arg,
-                        formula_sheet,
-                        resolve,
-                        &scoped,
-                    ));
-                } else if index % 2 == 0 {
-                    resolved.push(arg);
-                } else {
-                    resolved.push(resolve_named_ranges_inner(
-                        arg,
-                        formula_sheet,
-                        resolve,
-                        &scoped,
-                    ));
-                    if let Some(Ast::Name(name)) = resolved.get(index - 1) {
-                        scoped.push(name.to_string());
-                    }
+        Ast::Name(name) => {
+            if !is_local(locals, name) {
+                if let Some(bound) = resolve(name, false) {
+                    *ast = bound;
                 }
             }
-            Ast::Func(Func::Let, resolved.into())
+        }
+        Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {
+            let outer = locals.len();
+            let last = args.len() - 1;
+            for index in (1..last).step_by(2) {
+                bind_names_in(&mut args[index], resolve, locals);
+                if let Ast::Name(name) = &args[index - 1] {
+                    locals.push(name.clone());
+                }
+            }
+            bind_names_in(&mut args[last], resolve, locals);
+            locals.truncate(outer);
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), lambda_args)
-            if !lambda_args.is_empty() =>
-        {
-            let mut args = lambda_args.into_vec();
-            let body = args.pop().expect("nonempty arguments");
-            let mut scoped = locals.to_vec();
-            scoped.extend(args.iter().filter_map(|parameter| {
-                if let Ast::Name(name) = parameter {
-                    Some(name.to_string())
-                } else {
-                    None
-                }
-            }));
-            args.push(resolve_named_ranges_inner(
-                body,
-                formula_sheet,
-                resolve,
-                &scoped,
-            ));
-            Ast::Func(
-                Func::Analysis(crate::eval::analysis::LAMBDA_ID),
-                args.into(),
-            )
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args) => {
+            let outer = locals.len();
+            if let Some((body, parameters)) = args.split_last_mut() {
+                locals.extend(parameters.iter().filter_map(|parameter| match parameter {
+                    Ast::Name(name) => Some(name.clone()),
+                    _ => None,
+                }));
+                bind_names_in(body, resolve, locals);
+            }
+            locals.truncate(outer);
         }
-        Ast::Func(func, args) => Ast::Func(
-            func,
-            (args
-                .into_vec()
-                .into_iter()
-                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
-                .collect::<Vec<_>>())
-            .into(),
-        ),
         Ast::UnknownFunc(call) => {
-            let UnknownCall {
-                name,
-                args: unresolved_args,
-            } = *call;
-
-            let args = unresolved_args
-                .into_vec()
-                .into_iter()
-                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
-                .collect::<Box<[Ast]>>();
+            for arg in &mut call.args {
+                bind_names_in(arg, resolve, locals);
+            }
             // `MYFN(A1)` calls the LAMBDA that the defined name MYFN holds.
             // LAMBDA needs the full engine; the default engine leaves the call
             // unknown, so it returns #NAME? as LAMBDA itself does there.
             #[cfg(feature = "analysis")]
-            if !locals.iter().any(|local| local.eq_ignore_ascii_case(&name)) {
-                if let Some(NameTarget::Formula(formula)) = resolve(&name, formula_sheet) {
-                    return named_lambda_call(formula, args);
+            if !is_local(locals, &call.name) {
+                if let Some(callee) = resolve(&call.name, true) {
+                    let arguments = std::mem::take(&mut call.args);
+                    *ast = named_lambda_call(callee, arguments);
                 }
             }
-            Ast::UnknownFunc(Box::new(UnknownCall { name, args }))
         }
-        Ast::Bin(op, left, right) => Ast::Bin(
-            op,
-            Box::new(resolve_named_ranges_inner(
-                *left,
-                formula_sheet,
-                resolve,
-                locals,
-            )),
-            Box::new(resolve_named_ranges_inner(
-                *right,
-                formula_sheet,
-                resolve,
-                locals,
-            )),
-        ),
-        Ast::Cmp(op, left, right) => Ast::Cmp(
-            op,
-            Box::new(resolve_named_ranges_inner(
-                *left,
-                formula_sheet,
-                resolve,
-                locals,
-            )),
-            Box::new(resolve_named_ranges_inner(
-                *right,
-                formula_sheet,
-                resolve,
-                locals,
-            )),
-        ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_named_ranges_inner(
-            *inner,
-            formula_sheet,
-            resolve,
-            locals,
-        ))),
-        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_named_ranges_inner(
-            *inner,
-            formula_sheet,
-            resolve,
-            locals,
-        ))),
-        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_named_ranges_inner(
-            *inner,
-            formula_sheet,
-            resolve,
-            locals,
-        ))),
-        other => other,
+        _ => {
+            ast.fold_children_mut(&mut |child| {
+                bind_names_in(child, resolve, locals);
+                false
+            });
+        }
     }
 }
 
 /// A call of the LAMBDA that a defined name holds, in the form an immediate
 /// `LAMBDA(…)(…)` call parses to: the function, then the arguments.
 #[cfg(feature = "analysis")]
-pub(crate) fn named_lambda_call(
-    formula: std::rc::Rc<NamedFormulaRef>,
-    arguments: Box<[Ast]>,
-) -> Ast {
+pub(crate) fn named_lambda_call(callee: Ast, arguments: Box<[Ast]>) -> Ast {
     let mut call = Vec::with_capacity(arguments.len() + 1);
-    call.push(Ast::NamedFormula(formula));
+    call.push(callee);
     call.extend(arguments);
     Ast::UnknownFunc(Box::new(UnknownCall {
         name: crate::eval::analysis::lambda::CALL.into(),
@@ -3104,9 +2952,8 @@ pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: 
 /// in `ast` names, or 0 for an axis no reference leaves relative. Moving the
 /// references by a shift keeps them in the sheet, exactly as
 /// [`translate_relative_refs`] would, while `shift + reach` stays within the
-/// sheet's rows and columns. A defined name's expansion is placed for its
-/// formula and translation leaves it, so a relative reference inside one
-/// reports a reach past the sheet: no shift reproduces it.
+/// sheet's rows and columns. A defined name reports a reach past the sheet,
+/// so a conditional-format rule that uses one reads a translated copy.
 pub(crate) fn relative_reach(ast: &Ast) -> (u32, u32) {
     let mut reach = (0, 0);
     add_relative_reach(ast, 0, &mut reach);
@@ -3140,13 +2987,9 @@ fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
             add_end_reach(reach, (span.row_start, span.col_start), span.flags.start);
             add_end_reach(reach, (span.row_end, span.col_end), span.flags.end);
         }
-        Ast::NamedFormula(named) => {
-            let mut inside = (0, 0);
-            add_relative_reach(&named.expression, depth + 1, &mut inside);
-            if inside != (0, 0) {
-                *reach = PAST_SHEET;
-            }
-        }
+        // A conditional-format rule that uses a defined name takes the
+        // translated copy, which reads the name for the rule's cell.
+        Ast::DefinedName(..) => *reach = PAST_SHEET,
         // These hold no reference of their own; `any_child` visits the
         // children of those that have some.
         Ast::Func(..)
@@ -3163,7 +3006,6 @@ fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
         | Ast::Missing
         | Ast::Name(_)
         | Ast::LetName { .. }
-        | Ast::NamedRange(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef
@@ -3360,15 +3202,14 @@ fn translate_relative_refs_inner(
             ast.fold_children_mut(&mut translate_child);
             true
         }
-        // A defined name's expansion is already placed for its formula.
+        // A defined name's formula is placed for its formula when it is read.
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
         | Ast::LetName { .. }
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef
@@ -3576,8 +3417,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -3756,8 +3596,7 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -3955,13 +3794,15 @@ fn span_endpoint_name<'a>(endpoint: &'a SheetSpanEndpoint, names: &'a [String]) 
         .or_else(|| names.get(endpoint.handle as usize).map(String::as_str))
 }
 
-/// What bound references write: the current name of each sheet handle, and
-/// the table and column names of each table slot. Without tables, a bound
-/// table reference writes `#REF!`.
+/// What bound references write: the current name of each sheet handle, the
+/// table and column names of each table slot, and the spelling of each
+/// defined name. Without tables, a bound table reference writes `#REF!`;
+/// without names, a defined name writes nothing.
 #[derive(Clone, Copy)]
 pub(crate) struct WrittenNames<'a> {
     pub(crate) sheets: &'a [String],
     pub(crate) tables: Option<&'a TableSlots>,
+    pub(crate) names: Option<&'a crate::store::names::NameTable>,
 }
 
 impl WrittenNames<'_> {
@@ -3969,6 +3810,7 @@ impl WrittenNames<'_> {
     pub(crate) const NONE: WrittenNames<'static> = WrittenNames {
         sheets: &[],
         tables: None,
+        names: None,
     };
 }
 
@@ -3983,8 +3825,11 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::LetName { name, .. } => out.push_str(name),
-        Ast::NamedRange(named) => out.push_str(&named.name),
-        Ast::NamedFormula(named) => out.push_str(&named.name),
+        Ast::DefinedName(id, _) => {
+            if let Some(table) = names.names {
+                table.write_spelling(*id, out);
+            }
+        }
         Ast::UnresolvedStructured(reference) => write_structured_ref(
             reference.table_name.as_deref(),
             &reference.column_name,
@@ -4541,17 +4386,9 @@ mod tests {
             ("string", Ast::Str("abc".to_owned().into()), 3),
             ("name", Ast::Name("Total".to_owned().into()), 5),
             (
-                "named range",
-                Ast::NamedRange(Box::new(NamedRangeRef {
-                    name: "Band".to_owned(),
-                    scope: None,
-                    sheet: 1,
-                    row_start: 0,
-                    col_start: 0,
-                    row_end: 4,
-                    col_end: 0,
-                })),
-                std::mem::size_of::<NamedRangeRef>() + 4,
+                "defined name",
+                Ast::DefinedName(NameId::at(0).unwrap(), false),
+                0,
             ),
             (
                 "unqualified structured ref",

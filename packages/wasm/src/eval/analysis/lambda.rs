@@ -25,6 +25,7 @@ use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
 use crate::calc::{Ast, Func, LambdaDefinition};
 use crate::memory::MemoryOwnerStats;
+use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
@@ -215,7 +216,8 @@ impl CallFrame {
 }
 
 /// What shape checks know about parameters: the frame of the calls in
-/// progress, and the argument shapes of calls whose shape is being decided.
+/// progress, the argument shapes of calls whose shape is being decided, and
+/// the defined names the checked formula reads.
 #[derive(Clone, Copy)]
 pub(crate) struct Shapes<'a> {
     frame: Option<&'a CallFrame>,
@@ -224,6 +226,7 @@ pub(crate) struct Shapes<'a> {
     scope: Option<&'a ShapeScope<'a>>,
     /// Calls whose shape is being decided, nested.
     nesting: usize,
+    names: NameScope<'a>,
 }
 
 /// The argument shapes of one call whose shape is being decided.
@@ -241,21 +244,25 @@ enum Kind<'a> {
 }
 
 impl<'a> Shapes<'a> {
-    /// No parameters are bound: a formula's own shape, outside every call.
-    pub(crate) const NONE: Shapes<'static> = Shapes {
-        frame: None,
-        call: NO_CALL,
-        scope: None,
-        nesting: 0,
-    };
+    /// No parameters are bound: a formula's own shape, outside every call,
+    /// reading its defined names through `names`.
+    pub(crate) const fn top(names: NameScope<'a>) -> Self {
+        Self::of(None, names)
+    }
 
-    pub(crate) const fn of(frame: Option<&'a CallFrame>) -> Self {
+    pub(crate) const fn of(frame: Option<&'a CallFrame>, names: NameScope<'a>) -> Self {
         Shapes {
             frame,
             call: NO_CALL,
             scope: None,
             nesting: 0,
+            names,
         }
+    }
+
+    /// The defined names the checked formula reads.
+    pub(crate) const fn names(self) -> NameScope<'a> {
+        self.names
     }
 
     fn kind(self, depth: u16, index: u16) -> Option<Kind<'a>> {
@@ -288,6 +295,7 @@ impl<'a> Shapes<'a> {
                     call: *link,
                     scope: None,
                     nesting: self.nesting,
+                    names: self.names,
                 },
             ),
         })
@@ -311,7 +319,9 @@ impl<'a> Shapes<'a> {
                 Kind::Scalar | Kind::Array => None,
             }
         } else {
-            definition(function).ok().map(|shared| (&**shared, self))
+            definition(function, self.names)
+                .ok()
+                .map(|shared| (&**shared, self))
         }
     }
 
@@ -321,7 +331,7 @@ impl<'a> Shapes<'a> {
                 return kind;
             }
         }
-        if let Ok(shared) = definition(argument) {
+        if let Ok(shared) = definition(argument, self.names) {
             return Kind::Closure(shared, self);
         }
         if ast_produces_array(argument, self) {
@@ -412,8 +422,7 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
         | Ast::Missing
         | Ast::Parameter { .. }
         | Ast::RegexPattern(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -515,16 +524,24 @@ fn valid_parameters(parameters: &[Ast]) -> bool {
         })
 }
 
-fn definition(expression: &Ast) -> Result<&Rc<LambdaDefinition>, FormulaError> {
-    if let Ast::Lambda(definition) = expression.bound_value() {
+/// The LAMBDA `expression` is: one written in place, or one a LET binding or
+/// a defined name holds, read through `names`.
+fn definition<'a>(
+    expression: &'a Ast,
+    names: NameScope<'a>,
+) -> Result<&'a Rc<LambdaDefinition>, FormulaError> {
+    if let Ast::Lambda(definition) = names.bound_value(expression) {
         Ok(definition)
     } else {
         Err(FormulaError::Value)
     }
 }
 
-pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
-    definition(expression).map(|shared| shared.parameters.len())
+pub(crate) fn parameter_count(
+    expression: &Ast,
+    names: NameScope<'_>,
+) -> Result<usize, FormulaError> {
+    definition(expression, names).map(|shared| shared.parameters.len())
 }
 
 /// The value a parameter use reads.
@@ -716,6 +733,7 @@ fn call_produces_array<'a>(arguments: &'a [Ast], shapes: Shapes<'a>) -> bool {
             call: shapes.call,
             scope: Some(&scope),
             nesting: shapes.nesting + 1,
+            names: shapes.names,
         },
     )
 }
@@ -875,8 +893,34 @@ impl<'a, 'p> Context<'a, 'p> {
         }
     }
 
+    fn names(&self) -> NameScope<'a> {
+        self.store.name_scope(self.sheet)
+    }
+
     fn shapes(&self) -> Shapes<'_> {
-        Shapes::of(self.pass.results.call_frame())
+        Shapes::of(self.pass.results.call_frame(), self.names())
+    }
+
+    /// The LAMBDA `expression` is, as [`definition`] finds it; a defined
+    /// name's LAMBDA is placed for the formula's cell first, as its
+    /// evaluation reads it.
+    fn lambda(&self, expression: &Ast) -> Option<Rc<LambdaDefinition>> {
+        let names = self.names();
+        let Ast::DefinedName(id, _) = expression else {
+            return definition(expression, names).ok().cloned();
+        };
+        // A formula read in place holds no LAMBDA when it is shifted: a
+        // name's LAMBDA is always placed in a copy.
+        let read;
+        let formula = match names.in_place(*id) {
+            Some(InPlace::Formula(formula) | InPlace::Shifted(formula, _)) => formula,
+            Some(InPlace::Range(_)) => return None,
+            None => {
+                read = names.read(*id);
+                read.formula()?
+            }
+        };
+        definition(formula, names).ok().cloned()
     }
 
     fn slot(&self, depth: u16, index: u16) -> Option<&Slot> {
@@ -921,12 +965,15 @@ impl<'a, 'p> Context<'a, 'p> {
             let Some(Slot::Closure { definition, link }) = self.slot(*depth, *index) else {
                 return Err(FormulaError::Value);
             };
-            (definition, *link)
+            (Rc::clone(definition), *link)
         } else {
-            (definition(function)?, self.top())
+            (
+                self.lambda(function).ok_or(FormulaError::Value)?,
+                self.top(),
+            )
         };
         Ok(Callee {
-            definition: Rc::clone(shared),
+            definition: shared,
             link,
         })
     }
@@ -941,9 +988,14 @@ impl<'a, 'p> Context<'a, 'p> {
                 return Ok(closure.clone());
             }
         }
-        if let Ok(shared) = definition(argument) {
+        // Only a LAMBDA, a LET binding or a defined name can stand for one.
+        let may_be_lambda = matches!(
+            argument,
+            Ast::Lambda(_) | Ast::LetSlot { .. } | Ast::DefinedName(..)
+        );
+        if let Some(shared) = may_be_lambda.then(|| self.lambda(argument)).flatten() {
             return Ok(Slot::Closure {
-                definition: Rc::clone(shared),
+                definition: shared,
                 link: self.top(),
             });
         }
@@ -1252,7 +1304,7 @@ impl Context<'_, '_> {
         for argument in supplied {
             let slot = if matches!(argument, Ast::Missing) {
                 Slot::Missing
-            } else if definition(argument).is_ok()
+            } else if definition(argument, self.names()).is_ok()
                 || matches!(argument, Ast::Parameter { depth, index, .. }
                     if matches!(self.slot(*depth, *index), Some(Slot::Closure { .. })))
             {
@@ -1295,7 +1347,7 @@ impl Context<'_, '_> {
         if depth >= FORMULA_RECURSION_LIMIT {
             return None;
         }
-        if let Some(range) = range_from_ast(expression, self.sheet) {
+        if let Some(range) = range_from_ast(expression, self.names()) {
             return Some((
                 (range.row_end - range.row_start) as usize + 1,
                 (range.col_end - range.col_start) as usize + 1,
@@ -1326,8 +1378,11 @@ impl Context<'_, '_> {
         {
             return self.written_shape(bound, depth + 1);
         }
-        if let Ast::NamedFormula(named) = expression {
-            return self.written_shape(&named.expression, depth + 1);
+        if let Ast::DefinedName(id, _) = expression {
+            let read = self.names().read(*id);
+            return read
+                .formula()
+                .and_then(|formula| self.written_shape(formula, depth + 1));
         }
         if let Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) = expression {
             return self.written_shape(inner, depth + 1);

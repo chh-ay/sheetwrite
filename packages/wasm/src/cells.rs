@@ -1522,8 +1522,10 @@ mod paged_storage_tests {
         assert!(sheet.write_cell(3, 1, KIND_EMPTY, 20, 0, Some(12)));
 
         let mut slots = crate::formula_slots::FormulaStore::default();
-        assert!(sheet.insert_rows(0, 0, 2, &mut slots).is_ok());
-        assert!(sheet.insert_cols(0, 0, 1, &mut slots).is_ok());
+        let store = crate::store::CellStore::new();
+        let names = store.name_scope(0);
+        assert!(sheet.insert_rows(names, 0, 2, &mut slots).is_ok());
+        assert!(sheet.insert_cols(names, 0, 1, &mut slots).is_ok());
         assert_eq!(
             sheet.cells.paged.as_ref().unwrap().read(3, 1),
             (KIND_EMPTY, 10, 0, true, true)
