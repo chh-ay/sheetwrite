@@ -24,7 +24,7 @@ import {
   insertOrDelete,
   runCellCommand,
 } from "./cell-commands.js";
-import { cellDisplayText, cellScalarToText } from "./cell-input.js";
+import { cellDisplayText, cellEditText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { isDashboard } from "./dashboard.js";
@@ -178,7 +178,7 @@ import type {
   GridOptions,
   GridPanel,
   GridPresentation,
-  ReplaceChange,
+  ReplacePreview,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -997,14 +997,26 @@ export class GridImpl implements Grid {
         this.validationRefusedNotice(refused, warned);
       },
       validationReads: () => storeEngine(this.store)?.validationReads,
-      // Excel's cut moves the rows a filter hides without a word; say so.
-      onHiddenRowsMoved: (count, step) => {
+      // Excel's cut moves the rows a filter or Hide Rows hides without a word;
+      // say so. Show them clears the filters and shows the step's hidden rows,
+      // as one undo step.
+      onHiddenRowsMoved: (count, step, spans) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
         this.actionFeedback.show(
           step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
           {
             label: "Show them",
-            run: () => this.actions.clearFilters(),
+            run: () => {
+              const sheet = this.sheet();
+              const shown = [...(sheet.hiddenRows ?? [])].filter((row) =>
+                spans.some(({ start, end }) => row >= start && row <= end),
+              );
+              const patches = rowVisibilityPatches(sheet, shown, false);
+              if ((sheet.filters?.length ?? 0) > 0) {
+                patches.push({ op: "setSheetMeta", sheet: sheet.id, patch: { filters: [] } });
+              }
+              if (patches.length > 0) this.document.commit(patches, "structure");
+            },
           },
         );
       },
@@ -2380,8 +2392,8 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
-  previewReplaceAll(replacement: string): ReplaceChange[] {
-    return this.searchController.previewReplaceAll(replacement);
+  previewReplaceAll(replacement: string, limit?: number): ReplacePreview {
+    return this.searchController.previewReplaceAll(replacement, limit);
   }
 
   getShortcutLabel(action: KeyboardAction): string {
@@ -2971,8 +2983,15 @@ export class GridImpl implements Grid {
     format: CellInputSnapshot["format"],
   ): CellInputSnapshot {
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
-    const resolved = this.store.getCell(address).resolved;
-    const text = formula ?? cellScalarToText(resolved);
+    const stored = this.store.getCell(address);
+    // The text the cell editor opens with, so the formula bar reads it back the same.
+    const text =
+      formula ??
+      cellEditText(
+        stored.resolved,
+        column.type,
+        stored.style.numberFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
+      );
 
     return { address, text, format };
   }
@@ -3708,7 +3727,7 @@ export class GridImpl implements Grid {
     let suffix = 2;
     while (used.has(id)) id = `${input.id?.trim() || "sheet"}-${suffix++}`;
     const columns = input.columns?.map((column) => ({ ...column })) ?? [
-      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
+      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "general" as const },
     ];
     const name = validateSheetName(
       input.name,
@@ -4034,7 +4053,7 @@ export class GridImpl implements Grid {
       let suffix = 1;
       while (used.has(key)) key = `${base}_${suffix++}`;
       used.add(key);
-      columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+      columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "general" });
     }
     return columns;
   }
@@ -4102,7 +4121,7 @@ export class GridImpl implements Grid {
         let suffix = 1;
         while (used.has(key)) key = `${base}_${suffix++}`;
         used.add(key);
-        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "general" });
       }
       additions.push({ op: "addColumns", sheet: sheetId, at: stored.columns.length, columns });
     }
@@ -5101,7 +5120,7 @@ function changedCells(patch: DocumentOp): Range | null {
 
 function appendPadColumns(columns: Column[], target: number): void {
   for (let c = columns.length; c < target; c++) {
-    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
+    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "general" });
   }
 }
 

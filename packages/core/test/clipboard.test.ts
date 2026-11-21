@@ -844,6 +844,121 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula({ sheet: "s1", row: 5, col: 0 })).toBeNull();
     expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({});
   });
+
+  describe("applies the pasted-text limits to HTML and another grid's payload", () => {
+    const tooWide = 16_385;
+    const offer = (type: string, text: string) => {
+      const item = new FakeClipboardItem({ [type]: new Blob([text], { type }) });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          read: () => Promise.resolve([item]),
+          readText: () => Promise.reject(new Error("the rich payload should be read first")),
+        },
+      });
+    };
+    const envelope = (cells: unknown[][]) =>
+      JSON.stringify({
+        version: 3,
+        token: "untrusted-token-value",
+        anchor: { row: 0, col: 0 },
+        cells,
+        hyperlinks: [],
+        tsv: "",
+        cut: false,
+      });
+    const literal = { value: { kind: "literal", value: "x" }, resolved: "x", style: {} };
+    const padding = " ".repeat(32 * 1024 * 1024);
+
+    it.each([
+      [
+        "HTML wider than a sheet",
+        "text/html",
+        `<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`,
+        "maxColumns",
+      ],
+      [
+        "HTML over the byte limit",
+        "text/html",
+        `<table><tr><td>x</td></tr></table>${padding}`,
+        "maxInputBytes",
+      ],
+      [
+        "a payload wider than a sheet",
+        SHEETWRITE_CLIPBOARD_MIME,
+        envelope([Array(tooWide).fill(literal)]),
+        "maxColumns",
+      ],
+      [
+        "a payload over the byte limit",
+        SHEETWRITE_CLIPBOARD_MIME,
+        `${envelope([[literal]])}${padding}`,
+        "maxInputBytes",
+      ],
+    ])("refuses %s, as pasted text is refused", async (_name, type, text, resource) => {
+      offer(type, text);
+      h.select(1, 0);
+
+      await expect(h.controller.paste()).rejects.toMatchObject({
+        name: "DelimitedTextResourceError",
+        resource,
+      });
+      expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).not.toBe("x");
+    });
+
+    it("refuses an oversized payload in Paste Special too", async () => {
+      offer(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(tooWide).fill(literal)]));
+      h.select(1, 0);
+
+      await expect(h.controller.pasteSpecial({ paste: "values" })).rejects.toMatchObject({
+        name: "DelimitedTextResourceError",
+        resource: "maxColumns",
+      });
+    });
+
+    it("pastes the text beside HTML past the limits, as Excel's large HTML gives way to its text", async () => {
+      const item = new FakeClipboardItem({
+        "text/html": new Blob([`<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`], {
+          type: "text/html",
+        }),
+        "text/plain": new Blob(["from text"], { type: "text/plain" }),
+      });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { read: () => Promise.resolve([item]) },
+      });
+      h.select(1, 0);
+
+      await expect(h.controller.paste()).resolves.toBe("done");
+      expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("from text");
+    });
+
+    it("pastes this grid's own copy whatever the size of its payload", async () => {
+      let written: FakeClipboardItem | undefined;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          write: ([item]: FakeClipboardItem[]) => {
+            written = item;
+            return Promise.resolve();
+          },
+        },
+      });
+      h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7);
+      h.select(0, 0);
+      await h.controller.copy();
+      const type = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
+      // The write happens in a callback, which narrowing does not see.
+      const captured = written as FakeClipboardItem | undefined;
+      if (!captured) throw new Error("the copy wrote nothing");
+      const json = await (await captured.getType(type)).text();
+      offer(type, `${json}${padding}`);
+      h.select(3, 0);
+
+      await expect(h.controller.paste()).resolves.toBe("done");
+      expect(h.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBe("=B4");
+    });
+  });
 });
 
 describe("spill clipboard commands", () => {

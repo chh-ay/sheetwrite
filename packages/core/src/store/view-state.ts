@@ -313,10 +313,10 @@ export class StoreViewState {
   }
 
   /**
-   * The distinct values of a column, in first-seen order, the style id of
-   * each value's first cell, and how many scanned rows hold each value. With
-   * `rows` and `counted`, the scan reads past `limit` values so the counts
-   * cover every row.
+   * The distinct values of a column, in first-seen order. With `rows` and
+   * `counted`, also the style id of each value's first cell and how many
+   * scanned rows hold each value, and the scan reads past `limit` values so
+   * the counts cover every row; without `counted` both are empty.
    */
   distinctValues(
     sheet: SheetId,

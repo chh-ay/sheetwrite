@@ -1,5 +1,5 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
-import { parseCellInput } from "./cell-input.js";
+import { parseCellEntry } from "./cell-input.js";
 import { isCellFontFamily, isCellVerticalAlign, sanitizeCellStyle } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
@@ -8,6 +8,10 @@ import {
   parseTsv,
   rowsToTsv,
 } from "./clipboard.js";
+import {
+  DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
+  DelimitedTextResourceError,
+} from "./delimited-text.js";
 import {
   cloneCellHyperlink,
   createHyperlinkId,
@@ -37,6 +41,7 @@ import type {
 import type { ClipboardOutcome, PasteSpecialOptions } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
+import { utf8ByteLength } from "./utf8.js";
 import {
   failingValidationRule,
   ValidationBudgetError,
@@ -79,9 +84,15 @@ export interface ClipboardControllerDeps {
   validationReads?: () => ValidationReads | undefined;
   /**
    * Called when a cut, then its paste, moves `count` rows that a filter or
-   * the user hides, which the selection did not show.
+   * the user hides, which the selection did not show. `rows` are the active
+   * sheet's data rows the step covers: the cut's, and after the paste also
+   * the rows it landed on.
    */
-  onHiddenRowsMoved?: (count: number, step: "cut" | "paste") => void;
+  onHiddenRowsMoved?: (
+    count: number,
+    step: "cut" | "paste",
+    rows: readonly { readonly start: number; readonly end: number }[],
+  ) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -137,6 +148,62 @@ const EMPTY: ClipboardPayload = { kind: "outcome", outcome: "empty" };
 export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
 const SHEETWRITE_WEB_CLIPBOARD_FORMAT = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
 
+/**
+ * Pasted HTML and another grid's payload are held to the limits pasted text
+ * is: the text's bytes before it is parsed, and its rows, columns and cells
+ * while they are read.
+ */
+const PASTE_LIMITS = DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS;
+
+/** Refuse pasted `text` larger than pasted text may be, before it is parsed. */
+function checkPasteBytes(text: string): void {
+  const bytes = utf8ByteLength(text, PASTE_LIMITS.maxInputBytes);
+  if (bytes > PASTE_LIMITS.maxInputBytes) {
+    throw new DelimitedTextResourceError(
+      "maxInputBytes",
+      PASTE_LIMITS.maxInputBytes,
+      bytes,
+      "parse",
+    );
+  }
+}
+
+/**
+ * The cells read once row `rows` (counting from 1) adds its `columns` cells
+ * to the `cells` before it. Refuses a row past the limits pasted text has.
+ */
+function countPasteRow(rows: number, columns: number, cells: number): number {
+  if (rows > PASTE_LIMITS.maxRows) {
+    throw new DelimitedTextResourceError("maxRows", PASTE_LIMITS.maxRows, rows, "parse");
+  }
+  if (columns > PASTE_LIMITS.maxColumns) {
+    throw new DelimitedTextResourceError("maxColumns", PASTE_LIMITS.maxColumns, columns, "parse");
+  }
+  const total = cells + columns;
+  if (total > PASTE_LIMITS.maxCells) {
+    throw new DelimitedTextResourceError("maxCells", PASTE_LIMITS.maxCells, total, "parse");
+  }
+  return total;
+}
+
+/** `parse()`, or the limit it reached. */
+function limited<T>(parse: () => T): T | DelimitedTextResourceError {
+  try {
+    return parse();
+  } catch (error) {
+    if (error instanceof DelimitedTextResourceError) return error;
+    throw error;
+  }
+}
+
+/**
+ * The token at the start of a payload `clipboardJson` wrote, which writes it
+ * second, after the version.
+ */
+const PAYLOAD_TOKEN = /^\{"version":3,"token":"([^"\\]{16,256})"/u;
+/** How much of a payload holds its token. */
+const PAYLOAD_TOKEN_PREFIX = 300;
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -145,10 +212,29 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellValue {
-  const parsed = parseCellInput(source, type);
+/** One style object per number format a paste gives, so a block's cells share it. */
+const formatStyles = new Map<string, CellStyle>();
 
-  return parsed.kind === "formula" ? { kind: "literal", value: `'${parsed.src}` } : parsed;
+function formatStyle(numberFormat: string): CellStyle {
+  let style = formatStyles.get(numberFormat);
+  if (style === undefined) {
+    style = { numberFormat };
+    formatStyles.set(numberFormat, style);
+  }
+  return style;
+}
+
+/**
+ * Text from elsewhere read as typed input for the target column: a formula
+ * lands as inert text, and in a `general` column a number gets the format
+ * Excel's General gives it (`12%` in `0%`).
+ */
+function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellWrite {
+  const parsed = parseCellEntry(source, type);
+  const { value, numberFormat } = parsed;
+  if (value.kind === "formula") return { value: { kind: "literal", value: `'${value.src}` } };
+  // A paste reads many cells; the parsed entry is the write when it has no format.
+  return numberFormat === undefined ? parsed : { value, style: formatStyle(numberFormat) };
 }
 
 /**
@@ -168,7 +254,12 @@ function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type
     return { value, style: cell.style };
   }
 
-  return { value: parseExternalInput(source, type), style: cell.style };
+  const parsed = parseExternalInput(source, type);
+  const style =
+    parsed.style && cell.style?.numberFormat === undefined
+      ? { ...cell.style, ...parsed.style }
+      : cell.style;
+  return { value: parsed.value, style };
 }
 
 function clipboardHtml(snapshot: ClipboardSnapshot): string {
@@ -227,7 +318,12 @@ function clipboardJson(snapshot: ClipboardSnapshot, token: string): string {
   });
 }
 
+/**
+ * Another grid's payload, or null when it is not one.
+ * @throws {@link DelimitedTextResourceError} when it is larger than pasted text may be.
+ */
 function parseClipboardJson(text: string): TrustedClipboard | null {
+  checkPasteBytes(text);
   try {
     const value = JSON.parse(text) as {
       version?: unknown;
@@ -257,8 +353,10 @@ function parseClipboardJson(text: string): TrustedClipboard | null {
     }
 
     const cells: ClipboardCell[][] = [];
+    let cellCount = 0;
     for (const inputRow of value.cells) {
       if (!Array.isArray(inputRow)) return null;
+      cellCount = countPasteRow(cells.length + 1, inputRow.length, cellCount);
       const row: ClipboardCell[] = [];
       for (const inputCell of inputRow) {
         if (!inputCell || typeof inputCell !== "object") return null;
@@ -309,7 +407,8 @@ function parseClipboardJson(text: string): TrustedClipboard | null {
         cut: value.cut,
       },
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof DelimitedTextResourceError) throw error;
     return null;
   }
 }
@@ -440,17 +539,26 @@ function styleFromHtml(cell: HTMLElement): CellStyle | undefined {
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
+/**
+ * The table in pasted HTML, or null when it holds none.
+ * @throws {@link DelimitedTextResourceError} when it is larger than pasted text may be.
+ */
 function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | null {
   if (typeof DOMParser === "undefined") return null;
+  checkPasteBytes(html);
   const document = new DOMParser().parseFromString(html, "text/html");
   const table = document.querySelector("table");
   if (!table) return null;
   const grid: CellWrite[][] = [];
+  let cellCount = 0;
   for (const row of table.querySelectorAll(
     ":scope > thead > tr, :scope > tbody > tr, :scope > tr",
   )) {
+    const cells = row.querySelectorAll(":scope > th, :scope > td");
+    if (cells.length === 0) continue;
+    cellCount = countPasteRow(grid.length + 1, cells.length, cellCount);
     const values: CellWrite[] = [];
-    for (const cell of row.querySelectorAll(":scope > th, :scope > td")) {
+    for (const cell of cells) {
       const formula = valuesOnly ? null : spreadsheetFormula(cell);
       values.push({
         value: formula
@@ -459,7 +567,7 @@ function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | 
         style: valuesOnly || !(cell instanceof HTMLElement) ? undefined : styleFromHtml(cell),
       });
     }
-    if (values.length > 0) grid.push(values);
+    grid.push(values);
   }
   return grid.length > 0 ? grid : null;
 }
@@ -607,7 +715,10 @@ export class ClipboardController {
       const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
-      if (hidden > 0) this.deps.onHiddenRowsMoved?.(hidden, "cut");
+      if (hidden > 0) {
+        const rows = { start: source.start.row, end: source.end.row };
+        this.deps.onHiddenRowsMoved?.(hidden, "cut", [rows]);
+      }
       return "done";
     } finally {
       write.close();
@@ -779,6 +890,10 @@ export class ClipboardController {
     valuesOnly: boolean,
   ): Promise<ClipboardPayload> {
     let richReadFailed = false;
+    // A rich format past the pasted-text limits gives way to the next one,
+    // as Excel's large HTML gives way to its text; with none left, the paste
+    // is refused as too large a text is.
+    let tooLarge: DelimitedTextResourceError | undefined;
 
     if (typeof clipboard.read === "function") {
       try {
@@ -791,17 +906,31 @@ export class ClipboardController {
               ? SHEETWRITE_CLIPBOARD_MIME
               : null;
           if (!customType) continue;
-          const envelope = parseClipboardJson(await (await item.getType(customType)).text());
+          const json = await (await item.getType(customType)).text();
           if (read.closed) return EMPTY;
-          if (!envelope) continue;
-          if (this.pendingCut?.token === envelope.token)
-            return { kind: "cut", cut: this.pendingCut };
+          // This grid's own copy is known by its token, whatever its size: its
+          // cells are in memory, so the rest of the payload is not read.
+          const leading = PAYLOAD_TOKEN.exec(json.slice(0, PAYLOAD_TOKEN_PREFIX))?.[1];
+          const own =
+            leading !== undefined &&
+            (leading === this.pendingCut?.token ||
+              leading === this.endedCutToken ||
+              leading === this.trusted?.token);
+          const envelope = own ? null : limited(() => parseClipboardJson(json));
+          if (envelope instanceof DelimitedTextResourceError) {
+            tooLarge ??= envelope;
+            continue;
+          }
+          const token = own ? leading : envelope?.token;
+          if (token === undefined) continue;
+          if (this.pendingCut?.token === token) return { kind: "cut", cut: this.pendingCut };
           // A cut that was pasted or ended does not paste again, as in Excel.
-          if (this.endedCutToken === envelope.token) return EMPTY;
+          if (this.endedCutToken === token) return EMPTY;
           this.endCut();
-          return this.trusted?.token === envelope.token
-            ? { kind: "internal", snapshot: this.trusted.snapshot }
-            : { kind: "foreign", snapshot: envelope.snapshot };
+          if (this.trusted?.token === token) {
+            return { kind: "internal", snapshot: this.trusted.snapshot };
+          }
+          if (envelope) return { kind: "foreign", snapshot: envelope.snapshot };
         }
 
         // The clipboard no longer holds the cut: this is a plain paste.
@@ -810,7 +939,11 @@ export class ClipboardController {
           if (!item.types.includes("text/html")) continue;
           const html = await (await item.getType("text/html")).text();
           if (read.closed) return EMPTY;
-          const grid = parseClipboardHtml(html, valuesOnly);
+          const grid = limited(() => parseClipboardHtml(html, valuesOnly));
+          if (grid instanceof DelimitedTextResourceError) {
+            tooLarge ??= grid;
+            continue;
+          }
           if (!grid) continue;
           return { kind: "html", grid };
         }
@@ -818,10 +951,16 @@ export class ClipboardController {
         for (const item of items) {
           if (!item.types.includes("text/plain")) continue;
           const text = await (await item.getType("text/plain")).text();
-          if (read.closed || text.length === 0) return EMPTY;
+          if (read.closed) return EMPTY;
+          if (text.length === 0) {
+            if (tooLarge) throw tooLarge;
+            return EMPTY;
+          }
           return { kind: "text", text };
         }
-      } catch {
+        if (tooLarge) throw tooLarge;
+      } catch (error) {
+        if (error instanceof DelimitedTextResourceError) throw error;
         richReadFailed = true;
       }
     }
@@ -877,7 +1016,15 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
-    if (cut.hidden > 0) this.deps.onHiddenRowsMoved?.(cut.hidden, "paste");
+    if (cut.hidden > 0) {
+      const landed = { start: firstRow, end: firstRow + rows - 1 };
+      const cutRows = { start: cut.range.start.row, end: cut.range.end.row };
+      this.deps.onHiddenRowsMoved?.(
+        cut.hidden,
+        "paste",
+        cut.range.sheet === this.deps.activeSheet() ? [cutRows, landed] : [landed],
+      );
+    }
     return "done";
   }
 
@@ -1210,9 +1357,8 @@ export class ClipboardController {
       focus,
       grid.length,
       (r) => grid[r]!.length,
-      (r, c, targetCol): CellWrite => ({
-        value: parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
-      }),
+      (r, c, targetCol): CellWrite =>
+        parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
     );
   }
 
@@ -1323,6 +1469,10 @@ export class ClipboardController {
       const refs: Array<[number, { sheet: SheetId; row: number; col: number }]> = [];
       const styleTable: CellStyle[] = [];
       const styleLookup = new Map<string, number>();
+      // Most cells share a style object (none, or one per pasted format), so
+      // the id is found by identity before the style is serialized.
+      const styleIdOf = new Map<CellStyle, number>();
+      const noStyle: CellStyle = {};
       const styleIds: number[] = new Array(availableRows * width);
       let canPack = true;
       for (let row = 0; row < availableRows && canPack; row++) {
@@ -1351,13 +1501,17 @@ export class ClipboardController {
             values[offset] = write.value.value;
           }
 
-          const style = write.style ?? {};
-          const styleKey = JSON.stringify(style);
-          let styleId = styleLookup.get(styleKey);
+          const style = write.style ?? noStyle;
+          let styleId = styleIdOf.get(style);
           if (styleId === undefined) {
-            styleId = styleTable.length;
-            styleLookup.set(styleKey, styleId);
-            styleTable.push(style);
+            const styleKey = JSON.stringify(style);
+            styleId = styleLookup.get(styleKey);
+            if (styleId === undefined) {
+              styleId = styleTable.length;
+              styleLookup.set(styleKey, styleId);
+              styleTable.push(style);
+            }
+            styleIdOf.set(style, styleId);
           }
 
           styleIds[offset] = styleId;

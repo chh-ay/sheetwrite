@@ -111,12 +111,15 @@ export interface ConditionalFormatRule {
 }
 
 /**
- * How a column's cells are typed, parsed, and rendered: `text` verbatim, `number`
- * via its `numberFormat`, `date` as an Excel-style serial (see `date-serial.ts`)
- * rendered by a date `numberFormat`, and `currency` as a plain number rendered by
- * a currency `numberFormat` (e.g. `$#,##0.00`).
+ * How a column's cells are typed, parsed, and rendered: `general` as Excel's
+ * General format (a typed number, percentage, amount, date or time becomes a
+ * number, and the cell gets the format that shows it as typed), `text`
+ * verbatim, `number` via its `numberFormat`, `date` as an Excel-style serial
+ * (see `date-serial.ts`) rendered by a date `numberFormat`, and `currency` as
+ * a plain number rendered by a currency `numberFormat` (e.g. `$#,##0.00`).
+ * The columns Sheetwrite makes itself, in new sheets and XLSX imports, are `general`.
  */
-export type CellFormat = "text" | "number" | "date" | "currency";
+export type CellFormat = "general" | "text" | "number" | "date" | "currency";
 
 /** A scalar that can be displayed directly. */
 export type CellScalar = string | number | boolean | null;
