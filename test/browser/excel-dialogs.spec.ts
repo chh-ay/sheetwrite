@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
 import { expect, test } from "./fixtures.js";
@@ -16,6 +16,22 @@ async function open(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1_600, height: 900 });
   await page.goto("/showcases/spreadsheet/");
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
+}
+
+/**
+ * The dialog sits in the middle of the window, as Excel's do, even under the
+ * docs site's `* { margin: 0 }` reset. Chromium centres it in the window less
+ * the page's stable scrollbar gutter (`scrollbar-gutter: stable`), which no
+ * DOM measure reports, so the centre may be up to half a scrollbar (8 px)
+ * off. A dialog in the corner is hundreds of pixels off.
+ */
+async function expectCentred(page: Page, dialog: Locator): Promise<void> {
+  const box = await dialog.boundingBox();
+  if (!box) throw new Error("The dialog must have a box");
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("The page must have a viewport");
+  expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(8);
+  expect(Math.abs(box.y + box.height / 2 - viewport.height / 2)).toBeLessThanOrEqual(8);
 }
 
 /** Put `m1` and `m2` in row 6's first two cells (A6:B6) and select them. */
@@ -60,6 +76,7 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
 
   const dialog = page.getByRole("alertdialog", { name: "Merge Cells" });
   await expect(dialog).toBeVisible();
+  await expectCentred(page, dialog);
   await expect(dialog).toContainText(
     "Merging cells only keeps the upper-left value and discards other values. This value will be discarded: B6: 'm2'.",
   );
@@ -160,6 +177,7 @@ test("Excel's format, hide, insert, delete and Format Cells keys reach the grid 
     await page.keyboard.press(key);
     const dialog = page.getByRole("dialog", { name, exact: true });
     await expect(dialog).toBeVisible();
+    await expectCentred(page, dialog);
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(grid).toBeFocused();
@@ -183,6 +201,7 @@ for (const viewport of [
 
     const dialog = page.getByRole("dialog", { name: "Format Cells", exact: true });
     await expect(dialog).toBeVisible();
+    await expectCentred(page, dialog);
     const box = await dialog.boundingBox();
     if (!box) throw new Error("Format Cells must have a box");
     expect(box.x).toBeGreaterThanOrEqual(0);

@@ -6,6 +6,7 @@ import {
   type DataValidationComparison,
   dateToSerial,
   formatNumber,
+  MAX_VALIDATION_RULES,
 } from "@sheetwrite/core";
 
 import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
@@ -328,6 +329,32 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(warnings).toContainEqual(expect.objectContaining({ code: "validation-loss" }));
   });
 
+  it("drops a validation rule whose formula is longer than Excel's 255 characters and keeps the import", async () => {
+    const long = `LEN(C1)=${"1+".repeat(150)}1`;
+    const rule = (attributes: string, sqref: string, formulas: string) =>
+      `<dataValidation ${attributes} showErrorMessage="1" sqref="${sqref}">${formulas}</dataValidation>`;
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:D1"/><sheetData/><dataValidations count="4">${[
+          rule('type="custom"', "A1", `<formula1>${long}</formula1>`),
+          rule('type="list"', "B1", `<formula1>${long}</formula1>`),
+          rule(
+            'type="whole" operator="between"',
+            "C1",
+            `<formula1>0</formula1><formula2>${long}</formula2>`,
+          ),
+          rule('type="custom"', "D1", "<formula1>ISNUMBER(D1)</formula1>"),
+        ].join("")}</dataValidations>`,
+      ),
+      { onWarning },
+    );
+    expect(sheetAt(imported).validationRules).toMatchObject([
+      { condition: { kind: "custom", formula: "=ISNUMBER(D1)" } },
+    ]);
+    expect(warnings.filter((warning) => warning.code === "validation-loss")).toHaveLength(3);
+  });
+
   it("round-trips the error alert and the input message of a validation rule", async () => {
     const { warnings, onWarning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
@@ -359,6 +386,24 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(sheetAt(await backend.fromXlsxWorkbook(exported)).validationRules).toMatchObject(
       expected,
     );
+  });
+
+  it(`keeps the first ${MAX_VALIDATION_RULES} validation rules of a sheet and drops the rest with a warning`, async () => {
+    const rule = (row: number) =>
+      `<dataValidation type="list" errorStyle="warning" showErrorMessage="1" sqref="A${row}"><formula1>$Z$1:$Z$32767</formula1></dataValidation>`;
+    const count = MAX_VALIDATION_RULES + 5;
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:A${count}"/><sheetData/><dataValidations count="${count}">${Array.from({ length: count }, (_, index) => rule(index + 1)).join("")}</dataValidations>`,
+      ),
+      { onWarning },
+    );
+    const rules = sheetAt(imported).validationRules ?? [];
+    expect(rules).toHaveLength(MAX_VALIDATION_RULES);
+    // The rules of rows 1 to 1,000 are kept.
+    expect(Math.max(...rules.map((rule) => rule.range.start.row))).toBe(MAX_VALIDATION_RULES - 1);
+    expect(warnings).toEqual([expect.objectContaining({ code: "validation-loss" })]);
   });
 
   it("round-trips every Data Validation type, formula sources and bounds, and the dropdown flag", async () => {

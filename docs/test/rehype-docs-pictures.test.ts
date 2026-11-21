@@ -61,7 +61,10 @@ test("a placement whose heading is gone fails the build", async () => {
 });
 
 test("a screenshot placement adds the framed capture, beside the page's diagram, and links both stylesheets", async () => {
-  const output = await compilePage("features/grid/search.md", "Lead.\n\n## Options and result");
+  const output = await compilePage(
+    "features/grid/search.md",
+    "Lead.\n\n## Options and result\n\n## Options and Find All in the find bar",
+  );
   expect(output).toMatch(/<p>\{"Lead\."\}<\/p><figure class="sw-frame">/);
   expect(output).toContain('src="/figures/shots/search-light-1x.avif"');
   expect(output).toContain('src="/figures/shots/search-dark-1x.avif"');

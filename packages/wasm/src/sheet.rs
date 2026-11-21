@@ -8,6 +8,7 @@ use crate::graph::SheetFormulas;
 use crate::memory::StoreMemoryStats;
 use crate::row_visibility::RowVisibility;
 use crate::spill::SpillState;
+use crate::store::names::NameScope;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
@@ -136,9 +137,11 @@ impl SheetData {
 
     /// Shift rows `[at, row_count)` down by `count`, opening a blank gap.
     /// Formulas move only after the cells did; on error nothing changes.
+    /// The sheet is `names.sheet`, whose formulas read their defined names
+    /// through `names`.
     pub(crate) fn insert_rows(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: usize,
         count: usize,
         slots: &mut FormulaStore,
@@ -147,7 +150,7 @@ impl SheetData {
         self.cells.insert_rows(clamped_at, count)?;
         if count != 0 {
             self.formulas
-                .insert_rows(sheet, clamped_at as u32, count as u32, slots);
+                .insert_rows(names, clamped_at as u32, count as u32, slots);
             self.visibility.insert_rows(clamped_at as u32, count as u32);
         }
         Ok(())
@@ -156,7 +159,7 @@ impl SheetData {
     /// Delete `count` rows starting at `at`, closing the gap.
     pub(crate) fn delete_rows(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: usize,
         count: usize,
         slots: &mut FormulaStore,
@@ -169,7 +172,7 @@ impl SheetData {
         let clamped_count = count.min(extent - at);
         self.cells.delete_rows(at, clamped_count)?;
         self.formulas
-            .delete_rows(sheet, at as u32, clamped_count as u32, slots);
+            .delete_rows(names, at as u32, clamped_count as u32, slots);
         self.visibility.delete_rows(at as u32, clamped_count as u32);
         Ok(())
     }
@@ -177,7 +180,7 @@ impl SheetData {
     /// Shift columns `[at, n_cols)` right by `count`, opening blank columns.
     pub(crate) fn insert_cols(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: usize,
         count: usize,
         slots: &mut FormulaStore,
@@ -186,7 +189,7 @@ impl SheetData {
         self.cells.insert_cols(clamped_at, count)?;
         if count != 0 {
             self.formulas
-                .insert_cols(sheet, clamped_at as u32, count as u32, slots);
+                .insert_cols(names, clamped_at as u32, count as u32, slots);
         }
         Ok(())
     }
@@ -194,7 +197,7 @@ impl SheetData {
     /// Delete `count` columns starting at `at`, closing the gap.
     pub(crate) fn delete_cols(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: usize,
         count: usize,
         slots: &mut FormulaStore,
@@ -207,7 +210,7 @@ impl SheetData {
         let clamped_count = count.min(extent - at);
         self.cells.delete_cols(at, clamped_count)?;
         self.formulas
-            .delete_cols(sheet, at as u32, clamped_count as u32, slots);
+            .delete_cols(names, at as u32, clamped_count as u32, slots);
         Ok(())
     }
 
