@@ -232,6 +232,8 @@ export interface QueriesSnapshot {
   readonly statuses: StatusFilter;
   /** Whether a definition changed after the last refresh, so the tables are older. */
   readonly definitionChanged: boolean;
+  /** Whether orders arrived after the last refresh, so the tables are older than the feed. */
+  readonly feedChanged: boolean;
   readonly lastRefresh: RefreshReading | null;
   readonly formulas: readonly { label: string; src: string; value: string }[];
   readonly refreshing: boolean;
@@ -259,6 +261,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
   let fetches = 0;
   let statuses: StatusFilter = "shipped";
   let definitionChanged = false;
+  let feedChanged = false;
   let lastRefresh: RefreshReading | null = null;
   let refreshing = false;
 
@@ -282,6 +285,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
       lastRefresh = { status: result.status, milliseconds: performance.now() - started };
       if (result.status !== "applied") throw new Error(refreshFailure(result));
       definitionChanged = false;
+      feedChanged = false;
     } finally {
       refreshing = false;
       listeners.notify();
@@ -330,6 +334,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
         fetches,
         statuses,
         definitionChanged,
+        feedChanged,
         lastRefresh,
         refreshing,
         formulas: REPORT_FORMULAS.map((formula, row) => {
@@ -351,6 +356,7 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
     addOrders() {
       const start = feed.length;
       for (let index = start; index < start + FEED_BATCH_ROWS; index++) feed.push(feedLine(index));
+      feedChanged = true;
       listeners.notify();
     },
     setStatuses(next) {

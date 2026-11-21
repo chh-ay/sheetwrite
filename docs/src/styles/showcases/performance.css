@@ -1143,6 +1143,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Source and protocol lines keep a readable line length on wide screens. */
+.sw-sp-provenance > * {
+  max-width: var(--sw-measure-prose);
+}
+
 .sw-sp-proof-distribution {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

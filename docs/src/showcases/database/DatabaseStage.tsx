@@ -220,7 +220,6 @@ export function DatabaseStage(props: DatabaseStageProps) {
           >
             <fieldset aria-label="Durability actions" class="sw-dbx__controls">
               <Button
-                aria-label="Add one subscriber seat — Commit sample edit"
                 disabled={!ready()}
                 onClick={() => runAction((current) => current.commitSampleEdit())}
               >
