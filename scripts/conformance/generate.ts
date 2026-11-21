@@ -276,14 +276,22 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   },
   SHEET: { empty: "SHEET(C1)=1", mixed: "SHEET(C1)=1", boundary: "SHEET(C1)=1" },
   SHEETS: { empty: "SHEETS(C1)=1", mixed: "SHEETS(C1)=1", boundary: "SHEETS(C1)=1" },
-  ACOS: { mixed: "ISERROR(ACOS(C1))" },
-  ASIN: { mixed: "ISERROR(ASIN(C1))" },
+  // A function that takes one value runs once for each cell of a range
+  // (#1127): ACOS(1) is 0 and ACOS(2) is #NUM!, each in its own element.
+  ACOS: {
+    mixed: "ISERROR(ACOS(C1))",
+    "range-array": "AND(INDEX(ACOS(C1:C2),1)=0,ISERROR(INDEX(ACOS(C1:C2),2)))",
+  },
+  ASIN: {
+    mixed: "ISERROR(ASIN(C1))",
+    "range-array": "AND(ISNUMBER(INDEX(ASIN(C1:C2),1)),ISERROR(INDEX(ASIN(C1:C2),2)))",
+  },
   ACOSH: { empty: "ISERROR(ACOSH(C1))", boundary: "ISERROR(ACOSH(C1))" },
   ATANH: { mixed: "ISERROR(ATANH(C1))", "range-array": "ISERROR(ATANH(C1:C2))" },
   ACOTH: {
     empty: "ISERROR(ACOTH(C1))",
     boundary: "ISERROR(ACOTH(C1))",
-    "range-array": "ISERROR(ACOTH(C1:C2))",
+    "range-array": "AND(ISERROR(INDEX(ACOTH(C1:C2),1)),ISNUMBER(INDEX(ACOTH(C1:C2),2)))",
   },
   COT: { empty: "ISERROR(COT(C1))", boundary: "ISERROR(COT(C1))" },
   CSC: { empty: "ISERROR(CSC(C1))", boundary: "ISERROR(CSC(C1))" },
@@ -342,7 +350,21 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
     empty: "RANDBETWEEN(C1,0)=0",
     mixed: "RANDBETWEEN(C1,2)=2",
     boundary: "RANDBETWEEN(C1,C1)=0",
+    "range-array": "AND(ROWS(RANDBETWEEN(C1:C2,6))=2,NOT(ISERROR(RANDBETWEEN(C1:C2,6))))",
   },
+  // A range in the selecting argument or the lookup value gives one result
+  // for each cell (#1091, #1127).
+  IF: { "range-array": "AND(ROWS(IF(C1:C2,1,0))=2,NOT(ISERROR(IF(C1:C2,1,0))))" },
+  IFNA: { "range-array": "AND(ROWS(IFNA(C1:C2,0))=2,NOT(ISERROR(IFNA(C1:C2,0))))" },
+  IFS: { "range-array": "AND(ROWS(IFS(C1:C2,1))=2,NOT(ISERROR(IFS(C1:C2,1))))" },
+  SWITCH: {
+    "range-array":
+      'AND(ROWS(SWITCH(C1:C2,1,"a",2,"b","c"))=2,NOT(ISERROR(SWITCH(C1:C2,1,"a",2,"b","c"))))',
+  },
+  CHOOSE: {
+    "range-array": 'AND(ROWS(CHOOSE(C1:C2,"a","b"))=2,NOT(ISERROR(CHOOSE(C1:C2,"a","b"))))',
+  },
+  HLOOKUP: { "range-array": "ROWS(HLOOKUP(C1:C2,A1:B3,2,FALSE))=2" },
   // FORMULATEXT and ISFORMULA describe the referenced cell, never its value,
   // and corpus inputs are literals.
   FORMULATEXT: {
@@ -384,7 +406,7 @@ const DIRECT_ERROR_EXPECTATIONS: Readonly<
     ),
   ),
   "range-array": new Set(
-    "IF IFNA IFS SWITCH N DATEVALUE SUMIFS AVERAGEIFS MATCH VLOOKUP HLOOKUP XLOOKUP FILTER SUMPRODUCT FIND SEARCH TIMEVALUE RANK.EQ CORREL COVARIANCE.S COVARIANCE.P MAXIFS MINIFS XMATCH CHOOSE ADDRESS SEQUENCE IRR".split(
+    "N DATEVALUE SUMIFS AVERAGEIFS MATCH VLOOKUP XLOOKUP FILTER SUMPRODUCT FIND SEARCH TIMEVALUE RANK.EQ CORREL COVARIANCE.S COVARIANCE.P MAXIFS MINIFS XMATCH ADDRESS SEQUENCE IRR".split(
       " ",
     ),
   ),

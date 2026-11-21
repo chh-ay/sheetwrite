@@ -97,7 +97,7 @@ When the condition is one value, the function returns the argument it takes, whi
 
 A function that takes one value runs once for each element when it gets an array or a range there, as in Excel, and returns an array of the same shape. For example, `=LEN(A1:A3)` spills three lengths, `=ROUND(B1:B3,{0,1})` spills a three-by-two table, and `=SUM(LEN(A1:A3))` adds the lengths. This covers the math, trigonometry, text, date, logical and IS functions, the financial functions `PV`, `FV`, `PMT`, `IPMT`, `PPMT` and `RATE`, and `RANDBETWEEN`, which draws once for each element.
 
-Arguments that take a range are never expanded. `SUM(A1:A3)` adds the range. In `COUNTIF`, `SUMIF` and `AVERAGEIF` only the criteria expand, in `LARGE`, `SMALL`, `PERCENTILE.INC` and `QUARTILE.INC` only `k`, and in `MATCH`, `XMATCH`, `VLOOKUP` and `HLOOKUP` the lookup value and the number arguments. For example, `=LARGE(A1:A10,{1,2,3})` returns the three largest values.
+Arguments that take a range are never expanded. `SUM(A1:A3)` adds the range. In `COUNTIF`, `SUMIF` and `AVERAGEIF` only the criteria expand, in `LARGE`, `SMALL`, `PERCENTILE.INC` and `QUARTILE.INC` only `k`, in `LOOKUP` only the lookup value, and in `MATCH`, `XMATCH`, `VLOOKUP` and `HLOOKUP` the lookup value and the number arguments. For example, `=LARGE(A1:A10,{1,2,3})` returns the three largest values.
 
 The arguments expand with the same rules as operators: a single row repeats down, a single column across, and an array with fewer rows or columns than the result, and more than one, gives `#N/A` in the cells outside it. An error stays in its own element: `=ISERROR(A1:A3)` tests each cell.
 

@@ -2675,6 +2675,7 @@ const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=LARGE(Data!B1:B3,{1,2})", 2, &["30", "20"]),
     ("=MATCH({3,1},Data!A1:A3,0)", 2, &["3", "1"]),
     ("=VLOOKUP({2;3},Data!A1:B3,2,FALSE)", 1, &["20", "30"]),
+    ("=LOOKUP({2,3},Data!A1:A3,Data!B1:B3)", 2, &["20", "30"]),
     ("=RANDBETWEEN(Data!A1:A2,Data!A1:A2)", 1, &["1", "2"]),
 ];
 

@@ -70,6 +70,8 @@ const DAYS_ARGS: ValueArgs = ValueArgs::at(&[0, 1]);
 const AFTER_RANGE_ARGS: ValueArgs = ValueArgs::at(&[1]);
 /// MATCH: the lookup value and the match type.
 const MATCH_ARGS: ValueArgs = ValueArgs::at(&[0, 2]);
+/// LOOKUP: the lookup value; the vectors are ranges or arrays.
+const LOOKUP_VALUE_ARGS: ValueArgs = ValueArgs::at(&[0]);
 /// VLOOKUP and HLOOKUP: the lookup value, the column or row number and the
 /// match flag; XMATCH: the lookup value and the two modes.
 const LOOKUP_ARGS: ValueArgs = ValueArgs::at(&[0, 2, 3]);
@@ -94,6 +96,7 @@ pub(super) const fn value_args(func: Func) -> ValueArgs {
         | Func::SumIf
         | Func::AverageIf => AFTER_RANGE_ARGS,
         Func::Match => MATCH_ARGS,
+        Func::Lookup => LOOKUP_VALUE_ARGS,
         Func::VLookup | Func::HLookup | Func::XMatch => LOOKUP_ARGS,
         _ if is_math_of_values(func) || is_text_date_or_test_of_values(func) => ValueArgs::ALL,
         _ => ValueArgs::NONE,
