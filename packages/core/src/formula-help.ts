@@ -829,6 +829,9 @@ export class FormulaHelp {
     const caret = fix.from + fix.insert.length;
     field.value = `${text.slice(0, fix.from)}${fix.insert}${text.slice(fix.to)}`;
     field.setSelectionRange(caret, caret);
+    // A fixed function name ends at the caret; listing functions for it would
+    // take the next Enter or Tab, which should commit as without a fix.
+    this.dismissedText = field.value;
     field.focus();
     field.dispatchEvent(new Event("input", { bubbles: true }));
   }
