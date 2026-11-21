@@ -2115,8 +2115,10 @@ export class StoreDataEngine {
     sheet: SheetId,
     viewRows: { start: number; end: number },
     cols: readonly number[],
+    options?: { readonly dataRows?: boolean },
   ): ClipboardWindowView {
-    const order = this.view.order(sheet);
+    // Data rows read in sheet order, past the rows the view hides.
+    const order = options?.dataRows ? undefined : this.view.order(sheet);
     const clippedEnd = order ? Math.min(viewRows.end, order.length) : viewRows.end;
     const rowCount = Math.max(0, clippedEnd - viewRows.start);
     const dataRows = new Uint32Array(rowCount);

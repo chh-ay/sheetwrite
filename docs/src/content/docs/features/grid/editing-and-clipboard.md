@@ -135,6 +135,8 @@ To supply your own editor, see [Host-supplied editors](/docs/features/grid/custo
 
 Copy and cut always produce injection-hardened TSV. Where the browser exposes `ClipboardItem`, they also write sanitized `text/html`, and where the browser keeps custom formats (Chromium), Sheetwrite's private `application/x-sheetwrite+json` payload. The HTML contains only escaped table markup, plain cell text, safe `data-sheetwrite-formula` attributes, a bounded style subset, and a random token on the table. No pasted HTML goes into the document.
 
+As in Excel, a copy takes the rows hidden by hand (Hide Rows or a collapsed group) between the selected rows; the rows a filter hides stay out, and so do rows out of order under a view sort ([Copy visible cells only](https://support.microsoft.com/en-us/excel/copy-visible-cells-only)).
+
 A grid keeps its last copy or cut, with formula source and cell styles, in memory. A paste whose clipboard carries that copy's token, in the private payload or in the HTML, pastes it with its formulas and styles, or moves the cells of a cut. This works the same in Chromium, Firefox and Safari, whose clipboards keep only plain text and HTML. A token from another grid, or HTML whose text was changed in another app, pastes as external content.
 
 Other content pastes from the private payload, then sanitized HTML tables, then plain TSV:
