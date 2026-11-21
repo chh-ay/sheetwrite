@@ -72,7 +72,7 @@ Editing happens in a single real `<textarea>` on top of the active cell. The gri
 
 As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
-In a `general` column, the editor opens a date or a time as Excel's formula bar shows it. A time uses the clock of the column's `numberLocale`, whatever the cell's format: `9:30:00 PM` in `en-US` (the default) and `21:30:00` in `de-DE` or `en-GB`. A date opens month first, such as `1/15/2026`.
+In a `general` column, the editor opens a date or a time as Excel's formula bar shows it. A time uses the clock of the column's `numberLocale`, whatever the cell's format: `9:30:00 PM` in `en-US` (the default) and `21:30:00` in `de-DE` or `en-GB`. A date uses the short date of the same locale, with a four-digit year: `1/15/2026` in `en-US`, `15.01.2026` in `de-DE` and `15/01/2026` in `en-GB`. Typing that text back reads the same date.
 
 The [status bar](/docs/features/grid/status-bar/) names the mode, as Excel's does: **Ready** with no edit open, **Enter**, **Edit**, and **Point** while an arrow key or a click has just picked a reference for a formula. Typing ends Point mode. Hosts read the mode with `grid.getCellMode()` (`"ready"`, `"enter"`, `"edit"` or `"point"`) and hear changes with the `cell-mode` event. A [host-supplied editor](/docs/features/grid/custom-editors/) counts as Edit mode, and a list rule's list as Ready.
 
