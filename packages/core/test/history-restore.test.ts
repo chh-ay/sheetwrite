@@ -513,30 +513,87 @@ class PageCountingStorage extends MemoryHistoryStorage {
 }
 
 describe("restore through sync", () => {
-  it("restores a document at the archive head from the pages that differ", async () => {
+  /**
+   * A 208-row Data sheet with a checkpoint after every commit, saved as a
+   * version, then two edits; and the cell pages that rebuilding that version
+   * whole reads.
+   */
+  async function atHeadSession() {
     const storage = new PageCountingStorage();
-    // A checkpoint after every commit, so the version's checkpoint holds every row.
-    const { archive, alice } = await session(storage, "Data", { checkpointTransactions: 1 });
-    await edit(alice, [
+    const opened = await session(storage, "Data", { checkpointTransactions: 1 });
+    await edit(opened.alice, [
       { op: "addRows", sheet: "data", at: 8, count: 200 },
       ...Array.from({ length: 200 }, (_, row) => set("data", 8 + row, 1, row)),
     ]);
-    const version = await archive.saveVersion("Long", "alice", 0);
-    await edit(alice, [set("data", 2, 0, 33), set("data", 150, 1, -1)]);
+    const version = await opened.archive.saveVersion("Long", "alice", 0);
+    await edit(opened.alice, [set("data", 2, 0, 33), set("data", 150, 1, -1)]);
 
-    const fresh = await HistoryArchive.open({ documentId: DOCUMENT, storage });
-    let reads = storage.cellPageReads;
-    await fresh.readVersion(version.id);
-    const wholeReads = storage.cellPageReads - reads;
+    const before = storage.cellPageReads;
+    await (await HistoryArchive.open({ documentId: DOCUMENT, storage })).readVersion(version.id);
+    const wholeReads = storage.cellPageReads - before;
 
-    reads = storage.cellPageReads;
-    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
-    expect(outcome.status).toBe("applied");
+    const reads = async (action: () => Promise<unknown>) => {
+      const start = storage.cellPageReads;
+      await action();
+      return storage.cellPageReads - start;
+    };
 
-    expect(storage.cellPageReads - reads).toBeLessThan(wholeReads);
+    return { ...opened, version, wholeReads, reads };
+  }
+
+  it("restores a document at the archive head from the pages that differ", async () => {
+    const { archive, alice, version, wholeReads, reads } = await atHeadSession();
+
+    let outcome: Awaited<ReturnType<typeof restore>> | undefined;
+    const read = await reads(async () => {
+      outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    });
+
+    expect(outcome?.status).toBe("applied");
+    expect(read).toBeLessThan(wholeReads);
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([3, 142]);
     alice.grid.undo();
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([33, -1]);
+  });
+
+  it("rebuilds the version whole when another client moved the archive head", async () => {
+    const { adapter, archive, alice, version, wholeReads, reads } = await atHeadSession();
+    const bob = await client(adapter, "bob");
+    // Bob has not received this edit: his server version is behind the archive head.
+    await edit(alice, [set("data", 100, 1, -2)]);
+
+    let outcome: Awaited<ReturnType<typeof restore>> | undefined;
+    const read = await reads(async () => {
+      outcome = await restore(archive, bob, version.id, { kind: "workbook" });
+    });
+
+    expect(outcome?.status).toBe("applied");
+    expect(read).toBe(wholeReads);
+    const cells = () => [value(bob.grid, "data", 2, 0), value(bob.grid, "data", 150, 1)];
+    expect(cells()).toEqual([3, 142]);
+    bob.grid.undo();
+    expect(cells()).toEqual([33, -1]);
+  });
+
+  it.each([
+    ["local edits are not sent yet", false],
+    ["a request is in flight", true],
+  ])("refuses to restore before reading any page when %s", async (_, flushing) => {
+    const { archive, alice, version, reads } = await atHeadSession();
+    alice.grid.applyTransaction({ patches: [set("data", 7, 0, 70)] });
+    const sending = flushing ? alice.sync.flush() : undefined;
+
+    const read = await reads(async () => {
+      await expect(restore(archive, alice, version.id, { kind: "workbook" })).rejects.toMatchObject(
+        {
+          code: "conflict",
+        },
+      );
+    });
+    await sending;
+
+    expect(read).toBe(0);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 7, 0)]).toEqual([33, 70]);
   });
 
   it("restores a cell that the version's log tail wrote and a later edit put back", async () => {
