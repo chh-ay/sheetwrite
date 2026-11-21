@@ -4,6 +4,7 @@ import {
   cellDisplayText,
   cellEditText,
   cellScalarToText,
+  formulaBarText,
   parseCellEntry,
   parseCellInput,
   parseCellLiteralInput,
@@ -175,5 +176,14 @@ describe("typing into a general column", () => {
     expect(cellEditText(0, "general", "h:mm AM/PM")).toBe("12:00:00 AM");
     expect(cellEditText(21.5 / 24, "general", "h:mm")).toBe("9:30:00 PM");
     expect(cellEditText(46_037.5, "general", "m/d/yyyy h:mm")).toBe("1/15/2026 12:00:00 PM");
+  });
+
+  // The formula bar uses the clock of the region: 24-hour in Germany and the UK.
+  it("opens a time on the clock of the column's number locale", () => {
+    expect(cellEditText(21.5 / 24, "general", "h:mm", "de-DE")).toBe("21:30:00");
+    expect(cellEditText(21.5 / 24, "general", "h:mm AM/PM", "en-GB")).toBe("21:30:00");
+    expect(cellEditText(46_037.5, "general", "m/d/yyyy h:mm", "de-DE")).toBe("1/15/2026 12:00:00");
+    expect(cellEditText(21.5 / 24, "general", "h:mm", "en-US")).toBe("9:30:00 PM");
+    expect(formulaBarText(21.5 / 24, "h:mm", "en-GB")).toBe("21:30:00");
   });
 });

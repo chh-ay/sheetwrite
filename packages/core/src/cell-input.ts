@@ -37,12 +37,18 @@ const DATE_EDIT_CODES = ["yyyy-mm-dd", "yyyy-mm-dd hh:mm", "yyyy-mm-dd hh:mm:ss"
  * or a serial no such text reproduces, opens as {@link cellScalarToText}.
  *
  * In a `general` column, a number in a date, time or percent format opens as
- * Excel opens it in US English (`1/15/2026`, `9:30:00 PM`, `12%`): a time is
- * on the 12-hour clock whatever the cell's format. Text that would read back
- * as a number opens with Excel's leading apostrophe (`'007`).
+ * Excel's formula bar shows it (`1/15/2026`, `9:30:00 PM`, `12%`): a time is
+ * on the clock of `locale` (US English when unset) whatever the cell's
+ * format. Text that would read back as a number opens with Excel's leading
+ * apostrophe (`'007`).
  */
-export function cellEditText(value: CellScalar, type: CellFormat, numberFormat?: string): string {
-  if (type === "general") return generalEditText(value, numberFormat);
+export function cellEditText(
+  value: CellScalar,
+  type: CellFormat,
+  numberFormat?: string,
+  locale?: string,
+): string {
+  if (type === "general") return generalEditText(value, numberFormat, locale);
   if (type !== "date" || typeof value !== "number") return cellScalarToText(value);
 
   for (const code of DATE_EDIT_CODES) {
@@ -54,13 +60,17 @@ export function cellEditText(value: CellScalar, type: CellFormat, numberFormat?:
 }
 
 /** {@link cellEditText} in a `general` column: text that reads back as the same value. */
-function generalEditText(value: CellScalar, numberFormat: string | undefined): string {
+function generalEditText(
+  value: CellScalar,
+  numberFormat: string | undefined,
+  locale: string | undefined,
+): string {
   if (typeof value === "string") {
     const reread = parseCellEntry(value, "general").value;
     return reread.kind === "literal" && reread.value === value ? value : `'${value}`;
   }
   if (typeof value !== "number") return cellScalarToText(value);
-  const text = formulaBarText(value, numberFormat);
+  const text = formulaBarText(value, numberFormat, locale);
   if (text === null) return cellScalarToText(value);
   const reread = parseCellEntry(text, "general").value;
   return reread.kind === "literal" && reread.value === value ? text : cellScalarToText(value);
@@ -81,19 +91,45 @@ function dateKindOf(format: string | undefined): "date" | "time" | null {
   return kind;
 }
 
+/** Whether each locale writes a time on the 12-hour clock; a workbook uses few locales. */
+const twelveHourLocales = new Map<string, boolean>();
+
+/**
+ * Whether `locale` writes a time on the 12-hour clock, as `Intl` resolves its
+ * hour cycle: `en-US` does, `de-DE` and `en-GB` do not. US English when unset.
+ */
+function twelveHourClock(locale: string | undefined): boolean {
+  if (locale === undefined || locale === "en-US") return true;
+  let twelve = twelveHourLocales.get(locale);
+  if (twelve === undefined) {
+    const cycle = new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
+    twelve = cycle === "h11" || cycle === "h12";
+    twelveHourLocales.set(locale, twelve);
+  }
+  return twelve;
+}
+
 /**
  * The text Excel's formula bar shows for a number in a date, time or percent
  * format (`1/15/2026`, `9:30:00 PM`, `12%`), or null for any other format,
- * where it shows the number as stored. In US English a time is on the
- * 12-hour clock whatever the cell's format.
+ * where it shows the number as stored. A time is on the clock of `locale`
+ * (US English when unset) whatever the cell's format; dates stay month first,
+ * as a `general` column reads them.
  */
-export function formulaBarText(value: number, numberFormat: string | undefined): string | null {
+export function formulaBarText(
+  value: number,
+  numberFormat: string | undefined,
+  locale?: string,
+): string | null {
   const kind = dateKindOf(numberFormat);
-  if (kind === "date" || (kind === "time" && value >= 1)) {
-    return formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss AM/PM");
+  if (kind === null) {
+    return numberFormat?.endsWith("%") ? `${Number((value * 100).toPrecision(15))}%` : null;
   }
-  if (kind === "time") return formatNumber(value, "h:mm:ss AM/PM");
-  return numberFormat?.endsWith("%") ? `${Number((value * 100).toPrecision(15))}%` : null;
+  const time = twelveHourClock(locale) ? "h:mm:ss AM/PM" : "h:mm:ss";
+  if (kind === "date" || (kind === "time" && value >= 1)) {
+    return formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : `m/d/yyyy ${time}`);
+  }
+  return formatNumber(value, time);
 }
 
 /**
