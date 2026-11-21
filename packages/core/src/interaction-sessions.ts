@@ -1,5 +1,5 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
-import { filterButtonRect, filterTextWidth } from "./canvas-paint.js";
+import { filterButtonHitRect, filterTextRight } from "./canvas-paint.js";
 import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellEntry } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
@@ -518,10 +518,12 @@ export class InteractionSessions {
 
   /**
    * Where the cell editor sits: the cell, or in an AutoFilter header cell
-   * its text box, which ends before the filter button, as in Excel.
+   * its text box, which ends a gap before the filter button, as in Excel.
    */
   private textBox(row: number, col: number, rect: EditRect): EditRect {
-    return this.isAutoFilterHeader(row, col) ? { ...rect, w: filterTextWidth(rect) } : rect;
+    return this.isAutoFilterHeader(row, col)
+      ? { ...rect, w: filterTextRight(rect) - rect.x }
+      : rect;
   }
 
   /**
@@ -1293,7 +1295,8 @@ export class InteractionSessions {
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
     if (this.isAutoFilterHeader(cell.row, cell.col)) {
-      const button = filterButtonRect(
+      // The area is at least 24 px wide, for touch, and may cover the inset.
+      const hit = filterButtonHitRect(
         this.deps.screenRect(
           cell.row,
           cell.col,
@@ -1302,12 +1305,7 @@ export class InteractionSessions {
         ),
       );
       const x = e.clientX - viewportRect.left;
-      if (
-        x >= button.x &&
-        x <= button.x + button.w &&
-        py >= button.y &&
-        py <= button.y + button.h
-      ) {
+      if (x >= hit.x && x <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
         e.preventDefault();
         const selection = this.deps.selection();
         selection.selectCell(cell.row, cell.col);

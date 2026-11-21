@@ -2,6 +2,9 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
   blitScroll,
+  filterButtonHitRect,
+  filterButtonRect,
+  filterTextRight,
   fontFor,
   getMergeIndexResourceStatsForTest,
   layoutTextLines,
@@ -444,17 +447,37 @@ describe("paintFrame AutoFilter header text", () => {
       filterHeader: { row: 0, start: 0, end: 3 },
     });
 
-    // Each 100 px cell's 16 px button starts at 82 px, and its text box ends there.
+    // Each 100 px cell's 16 px button sits 6 px from the right gridline, at
+    // 78 px, and its text box ends 6 px before it, at 72 px.
     const text = (label: string) => ctx.fillTexts.find((call) => call.text === label);
-    expect(text("Revenue")?.x).toBe(82 - 6);
-    expect(text("Units")?.x).toBe(100 + 82 / 2);
-    // Left-aligned text clips at its own button, not under it in the empty cell beside.
+    expect(text("Revenue")?.x).toBe(72);
+    expect(text("Units")?.x).toBe(100 + (6 + 72) / 2);
+    // Left-aligned text clips at its text box, not under the button or in the empty cell beside.
     expect(text("Region of sale")?.clips).toContainEqual({
       x: 200,
       y: HEADER_HEIGHT,
-      w: 82,
+      w: 72,
       h: ROW_HEIGHT,
     });
+  });
+
+  it("insets the filter button from the gridline by the text padding, at any row height", () => {
+    for (const h of [20, 24, 32]) {
+      const cell = { x: 0, y: 0, w: 100, h };
+      const button = filterButtonRect(cell);
+      // As much room right of the button as left of the text, and centred in the row.
+      expect(button).toEqual({ x: 100 - 6 - 16, y: (h - 16) / 2, w: 16, h: 16 });
+      // The text box ends that much room again before the button.
+      expect(filterTextRight(cell)).toBe(button.x - 6);
+      // A touch opens the dropdown 24 px wide, over the inset to the gridline.
+      const hit = filterButtonHitRect(cell);
+      expect([hit.x, hit.w, hit.y, hit.h]).toEqual([
+        76,
+        24,
+        Math.max(0, h / 2 - 12),
+        Math.min(h, 24),
+      ]);
+    }
   });
 });
 

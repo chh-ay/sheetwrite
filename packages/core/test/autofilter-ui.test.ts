@@ -218,8 +218,9 @@ describe("AutoFilter in the grid", () => {
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
     press(host, "F2");
-    // B1 is 100 px wide; its 16 px button sits 2 px from the right edge.
-    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("82px");
+    // B1 is 100 px wide: its 16 px button sits 6 px from the right edge, and the
+    // text box ends 6 px before the button.
+    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("72px");
   });
 
   it("groups only the numbers that show as dates in a mostly-date column, as Excel does", async () => {
