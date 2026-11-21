@@ -2003,15 +2003,11 @@ mod tests {
 
     #[test]
     fn a_rebuilt_band_drops_a_removal_below_its_additions() {
-        let (mut store, _) = store_with_rebuilt_band();
-        assert_patch_matches_rebuild(&mut store);
-    }
-
-    #[test]
-    fn a_removed_edge_no_longer_recalculates_its_old_reader() {
         let (mut store, sheet) = store_with_rebuilt_band();
-        store.set_number(sheet, 9, 0, 6.0, 0);
+        assert_patch_matches_rebuild(&mut store);
 
+        // B1 no longer reads A10, so an edit of A10 recalculates nothing.
+        store.set_number(sheet, 9, 0, 6.0, 0);
         super::super::FORMULA_EVALUATIONS.with(|count| count.set(0));
         store.recompute(sheet);
         assert_eq!(

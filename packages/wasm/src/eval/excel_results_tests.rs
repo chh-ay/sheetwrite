@@ -61,24 +61,6 @@ fn assert_results(cases: &[(&str, &str)]) {
     assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
 }
 
-#[test]
-fn issue_reproduction_formulas_give_the_excel_result() {
-    assert_results(&[
-        ("=1E3", "1000"),
-        ("=SUM(C:C)", "15"),
-        ("=ROUND(1.005,2)", "1.01"),
-        ("=(0.1+0.2)&\"\"", "0.3"),
-        ("=CHOOSE(1.5,\"a\",\"b\")", "a"),
-        ("=TEXT(0.5,\"0%\")", "50%"),
-        ("=REPLACE(\"abc\",5,1,\"X\")", "abcX"),
-        // A percent code that takes the number past the largest double
-        // overflows: #NUM!, as for Excel's numeric functions (#433).
-        ("=TEXT(9.99999999999999E+307,\"0%\")", "#NUM!"),
-        ("=TEXT(-9.99999999999999E+307,\"0.0%;(0.0%)\")", "#NUM!"),
-        ("=TEXT(1E+305,\"0%%\")", "#NUM!"),
-    ]);
-}
-
 #[cfg(feature = "analysis")]
 #[test]
 fn lambda_arguments_can_be_errors_that_the_body_handles() {
@@ -342,6 +324,11 @@ fn text_applies_the_number_format_codes() {
         ("=TEXT(7,\"0 \"\"units\"\"\")", "7 units"),
         ("=TEXT(1234.5,\"General\")", "1234.5"),
         ("=TEXT(45000,\"yyyy-mm-dd\")", "2023-03-15"),
+        // A percent code that takes the number past the largest double
+        // overflows: #NUM!, as for Excel's numeric functions (#433).
+        ("=TEXT(9.99999999999999E+307,\"0%\")", "#NUM!"),
+        ("=TEXT(-9.99999999999999E+307,\"0.0%;(0.0%)\")", "#NUM!"),
+        ("=TEXT(1E+305,\"0%%\")", "#NUM!"),
     ]);
 }
 

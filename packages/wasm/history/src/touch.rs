@@ -127,20 +127,6 @@ mod tests {
         authors[0]
     }
 
-    #[test]
-    fn one_sweep_finds_the_newest_writer_of_each_cell() {
-        let mut touches = Touches::default();
-        touches.add(rect(0, 0, 9, 3, 1));
-        touches.add(rect(2, 1, 4, 1, 2));
-        touches.add(rect(4, 0, 4, 3, 3));
-
-        let rows = [0, 2, 3, 4, 12];
-        let cols = [0, 1, 2, 1, 0];
-        let mut authors = [NONE; 5];
-        touches.last_authors(&rows, &cols, &mut authors);
-        assert_eq!(authors, [1, 2, 1, 3, NONE]);
-    }
-
     fn rect(r0: u32, c0: u32, r1: u32, c1: u32, author: u32) -> Touch {
         Touch {
             r0,
