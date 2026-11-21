@@ -19,6 +19,7 @@ const RELEASE_NOTES_PACKAGE_ORDER: readonly string[] = [
   "@sheetwrite/formulas",
   "@sheetwrite/xlsx",
   "@sheetwrite/charts",
+  "@sheetwrite/formula-assist",
   "@sheetwrite/react",
   "@sheetwrite/vue",
   "@sheetwrite/svelte",

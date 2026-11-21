@@ -354,6 +354,10 @@ async function buildSizeReport(
       ["svelte", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/svelte"]],
       ["core-xlsx", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/xlsx"]],
       ["core-charts", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/charts"]],
+      [
+        "core-formula-assist",
+        ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/formula-assist"],
+      ],
       ["core-queries", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/queries"]],
     ];
     const closures = await Promise.all(
