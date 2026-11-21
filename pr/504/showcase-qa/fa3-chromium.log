@@ -1,0 +1,3 @@
+PASS [fa3-chromium-1440] open
+PASS [fa3-chromium-1440] = wait, then S U '=' ["SUM(D2:D11)"]; '=S' []; '=SU' []
+PASS [fa3-chromium-1440] =S typed at once, wait 3 s '=S' []; '=SUM(' ["D2:D11)"]
