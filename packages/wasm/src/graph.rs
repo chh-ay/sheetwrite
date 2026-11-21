@@ -24,11 +24,12 @@ const RETAINED_DIRTY_CAPACITY: usize = 4096;
 /// per-sheet dirty metadata; overflow merges into conservative rectangles.
 const MAX_DIRTY_RECTS: usize = 64;
 
-/// Formula evaluations that finding the readers of one written cell costs.
-/// Measured on 10,000 rows of `=SUM(A:H)`: 18 µs per seeded cell, 4.2 µs per
-/// formula, so a remote edit of a quarter as many cells as the sheet has
-/// formulas costs as much as recalculating every formula once.
-const SEED_COST_IN_EVALUATIONS: usize = 4;
+/// Formulas a remote edit's seeded cell may stand for before recalculating
+/// the whole sheet is cheaper. Measured on 10,000 rows of `=SUM(A:H)`: 150
+/// remote cells took 10.2 ms seeded and 13.5 ms with every formula
+/// recalculated, 300 cells 15.3 and 11.1 ms, so the two meet near one cell
+/// per 50 formulas.
+const FORMULAS_PER_SEEDED_CELL: usize = 64;
 
 /// Inclusive source coordinates; rectangles never enumerate logical sheet area.
 #[derive(Clone, Copy)]
@@ -804,13 +805,13 @@ impl SheetFormulas {
         }
     }
 
-    /// Seeds a remote edit like a local one while its cells are few. From a
-    /// quarter as many cells as the sheet has formulas, recalculating every
+    /// Seeds a remote edit's cells while they are few. From one cell per
+    /// `FORMULAS_PER_SEEDED_CELL` formulas of the sheet, recalculating every
     /// formula once costs less than finding the readers of each cell.
     pub(crate) fn mark_remote_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
         self.mark_cells_dirty(keys);
         if let DirtyState::Cells(cells) = &self.dirty {
-            if cells.cells.len().saturating_mul(SEED_COST_IN_EVALUATIONS) >= self.count {
+            if cells.cells.len().saturating_mul(FORMULAS_PER_SEEDED_CELL) >= self.count {
                 self.dirty = DirtyState::All;
             }
         }
