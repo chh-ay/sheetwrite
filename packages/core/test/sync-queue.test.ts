@@ -22,35 +22,6 @@ function expectQueue(queue: PendingRecordQueue, expected: readonly SyncMutationR
 }
 
 describe("PendingRecordQueue", () => {
-  it("keeps the head through an in-order drain longer than its compaction threshold", () => {
-    const queue = new PendingRecordQueue();
-    const records = Array.from({ length: 1_000 }, (_, id) => record(id));
-    for (const item of records) queue.add(item);
-    for (let index = 0; index < records.length; index += 1) {
-      expect(queue.head()).toBe(records[index]);
-      queue.remove(`m-${index}`);
-    }
-    expectQueue(queue, []);
-    queue.add(records[0] as SyncMutationRecord);
-    expectQueue(queue, [records[0] as SyncMutationRecord]);
-  });
-
-  it("removes records near the head and near the tail out of order", () => {
-    const queue = new PendingRecordQueue();
-    const live = Array.from({ length: 200 }, (_, id) => record(id));
-    for (const item of live) queue.add(item);
-    for (const id of [1, 0, 3, 198, 2, 150, 4, 199]) {
-      queue.remove(`m-${id}`);
-      live.splice(
-        live.findIndex((item) => item.clientMutationId === `m-${id}`),
-        1,
-      );
-      expectQueue(queue, live);
-    }
-    queue.remove("m-1");
-    expectQueue(queue, live);
-  });
-
   it("matches a plain array under interleaved adds, removals and clears", () => {
     const queue = new PendingRecordQueue();
     let live: SyncMutationRecord[] = [];

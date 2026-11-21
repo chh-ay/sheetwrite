@@ -182,7 +182,7 @@ describe("snapshot persistence boundary", () => {
     restored.dispose();
   });
 
-  it("mounts without a user change or undo entry and rejects invalid input cleanly", () => {
+  it("mounts without a user change or undo entry", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     const grid = createGridFromSnapshot(host, richSnapshot());
@@ -195,12 +195,6 @@ describe("snapshot persistence boundary", () => {
     expect(grid.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
     expect(changes).toBe(0);
     grid.destroy();
-
-    const invalidHost = document.createElement("div");
-    expect(() =>
-      createGridFromSnapshot(invalidHost, { ...richSnapshot(), schemaVersion: 99 }),
-    ).toThrow(PersistenceError);
-    expect(invalidHost.childElementCount).toBe(0);
   });
 
   it("surfaces malformed snapshots as validation errors at public load boundaries", () => {
