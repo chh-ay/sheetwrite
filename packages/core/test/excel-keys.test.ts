@@ -456,6 +456,7 @@ describe("insert and delete keys", () => {
     await answerDialog(host, "OK");
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBe("Customer 1");
+    expect(document.activeElement).toBe(host);
 
     // A tall range defaults to Shift cells left.
     select(0, 1, 3, 1);
