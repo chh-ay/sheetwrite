@@ -396,13 +396,18 @@ const PAGE_SHOTS: readonly Shot[] = [
       await settle(page);
     },
   },
-  // A1, the pivot's first cell, is active by default, which opens the PivotTable
-  // Fields pane over the chart; a cell below the pivot leaves the chart whole.
+  // The PivotChart selected, with its frame. A selected PivotChart, like an
+  // active pivot cell, opens the PivotTable Fields pane over the chart, so the
+  // capture closes the pane.
   {
     name: "pivot-chart",
     size: "app",
     query: { sheet: "pivot" },
-    steps: (page) => select(page, { kind: "cell", addr: { sheet: "pivot", row: 17, col: 0 } }),
+    steps: async (page) => {
+      await page.locator(".sheetwrite-object").first().click();
+      await page.locator(".sheetwrite-panel-header button").first().click();
+      await settle(page);
+    },
   },
   {
     name: "pivot",
@@ -561,7 +566,7 @@ const SECTION_CROPS: Readonly<
   // The table under its merged title; then its first three columns.
   report: { tablet: { x: 0, y: 100 }, phone: { x: 48, y: 120 } },
   // The PivotChart; then the pivot beside it.
-  "pivot-chart": { tablet: { x: 360, y: 158 }, phone: { x: 48, y: 158 } },
+  "pivot-chart": { tablet: { x: 370, y: 158 }, phone: { x: 48, y: 158 } },
   // The filtered columns; then Month, Region and Product.
   filter: { tablet: { x: 8, y: 0 }, phone: { x: 48, y: 66 } },
   // The formula bar over the sheet; then the formula over the selected cell.
