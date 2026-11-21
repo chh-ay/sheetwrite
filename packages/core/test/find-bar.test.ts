@@ -271,3 +271,71 @@ describe("FindBar Replace all preview", () => {
     grid.destroy();
   });
 });
+
+describe("Find in numbers with a number format", () => {
+  it("matches the formula bar's text or the shown text, as Excel's Look in does", () => {
+    const host = mountHost();
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.columns[1] = {
+      key: "amount",
+      header: "Amount",
+      width: 120,
+      type: "general",
+    };
+    const grid = createGrid(host, {
+      workbook,
+      data: {
+        rowCount: 4,
+        columns: {
+          name: ["a", "b", "c", "d"],
+          amount: [46037, 0.15, 4.5, 0.15],
+          city: ["", "", "", ""],
+        },
+      },
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    const cell = (row: number) => ({ sheet: "s1", row, col: 1 });
+    const formats = ["m/d/yyyy", "0%", "$#,##0.00"];
+    grid.applyTransaction({
+      patches: formats.map((numberFormat, row) => ({
+        op: "setRangeStyle" as const,
+        range: { sheet: "s1", start: cell(row), end: cell(row) },
+        style: { numberFormat },
+      })),
+    });
+    const rows = (query: string, lookIn: "formulas" | "values") =>
+      grid.search(query, { lookIn }).matches.map((match) => match.row);
+
+    expect(rows("1/15/2026", "formulas")).toEqual([0]);
+    expect(rows("1/15/2026", "values")).toEqual([0]);
+    expect(rows("15%", "formulas")).toEqual([1]);
+    expect(rows("15%", "values")).toEqual([1]);
+    expect(rows("$4.50", "values")).toEqual([2]);
+    // A formatted number is not found by its stored number; a General one is.
+    expect(rows("0.15", "formulas")).toEqual([3]);
+
+    // Replace rewrites the text Find read, and the cell keeps its format.
+    grid.search("1/15", { lookIn: "formulas" });
+    expect(grid.replaceAll("1/16").replaced).toBe(1);
+    expect(grid.store.getCell(cell(0))).toMatchObject({
+      resolved: 46038,
+      style: { numberFormat: "m/d/yyyy" },
+    });
+
+    // A number format given to a found cell takes it out of the open search.
+    expect(rows("4.5", "formulas")).toEqual([2]);
+    const events: SearchResult[] = [];
+    grid.on("search", (event) => events.push(event));
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "setRangeStyle",
+          range: { sheet: "s1", start: cell(2), end: cell(2) },
+          style: { numberFormat: "0.0%" },
+        },
+      ],
+    });
+    expect(events.at(-1)?.matches).toEqual([]);
+    grid.destroy();
+  });
+});

@@ -695,4 +695,13 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       ],
     ],
   ],
+  // Paste's options, continued (the clipboard row is full). Paste into
+  // visible rows only: two shown rows on the board, the hidden row between
+  // them dotted.
+  [
+    [
+      "pasteVisibleRows",
+      [PASTE_BOARD, PASTE_CLIP, "M14 13h7.5", guide("M14 16.5h7.5"), "M14 20h7.5"],
+    ],
+  ],
 ];

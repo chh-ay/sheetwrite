@@ -9,6 +9,7 @@ import {
   FORMULA_PROTOCOL,
   FORMULA_SOURCE_FILES,
   formulaSourceDigest,
+  OUTPUT_CAPTURE_BLOCKER,
   TIMING_METHOD,
 } from "../src/formula-artifact.js";
 import {
@@ -297,5 +298,48 @@ describe("formula regression gate", () => {
     const baseline = formulaFixture("full");
     baseline.workloads = baseline.workloads.filter((workload) => !expanded.has(workload.id));
     expect(() => validateFormulaRegression(formulaFixture("smoke"), baseline)).not.toThrow();
+  });
+});
+
+describe("release baseline capture", () => {
+  /** A full output capture without the `left` workload, optionally of an earlier release's engine. */
+  function capture(left: string, olderEngine: boolean): Fixture {
+    const result = formulaFixture("full");
+    result.workloads = result.workloads.filter((workload) => workload.id !== left);
+    result.runner.command = ["bun", "run", "src/formula-bench.ts", "--output", "formula.json"];
+    result.gates = {
+      passed: false,
+      tolerance: FORMULA_GATE_TOLERANCE,
+      regression: { status: "blocked", blocker: OUTPUT_CAPTURE_BLOCKER },
+    };
+    if (olderEngine) {
+      const runtime = [
+        "loader-node.mjs",
+        "loader-state.mjs",
+        "pkg/sheetwrite_wasm.js",
+        "pkg/sheetwrite_wasm_factory.js",
+        "pkg/sheetwrite_wasm_bg.wasm",
+      ];
+      result.source.baselineContext = {
+        label: "0.6.1 engine (WASM) under 0.7 core and harness",
+        engineCommit: "1".repeat(40),
+        harnessCommit: COMMIT,
+        engineFiles: Object.fromEntries(
+          runtime.map((path) => [`packages/wasm/${path}`, SOURCE_HASH]),
+        ),
+        currentWasmFiles: { "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "b".repeat(64) },
+      };
+    }
+    const { files, baselineContext } = result.source;
+    result.source.digest = formulaSourceDigest(COMMIT, files, baselineContext);
+    return result;
+  }
+
+  it("leaves out expanded rows an earlier release's engine cannot run, never core rows", () => {
+    expect(() => validateFormulaCapture(capture("history-diff", true))).not.toThrow();
+    expect(() => validateFormulaCapture(capture("history-diff", false))).toThrow(
+      "formula workload",
+    );
+    expect(() => validateFormulaCapture(capture("linear-chain", true))).toThrow();
   });
 });

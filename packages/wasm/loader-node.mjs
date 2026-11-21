@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 
 import { createLoader } from "./loader-state.mjs";
 import init, { initSync } from "./pkg/sheetwrite_wasm.js";
@@ -6,14 +6,23 @@ import { adoptPublishedModule, createInstance } from "./pkg/sheetwrite_wasm_fact
 
 export * from "./pkg/sheetwrite_wasm.js";
 
+/**
+ * The bundled engine's bytes. The read is synchronous: compiling the bytes
+ * blocks the thread far longer, and an asynchronous read waits on the thread
+ * pool for each of its open, size, read and close steps, which takes longer
+ * than the read itself.
+ */
+function readBundledEngine() {
+  return readFileSync(new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url));
+}
+
 const loader = createLoader(async (source) => {
   if (source !== undefined) {
     await init({ module_or_path: source });
     return;
   }
 
-  const url = new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
-  initSync({ module: await readFile(url) });
+  initSync({ module: readBundledEngine() });
 });
 
 export const { load, isLoaded } = loader;
@@ -23,9 +32,7 @@ export async function createEngine(source) {
   const engine = createInstance();
 
   if (source === undefined) {
-    engine.initSync({
-      module: await readFile(new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url)),
-    });
+    engine.initSync({ module: readBundledEngine() });
   } else {
     await engine.init({ module_or_path: source });
   }

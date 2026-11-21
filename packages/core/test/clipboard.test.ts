@@ -261,6 +261,10 @@ function makeHarness(
     mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
     toDataRow: options.toDataRow ?? ((viewRow) => viewRow),
     toViewRow: (dataRow) => dataRow,
+    undo: () => {
+      throw new Error("This harness has no undo history");
+    },
+    lastUndo: () => null,
     // A harness with its own row order stands for a sorted or filtered view.
     rowSpan: (first, last) => (options.toDataRow ? null : { first, last }),
     commit: (patches, reason) => {
@@ -280,6 +284,7 @@ function makeHarness(
           sheet.hyperlinks = sheet.hyperlinks?.filter((candidate) => candidate.id !== patch.id);
         }
       }
+      return { status: "applied", epoch: 0, transaction: { patches } };
     },
     onCutChange: (range) => cutMarks.push(range),
     loadPasteSpecial: () => import("../src/paste-special.js"),
@@ -1043,9 +1048,13 @@ describe("spill clipboard commands", () => {
       mergeAnchorAt: () => null,
       toDataRow: (row) => row,
       toViewRow: (row) => row,
+      undo: () => {
+        throw new Error("This harness has no undo history");
+      },
+      lastUndo: () => null,
       rowSpan: (first, last) => ({ first, last }),
       commit: (patches, reason) => {
-        document.commit(patches, reason);
+        return document.commit(patches, reason);
       },
       onCutChange: () => {},
       loadPasteSpecial: () => import("../src/paste-special.js"),
