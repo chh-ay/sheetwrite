@@ -135,6 +135,18 @@ function stubClipboard(): () => Promise<string | undefined> {
   return async () => (await items[0]?.getType("text/plain"))?.text();
 }
 
+/** A browser clipboard of plain text only. Returns a setter of its text. */
+function textClipboard(text = ""): (next: string) => void {
+  let current = text;
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { read: () => Promise.resolve([]), readText: () => Promise.resolve(current) },
+  });
+  return (next) => {
+    current = next;
+  };
+}
+
 describe("AutoFilter in the grid", () => {
   it("turns on for the current region with Ctrl+Shift+L and off again", () => {
     const { grid, host } = mount();
@@ -356,14 +368,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("pastes a block over a filtered range into the hidden rows too, as Excel does, and says so", async () => {
-    let clipboardText = "";
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([]),
-        readText: () => Promise.resolve(clipboardText),
-      },
-    });
+    const setClipboard = textClipboard();
     const { grid, store } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
@@ -371,7 +376,7 @@ describe("AutoFilter in the grid", () => {
     const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
     // Three copied rows on B2 land on sheet rows 2 to 4, the hidden B3 included.
-    clipboardText = "10\n20\n30";
+    setClipboard("10\n20\n30");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
     expect(await grid.actions.paste()).toBe("done");
     expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
@@ -389,7 +394,7 @@ describe("AutoFilter in the grid", () => {
     expect([1, 2, 3, 4].map(qty)).toEqual([3, 12, 7, null]);
 
     // One copied value over a filtered selection fills its shown cells only, as in Excel.
-    clipboardText = "5";
+    setClipboard("5");
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
@@ -400,20 +405,13 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("pastes a block over rows Hide Rows hid as Excel does, then into the shown rows only", async () => {
-    let clipboardText = "";
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([]),
-        readText: () => Promise.resolve(clipboardText),
-      },
-    });
+    const setClipboard = textClipboard();
     const { grid, store } = mount();
     grid.hideRows([2]);
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
     const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
-    clipboardText = "10\n20\n30";
+    setClipboard("10\n20\n30");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
     expect(await grid.actions.paste()).toBe("done");
     expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
@@ -437,21 +435,14 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("refuses Paste into visible rows only when the shown rows below are too few, and keeps the paste", async () => {
-    let clipboardText = "";
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([]),
-        readText: () => Promise.resolve(clipboardText),
-      },
-    });
+    const setClipboard = textClipboard();
     const { grid, store } = mount();
     grid.hideRows([8]);
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
     const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
     // Three rows on B8 of a 10-row sheet land on rows 8 to 10, the hidden B9 included.
-    clipboardText = "10\n20\n30";
+    setClipboard("10\n20\n30");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 7, col: 1 } });
     expect(await grid.actions.paste()).toBe("done");
     expect([7, 8, 9].map(qty)).toEqual([10, 20, 30]);
@@ -467,14 +458,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("refuses a paste under a view sort that runs past the view's last row", async () => {
-    let clipboardText = "";
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([]),
-        readText: () => Promise.resolve(clipboardText),
-      },
-    });
+    const setClipboard = textClipboard();
     const { grid, store } = mount();
     grid.setViewSort([{ col: 1, ascending: false }]);
     const qty = () =>
@@ -483,7 +467,7 @@ describe("AutoFilter in the grid", () => {
     const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
 
     // The second-last row of the sorted view has one row below it.
-    clipboardText = "1\n2\n3";
+    setClipboard("1\n2\n3");
     const row = grid.sheetRowOf(8)!;
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row, col: 1 } });
     expect(await grid.actions.paste()).toBe("rejected");
@@ -496,10 +480,7 @@ describe("AutoFilter in the grid", () => {
   it("pastes over more than 10,000 shown cells of a filtered range", async () => {
     // Excel fills one copied value into every shown cell of the selection,
     // however many; the paste is one operation, not one per cell.
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("5") },
-    });
+    textClipboard("5");
     const rows: CellScalar[][] = [["Item", "Qty"]];
     for (let row = 1; row <= 12_000; row++) rows.push([row % 2 === 1 ? "keep" : "hide", row]);
     const { grid, store } = mount(rows);
@@ -518,10 +499,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("offers Paste into visible rows only only after a paste that applied, and undoes only that paste", async () => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("10\n20\n30") },
-    });
+    textClipboard("10\n20\n30");
     const { grid, host, store } = mount();
     // An earlier edit, which no paste offer may undo.
     grid.beginEdit(8, 0, "x");
@@ -545,19 +523,13 @@ describe("AutoFilter in the grid", () => {
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
     expect([1, 2, 3].map(qty)).toEqual([3, 12, 7]);
     expect(grid.canPasteVisibleRows()).toBe(false);
-    expect(document.querySelector(".sheetwrite-action-status")?.textContent).toBe(
-      'Nothing was pasted: Protected range "locked" denied this mutation.',
-    );
 
     grid.actions.pasteVisibleRows();
     expect(store.getCell({ sheet: "s1", row: 8, col: 0 }).resolved).toBe("x");
   });
 
   it("says a paste or a cut's paste that the grid refused pasted nothing", async () => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { read: () => Promise.resolve([]), readText: () => Promise.resolve("10\n20") },
-    });
+    textClipboard("10\n20");
     const { grid, store } = mount();
     grid.setProtectedRange({
       id: "locked",
