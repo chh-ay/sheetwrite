@@ -325,7 +325,18 @@ describe("AutoFilter in the grid", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
     expect(await grid.actions.paste()).toBe("done");
     expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
-    expect(notice()?.textContent).toBe("This paste wrote into 1 hidden row. Show them");
+    expect(notice()?.textContent).toBe(
+      "This paste wrote into 1 hidden row. Paste Options › Paste into visible rows only skips them. Show them",
+    );
+
+    // Paste into visible rows only: the same paste on the shown rows B2, B4
+    // and B5, as one undo step.
+    expect(grid.canPasteVisibleRows()).toBe(true);
+    grid.actions.pasteVisibleRows();
+    expect([1, 2, 3, 4].map(qty)).toEqual([10, 12, 20, 30]);
+    expect(grid.canPasteVisibleRows()).toBe(false);
+    grid.undo();
+    expect([1, 2, 3, 4].map(qty)).toEqual([3, 12, 7, null]);
 
     // One copied value over a filtered selection fills its shown cells only, as in Excel.
     clipboardText = "5";
@@ -334,7 +345,45 @@ describe("AutoFilter in the grid", () => {
       range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
     });
     expect(await grid.actions.paste()).toBe("done");
-    expect([1, 2, 3].map(qty)).toEqual([5, 20, 5]);
+    expect([1, 2, 3].map(qty)).toEqual([5, 12, 5]);
+    expect(grid.canPasteVisibleRows()).toBe(false);
+  });
+
+  it("pastes a block over rows Hide Rows hid as Excel does, then into the shown rows only", async () => {
+    let clipboardText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([]),
+        readText: () => Promise.resolve(clipboardText),
+      },
+    });
+    const { grid, store } = mount();
+    grid.hideRows([2]);
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+
+    clipboardText = "10\n20\n30";
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    expect([1, 2, 3, 4].map(qty)).toEqual([10, 20, 30, null]);
+    expect(notice()?.textContent).toBe(
+      "This paste wrote into 1 hidden row. Paste Options › Paste into visible rows only skips them. Show them",
+    );
+
+    grid.actions.pasteVisibleRows();
+    expect([1, 2, 3, 4].map(qty)).toEqual([10, 12, 20, 30]);
+    // Another change ends the offer.
+    grid.undo();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    expect(grid.canPasteVisibleRows()).toBe(true);
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "s1", row: 8, col: 1 }, value: { kind: "literal", value: 1 } },
+      ],
+    });
+    expect(grid.canPasteVisibleRows()).toBe(false);
   });
 
   it("shows the rows Hide Rows hid, from the cut notice's Show them", async () => {

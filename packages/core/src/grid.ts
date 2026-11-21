@@ -981,6 +981,7 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
+      undo: () => this.undo(),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
       askPasteSpecial: (ownCopy) =>
@@ -1003,7 +1004,7 @@ export class GridImpl implements Grid {
             ? `This cut includes ${rows}.`
             : step === "paste"
               ? `This paste moved ${rows}.`
-              : `This paste wrote into ${rows}.`,
+              : `This paste wrote into ${rows}. Paste Options › Paste into visible rows only skips them.`,
           {
             label: "Show them",
             run: () => {
@@ -4269,6 +4270,7 @@ export class GridImpl implements Grid {
       paste: () => this.clipboard.paste(),
       pasteValues: () => this.clipboard.pasteValues(),
       pasteSpecial: (options) => this.clipboard.pasteSpecial(options),
+      pasteVisibleRows: () => this.clipboard.pasteShownRows(),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => {
         try {
@@ -4731,6 +4733,10 @@ export class GridImpl implements Grid {
 
   hiddenRows(): readonly number[] {
     return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
+  }
+
+  canPasteVisibleRows(): boolean {
+    return this.clipboard.canPasteShownRows;
   }
 
   sheetRowOf(viewRow: number): number | null {

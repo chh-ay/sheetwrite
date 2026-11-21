@@ -87,6 +87,9 @@ function cutHarness() {
     mergeAnchorAt: () => null,
     toDataRow: (row) => row,
     toViewRow: (row) => row,
+    undo: () => {
+      throw new Error("This harness has no undo history");
+    },
     commit: (patches, reason) => {
       document.commit(patches, reason);
     },
