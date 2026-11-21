@@ -1,6 +1,6 @@
 ---
 title: Sheetwrite 0.7.0
-description: "Sheetwrite 0.7.0: dashboards, a data model with measures, in-place sort, linked workbooks, saved queries and version history, and what to change when you upgrade."
+description: "Sheetwrite 0.7.0: dashboards, a data model with measures, in-place sort, linked workbooks, saved queries, version history and Excel's editing tools, and what to change when you upgrade."
 ---
 
 <Note>
@@ -12,8 +12,10 @@ Sheetwrite 0.7.0 turns a workbook into an analysis tool. Tables relate to each o
 model, measures calculate over it, and dashboards put pivots, slicers, PivotCharts and KPI cards
 on one sheet. Sort moves the cells, as Excel's Sort does. Formulas read other workbooks, saved
 queries refresh tables from your sources, and version history saves, compares and restores
-versions. Every add-on now installs through one call. Read the [breaking changes](#breaking-changes)
-before you upgrade.
+versions. Editing works as in Excel: AutoFilter, cut and paste that moves cells, Paste Special,
+Data Validation, Format Cells, Excel's keys with a panel to change them, and AutoComplete. Every
+add-on now installs through one call. Read the [breaking changes](#breaking-changes) before you
+upgrade.
 
 <Frame
   caption="A dashboard over the data model: KPI cards, a region slicer, a PivotChart and a pivot with a share-of-total measure."
@@ -65,6 +67,30 @@ before you upgrade.
   <Card title="Compact ribbon" screenshot="card-compact-ribbon" size="highlight" alt="The compact ribbon: each group is a menu, and the Number menu is open under it." href="/docs/features/grid/">
     One command model drives the toolbar, the full ribbon and a new compact ribbon for narrow
     layouts.
+  </Card>
+  <Card title="AutoFilter" screenshot="card-autofilter" size="highlight" alt="The Region filter dropdown: a search box and the values Americas, APAC, EMEA and LATAM, each with its row count." href="/docs/features/data/autofilter/">
+    Filter buttons on a header row open Excel's dropdown: sort, a searchable value list with row
+    counts, and Number, Text and Date Filters.
+  </Card>
+  <Card title="Cut and paste moves cells" screenshot="card-cut-paste" size="highlight" alt="Cut cells in columns C to E inside a moving dashed border, and the cell beside them where the paste moves them." href="/docs/features/grid/editing-and-clipboard/#cut-and-paste-moves-cells">
+    A paste moves the cut cells, and every formula, name and chart that refers to them follows,
+    as in Excel.
+  </Card>
+  <Card title="Paste Special" screenshot="card-paste-special" size="highlight" alt="The Paste Special dialog: All, Formulas, Values, Formats and the other Paste choices." href="/docs/features/grid/editing-and-clipboard/#paste-special">
+    Excel's dialog: every Paste choice, Add, Subtract, Multiply and Divide, Skip blanks,
+    Transpose and Paste Link.
+  </Card>
+  <Card title="Data Validation" screenshot="card-data-validation" size="highlight" alt="The Data Validation dialog: Settings, Input Message and Error Alert tabs, and a List rule with its source." href="/docs/features/data/validation-protection-and-notes/#validation">
+    Excel's dialog and every rule type, a dropdown arrow on list cells, and Excel's error alerts.
+  </Card>
+  <Card title="Format Cells" screenshot="card-format-cells" size="highlight" alt="The Format Cells dialog: Number, Alignment, Font, Border and Fill tabs, and the Currency category selected." href="/docs/features/formatting/number-formats/#keys-and-the-format-cells-dialog">
+    Ctrl+1 opens Excel's dialog, and the selected cells preview the new format while it is open.
+  </Card>
+  <Card title="Keyboard shortcuts" screenshot="card-keyboard-shortcuts" size="highlight" alt="The Keyboard shortcuts panel: a search box that also takes keys, and the Copy and Cut commands with their keys." href="/docs/features/grid/keyboard-shortcuts/">
+    Excel's keys by default, and a panel where users find, record and reset their own.
+  </Card>
+  <Card title="AutoComplete" screenshot="card-autocomplete" size="highlight" alt="A cell in the Region column with Am typed and the rest of Americas selected after it." href="/docs/features/grid/editing-and-clipboard/#autocomplete">
+    Typing a text entry completes it from the entries above and below in the column.
   </Card>
 </CardGroup>
 
@@ -148,9 +174,9 @@ before you upgrade.
   a version with the current document, preview it read-only, and restore the workbook, a sheet
   or a range.
 - `HistoryArchive` stores versions in content-addressed chunks through a
-  `HistoryStorageAdapter` or the built-in IndexedDB adapter, and `diffVersions` pages changed
-  cells with their authors, computed by a 17 KB gzip WebAssembly kernel that loads only when a
-  comparison opens.
+  `HistoryStorageAdapter` or the built-in IndexedDB adapter. `diffVersions` pages changed cells
+  with their authors. A 17 KB gzip WebAssembly kernel computes the comparison and loads only
+  when one opens.
 - `SyncCoordinatorOptions.authorId` records who made each change.
 
 ## Formulas
@@ -175,11 +201,55 @@ before you upgrade.
 - `grid.trimMemory()` gives back memory an open grid can build again.
 - Moving rows or columns moves the cells, as Excel's Insert Cut Cells does, and every reference
   follows them.
+- `grid.sheetRowOf` and `grid.viewRowOf` map between view rows and sheet rows, and the
+  `edit-begin`, `edit-commit` and `selection` events carry the sheet address too.
+
+## Excel editing
+
+### Filter, cut and paste
+
+- **AutoFilter**: Data › Filter or Ctrl+Shift+L puts filter buttons on a header row. A button, or
+  Alt+Down on a header cell, opens Excel's dropdown: sort, Number, Text and Date Filters with
+  custom conditions, and a searchable value list with row counts. Date columns group by year,
+  month and day. Each change is one undo step that syncs, and XLSX keeps the filter.
+- **Cut and paste moves cells**: cut marks the cells with a moving border, and the paste moves
+  their values, formulas, formats, notes, links, merged cells and rules. Every formula, name and
+  chart that refers to them follows, as one undo step and one `moveCells` operation.
+- **Paste Special**: Ctrl+Alt+V, Home › Paste and the context menu open Excel's dialog, with every
+  Paste choice, Add, Subtract, Multiply, Divide, Skip blanks, Transpose and Paste Link. Paste
+  Options paste Values, Formulas, Formatting, Transpose or Paste Link in one click.
+- **Fill**: the fill handle continues Excel's series, shows each new value while it drags, and
+  offers Auto Fill Options after the fill.
+- **Insert and Delete** shift cells right, down, left or up, as in Excel.
+
+### Validation and formats
+
+- **Data Validation**: Data › Data Validation opens Excel's dialog with Settings, Input Message
+  and Error Alert. Rules take every Excel type, lists from a range or a defined name, and formula
+  bounds. A list cell shows a dropdown arrow, typing filters its list, and a rejected value shows
+  Excel's Stop, Warning or Information alert.
+- **Format Cells**: Ctrl+1 opens a dialog with Number, Alignment, Font, Border and Fill, and the
+  selected cells preview the new format until OK or Cancel. Fraction and Text formats work as in
+  Excel.
+
+### Keys and typing
+
+- **Excel's keys**: the active cell, Enter and Tab, the editor's Enter, Edit and Point modes, and
+  Excel's format, fill, hide, insert and sheet keys.
+- **Keyboard shortcuts panel**: `config.keyboardSettings: true` adds a panel where users search
+  commands by name or keys, record, swap and reset keys, and export them. The grid emits
+  `key-bindings-change` for you to store.
+- **AutoComplete**: typing a text entry completes it from the column, and several matches show
+  in a list. Alt+Down opens Excel's Pick From Drop-down List.
+- **Find**: Excel's wildcards and Find Options, Find All, workbook search, and a preview of what
+  Replace all will change.
+- **Formula editor**: the formula list offers names, tables, columns and argument values; a
+  formula that doesn't parse is refused with Excel's message; live errors offer a one-click fix.
 
 ## Performance
 
-0.7.0 is faster than 0.6.1 in every group below. Recalculation takes 0.835–0.912 of the time on
-average, and large `INDEX`/`MATCH` lookups as little as 0.008 of the time.
+0.7.0 is faster than 0.6.1 in every group below. Recalculation is faster on average, and large
+`INDEX`/`MATCH` lookups are up to 125 times faster. The lanes give the exact figures.
 
 Each lane compares 0.7.0 with 0.6.1 on the same machine: the further right the mark, the larger
 the gain. "0.25 of the time" means four times faster. A range covers both machines, or the
@@ -375,6 +445,20 @@ The scalar setters and `clearCell`, `CellStore.rowCount` / `colCount`, and
 
 `setSheetName` now returns whether it named the sheet. Like `renameSheet`, it refuses an empty
 name, a name another sheet holds in any case, and another sheet's id.
+
+### Excel's keys, search, paste and validation
+
+- New default keys, such as Ctrl+B, Ctrl+1 and Ctrl+Alt+V, throw `shortcut-conflict` for a host
+  key that already uses one. Rebind the action or set it to `null`. See
+  [Keyboard defaults](/docs/start/upgrade-to-0-7-0/#keyboard-defaults).
+- A selection's active cell is the cell it started from, reported as `active`.
+- Cut no longer empties its cells; the paste moves them with the new `moveCells` operation, and
+  the `"cut"` commit reason is gone. Servers that check operation kinds must accept it.
+- Search treats `*` and `?` as wildcards, looks in formulas unless `lookIn: "values"`, and
+  searches only a selection of more than one cell.
+- A paste brings the copied cells' validation rules. `paste.keepValidation: true` keeps the
+  target's rules, as 0.6 did.
+- `DataValidationCondition`, `ColumnFilter` and `SheetNameIssueCode` have new members.
 
 ### Errors and cancellation
 

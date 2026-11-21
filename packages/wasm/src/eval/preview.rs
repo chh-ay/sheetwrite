@@ -16,9 +16,10 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, NameId};
 use crate::cells::{encode_num, encode_str_id};
 use crate::formula_slots::{FormulaResults, FormulaWork};
+use crate::store::names::shapes;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING};
 
@@ -302,7 +303,7 @@ impl CellStore {
         if self.sheets.get(sheet).is_none() {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Syntax);
         }
-        let Ok(ast) = self.resolve_preview_ast(source, formula_sheet, row, col) else {
+        let Ok(mut ast) = self.resolve_preview_ast(source, formula_sheet, row, col) else {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Syntax);
         };
 
@@ -310,9 +311,7 @@ impl CellStore {
         let _origin = FormulaOriginGuard::push((row, col));
         let _reads = super::reference::RuntimeReadPause::enter();
         let mut walk = SafetyWalk {
-            #[cfg(feature = "host-functions")]
             store: self,
-            #[cfg(feature = "host-functions")]
             sheet,
             scope: &scope,
             named: Vec::new(),
@@ -322,6 +321,8 @@ impl CellStore {
         if let Some(refusal) = walk.refusal {
             return FormulaPreview::unavailable(refusal);
         }
+        // Marked as a stored formula's uses are, for the shape checks.
+        shapes::mark(&mut ast, self.name_scope(sheet));
 
         let preview = self.evaluate_preview(&ast, sheet);
         if scope.exceeded() {
@@ -341,22 +342,23 @@ impl CellStore {
         };
 
         let resolved = self.resolve_spill_refs(ast, sheet, &mut pass, 0);
-        let (status, value, shape) = if ast_produces_array(&resolved, pass.shapes()) {
-            match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
-                // A one-cell array, such as a one-cell OFFSET, shows as its value.
-                Ok(matrix) if matrix.rows == 1 && matrix.cols == 1 => {
-                    (FormulaPreviewStatus::Value, matrix.into_first(), (1, 1))
+        let (status, value, shape) =
+            if ast_produces_array(&resolved, pass.shapes(self.name_scope(sheet))) {
+                match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
+                    // A one-cell array, such as a one-cell OFFSET, shows as its value.
+                    Ok(matrix) if matrix.rows == 1 && matrix.cols == 1 => {
+                        (FormulaPreviewStatus::Value, matrix.into_first(), (1, 1))
+                    }
+                    Ok(matrix) => {
+                        let shape = (matrix.rows, matrix.cols);
+                        (FormulaPreviewStatus::Array, matrix.into_first(), shape)
+                    }
+                    Err(error) => (FormulaPreviewStatus::Value, Value::Error(error), (1, 1)),
                 }
-                Ok(matrix) => {
-                    let shape = (matrix.rows, matrix.cols);
-                    (FormulaPreviewStatus::Array, matrix.into_first(), shape)
-                }
-                Err(error) => (FormulaPreviewStatus::Value, Value::Error(error), (1, 1)),
-            }
-        } else {
-            let value = self.eval_ast(&resolved, sheet, &mut pass, 0);
-            (FormulaPreviewStatus::Value, value, (1, 1))
-        };
+            } else {
+                let value = self.eval_ast(&resolved, sheet, &mut pass, 0);
+                (FormulaPreviewStatus::Value, value, (1, 1))
+            };
 
         if value == Value::Error(FormulaError::Loading) {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
@@ -373,14 +375,11 @@ impl CellStore {
 /// Refuses a formula that would call a function that changes state or a
 /// host function, wherever the call sits, before any of the formula runs.
 struct SafetyWalk<'a> {
-    #[cfg(feature = "host-functions")]
     store: &'a CellStore,
-    #[cfg(feature = "host-functions")]
     sheet: usize,
     scope: &'a PreviewScope,
-    /// Defined names already walked, by address: a name used many times is
-    /// walked once.
-    named: Vec<usize>,
+    /// Defined names already walked: a name used many times is walked once.
+    named: Vec<NameId>,
     refusal: Option<FormulaPreviewStatus>,
 }
 
@@ -394,11 +393,15 @@ impl SafetyWalk<'_> {
         if matches!(ast, Ast::Func(Func::Rand | Func::RandBetween, _)) {
             return self.refuse(FormulaPreviewStatus::UnsafeFunction);
         }
-        if let Ast::NamedFormula(named) = ast {
-            let address = std::rc::Rc::as_ptr(named) as usize;
-            if !self.named.contains(&address) {
-                self.named.push(address);
-                if self.visit(&named.expression, depth + 1) {
+        if let Ast::DefinedName(id, _) = ast {
+            if !self.named.contains(id) {
+                self.named.push(*id);
+                let names = self.store.name_scope(self.sheet);
+                let read = names.read(*id);
+                let refused = read
+                    .formula()
+                    .is_some_and(|expression| self.visit(expression, depth + 1));
+                if refused {
                     return true;
                 }
             }
@@ -411,8 +414,8 @@ impl SafetyWalk<'_> {
         ast.any_child(&mut |child| self.visit(child, depth + 1))
     }
 
-    /// A host function is refused. A call the formula left unresolved can be
-    /// a defined name's LAMBDA calling itself, whose body is walked once.
+    /// A host function is refused. A call the formula left unbound can be a
+    /// defined name's LAMBDA, whose formula is walked once.
     #[cfg_attr(
         not(feature = "host-functions"),
         allow(
@@ -435,8 +438,14 @@ impl SafetyWalk<'_> {
         }
 
         #[cfg(feature = "analysis")]
-        if let Some(lambda) = self.store.named_lambda(name, self.sheet) {
-            return self.visit(&Ast::NamedFormula(lambda), depth + 1);
+        if let Some(id) = self
+            .store
+            .bindings
+            .names
+            .formula_id(name, self.sheet as u32)
+        {
+            // Only walked for what it calls, so its shape is not marked.
+            return self.visit(&Ast::DefinedName(id, false), depth + 1);
         }
 
         false

@@ -6,6 +6,7 @@ import {
   type DataValidationComparison,
   dateToSerial,
   formatNumber,
+  MAX_VALIDATION_RULES,
 } from "@sheetwrite/core";
 
 import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
@@ -359,6 +360,24 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(sheetAt(await backend.fromXlsxWorkbook(exported)).validationRules).toMatchObject(
       expected,
     );
+  });
+
+  it(`keeps the first ${MAX_VALIDATION_RULES} validation rules of a sheet and drops the rest with a warning`, async () => {
+    const rule = (row: number) =>
+      `<dataValidation type="list" errorStyle="warning" showErrorMessage="1" sqref="A${row}"><formula1>$Z$1:$Z$32767</formula1></dataValidation>`;
+    const count = MAX_VALIDATION_RULES + 5;
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:A${count}"/><sheetData/><dataValidations count="${count}">${Array.from({ length: count }, (_, index) => rule(index + 1)).join("")}</dataValidations>`,
+      ),
+      { onWarning },
+    );
+    const rules = sheetAt(imported).validationRules ?? [];
+    expect(rules).toHaveLength(MAX_VALIDATION_RULES);
+    // The rules of rows 1 to 1,000 are kept.
+    expect(Math.max(...rules.map((rule) => rule.range.start.row))).toBe(MAX_VALIDATION_RULES - 1);
+    expect(warnings).toEqual([expect.objectContaining({ code: "validation-loss" })]);
   });
 
   it("round-trips every Data Validation type, formula sources and bounds, and the dropdown flag", async () => {

@@ -166,7 +166,7 @@ As the grid narrows, the ribbon shrinks the way Excel does:
 
 Groups fold in Excel order. On Home, Editing folds first, then Cells, Number, Alignment, Clipboard, Font and Undo.
 
-When the tabs do not fit beside the **Compact** and minimize buttons, the tab row scrolls sideways. Arrow keys, Home and End move focus to any tab and scroll it into view; on touch screens, swipe the tab row.
+When the tabs do not fit beside the **Compact** and minimize buttons, the last ones move into a **More tabs** menu (the arrow after the tabs), so no tab is cut off. Picking a tab there selects it and brings it into the row. Arrow keys, Home and End still move to any tab.
 
 Double-click a tab, or use the arrow at the right, to hide the panel and keep only the tab row. The grid takes the space back.
 

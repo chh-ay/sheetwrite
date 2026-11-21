@@ -211,6 +211,8 @@ export function toTsvStream(
  * resource ceilings before materializing the next oversized field or record.
  *
  * @param text - The CSV file's text.
+ * @param options - Resource limits that replace the defaults, and a signal
+ *   that stops the parse.
  * @returns One array of field strings per record, in file order; values are
  *   not converted to numbers.
  */
@@ -229,6 +231,8 @@ export function parseCsv(text: string, options: DelimitedTextOptions = {}): stri
  * @param columns - The sheet's columns. Visible ones take the fields left to
  *   right. `TRUE` and `FALSE` become booleans, and number, currency and date
  *   columns turn number text (and dates or amounts) into numbers.
+ * @param options - Resource limits that replace the defaults, and a signal
+ *   that stops the parse.
  */
 export function fromCsv(
   text: string,

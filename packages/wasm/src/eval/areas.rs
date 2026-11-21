@@ -76,7 +76,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Value {
-        match intersection_range(operands, sheet) {
+        match intersection_range(operands, self.name_scope(sheet)) {
             Ok(range) if range.row_start == range.row_end && range.col_start == range.col_end => {
                 self.eval_at(
                     range.sheet as usize,
@@ -126,7 +126,9 @@ impl CellStore {
                 }
                 Ok(count)
             }
-            Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).map(|_| 1),
+            Ast::Func(Func::Intersect, operands) => {
+                intersection_range(operands, self.name_scope(sheet)).map(|_| 1)
+            }
             // Inside LET and LAMBDA these calls are still unresolved here.
             Ast::Func(func @ (Func::Offset | Func::Indirect), args) => self
                 .runtime_range(*func, args, sheet, pass, depth + 1)
@@ -137,8 +139,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -157,12 +158,12 @@ impl CellStore {
             | Ast::Percent(_)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
-            | Ast::Array { .. }) => range_from_ast(other, sheet)
+            | Ast::Array { .. }) => range_from_ast(other, self.name_scope(sheet))
                 .map(|_| 1)
                 .ok_or(FormulaError::Value),
             #[cfg(feature = "analysis")]
             other @ (Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_)) => {
-                range_from_ast(other, sheet)
+                range_from_ast(other, self.name_scope(sheet))
                     .map(|_| 1)
                     .ok_or(FormulaError::Value)
             }
@@ -228,7 +229,7 @@ impl CellStore {
             Ast::Func(Func::Union, areas) if accepts_union(func) => {
                 let mut ranges = Vec::new();
                 for area in areas {
-                    if let Some(range) = range_from_ast(area, sheet) {
+                    if let Some(range) = range_from_ast(area, self.name_scope(sheet)) {
                         ranges.push(Ok((range, depth + 1)));
                         continue;
                     }
@@ -242,17 +243,18 @@ impl CellStore {
             }
             Ast::SheetSpan(span) if accepts_sheet_span(func) => self.sheet_span_ranges(span, depth),
             // A resolvable intersection never reaches here: it is one range.
-            Ast::Func(Func::Intersect, operands) => vec![Err(intersection_range(operands, sheet)
-                .err()
-                .unwrap_or(FormulaError::Value))],
+            Ast::Func(Func::Intersect, operands) => {
+                vec![Err(intersection_range(operands, self.name_scope(sheet))
+                    .err()
+                    .unwrap_or(FormulaError::Value))]
+            }
             Ast::InvalidRef => vec![Err(FormulaError::Ref)],
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -333,8 +335,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)

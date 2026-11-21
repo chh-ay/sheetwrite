@@ -27,6 +27,9 @@ export interface ToolbarOptions {
  * Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
  *
  * @param host - Element the toolbar is appended to.
+ * @param grid - The grid whose commands the toolbar runs.
+ * @param options - The items, which commands show, icon overrides, the
+ *   accessible label, and how to return focus to the grid.
  */
 export function createToolbar(
   host: HTMLElement,

@@ -194,3 +194,12 @@
   );
   border-style: dashed;
 }
+
+/* Touch screens get targets of at least 24 by 24 px (WCAG 2.2 target size). */
+@media (pointer: coarse) {
+  .sheetwrite-dashboard-slicer-value,
+  .sheetwrite-dashboard-slicer-clear {
+    min-width: 24px;
+    min-height: 24px;
+  }
+}

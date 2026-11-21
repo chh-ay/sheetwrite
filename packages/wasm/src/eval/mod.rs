@@ -58,13 +58,14 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::cmp::Ordering;
 
-use crate::calc::{write_col, Ast, Func, RangeFlags, RefFlags, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, NameId, RangeFlags, RefFlags, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
+use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -106,18 +107,31 @@ pub(crate) use wildcard::Wildcard;
 const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
-thread_local! {
-    /// The cell whose formula is being evaluated. Each evaluation sets it and
-    /// its guard restores the enclosing value, so nested evaluations keep a
-    /// stack on the native stack without a heap list.
-    static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
+/// Where the expression being evaluated reads its cells from. One
+/// thread-local holds both parts, so a positional name's read finds the cell
+/// and sets the shift with one lookup: on some targets each lookup is a call.
+struct EvaluationPlace {
+    /// The cell whose formula is being evaluated. Each evaluation sets it
+    /// and its guard restores the enclosing value, so nested evaluations keep
+    /// a stack on the native stack without a heap list.
+    origin: Cell<Option<(u32, u32)>>,
     /// Rows and columns that relative references of the expression being
     /// evaluated move by. A conditional-format rule's one parsed expression
     /// is written for the rule range's top-left cell; at every other cell it
-    /// reads with that cell's distance from it. Only [`read_shifted`] sets
-    /// it, so ordinary recalculation never writes it and always reads
-    /// (0, 0).
-    static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
+    /// reads with that cell's distance from it. A defined name's formula is
+    /// written for A1 and reads with the reading cell's row and column. Only
+    /// [`read_shifted`] sets it, and the evaluation of a formula cell reads
+    /// (0, 0) under any enclosing shift.
+    shift: Cell<(u32, u32)>,
+}
+
+thread_local! {
+    static EVALUATION_PLACE: EvaluationPlace = const {
+        EvaluationPlace {
+            origin: Cell::new(None),
+            shift: Cell::new((0, 0)),
+        }
+    };
 }
 
 #[cfg(test)]
@@ -127,15 +141,15 @@ thread_local! {
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Sets the formula origin for one evaluation and restores the enclosing
-/// origin when dropped.
-struct FormulaOriginGuard {
+/// Sets the formula origin for one evaluation or binding and restores the
+/// enclosing origin when dropped.
+pub(crate) struct FormulaOriginGuard {
     enclosing: Option<(u32, u32)>,
 }
 
 impl FormulaOriginGuard {
-    fn push(origin: (u32, u32)) -> Self {
-        let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
+    pub(crate) fn push(origin: (u32, u32)) -> Self {
+        let enclosing = EVALUATION_PLACE.with(|place| place.origin.replace(Some(origin)));
         Self { enclosing }
     }
 }
@@ -143,13 +157,21 @@ impl FormulaOriginGuard {
 impl Drop for FormulaOriginGuard {
     fn drop(&mut self) {
         let enclosing = self.enclosing;
-        FORMULA_ORIGIN.with(|current| current.set(enclosing));
+        EVALUATION_PLACE.with(|place| place.origin.set(enclosing));
     }
 }
 
 /// The cell whose formula is being evaluated, or nothing outside a formula.
 pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
-    FORMULA_ORIGIN.with(Cell::get)
+    EVALUATION_PLACE.with(|place| place.origin.get())
+}
+
+/// Run `bind` as the formula at `origin`, for work on a formula outside
+/// evaluation that reads its defined names: a name whose formula is
+/// relative to the cell that uses it is placed for `origin`.
+pub(crate) fn with_formula_origin<R>(origin: (u32, u32), bind: impl FnOnce() -> R) -> R {
+    let _origin = FormulaOriginGuard::push(origin);
+    bind()
 }
 
 /// Run `read` with relative references moved by `shift`, then restore the
@@ -157,18 +179,33 @@ pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
 /// itself, such as INDIRECT's text: it is placed for the target cell already,
 /// so a conditional-format shift must not move it again.
 pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
-    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
+    // The read runs outside the thread-local's access, so its value goes
+    // straight to the caller instead of through the access's result. The
+    // two accesses, and a positional name's read of the origin, share one
+    // thread-local, so the compiler looks it up once where it sees them
+    // together: on some targets each lookup is a call.
+    let enclosing = EVALUATION_PLACE.with(|place| place.shift.replace(shift));
     let value = read();
-    REFERENCE_SHIFT.with(|current| current.set(enclosing));
+    EVALUATION_PLACE.with(|place| place.shift.set(enclosing));
     value
 }
 
-/// Where a reference node's cell is read in this evaluation: its relative
-/// axes moved by the reference shift, its `$` axes as written. The caller
-/// that sets a shift keeps every shifted reference inside the sheet.
+/// The rows and columns relative references move by in this evaluation;
+/// see [`EvaluationPlace::shift`].
 #[inline]
-pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
-    let (row_shift, col_shift) = REFERENCE_SHIFT.with(Cell::get);
+pub(crate) fn reference_shift() -> (u32, u32) {
+    EVALUATION_PLACE.with(|place| place.shift.get())
+}
+
+/// The cell at (`row`, `col`) with its relative axes moved by `shift` and
+/// its `$` axes as written. The caller keeps every moved axis in the sheet.
+#[inline]
+pub(crate) const fn shifted_cell(
+    (row_shift, col_shift): (u32, u32),
+    row: u32,
+    col: u32,
+    flags: RefFlags,
+) -> (u32, u32) {
     (
         if flags.row_abs() {
             row
@@ -183,17 +220,38 @@ pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
     )
 }
 
-/// The range a reference node names in this evaluation; see [`placed_cell`].
+/// The range from `start` to `end` on `sheet` with its relative axes moved
+/// by `shift`; see [`shifted_cell`].
 #[inline]
-pub(crate) fn placed_range(
+pub(crate) const fn shifted_range(
+    shift: (u32, u32),
     sheet: u32,
     (row_start, col_start): (u32, u32),
     (row_end, col_end): (u32, u32),
     flags: RangeFlags,
 ) -> CellRange {
-    let start = placed_cell(row_start, col_start, flags.start);
-    let end = placed_cell(row_end, col_end, flags.end);
+    let start = shifted_cell(shift, row_start, col_start, flags.start);
+    let end = shifted_cell(shift, row_end, col_end, flags.end);
     CellRange::new(sheet, start.0, start.1, end.0, end.1)
+}
+
+/// Where a reference node's cell is read in this evaluation: its relative
+/// axes moved by the reference shift, its `$` axes as written. The caller
+/// that sets a shift keeps every shifted reference inside the sheet.
+#[inline]
+pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
+    shifted_cell(reference_shift(), row, col, flags)
+}
+
+/// The range a reference node names in this evaluation; see [`placed_cell`].
+#[inline]
+pub(crate) fn placed_range(
+    sheet: u32,
+    start: (u32, u32),
+    end: (u32, u32),
+    flags: RangeFlags,
+) -> CellRange {
+    shifted_range(reference_shift(), sheet, start, end, flags)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
@@ -208,15 +266,15 @@ pub(crate) struct EvalPass<'a> {
 
 impl EvalPass<'_> {
     /// What shape checks know about the LAMBDA parameters of the calls in
-    /// progress.
+    /// progress, for a formula whose defined names `names` reads.
     #[cfg(feature = "analysis")]
-    pub(crate) fn shapes(&self) -> Shapes<'_> {
-        Shapes::of(self.results.call_frame())
+    pub(crate) fn shapes<'a>(&'a self, names: NameScope<'a>) -> Shapes<'a> {
+        Shapes::of(self.results.call_frame(), names)
     }
 
     #[cfg(not(feature = "analysis"))]
-    pub(crate) const fn shapes(&self) -> Shapes<'static> {
-        Shapes::NONE
+    pub(crate) const fn shapes<'a>(&self, names: NameScope<'a>) -> Shapes<'a> {
+        Shapes::top(names)
     }
 }
 
@@ -409,8 +467,7 @@ fn expand_let_node<'a>(
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -547,8 +604,7 @@ fn shift_parameters(ast: &mut Ast, by: u16) {
             | Ast::Parameter { .. }
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -1696,6 +1752,14 @@ impl CellStore {
                 // a clean formula is; iteration still records the read.
                 if pass.affected.contains(id) {
                     if !pass.results.is_settled(id) {
+                        // A formula evaluated inside a shifted read, such as
+                        // a dependency a defined name reads before the pass
+                        // has computed it, reads its own references where
+                        // they are written. Top-level evaluations start
+                        // unshifted.
+                        if reference_shift() != (0, 0) {
+                            return self.eval_unshifted_family(id, pass, depth + 1);
+                        }
                         return self.eval_formula_id(id, pass, depth + 1);
                     }
                     if self.iteration.is_some() {
@@ -1726,6 +1790,20 @@ impl CellStore {
 
         // A `KIND_FORMULA` cell without a formula entry keeps its last number.
         Value::number(s.cells.num_at(i))
+    }
+
+    /// [`Self::eval_formula_id`] under no reference shift. Cold and out of
+    /// line: only a dependency met inside a shifted read needs it, and
+    /// `eval_at` keeps its plain call.
+    #[cold]
+    #[inline(never)]
+    fn eval_unshifted_family(
+        &self,
+        id: FormulaId,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        read_shifted((0, 0), || self.eval_formula_id(id, pass, depth))
     }
 
     /// Evaluate a selected id without repeating its address-index lookup.
@@ -1789,7 +1867,7 @@ impl CellStore {
                     let _origin = FormulaOriginGuard::push(local);
                     if entry.has_spill_refs() {
                         let resolved = self.resolve_spill_refs(ast, sheet, pass, depth + 1);
-                        if range_from_ast(&resolved, sheet).is_some() {
+                        if range_from_ast(&resolved, self.name_scope(sheet)).is_some() {
                             self.eval_matrix_arg(&resolved, sheet, pass, depth + 1)
                                 .map(EvalMatrix::into_first)
                                 .unwrap_or_else(Value::Error)
@@ -1810,9 +1888,9 @@ impl CellStore {
     /// cell. `shift` is the target's distance from the cell the expression
     /// is written for, which its relative references move by; the caller
     /// keeps every shifted reference inside the sheet. The pass recomputes
-    /// nothing, so referenced formula cells use their recomputed cache and no
-    /// other formula evaluates under the shift. The origin guard gives
-    /// zero-argument ROW/COLUMN the target cell's coordinates.
+    /// nothing, so referenced formula cells use their recomputed cache. The
+    /// origin guard gives zero-argument ROW/COLUMN the target cell's
+    /// coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
@@ -1913,7 +1991,7 @@ impl CellStore {
                 }
             }
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
-            Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
+            Ast::DefinedName(id, _) => self.eval_defined_name_family(*id, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(call) => {
                 let crate::calc::UnknownCall {
@@ -1930,17 +2008,6 @@ impl CellStore {
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(_) => {
                 Value::Error(FormulaError::Name)
             }
-            Ast::NamedRange(named)
-                if named.row_start == named.row_end && named.col_start == named.col_end =>
-            {
-                self.eval_at(
-                    named.sheet as usize,
-                    named.row_start as usize,
-                    named.col_start as usize,
-                    pass,
-                    depth + 1,
-                )
-            }
             Ast::Structured(reference) if reference.row_start == reference.row_end => self.eval_at(
                 reference.sheet as usize,
                 reference.row_start as usize,
@@ -1948,11 +2015,9 @@ impl CellStore {
                 pass,
                 depth + 1,
             ),
-            Ast::Structured(_)
-            | Ast::NamedRange(_)
-            | Ast::Range(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
+            Ast::Structured(_) | Ast::Range(..) | Ast::AbsRange(..) | Ast::SheetSpan(_) => {
+                Value::Error(FormulaError::Value)
+            }
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
@@ -1962,8 +2027,7 @@ impl CellStore {
                     | Ast::Bool(_)
                     | Ast::Missing
                     | Ast::Name(_)
-                    | Ast::NamedRange(_)
-                    | Ast::NamedFormula(_)
+                    | Ast::DefinedName(..)
                     | Ast::UnresolvedStructured(_)
                     | Ast::Structured(_)
                     | Ast::Cell(..)
@@ -2085,19 +2149,75 @@ impl CellStore {
         value
     }
 
-    /// The value of a defined name's formula. Out of line, so the name adds
+    /// The value of a defined name for a formula on `sheet`. A formula read
+    /// in place is evaluated here; every other name takes
+    /// [`Self::eval_defined_name_read_family`]. Out of line, so the name adds
     /// one call to `eval_ast`, which must stay under the size above which
     /// JavaScriptCore does not optimize a function; the `_family` suffix
-    /// keeps wasm-opt from inlining it back.
+    /// keeps wasm-opt from inlining it back. The read path has its own
+    /// function, so this one keeps a small frame and its calls stay tail
+    /// calls.
     #[inline(never)]
-    fn eval_named_formula_family(
+    fn eval_defined_name_family(
         &self,
-        named: &crate::calc::NamedFormulaRef,
+        id: NameId,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        self.eval_ast(&named.expression, sheet, pass, depth + 1)
+        match self.name_scope(sheet).in_place(id) {
+            Some(InPlace::Range(range)) => self.named_range_value(range, pass, depth),
+            Some(InPlace::Formula(expression)) => self.eval_ast(expression, sheet, pass, depth + 1),
+            Some(InPlace::Shifted(expression, shift)) => {
+                read_shifted(shift, || self.eval_ast(expression, sheet, pass, depth + 1))
+            }
+            None => self.eval_defined_name_read_family(id, sheet, pass, depth),
+        }
+    }
+
+    /// The value of a defined name read through [`NameScope::read`]: its
+    /// range's value, its formula's value, or `#NAME?` while undefined
+    /// (`#REF!` for a linked workbook's name the link does not hold).
+    #[inline(never)]
+    fn eval_defined_name_read_family(
+        &self,
+        id: NameId,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let read = self.name_scope(sheet).read(id);
+        if let Some(value) =
+            read.with_formula(|expression| self.eval_ast(expression, sheet, pass, depth + 1))
+        {
+            return value;
+        }
+        match read.range() {
+            Some(range) => self.named_range_value(range, pass, depth),
+            None => Value::Error(read.error().unwrap_or(FormulaError::Name)),
+        }
+    }
+
+    /// A name's range as a value: its one cell, or `#VALUE!` for a range of
+    /// more than one cell, as a range written there is.
+    #[inline]
+    fn named_range_value(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if range.row_start == range.row_end && range.col_start == range.col_end {
+            self.eval_at(
+                range.sheet as usize,
+                range.row_start as usize,
+                range.col_start as usize,
+                pass,
+                depth + 1,
+            )
+        } else {
+            Value::Error(FormulaError::Value)
+        }
     }
 
     /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,
@@ -2133,7 +2253,7 @@ impl CellStore {
         if let Func::Analysis(id) = func {
             let family = analysis::family(id);
             if let Some(hooks) = &family.array {
-                if (hooks.produces_array)(id, args, pass.shapes()) {
+                if (hooks.produces_array)(id, args, pass.shapes(self.name_scope(sheet))) {
                     return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
                         |matrix| {
                             matrix.validate_bytes()?;
@@ -2359,7 +2479,7 @@ impl CellStore {
                 }
                 continue;
             }
-            let shape = if let Some(area) = argument_range(arg, sheet) {
+            let shape = if let Some(area) = argument_range(arg, self.name_scope(sheet)) {
                 match self.eval_range_values(area, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
@@ -2369,7 +2489,7 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if ast_produces_array(arg, pass.shapes()) {
+            } else if ast_produces_array(arg, pass.shapes(self.name_scope(sheet))) {
                 match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {
@@ -2471,7 +2591,7 @@ impl CellStore {
                 Err(error) => return Value::Error(error),
             };
             let selected = &args[index];
-            if range_from_ast(selected, sheet).is_some() {
+            if range_from_ast(selected, self.name_scope(sheet)).is_some() {
                 return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix.into_first(),
                     Err(error) => Value::Error(error),
@@ -2488,7 +2608,7 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             let coordinate = if let Some(reference) = args.first() {
-                let range = match (range_from_ast(reference, sheet), reference) {
+                let range = match (range_from_ast(reference, self.name_scope(sheet)), reference) {
                     (Some(range), _) => range,
                     (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
                         match self.runtime_range(*func, args, sheet, pass, depth + 1) {
@@ -2523,7 +2643,7 @@ impl CellStore {
             }
             // A written reference has its shape without its cells, which
             // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
-            if let Some(range) = range_from_ast(&args[0], sheet) {
+            if let Some(range) = range_from_ast(&args[0], self.name_scope(sheet)) {
                 if self.sheets.get(range.sheet as usize).is_none() {
                     return Value::Error(FormulaError::Ref);
                 }
@@ -2748,7 +2868,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let Some(range) = range_from_ast(ast, formula_sheet) else {
+        let Some(range) = range_from_ast(ast, self.name_scope(formula_sheet)) else {
             let Some(result) = self.eval_dynamic_array(ast, formula_sheet, pass, depth + 1) else {
                 return Err(FormulaError::Value);
             };
@@ -2798,7 +2918,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(func)?;
         let mut ranges = Vec::with_capacity(args.len());
         for arg in args {
-            ranges.push(range_from_ast(arg, sheet)?);
+            ranges.push(range_from_ast(arg, self.name_scope(sheet))?);
         }
         for range in ranges {
             if let Err(error) = self.fold_range(range, &mut fold, false, pass, depth) {
@@ -2844,7 +2964,7 @@ impl CellStore {
         if args.len() != 2 {
             return None;
         }
-        let range = range_from_ast(&args[0], sheet)?;
+        let range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let reader_depth = depth + 1;
         let reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
@@ -2925,7 +3045,7 @@ impl CellStore {
         let mut readers = Vec::with_capacity(args.len() / 2);
         let mut criteria = Vec::with_capacity(args.len() / 2);
         for pair in args.as_chunks::<2>().0 {
-            let range = range_from_ast(&pair[0], sheet)?;
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
             let reader = match RangeReader::new(self, range, depth + 1) {
                 Ok(reader) => reader,
                 Err(error) => return Some(Value::Error(error)),
@@ -2966,7 +3086,7 @@ impl CellStore {
         if !(2..=3).contains(&args.len()) {
             return None;
         }
-        let criteria_range = range_from_ast(&args[0], sheet)?;
+        let criteria_range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
@@ -2977,7 +3097,7 @@ impl CellStore {
         };
         let value_range = match args.get(2) {
             Some(ast) => sum_range_extent(
-                range_from_ast(ast, sheet)?,
+                range_from_ast(ast, self.name_scope(sheet))?,
                 criteria_range.row_end - criteria_range.row_start + 1,
                 criteria_range.col_end - criteria_range.col_start + 1,
             ),
@@ -3014,7 +3134,7 @@ impl CellStore {
         if args.len() < 3 || args.len().is_multiple_of(2) {
             return None;
         }
-        let value_range = range_from_ast(&args[0], sheet)?;
+        let value_range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
@@ -3022,7 +3142,7 @@ impl CellStore {
         let mut readers = Vec::with_capacity((args.len() - 1) / 2);
         let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
         for pair in args[1..].as_chunks::<2>().0 {
-            let range = range_from_ast(&pair[0], sheet)?;
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
             let reader = match RangeReader::new(self, range, depth + 1) {
                 Ok(reader) => reader,
                 Err(error) => return Some(Value::Error(error)),
@@ -3142,15 +3262,18 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 };
                 let value_range = if let Some(ast) = args.get(2) {
-                    let matrix = match range_from_ast(ast, sheet) {
+                    let matrix = match range_from_ast(ast, self.name_scope(sheet)) {
                         Some(range) => {
-                            let (rows, cols) = match range_from_ast(&args[0], sheet) {
-                                Some(criteria) => (
-                                    criteria.row_end - criteria.row_start + 1,
-                                    criteria.col_end - criteria.col_start + 1,
-                                ),
-                                None => (criteria_range.rows as u32, criteria_range.cols as u32),
-                            };
+                            let (rows, cols) =
+                                match range_from_ast(&args[0], self.name_scope(sheet)) {
+                                    Some(criteria) => (
+                                        criteria.row_end - criteria.row_start + 1,
+                                        criteria.col_end - criteria.col_start + 1,
+                                    ),
+                                    None => {
+                                        (criteria_range.rows as u32, criteria_range.cols as u32)
+                                    }
+                                };
                             let sum_range = sum_range_extent(range, rows, cols);
                             self.eval_range_matrix(sum_range, pass, depth + 1)
                         }
