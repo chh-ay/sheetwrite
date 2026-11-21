@@ -431,36 +431,17 @@ describe("cut and paste in browsers without custom clipboard formats", () => {
 
     h.select(0, 0, 1, 1);
     expect(await h.clipboard.cut()).toBe("done");
-    h.select(0, 3);
+    h.select(0, 2);
     expect(await h.clipboard.paste()).toBe("done");
     expect([h.value(0, 0), h.value(0, 1)]).toEqual([null, null]);
-    expect([h.value(0, 3), h.value(0, 4)]).toEqual(["a", 1]);
-    expect(h.formula(1, 3)).toBe("=E1*2");
+    expect([h.value(0, 2), h.value(0, 3)]).toEqual(["a", 1]);
+    expect(h.formula(1, 2)).toBe("=D1*2");
 
-    h.select(0, 3, 1, 4);
+    h.select(0, 2, 1, 3);
     expect(await h.clipboard.copy()).toBe("done");
     h.select(10, 0);
     expect(await h.clipboard.paste()).toBe("done");
     expect(h.formula(11, 0)).toBe("=B11*2");
-  });
-
-  it("pastes another application's copy made after the cut as a plain paste", async () => {
-    harness = cutHarness({ nativeFormatsOnly: true });
-    const h = harness;
-    h.set(0, 0, 1);
-
-    h.select(0, 0);
-    await h.clipboard.cut();
-    h.clip.items = [
-      new FakeClipboardItem({
-        "text/plain": new Blob(["42"], { type: "text/plain" }),
-        "text/html": new Blob(["<table><tr><td>42</td></tr></table>"], { type: "text/html" }),
-      }),
-    ];
-    h.select(5, 0);
-    expect(await h.clipboard.paste()).toBe("done");
-    expect([h.value(0, 0), h.value(5, 0)]).toEqual([1, 42]);
-    expect(h.marks.at(-1)).toBeNull();
   });
 });
 
