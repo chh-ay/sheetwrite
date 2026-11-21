@@ -9,6 +9,7 @@ import { buildOnEngineInstance, prepareEngineInstance } from "./engine.js";
 import { commitRestore } from "./restore-commit.js";
 import { SheetwriteStore } from "./store.js";
 import { forgetLiveStoreEngine } from "./store/engine-registry.js";
+import type { SyncCoordinator } from "./sync.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type {
@@ -56,6 +57,7 @@ import {
   manifestShapes,
   selectedPages,
   selectPages,
+  selectRestorePages,
   type TailWrites,
 } from "./version-history/page-compare.js";
 import {
@@ -67,7 +69,9 @@ import {
   assertIdle,
   type HistoryRestoreOptions,
   type HistoryRestoreScope,
+  planPageRestore,
   planRestore,
+  type RestoreCommit,
 } from "./version-history/restore.js";
 import { loadRowComparer } from "./version-history/row-compare.js";
 import type {
@@ -842,9 +846,13 @@ export class HistoryArchive {
    * `SyncCoordinator` sends as one transaction that is never rebased.
    *
    * With `options.sync`, the coordinator must be online with no pending or
-   * conflicted commits. A change to the grid while the version is read, or a
-   * scope that cuts a merged cell or hyperlink, rejects before anything changes.
-   * See the restore section of the persistence guide for what each scope covers.
+   * conflicted commits. When its server version is the archive head, the grid
+   * holds the head, so only the checkpoint pages where the version and the head
+   * differ are read and written again (see `selectRestorePages`).
+   *
+   * A change to the grid while the version is read, or a scope that cuts a
+   * merged cell or hyperlink, rejects before anything changes. See the restore
+   * section of the persistence guide for what each scope covers.
    */
   async restoreVersion(
     grid: Grid,
@@ -859,40 +867,105 @@ export class HistoryArchive {
       changed = true;
     });
 
+    /** Commit a plan built from `revision`, if the grid is still as it was read. */
+    const commit = (
+      plan: RestoreCommit,
+      version: HistoryVersion,
+      revision: number,
+    ): ApplyTransactionResult => {
+      if (revision !== version.revision) {
+        throw new HistoryError("integrity", "History log does not reach its version marker");
+      }
+
+      if (changed) {
+        throw new HistoryError("conflict", "The document changed while the version was read");
+      }
+
+      assertIdle(options.sync);
+
+      const outcome = commitRestore(grid, plan.operations, plan.guards, {
+        versionId: id,
+        scope: scope.kind,
+      });
+
+      if (!outcome) {
+        throw new HistoryError("capacity", "A restored cell block does not fit one server version");
+      }
+
+      return outcome;
+    };
+
     try {
       const compareRows = await loadRowComparer(options.kernel);
-      return await this.withPinnedVersion(id, options.signal, (version, read) =>
-        this.withRebuiltVersion(version, read, options.signal, true, ({ store, revision }) => {
-          if (revision !== version.revision) {
-            throw new HistoryError("integrity", "History log does not reach its version marker");
+      return await this.withPinnedVersion(id, options.signal, async (version, read) => {
+        const kept = this.rebuilt.holds(
+          rebuiltKey(version.id, version.revision, version.checkpoint),
+        );
+        const sync = options.sync;
+        if (sync && !kept) {
+          const atHead = await this.restoreAtHead(
+            grid,
+            { version, read },
+            scope,
+            sync,
+            options.signal,
+            (plan, revision) => commit(plan, version, revision),
+          );
+          if (atHead) {
+            return atHead;
           }
+        }
 
-          if (changed) {
-            throw new HistoryError("conflict", "The document changed while the version was read");
-          }
-
-          assertIdle(options.sync);
-
-          const plan = planRestore(grid.store, store, scope, compareRows);
-
-          const outcome = commitRestore(grid, plan.operations, plan.guards, {
-            versionId: id,
-            scope: scope.kind,
-          });
-
-          if (!outcome) {
-            throw new HistoryError(
-              "capacity",
-              "A restored cell block does not fit one server version",
-            );
-          }
-
-          return outcome;
-        }),
-      );
+        return this.withRebuiltVersion(version, read, options.signal, true, ({ store, revision }) =>
+          commit(planRestore(grid.store, store, scope, compareRows), version, revision),
+        );
+      });
     } finally {
       stop();
     }
+  }
+
+  /**
+   * Restore from the pages where the version and the archive head differ, when
+   * the synchronized grid holds the head: its coordinator's server version is
+   * the head's revision. `undefined` when the restore needs the whole version:
+   * the grid is not at the head, a log tail or the scope needs more cells, or
+   * too many pages differ.
+   */
+  private async restoreAtHead(
+    grid: Grid,
+    leased: LeasedVersion,
+    scope: HistoryRestoreScope,
+    sync: SyncCoordinator,
+    signal: AbortSignal | undefined,
+    commit: (plan: RestoreCommit, revision: number) => ApplyTransactionResult,
+  ): Promise<ApplyTransactionResult | undefined> {
+    return this.withPinnedVersion("head", signal, async (head, readHead) => {
+      if (head.revision !== sync.state.serverVersion) {
+        return undefined;
+      }
+
+      const inputs = await this.pageInputs(leased.version, leased.read, head, readHead);
+      const pages =
+        inputs &&
+        selectRestorePages(inputs.earlier, inputs.later, inputs.earlierWrites, inputs.laterWrites);
+      if (!inputs || !pages) {
+        return undefined;
+      }
+
+      const sparse = await this.sparseVersion(inputs.earlier, pages.read, leased, signal);
+      try {
+        // A server version that moved while the pages were read leaves the grid off the head.
+        if (head.revision !== sync.state.serverVersion) {
+          return undefined;
+        }
+
+        const plan = planPageRestore(grid.store, sparse.store, scope, pages.changed);
+        return plan && commit(plan, sparse.revision);
+      } finally {
+        sparse.free();
+      }
+    });
   }
 
   /**

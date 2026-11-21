@@ -52,6 +52,7 @@ mod parser;
 mod relative;
 mod rename;
 mod structural;
+mod template;
 #[cfg(test)]
 mod tests;
 mod write;
@@ -65,4 +66,5 @@ pub(crate) use parser::*;
 pub(crate) use relative::*;
 pub(crate) use rename::*;
 pub(crate) use structural::*;
+pub(crate) use template::*;
 pub(crate) use write::*;

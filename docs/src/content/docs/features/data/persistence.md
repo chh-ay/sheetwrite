@@ -186,6 +186,14 @@ document operations, so the undo step and the synchronized transaction grow with
 rows that are written. The comparison runs on the history kernel; `kernel` sets where
 its WASM comes from, as in `diffVersions`.
 
+In a shared document whose `SyncCoordinator` is at the archive head (its server version
+is the head's revision), the grid holds the head. The restore then reads only the
+checkpoint pages where the version and the head differ, or that their log tails write,
+and writes those cells again; it does not rebuild the whole version. It rebuilds the
+version whole when a log tail holds operations other than cell writes, styles, clears,
+notes, row metadata, sheet settings and sheet order, when a sheet is added, removed or
+reshaped, or when more than a quarter of the version's pages differ.
+
 | Scope | Restores | Keeps current |
 | --- | --- | --- |
 | `{ kind: "workbook" }` | Every sheet (re-creating removed sheets with their IDs and removing later ones), sheet order, names, table relationships, calculation options | Retained OOXML parts (`xlsxSource`), as undo does |
@@ -220,10 +228,11 @@ through the log's row and column alignment, one page of the earlier version with
 same content ID, and neither version's log tail writes them. The other pages, and the
 pages their cells meet, are rebuilt; the rest of each version stays empty. The result
 is the same as rebuilding both versions whole. Both versions are rebuilt whole when a
-version's log tail holds an operation other than cell writes, styles, clears, notes
-and row metadata, or when more than a quarter of the pages would be read. A changed
-cell that holds a formula or a reference takes its calculated value from the whole
-version. A small change of a large workbook reads a few pages instead of all of them.
+version's log tail holds an operation other than cell writes, styles, clears, notes,
+row metadata, sheet settings and sheet order, or when more than a quarter of the pages
+would be read. A changed cell that holds a formula or a reference takes its calculated
+value from the whole version. A small change of a large workbook reads a few pages
+instead of all of them.
 
 | Page field | Contents |
 | --- | --- |

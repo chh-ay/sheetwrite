@@ -68,6 +68,11 @@ export class RebuiltVersionCache {
     }
   }
 
+  /** Whether the version under `key` is kept rebuilt. */
+  holds(key: string): boolean {
+    return this.kept?.key === key;
+  }
+
   /** Stop keeping the rebuilt version; it is freed now, or when its last user returns. */
   release(): void {
     const entry = this.kept;

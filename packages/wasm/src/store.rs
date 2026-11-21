@@ -150,6 +150,9 @@ pub struct CellStore {
     /// Set while a page load applies edits another client committed, which
     /// recalculate only the formulas that read them.
     remote_load: bool,
+    /// Drops the formulas that ingest keeps for reuse with the store; held
+    /// only for that.
+    _formula_templates: crate::calc::FormulaTemplatesHold,
     /// The defined names, by the id formulas hold, and the tables.
     pub(crate) bindings: names::Bindings,
     mutation_revision: u64,
@@ -210,6 +213,7 @@ impl CellStore {
             regex_patterns: std::cell::Cell::new(None),
             loading_page: 0,
             remote_load: false,
+            _formula_templates: crate::calc::FormulaTemplatesHold,
             mutation_revision: 0,
             active_mutation_revision: None,
             bindings: names::Bindings::default(),
