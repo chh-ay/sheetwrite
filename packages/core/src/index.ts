@@ -74,6 +74,7 @@ export {
   type SnapshotValidationOptions,
   type TransactionResourceValidationResult,
   MAX_ITERATIONS,
+  MAX_VALIDATION_FORMULA_LENGTH,
   validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,

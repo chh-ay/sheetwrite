@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value};
 
@@ -84,26 +85,26 @@ impl RewriteScope {
     }
 }
 
-pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
+/// Whether `ast` resolves a reference at run time (`OFFSET`, `INDIRECT`),
+/// through the defined names it reads too.
+pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool {
+    let contains = move |child: &Ast| ast_contains_runtime_ref(child, names);
     match ast {
         Ast::Func(Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::Func(_, args) => args.iter().any(contains),
         Ast::UnknownFunc(call) => {
             let args = &call.args;
-            args.iter().any(ast_contains_runtime_ref)
+            args.iter().any(contains)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_contains_runtime_ref(left) || ast_contains_runtime_ref(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_runtime_ref(inner),
-        Ast::LetSlot { expression, .. } => ast_contains_runtime_ref(expression),
-        Ast::NamedFormula(named) => ast_contains_runtime_ref(&named.expression),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => contains(left) || contains(right),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains(inner),
+        Ast::LetSlot { expression, .. } => contains(expression),
+        Ast::DefinedName(id, _) => names.formula_satisfies_family(*id, ast_contains_runtime_ref),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -119,7 +120,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => ast_contains_runtime_ref(&definition.body),
+        Ast::Lambda(definition) => contains(&definition.body),
     }
 }
 
@@ -301,7 +302,10 @@ impl CellStore {
         depth: usize,
         scope: RewriteScope,
     ) -> Ast {
-        if args.iter().any(ast_contains_runtime_ref) {
+        if args
+            .iter()
+            .any(|arg| ast_contains_runtime_ref(arg, self.name_scope(sheet)))
+        {
             self.rewrite_references(&mut expanded, sheet, pass, depth, scope);
         }
         expanded
@@ -346,11 +350,13 @@ impl CellStore {
                 self.rewrite_deferred(std::slice::from_mut(body), sheet, pass, depth);
             }
             // The copy is only evaluated, never written back, so the name's
-            // expansion takes the node's place.
-            Ast::NamedFormula(named) => {
-                let mut expression = named.expression.clone();
-                self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
-                *ast = expression;
+            // formula, placed for the formula's cell, takes the node's place.
+            Ast::DefinedName(id, _) => {
+                let formula = self.name_scope(sheet).read(*id).placed_formula();
+                if let Some(mut expression) = formula {
+                    self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
+                    *ast = expression;
+                }
             }
             Ast::Func(..)
             | Ast::Bin(..)
@@ -364,7 +370,6 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::NamedRange(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -412,7 +417,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
 
-        let source = match range_from_ast(&args[0], sheet) {
+        let source = match range_from_ast(&args[0], self.name_scope(sheet)) {
             Some(source) => source,
             None => {
                 return Err(match self.eval_ast(&args[0], sheet, pass, depth + 1) {
@@ -513,7 +518,7 @@ impl CellStore {
         entry
             .ast
             .as_ref()
-            .and_then(|ast| read_shifted((0, 0), || range_from_ast(ast, sheet)))
+            .and_then(|ast| read_shifted((0, 0), || range_from_ast(ast, self.name_scope(sheet))))
             .or_else(|| self.indirect_named_reference(source, sheet))
             .ok_or(FormulaError::Ref)
     }
@@ -536,13 +541,13 @@ impl CellStore {
         let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
-            ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),
+            Ast::Structured(_) => range_from_ast(entry.ast.as_ref()?, self.name_scope(sheet)),
+            Ast::DefinedName(id, _) => self.name_scope(sheet).read(*id).range(),
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::NamedFormula(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Cell(..)
             | Ast::SheetCell(..)

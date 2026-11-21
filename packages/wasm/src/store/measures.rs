@@ -484,7 +484,12 @@ impl CellStore {
             })
             .collect();
         for (column, context) in read {
-            let table_id = &self.tables.get(column.table).ok_or(FormulaError::Ref)?.id;
+            let table_id = &self
+                .bindings
+                .tables
+                .get(column.table)
+                .ok_or(FormulaError::Ref)?
+                .id;
             let slot = slots
                 .iter()
                 .position(|slot| slot.0 == *table_id && slot.1 == context)
@@ -584,8 +589,7 @@ impl CellStore {
             | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -737,7 +741,10 @@ impl CellStore {
         };
         let mut results = FormulaResults::default();
         bind_slots(&mut results, slots);
-        let value = if ast_produces_array(expression, Shapes::of(results.call_frame())) {
+        let value = if ast_produces_array(
+            expression,
+            Shapes::of(results.call_frame(), self.name_scope(0)),
+        ) {
             Value::Error(FormulaError::Value)
         } else {
             self.eval_conditional_ast(expression, 0, (0, 0), (0, 0), &mut results)
@@ -767,7 +774,11 @@ struct ContextEdit {
 impl CellStore {
     /// The stable table and column ids of a bound model column.
     fn column_ref(&self, column: &StructuredRef) -> Result<ColumnRef, FormulaError> {
-        let table = self.tables.get(column.table).ok_or(FormulaError::Ref)?;
+        let table = self
+            .bindings
+            .tables
+            .get(column.table)
+            .ok_or(FormulaError::Ref)?;
         let id = &table.column_at(column.col).ok_or(FormulaError::Ref)?.id;
         Ok(ColumnRef {
             table: table.id.clone(),
@@ -855,8 +866,7 @@ impl CellStore {
             | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -918,8 +928,7 @@ impl CellStore {
                 | Ast::Lambda(_)
                 | Ast::RegexPattern(_)
                 | Ast::Name(_)
-                | Ast::NamedRange(_)
-                | Ast::NamedFormula(_)
+                | Ast::DefinedName(..)
                 | Ast::UnresolvedStructured(_)
                 | Ast::Structured(_)
                 | Ast::Cell(..)
