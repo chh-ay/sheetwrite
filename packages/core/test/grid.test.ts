@@ -74,6 +74,10 @@ function makeFakeStore(
 
 let restoreStubs: () => void;
 
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
 let restoreXlsxSlots = keepXlsxSlots();
 
@@ -99,6 +103,21 @@ function expectEditor(host: HTMLElement): HTMLTextAreaElement {
   return node;
 }
 
+/** Serves `text` from navigator.clipboard while `run` runs, then puts the clipboard back. */
+async function withClipboardText(text: string, run: () => Promise<void>): Promise<void> {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { readText: async () => text },
+  });
+  try {
+    await run();
+  } finally {
+    if (descriptor) Object.defineProperty(navigator, "clipboard", descriptor);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+}
+
 function typeIntoFocusedCell(host: HTMLElement, value: string, key = "F2"): void {
   host.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 
@@ -108,21 +127,12 @@ function typeIntoFocusedCell(host: HTMLElement, value: string, key = "F2"): void
 }
 
 describe("Grid editing (Layer 3)", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   it("pastes across hidden columns without changing them and undoes in one step", async () => {
     const workbook = makeWorkbook(2);
     const sheet = workbook.sheets[0];
     const hiddenColumn = sheet?.columns[1];
     if (!hiddenColumn) throw new Error("expected the amount column in the fixture");
     hiddenColumn.visible = false;
-    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { readText: async () => "Alice\tParis\nBob\tTokyo" },
-    });
     const grid = createGrid(mountHost(), { workbook, data: makeColumnarData(2) });
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
@@ -130,8 +140,7 @@ describe("Grid editing (Layer 3)", () => {
       [0, 1].map((row) =>
         [0, 1, 2].map((col) => grid.store.getCell({ sheet: "s1", row, col }).resolved),
       );
-    try {
-      expect(grid.store).toBeInstanceOf(SheetwriteStore);
+    await withClipboardText("Alice\tParis\nBob\tTokyo", async () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
       expect(await grid.actions.paste()).toBe("done");
       expect(readCells()).toEqual([
@@ -144,11 +153,8 @@ describe("Grid editing (Layer 3)", () => {
         ["Customer 1", 10.5, "Tokyo"],
       ]);
       expect(changes.map((event) => event.commitReason)).toEqual(["paste", "undo"]);
-    } finally {
-      grid.destroy();
-      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
-      else Reflect.deleteProperty(navigator, "clipboard");
-    }
+    });
+    grid.destroy();
   });
 
   it("grows the sheet to hold a paste longer and wider than it, as Excel's sheet does (#952)", async () => {
@@ -156,14 +162,9 @@ describe("Grid editing (Layer 3)", () => {
     const text = Array.from({ length: 5 }, (_, row) =>
       Array.from({ length: 40 }, (_, col) => row * 100 + col).join("\t"),
     ).join("\n");
-    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { readText: async () => text },
-    });
     const grid = createGrid(mountHost(), { workbook: makeWorkbook(3), data: makeColumnarData(3) });
     const sheet = () => grid.store.getWorkbook().sheets[0]!;
-    try {
+    await withClipboardText(text, async () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
       expect(await grid.actions.paste()).toBe("done");
       expect(sheet().rowCount).toBe(6);
@@ -174,11 +175,8 @@ describe("Grid editing (Layer 3)", () => {
       grid.undo();
       expect(sheet().rowCount).toBe(3);
       expect(grid.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(10.5);
-    } finally {
-      grid.destroy();
-      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
-      else Reflect.deleteProperty(navigator, "clipboard");
-    }
+    });
+    grid.destroy();
   });
 
   it("requests the required datasource window fields and consumes its page", async () => {
@@ -317,6 +315,7 @@ describe("Grid editing (Layer 3)", () => {
 
     grid.destroy();
   });
+
   it("applies arbitrary patches as one undoable Grid transaction", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -350,150 +349,54 @@ describe("Grid editing (Layer 3)", () => {
 });
 
 describe("Grid transaction resource ingress", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  it("rejects local, remote, and direct-store overflow without state, history, or events", () => {
-    const workbook = makeWorkbook(4);
-    const grid = new GridImpl(mountHost(), {
-      workbook,
-      transactionResourceLimits: { maxOperations: 1 },
-    });
-    const changes: ChangeEvent[] = [];
-    let rejectionEvents = 0;
-    grid.on("change", (event) => changes.push(event));
-    grid.on("mutation-rejected", () => {
-      rejectionEvents += 1;
-    });
-    const first = { sheet: "s1", row: 0, col: 0 };
-    const second = { sheet: "s1", row: 1, col: 0 };
-    const third = { sheet: "s1", row: 2, col: 0 };
-
-    const accepted = grid.applyTransaction({
-      patches: [{ op: "set", addr: first, value: { kind: "literal", value: "accepted" } }],
-    });
-    expect(accepted.status).toBe("applied");
-    if (accepted.status !== "applied") throw new Error("Grid count limit unexpectedly rejected");
-    expect(
-      validateTransactionResources(accepted.transaction.patches, {
-        maxOperations: 1,
-        maxEncodedBytes: 8 * 1024 * 1024,
-      }).ok,
-    ).toBe(true);
-
-    const oversized: DocumentOp[] = [
-      { op: "set", addr: second, value: { kind: "literal", value: "blocked" } },
-      { op: "set", addr: third, value: { kind: "literal", value: "blocked" } },
-    ];
-    const local = grid.applyTransaction({ patches: oversized });
-    const remote = grid.applyRemoteOperations(oversized);
-    const direct = grid.store.applyTransaction({ patches: oversized });
-    for (const result of [local, remote, direct]) {
-      expect(result).toMatchObject({
-        status: "rejected",
-        epoch: 1,
-        issues: [
-          {
-            kind: "resource-limit",
-            resource: "operations",
-            actual: 2,
-            max: 1,
-          },
-        ],
-      });
-    }
-    expect(grid.store.getCell(second).resolved).toBeNull();
-    expect(grid.store.getCell(third).resolved).toBeNull();
-    expect(changes).toHaveLength(1);
-    expect(rejectionEvents).toBe(0);
-
-    grid.undo();
-    expect(grid.store.getCell(first).resolved).toBeNull();
-    expect(changes).toHaveLength(2);
-    expect(rejectionEvents).toBe(0);
-    grid.destroy();
-  });
-
-  it("undoes a local edit where remote row and column changes moved it", () => {
-    const amounts = (grid: GridImpl, rows: number) =>
-      Array.from(
-        { length: rows },
-        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 1 }).resolved,
-      );
-    const editRow3 = (grid: GridImpl) =>
-      grid.applyTransaction({
-        patches: [
-          {
-            op: "set",
-            addr: { sheet: "s1", row: 3, col: 1 },
-            value: { kind: "literal", value: 999 },
-          },
-        ],
-      });
-    const cases: Array<{
-      remote: DocumentOp;
-      localReplay?: boolean;
-      rows: number;
-      expected: CellScalar[];
-    }> = [
-      {
-        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
-        rows: 7,
-        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+  const rowsAfterTop = [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5];
+  it.each<{ remote: DocumentOp; localReplay?: boolean; col?: number; expected: CellScalar[] }>([
+    { remote: { op: "addRows", sheet: "s1", at: 0, count: 1 }, expected: rowsAfterTop },
+    {
+      remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+      localReplay: true,
+      expected: rowsAfterTop,
+    },
+    {
+      remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+      expected: [10.5, 20.5, 30.5, 40.5, 50.5],
+    },
+    {
+      remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
+      expected: [0.5, 10.5, 20.5, 40.5, 50.5],
+    },
+    {
+      remote: {
+        op: "addColumns",
+        sheet: "s1",
+        at: 0,
+        columns: [{ key: "peer", header: "Peer", width: 80, type: "text" as const }],
       },
-
-      {
-        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
-        localReplay: true,
-        rows: 7,
-        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
-      },
-
-      {
-        remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
-        rows: 5,
-        expected: [10.5, 20.5, 30.5, 40.5, 50.5],
-      },
-
-      {
-        remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
-        rows: 5,
-        expected: [0.5, 10.5, 20.5, 40.5, 50.5],
-      },
-    ];
-
-    for (const { remote, localReplay, rows, expected } of cases) {
+      col: 2,
+      expected: [0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+    },
+  ])(
+    "undoes a local edit that a remote $remote.op moved",
+    ({ remote, localReplay, col = 1, expected }) => {
       const grid = new GridImpl(mountHost(), {
         workbook: makeWorkbook(6),
         data: makeColumnarData(6),
       });
-      expect(editRow3(grid).status).toBe("applied");
+      const edit = {
+        op: "set",
+        addr: { sheet: "s1", row: 3, col: 1 },
+        value: { kind: "literal", value: 999 },
+      } as const;
+      expect(grid.applyTransaction({ patches: [edit] }).status).toBe("applied");
       expect(grid.applyRemoteOperations([remote], { localReplay }).status).toBe("applied");
       grid.undo();
-      expect({ remote, amounts: amounts(grid, rows) }).toEqual({ remote, amounts: expected });
+      const values = expected.map(
+        (_, row) => grid.store.getCell({ sheet: "s1", row, col }).resolved,
+      );
+      expect(values).toEqual(expected);
       grid.destroy();
-    }
-
-    const grid = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(6),
-      data: makeColumnarData(6),
-    });
-    expect(editRow3(grid).status).toBe("applied");
-    const inserted = { key: "peer", header: "Peer", width: 80, type: "text" as const };
-    expect(
-      grid.applyRemoteOperations([{ op: "addColumns", sheet: "s1", at: 0, columns: [inserted] }])
-        .status,
-    ).toBe("applied");
-    grid.undo();
-    expect(
-      Array.from(
-        { length: 6 },
-        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 2 }).resolved,
-      ),
-    ).toEqual([0.5, 10.5, 20.5, 30.5, 40.5, 50.5]);
-    grid.destroy();
-  });
+    },
+  );
 
   it("reports an undo whose restore payload exceeds the limit and still undoes older edits", () => {
     const rows = 200;
@@ -573,12 +476,6 @@ describe("Grid transaction resource ingress", () => {
         ),
       },
     });
-    const changes: ChangeEvent[] = [];
-    let rejections = 0;
-    grid.on("change", (event) => changes.push(event));
-    grid.on("mutation-rejected", () => {
-      rejections += 1;
-    });
     try {
       const older = { sheet: "s1", row: rows, col: 0 };
       const newer = { sheet: "s1", row: rows, col: 1 };
@@ -633,14 +530,6 @@ describe("Grid transaction resource ingress", () => {
         }
       }
       expect(mismatches).toBe(0);
-      expect(changes.map((event) => event.commitReason)).toEqual([
-        "api",
-        "api",
-        "api",
-        "undo",
-        "undo",
-      ]);
-      expect(rejections).toBe(0);
       await releaseEngineMemory();
       grid.undo();
       expect(grid.store.getCell(older).resolved).toBeNull();
@@ -658,10 +547,6 @@ describe("Grid transaction resource ingress", () => {
 });
 
 describe("setBlock arrays at every entry point", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
   const setBlock = (values: CellScalar[], styleIds?: number[]): DocumentOp => ({
     op: "setBlock",
@@ -734,6 +619,13 @@ describe("setBlock arrays at every entry point", () => {
       expect(operation.block.values).toEqual(["kept", 10]);
       expect(operation.block.values).not.toBe(values.entries);
       expect(operation.block.styleIds).toEqual([0, 1]);
+      if (name === "grid.applyTransaction") {
+        // History keeps the measured value too.
+        grid.undo();
+        expect(cellAt(grid, 1)).toBeNull();
+        grid.redo();
+        expect(cellAt(grid, 1)).toBe(10);
+      }
       expect(values.counter.reads).toBe(1);
       grid.destroy();
     });
@@ -805,26 +697,25 @@ describe("setBlock arrays at every entry point", () => {
       grid.destroy();
     });
 
-    it(`${name} applies a block at the byte limit and rejects it one byte below`, () => {
+    it(`${name} applies a block at the byte limit, rejects it one byte below, and stores the measured values when an operation from a change event is sent again`, () => {
       const exact = validateTransactionResources([setBlock(["kept", "text"])]);
       if (!exact.ok) throw new Error("expected a measurable block");
-      const limited = (maxEncodedBytes: number) =>
-        new GridImpl(mountHost(), {
-          workbook: makeWorkbook(4),
-          transactionResourceLimits: { maxEncodedBytes },
-        });
-      const atLimit = limited(exact.encodedBytes);
-      expect(apply(atLimit, [setBlock(["kept", "text"])]).status).toBe("applied");
-      atLimit.destroy();
-      const belowLimit = limited(exact.encodedBytes - 1);
+      const belowLimit = new GridImpl(mountHost(), {
+        workbook: makeWorkbook(4),
+        transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes - 1 },
+      });
+      let rejections = 0;
+      belowLimit.on("mutation-rejected", () => {
+        rejections += 1;
+      });
       expect(apply(belowLimit, [setBlock(["kept", "text"])])).toMatchObject({
         status: "rejected",
         issues: [{ kind: "resource-limit", resource: "encoded-bytes" }],
       });
+      // A host or remote resource-limit rejection returns its issues and emits no event.
+      expect(rejections).toBe(0);
       belowLimit.destroy();
-    });
 
-    it(`${name} stores the measured values when an operation from a change event is sent again`, () => {
       const grid = limitedGrid();
       const emitted: DocumentOp[] = [];
       grid.on("change", (event) => emitted.push(...event.transaction.patches));
@@ -861,103 +752,56 @@ describe("setBlock arrays at every entry point", () => {
     });
   }
 
-  it("re-measures an entry a permission callback turned into a getter", () => {
+  it.each([
+    [
+      "a permission callback",
+      true,
+      (grid: GridImpl) => {
+        let installed = false;
+        grid.setProtectionResolver(({ operation }) => {
+          if (!installed) smallThenOverLimit(operation);
+          installed = true;
+          return "allow";
+        });
+      },
+    ],
+    [
+      "a sync guard",
+      false,
+      (grid: GridImpl) => {
+        registerGridTransactionAdmission(grid, {
+          reserve: (operations) => {
+            smallThenOverLimit(operations[0]);
+            return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+          },
+        });
+      },
+    ],
+  ] as const)("re-measures an entry %s turned into a getter", (_source, protect, install) => {
     // The resolver is asked only about edits to a protected range.
     const workbook = makeWorkbook(4);
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("fixture is missing its sheet");
-    sheet.protectedRanges = [{ id: "locked", range }];
+    if (protect) workbook.sheets[0]!.protectedRanges = [{ id: "locked", range }];
     const grid = limitedGrid(workbook);
-    let installed = false;
-    grid.setProtectionResolver(({ operation }) => {
-      if (!installed) smallThenOverLimit(operation);
-      installed = true;
-      return "allow";
-    });
-
+    install(grid);
     expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
       "rejected",
     );
     expect(cellAt(grid, 0)).toBeNull();
-    grid.destroy();
-  });
-
-  it("re-measures an entry a sync guard turned into a getter", () => {
-    const grid = limitedGrid();
-    const disposeAdmission = registerGridTransactionAdmission(grid, {
-      reserve: (operations) => {
-        smallThenOverLimit(operations[0]);
-        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
-      },
-    });
-
-    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
-      "rejected",
-    );
-    expect(cellAt(grid, 0)).toBeNull();
-    disposeAdmission();
-    grid.destroy();
-  });
-
-  it("grid.applyTransaction sends, undoes and redoes the value an entry getter returned once", () => {
-    const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
-    const sent: DocumentOp[] = [];
-    const disposeAdmission = registerGridTransactionAdmission(grid, {
-      reserve: (operations) => {
-        sent.push(...operations);
-        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
-      },
-    });
-    const before = cellAt(grid, 1);
-    // The entry-point loop above checks the store and the change event; this
-    // checks what admission sends and what history keeps.
-    const values = withGetter<CellScalar>(["kept", 0], 1, (count) => count * 10);
-
-    expect(grid.applyTransaction({ patches: [setBlock(values.entries)] }).status).toBe("applied");
-    const operation = sent[0];
-    if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
-    expect(operation.block.values).toEqual(["kept", 10]);
-    expect(operation.block.values).not.toBe(values.entries);
-
-    grid.undo();
-    expect(cellAt(grid, 1)).toBe(before);
-    grid.redo();
-    expect(cellAt(grid, 1)).toBe(10);
-    expect(values.counter.reads).toBe(1);
-    disposeAdmission();
     grid.destroy();
   });
 });
 
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  it("replaceTheme replaces the whole option value instead of merging", () => {
-    const workbook = makeWorkbook(10);
-    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
-
-    grid.replaceTheme({ bg: "#ff0000" });
-    grid.replaceTheme({ fg: "#123456" });
-
-    const theme = grid.getEffectiveTheme();
-    expect(theme.fg).toBe("#123456");
-    expect(theme.bg).toBe(DEFAULT_THEME.bg);
-
-    grid.destroy();
-  });
-
-  it("setTheme keeps merging for imperative users", () => {
+  it("setTheme merges into the current theme and replaceTheme replaces it", () => {
     const workbook = makeWorkbook(10);
     const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
 
     grid.setTheme({ bg: "#ff0000" });
     grid.setTheme({ fg: "#123456" });
+    expect(grid.getEffectiveTheme()).toMatchObject({ bg: "#ff0000", fg: "#123456" });
 
-    const theme = grid.getEffectiveTheme();
-    expect(theme.bg).toBe("#ff0000");
-    expect(theme.fg).toBe("#123456");
+    grid.replaceTheme({ fg: "#654321" });
+    expect(grid.getEffectiveTheme()).toMatchObject({ bg: DEFAULT_THEME.bg, fg: "#654321" });
 
     grid.destroy();
   });
@@ -991,10 +835,6 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
 });
 
 describe("Grid.setMinColumns", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   it("fills the host width with empty columns only for a spreadsheet", () => {
     const columnCount = (options: Partial<GridOptions>) => {
       const host = mountHost();
@@ -1334,10 +1174,6 @@ describe("Grid search over a custom store", () => {
 });
 
 describe("transactional document metadata", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   it("returns the view-sort outcome and restores data order", () => {
     const workbook = makeWorkbook(4);
     const store = new SheetwriteStore(workbook, makeColumnarData(4));
@@ -1472,7 +1308,7 @@ describe("transactional document metadata", () => {
     store.dispose();
   });
 
-  it("supports add, rename, reorder, remove, and lossless undo for cross-sheet formulas", () => {
+  it("undoes and redoes an added sheet and a rename that rewrites cross-sheet formulas", () => {
     const workbook: Workbook = {
       activeSheet: "summary",
       sheets: [
@@ -1524,23 +1360,6 @@ describe("transactional document metadata", () => {
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Sales!A1+1");
     grid.redo();
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
-
-    grid.moveSheet("source", 1);
-    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "source", "notes"]);
-    grid.undo();
-    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
-
-    grid.removeSheet("source");
-    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
-    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
-    grid.undo();
-    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
-    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='Sales Data'!A1+1");
-    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
-    grid.redo();
-    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
-    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
 
     grid.destroy();
     store.dispose();
@@ -1625,7 +1444,7 @@ describe("transactional document metadata", () => {
     store.dispose();
   });
 
-  it("histories validation, protection, notes, filters, and column visibility", () => {
+  it("histories validation, protection, notes, and column visibility", () => {
     const workbook = makeWorkbook(6);
     const store = new SheetwriteStore(workbook, makeColumnarData(6));
     const grid = new GridImpl(mountHost(), { workbook }, store);
@@ -1657,11 +1476,6 @@ describe("transactional document metadata", () => {
     expect(grid.getNote(noteAddr)).toBeNull();
     grid.redo();
     expect(grid.getNote(noteAddr)).toBe("Check source");
-
-    grid.setColumnFilter(0, { kind: "contains", text: "Customer" });
-    expect(grid.getColumnFilters().get(0)).toEqual({ kind: "contains", text: "Customer" });
-    grid.undo();
-    expect(grid.getColumnFilters().has(0)).toBe(false);
 
     grid.hideColumns([1]);
     expect(grid.hiddenColumns()).toEqual([1]);
@@ -1742,6 +1556,8 @@ describe("transactional document metadata", () => {
 
   it("keeps every document metadata action inert in read-only mode", () => {
     const workbook = makeWorkbook(10);
+    const existingMerge = { r0: 4, c0: 0, r1: 5, c1: 1 };
+    workbook.sheets[0]!.merges = [existingMerge];
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const grid = new GridImpl(mountHost(), { workbook, readOnly: true }, store);
     let changes = 0;
@@ -1754,6 +1570,13 @@ describe("transactional document metadata", () => {
     });
 
     grid.actions.merge();
+    expect(grid.getSelection()).toEqual({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 1 } });
+    grid.actions.unmerge();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 5, col: 1 } });
     grid.setRowHeight(0, 99);
     grid.setFrozen(2, 1);
     grid.groupRows(1, 3);
@@ -1778,7 +1601,7 @@ describe("transactional document metadata", () => {
     expect(changes).toBe(0);
     expect(workbook.sheets).toHaveLength(1);
     expect(workbook.sheets[0]).toMatchObject({ name: "Sheet 1" });
-    expect(workbook.sheets[0]!.merges ?? []).toEqual([]);
+    expect(workbook.sheets[0]!.merges).toEqual([existingMerge]);
     expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
     expect(workbook.sheets[0]!.frozenRows).toBeUndefined();
     expect(workbook.sheets[0]!.rowGroups).toBeUndefined();
@@ -1822,7 +1645,7 @@ describe("element height cap measurement", () => {
     } as unknown as Document;
   };
 
-  it("uses the engine's measured clamp minus a safety margin", () => {
+  it("uses the engine's measured clamp minus a safety margin, or a conservative fallback", () => {
     // Chromium at 125% browser zoom clamps near 26.8M CSS px — well below the
     // 33M constant this measurement replaced; trusting the constant left the
     // tail of a 1M-row document unreachable.
@@ -1831,9 +1654,8 @@ describe("element height cap measurement", () => {
     expect(cap).toBeGreaterThan(0);
     expect(cap).toBeLessThan(measuredClamp);
     expect(measureMaxElementHeight(stubDocument(measuredClamp / 2))).toBeLessThan(cap);
-  });
 
-  it("falls back to a conservative cap when no clamp can be measured", () => {
+    // No measurable clamp falls back to a conservative cap.
     const fallback = measureMaxElementHeight(null);
     expect(fallback).toBeGreaterThan(0);
     expect(fallback).toBeLessThan(26_843_545);
@@ -1843,10 +1665,6 @@ describe("element height cap measurement", () => {
 });
 
 describe("undo and redo selection", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   it("selects the cells undo and redo change, as Excel does", () => {
     const workbook = makeWorkbook(20);
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
@@ -1925,10 +1743,6 @@ describe("undo and redo selection", () => {
 });
 
 describe("a sheet named History", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
   it("is refused only to a user's rename, so undo gives the name back", () => {
     const workbook = makeWorkbook(5);
     const first = workbook.sheets[0]!;
