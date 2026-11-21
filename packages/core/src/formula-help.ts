@@ -108,6 +108,21 @@ function previewLine(preview: FormulaPreview): string {
       }
   }
 }
+
+/**
+ * Whether the text at the caret is a name the user is still typing: the list
+ * offers names for it, and it is not itself a defined name, table or value.
+ * Such a formula has no preview, as in Excel: a function name without its
+ * `(` would only show `#NAME?`.
+ */
+function unfinishedName(text: string, completion: FormulaCompletion | null): boolean {
+  if (completion === null) return false;
+  const typed = text.slice(completion.from, completion.to).toUpperCase();
+  return !completion.matches.some(
+    (item) => item.kind !== "function" && item.name.toUpperCase() === typed,
+  );
+}
+
 /**
  * Errors to show now. An error that only says the formula is not finished
  * waits while the caret is at the end of the text, where the user is still
@@ -501,7 +516,10 @@ export class FormulaHelp {
     this.fix =
       first === undefined ? null : (nameFixes.get(first) ?? syntaxFix(text, first, this.functions));
     this.showGuide();
-    this.schedulePreview(text, analysis.diagnostics.length === 0);
+    this.schedulePreview(
+      text,
+      analysis.diagnostics.length === 0 && !unfinishedName(text, analysis.completion),
+    );
     field.setAttribute("aria-invalid", diagnostics.length > 0 ? "true" : "false");
     this.reposition();
   }

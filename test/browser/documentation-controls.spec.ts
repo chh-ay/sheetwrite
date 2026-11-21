@@ -117,6 +117,32 @@ test("copied feedback belongs to the command that was copied", async ({ page }) 
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("npm install");
 });
 
+test("the package command and the code block below it share one copy button", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(INSTALLATION_URL);
+  await waitForHydration(page);
+  const tab = page.getByRole("tabpanel").filter({ visible: true }).first();
+  const commandCopy = tab.locator(".sw-terminal__copy");
+  const blockCopy = tab.locator(".expressive-code .copy button").first();
+  await tab.locator(".expressive-code .frame").first().hover();
+
+  const [command, block] = await Promise.all([commandCopy.boundingBox(), blockCopy.boundingBox()]);
+  if (command === null || block === null) throw new Error("A copy button has no box.");
+  expect(command.width).toBe(block.width);
+  expect(command.height).toBe(block.height);
+  // Both show only the icon; the label is for screen readers.
+  const visibleLabelWidth = await commandCopy
+    .locator("span")
+    .evaluate((label) => label.getBoundingClientRect().width);
+  expect(visibleLabelWidth).toBeLessThanOrEqual(1);
+  const [commandRadius, blockRadius] = await Promise.all(
+    [commandCopy, blockCopy].map((button) =>
+      button.evaluate((element) => getComputedStyle(element).borderTopLeftRadius),
+    ),
+  );
+  expect(commandRadius).toBe(blockRadius);
+});
+
 test("a malformed fragment is ignored", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(`${INSTALLATION_URL}#%`);

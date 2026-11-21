@@ -237,7 +237,8 @@ function HostState(
               : ""}
           </span>
         </header>
-        <div class="host-row-table-scroll">
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the table scrolls, so it takes a tab stop and keyboard users can scroll it. */}
+        <div aria-label="Account store" class="host-row-table-scroll" role="region" tabindex="0">
           <table data-testid="host-entity-list">
             <thead>
               <tr>

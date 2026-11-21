@@ -1782,6 +1782,11 @@
   color: var(--sw-fg-strong);
 }
 
+/* The sentence keeps a readable line length on wide screens. */
+.sw-vault-verify-set > span {
+  max-width: var(--sw-measure-prose);
+}
+
 .sw-vault-verify-set__icon {
   color: var(--sw-fg-muted);
 }
