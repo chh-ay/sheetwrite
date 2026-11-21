@@ -1,0 +1,489 @@
+[
+  {
+    "path": "/docs/start/first-grid/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": null,
+    "actual": [
+      [
+        "Notebook",
+        "12",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Pen",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Folder",
+        "9",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": []
+  },
+  {
+    "path": "/docs/features/formatting/conditional-formats/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": [
+      [
+        "Ana",
+        "92"
+      ],
+      [
+        "Ben (late)",
+        "48"
+      ],
+      [
+        "Chen",
+        "75"
+      ],
+      [
+        "Dee",
+        ""
+      ]
+    ],
+    "actual": [
+      [
+        "Ana",
+        "92",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Ben (late)",
+        "48",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Chen",
+        "75",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Dee",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": []
+  },
+  {
+    "path": "/docs/features/formatting/number-formats/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": [
+      [
+        "1.234,50",
+        "2024-02-29",
+        "12.5%"
+      ],
+      [
+        "99,00",
+        "2024-03-01",
+        "50.0%"
+      ]
+    ],
+    "actual": [
+      [
+        "1234.5",
+        "45351",
+        "0.125",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "99",
+        "45352",
+        "0.5",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": [
+      {
+        "row": 1,
+        "col": 1,
+        "expected": "1.234,50",
+        "shown": "1234.5"
+      },
+      {
+        "row": 1,
+        "col": 2,
+        "expected": "2024-02-29",
+        "shown": "45351"
+      },
+      {
+        "row": 1,
+        "col": 3,
+        "expected": "12.5%",
+        "shown": "0.125"
+      },
+      {
+        "row": 2,
+        "col": 1,
+        "expected": "99,00",
+        "shown": "99"
+      },
+      {
+        "row": 2,
+        "col": 2,
+        "expected": "2024-03-01",
+        "shown": "45352"
+      },
+      {
+        "row": 2,
+        "col": 3,
+        "expected": "50.0%",
+        "shown": "0.5"
+      }
+    ]
+  },
+  {
+    "path": "/docs/features/formulas/dynamic-arrays-and-spills/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": [
+      [
+        "1",
+        "2"
+      ],
+      [
+        "3",
+        "4"
+      ],
+      [
+        "5",
+        "6"
+      ]
+    ],
+    "actual": [
+      [
+        "1",
+        "2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "3",
+        "4",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "5",
+        "6",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": []
+  },
+  {
+    "path": "/docs/features/analysis/charts/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": [
+      [
+        "Month",
+        "Revenue"
+      ],
+      [
+        "Jan",
+        "120"
+      ],
+      [
+        "Feb",
+        "95"
+      ],
+      [
+        "Mar",
+        "140"
+      ]
+    ],
+    "actual": [
+      [
+        "Month",
+        "Revenue",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Jan",
+        "120",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Feb",
+        "95",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Mar",
+        "140",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": []
+  },
+  {
+    "path": "/docs/features/analysis/pivot-tables/",
+    "browser": "chromium",
+    "alerts": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "expected": [
+      [
+        "Month",
+        "Americas",
+        "EMEA",
+        "Total"
+      ],
+      [
+        "",
+        "Sum of Revenue",
+        "Sum of Revenue",
+        "Sum of Revenue"
+      ],
+      [
+        "2026-01",
+        "120",
+        "80",
+        "200"
+      ],
+      [
+        "2026-02",
+        "140",
+        "60",
+        "200"
+      ],
+      [
+        "Total",
+        "260",
+        "140",
+        "400"
+      ]
+    ],
+    "actual": [
+      [
+        "Month",
+        "Americas",
+        "EMEA",
+        "Total",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "Sum of Revenue",
+        "Sum of Revenue",
+        "Sum of Revenue",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "2026-01",
+        "120",
+        "80",
+        "200",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "2026-02",
+        "140",
+        "60",
+        "200",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Total",
+        "260",
+        "140",
+        "400",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "mismatches": []
+  }
+]

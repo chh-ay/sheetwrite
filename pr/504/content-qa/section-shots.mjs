@@ -5,7 +5,7 @@
 // shots.json: [{ "name": "...", "path": "/docs/...", "heading": "heading-id" }]
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
 
 const [beforeOrigin = "", afterOrigin = "", outputDirectory = "", shotsFile = ""] = process.argv.slice(2);
 if (shotsFile === "") {

@@ -5,7 +5,7 @@
 //   node runnable-results.mjs <origin> <output-directory> <chromium|firefox>
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { chromium, firefox } from "playwright";
+import { chromium, firefox } from "@playwright/test";
 
 const [origin = "", outputDirectory = "", browserName = "chromium"] = process.argv.slice(2);
 if (origin === "" || outputDirectory === "") {
@@ -23,25 +23,28 @@ const PAGES = [
   "/docs/features/analysis/pivot-tables/",
 ];
 
-/** The body cells of the first result table after the runnable example, by row, without decoration. */
+/**
+ * The body cells of the page's result table for the runnable example: the
+ * last `figure.sw-grid-result` before it (pages show the result above the
+ * "Full setup" that holds the runnable code), by row, without decoration.
+ */
 function expectedTable(page) {
   return page.evaluate(() => {
     const runnable = document.querySelector(".sw-runnable");
-    let node = runnable;
-    let table = null;
-    while (node !== null && table === null) {
-      node = node.nextElementSibling;
-      if (node === null) break;
-      table = node.matches(".sw-grid-result, figure") ? node.querySelector("table") : node.querySelector(".sw-grid-result table");
-    }
-    if (table === null) return null;
+    if (runnable === null) return null;
+    const before = [...document.querySelectorAll("figure.sw-grid-result")].filter(
+      (figure) => figure.compareDocumentPosition(runnable) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    const table = before.at(-1)?.querySelector("table");
+    if (table === undefined || table === null) return null;
     return [...table.querySelectorAll("tbody tr")]
       .filter((row) => row.getAttribute("aria-hidden") !== "true")
       .map((row) =>
         [...row.children]
           .filter((cell) => cell.getAttribute("aria-hidden") !== "true" && cell.tagName === "TD")
           .map((cell) => cell.textContent.trim()),
-      );
+      )
+      .filter((cells) => cells.length > 0);
   });
 }
 

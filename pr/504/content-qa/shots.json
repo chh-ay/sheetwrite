@@ -1,0 +1,9 @@
+[
+  { "name": "992-context-menu-items", "path": "/docs/features/grid/context-menu/", "heading": "menu-items" },
+  { "name": "992-ribbon-tabs", "path": "/docs/features/grid/toolbar-and-ribbon/", "heading": "ribbon" },
+  { "name": "992-search-limits", "path": "/docs/features/grid/search/", "heading": "edge-cases-and-limits" },
+  { "name": "993-grid-events", "path": "/docs/reference/events/", "heading": "grid-events" },
+  { "name": "993-criteria-semantics", "path": "/docs/features/formulas/lookup-criteria-and-financial/", "heading": "criteria-semantics-and-shapes" },
+  { "name": "993-lookup-semantics", "path": "/docs/features/formulas/lookup-criteria-and-financial/", "heading": "lookup-semantics" },
+  { "name": "994-lifecycle-resets", "path": "/docs/frameworks/lifecycle/", "heading": "controlled-values-do-not-reset-the-document" }
+]
