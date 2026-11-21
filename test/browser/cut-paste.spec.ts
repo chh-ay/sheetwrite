@@ -21,14 +21,7 @@ async function open(page: Page, browserName: string): Promise<void> {
     chromium: ["clipboard-read", "clipboard-write"],
     webkit: ["clipboard-read"],
   };
-  try {
-    await page.context().grantPermissions(permissions[browserName] ?? []);
-  } catch (error) {
-    console.log(`PROBE ${browserName} grant failed: ${String(error).slice(0, 200)}`);
-  }
-  page.on("console", (message) => {
-    if (message.text().startsWith("PROBE")) console.log(`${browserName} ${message.text()}`);
-  });
+  await page.context().grantPermissions(permissions[browserName] ?? []);
   await page.setViewportSize({ width: 1_600, height: 900 });
   await page.goto("/showcases/spreadsheet/");
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
