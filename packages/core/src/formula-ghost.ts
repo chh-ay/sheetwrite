@@ -17,31 +17,82 @@ import type { Store } from "./types/store.js";
 /** What the bar shows of a suggestion: its text, and the function list entry Tab takes with it. */
 export interface ShownSuggestion {
   readonly text: string;
-  /** The entry of the open function list that inserts the same text; `null` when the list is closed. */
+  /** The entry of the open function list whose text the suggestion starts with; `null` when there is none. */
   readonly listIndex: number | null;
 }
 
+/** The suggestion on screen and the text it showed after. */
+export interface GhostOnScreen {
+  readonly text: string;
+  readonly shown: ShownSuggestion;
+}
+
+/** Whether a quote opens a string before the end of `text`. */
+function endsInString(text: string): boolean {
+  let inside = false;
+  for (const char of text) if (char === '"') inside = !inside;
+  return inside;
+}
+
 /**
- * What the formula bar shows of `suggestion` after `text`, or null. While the
- * function list is open, Tab takes the list's entry as in Excel, so a
- * suggestion shows only when it is exactly what one entry inserts (its name
- * and `(`); that entry becomes the active one.
+ * The rest of the ghost on screen once the user has typed into it: `text`
+ * extends the text it showed after by characters that start the ghost
+ * (letter case aside outside strings, as Excel capitalises names). Null on a
+ * mismatch, or when the ghost is all typed.
+ */
+function typedThrough(previous: GhostOnScreen | null, text: string): string | null {
+  if (previous === null || !text.startsWith(previous.text)) return null;
+  const typed = text.slice(previous.text.length);
+  const ghost = previous.shown.text;
+  if (typed.length === 0 || typed.length >= ghost.length) return null;
+
+  let inString = endsInString(previous.text);
+  for (let index = 0; index < typed.length; index++) {
+    const expected = ghost.charAt(index);
+    const char = typed.charAt(index);
+    const same = inString ? char === expected : char.toUpperCase() === expected.toUpperCase();
+    if (!same) return null;
+    if (expected === '"') inString = !inString;
+  }
+  return ghost.slice(typed.length);
+}
+
+/**
+ * What the formula bar shows of `suggestion` after `text`, or null.
+ *
+ * While the function list is open, a suggestion shows only when it starts
+ * with what one entry inserts (its name and `(`): that entry becomes the
+ * active one, so the list and the ghost agree. A ghost on screen
+ * (`previous`) stays while the user types its next characters, shortened by
+ * them, unless another suggestion shows instead; a mismatch drops it. A shown
+ * ghost takes Tab while the list's active entry is the one it showed with.
  */
 export function shownSuggestion(
   text: string,
   analysis: Pick<FormulaAnalysis, "completion">,
   suggestion: FormulaSuggestion | null,
+  previous: GhostOnScreen | null = null,
 ): ShownSuggestion | null {
-  if (suggestion === null || suggestion.text.length === 0 || suggestion.text.includes("\n")) {
-    return null;
-  }
-
   const completion = analysis.completion;
-  if (completion === null) return { text: suggestion.text, listIndex: null };
+  const entryOf = (rest: string): number => {
+    if (completion === null) return -1;
+    const name = `${text.slice(completion.from)}${rest}`.toUpperCase();
+    return completion.matches.findIndex((fn) => name.startsWith(`${fn.name.toUpperCase()}(`));
+  };
+  // A new suggestion needs an entry while the list is open; one the user is typing through doesn't.
+  const shown = (rest: string, needsEntry: boolean): ShownSuggestion | null => {
+    const entry = entryOf(rest);
+    if (entry >= 0) return { text: rest, listIndex: entry };
+    return completion === null || !needsEntry ? { text: rest, listIndex: null } : null;
+  };
 
-  const name = `${text.slice(completion.from)}${suggestion.text}`.toUpperCase();
-  const listIndex = completion.matches.findIndex((fn) => `${fn.name.toUpperCase()}(` === name);
-  return listIndex < 0 ? null : { text: suggestion.text, listIndex };
+  const fresh =
+    suggestion === null || suggestion.text.length === 0 || suggestion.text.includes("\n")
+      ? null
+      : shown(suggestion.text, true);
+  if (fresh !== null) return fresh;
+  const kept = typedThrough(previous, text);
+  return kept === null ? null : shown(kept, false);
 }
 
 /** Arguments a function needs: those before its first optional or repeating one, plus one repeating. */
@@ -90,10 +141,17 @@ export class FormulaGhost {
   private session: FormulaSuggestionSession | null = null;
   private sessionCell: string | null = null;
   private shown: ShownSuggestion | null = null;
+  /** The text the shown ghost follows. */
+  private shownAfter = "";
   /** The text at which Esc hid the ghost; it stays hidden until the text changes. */
   private dismissedText: string | null = null;
 
   constructor(private readonly deps: GhostDeps) {}
+
+  /** The ghost on screen, or null. */
+  current(): ShownSuggestion | null {
+    return this.shown;
+  }
 
   /** The ghost for `text` with the caret at `cursor`; `null` when none shows. */
   update(text: string, cursor: number, analysis: FormulaAnalysis): ShownSuggestion | null {
@@ -101,11 +159,12 @@ export class FormulaGhost {
 
     const session = this.sessionFor();
     const atEnd = cursor === text.length;
-    const suggestion =
-      session === null || !atEnd || this.dismissedText !== null || !text.startsWith("=")
-        ? null
-        : session.suggest(text, analysis);
-    this.shown = shownSuggestion(text, analysis, suggestion);
+    const asks = session !== null && atEnd && this.dismissedText === null && text.startsWith("=");
+    const suggestion = asks ? session.suggest(text, analysis) : null;
+    const previous =
+      asks && this.shown !== null ? { text: this.shownAfter, shown: this.shown } : null;
+    this.shown = shownSuggestion(text, analysis, suggestion, previous);
+    this.shownAfter = text;
     return this.shown;
   }
 

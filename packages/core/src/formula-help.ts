@@ -356,6 +356,8 @@ export class FormulaHelp {
   private mirror: TextMirror | null = null;
   /** The text the guide shows now, so an unchanged guide is not announced again. */
   private guideText = "";
+  /** The list's active entry when the ghost showed; null without a ghost. */
+  private ghostEntry: number | null = null;
 
   private completion: FormulaCompletion | null = null;
   private activeIndex = 0;
@@ -492,6 +494,7 @@ export class FormulaHelp {
       this.activeIndex = ghost.listIndex;
       this.renderActive();
     }
+    this.ghostEntry = ghost === null ? null : this.activeIndex;
     this.call = analysis.call;
     this.diagnostics = diagnostics;
     const first = diagnostics[0];
@@ -506,8 +509,9 @@ export class FormulaHelp {
   /**
    * Keys that drive the open function list; while it is closed, the ghost's
    * keys, then Tab, which applies the fix the guide offers. A shown ghost
-   * takes Tab first, as the user sees it. Returns true only when help used
-   * the key, so the editor's own Enter, Tab and Escape still work.
+   * takes Tab first, as the user sees it, also while the list is open, until
+   * the user moves to another entry. Returns true only when help used the
+   * key, so the editor's own Enter, Tab and Escape still work.
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     if (this.completion === null) {
@@ -525,8 +529,13 @@ export class FormulaHelp {
         event.preventDefault();
         this.move(event.key === "ArrowDown" ? 1 : -1);
         return true;
-      case "Enter":
       case "Tab":
+        // A ghost takes Tab until the user moves in the list: the list's entry is theirs then.
+        if (this.ghostEntry === this.activeIndex && this.ghostKey(event)) return true;
+        event.preventDefault();
+        this.accept();
+        return true;
+      case "Enter":
         event.preventDefault();
         this.accept();
         return true;
@@ -541,7 +550,7 @@ export class FormulaHelp {
     }
   }
 
-  /** The ghost's keys, while the function list is closed and the caret is at the end of the text. */
+  /** The ghost's keys, while the caret is at the end of the text. */
   private ghostKey(event: KeyboardEvent): boolean {
     const field = this.field;
     const analysis = this.analysis;

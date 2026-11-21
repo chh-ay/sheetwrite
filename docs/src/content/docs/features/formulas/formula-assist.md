@@ -32,7 +32,7 @@ Excel's own keys and defaults keep working: the function list, Tab to take its e
 | Esc | Hides the suggestion until the text changes. The add-on doesn't suggest the same formula again during this edit. | Excel's Esc |
 | Enter | Commits only the text you typed | Excel's Enter |
 
-While the function list is open, Tab takes the list's entry, as in Excel. A suggestion shows then only when it is exactly what one entry inserts, and that entry becomes the selected one. Suggestions show only while the caret is at the end of the text, with nothing selected and no IME composition open. The cell editor has no suggestions: it keeps Excel's AutoComplete.
+A suggestion stays while you type it: after `=` shows `SUM(D2:D11)`, typing `S` leaves `UM(D2:D11)`, and a character that differs takes it away. While the function list is open, a new suggestion shows only when it starts with what one entry inserts, and that entry becomes the selected one. Tab takes the suggestion while it shows; once you move to another entry of the list, Tab takes that entry, as in Excel. Suggestions show only while the caret is at the end of the text, with nothing selected and no IME composition open. The cell editor has no suggestions: it keeps Excel's AutoComplete.
 
 ## How it predicts
 
@@ -59,8 +59,8 @@ The add-on was measured on workbooks from the Enron spreadsheet corpus that it w
 
 | Set | Formulas | Keystrokes saved | Wrong suggestions | Excel's function list alone |
 | --- | ---: | ---: | ---: | ---: |
-| 50 whole workbooks | 966 | 62.0% | 0.7% (5 of 735 shown) | 5.8% saved |
-| 50 workbooks, the cells near each formula | 975 | 48.3% | 2.2% (16 of 715 shown) | 3.1% saved |
+| 50 whole workbooks | 966 | 62.2% | 0.7% (5 of 735 shown) | 5.8% saved |
+| 50 workbooks, the cells near each formula | 975 | 48.4% | 2.0% (14 of 713 shown) | 3.1% saved |
 
 A wrong suggestion is one that wasn't how the formula went on. The neighbouring formulas give most of the savings; the column's pattern and the workbook's formulas add suggestions where the neighbours don't agree on one, such as the last row of a column. A one-off formula mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
 

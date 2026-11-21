@@ -16,7 +16,12 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { analyzeFormula, type FormulaAnalysis } from "@sheetwrite/core/functions";
-import { openFormulaEdit, shownSuggestion, suggestionWordEnds } from "@sheetwrite/core/testing";
+import {
+  type GhostOnScreen,
+  openFormulaEdit,
+  shownSuggestion,
+  suggestionWordEnds,
+} from "@sheetwrite/core/testing";
 
 /** One formula to type, in the cell it was found in. */
 export interface ReplayTarget {
@@ -231,6 +236,9 @@ function agreeingWords(
 class TypedFormula {
   private text = "=";
   private shown: ShownSuggestion | null = null;
+  /** The ghost on screen as the formula bar keeps it, and the signal that made it. */
+  private ghost: GhostOnScreen | null = null;
+  private ghostSignal = "";
   private helped = false;
 
   constructor(
@@ -260,13 +268,18 @@ class TypedFormula {
     const suggestion = this.session.suggest(this.text, analysis);
     this.counts.suggestMs.push(performance.now() - started);
 
-    // What the formula bar would show: with the function list open, only what one entry inserts.
-    const shown = shownSuggestion(this.text, analysis, suggestion);
-    if (suggestion !== null && shown !== null) {
-      const keys = this.considerSuggestion({ text: shown.text, signal: suggestion.signal });
+    // What the formula bar would show: the ghost the user types through, or a new suggestion,
+    // which needs a list entry it starts with while the function list is open.
+    const shown = shownSuggestion(this.text, analysis, suggestion, this.ghost);
+    if (shown !== null) {
+      if (suggestion !== null && suggestion.text === shown.text)
+        this.ghostSignal = suggestion.signal;
+      this.ghost = { text: this.text, shown };
+      const keys = this.considerSuggestion({ text: shown.text, signal: this.ghostSignal });
       if (keys > 0) return keys;
     } else {
       this.shown = null;
+      this.ghost = null;
     }
 
     if (this.takeListEntry(analysis)) return 1;
