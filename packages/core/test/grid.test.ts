@@ -151,6 +151,36 @@ describe("Grid editing (Layer 3)", () => {
     }
   });
 
+  it("grows the sheet to hold a paste longer and wider than it, as Excel's sheet does (#952)", async () => {
+    // 5 rows by 40 columns from B2, on a sheet of 3 rows by 3 columns.
+    const text = Array.from({ length: 5 }, (_, row) =>
+      Array.from({ length: 40 }, (_, col) => row * 100 + col).join("\t"),
+    ).join("\n");
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => text },
+    });
+    const grid = createGrid(mountHost(), { workbook: makeWorkbook(3), data: makeColumnarData(3) });
+    const sheet = () => grid.store.getWorkbook().sheets[0]!;
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+      expect(await grid.actions.paste()).toBe("done");
+      expect(sheet().rowCount).toBe(6);
+      expect(sheet().columns.length).toBe(41);
+      expect(grid.store.getCell({ sheet: "s1", row: 5, col: 40 }).resolved).toBe(439);
+
+      // One undo takes back the cells and the added rows.
+      grid.undo();
+      expect(sheet().rowCount).toBe(3);
+      expect(grid.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(10.5);
+    } finally {
+      grid.destroy();
+      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
   it("requests the required datasource window fields and consumes its page", async () => {
     const workbook = makeWorkbook(20);
     let captured: DataSourceRequest | undefined;

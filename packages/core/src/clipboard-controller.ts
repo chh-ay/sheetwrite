@@ -316,6 +316,14 @@ function parseExternalInput(source: string, type: Sheet["columns"][number]["type
 }
 
 /**
+ * The type a pasted cell is read for: its column's, or `general` past the
+ * sheet's columns, which the paste adds as `general` columns.
+ */
+function pastedColumnType(sheet: Sheet, col: number): Sheet["columns"][number]["type"] {
+  return sheet.columns[col]?.type ?? "general";
+}
+
+/**
  * The write of one cell pasted from another workbook or application. Its
  * formula, reference or text is re-read as typed input for the target column,
  * so an external formula lands as inert text; other values keep their kind.
@@ -1228,9 +1236,11 @@ export class ClipboardController {
     const firstRow = this.deps.toDataRow(target.row);
     const sheet = this.deps.sheet();
     const sorted = (sheet.sortKeys?.length ?? 0) > 0;
+    // As for a paste, the sheet grows to hold the moved rows.
+    const addedRows = valuesOnly || sorted ? 0 : this.rowsToAdd(firstRow, rows);
     const fits =
       !valuesOnly &&
-      firstRow + rows <= sheet.rowCount &&
+      firstRow + rows <= sheet.rowCount + addedRows &&
       target.col + cols <= sheet.columns.length &&
       (!sorted ||
         Array.from({ length: rows }, (_, row) => row).every(
@@ -1243,6 +1253,9 @@ export class ClipboardController {
     try {
       result = this.deps.commit(
         [
+          ...(addedRows > 0
+            ? [{ op: "addRows" as const, sheet: sheet.id, at: sheet.rowCount, count: addedRows }]
+            : []),
           {
             op: "moveCells",
             range: cut.range,
@@ -1440,9 +1453,9 @@ export class ClipboardController {
   private pasteSourceCells(
     payload: Exclude<ClipboardPayload, { kind: "cut" | "outcome" }>,
   ): PasteSourceCells {
-    const columns = this.deps.sheet().columns;
+    const sheet = this.deps.sheet();
     const external = (write: CellWrite, targetCol: number): ClipboardCell => {
-      const { value, style } = externalCellWrite(write, columns[targetCol]?.type ?? "text");
+      const { value, style } = externalCellWrite(write, pastedColumnType(sheet, targetCol));
       return { value, resolved: value.kind === "literal" ? value.value : null, style: style ?? {} };
     };
     const rows: readonly (readonly unknown[])[] =
@@ -1581,7 +1594,7 @@ export class ClipboardController {
       (row, col, targetCol): CellWrite => {
         const cell = snapshot.cells[row]![col]!;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
-        return externalCellWrite(cell, sheet.columns[targetCol]?.type ?? "text");
+        return externalCellWrite(cell, pastedColumnType(sheet, targetCol));
       },
     );
   }
@@ -1593,7 +1606,7 @@ export class ClipboardController {
       grid.length,
       (row) => grid[row]!.length,
       (row, col, targetCol): CellWrite =>
-        externalCellWrite(grid[row]![col]!, sheet.columns[targetCol]?.type ?? "text"),
+        externalCellWrite(grid[row]![col]!, pastedColumnType(sheet, targetCol)),
     );
   }
 
@@ -1607,7 +1620,7 @@ export class ClipboardController {
       grid.length,
       (r) => grid[r]!.length,
       (r, c, targetCol): CellWrite =>
-        parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
+        parseExternalInput(grid[r]?.[c] ?? "", pastedColumnType(sheet, targetCol)),
     );
   }
 
@@ -1748,24 +1761,37 @@ export class ClipboardController {
     const colIndices = this.deps.colIndices();
     const startPos = colIndices.indexOf(focus.col);
     if (startPos < 0) return null;
+    // Columns past the last one the grid shows are added, as typing there
+    // adds them (`materializeVirtualColumns`), so a wide block is not cut off.
+    const lastShownCol = colIndices[colIndices.length - 1] ?? focus.col;
+    const targetColAt = (c: number): number =>
+      colIndices[startPos + c] ?? lastShownCol + startPos + c - colIndices.length + 1;
 
+    // A block pasted on sheet rows grows the sheet to hold it, as Excel's
+    // 1,048,576 rows do; otherwise its rows past the end would be lost.
+    const sheetRows = this.deps.sheet().rowCount;
+    const addedRows = rows === "sheet" ? this.rowsToAdd(firstDataRow, height) : 0;
     const availableRows = Math.min(
       height,
       shown
         ? shown.data.length
         : rows === "sheet"
-          ? this.deps.sheet().rowCount - firstDataRow
+          ? sheetRows + addedRows - firstDataRow
           : this.deps.store.viewRowCount(activeSheet) - focus.row,
     );
-    const hiddenRows = rows === "sheet" ? this.hiddenRowsIn(firstDataRow, availableRows) : 0;
+    const grow: DocumentOp[] =
+      addedRows > 0 ? [{ op: "addRows", sheet: activeSheet, at: sheetRows, count: addedRows }] : [];
+    const hiddenRows =
+      rows === "sheet"
+        ? this.hiddenRowsIn(firstDataRow, Math.min(availableRows, sheetRows - firstDataRow))
+        : 0;
     // The sheet rows the block writes, for the hidden-rows notice's Show them.
     const writtenRows = [{ start: firstDataRow, end: firstDataRow + availableRows - 1 }];
     const width = availableRows > 0 ? widthAt(0) : 0;
-    const targetCols = colIndices.slice(startPos, startPos + width);
+    const targetCols = Array.from({ length: width }, (_, c) => targetColAt(c));
     const rectangular =
       availableRows > 0 &&
       width > 0 &&
-      targetCols.length === width &&
       targetCols.every((col, index) => col === focus.col + index) &&
       Array.from({ length: availableRows }, (_, row) => row).every(
         (row) => widthAt(row) === width && dataRowAt(row) === firstDataRow + row,
@@ -1838,6 +1864,7 @@ export class ClipboardController {
 
         const result = this.deps.commit(
           [
+            ...grow,
             {
               op: "setBlock",
               range: {
@@ -1867,8 +1894,8 @@ export class ClipboardController {
     for (let r = 0; r < height; r++) {
       const width = widthAt(r);
       for (let c = 0; c < width; c++) {
-        const targetCol = colIndices[startPos + c];
-        if (r >= availableRows || targetCol === undefined) continue;
+        if (r >= availableRows) continue;
+        const targetCol = targetColAt(c);
 
         const viewRow = viewRowAt(r);
         const merge = viewRow === null ? null : this.deps.mergeAnchorAt(viewRow, targetCol);
@@ -1881,12 +1908,22 @@ export class ClipboardController {
     }
 
     const result = this.deps.commit(
-      [...sparseCellsPatch(activeSheet, cells), ...extraPatches],
+      [...grow, ...sparseCellsPatch(activeSheet, cells), ...extraPatches],
       "paste",
     );
     check?.report();
     this.wroteHiddenRows(result, hiddenRows, writtenRows);
     return result;
+  }
+
+  /**
+   * The rows a block of `height` rows from sheet row `first` needs past the
+   * sheet's end. Past the most rows a sheet holds, the store refuses the
+   * added rows, and the grid says why ("cannot grow to 1,000,005 rows: the
+   * limit is 1,000,000").
+   */
+  private rowsToAdd(first: number, height: number): number {
+    return Math.max(0, first + height - this.deps.sheet().rowCount);
   }
 
   /** How many of the `count` sheet rows from `first` a filter or Hide Rows hides. */
