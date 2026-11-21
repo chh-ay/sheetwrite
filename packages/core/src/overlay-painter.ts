@@ -26,17 +26,15 @@ const INPUT_MESSAGE_GAP = 4;
 const LIST_BUTTON_SIZE = 18;
 
 /**
- * Where the dropdown arrow of a selected list cell sits: a square just right
- * of the cell, on its bottom edge, as in Excel. `cell` and the result share a
- * coordinate space.
+ * Where the dropdown arrow of a selected list cell sits at `zoom`: a square
+ * just right of the cell, on its bottom edge, as in Excel. It scales with the
+ * zoom, as the cell does. `cell` and the result share a coordinate space.
  */
-export function listButtonRect(cell: { x: number; y: number; w: number; h: number }): {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-} {
-  const size = Math.max(0, Math.min(LIST_BUTTON_SIZE, cell.h));
+export function listButtonRect(
+  cell: { x: number; y: number; w: number; h: number },
+  zoom: number,
+): { x: number; y: number; w: number; h: number } {
+  const size = Math.max(0, Math.min(LIST_BUTTON_SIZE * zoom, cell.h));
   return { x: cell.x + cell.w, y: cell.y + cell.h - size, w: size, h: size };
 }
 
@@ -1218,7 +1216,8 @@ export class OverlayPainter {
     if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= clientW || rect.y >= clientH) {
       return;
     }
-    const size = Math.min(NOTE_INDICATOR_SIZE, rect.w, rect.h);
+    // The marker scales with the zoom, as the cell does.
+    const size = Math.min(NOTE_INDICATOR_SIZE * this.deps.zoom(), rect.w, rect.h);
     const indicator = this.acquireRect(
       rect.x + rect.w - size,
       rect.y,
@@ -1623,7 +1622,7 @@ export class OverlayPainter {
       if (cell.w <= 0 || cell.x >= clientW || cell.y >= clientH) continue;
       // A header row scrolled under the column headers shows no button.
       if (cell.x + cell.w <= 0 || cell.y < this.deps.theme().headerHeight) continue;
-      const button = filterButtonRect(cell);
+      const button = filterButtonRect(cell, this.deps.zoom());
       const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-autofilter-button";
       el.style.outlineStyle = "none";
@@ -1667,7 +1666,7 @@ export class OverlayPainter {
     }
 
     if (hasListDropdown(rule)) {
-      const button = listButtonRect(cell);
+      const button = listButtonRect(cell, this.deps.zoom());
       const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-list-button";
       el.style.outlineStyle = "none";

@@ -13,67 +13,81 @@ import type {
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
+/** Space between a cell's text and its left and right gridlines, in CSS pixels at zoom 1. */
 const CELL_PAD = 6;
 
-/** Edge of an AutoFilter header cell's filter button, in CSS pixels. */
+/**
+ * Space between a cell's text and its gridlines at `zoom`. Like the text, it
+ * scales with the sheet's zoom, as in Excel.
+ */
+export function cellPadding(zoom: number): number {
+  return CELL_PAD * zoom;
+}
+
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
 const FILTER_BUTTON_SIZE = 16;
 
 /**
  * Room between an AutoFilter header cell's filter button and the cell's
  * right gridline: the text's left padding, so the header has the same room on
- * both sides. In CSS pixels.
+ * both sides. In CSS pixels at zoom 1.
  */
 const FILTER_BUTTON_INSET = CELL_PAD;
 
 /** Room between the end of a header cell's text and its filter button: the text's left padding again. */
 const FILTER_TEXT_GAP = CELL_PAD;
 
-/** The least width of the area a pointer opens the filter dropdown in, for touch. */
+/** Room above and below the filter button in a row too short for its full size, at zoom 1. */
+const FILTER_BUTTON_MARGIN = 2;
+
+/** The least width of the area a pointer opens the filter dropdown in, in screen pixels, for touch. */
 const FILTER_BUTTON_HIT_WIDTH = 24;
 
 type CellBox = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 
 /**
- * Where an AutoFilter header cell's filter button sits: a square
+ * Where an AutoFilter header cell's filter button sits at `zoom`: a square
  * `FILTER_BUTTON_INSET` from the cell's right gridline, centred in the row, as
- * in Excel. `cell` and the result share a coordinate space.
+ * in Excel. Its size, inset and gap scale with the zoom, as the text does.
+ * `cell` and the result share a coordinate space.
  */
-export function filterButtonRect(cell: CellBox): CellBox {
+export function filterButtonRect(cell: CellBox, zoom: number): CellBox {
+  const inset = FILTER_BUTTON_INSET * zoom;
   const size = Math.max(
     0,
-    Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 2 * FILTER_BUTTON_INSET),
+    Math.min(
+      FILTER_BUTTON_SIZE * zoom,
+      cell.h - 2 * FILTER_BUTTON_MARGIN * zoom,
+      cell.w - 2 * inset,
+    ),
   );
-  return {
-    x: cell.x + cell.w - FILTER_BUTTON_INSET - size,
-    y: cell.y + (cell.h - size) / 2,
-    w: size,
-    h: size,
-  };
+  return { x: cell.x + cell.w - inset - size, y: cell.y + (cell.h - size) / 2, w: size, h: size };
 }
 
 /**
- * Where a pointer opens the filter dropdown: the button, widened to
- * `FILTER_BUTTON_HIT_WIDTH` towards the text and over the inset, and as tall,
- * within the cell.
+ * Where a pointer opens the filter dropdown: the button and the inset to the
+ * gridline, and at any zoom at least `FILTER_BUTTON_HIT_WIDTH` wide and as
+ * tall, within the cell.
  */
-export function filterButtonHitRect(cell: CellBox): CellBox {
-  const button = filterButtonRect(cell);
+export function filterButtonHitRect(cell: CellBox, zoom: number): CellBox {
+  const button = filterButtonRect(cell, zoom);
   const right = cell.x + cell.w;
   const left = Math.max(cell.x, Math.min(button.x, right - FILTER_BUTTON_HIT_WIDTH));
   const middle = button.y + button.h / 2;
-  const top = Math.max(cell.y, middle - FILTER_BUTTON_HIT_WIDTH / 2);
-  const bottom = Math.min(cell.y + cell.h, middle + FILTER_BUTTON_HIT_WIDTH / 2);
+  const half = Math.max(FILTER_BUTTON_HIT_WIDTH, button.h) / 2;
+  const top = Math.max(cell.y, middle - half);
+  const bottom = Math.min(cell.y + cell.h, middle + half);
   return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
 /**
- * Where an AutoFilter header cell's text box ends: `FILTER_TEXT_GAP` before
- * the filter button, as Excel keeps header text clear of the button. Text of
- * every alignment lays out and clips in the box from the cell's left edge to
- * here, and the cell editor ends here too.
+ * Where an AutoFilter header cell's text box ends at `zoom`:
+ * `FILTER_TEXT_GAP` before the filter button, as Excel keeps header text clear
+ * of the button. Text of every alignment lays out and clips in the box from
+ * the cell's left edge to here, and the cell editor ends here too.
  */
-export function filterTextRight(cell: CellBox): number {
-  return filterButtonRect(cell).x - FILTER_TEXT_GAP;
+export function filterTextRight(cell: CellBox, zoom: number): number {
+  return filterButtonRect(cell, zoom).x - FILTER_TEXT_GAP * zoom;
 }
 
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
@@ -459,16 +473,17 @@ function fillAlignedText(
   x: number,
   w: number,
   cy: number,
+  pad: number,
 ): void {
   if (align === "right") {
     ctx.textAlign = "right";
-    ctx.fillText(text, x + w - CELL_PAD, cy);
+    ctx.fillText(text, x + w - pad, cy);
   } else if (align === "center") {
     ctx.textAlign = "center";
     ctx.fillText(text, x + w / 2, cy);
   } else {
     ctx.textAlign = "left";
-    ctx.fillText(text, x + CELL_PAD, cy);
+    ctx.fillText(text, x + pad, cy);
   }
 }
 
@@ -487,14 +502,15 @@ function paintTextDecoration(
   w: number,
   cy: number,
   fontPx: number,
+  pad: number,
 ): void {
   const runWidth = ctx.measureText(text).width;
   if (runWidth <= 0) return;
 
   let left: number;
-  if (align === "right") left = x + w - CELL_PAD - runWidth;
+  if (align === "right") left = x + w - pad - runWidth;
   else if (align === "center") left = x + w / 2 - runWidth / 2;
-  else left = x + CELL_PAD;
+  else left = x + pad;
 
   const effectiveFontPx = fontPx || 12;
 
@@ -879,7 +895,7 @@ export function paintFrame(
         row === filterHeader.row &&
         col >= filterHeader.start &&
         col <= filterHeader.end
-          ? filterTextRight({ x, y, w: cw, h: ch })
+          ? filterTextRight({ x, y, w: cw, h: ch }, layout.zoom ?? 1)
           : undefined;
 
       // Sheets lets text spill through adjacent empty cells, but never through
@@ -1201,8 +1217,9 @@ function paintCell(
   const align = cellAlign(effective, value, column?.type);
   let text = cellDisplayText(value, numberFormat, column?.numberLocale);
   // A filter header's text pads on the left as usual and ends at its text box.
-  const textW = textRight === undefined ? w : textRight + CELL_PAD - x;
-  const availableTextWidth = Math.max(0, textW - CELL_PAD * 2);
+  const pad = cellPadding(layout.zoom ?? 1);
+  const textW = textRight === undefined ? w : textRight + pad - x;
+  const availableTextWidth = Math.max(0, textW - pad * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
       state.measuredFont = state.lastFont;
@@ -1245,9 +1262,9 @@ function paintCell(
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
       const lineText = lines[line]!;
-      fillAlignedText(ctx, lineText, align, x, textW, cy);
+      fillAlignedText(ctx, lineText, align, x, textW, cy, pad);
       if (effective.underline || effective.strikethrough) {
-        paintTextDecoration(ctx, effective, lineText, align, x, textW, cy, fontPx);
+        paintTextDecoration(ctx, effective, lineText, align, x, textW, cy, fontPx, pad);
       }
     }
   } else {
@@ -1274,9 +1291,9 @@ function paintCell(
     // A filter header's text clips at its text box, the gap before the button.
     if (textRight !== undefined) textClipW = Math.min(textClipW, textRight - textClipX);
     clipCell(ctx, textClipX, y, textClipW, h);
-    fillAlignedText(ctx, text, align, x, textW, cy);
+    fillAlignedText(ctx, text, align, x, textW, cy, pad);
     if (effective.underline || effective.strikethrough) {
-      paintTextDecoration(ctx, effective, text, align, x, textW, cy, fontPx);
+      paintTextDecoration(ctx, effective, text, align, x, textW, cy, fontPx, pad);
     }
   }
 
@@ -1385,7 +1402,7 @@ function paintHeader(
     const align = headerStyle?.align ?? "center";
     ctx.save();
     clipCell(ctx, x, 0, w, h);
-    fillAlignedText(ctx, column.header, align, x, w, cy);
+    fillAlignedText(ctx, column.header, align, x, w, cy, cellPadding(layout.zoom ?? 1));
     ctx.restore();
   }
 

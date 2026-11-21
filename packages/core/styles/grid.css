@@ -83,7 +83,9 @@
   font: var(--sheetwrite-font);
   color: var(--sheetwrite-fg);
   background: var(--sheetwrite-bg);
-  padding: 0 4px;
+  /* The text sits as far from the gridlines as the cell paints it: the
+     cell padding, which scales with the zoom, less this border. */
+  padding: 0 calc(var(--sheetwrite-cell-pad, 6px) - 2px);
   box-sizing: border-box;
   z-index: 3;
   overflow: auto;
