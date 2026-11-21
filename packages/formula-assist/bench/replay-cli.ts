@@ -2,8 +2,10 @@
 //
 //   bun packages/formula-assist/bench/replay-cli.ts [--set <name>]... [--per-signal]
 //
-// Without `--set` it runs every set except `enron-heldout`, the set kept
-// back for the gate: tune on `enron-dev` and `enron-dev2`, never on the held-out set.
+// Without `--set` it runs every committed set except `enron-heldout`, the set
+// kept back for the gate: tune on `enron-dev`, `enron-dev2` and
+// `enron-dev-large` (built by enron/build.ts --dev-large), never on the
+// held-out set.
 // `--per-signal` adds each signal alone and the predictor without each one.
 
 import { parseArgs } from "node:util";
@@ -27,7 +29,8 @@ function isSetName(name: string): name is ReplaySetName {
   return REPLAY_SETS.some((set) => set === name);
 }
 
-const requested = values.set ?? REPLAY_SETS.filter((set) => set !== "enron-heldout");
+const requested =
+  values.set ?? REPLAY_SETS.filter((set) => set !== "enron-heldout" && set !== "enron-dev-large");
 const sets = requested.map((name) => {
   if (!isSetName(name)) throw new Error(`Unknown set ${name}; sets: ${REPLAY_SETS.join(", ")}`);
   return name;
