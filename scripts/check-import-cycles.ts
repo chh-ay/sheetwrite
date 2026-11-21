@@ -358,9 +358,19 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   xlsx: {
     source: "packages/core/src/types/xlsx.ts",
-    dependencies: ["chart", "coordinates", "dashboard", "data", "document", "query", "store"],
+    dependencies: [
+      "cell",
+      "chart",
+      "coordinates",
+      "dashboard",
+      "data",
+      "document",
+      "query",
+      "store",
+    ],
     exports: [
       "XlsxResourceLimits",
+      "XlsxSpillExport",
       "XlsxTableExportBackend",
       "XlsxTableImportBackend",
       "XlsxWorkbookBackend",

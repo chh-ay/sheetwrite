@@ -121,6 +121,20 @@ describe("typing into a general column", () => {
     expect(entry("0 3/16")).toEqual([0.1875, "# ??/??"]);
   });
 
+  // Excel reads a date of two parts as day and month of the current year,
+  // then as month and year, then as text.
+  // https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/two-digit-year-numbers
+  it("reads a two-part date as day and month of this year, else as month and year", () => {
+    const [january26] = entry(`1/26/${new Date().getFullYear()}`);
+    expect(entry("Jan-26")).toEqual([january26, "d-mmm"]);
+    expect(entry("Jan 26")).toEqual([january26, "d-mmm"]);
+    // No year has 30 February, so this is February 1930.
+    expect(entry("Feb-30")).toEqual([10_990, "mmm-yy"]);
+    expect(entry("1/99")).toEqual([36_161, "mmm-yy"]);
+    expect(entry("11/95")).toEqual([35_004, "mmm-yy"]);
+    expect(entry("13/99")).toEqual(["13/99", null]);
+  });
+
   it("keeps text, and a leading apostrophe forces text", () => {
     expect(entry("North")).toEqual(["North", null]);
     expect(entry("'007")).toEqual(["007", null]);

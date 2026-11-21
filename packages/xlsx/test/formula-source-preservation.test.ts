@@ -13,7 +13,7 @@ import {
   generateConformanceEvidence,
   readFormulaInventory,
 } from "../../../scripts/conformance/generate.js";
-import { convertWorkbookFormulas, workbookFormulaSources } from "../src/formula.js";
+import { exportWorkbookFormulas, workbookFormulaSources } from "../src/formula.js";
 import { xlsxAddon } from "../src/index.js";
 import { escapeXml } from "../src/xml.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
@@ -62,7 +62,8 @@ it("round-trips every required function source and writes Excel's native spellin
 
   const native = partText(encoded, "xl/worksheets/sheet1.xml");
   for (const [, expected] of cases) {
-    if (expected) expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
+    // An array result such as FILTER's is written as `<f t="array" ref="…">`.
+    if (expected) expect(native).toContain(`>${escapeXml(expected)}</f>`);
   }
   expect(valuesOf(await fromXlsxWorkbook(encoded))).toEqual(sources.map(formula));
 });
@@ -117,7 +118,9 @@ it("spells plain export formulas as the engine does", async () => {
   expect(sources.size).toBeGreaterThan(1_000);
 
   const all = [...sources];
-  const spelled = await convertWorkbookFormulas(book([sheet("all", "All", column(all))]), "export");
+  const { formulas: spelled } = await exportWorkbookFormulas(
+    book([sheet("all", "All", column(all))]),
+  );
   const engine = await withXlsxFormulaEngine((formulas) => formulas.convert(all, "export"));
   expect(all.map((source) => spelled.get(source))).toEqual(engine);
 });
