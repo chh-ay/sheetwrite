@@ -12,7 +12,7 @@ Choose a framework in the header once. Every framework-aware example uses that p
 npm install @sheetwrite/core
 ```
 
-```ts prelude="framework" partial="requires workbook and data declarations" title="Vanilla"
+```ts prelude="framework" partial="requires workbook and data declarations"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -29,7 +29,7 @@ The host owns initialization and must destroy the returned `Grid` when its DOM l
 npm install @sheetwrite/react
 ```
 
-```tsx prelude="react" partial="requires component-owned columns and rows" title="React"
+```tsx prelude="react" partial="requires component-owned columns and rows"
 import { Sheetwrite } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 
@@ -47,7 +47,7 @@ The adapter initializes WASM after client mount. Use a client component boundary
 npm install @sheetwrite/vue
 ```
 
-```vue prelude="vue" partial="requires component-owned columns and rows" title="Vue"
+```vue prelude="vue" partial="requires component-owned columns and rows"
 <script setup lang="ts">
 import { Sheetwrite } from "@sheetwrite/vue";
 import "@sheetwrite/vue/styles.css";
@@ -67,7 +67,7 @@ The adapter initializes WASM after client mount. Use a client-only boundary in N
 npm install @sheetwrite/svelte
 ```
 
-```svelte prelude="svelte" partial="requires component-owned columns and rows" title="Svelte"
+```svelte prelude="svelte" partial="requires component-owned columns and rows"
 <script lang="ts">
   import { Sheetwrite } from "@sheetwrite/svelte";
   import "@sheetwrite/svelte/styles.css";

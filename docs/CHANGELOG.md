@@ -15,6 +15,7 @@
 - The opening screenshot of each feature section has tablet and phone crops of the same view (`<name>-tablet` and `<name>-phone`, the new `sectionTablet` and `sectionPhone` sizes), so its text stays readable at 834 and 390 px. A placed screenshot takes them as `narrow`.
 - The Charts page opens with a short lead and a figure of the line chart its example draws, then the install step, then the example. The column chart screenshot moves to Insert and edit in the grid.
 - The worker rendering and collaboration pages open in plain words, without repository paths or commands.
+- On the Installation page, the quick-start code inside each framework tab has no title bar. The bar repeated the tab's name ("Vanilla" under the Vanilla tab).
 - The docs home cards and section headers, the showcase hub cards, and the database and collaboration proof cards are blueprint pictures: boxes and connectors on the dotted canvas (`BlueprintCard` and `cardLayout`), with text that reaches 4.5:1 in both themes. The old card art for them, and `Panel` and `FRAMEWORK_CARD_HEIGHT`, which only it used, are gone.
 - The 0.7.0 release notes show performance as lanes against 0.6.1, one row per workload with each machine's result in the words of the text, from a new `perf-lanes` fence. They open their highlights with a blueprint summary, and the highlight cards show each panel cropped from its capture (`card-*` shots, the new `highlight` size) instead of the whole app shrunk to a sliver.
 - The 0.7.0 upgrade guide no longer says how its code is built.
