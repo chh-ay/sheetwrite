@@ -1256,7 +1256,12 @@ export interface Grid {
   summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null>;
   /** Show the sheet `id`. Hidden sheets and unknown ids are ignored. */
   setActiveSheet(id: SheetId): void;
-  /** Scroll `addr` into view, switching to its sheet first when needed. */
+  /**
+   * Scroll `addr` into view, switching to its sheet first when needed. Like a
+   * keyboard move, it scrolls by whole columns and rows: going right or down
+   * it stops where the first column and row on screen start at their
+   * gridlines. A cell wider or taller than the view shows from its own edge.
+   */
   scrollToCell(addr: CellAddress): void;
   /**
    * Resolve browser viewport coordinates to an active-sheet cell for host-owned

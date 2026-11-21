@@ -310,3 +310,182 @@ describe("datasource repaint invalidation", () => {
     }
   });
 });
+
+describe("scroll into view", () => {
+  const VIEW_WIDTH = 720;
+  const VIEW_HEIGHT = 400;
+
+  interface Layout {
+    widths: number[];
+    rowCount?: number;
+    heights?: Map<number, number>;
+    frozenCols?: number;
+    frozenRows?: number;
+    hiddenCols?: number[];
+    hiddenRows?: number[];
+    zoom?: number;
+  }
+
+  /** A 720 × 400 px grid of `layout`, with its edges in zoomed content pixels. */
+  function mountLayout(layout: Layout) {
+    const rowCount = layout.rowCount ?? 200;
+    const workbook = makeWorkbook(rowCount);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("expected fixture sheet");
+    const hiddenCols = new Set(layout.hiddenCols);
+    sheet.columns = layout.widths.map((width, col) => ({
+      key: `c${col}`,
+      header: `C${col}`,
+      width,
+      type: "text" as const,
+      ...(hiddenCols.has(col) ? { visible: false } : {}),
+    }));
+    sheet.rowHeights = layout.heights;
+    sheet.hiddenRows = new Set(layout.hiddenRows);
+    sheet.frozenCols = layout.frozenCols;
+    sheet.frozenRows = layout.frozenRows;
+    const host = mountHost();
+    const grid = createGrid(host, { workbook });
+    const scroller = scrollerOf(host);
+    for (const element of [host.querySelector(".sheetwrite-viewport"), scroller]) {
+      if (!element) throw new Error("expected grid viewport");
+      Object.defineProperty(element, "clientWidth", { value: VIEW_WIDTH, configurable: true });
+      Object.defineProperty(element, "clientHeight", { value: VIEW_HEIGHT, configurable: true });
+    }
+    // Lay out again at the stubbed size.
+    grid.setTheme({});
+    const zoom = layout.zoom ?? 1;
+    grid.setZoom(zoom);
+    const columnLefts: number[] = [];
+    let x = 0;
+    for (const [col, width] of layout.widths.entries()) {
+      columnLefts.push(x);
+      if (!hiddenCols.has(col)) x += width * zoom;
+    }
+    columnLefts.push(x);
+    // View rows skip hidden sheet rows; scrollToCell counts rows in the view.
+    const hiddenRows = new Set(layout.hiddenRows);
+    const rowTops: number[] = [];
+    let y = 0;
+    for (let row = 0; row < rowCount; row++) {
+      if (hiddenRows.has(row)) continue;
+      rowTops.push(y);
+      y += (layout.heights?.get(row) ?? DEFAULT_THEME.rowHeight) * zoom;
+    }
+    rowTops.push(y);
+    const frozenWidth = columnLefts[layout.frozenCols ?? 0] ?? 0;
+    const frozenHeight = rowTops[layout.frozenRows ?? 0] ?? 0;
+    const sizer = host.querySelector<HTMLElement>(".sheetwrite-sizer");
+    if (!sizer) throw new Error("expected grid sizer");
+    return {
+      grid,
+      scroller,
+      maxScroll: () => ({
+        left: Number.parseFloat(sizer.style.width) - VIEW_WIDTH,
+        top: Number.parseFloat(sizer.style.height) - VIEW_HEIGHT,
+      }),
+      /** The scroll that shows column `col` whole with the first body column on its gridline. */
+      snappedLeft(col: number): number {
+        const body = VIEW_WIDTH - DEFAULT_THEME.rowHeaderWidth * zoom - frozenWidth;
+        return snap(
+          columnLefts.slice(layout.frozenCols ?? 0),
+          columnLefts[col]!,
+          layout.widths[col]! * zoom,
+          body,
+          frozenWidth,
+        );
+      },
+      /** The scroll that shows view row `row` whole with the first body row on its gridline. */
+      snappedTop(row: number): number {
+        const body = VIEW_HEIGHT - DEFAULT_THEME.headerHeight * zoom - frozenHeight;
+        return snap(
+          rowTops.slice(layout.frozenRows ?? 0),
+          rowTops[row]!,
+          rowTops[row + 1]! - rowTops[row]!,
+          body,
+          frozenHeight,
+        );
+      },
+    };
+  }
+
+  /**
+   * The scroll that shows the span at `start`, `size` long, whole in a body
+   * `body` long after `frozen` pinned pixels: the least edge past the
+   * overflow, or the span's own start when it is longer than the body.
+   */
+  function snap(
+    edges: number[],
+    start: number,
+    size: number,
+    body: number,
+    frozen: number,
+  ): number {
+    const need = start + size - body;
+    const edge = edges.find((candidate) => candidate >= need) ?? start;
+    return Math.min(start, edge) - frozen;
+  }
+
+  const WIDTHS = Array.from({ length: 30 }, (_, col) => 70 + ((col * 37) % 90));
+  const LAYOUTS: Array<[string, Layout]> = [
+    ["plain", { widths: WIDTHS }],
+    [
+      "frozen panes, hidden columns and rows, mixed heights at 150%",
+      {
+        widths: WIDTHS,
+        heights: new Map(Array.from({ length: 200 }, (_, row) => [row, 20 + ((row * 13) % 30)])),
+        frozenCols: 2,
+        frozenRows: 1,
+        hiddenCols: [9, 10],
+        hiddenRows: [30, 31, 32],
+        zoom: 1.5,
+      },
+    ],
+    ["50% zoom", { widths: [...WIDTHS, ...WIDTHS], zoom: 0.5 }],
+    ["200% zoom", { widths: WIDTHS, zoom: 2 }],
+    ["a column wider than the view", { widths: [100, 120, 2_000, 90, 90] }],
+  ];
+
+  for (const [name, layout] of LAYOUTS) {
+    it(`stops on a column and row boundary going right and down: ${name}`, () => {
+      const view = mountLayout(layout);
+      const col = layout.widths.length - 3;
+      const row = 120;
+      try {
+        view.grid.scrollToCell({ sheet: "s1", row, col });
+        expect(view.scroller.scrollLeft).toBe(view.snappedLeft(col));
+        expect(view.scroller.scrollTop).toBe(view.snappedTop(row));
+      } finally {
+        view.grid.destroy();
+      }
+    });
+  }
+
+  it("leaves room to stop on a boundary at the last column and row", () => {
+    // The docs Report sheet's seven columns, 808 px, in a 720 px grid, with
+    // the two 100 px empty columns an 800 px host pads a spreadsheet with.
+    const view = mountLayout({
+      widths: [96, 112, 104, 104, 96, 88, 208, 100, 100],
+      rowCount: 24,
+      heights: new Map([
+        [0, 44],
+        [2, 48],
+        [3, 48],
+        [4, 48],
+        [5, 48],
+      ]),
+    });
+    try {
+      view.grid.scrollToCell({ sheet: "s1", row: 2, col: 6 });
+      // Column C (208 px) starts the body, not the end of column B's "Manager".
+      expect(view.snappedLeft(6)).toBe(208);
+      expect(view.scroller.scrollLeft).toBe(208);
+      view.grid.scrollToCell({ sheet: "s1", row: 23, col: 8 });
+      expect(view.scroller.scrollLeft).toBe(view.snappedLeft(8));
+      expect(view.scroller.scrollTop).toBe(view.snappedTop(23));
+      expect(view.maxScroll()).toEqual({ left: view.snappedLeft(8), top: view.snappedTop(23) });
+    } finally {
+      view.grid.destroy();
+    }
+  });
+});
