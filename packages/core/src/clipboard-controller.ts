@@ -718,8 +718,11 @@ export class ClipboardController {
       this.endCut();
       // A read-only grid copies: nothing can move.
       if (this.deps.readOnly()) return "done";
-      // The snapshot holds the selected rows, which are the ones shown.
-      const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
+      // The rows the move takes that the view does not show.
+      let hidden = 0;
+      for (let row = source.start.row; row <= source.end.row; row++) {
+        if (this.deps.toViewRow(row) === null) hidden++;
+      }
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
       if (hidden > 0) {
