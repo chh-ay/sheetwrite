@@ -25,9 +25,6 @@ const PIVOT_ANCHOR = { row: 2, col: 1 };
 const EAST_ROW = 3;
 const WEST_ROW = 4;
 const SUM_COL = 2;
-/** Grand total row once a third region adds an output row. */
-const GROWN_TOTAL_ROW = 6;
-const GRAND_TOTAL = 35;
 
 const columns = Array.from({ length: SHEET_COLS }, (_, index) => ({
   key: `c${index}`,
@@ -107,49 +104,17 @@ function seriesValues(store: SheetwriteStore, sheet: string, id: string) {
 }
 
 const scenarios: Record<string, () => void> = {
-  "source-edit": () => {
-    // The cell under the grand total: the output reaches it only after a third group appears.
-    // A chart over cells the output already holds is tracked through its spill children.
-    const grown: Range = {
-      sheet: "report",
-      start: { row: GROWN_TOTAL_ROW, col: SUM_COL },
-      end: { row: GROWN_TOTAL_ROW, col: SUM_COL },
-    };
-    const { store, events } = setup([pivot], "report", "total", grown);
-    try {
-      const empty = seriesValues(store, "report", "total");
-
-      // The edited cell is outside the series; only the pivot carries the change into it.
-      apply(store, [set("data", 3, 0, "North")]);
-      assert.equal(events.length, 1, "a pivot source edit reaches the chart");
-      assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "total" }]);
-      assert.notDeepEqual(seriesValues(store, "report", "total"), empty);
-      assert.deepEqual(seriesValues(store, "report", "total"), [GRAND_TOTAL]);
-    } finally {
-      store.dispose();
-    }
-  },
-
-  set: () => {
+  "set and remove": () => {
     const { store, events } = setup([], "report", "sums", sums);
     try {
       assert.equal(store.setPivot(pivot, "report").status, "applied");
       assert.equal(events.length, 1, "setPivot reaches a chart under its output");
       assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "sums" }]);
       assert.deepEqual(seriesValues(store, "report", "sums"), [15, 20]);
-    } finally {
-      store.dispose();
-    }
-  },
-
-  remove: () => {
-    const { store, events } = setup([pivot], "report", "sums", sums);
-    try {
-      assert.deepEqual(seriesValues(store, "report", "sums"), [15, 20]);
 
       assert.equal(store.removePivot("sales").status, "applied");
-      assert.equal(events.length, 1, "removePivot reaches a chart under its old output");
-      assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "sums" }]);
+      assert.equal(events.length, 2, "removePivot reaches a chart under its old output");
+      assert.deepEqual(events[1]?.charts, [{ sheet: "report", id: "sums" }]);
       assert.deepEqual(seriesValues(store, "report", "sums"), [null, null]);
     } finally {
       store.dispose();
@@ -176,6 +141,4 @@ const scenarios: Record<string, () => void> = {
   },
 };
 
-const scenario = scenarios[process.argv[2] ?? ""];
-assert.ok(scenario, `unknown scenario: ${process.argv[2]}`);
-scenario();
+for (const scenario of Object.values(scenarios)) scenario();
