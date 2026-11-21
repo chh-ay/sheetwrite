@@ -65,6 +65,7 @@ The panel refuses keys it can't use, and says why:
 
 - **Keys without Ctrl, ⌘ or Alt** type into the cell. Only function keys, Delete and Insert can stand alone.
 - **Keys that move or edit in the sheet**, such as arrows, Enter, Tab, Space, Page Up and F2, keep their Excel meaning.
+- **F6 and Shift + F6** move the focus to the next or previous part of the window and out of the grid, as in Excel, so they stay free. The panel's hint says so.
 - **Keys the browser or the operating system keeps** never reach the page.
 
 The keys the browser or the operating system keeps:

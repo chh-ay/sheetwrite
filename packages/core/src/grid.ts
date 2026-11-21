@@ -58,6 +58,7 @@ import {
 } from "./errors.js";
 import { downloadBytesIn, toCsv } from "./export.js";
 import type { FindBar } from "./find-bar.js";
+import { GRID_EXIT_HINT } from "./focus-exit.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import {
@@ -1071,6 +1072,11 @@ export class GridImpl implements Grid {
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
+    // Said once, when the focus enters the grid: Tab stays inside it, so name the way out.
+    if (!host.hasAttribute("aria-description")) {
+      host.setAttribute("aria-description", GRID_EXIT_HINT);
+      this.lifetime.add(() => host.removeAttribute("aria-description"));
+    }
     this.actionFeedback = attachActionFeedback(this, host, this.lifetime);
 
     const config = this.config;
@@ -1325,6 +1331,7 @@ export class GridImpl implements Grid {
       readOnly: this.readOnly,
       presentation: this.presentation,
       columnHeader: (col) => this.columnHeader(col),
+      column: (col) => this.sheet().columns[col],
       focusCell: () => this.selection.focusCell,
       descriptionAt: (row, col) => this.cellDescription(row, col),
       selection: () => this.selection.toSelection(this.activeSheet),
