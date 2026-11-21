@@ -69,6 +69,9 @@ const changelogs: Readonly<Record<string, string>> = {
   "@sheetwrite/charts": changelog("@sheetwrite/charts", {
     "Patch Changes": [provenance, dependencyUpdate],
   }),
+  "@sheetwrite/formula-assist": changelog("@sheetwrite/formula-assist", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
     "Patch Changes": [
       pivots,

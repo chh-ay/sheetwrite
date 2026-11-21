@@ -97,6 +97,8 @@ function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
     readOnly: () => false,
     mergeAnchorAt: () => null,
     toDataRow: (row) => row,
+    toViewRow: (row) => row,
+    rowSpan: (first, last) => ({ first, last }),
     commit: (patches, reason) => {
       document.commit(patches, reason);
     },

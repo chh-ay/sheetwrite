@@ -69,6 +69,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/formula-suggestion.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/grid.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
@@ -147,6 +151,10 @@
     {
       "path": "packages/wasm/loader.mjs",
       "reason": "Conditional export selection is verified by Node and browser consumer contracts"
+    },
+    {
+      "path": "packages/wasm/src/calc.rs",
+      "reason": "Module wiring and sheet limits only; the formula code lives in calc/ and is covered there"
     },
     {
       "path": "packages/wasm/src/lib.rs",

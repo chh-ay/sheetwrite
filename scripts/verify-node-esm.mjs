@@ -4,6 +4,7 @@
 import * as Charts from "../packages/charts/dist/index.js";
 import { createGridController } from "../packages/core/dist/adapter.js";
 import { createGrid, initSheetwrite } from "../packages/core/dist/index.js";
+import * as FormulaAssist from "../packages/formula-assist/dist/index.js";
 import * as Xlsx from "../packages/xlsx/dist/index.js";
 
 console.log(
@@ -13,4 +14,5 @@ console.log(
   typeof Xlsx.xlsxAddon,
   typeof Charts.createChartViewCache,
   typeof Charts.chartsAddon,
+  typeof FormulaAssist.formulaAssistAddon,
 );

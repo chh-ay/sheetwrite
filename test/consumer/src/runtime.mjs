@@ -6,6 +6,7 @@ import * as Adapter from "@sheetwrite/core/adapter";
 import * as Shell from "@sheetwrite/core/shell";
 import * as Xlsx from "@sheetwrite/xlsx";
 import * as Charts from "@sheetwrite/charts";
+import * as FormulaAssist from "@sheetwrite/formula-assist";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as VueAdapter from "@sheetwrite/vue";
 import { load } from "@sheetwrite/wasm";
@@ -14,6 +15,7 @@ const entries = {
   "@sheetwrite/core": Core,
   "@sheetwrite/xlsx": Xlsx,
   "@sheetwrite/charts": Charts,
+  "@sheetwrite/formula-assist": FormulaAssist,
   "@sheetwrite/core/adapter": Adapter,
   "@sheetwrite/core/shell": Shell,
   "@sheetwrite/react": ReactAdapter,
@@ -66,7 +68,9 @@ if (!String(uninitializedError?.message).includes("does not initialize core")) {
   throw new Error("SheetwriteStore must require initSheetwrite() even after the engine's load()");
 }
 
-await Core.initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon()] });
+await Core.initSheetwrite({
+  addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), FormulaAssist.formulaAssistAddon()],
+});
 
 // styles.css imports the parts; each must be an export of the packed package.
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");

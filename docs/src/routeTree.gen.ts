@@ -25,6 +25,7 @@ import { Route as ShowcasesDataModelRouteImport } from './routes/showcases.data-
 import { Route as ShowcasesDataToolsRouteImport } from './routes/showcases.data-tools'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesFormattingRouteImport } from './routes/showcases.formatting'
+import { Route as ShowcasesFormulaAssistRouteImport } from './routes/showcases.formula-assist'
 import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
 import { Route as ShowcasesFunctionsRouteImport } from './routes/showcases.functions'
 import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
@@ -121,6 +122,11 @@ const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
 const ShowcasesFormattingRoute = ShowcasesFormattingRouteImport.update({
   id: '/showcases/formatting',
   path: '/showcases/formatting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesFormulaAssistRoute = ShowcasesFormulaAssistRouteImport.update({
+  id: '/showcases/formula-assist',
+  path: '/showcases/formula-assist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesFormulasRoute = ShowcasesFormulasRouteImport.update({
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
+  '/showcases/formula-assist': typeof ShowcasesFormulaAssistRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByTo {
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
+  '/showcases/formula-assist': typeof ShowcasesFormulaAssistRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/showcases/data-tools': typeof ShowcasesDataToolsRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/formatting': typeof ShowcasesFormattingRoute
+  '/showcases/formula-assist': typeof ShowcasesFormulaAssistRoute
   '/showcases/formulas': typeof ShowcasesFormulasRoute
   '/showcases/functions': typeof ShowcasesFunctionsRoute
   '/showcases/host-rows': typeof ShowcasesHostRowsRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/formatting'
+    | '/showcases/formula-assist'
     | '/showcases/formulas'
     | '/showcases/functions'
     | '/showcases/host-rows'
@@ -369,6 +379,7 @@ export interface FileRouteTypes {
     | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/formatting'
+    | '/showcases/formula-assist'
     | '/showcases/formulas'
     | '/showcases/functions'
     | '/showcases/host-rows'
@@ -404,6 +415,7 @@ export interface FileRouteTypes {
     | '/showcases/data-tools'
     | '/showcases/database'
     | '/showcases/formatting'
+    | '/showcases/formula-assist'
     | '/showcases/formulas'
     | '/showcases/functions'
     | '/showcases/host-rows'
@@ -440,6 +452,7 @@ export interface RootRouteChildren {
   ShowcasesDataToolsRoute: typeof ShowcasesDataToolsRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
   ShowcasesFormattingRoute: typeof ShowcasesFormattingRoute
+  ShowcasesFormulaAssistRoute: typeof ShowcasesFormulaAssistRoute
   ShowcasesFormulasRoute: typeof ShowcasesFormulasRoute
   ShowcasesFunctionsRoute: typeof ShowcasesFunctionsRoute
   ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
@@ -573,6 +586,13 @@ declare module '@tanstack/solid-router' {
       path: '/showcases/formatting'
       fullPath: '/showcases/formatting'
       preLoaderRoute: typeof ShowcasesFormattingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/formula-assist': {
+      id: '/showcases/formula-assist'
+      path: '/showcases/formula-assist'
+      fullPath: '/showcases/formula-assist'
+      preLoaderRoute: typeof ShowcasesFormulaAssistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/formulas': {
@@ -712,6 +732,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesDataToolsRoute: ShowcasesDataToolsRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
   ShowcasesFormattingRoute: ShowcasesFormattingRoute,
+  ShowcasesFormulaAssistRoute: ShowcasesFormulaAssistRoute,
   ShowcasesFormulasRoute: ShowcasesFormulasRoute,
   ShowcasesFunctionsRoute: ShowcasesFunctionsRoute,
   ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
