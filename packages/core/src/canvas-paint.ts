@@ -22,10 +22,10 @@ const FILTER_BUTTON_SIZE = 16;
  * right gridline: the text's left padding, so the header has the same room on
  * both sides. In CSS pixels.
  */
-export const FILTER_BUTTON_INSET = CELL_PAD;
+const FILTER_BUTTON_INSET = CELL_PAD;
 
 /** Room between the end of a header cell's text and its filter button: the text's left padding again. */
-export const FILTER_TEXT_GAP = CELL_PAD;
+const FILTER_TEXT_GAP = CELL_PAD;
 
 /** The least width of the area a pointer opens the filter dropdown in, for touch. */
 const FILTER_BUTTON_HIT_WIDTH = 24;
