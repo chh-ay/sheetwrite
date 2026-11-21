@@ -2,12 +2,18 @@
 
 use std::cmp::Ordering;
 
-use crate::calc::{CmpOp, SHEET_COLS, SHEET_ROWS};
-use crate::types::{CellRange, FormulaError, Value};
+use crate::calc::{Ast, CmpOp, Func, SHEET_COLS, SHEET_ROWS};
+use crate::store::CellStore;
+use crate::types::{
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER,
+};
 
-use super::matrix::EvalMatrix;
+use super::matrix::{range_from_ast, EvalMatrix};
+use super::range_criteria::{CriteriaFold, CriteriaRead};
+use super::range_reader::RangeReader;
 use super::value::{compare_text_case_insensitive, plain_number};
 use super::wildcard::Wildcard;
+use super::EvalPass;
 
 #[derive(Debug)]
 pub(crate) struct Criterion {
@@ -374,4 +380,427 @@ fn matched_rows<'a>(
                 .all(|(range, criterion)| criterion.matches(&range.values[index]))
                 .then_some(cell)
         })
+}
+
+impl CellStore {
+    fn eval_criterion(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Criterion, FormulaError> {
+        let value = self.eval_ast(ast, sheet, pass, depth + 1);
+        if let Value::Error(error) = value {
+            return Err(error);
+        }
+        Criterion::parse(value)
+    }
+
+    /// Walks the criteria functions over their ranges instead of
+    /// materializing them. `None` keeps the materialized path, which also
+    /// handles computed arguments, missing arguments and dynamic arrays.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
+    fn streamed_criteria(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        match func {
+            Func::CountIf => self.streamed_count_if(args, sheet, pass, depth),
+            Func::CountIfs => self.streamed_count_ifs(args, sheet, pass, depth),
+            Func::SumIf | Func::AverageIf => self.streamed_sum_if(func, args, sheet, pass, depth),
+            Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
+                self.streamed_sum_ifs_or_extreme(func, args, sheet, pass, depth)
+            }
+            _ => None,
+        }
+    }
+
+    fn streamed_count_if(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.len() != 2 {
+            return None;
+        }
+        let range = range_from_ast(&args[0], self.name_scope(sheet))?;
+        let reader_depth = depth + 1;
+        let reader = match RangeReader::new(self, range, reader_depth) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+            Ok(criterion) => criterion,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
+            return Some(Value::number(count as f64));
+        }
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut [(reader, &criterion)],
+                value_first: false,
+            }
+            .finish(self, pass),
+        )
+    }
+
+    /// COUNTIF with a numeric criterion over dense columns that hold only
+    /// number literals: it compares the stored payloads directly instead of
+    /// reading each cell as a `Value`. `None` sends the caller to the cell
+    /// reader, for paged storage, any other cell kind or any other criterion.
+    /// Call it only after `RangeReader::new` accepted `range`: it clamps the
+    /// range to the used extent the same way.
+    ///
+    /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
+    /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
+    /// one function enables it for the whole module, which makes other range
+    /// formulas up to 1.8x slower on x86-64 (#342).
+    #[inline(never)]
+    fn dense_number_count_if_family(
+        &self,
+        range: CellRange,
+        criterion: &Criterion,
+        reader_depth: usize,
+    ) -> Option<usize> {
+        // At the depth limit the reader reads literals through `eval_at`,
+        // which fails; see `LiteralSources::new`.
+        if reader_depth >= FORMULA_RECURSION_LIMIT {
+            return None;
+        }
+
+        let cells = &self.sheets.get(range.sheet as usize)?.cells;
+        let row_start = range.row_start as usize;
+        let row_end = (range.row_end as usize).min(cells.row_count().checked_sub(1)?);
+        let col_end = (range.col_end as usize).min(cells.n_cols().checked_sub(1)?);
+
+        let mut count = 0;
+        for col in range.col_start as usize..=col_end {
+            let column = cells.dense_column(col)?;
+            let (column_kinds, numbers) = column.raw_slices();
+            let kinds = column_kinds.get(row_start..=row_end)?;
+            // A literal's raw kind is its kind, and a number's payload is its
+            // `f64` bits. Formulas and blanks have other raw kinds.
+            if kinds.iter().any(|&kind| kind != KIND_NUMBER) {
+                return None;
+            }
+            count += criterion.count_numbers(&numbers[row_start..=row_end])?;
+        }
+        Some(count)
+    }
+
+    fn streamed_count_ifs(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.is_empty() || !args.len().is_multiple_of(2) {
+            return None;
+        }
+        let mut readers = Vec::with_capacity(args.len() / 2);
+        let mut criteria = Vec::with_capacity(args.len() / 2);
+        for pair in args.as_chunks::<2>().0 {
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
+            let reader = match RangeReader::new(self, range, depth + 1) {
+                Ok(reader) => reader,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            if readers
+                .first()
+                .is_some_and(|first: &RangeReader<'_>| first.shape() != reader.shape())
+            {
+                return Some(Value::Error(FormulaError::Value));
+            }
+            let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            readers.push(reader);
+            criteria.push(criterion);
+        }
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut pairs,
+                value_first: false,
+            }
+            .finish(self, pass),
+        )
+    }
+
+    fn streamed_sum_if(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if !(2..=3).contains(&args.len()) {
+            return None;
+        }
+        let criteria_range = range_from_ast(&args[0], self.name_scope(sheet))?;
+        let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+            Ok(criterion) => criterion,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let value_range = match args.get(2) {
+            Some(ast) => sum_range_extent(
+                range_from_ast(ast, self.name_scope(sheet))?,
+                criteria_range.row_end - criteria_range.row_start + 1,
+                criteria_range.col_end - criteria_range.col_start + 1,
+            ),
+            None => criteria_range,
+        };
+        let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        if criteria_reader.shape() != value_reader.shape() {
+            return Some(Value::Error(FormulaError::Value));
+        }
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Sum {
+                    average: func == Func::AverageIf,
+                },
+                values: Some(&mut value_reader),
+                criteria: &mut [(criteria_reader, &criterion)],
+                value_first: false,
+            }
+            .finish(self, pass),
+        )
+    }
+
+    fn streamed_sum_ifs_or_extreme(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.len() < 3 || args.len().is_multiple_of(2) {
+            return None;
+        }
+        let value_range = range_from_ast(&args[0], self.name_scope(sheet))?;
+        let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let mut readers = Vec::with_capacity((args.len() - 1) / 2);
+        let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
+        for pair in args[1..].as_chunks::<2>().0 {
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
+            let reader = match RangeReader::new(self, range, depth + 1) {
+                Ok(reader) => reader,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            if value_reader.shape() != reader.shape() {
+                return Some(Value::Error(FormulaError::Value));
+            }
+            let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            readers.push(reader);
+            criteria.push(criterion);
+        }
+        let fold = if matches!(func, Func::MaxIfs | Func::MinIfs) {
+            CriteriaFold::Extreme {
+                maximum: func == Func::MaxIfs,
+            }
+        } else {
+            CriteriaFold::Sum {
+                average: func == Func::AverageIfs,
+            }
+        };
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold,
+                values: Some(&mut value_reader),
+                criteria: &mut pairs,
+                value_first: true,
+            }
+            .finish(self, pass),
+        )
+    }
+
+    #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
+    pub(super) fn eval_criteria_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if let Some(result) = self.streamed_criteria(func, args, sheet, pass, depth) {
+            return result;
+        }
+        match func {
+            Func::CountIf => {
+                if args.len() != 2 {
+                    return Value::Error(FormulaError::Value);
+                }
+                let range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                    Ok(range) => range,
+                    Err(error) => return Value::Error(error),
+                };
+                let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Value::Error(error),
+                };
+                Value::number(
+                    range
+                        .values
+                        .iter()
+                        .filter(|value| criterion.matches(value))
+                        .count() as f64,
+                )
+            }
+            Func::CountIfs => {
+                if args.is_empty() || !args.len().is_multiple_of(2) {
+                    return Value::Error(FormulaError::Value);
+                }
+                let mut ranges = Vec::with_capacity(args.len() / 2);
+                let mut criteria = Vec::with_capacity(args.len() / 2);
+                for pair in args.as_chunks::<2>().0 {
+                    let range = match self.eval_matrix_arg(&pair[0], sheet, pass, depth + 1) {
+                        Ok(range) => range,
+                        Err(error) => return Value::Error(error),
+                    };
+                    if ranges
+                        .first()
+                        .is_some_and(|first: &EvalMatrix| !first.same_shape(&range))
+                    {
+                        return Value::Error(FormulaError::Value);
+                    }
+                    let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                        Ok(criterion) => criterion,
+                        Err(error) => return Value::Error(error),
+                    };
+                    ranges.push(range);
+                    criteria.push(criterion);
+                }
+                let count = (0..ranges[0].values.len())
+                    .filter(|&index| {
+                        ranges
+                            .iter()
+                            .zip(&criteria)
+                            .all(|(range, criterion)| criterion.matches(&range.values[index]))
+                    })
+                    .count();
+                Value::number(count as f64)
+            }
+            Func::SumIf | Func::AverageIf => {
+                if !(2..=3).contains(&args.len()) {
+                    return Value::Error(FormulaError::Value);
+                }
+                let criteria_range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                    Ok(range) => range,
+                    Err(error) => return Value::Error(error),
+                };
+                let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Value::Error(error),
+                };
+                let value_range = if let Some(ast) = args.get(2) {
+                    let matrix = match range_from_ast(ast, self.name_scope(sheet)) {
+                        Some(range) => {
+                            let (rows, cols) =
+                                match range_from_ast(&args[0], self.name_scope(sheet)) {
+                                    Some(criteria) => (
+                                        criteria.row_end - criteria.row_start + 1,
+                                        criteria.col_end - criteria.col_start + 1,
+                                    ),
+                                    None => {
+                                        (criteria_range.rows as u32, criteria_range.cols as u32)
+                                    }
+                                };
+                            let sum_range = sum_range_extent(range, rows, cols);
+                            self.eval_range_matrix(sum_range, pass, depth + 1)
+                        }
+                        None => self.eval_matrix_arg(ast, sheet, pass, depth + 1),
+                    };
+                    match matrix {
+                        Ok(range) => range,
+                        Err(error) => return Value::Error(error),
+                    }
+                } else {
+                    EvalMatrix::new(
+                        criteria_range.rows,
+                        criteria_range.cols,
+                        criteria_range.values.clone(),
+                    )
+                };
+                if !criteria_range.same_shape(&value_range) {
+                    return Value::Error(FormulaError::Value);
+                }
+                aggregate_if(
+                    &value_range,
+                    &[(&criteria_range, &criterion)],
+                    func == Func::AverageIf,
+                )
+            }
+            Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
+                if args.len() < 3 || args.len().is_multiple_of(2) {
+                    return Value::Error(FormulaError::Value);
+                }
+                let value_range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                    Ok(range) => range,
+                    Err(error) => return Value::Error(error),
+                };
+                let mut ranges = Vec::with_capacity((args.len() - 1) / 2);
+                let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
+                for pair in args[1..].as_chunks::<2>().0 {
+                    let range = match self.eval_matrix_arg(&pair[0], sheet, pass, depth + 1) {
+                        Ok(range) => range,
+                        Err(error) => return Value::Error(error),
+                    };
+                    if !value_range.same_shape(&range) {
+                        return Value::Error(FormulaError::Value);
+                    }
+                    let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                        Ok(criterion) => criterion,
+                        Err(error) => return Value::Error(error),
+                    };
+                    ranges.push(range);
+                    criteria.push(criterion);
+                }
+                let pairs: Vec<_> = ranges.iter().zip(&criteria).collect();
+                if matches!(func, Func::MaxIfs | Func::MinIfs) {
+                    extreme_if(&value_range, &pairs, func == Func::MaxIfs)
+                } else {
+                    aggregate_if(&value_range, &pairs, func == Func::AverageIfs)
+                }
+            }
+            _ => Value::Error(FormulaError::Value),
+        }
+    }
 }
