@@ -131,7 +131,9 @@ describe("JavaScript dependency audit policy", () => {
       { exitCode: 1, stdout: "", stderr: "registry request timed out" },
       "produced no JSON: registry request timed out",
     ],
-  ])("fails closed on %s", (_label, result, message) => {
-    expect(() => evaluateAuditPolicy(result, [REVIEWED_ALLOWANCE], TODAY)).toThrow(message);
+  ])("fails closed on %s", (label, result, message) => {
+    // Only the stale-allowance case has an allowance; the others must fail without one.
+    const allowances = label === "a stale allowance" ? [REVIEWED_ALLOWANCE] : [];
+    expect(() => evaluateAuditPolicy(result, allowances, TODAY)).toThrow(message);
   });
 });

@@ -83,6 +83,74 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
 });
 
+describe("re-export documentation", () => {
+  it("keeps interface kind, signature, and member docs through re-exports", async () => {
+    const root = await fixture(
+      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\nexport type { ExternalService } from "framework";\n`,
+      {
+        "generated.d.ts":
+          "export interface GeneratedOutput {\n  /** Shared linear memory. */\n  readonly memory: object;\n}\n",
+        "node_modules/framework/package.json": JSON.stringify({
+          name: "framework",
+          types: "./index.d.ts",
+        }),
+        "node_modules/framework/index.d.ts": [
+          "/** Upstream service.",
+          " * @see https://example.com/upstream",
+          " */",
+          "export interface ExternalService {",
+          "  /** Upstream property.",
+          "   * @see https://example.com/property",
+          "   */",
+          "  value: string;",
+          "}",
+        ].join("\n"),
+      },
+    );
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const generated = entry?.exports.find((candidate) => candidate.name === "GeneratedOutput");
+    expect(generated?.kind).toBe("interface");
+    expect(generated?.documentation).toBe("Instantiated module exports.");
+    expect(generated?.signature).toContain("readonly memory: object;");
+    expect(generated?.memberDocs).toEqual([
+      { name: "memory", documentation: "Shared linear memory." },
+    ]);
+    const external = entry?.exports.find((candidate) => candidate.name === "ExternalService");
+    expect(external?.documentation).toBe("Upstream service.");
+    expect(external?.memberDocs).toEqual([{ name: "value", documentation: "Upstream property." }]);
+  });
+
+  it("keeps param, returns and throws tags, a thrown type as code, and drops empty ones", async () => {
+    const tagged = [
+      "/**",
+      " * Mounts a widget.",
+      " * @param {object} host - Element the widget mounts into.",
+      " * @param size",
+      " * @returns {number} The widget's id.",
+      " * @throws {TypeError} when `host` is detached.",
+      " * @throws SheetwriteError with code `aborted` when cancelled.",
+      " */",
+      "export declare function mount(host: object, size: number): number;",
+      "/**",
+      " * Reads nothing.",
+      " * @returns {number}",
+      " */",
+      "export declare function nothing(): number;",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const exports = manifest.packages[0]?.entryPoints[0]?.exports ?? [];
+    const documentation = (name: string) =>
+      exports.find((candidate) => candidate.name === name)?.documentation;
+    expect(documentation("mount")).toBe(
+      "Mounts a widget.\n@param host - Element the widget mounts into.\n@returns The widget's id.\n@throws `TypeError` when `host` is detached.\n@throws SheetwriteError with code `aborted` when cancelled.",
+    );
+    expect(documentation("nothing")).toBe("Reads nothing.");
+  });
+});
+
 describe("public API policy", () => {
   it("rejects untyped error payloads, Error subclasses and ambiguous re-exports", async () => {
     const root = await fixture(

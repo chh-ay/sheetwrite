@@ -87,6 +87,22 @@ describe("CI and release workflow contracts", () => {
     expect(job("docs", "deploy").needs).toEqual(["build", "check"]);
   });
 
+  it("checks the XLSX isolation of the examples in the production docs build", () => {
+    const steps = job("ci", "docs-build").steps ?? [];
+    const build = steps.findIndex((step) => step.name === "Build production docs");
+    const check = steps.findIndex((step) => step.name === "Example XLSX isolation");
+    expect(build).toBeGreaterThanOrEqual(0);
+    expect(check).toBeGreaterThan(build);
+    expect(steps[check]?.run).toBe("bun scripts/verify-example-xlsx-isolation.ts");
+  });
+
+  it("builds docs with the toolchain versions CI tests", () => {
+    const ciEnv = workflows().ci.env ?? {};
+    for (const [name, version] of Object.entries(workflows().docs.env ?? {})) {
+      expect({ name, version }).toEqual({ name, version: ciEnv[name] });
+    }
+  });
+
   it("publishes the GitHub release from the verified commit, then deploys docs from it", () => {
     const publish = job("release", "publish");
     const docs = job("release", "docs");
@@ -95,7 +111,9 @@ describe("CI and release workflow contracts", () => {
     const githubRelease = steps[releaseIndex];
     if (githubRelease?.if === undefined) throw new Error("Missing GitHub release condition");
 
-    expect(releaseIndex).toBeGreaterThan(steps.findIndex((step) => step.id === "publish"));
+    const publishIndex = steps.findIndex((step) => step.id === "publish");
+    expect(publishIndex).toBeGreaterThan(-1);
+    expect(releaseIndex).toBeGreaterThan(publishIndex);
     expect(githubRelease.if).toBe("steps.publish.outputs.pending != 'true'");
     expect(githubRelease.env).toEqual({
       GH_TOKEN: "${{ github.token }}",
@@ -270,6 +288,11 @@ describe("CI and release workflow contracts", () => {
       expect(result.exitCode).toBe(1);
       expect(result.stdout.toString()).toContain(name);
       expect(result.stdout.toString()).not.toContain(credentials.VERCEL_TOKEN);
+    }
+    const missingAll = runDeployment({});
+    expect(missingAll.exitCode).toBe(1);
+    for (const name of Object.keys(credentials)) {
+      expect(missingAll.stdout.toString()).toContain(name);
     }
   });
 

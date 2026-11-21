@@ -48,6 +48,28 @@ interface MutableContract {
 
 const MUTATIONS: [string, (contract: MutableContract) => void, string][] = [
   [
+    "rejects an unknown top-level field",
+    (contract) => {
+      contract.unreviewedCapability = true;
+    },
+    "contract.unreviewedCapability: unknown field",
+  ],
+  [
+    "rejects a version outside the closed protocol",
+    (contract) => {
+      contract.version = 2;
+    },
+    "contract.version: expected constant 1",
+  ],
+  [
+    "rejects an unrecognized engine build",
+    (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
+      if (formula) formula.builds = ["@sheetwrite/unknown"];
+    },
+    "value is outside the closed enum",
+  ],
+  [
     "rejects insecure public source links",
     (contract) => {
       const source = contract.sources["microsoft-excel-functions"];

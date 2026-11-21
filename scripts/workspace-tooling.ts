@@ -203,6 +203,7 @@ export const UNIT_TEST_PATHS = [
   "packages",
   "scripts/public-api.test.ts",
   "scripts/conformance.test.ts",
+  "scripts/conformance-excel-runner.test.ts",
   "scripts/formula-contract.test.ts",
   "scripts/ci-paths.test.ts",
   "scripts/indexnow.test.ts",
