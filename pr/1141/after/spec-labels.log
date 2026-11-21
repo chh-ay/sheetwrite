@@ -1,0 +1,9 @@
+
+Running 4 tests using 1 worker
+
+  ✓  1 [chromium] › test/browser/ribbon-labels.spec.ts:106:1 › every ribbon button shows its whole label, on any tab, 1440 px to 320 px (24.7s)
+  ✓  2 [chromium] › test/browser/ribbon-labels.spec.ts:133:1 › a collapsed group is one labelled button that opens its labelled commands (929ms)
+  ✓  3 [chromium] › test/browser/ribbon-labels.spec.ts:179:3 › on a touch screen › a tap opens a collapsed group @portability (810ms)
+  ✓  4 [firefox] › test/browser/ribbon-labels.spec.ts:179:3 › on a touch screen › a tap opens a collapsed group @portability (2.0s)
+
+  4 passed (31.0s)
