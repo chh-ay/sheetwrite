@@ -624,14 +624,29 @@ function frameOf(layout: BlueprintLayout, geometry: readonly EdgeGeometry[], pad
   return { x: round(x), y: round(y), w: round(w), h: round(h) };
 }
 
-/** A layout's boxes and connectors, each connector's geometry worked out once, and its frame. */
+/**
+ * A layout's boxes, moved so its frame starts at the origin, each
+ * connector's geometry, and the frame. Nothing is drawn at negative
+ * coordinates: Chromium reports SVG text above the origin as taller than its
+ * own box, which reads as clipped content.
+ */
 function placeLayout(layout: BlueprintLayout, pad: number) {
-  const nodes = new Map(layout.nodes.map((node) => [node.id, node]));
-  const edges = edgeGeometries(layout.edges, nodes);
+  const byId = (nodes: readonly BlueprintNode[]) => new Map(nodes.map((node) => [node.id, node]));
+  const first = frameOf(
+    layout,
+    edgeGeometries(layout.edges, byId(layout.nodes)).map(({ geometry }) => geometry),
+    pad,
+  );
+  const nodes = layout.nodes.map((node) => ({
+    ...node,
+    rect: { ...node.rect, x: node.rect.x - first.x, y: node.rect.y - first.y },
+  }));
+  const edges = edgeGeometries(layout.edges, byId(nodes));
   return {
+    nodes,
     edges,
     frame: frameOf(
-      layout,
+      { ...layout, nodes },
       edges.map(({ geometry }) => geometry),
       pad,
     ),
@@ -639,7 +654,7 @@ function placeLayout(layout: BlueprintLayout, pad: number) {
 }
 
 function Drawing(props: Readonly<{ layout: BlueprintLayout; text: BlueprintText; id: string }>) {
-  const { edges, frame } = placeLayout(props.layout, SPACING.frame);
+  const { nodes, edges, frame } = placeLayout(props.layout, SPACING.frame);
   return (
     <svg
       aria-labelledby={`${props.id}-title ${props.id}-desc`}
@@ -652,7 +667,7 @@ function Drawing(props: Readonly<{ layout: BlueprintLayout; text: BlueprintText;
     >
       <title id={`${props.id}-title`}>{props.text.title}</title>
       <desc id={`${props.id}-desc`}>{props.text.description}</desc>
-      <For each={props.layout.nodes}>{(node) => <Node node={node} />}</For>
+      <For each={nodes}>{(node) => <Node node={node} />}</For>
       {/* Connectors after the boxes, so a label's halo sits over any box edge it meets. */}
       <For each={edges}>{({ edge, geometry }) => <Edge edge={edge} geometry={geometry} />}</For>
     </svg>
@@ -716,7 +731,7 @@ export function BlueprintCard(
   props: Readonly<{ layout: BlueprintLayout; class?: string }>,
 ): JSX.Element {
   const dots = `bp-dots-${createUniqueId()}`;
-  const { edges, frame } = placeLayout(props.layout, SPACING.card.frame);
+  const { nodes, edges, frame } = placeLayout(props.layout, SPACING.card.frame);
   return (
     <svg
       aria-hidden="true"
@@ -735,7 +750,7 @@ export function BlueprintCard(
         x={round(frame.x - frame.w * 2)}
         y={round(frame.y - frame.h * 2)}
       />
-      <For each={props.layout.nodes}>{(node) => <Node node={node} />}</For>
+      <For each={nodes}>{(node) => <Node node={node} />}</For>
       <For each={edges}>{({ edge, geometry }) => <Edge edge={edge} geometry={geometry} />}</For>
     </svg>
   );
