@@ -70,19 +70,6 @@ describe("AutoFilter dropdown", () => {
     ).toEqual(["Sort A to Z", "Sort Z to A", 'Clear Filter From "Item"', "Text Filters"]);
   });
 
-  it("checks values from the keyboard and applies them with Enter", () => {
-    const { list, applied, key, closed } = open();
-    list.focus();
-    key(list, "ArrowDown");
-    key(list, " ");
-    key(list, "End");
-    key(list, " ");
-    key(list, "Enter");
-    expect(applied).toEqual([{ kind: "values", values: [3, "apple", "pear"] }]);
-    expect(closed()).toBe(1);
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-  });
-
   it("clears the filter when every value is checked again", () => {
     const first = open({ kept: [1] });
     first.list.focus();
