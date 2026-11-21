@@ -108,7 +108,7 @@ export function literalFromCell(
   const valueText = xmlChild(cell, "v")?.text ?? "";
   if (type === "inlineStr") {
     const inline = xmlChild(cell, "is") ?? cell;
-    if (xmlChildren(inline, "r").length > 0) {
+    if (xmlChild(inline, "r")) {
       emitWarning(context, {
         code: "rich-text",
         message: "Inline rich text formatting was flattened",
@@ -116,7 +116,7 @@ export function literalFromCell(
         cell: address,
       });
     }
-    if (xmlChildren(inline, "rPh").length > 0 || xmlChild(inline, "phoneticPr")) {
+    if (xmlChild(inline, "rPh") || xmlChild(inline, "phoneticPr")) {
       emitWarning(context, {
         code: "rich-text",
         message: "Phonetic guide text was omitted from the displayed inline string",

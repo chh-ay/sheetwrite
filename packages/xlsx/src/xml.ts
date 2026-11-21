@@ -21,6 +21,10 @@ interface MutableXmlElement {
   attributes: Record<string, string>;
   children: MutableXmlElement[];
   text: string;
+  /**
+   * Exact UTF-8 bytes of `text`, or -1 while `text` is too short to pass
+   * `maxXmlTextBytes`: UTF-8 takes at most three bytes per UTF-16 unit.
+   */
   textBytes: number;
 }
 
@@ -67,8 +71,36 @@ function utf8Length(value: string): number {
   return bytes;
 }
 
+/** Append `decoded` to the text of `element`, failing once the text passes `maxXmlTextBytes`. */
+function appendElementText(
+  element: MutableXmlElement,
+  decoded: string,
+  context: XlsxCodecContext,
+): void {
+  element.text += decoded;
+  if (element.textBytes >= 0) element.textBytes += utf8Length(decoded);
+  else if (element.text.length * 3 > context.limits.maxXmlTextBytes) {
+    // Appended pieces never split a surrogate pair, so one count of the
+    // whole text equals the sum of the pieces' counts.
+    element.textBytes = utf8Length(element.text);
+  } else return;
+  assertResource(context, "maxXmlTextBytes", element.textBytes);
+}
+
+/** An `&` that does not start one of the five predefined entities. */
+const OTHER_ENTITY = /&(?!(?:amp|lt|gt|quot|apos);)/;
+
 function decodeXmlEntities(value: string, part: string): string {
   if (!value.includes("&")) return value;
+  if (!OTHER_ENTITY.test(value)) {
+    // `&amp;` goes last, so the text it frees (`&amp;lt;` → `&lt;`) stays as written.
+    return value
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      .replaceAll("&quot;", '"')
+      .replaceAll("&apos;", "'")
+      .replaceAll("&amp;", "&");
+  }
   let output = "";
   let cursor = 0;
   while (cursor < value.length) {
@@ -125,6 +157,8 @@ const CODE_APOSTROPHE = 0x27;
 const CODE_GREATER_THAN = 0x3e;
 const CODE_SLASH = 0x2f;
 const CODE_EQUALS = 0x3d;
+const CODE_EXCLAMATION = 0x21;
+const CODE_QUESTION = 0x3f;
 
 /** Same set as `/\s/.test(char)`; NaN (past the end) is not space. */
 function isXmlSpace(code: number): boolean {
@@ -167,6 +201,12 @@ function findTagEnd(xml: string, start: number, part: string): number {
     else if (code === CODE_GREATER_THAN) return index;
   }
   return xmlFailure(part, "unterminated tag");
+}
+
+/** Whether `source` from `start` to `end`, trimmed, is `name`; the usual exact case needs no slice. */
+function closingNameMatches(source: string, start: number, end: number, name: string): boolean {
+  if (end - start === name.length && source.startsWith(name, start)) return true;
+  return source.slice(start, end).trim() === name;
 }
 
 function parseStartTag(
@@ -214,7 +254,10 @@ function parseStartTag(
     attributeCount += 1;
     assertResource(context, "maxXmlAttributesPerElement", attributeCount);
     const attributeValue = decodeXmlEntities(source.slice(offset + 1, end), part);
-    assertResource(context, "maxXmlTextBytes", utf8Length(attributeValue));
+    // UTF-8 takes at most three bytes per UTF-16 unit, so a short value needs no count.
+    if (attributeValue.length * 3 > context.limits.maxXmlTextBytes) {
+      assertResource(context, "maxXmlTextBytes", utf8Length(attributeValue));
+    }
     attributes[attributeName] = attributeValue;
     offset = end + 1;
   }
@@ -249,14 +292,11 @@ export function parseXml(
     if (raw.length === 0) return;
     const current = stack.at(-1);
     const decoded = cdata ? raw : decodeXmlEntities(raw, part);
-    const decodedBytes = utf8Length(decoded);
     if (!current) {
       if (decoded.trim().length > 0) xmlFailure(part, "text exists outside the root element");
       return;
     }
-    current.textBytes += decodedBytes;
-    assertResource(context, "maxXmlTextBytes", current.textBytes);
-    current.text += decoded;
+    appendElementText(current, decoded, context);
   };
 
   const deliverStreamedChild = (element: MutableXmlElement, sink: XmlChildStream): void => {
@@ -318,7 +358,7 @@ export function parseXml(
       attributes: parsed.attributes,
       children: [],
       text: "",
-      textBytes: 0,
+      textBytes: -1,
     };
     const parent = stack.at(-1);
     const depth = stack.length + 1;
@@ -419,9 +459,7 @@ export async function parseXmlChunks(
       if (decoded.trim()) xmlFailure(part, "text exists outside the root element");
       return;
     }
-    current.textBytes += utf8Length(decoded);
-    assertResource(context, "maxXmlTextBytes", current.textBytes);
-    current.text += decoded;
+    appendElementText(current, decoded, context);
   };
   const deliver = (element: MutableXmlElement): void => {
     const root = roots[0];
@@ -480,23 +518,27 @@ export async function parseXmlChunks(
         );
         if (ambiguous) break;
       }
-      if (pending.startsWith("<!--", cursor)) {
-        ignored = "comment";
-        cursor += 4;
-        continue;
+      const second = pending.charCodeAt(cursor + 1);
+      // Only `<!` and `<?` start markup other than tags; element tags skip these checks.
+      if (second === CODE_EXCLAMATION || second === CODE_QUESTION) {
+        if (pending.startsWith("<!--", cursor)) {
+          ignored = "comment";
+          cursor += 4;
+          continue;
+        }
+        if (pending.startsWith("<![CDATA[", cursor)) {
+          ignored = "cdata";
+          cursor += 9;
+          continue;
+        }
+        if (second === CODE_QUESTION) {
+          ignored = "instruction";
+          cursor += 2;
+          continue;
+        }
+        xmlFailure(part, "unsupported declaration");
       }
-      if (pending.startsWith("<![CDATA[", cursor)) {
-        ignored = "cdata";
-        cursor += 9;
-        continue;
-      }
-      if (pending.startsWith("<?", cursor)) {
-        ignored = "instruction";
-        cursor += 2;
-        continue;
-      }
-      if (pending.startsWith("<!", cursor)) xmlFailure(part, "unsupported declaration");
-      const closing = pending.startsWith("</", cursor);
+      const closing = second === CODE_SLASH;
       let end = cursor + (closing ? 2 : 1);
       let quote = 0;
       for (; end < pending.length; end++) {
@@ -515,10 +557,10 @@ export async function parseXmlChunks(
         break;
       }
       if (closing) {
-        const name = pending.slice(cursor + 2, end).trim();
         const current = stack.pop();
-        if (!current || current.name !== name)
-          xmlFailure(part, `closing tag ${name} does not match`);
+        if (!current || !closingNameMatches(pending, cursor + 2, end, current.name)) {
+          xmlFailure(part, `closing tag ${pending.slice(cursor + 2, end).trim()} does not match`);
+        }
         if (streamedChild === current) {
           deliver(current);
           streamedChild = undefined;
@@ -533,7 +575,7 @@ export async function parseXmlChunks(
           attributes: parsed.attributes,
           children: [],
           text: "",
-          textBytes: 0,
+          textBytes: -1,
         };
         const parent = stack.at(-1);
         const depth = stack.length + 1;
