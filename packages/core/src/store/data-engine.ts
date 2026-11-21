@@ -205,6 +205,7 @@ import {
   deleteRemap,
   insertRemap,
   integerAt,
+  MAX_VALIDATION_RULES,
   mergeCrossesFreeze,
   mergesOverlap,
   movedCellBounds,
@@ -234,7 +235,7 @@ import {
 } from "./ranges.js";
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
-import { storeValidationReads } from "./validation-reads.js";
+import { type StoreValidationReads, storeValidationReads } from "./validation-reads.js";
 import { StoreViewState } from "./view-state.js";
 import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
@@ -1448,13 +1449,15 @@ export class StoreDataEngine {
     return decodePreview(fields, result);
   }
 
-  private validationReadsCache: ValidationReads | undefined;
+  private validationReadsCache: StoreValidationReads | undefined;
 
   /** What data validation rules read from this store: formula results and list sources. */
   get validationReads(): ValidationReads {
     this.validationReadsCache ??= storeValidationReads({
       workbook: () => this.workbook,
-      getCell: (addr) => this.getCell(addr),
+      // One window read of a list's source, kept out of the scroll counts.
+      values: (sheet, rows, cols) =>
+        this.windowReader.read(sheet, rows, cols, undefined, false).values,
       previewFormula: (cell, text) => this.previewFormula(cell, text),
       previewFormulaWith: (cell, text, trial) => this.previewFormulaWith(cell, text, trial),
     });
@@ -2066,6 +2069,8 @@ export class StoreDataEngine {
     if (!Number.isFinite(milliseconds)) {
       throw storeFailure("invalid-argument", "invalid volatile recalculation date");
     }
+    // A list source may hold a volatile formula.
+    this.validationReadsCache?.invalidate();
     this.wasm.recomputeVolatile(dateToSerial(now));
     if (this.chartRecalculationTracked)
       this.recalculatedRectCount = this.wasm.recalculatedRectCount();
@@ -3055,6 +3060,8 @@ export class StoreDataEngine {
       replayPivotSources?: boolean;
     },
   ): StoreDataEngineEffects {
+    // A check that spans this write reads its lists again after it.
+    this.validationReadsCache?.invalidate();
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
     const touchedSheets = new Set<SheetId>();
@@ -3634,7 +3641,9 @@ export class StoreDataEngine {
         };
 
         if (!validValidationRules(sheet, [rule]) || rule.range.sheet !== patch.sheet) return false;
-        sheet.validationRules = upsertById(sheet.validationRules ?? [], rule);
+        const rules = upsertById(sheet.validationRules ?? [], rule, MAX_VALIDATION_RULES);
+        if (!rules) return false;
+        sheet.validationRules = rules;
 
         this.spillBlockersDirty.add(patch.sheet);
         return true;

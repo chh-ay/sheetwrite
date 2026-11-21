@@ -101,51 +101,28 @@
   box-sizing: border-box;
 }
 
-/* Tabs keep their width and the list scrolls sideways when they do not fit,
-   so a narrow ribbon never puts tabs under the layout buttons. Focusing a tab
-   (arrow keys, Tab) scrolls it into view, clear of the edge fades below, so
-   the bar itself can stay hidden. */
+/* Tabs keep their width. Those that do not fit move into the More tabs menu
+   (data-overflow, set by ribbon.ts), so a narrow ribbon never cuts a tab
+   label or puts a tab under the layout buttons. */
 .sheetwrite-ribbon-tablist {
   display: flex;
   align-items: flex-end;
   gap: 2px;
   min-width: 0;
   height: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-padding-inline: 30px;
-  scrollbar-width: none;
-}
-
-.sheetwrite-ribbon-tablist::-webkit-scrollbar {
-  display: none;
-}
-
-/* A hidden end fades out and its last 6px stay clear, so a cut tab label never
-   runs into the layout buttons beside it. */
-.sheetwrite-ribbon-tablist[data-overflow="end"] {
-  mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent calc(100% - 6px));
-}
-
-.sheetwrite-ribbon-tablist[data-overflow="start"] {
-  mask-image: linear-gradient(to left, #000 calc(100% - 30px), transparent calc(100% - 6px));
-}
-
-.sheetwrite-ribbon-tablist[data-overflow="both"] {
-  mask-image: linear-gradient(
-    to right,
-    transparent 6px,
-    #000 30px,
-    #000 calc(100% - 30px),
-    transparent calc(100% - 6px)
-  );
+  overflow: hidden;
 }
 
 .sheetwrite-ribbon-tab {
   flex: none;
 }
 
+.sheetwrite-ribbon-tab[data-overflow] {
+  display: none;
+}
+
 .sheetwrite-ribbon-tab,
+.sheetwrite-ribbon-more-tabs,
 .sheetwrite-ribbon-mode,
 .sheetwrite-ribbon-minimize {
   height: 26px;
@@ -159,6 +136,7 @@
 }
 
 .sheetwrite-ribbon-tab:hover,
+.sheetwrite-ribbon-more-tabs:hover,
 .sheetwrite-ribbon-mode:hover,
 .sheetwrite-ribbon-minimize:hover {
   background: var(--sheetwrite-ribbon-hover);
@@ -183,6 +161,19 @@
 }
 
 .sheetwrite-ribbon-mode[aria-pressed="true"] {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-more-tabs {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 0 8px;
+}
+
+.sheetwrite-ribbon-more-tabs[aria-expanded="true"] {
   background: var(--sheetwrite-ribbon-hover);
 }
 
@@ -464,6 +455,24 @@
   justify-content: center;
   height: 18px;
   border-radius: 0 0 4px 4px;
+}
+
+/* Touch screens get targets of at least 24 by 24 px (WCAG 2.2 target size);
+   mouse layouts keep their density. A large split button gives its arrow 6 px
+   of the face's height, so the button stays 72 px tall. */
+@media (pointer: coarse) {
+  .sheetwrite-ribbon-minimize,
+  .sheetwrite-ribbon-split-arrow {
+    min-width: 24px;
+  }
+
+  .sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-button {
+    height: 48px;
+  }
+
+  .sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-split-arrow {
+    height: 24px;
+  }
 }
 
 .sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])

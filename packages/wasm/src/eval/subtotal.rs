@@ -3,6 +3,7 @@
 //! AGGREGATE, which Excel skips so that a subtotal is not counted twice.
 
 use crate::calc::{Ast, Func};
+use crate::store::names::{NameFacts, NameScope};
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
@@ -19,25 +20,28 @@ use crate::formula_slots::FormulaStore;
 use crate::row_visibility::{HiddenRowCursor, SkippedRows};
 use crate::sheet::SheetData;
 
-/// Whether `ast` calls SUBTOTAL or AGGREGATE anywhere.
-pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
+/// Whether `ast` calls SUBTOTAL or AGGREGATE anywhere, through the defined
+/// names it reads too.
+pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
+    let calls = move |child: &Ast| ast_calls_subtotal(child, names);
     match ast {
         Ast::Func(Func::Subtotal, _) => true,
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), _) => true,
-        Ast::Func(_, args) => args.iter().any(ast_calls_subtotal),
+        Ast::Func(_, args) => args.iter().any(calls),
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => ast_calls_subtotal(&definition.body),
+        Ast::Lambda(definition) => calls(&definition.body),
         Ast::UnknownFunc(call) => {
             let args = &call.args;
-            args.iter().any(ast_calls_subtotal)
+            args.iter().any(calls)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_calls_subtotal(left) || ast_calls_subtotal(right)
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_calls_subtotal(inner),
-        Ast::LetSlot { expression, .. } => ast_calls_subtotal(expression),
-        Ast::NamedFormula(named) => ast_calls_subtotal(&named.expression),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
+        Ast::LetSlot { expression, .. } => calls(expression),
+        Ast::DefinedName(id, _) => names.facts(*id).map_or_else(
+            || names.formula_satisfies_family(*id, ast_calls_subtotal),
+            |facts| facts.has(NameFacts::CALLS_SUBTOTAL),
+        ),
         _ => false,
     }
 }
@@ -192,10 +196,11 @@ impl SubtotalReader<'_> {
     ) -> Result<Value, FormulaError> {
         // A cell after the code is a one-cell reference, so its row can be
         // hidden.
+        let names = self.store.name_scope(self.sheet);
         let reference = if index > 0 && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
-            range_from_ast(arg, self.sheet)
+            range_from_ast(arg, names)
         } else {
-            argument_range(arg, self.sheet)
+            argument_range(arg, names)
         };
         if let Some(range) = reference {
             return self.range(range, index > 0, pass, depth + 1);
@@ -281,7 +286,7 @@ impl SubtotalReader<'_> {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        if ast_produces_array(arg, pass.shapes()) {
+        if ast_produces_array(arg, pass.shapes(self.store.name_scope(self.sheet))) {
             if let Some(result) = self
                 .store
                 .eval_dynamic_array(arg, self.sheet, pass, depth + 1)

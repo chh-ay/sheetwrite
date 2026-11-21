@@ -59,6 +59,32 @@ fn relative_references_in_a_name_follow_the_cell_that_uses_it() {
     assert_eq!(number(&store, sheet, 2, 2), 31.0);
 }
 
+/// A relative name is read in place, its references moved by the reading
+/// cell's row and column. A spilling formula is evaluated before the plain
+/// formulas of the pass, so a formula cell the name reads is evaluated
+/// inside that read: it reads its own references where they are written.
+#[test]
+fn a_formula_a_relative_name_reads_first_reads_its_own_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    assert!(store.set_named_formula("Right", -1, "=B1+0"));
+    store.set_number(sheet, 1, 2, 10.0, 0);
+    store.set_number(sheet, 2, 2, 100.0, 0);
+    store.set_formula(sheet, 1, 0, "=Right*{1;2}", 0);
+    store.set_formula(sheet, 1, 1, "=C2+1", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        number(&store, sheet, 2, 0),
+        22.0,
+        "A3 spills B2*2, and B2 reads C2"
+    );
+
+    store.set_number(sheet, 1, 2, 20.0, 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 1, 1), 21.0, "B2 reads C2");
+    assert_eq!(number(&store, sheet, 2, 0), 42.0, "A3 spills B2*2");
+}
+
 /// `$A1048575:$A1`, relative to A1, is the two rows above a cell and the
 /// cell itself in column A; used in row 3 it wraps to A1:A3.
 #[test]
@@ -387,6 +413,74 @@ fn a_name_change_binds_only_the_formulas_that_use_it() {
         number(&store, sheet, 1, 3),
         100.0,
         "the new reads reach the graph"
+    );
+}
+
+/// The first operand of the operator at the root of the formula at (`row`,
+/// `col`), as an address that changes when the formula is parsed again.
+fn first_operand_address(
+    store: &CellStore,
+    sheet: usize,
+    row: u32,
+    col: u32,
+) -> Option<*const crate::calc::Ast> {
+    let entry = store.sheets[sheet]
+        .formulas
+        .get((row, col), &store.formula_slots)?;
+    let crate::calc::Ast::Bin(_, left, _) = entry.ast.as_ref()? else {
+        return None;
+    };
+    Some(std::ptr::from_ref(&**left))
+}
+
+/// A formula holds a name's id, so a change of what the name stands for
+/// gives its readers new reads without parsing them again.
+#[test]
+fn a_name_change_keeps_the_trees_of_the_formulas_that_read_it() {
+    let (mut store, sheet) = name_users();
+    let reader = first_operand_address(&store, sheet, 0, 3);
+    let through_total = first_operand_address(&store, sheet, 1, 3);
+    assert!(
+        reader.is_some() && through_total.is_some(),
+        "both have operands"
+    );
+
+    assert!(
+        store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
+        "Rate is B2"
+    );
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 20.0, "SUM(Rate)*A1 reads B2");
+    assert_eq!(number(&store, sheet, 1, 3), 400.0, "Total*2 reads B2");
+    assert_eq!(first_operand_address(&store, sheet, 0, 3), reader);
+    assert_eq!(first_operand_address(&store, sheet, 1, 3), through_total);
+}
+
+/// A formula holds a named range's id, not a copy of the name or of its
+/// range: it retains less than the same formula with the range written in
+/// a call, whose reads are the same.
+#[test]
+fn a_name_use_retains_no_copy_of_the_name() {
+    const FORMULAS: usize = 1_000;
+    let retained = |formula: &dyn Fn(usize) -> String| {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, FORMULAS);
+        assert!(
+            store.set_named_range("Rate", -1, sheet, 0, 2, 0, 2),
+            "Rate is C1"
+        );
+        for row in 0..FORMULAS {
+            store.set_formula(sheet, row, 1, &formula(row), 0);
+        }
+        store.recompute(sheet);
+        assert_eq!(number(&store, sheet, FORMULAS - 1, 1), 0.0, "C1 is blank");
+        retained_bytes(&store)
+    };
+    let named = retained(&|row| format!("=A{}*Rate", row + 1));
+    let written = retained(&|row| format!("=A{}*SUM($C$1:$C$1)", row + 1));
+    assert!(
+        named < written,
+        "a name use retains {named} bytes, the written range {written}"
     );
 }
 
