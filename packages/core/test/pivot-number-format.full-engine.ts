@@ -105,9 +105,8 @@ function formats(grid: Grid): (string | undefined)[][] {
   );
 }
 
-it("paints a value field's number format on its value cells only, as Excel does", () => {
+it("paints a value field's number format on its value cells only, as Excel does, and sets it from the field list in one undo step", async () => {
   const grid = mount();
-
   // Header row and labels keep General; the COUNT column has no format.
   expect(formats(grid)).toEqual([
     [undefined, undefined, undefined],
@@ -115,10 +114,7 @@ it("paints a value field's number format on its value cells only, as Excel does"
     [undefined, "$#,##0", undefined],
     [undefined, "$#,##0", undefined],
   ]);
-});
 
-it("sets a value field's number format from the field list in one undo step", async () => {
-  const grid = mount();
   const press = (target: Element | null | undefined) => {
     if (target == null) throw new Error("missing control");
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));

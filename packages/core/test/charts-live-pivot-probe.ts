@@ -130,26 +130,17 @@ const scenarios: Record<string, () => void> = {
     }
   },
 
-  set: () => {
+  "set and remove": () => {
     const { store, events } = setup([], "report", "sums", sums);
     try {
       assert.equal(store.setPivot(pivot, "report").status, "applied");
       assert.equal(events.length, 1, "setPivot reaches a chart under its output");
       assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "sums" }]);
       assert.deepEqual(seriesValues(store, "report", "sums"), [15, 20]);
-    } finally {
-      store.dispose();
-    }
-  },
-
-  remove: () => {
-    const { store, events } = setup([pivot], "report", "sums", sums);
-    try {
-      assert.deepEqual(seriesValues(store, "report", "sums"), [15, 20]);
 
       assert.equal(store.removePivot("sales").status, "applied");
-      assert.equal(events.length, 1, "removePivot reaches a chart under its old output");
-      assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "sums" }]);
+      assert.equal(events.length, 2, "removePivot reaches a chart under its old output");
+      assert.deepEqual(events[1]?.charts, [{ sheet: "report", id: "sums" }]);
       assert.deepEqual(seriesValues(store, "report", "sums"), [null, null]);
     } finally {
       store.dispose();
@@ -176,6 +167,4 @@ const scenarios: Record<string, () => void> = {
   },
 };
 
-const scenario = scenarios[process.argv[2] ?? ""];
-assert.ok(scenario, `unknown scenario: ${process.argv[2]}`);
-scenario();
+for (const scenario of Object.values(scenarios)) scenario();
