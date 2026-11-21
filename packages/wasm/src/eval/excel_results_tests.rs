@@ -2574,6 +2574,9 @@ const BRANCH_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=IFERROR(1/{1,0},{\"a\",\"b\"})", 2, &["1", "b"]),
     ("=IFERROR(SEQUENCE(0),\"none\")", 1, &["none"]),
     ("=IFNA({1,#N/A,#DIV/0!},\"na\")", 3, &["1", "na", "#DIV/0!"]),
+    ("=IFERROR(1/0,)", 1, &["0"]),
+    ("=IFNA(NA(),)", 1, &["0"]),
+    ("=IFERROR({1,#N/A},)", 2, &["1", "0"]),
     (
         "=IFS(Data!A1:A3>2,\"big\",Data!A1:A3>1,\"mid\")",
         1,
