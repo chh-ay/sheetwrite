@@ -174,7 +174,11 @@ export class Ribbon {
       settings.dataset.command = "keyboardShortcuts";
       settings.title = "Settings: keyboard shortcuts";
       settings.setAttribute("aria-label", "Keyboard shortcuts");
-      settings.appendChild(iconNode("settings", options.icons));
+      // An icon never stands alone: the gear shows its name beside it.
+      const name = document.createElement("span");
+      name.className = "sheetwrite-ribbon-settings-label";
+      name.textContent = "Shortcuts";
+      settings.append(iconNode("settings", options.icons), name);
       settings.addEventListener("mousedown", (event) => event.preventDefault());
       settings.addEventListener("click", () => grid.openKeyboardSettings());
       this.settingsButton = settings;

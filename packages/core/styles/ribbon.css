@@ -186,6 +186,8 @@
 .sheetwrite-ribbon-settings {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  font: inherit;
   height: 26px;
   margin-left: auto;
   padding: 0 6px;
@@ -368,7 +370,6 @@
 
 /* Labels show beside small buttons in flow groups, never in dense rows. */
 .sheetwrite-ribbon-row .sheetwrite-ribbon-label,
-.sheetwrite-ribbon-group[data-size="small"] .sheetwrite-ribbon-label,
 :is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow) .sheetwrite-ribbon-label {
   position: absolute;
   width: 1px;
@@ -403,14 +404,11 @@
 
 /* Medium: large buttons fall back to a small icon with the label beside it. */
 .sheetwrite-ribbon-group[data-size="medium"]
-  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large],
-.sheetwrite-ribbon-group[data-size="small"]
   :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
   grid-row: auto;
 }
 
-.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
-  .sheetwrite-ribbon-button[data-large] {
+.sheetwrite-ribbon-group[data-size="medium"] .sheetwrite-ribbon-button[data-large] {
   flex-direction: row;
   gap: 4px;
   height: 24px;
@@ -419,7 +417,7 @@
   white-space: nowrap;
 }
 
-.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+.sheetwrite-ribbon-group[data-size="medium"]
   .sheetwrite-ribbon-button[data-large]
   > .sheetwrite-ribbon-icon
   > :is(svg, .sheetwrite-icon) {
@@ -489,12 +487,11 @@
   }
 }
 
-.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
-  .sheetwrite-ribbon-split[data-large] {
+.sheetwrite-ribbon-group[data-size="medium"] .sheetwrite-ribbon-split[data-large] {
   flex-direction: row;
 }
 
-.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+.sheetwrite-ribbon-group[data-size="medium"]
   .sheetwrite-ribbon-split[data-large]
   > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
   height: 24px;
