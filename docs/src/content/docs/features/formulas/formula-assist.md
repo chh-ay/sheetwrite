@@ -21,7 +21,7 @@ Excel's own keys and defaults keep working: the function list, Tab to take its e
 - **The rest of the formula, before you type it.** Under a column of `=C4*D4`, typing `=` in row 5 shows `C5*D5`. Excel completes only function names, so you would retype what the sheet already shows. One key replaces a dozen, and you read the formula before you take it.
 - **One word at a time.** Ctrl+→ takes one word of the suggestion: a function name with its `(`, a whole reference such as `Sheet2!$A$2:$A$90`, a number, a string or an operator. You keep the part you agree with and type the rest.
 - **The next argument on Tab.** Inside a call that still lacks a required argument, Tab writes the `,` and moves to the next argument, where the suggestion for that argument appears. Excel's Tab can only refuse a formula with too few arguments there.
-- **Where it points.** The ranges a suggestion names get a faint fill on the grid in their reference colour, before you take it. A wrong suggestion is easy to see.
+- **Where it points.** The ranges a suggestion names get a faint fill on the grid in their reference color, before you take it. A wrong suggestion is easy to see.
 
 ## Keys
 
@@ -32,13 +32,13 @@ Excel's own keys and defaults keep working: the function list, Tab to take its e
 | Esc | Hides the suggestion until the text changes. The add-on doesn't suggest the same formula again during this edit. | Excel's Esc |
 | Enter | Commits only the text you typed | Excel's Enter |
 
-While the function list is open, Tab takes the list's entry, as in Excel. A suggestion shows then only when it is exactly what one entry inserts, and that entry becomes the selected one. Suggestions show only while the caret is at the end of the text, with nothing selected and no IME composition open. The cell editor has no suggestions: it keeps Excel's AutoComplete.
+A suggestion stays while you type it: after `=` shows `SUM(D2:D11)`, typing `S` leaves `UM(D2:D11)`, and a character that differs takes it away. While the function list is open, a new suggestion shows only when it starts with what one entry inserts, and that entry becomes the selected one. Tab takes the suggestion while it shows; once you move to another entry of the list, Tab takes that entry, as in Excel. Suggestions show only while the caret is at the end of the text, with nothing selected and no IME composition open. The cell editor has no suggestions: it keeps Excel's AutoComplete.
 
 ## How it predicts
 
 Predictions are deterministic. They use the workbook only: no network, no AI. Four signals each propose whole formulas, strongest first:
 
-1. **Neighbouring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them.
+1. **Neighboring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them.
 2. **Syntax.** The one function or visible sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take. Hidden and very hidden sheets are never suggested.
 3. **The column's pattern.** The nearest formula above or below in the same column, up to 100 rows away inside the same block of filled cells, moved to the cell. A formula that several cells in a row repeat is likelier, and so is one whose inputs in the cell's own row are filled: an empty row is often a total.
 4. **The workbook's formulas.** The formulas of every visible sheet, counted by their shape: two formulas have the same shape when a fill or a paste turns one into the other. The most common shapes are moved to the cell, and one shows once it holds most of the formulas that still fit what you typed.
@@ -47,7 +47,7 @@ The add-on counts the workbook's formulas while the page is idle, never during i
 
 The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, the end of the block a typed range starts, the formulas typed earlier in the session, and the formula in the same cell of other sheets. None was right often enough to show, so none ships.
 
-Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion from the neighbours or the syntax shows only when it is at least 90% likely, and one from the column or the workbook only when it is at least 98% likely. It must also be 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
+Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion from the neighbors or the syntax shows only when it is at least 90% likely, and one from the column or the workbook only when it is at least 98% likely. It must also be 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
 
 ### When it isn't sure
 
@@ -59,18 +59,18 @@ The add-on was measured on workbooks from the Enron spreadsheet corpus that it w
 
 | Set | Formulas | Keystrokes saved | Wrong suggestions | Excel's function list alone |
 | --- | ---: | ---: | ---: | ---: |
-| 50 whole workbooks | 966 | 62.0% | 0.7% (5 of 735 shown) | 5.8% saved |
-| 50 workbooks, the cells near each formula | 975 | 48.3% | 2.2% (16 of 715 shown) | 3.1% saved |
+| 50 whole workbooks | 966 | 62.2% | 0.7% (5 of 735 shown) | 5.8% saved |
+| 50 workbooks, the cells near each formula | 975 | 48.4% | 2.0% (14 of 713 shown) | 3.1% saved |
 
-A wrong suggestion is one that wasn't how the formula went on. The neighbouring formulas give most of the savings; the column's pattern and the workbook's formulas add suggestions where the neighbours don't agree on one, such as the last row of a column. A one-off formula mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
+A wrong suggestion is one that wasn't how the formula went on. The neighboring formulas give most of the savings; the column's pattern and the workbook's formulas add suggestions where the neighbors don't agree on one, such as the last row of a column. A one-off formula mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
 
 ## Accessibility
 
-The suggestion is drawn in the layer that colours the formula's references, so screen readers don't read it twice. A polite status announces "Suggestion: … Tab to accept." once a suggestion has held for 400 ms, never on every key.
+The suggestion is drawn in the layer that colors the formula's references, so screen readers don't read it twice. A polite status announces "Suggestion: … Tab to accept." once a suggestion has held for 400 ms, never on every key.
 
 ## Styles
 
-The ghost text uses the field's text colour at `--sheetwrite-formula-ghost-opacity` (0.45 by default, at least 3:1 contrast on the light and dark grid backgrounds). It is part of `@sheetwrite/core/styles/formula-help.css`.
+The ghost text uses the field's text color at `--sheetwrite-formula-ghost-opacity` (0.45 by default, at least 3:1 contrast on the light and dark grid backgrounds). It is part of `@sheetwrite/core/styles/formula-help.css`.
 
 ## Write your own suggester
 

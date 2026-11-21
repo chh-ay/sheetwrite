@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { chromium, type Page } from "@playwright/test";
+import { type Browser, chromium, type Page } from "@playwright/test";
 import type { Selection as GridSelection } from "@sheetwrite/core";
 import { createServer } from "vite";
 
@@ -47,12 +47,11 @@ interface Shot {
   size: ShotSize;
   /**
    * `items`: keep only the dashboard's items, with the dashboard's 12 px margin.
-   * `panel`: the shot's size from the side panel's top-right corner, with the grid beside it.
    * `{ x, y }`: the shot's size from that point of the stage.
-   * `{ dialog: { x, y } }`: the shot's size from that point of the open grid dialog.
+   * A `CardCrop`: the parts a highlight card shows, fitted into the card.
    */
-  crop?: "items" | "panel" | ShotPoint | { readonly dialog: ShotPoint };
-  /** The size of the stage a `panel`, `{ x, y }` or dialog crop is taken from. */
+  crop?: "items" | ShotPoint | CardCrop;
+  /** The size of the stage a `{ x, y }` or card crop is taken from. */
   stage?: ShotSize;
   /** With `crop: "items"`, the titles of the items to keep; every item by default. */
   cropItems?: readonly string[];
@@ -84,8 +83,47 @@ async function selectRows(page: Page, rows: number) {
 /** The site theme's grid geometry in CSS pixels: the column header, one row, the row numbers. */
 const HEADER_HEIGHT = 32;
 const ROW_HEIGHT = 28;
-/** The left edge of the Orders columns A to E inside the grid, then the right edge of E. */
-const ORDERS_COLUMN_EDGES = [48, 144, 248, 376, 456, 568] as const;
+/** The left edge of the Orders columns A to F inside the grid, then the right edge of F. */
+const ORDERS_COLUMN_EDGES = [48, 144, 248, 376, 456, 568, 668] as const;
+
+/** A block of grid cells, rows and columns from 0, inclusive. */
+interface CellBlock {
+  readonly top: number;
+  readonly left: number;
+  readonly bottom: number;
+  readonly right: number;
+}
+
+/** A box in the stage page's CSS pixels. */
+interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * A highlight card's crop: the box around whole parts of the view, fitted
+ * into the card's 2:1 frame with a margin of the background behind them.
+ * The capture fails when the box cuts through any visible text, control or
+ * Orders cell, so a card never shows a word or a button cut off.
+ */
+interface CardCrop {
+  /** The elements the card shows; each selector matches one element. */
+  readonly parts: readonly string[];
+  /** Orders cells the card shows as well. */
+  readonly cells?: CellBlock;
+  /** An area of the stage the card shows as well, for a grid with other column widths. */
+  readonly area?: Box;
+  /** Parts of the view hidden first, so the box does not cut them. */
+  readonly hide?: readonly string[];
+  /** Long fields the box may cut through: their text must still show whole. */
+  readonly cutThrough?: readonly string[];
+  /** The stage size the view is laid out at, when not the shot's own. */
+  readonly stage?: ShotSize;
+  /** An element whose full width the card shows: a side panel, whose list markers hang at its edge. */
+  readonly across?: string;
+}
 
 /** A point in the grid element: the middle of a cell by its row and column from 0. */
 function cellPoint(row: number, col: number) {
@@ -117,17 +155,17 @@ const PAGE_SHOTS: readonly Shot[] = [
     crop: "items",
   },
   // The 0.7.0 Dashboards highlight: the Region slicer narrowed to APAC, and the
-  // PivotChart and pivot it filters, so the card does not repeat the hero.
+  // PivotChart and pivot it filters, so the card does not repeat the hero's KPI cards.
   {
     name: "dashboard-filtered",
     size: "dashboardRow",
     query: { sheet: "dashboard", ribbon: "compact" },
     crop: "items",
-    cropItems: ["Revenue by month", "Revenue by product"],
+    cropItems: ["Revenue by month", "Revenue by product", "Region"],
     steps: async (page) => {
+      // A slicer click selects only that value, as in Excel.
       const slicer = page.locator(".sheetwrite-dashboard-slicer");
-      for (const region of ["APAC", "Americas", "EMEA"])
-        await slicer.getByRole("button", { name: region, exact: true }).click();
+      await slicer.getByRole("button", { name: "APAC", exact: true }).click();
       await settle(page);
     },
   },
@@ -522,32 +560,83 @@ const SECTION_CROPS: Readonly<
 };
 
 /**
- * The 0.7.0 highlight cards: a shot's view, cropped to the panel or control
- * the card is about, so it reads at a card's width on any screen.
+ * The 0.7.0 highlight cards: in each shot's view, the whole parts the card is
+ * about, fitted into the card so they read at its width on any screen.
  */
-const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
-  "data-model": "panel",
-  sort: "panel",
-  "edit-links": "panel",
-  queries: "panel",
-  "version-history": "panel",
-  // The formula bar and the argument guide under it.
-  "formula-help": { x: 30, y: 100 },
-  // The compact ribbon's group menus and the open Number menu.
-  "compact-ribbon": { x: 160, y: 0 },
-  // The Region column's filter dropdown: its value list with the row counts.
-  autofilter: { x: 120, y: 270 },
-  // The cut cells' moving border and the cell the paste would move them to.
-  "cut-paste": { x: 240, y: 140 },
-  // Each dialog from its tabs or its first group, without the window's edges.
-  "paste-special": { dialog: { x: 16, y: 0 } },
-  "data-validation": { dialog: { x: 12, y: 44 } },
-  "format-cells": { dialog: { x: 12, y: 44 } },
-  "keyboard-shortcuts": { dialog: { x: 12, y: 44 } },
-  // The cell editor and the AutoComplete list of the entries it matches.
-  autocomplete: { x: 40, y: 140 },
-  // The formula bar's ghost text over the March column it sums, faintly filled.
-  "formula-assist": { x: 40, y: 64 },
+const PANEL = ".sheetwrite-panel-host";
+const PANEL_HEADER = ".sheetwrite-panel-header";
+const CARD_CROPS: Readonly<Record<string, CardCrop>> = {
+  // The panel's title and the tables in the model.
+  "data-model": {
+    parts: [PANEL_HEADER, ".sheetwrite-panel-body > .sheetwrite-panel-section >> nth=0"],
+    across: PANEL,
+  },
+  // The panel's title, the range and its header row choice.
+  sort: {
+    parts: [PANEL_HEADER, ".sheetwrite-panel-body .sheetwrite-panel-check >> nth=0"],
+    across: PANEL,
+  },
+  // The panel's title, Update All, and the linked workbook with its location and status.
+  "edit-links": {
+    parts: [PANEL_HEADER, ".sheetwrite-panel-body .sheetwrite-panel-note >> nth=1"],
+    across: PANEL,
+  },
+  // The panel's title, Refresh All, and the first saved query with its commands.
+  queries: { parts: [PANEL_HEADER, ".sheetwrite-query-row >> nth=0"], across: PANEL },
+  // The panel's title, Save a version, and the saved Quarter plan.
+  "version-history": { parts: [PANEL_HEADER, ".history-version >> nth=0"], across: PANEL },
+  // The formula bar and the argument guide under it, laid out narrower so the
+  // guide's signature wraps instead of running past the card.
+  "formula-help": {
+    parts: [".sheetwrite-shell-formula", ".sheetwrite-formula-guide"],
+    stage: "sectionTablet",
+  },
+  // The compact ribbon's Font to Cells menus and the open Number menu, over
+  // an empty sheet.
+  "compact-ribbon": {
+    parts: [
+      ".sheetwrite-ribbon-group >> nth=2",
+      ".sheetwrite-ribbon-group >> nth=5",
+      ".sheetwrite-ribbon-group-popup",
+    ],
+    hide: [".sheetwrite-shell-formula-row", ".sheetwrite-shell-formula", ".sheetwrite-shell-grid"],
+  },
+  // The Region filter's search box and its values with their row counts.
+  autofilter: {
+    parts: [".sheetwrite-autofilter-search", ".sheetwrite-autofilter-list [role=option] >> nth=4"],
+  },
+  // The cut cells' moving border and the cell beside them the paste moves them to.
+  "cut-paste": { parts: [], cells: { top: 0, left: 2, bottom: 5, right: 5 } },
+  // Each dialog's tabs or first group.
+  "paste-special": {
+    parts: [".sheetwrite-dialog-title", ".sheetwrite-paste-special-group >> nth=0"],
+  },
+  "data-validation": {
+    parts: [
+      ".sheetwrite-data-validation-tabs",
+      ".sheetwrite-dialog-choice:has-text('In-cell dropdown')",
+    ],
+  },
+  "format-cells": {
+    parts: [".sheetwrite-format-cells-tabs", ".sheetwrite-format-cells-panel select >> nth=0"],
+  },
+  // The search box that takes keys, and the Copy and Cut commands with their keys.
+  "keyboard-shortcuts": {
+    parts: [
+      ".sheetwrite-keys-search",
+      ".sheetwrite-keys-table tr[data-action='cut'] .sheetwrite-keys-add",
+    ],
+    hide: [".sheetwrite-keys-filter", ".sheetwrite-keys-count", ".sheetwrite-keys-hint"],
+  },
+  // The cell editor with the rest of Americas selected, among the Region entries it matches.
+  autocomplete: { parts: [], cells: { top: 0, left: 0, bottom: 4, right: 2 } },
+  // The formula bar's ghost text over the first rows of the March column it sums,
+  // faintly filled: the assist grid's columns A to D under the formula bar.
+  "formula-assist": {
+    parts: [],
+    area: { x: 0, y: 67, width: 420, height: 178 },
+    cutThrough: [".sheetwrite-shell-formula"],
+  },
 };
 
 const SHOTS: readonly Shot[] = [
@@ -582,7 +671,7 @@ const SHOTS: readonly Shot[] = [
             ...shot,
             name: `card-${shot.name}`,
             size: "highlight" as const,
-            stage: shot.size,
+            stage: crop.stage ?? shot.size,
             crop,
           },
         ];
@@ -639,28 +728,269 @@ async function settle(page: Page) {
   await page.waitForTimeout(300);
 }
 
-/** The clip of a `panel` or `{ x, y }` crop: the shot's size, from the panel's top-right corner or the point. */
-async function cropBox(
-  page: Page,
-  crop: "panel" | ShotPoint | { readonly dialog: ShotPoint },
-  size: ShotSize,
-) {
+/** The clip of a `{ x, y }` crop: the shot's size from that point of the stage. */
+async function cropBox(page: Page, crop: ShotPoint, size: ShotSize): Promise<Box> {
   const { width, height } = SHOT_SIZES[size];
-  if (typeof crop === "object" && "dialog" in crop) {
-    const box = await page.locator(".sheetwrite-dialog[open]").boundingBox();
-    if (box === null) throw new Error("No grid dialog is open to crop to");
-    return { x: box.x + crop.dialog.x, y: box.y + crop.dialog.y, width, height };
+  const stage = await stageBox(page);
+  return { x: stage.x + crop.x, y: stage.y + crop.y, width, height };
+}
+
+async function stageBox(page: Page): Promise<Box> {
+  const box = await page.locator("#stage").boundingBox();
+  if (box === null) throw new Error("The stage is not on the page");
+  return box;
+}
+
+/** The background around a card's parts, in the card's own pixels. */
+const CARD_MARGIN = 12;
+/** A card draws its parts at most this much larger than the app does… */
+const CARD_MAX_SCALE = 1.2;
+/** …and at least this large: smaller, their text is too small to read on the card. */
+const CARD_MIN_SCALE = 0.7;
+/** A card's parts are captured at this many times the card's scale, then fitted. */
+const CARD_OVERSAMPLING = 2;
+/** Orders rows the cut check looks at: more than any stage shows. */
+const ORDERS_ROWS_CHECKED = 40;
+/** How far past an edge a box may reach and still count as inside: subpixel layout. */
+const EDGE_TOLERANCE = 0.5;
+
+function unionBox(boxes: readonly Box[]): Box {
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/** The box of a block of Orders cells, from the site theme's grid geometry. */
+async function ordersCellsBox(page: Page, cells: CellBlock): Promise<Box> {
+  const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
+  if (grid === null) throw new Error("The grid is not on the page");
+  const left = ORDERS_COLUMN_EDGES[cells.left];
+  const right = ORDERS_COLUMN_EDGES[cells.right + 1];
+  if (left === undefined || right === undefined) {
+    throw new Error(`Orders has no columns ${cells.left} to ${cells.right}`);
   }
-  const box = await page
-    .locator(crop === "panel" ? ".sheetwrite-panel-host" : "#stage")
-    .boundingBox();
-  if (box === null)
-    throw new Error(
-      crop === "panel" ? "No side panel is open to crop to" : "The stage is not on the page",
+  return {
+    x: grid.x + left,
+    y: grid.y + HEADER_HEIGHT + cells.top * ROW_HEIGHT,
+    width: right - left,
+    height: (cells.bottom - cells.top + 1) * ROW_HEIGHT,
+  };
+}
+
+/** The box around a card's parts, cells and area. */
+async function cardBox(page: Page, crop: CardCrop): Promise<Box> {
+  const boxes: Box[] = [];
+  for (const selector of crop.parts) {
+    const part = page.locator(selector);
+    const count = await part.count();
+    if (count !== 1) throw new Error(`The card part ${selector} matches ${count} elements`);
+    const box = await part.boundingBox();
+    if (box === null) throw new Error(`The card part ${selector} is not shown`);
+    boxes.push(box);
+  }
+  if (crop.cells !== undefined) boxes.push(await ordersCellsBox(page, crop.cells));
+  if (crop.area !== undefined) {
+    const stage = await stageBox(page);
+    boxes.push({ ...crop.area, x: stage.x + crop.area.x, y: stage.y + crop.area.y });
+  }
+  if (boxes.length === 0) throw new Error("A card crop needs parts, cells or an area");
+  const box = unionBox(boxes);
+  if (crop.across === undefined) return box;
+  const span = await page.locator(crop.across).boundingBox();
+  if (span === null) throw new Error(`The card's span ${crop.across} is not shown`);
+  return { ...box, x: span.x, width: span.width };
+}
+
+/** Every Orders cell, column header and row number, labelled, for the cut check. */
+async function ordersCellBoxes(page: Page): Promise<(Box & { label: string })[]> {
+  const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
+  if (grid === null) throw new Error("The grid is not on the page");
+  const [rowNumbersRight = 0, ...edges] = ORDERS_COLUMN_EDGES;
+  const boxes: (Box & { label: string })[] = [];
+  let left = rowNumbersRight;
+  for (const [col, right] of edges.entries()) {
+    const letter = String.fromCharCode("A".charCodeAt(0) + col);
+    const x = grid.x + left;
+    const width = right - left;
+    boxes.push({ x, y: grid.y, width, height: HEADER_HEIGHT, label: `column ${letter}` });
+    for (let row = 0; row < ORDERS_ROWS_CHECKED; row += 1) {
+      const y = grid.y + HEADER_HEIGHT + row * ROW_HEIGHT;
+      boxes.push({ x, y, width, height: ROW_HEIGHT, label: `${letter}${row + 1}` });
+      if (col === 0) {
+        boxes.push({
+          x: grid.x,
+          y,
+          width: rowNumbersRight,
+          height: ROW_HEIGHT,
+          label: `row ${row + 1}`,
+        });
+      }
+    }
+    left = right;
+  }
+  return boxes;
+}
+
+/**
+ * What `box` cuts through: each visible text, control and, on the Orders
+ * sheet, each grid cell that is partly inside it. A thing covered at that
+ * point (by a dialog or a menu) is not cut; nor is a `cutThrough` field,
+ * though its own text is.
+ */
+async function cutByBox(
+  page: Page,
+  box: Box,
+  cutThrough: readonly string[],
+  cells: readonly (Box & { label: string })[],
+): Promise<string[]> {
+  return page.evaluate(
+    ({ box, cutThrough, cells, tolerance }) => {
+      const right = box.x + box.width;
+      const bottom = box.y + box.height;
+      const isCut = (rect: DOMRect) =>
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.left < right - tolerance &&
+        rect.right > box.x + tolerance &&
+        rect.top < bottom - tolerance &&
+        rect.bottom > box.y + tolerance &&
+        (rect.left < box.x - tolerance ||
+          rect.right > right + tolerance ||
+          rect.top < box.y - tolerance ||
+          rect.bottom > bottom + tolerance);
+      // The element on top where `rect` meets the box: tells a shown thing from a covered one.
+      const topmostInside = (rect: DOMRect) =>
+        document.elementFromPoint(
+          (Math.max(rect.left, box.x) + Math.min(rect.right, right)) / 2,
+          (Math.max(rect.top, box.y) + Math.min(rect.bottom, bottom)) / 2,
+        );
+      const exempt = cutThrough.flatMap((selector) => [...document.querySelectorAll(selector)]);
+      const cut: string[] = [];
+      // Hidden text and fields: screen-reader-only (a 1 px box clipped out of
+      // sight) or hidden with visibility, as the card's `hide` does.
+      const isVisuallyHidden = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        return (
+          rect.width <= 1 || rect.height <= 1 || getComputedStyle(element).visibility !== "visible"
+        );
+      };
+
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const text = node.textContent?.trim();
+        const owner = node.parentElement;
+        if (!text || owner === null || isVisuallyHidden(owner)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const shownAndCut = [...range.getClientRects()].some((rect) => {
+          if (!isCut(rect)) return false;
+          const hit = topmostInside(rect);
+          return hit !== null && (owner.contains(hit) || hit.contains(owner));
+        });
+        if (shownAndCut) cut.push(`"${text.slice(0, 40)}"`);
+      }
+
+      const controls = "button, input, select, textarea, [role=button], [role=tab], [role=option]";
+      for (const control of document.querySelectorAll(controls)) {
+        if (exempt.some((field) => field.contains(control)) || isVisuallyHidden(control)) continue;
+        const rect = control.getBoundingClientRect();
+        if (!isCut(rect)) continue;
+        const hit = topmostInside(rect);
+        if (hit !== null && (control.contains(hit) || hit.contains(control))) {
+          const name = `${control.tagName.toLowerCase()}.${[...control.classList].join(".")}`;
+          cut.push(`<${name}> ${control.textContent?.trim().slice(0, 30) ?? ""}`);
+        }
+      }
+
+      for (const cell of cells) {
+        const rect = DOMRect.fromRect(cell);
+        if (!isCut(rect)) continue;
+        // The grid draws its cells on a canvas under transparent overlay
+        // layers; a cell shows unless something with a background (a menu,
+        // a dialog, a panel) is on top of it there.
+        const hit = topmostInside(rect);
+        const grid = hit?.closest(".sheetwrite-shell-grid");
+        let covered = hit === null || grid === null || grid === undefined;
+        for (
+          let node = hit;
+          !covered && node !== null && node !== grid;
+          node = node.parentElement
+        ) {
+          const background = getComputedStyle(node).backgroundColor;
+          covered = background !== "rgba(0, 0, 0, 0)" && background !== "transparent";
+        }
+        if (!covered) cut.push(`cell ${cell.label}`);
+      }
+      return cut;
+    },
+    { box, cutThrough, cells, tolerance: EDGE_TOLERANCE },
+  );
+}
+
+/** The background the nearest painted ancestor of `selector`'s element shows. */
+async function backgroundBehind(page: Page, selector: string): Promise<string> {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate((element) => {
+      for (let node = element.parentElement; node !== null; node = node.parentElement) {
+        const color = getComputedStyle(node).backgroundColor;
+        if (color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+      }
+      return getComputedStyle(document.body).backgroundColor;
+    });
+}
+
+/**
+ * Writes a highlight card: the parts' box, checked to cut nothing, fitted
+ * into the card's frame on the background behind them.
+ */
+async function captureCard(
+  browser: Browser,
+  page: Page,
+  shot: Shot,
+  crop: CardCrop,
+  scale: number,
+  png: string,
+) {
+  for (const selector of crop.hide ?? []) {
+    await page.locator(selector).evaluateAll((elements) => {
+      for (const element of elements) (element as HTMLElement).style.visibility = "hidden";
+    });
+  }
+  const box = await cardBox(page, crop);
+  const cells = shot.query.sheet === "orders" ? await ordersCellBoxes(page) : [];
+  const cut = await cutByBox(page, box, crop.cutThrough ?? [], cells);
+  if (cut.length > 0) throw new Error(`${shot.name} crops through ${cut.join(", ")}`);
+
+  const card = SHOT_SIZES.highlight;
+  const fit = Math.min(
+    (card.width - 2 * CARD_MARGIN) / box.width,
+    (card.height - 2 * CARD_MARGIN) / box.height,
+    CARD_MAX_SCALE,
+  );
+  if (fit < CARD_MIN_SCALE) {
+    throw new Error(`${shot.name} fits its card only at ${fit.toFixed(2)}×; show fewer parts`);
+  }
+  const background = await backgroundBehind(page, crop.parts[0] ?? ".sheetwrite-shell-grid");
+  const image = await page.screenshot({ clip: box, animations: "disabled" });
+  const frame = await browser.newPage({ viewport: card, deviceScaleFactor: scale });
+  try {
+    await frame.setContent(
+      `<body style="margin:0;display:grid;place-items:center;width:${card.width}px;height:${card.height}px;background:${background}">` +
+        `<img alt="" style="width:${box.width * fit}px;height:${box.height * fit}px" src="data:image/png;base64,${image.toString("base64")}"></body>`,
     );
-  return crop === "panel"
-    ? { x: box.x + box.width - width, y: box.y, width, height }
-    : { x: box.x + crop.x, y: box.y + crop.y, width, height };
+    await frame.locator("img").evaluate((element) => (element as HTMLImageElement).decode());
+    await frame.screenshot({ path: png });
+  } finally {
+    await frame.close();
+  }
+}
+
+function isCardCrop(crop: Shot["crop"]): crop is CardCrop {
+  return typeof crop === "object" && "parts" in crop;
 }
 
 async function capture(shot: Shot, origin: string, scratch: string) {
@@ -675,7 +1005,7 @@ async function capture(shot: Shot, origin: string, scratch: string) {
       for (const scale of SCALES) {
         const page = await browser.newPage({
           viewport: { width, height },
-          deviceScaleFactor: scale,
+          deviceScaleFactor: isCardCrop(shot.crop) ? scale * CARD_OVERSAMPLING : scale,
           colorScheme: theme,
           locale: "en-US",
           timezoneId: "UTC",
@@ -716,6 +1046,8 @@ async function capture(shot: Shot, origin: string, scratch: string) {
             throw new Error(`${shot.name} crops to ${clip.width}×${clip.height}, not its size`);
           }
           await page.screenshot({ path: png, clip, animations: "disabled" });
+        } else if (isCardCrop(shot.crop)) {
+          await captureCard(browser, page, shot, shot.crop, scale, png);
         } else if (shot.crop !== undefined) {
           const clip = await cropBox(page, shot.crop, shot.size);
           await page.screenshot({ path: png, clip, animations: "disabled" });

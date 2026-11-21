@@ -36,7 +36,8 @@ const workbook: Workbook = {
     {
       id: "sales",
       name: "Sales",
-      rowCount: 3,
+      // Three products and one free row for the total below.
+      rowCount: 4,
       columns: [
         { key: "product", header: "Product", width: 180, type: "text" },
         { key: "amount", header: "Amount", width: 100, type: "number" },
@@ -59,25 +60,26 @@ grid.on("change", ({ transaction }) => {
 });
 ```
 
-`initSheetwrite()` is re-entrant. Call it before `createGrid`; concurrent calls share initialization and a failed call can be retried. Destroy the returned grid when its host is permanently removed.
+Call `initSheetwrite()` before `createGrid`. You can call it more than once: calls at the same time share one start, and a failed start can be tried again. Destroy the returned grid when its host is permanently removed.
 
 </Step>
 <Step title="Add a formula" titleSize="h2">
 
-A formula is a cell value with `kind: "formula"`. The engine calculates it at once, and dependent cells follow every later edit.
+A formula is a cell value with `kind: "formula"`. The engine calculates it at once, and dependent cells follow every later edit. This step writes a total in row 4, below the three products:
 
 ```ts prelude="core" partial="continues the complete example above" title="Add a total"
 grid.applyTransaction({
   patches: [
+    { op: "set", addr: { sheet: "sales", row: 3, col: 0 }, value: { kind: "literal", value: "Total" } },
     {
       op: "set",
-      addr: { sheet: "sales", row: 2, col: 1 },
-      value: { kind: "formula", src: "=SUM(B1:B2)" },
+      addr: { sheet: "sales", row: 3, col: 1 },
+      value: { kind: "formula", src: "=SUM(B1:B3)" },
     },
   ],
 });
 
-console.log(grid.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+console.log(grid.store.getCell({ sheet: "sales", row: 3, col: 1 }).resolved); // 25
 ```
 
 Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](/docs/features/formulas/analysis-formulas/) before you create the grid.
@@ -92,7 +94,7 @@ const saved = JSON.stringify(grid.exportSnapshot());
 grid.destroy();
 
 const reopened = createGridFromSnapshot(host, JSON.parse(saved));
-console.log(reopened.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+console.log(reopened.store.getCell({ sheet: "sales", row: 3, col: 1 }).resolved); // 25
 ```
 
 For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](/docs/features/data/persistence/) explains the adapter and the offline queue.

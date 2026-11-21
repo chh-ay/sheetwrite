@@ -40,6 +40,7 @@ export function DemoGrid(props: {
       data-sized={props.rows !== undefined}
       data-testid={props.testId}
       ref={props.host}
+      role="group"
       style={
         props.rows === undefined
           ? undefined

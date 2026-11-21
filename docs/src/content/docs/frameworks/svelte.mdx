@@ -8,7 +8,7 @@ in the browser.
 
 <dl class="sw-fw-facts">
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Component</dt><dd><code>Sheetwrite</code></dd></div>
+<div><dt>Components</dt><dd><code>Sheetwrite</code>, <code>SheetwriteGrid</code></dd></div>
 <div><dt>Grid access</dt><dd><code>bind:grid</code> and <code>onReady</code></dd></div>
 <div><dt>Change events</dt><dd><code>onGridChange</code> prop</dd></div>
 </dl>
@@ -46,7 +46,7 @@ adapter's camel-case props.
   }
 
   let { columns, rows, save, onReady }: Props = $props();
-  let grid: Grid | undefined;
+  let grid = $state<Grid | undefined>();
   const handleGridChange = (event: ChangeEvent) => save(event.transaction);
 </script>
 

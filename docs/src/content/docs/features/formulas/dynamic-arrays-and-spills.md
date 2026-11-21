@@ -149,8 +149,11 @@ describes that formula text as [not editable](https://support.microsoft.com/en-u
 
 ### Sort and filter
 
-Sort keys and filters use displayed cell values, including every projected spill result.
-Single-key and multi-key sorts keep row order stable when the keys are equal. Filtering
+Sort commands move the cells, as Excel's Sort does; see [Sort cells in place](/docs/features/data/data-operations/#sort-cells-in-place).
+An in-place sort that would move only part of a spill range is refused and changes nothing.
+
+A view sort and filters use displayed cell values, including every projected spill result.
+Single-key and multi-key view sorts keep row order stable when the keys are equal. Filtering
 selects the displayed rows before sorting them. These view changes leave the anchor,
 spill ownership, and formula references unchanged and support undo and redo.
 

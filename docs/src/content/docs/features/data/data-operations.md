@@ -50,9 +50,9 @@ console.log(grid.aggregate(1, "sum")); // 195
 </details>
 
 Sheetwrite can sort, filter, hide, group, aggregate, import, and export the active
-sheet. An in-place sort rewrites the cells of a range. Display views sort and
-filter without rewriting the stored row data: the store keeps a row-order
-permutation/subset and the renderer reads through it.
+sheet. An in-place sort rewrites the cells of a range. A view sorts and filters
+the displayed rows and does not change the stored cells: the store keeps a list
+of which data rows show, in which order, and the grid draws from that list.
 
 ## Sort cells in place
 
@@ -160,7 +160,7 @@ grid.setGroupCollapsed(10, true);
 | `groupRows` / `ungroupRows` | `groupRows(start, end)` / `ungroupRows(start, end)` | Create/remove an inclusive data-row group. |
 | `setGroupCollapsed` | `setGroupCollapsed(start, collapsed): void` | Collapse or expand the group starting at `start`. |
 | `rowGroups` | `rowGroups(): readonly RowGroup[]` | Current row-group definitions. |
-| `clearView` | `clearView(): void` | Clears sort/filter state. Hidden rows and row groups are preserved. |
+| `clearView` | `clearView(): void` | Clears the view sort and the filters. Hidden rows and row groups stay. It does not undo an in-place sort. |
 
 `clearView()` deliberately does **not** unhide rows or expand row groups. This
 matches spreadsheet behavior: clearing a filter removes the query, but explicit
@@ -173,8 +173,8 @@ row-to-cell mapping change while a view is active:
 - **Merged cells** are not drawn (the layout reports no merges under a view).
 - **Drag-to-fill** fills the rows a filter shows, and under a sort the rows in the order they show; rows hidden by hand or by a collapsed group fill too, as in Excel. See [Resize, merge and fill](/docs/features/grid/resize-merge-and-fill/).
 
-Call `clearView()` to remove sort/filter state; also show hidden rows / expand
-row groups if you need the full natural data order.
+Call `clearView()` to remove the view sort and the filters. To see every row in
+data-row order, also show hidden rows and expand row groups.
 
 ## Aggregate
 
@@ -192,7 +192,7 @@ const rows = grid.aggregate(0, "count");
 
 ## Frozen panes and zoom
 
-Frozen panes and zoom are view geometry, not data mutations:
+Frozen panes freeze rows and columns, as Excel's Freeze Panes does. Frozen panes and zoom are view geometry, not data mutations:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.setFrozen(1, 1); // pin first view row and first column

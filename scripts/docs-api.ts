@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, normalize } from "node:path";
@@ -29,6 +30,7 @@ import {
   PACKAGE_DIRECTORIES,
   posix,
   REQUIRED_SEARCH_TARGETS,
+  repositoryRoot,
 } from "./docs-shared.js";
 import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
@@ -42,6 +44,33 @@ function packageSourcePath(packageName: string, source: string): string {
   if (packageDirectory === undefined) return source;
   const normalized = posix(normalize(join(packageDirectory, file)));
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
+}
+
+/** Build output: files the build writes, which the repository does not hold. */
+const BUILD_OUTPUT = /^packages\/[^/]+\/(?:dist|pkg|pkg-history)\//;
+
+/**
+ * The repository file for a declaration that resolved to build output. A
+ * re-export from another workspace package resolves to that package's
+ * `dist/*.d.ts`; its source is the same path under `src/`, at the line that
+ * declares `name`. Files that only the build writes, such as wasm-bindgen's
+ * `pkg/*.d.ts`, have no repository copy and stay as they are.
+ */
+function repositorySourcePath(source: string, name: string): string {
+  const file = source.split("#")[0] ?? source;
+  const built = /^(packages\/[^/]+)\/dist\/(.+)\.d\.[cm]?ts$/.exec(file);
+  if (built === null) return source;
+  const sourceFile = [".ts", ".tsx"]
+    .map((extension) => `${built[1]}/src/${built[2]}${extension}`)
+    .find((candidate) => existsSync(join(repositoryRoot, candidate)));
+  if (sourceFile === undefined) return source;
+  const declaration = new RegExp(
+    `^export\\s+(?:declare\\s+)?(?:abstract\\s+)?(?:interface|type|class|function|const|let|enum)\\s+${name}\\b`,
+  );
+  const line = readFileSync(join(repositoryRoot, sourceFile), "utf8")
+    .split("\n")
+    .findIndex((text) => declaration.test(text));
+  return line < 0 ? sourceFile : `${sourceFile}#L${line + 1}`;
 }
 
 interface DeclarationMember {
@@ -1152,7 +1181,7 @@ export async function renderSymbolPage(
   consumers: ConsumerIndex = EMPTY_CONSUMER_INDEX,
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
-  const source = packageSourcePath(pkg.name, item.source);
+  const source = repositorySourcePath(packageSourcePath(pkg.name, item.source), item.name);
   const parts = documentationParts(
     item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.",
     pkg,
@@ -1261,8 +1290,11 @@ export async function renderSymbolPage(
   return `${body.join("\n").trimEnd()}\n`;
 }
 
-/** The metadata row linking a page's source file in the repository. */
+/** The metadata row linking a page's source file in the repository; build output has no link. */
 function sourceRow(source: string): string {
+  if (BUILD_OUTPUT.test(source)) {
+    return `<div><dt>Source</dt><dd><code>${html(source)}</code> (generated at build time)</dd></div>`;
+  }
   return `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`;
 }
 

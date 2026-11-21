@@ -183,7 +183,7 @@ Fonts on import: only fonts other than the workbook default become a cell `fontF
 
 ## Edge cases and limits
 
-- `wrap` applies to text, not to numbers. A number that does not fit its cell paints as `#` characters.
+- `wrap` applies to text, not to numbers. A number in General that does not fit its cell first takes fewer decimals, then scientific notation; see [Number formats](/docs/features/formatting/number-formats/). A number that still does not fit, or one in another format, paints as `#` characters.
 - A wrapped block that is taller than its cell starts at the top of the cell.
 - Text that does not wrap can spill past its cell: left-aligned text to the right, right-aligned text to the left, and centered text to both sides. Numbers never spill.
 - Native boolean values are centered unless `CellStyle.align` overrides it.

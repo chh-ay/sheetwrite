@@ -1,5 +1,5 @@
 // Section marks for the docs tabs' landing pages (Guides, API reference,
-// Formulas, Changelog): one 48-unit mark each, shown only in that page's
+// Formulas, Changelog): one mark each, shown only in that page's
 // header, so no other page carries their bytes. Colours are site tokens.
 import type { JSX } from "solid-js";
 
@@ -8,7 +8,9 @@ export type SectionMarkName = "guides" | "api" | "formulas" | "changelog";
 
 // Every mark draws on one grid: a 40-unit tile from 4 to 44, its picture
 // inside 12–36 on both axes so it sits on the tile's optical centre, and
-// 2-unit strokes (1.5 only for the formula grid's inner rules).
+// 2-unit strokes (1.5 only for the formula grid's inner rules). The viewBox
+// is the tile itself, so the tile's edge is the box's edge and lines up with
+// the title and text below it.
 const MARK_MARKUP: Readonly<Record<SectionMarkName, string>> = {
   guides: `<rect x="4" y="4" width="40" height="40" rx="10" style="fill:var(--sw-accent-soft)"/><path d="M13 12h12l6 6v18H13z" style="fill:var(--sw-surface-1);stroke:currentColor;stroke-width:2;stroke-linejoin:round"/><path d="M25 12v6h6M17 24h9M17 29h6" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round"/><path d="M27 31l3 3 5-6" style="fill:none;stroke:var(--sw-accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>`,
   api: `<rect x="4" y="4" width="40" height="40" rx="10" style="fill:var(--sw-info-soft)"/><path d="M19 15c-4 0-4 3-4 6s-2 3-3 3c1 0 3 0 3 3s0 6 4 6M29 15c4 0 4 3 4 6s2 3 3 3c-1 0-3 0-3 3s0 6-4 6" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round"/><circle cx="24" cy="24" r="3" style="fill:var(--sw-info)"/>`,
@@ -24,7 +26,7 @@ export function SectionMark(props: Readonly<{ name: SectionMarkName }>): JSX.Ele
       class="sw-section-mark"
       focusable="false"
       innerHTML={MARK_MARKUP[props.name]}
-      viewBox="0 0 48 48"
+      viewBox="4 4 40 40"
     />
   );
 }

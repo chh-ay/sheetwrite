@@ -13,11 +13,9 @@
   --sw-code-symbol-highlight: color-mix(in srgb, var(--sw-accent-soft) 70%, var(--sw-code-bg));
 }
 
-/* The tint reaches a little past the glyphs; the negative margin gives the
-   padding back, so no text moves. */
+/* The tint covers the glyphs only, with no padding, so it never reaches over
+   the next character (the comma after a function name). */
 .expressive-code .sw-code-popover__trigger {
-  margin-inline: calc(-1 * var(--sw-space-0-5));
-  padding-inline: var(--sw-space-0-5);
   border-radius: var(--sw-radius-xs);
   color: inherit;
   text-decoration: underline dotted transparent;
@@ -42,7 +40,7 @@
 }
 
 /* The open symbol and its other mentions in the same block share one tint;
-   the open one adds an accent edge. */
+   the open one adds a solid accent underline. */
 .expressive-code .sw-code-popover__trigger:hover,
 .expressive-code .sw-code-popover__trigger[data-popover-open="true"],
 .expressive-code .sw-code-popover__trigger[data-popover-related] {
@@ -50,15 +48,22 @@
   text-decoration-color: transparent;
 }
 
-.expressive-code .sw-code-popover__trigger[data-popover-open="true"] {
-  box-shadow: inset 0 0 0 var(--sw-border-width) var(--sw-accent);
-}
-
-/* An outline, not a shadow, so the ring stays visible in forced-colors mode. */
+.expressive-code .sw-code-popover__trigger[data-popover-open="true"],
 .expressive-code .sw-code-popover__trigger:focus-visible {
   background: var(--sw-code-symbol-highlight);
-  outline: var(--sw-focus-ring-width) solid var(--sw-accent);
-  outline-offset: var(--sw-border-width);
+  text-decoration-style: solid;
+  text-decoration-color: var(--sw-accent);
+}
+
+.expressive-code .sw-code-popover__trigger:focus-visible {
+  text-decoration-thickness: var(--sw-focus-ring-width);
+}
+
+/* Forced colors drop the tint, so keyboard focus there shows a ring. */
+@media (forced-colors: active) {
+  .expressive-code .sw-code-popover__trigger:focus-visible {
+    outline: var(--sw-focus-ring-width) solid Highlight;
+  }
 }
 
 /* Identifiers in generated declarations link to their API pages. */
@@ -81,12 +86,10 @@
   z-index: 1000;
   display: block;
   box-sizing: border-box;
-  /* Size to content: a short signature gets a small panel. Floating UI sets
-     the viewport clamp inline as the panel opens. */
+  /* Size to content: a short signature gets a small panel; the docs text
+     wraps at the cap, and a longer signature line scrolls inside it. */
   width: max-content;
-  /* Wide enough for a one-line signature such as
-     `interface SimpleColumn<Row extends Record<string, CellScalar>>`. */
-  max-width: min(44rem, calc(100vw - var(--sw-space-6)));
+  max-width: min(35rem, calc(100vw - var(--sw-space-6)));
   max-height: 30rem;
   overflow: auto;
   visibility: hidden;

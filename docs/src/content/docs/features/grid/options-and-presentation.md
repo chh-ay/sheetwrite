@@ -92,6 +92,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
 | `minColumns` | `number` | workbook width | Minimum rendered/store column count. A spreadsheet also adds empty columns to fill the host width; a `data-grid` shows only its own columns unless you set `minColumns`. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar. Omit it for no toolbar. See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/). |
+| `addons` | `SheetwriteAddonSettings` | `undefined` | Settings for this grid's add-ons, keyed by add-on name. Install the add-ons first with `initSheetwrite({ addons })`; a name that is not installed rejects. |
 
 ## Spreadsheet and data-grid presentation
 
