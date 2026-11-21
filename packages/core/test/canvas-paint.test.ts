@@ -7,6 +7,7 @@ import {
   layoutTextLines,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
+  sidewaysBlitSafe,
 } from "../src/canvas-paint.js";
 import { contrastRatio, parseRgbColor, relativeLuminance } from "../src/color-contrast.js";
 import { dateToSerial } from "../src/date-serial.js";
@@ -554,7 +555,7 @@ describe("scroll blit and damage-band integrity", () => {
     ...at,
   });
 
-  function runBlit(prev: Partial<Viewport>, next: Partial<Viewport>, dpr = 1) {
+  function runBlit(prev: Partial<Viewport>, next: Partial<Viewport>, dpr = 1, sidewaysSafe = true) {
     const ctx = makeRecordingCtx();
     const draws: unknown[][] = [];
     ctx.drawImage = (...args: unknown[]) => {
@@ -568,6 +569,7 @@ describe("scroll blit and damage-band integrity", () => {
       blitViewport(next),
       dpr,
       dpr,
+      sidewaysSafe,
     );
     return { damage, draws };
   }
@@ -592,6 +594,33 @@ describe("scroll blit and damage-band integrity", () => {
     expect(right.damage).toEqual({ x: 370, y: 0, w: 30, h: 300 });
     const left = runBlit({ scrollLeft: 130 }, { scrollLeft: 100 });
     expect(left.damage).toEqual({ x: 0, y: 0, w: 30, h: 300 });
+  });
+
+  it("repaints a sideways scroll in full when text can spill or a border shows", () => {
+    const layout = makeLayout(
+      ["A", "B", "C"].map((header) => ({ key: header, header, width: 100, type: "text" as const })),
+    );
+    const dense = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
+    expect(sidewaysBlitSafe(dense, layout)).toBe(true);
+    // Text beside an empty cell spills only as far as the painted window
+    // reaches, so shifted pixels need not match the next full repaint.
+    const values = Array.from(dense.values);
+    values[4] = null;
+    expect(sidewaysBlitSafe({ ...dense, values }, layout)).toBe(false);
+    // Not beside it when the empty cell's column is not the next one.
+    expect(sidewaysBlitSafe({ ...dense, cols: [0, 2, 4], values }, layout)).toBe(true);
+    const bordered = makeView(
+      new Uint32Array(9).fill(1),
+      [{}, { border: { all: { color: "#000000" } } }],
+      [0, 1, 2],
+    );
+    expect(sidewaysBlitSafe(bordered, layout)).toBe(false);
+
+    const sideways = runBlit({ scrollLeft: 100 }, { scrollLeft: 130 }, 1, false);
+    expect(sideways.damage).toBeUndefined();
+    expect(sideways.draws).toHaveLength(0);
+    const vertical = runBlit({ scrollTop: 100 }, { scrollTop: 103 }, 1, false);
+    expect(vertical.draws).toHaveLength(1);
   });
 
   it("paints only the cells and header labels inside a sideways strip", () => {

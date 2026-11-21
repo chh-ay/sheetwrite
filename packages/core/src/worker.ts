@@ -2,7 +2,7 @@
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
-import { blitScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { blitScroll, paintFrame, paintFreezeDivider, sidewaysBlitSafe } from "./canvas-paint.js";
 import { KIND_NUMBER, KIND_STRING, NO_STRING } from "./store/wire-tags.js";
 import type { CellScalar } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
@@ -112,6 +112,7 @@ interface WorkerRuntimeState {
   dpr: number;
   lastViewport: Viewport | null;
   lastDpr: number;
+  lastSidewaysSafe: boolean;
 }
 
 function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
@@ -198,6 +199,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
   const round = Math.round;
   state.viewport.scrollTop = round(state.viewport.scrollTop * state.dpr) / state.dpr;
   state.viewport.scrollLeft = round(state.viewport.scrollLeft * state.dpr) / state.dpr;
+  const sidewaysSafe = sidewaysBlitSafe(view, state.layout);
   const damage = blitScroll(
     state.ctx,
     state.canvas,
@@ -206,6 +208,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
     state.viewport,
     state.dpr,
     state.lastDpr,
+    state.lastSidewaysSafe && sidewaysSafe,
   );
   paintFrame(
     state.ctx,
@@ -219,6 +222,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
   );
   state.lastViewport = { ...state.viewport };
   state.lastDpr = state.dpr;
+  state.lastSidewaysSafe = sidewaysSafe;
   return true;
 }
 
@@ -286,6 +290,7 @@ export function createWorkerMessageHandler(
     dpr: 1,
     lastViewport: null,
     lastDpr: 1,
+    lastSidewaysSafe: false,
   };
 
   const acknowledgeFrame = (painted: boolean): void => {

@@ -1,4 +1,4 @@
-import { blitScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { blitScroll, paintFrame, paintFreezeDivider, sidewaysBlitSafe } from "./canvas-paint.js";
 import { SheetwriteError } from "./errors.js";
 import type {
   CellRenderer,
@@ -26,6 +26,7 @@ export class CanvasRenderer implements Renderer {
   private cssHeight = -1;
   private lastViewport: Viewport | null = null;
   private lastDpr = 1;
+  private lastSidewaysSafe = false;
 
   mount(host: HTMLElement, theme: Theme): void {
     this.theme = theme;
@@ -87,6 +88,7 @@ export class CanvasRenderer implements Renderer {
     const round = Math.round;
     this.viewport.scrollTop = round(this.viewport.scrollTop * this.dpr) / this.dpr;
     this.viewport.scrollLeft = round(this.viewport.scrollLeft * this.dpr) / this.dpr;
+    const sidewaysSafe = sidewaysBlitSafe(view, this.layout);
     const damage = blitScroll(
       this.ctx,
       this.canvas,
@@ -95,6 +97,7 @@ export class CanvasRenderer implements Renderer {
       this.viewport,
       this.dpr,
       this.lastDpr,
+      this.lastSidewaysSafe && sidewaysSafe,
     );
     paintFrame(
       this.ctx,
@@ -108,6 +111,7 @@ export class CanvasRenderer implements Renderer {
     );
     this.lastViewport = { ...this.viewport };
     this.lastDpr = this.dpr;
+    this.lastSidewaysSafe = sidewaysSafe;
   }
 
   paintPanes(panes: readonly PanePaint[], divider: { x: number | null; y: number | null }): void {

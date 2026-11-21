@@ -489,13 +489,43 @@ export interface PaintDamage {
   h: number;
 }
 
+/** Whether `value` is an empty cell, through which text spills. */
+function emptyValue(value: CellScalar | undefined): boolean {
+  return value === null || value === "" || value === undefined;
+}
+
+/**
+ * Whether a frame of `view` can be shifted sideways and still match a full
+ * repaint. Text spills only through the empty cells of the painted window, so
+ * a text cell beside an empty one may paint differently once the window has
+ * moved; and a cell border is a stroke across the cell edge, which a shift can
+ * leave a pixel apart from a fresh stroke. Such frames repaint in full.
+ */
+export function sidewaysBlitSafe(view: VisibleWindowView, layout: RenderLayout): boolean {
+  for (const style of view.styles) if (style.border) return false;
+  for (const col of view.cols) if (layout.columns[col]?.cellStyle?.border) return false;
+  const nCols = view.cols.length;
+  for (let index = 0; index < view.values.length; index++) {
+    const value = view.values[index];
+    if (typeof value !== "string" || value === "") continue;
+    const cj = index % nCols;
+    const col = view.cols[cj] ?? -1;
+    const leftSpill = cj > 0 && view.cols[cj - 1] === col - 1 && emptyValue(view.values[index - 1]);
+    const rightSpill =
+      cj < nCols - 1 && view.cols[cj + 1] === col + 1 && emptyValue(view.values[index + 1]);
+    if (leftSpill || rightSpill) return false;
+  }
+  return true;
+}
+
 /**
  * Shift the last frame's pixels by a scroll along one axis and return the
  * strip the scroll exposed, which is all the frame then has to paint. A
  * vertical scroll moves the body below the header; a sideways scroll moves
- * the header and the body right of the row gutter. `undefined` when nothing
- * can be reused: the first frame, changed content or size, a scroll on both
- * axes, or a shift of a fraction of a device pixel.
+ * the header and the body right of the row gutter, and only when
+ * `sidewaysSafe` ({@link sidewaysBlitSafe}) holds for both frames.
+ * `undefined` when nothing can be reused: the first frame, changed content or
+ * size, a scroll on both axes, or a shift of a fraction of a device pixel.
  */
 export function blitScroll(
   ctx: Ctx,
@@ -505,6 +535,7 @@ export function blitScroll(
   viewport: Viewport,
   dpr: number,
   lastDpr: number,
+  sidewaysSafe: boolean,
 ): PaintDamage | undefined {
   if (!prev) return undefined;
   if (prev.contentRevision === undefined || viewport.contentRevision === undefined)
@@ -515,6 +546,7 @@ export function blitScroll(
   const rowsMoved = prev.scrollTop !== viewport.scrollTop;
   const columnsMoved = prev.scrollLeft !== viewport.scrollLeft;
   if (rowsMoved === columnsMoved) return undefined;
+  if (columnsMoved && !sidewaysSafe) return undefined;
 
   // Blit only exact device-pixel shifts. A fractional shift would copy pixels
   // rounded to the nearest device pixel while the exposed strip repaints at
@@ -797,9 +829,10 @@ export function paintFrame(
     }
   }
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+  // Gridlines are filled one-pixel rectangles, not stroked lines: a long
+  // stroked line is not rasterized the same at every offset, so a line copied
+  // by a scroll blit could differ by a pixel from the line a full repaint draws.
+  ctx.fillStyle = theme.gridLine;
   for (let ri = 0; ri < nRows; ri++) {
     const row = view.rows.start + ri;
     const rowBottom =
@@ -819,28 +852,20 @@ export function paintFrame(
         const gapStart = Math.max(g, colX[merge.c0]! - scrollLeft + g);
         const gapEnd = Math.min(width, colX[merge.c1 + 1]! - scrollLeft + g);
         if (gapEnd <= cursorX || gapStart >= width) continue;
-        if (gapStart > cursorX) {
-          ctx.moveTo(cursorX, lineY);
-          ctx.lineTo(gapStart, lineY);
-        }
+        if (gapStart > cursorX) ctx.fillRect(cursorX, lineY - 0.5, gapStart - cursorX, 1);
 
         cursorX = Math.max(cursorX, gapEnd);
       }
     }
 
-    if (cursorX < width) {
-      ctx.moveTo(cursorX, lineY);
-      ctx.lineTo(width, lineY);
-    }
+    if (cursorX < width) ctx.fillRect(cursorX, lineY - 0.5, width - cursorX, 1);
   }
 
-  ctx.stroke();
   ctx.restore();
   state.lastFont = theme.font;
-  state.lastFill = theme.bg;
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.beginPath();
+  ctx.fillStyle = theme.gridLine;
+  state.lastFill = theme.gridLine;
   const appendVerticalGridline = (c: number, lineX: number): void => {
     if (lineX < g || lineX > width) return;
     const mergesByRow =
@@ -863,19 +888,13 @@ export function paintFrame(
           mergeTop + mergeRowSpanHeight(merge, view.rows.start, nRows, rowHeights, rowHeight),
         );
         if (gapEnd <= cursorY || gapStart >= height) continue;
-        if (gapStart > cursorY) {
-          ctx.moveTo(lineX, cursorY);
-          ctx.lineTo(lineX, gapStart);
-        }
+        if (gapStart > cursorY) ctx.fillRect(lineX - 0.5, cursorY, 1, gapStart - cursorY);
 
         cursorY = Math.max(cursorY, gapEnd);
       }
     }
 
-    if (cursorY < height) {
-      ctx.moveTo(lineX, cursorY);
-      ctx.lineTo(lineX, height);
-    }
+    if (cursorY < height) ctx.fillRect(lineX - 0.5, cursorY, 1, height - cursorY);
   };
 
   for (let cj = 0; cj < nCols; cj++) {
@@ -887,8 +906,6 @@ export function paintFrame(
     const c = view.cols[nCols - 1]! + 1;
     appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
-
-  ctx.stroke();
 
   if (clipTop < headerHeight) {
     const strip = { width, left: paintLeft, right: paintRight };
@@ -1273,12 +1290,8 @@ function paintHeader(
     ctx.restore();
   }
 
-  ctx.strokeStyle = theme.gridLine;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, h - 0.5);
-  ctx.lineTo(strip.width, h - 0.5);
-  ctx.stroke();
+  applyFill(ctx, state, theme.gridLine);
+  ctx.fillRect(0, h - 1, strip.width, 1);
 }
 
 export interface MergeRect {
