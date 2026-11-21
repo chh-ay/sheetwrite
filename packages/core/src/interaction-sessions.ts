@@ -1,5 +1,11 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
-import { cellAlign, filterButtonHitRect, filterTextRight, fontFor } from "./canvas-paint.js";
+import {
+  cellAlign,
+  cellPadding,
+  filterButtonHitRect,
+  filterTextRight,
+  fontFor,
+} from "./canvas-paint.js";
 import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellEntry } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
@@ -528,7 +534,7 @@ export class InteractionSessions {
    */
   private textBox(row: number, col: number, rect: EditRect): EditRect {
     return this.isAutoFilterHeader(row, col)
-      ? { ...rect, w: filterTextRight(rect) - rect.x }
+      ? { ...rect, w: filterTextRight(rect, this.deps.zoom()) - rect.x }
       : rect;
   }
 
@@ -970,6 +976,7 @@ export class InteractionSessions {
       font: fontFor(theme, style, this.deps.zoom()),
       color: style.color ?? theme.fg,
       decoration: lines.filter(Boolean).join(" ") || "none",
+      pad: cellPadding(this.deps.zoom()),
     };
   }
 
@@ -1335,6 +1342,7 @@ export class InteractionSessions {
           this.deps.contentTop(),
           this.deps.scroller.scrollLeft,
         ),
+        this.deps.zoom(),
       );
       const x = e.clientX - viewportRect.left;
       if (x >= hit.x && x <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
@@ -2199,6 +2207,7 @@ export class InteractionSessions {
         this.deps.contentTop(),
         this.deps.scroller.scrollLeft,
       ),
+      this.deps.zoom(),
     );
     const inside =
       x >= button.x && x <= button.x + button.w && y >= button.y && y <= button.y + button.h;
