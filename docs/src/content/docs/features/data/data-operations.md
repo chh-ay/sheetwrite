@@ -171,7 +171,7 @@ Because a view reorders or hides rows, two features that depend on a stable
 row-to-cell mapping are disabled while a view is active:
 
 - **Merged cells** are not drawn (the layout reports no merges under a view).
-- **Drag-to-fill** is unavailable (the fill handle is hidden).
+- **Drag-to-fill** is unavailable under a sort or a filter (the fill handle is hidden). With only rows hidden by hand or collapsed groups, the fill handle works and fills those rows too, as in Excel.
 
 Call `clearView()` to remove sort/filter state; also show hidden rows / expand
 row groups if you need the full natural data order.

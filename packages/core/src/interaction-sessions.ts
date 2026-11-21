@@ -174,6 +174,8 @@ interface InteractionDependencies {
   ) => { x: number; y: number; w: number; h: number };
   anchorCell: (row: number, col: number) => CellRef;
   toDataRow: (viewRow: number) => number;
+  /** The data rows view rows `first` to `last` span with the rows hidden by hand between them. */
+  rowSpan: (first: number, last: number) => { first: number; last: number } | null;
   clearSelection: () => void;
   emitSelection: () => void;
   scrollToCell: (addr: CellAddress) => void;
@@ -262,6 +264,7 @@ export class InteractionSessions {
       activeSheet: deps.activeSheet,
       sheet: deps.sheet,
       toDataRow: deps.toDataRow,
+      rowSpan: deps.rowSpan,
       readOnly: deps.readOnly,
       commit: deps.commit,
       undo: deps.undo,
@@ -1087,7 +1090,11 @@ export class InteractionSessions {
   }
 
   fillHandleScreen(contentTop: number, scrollLeft: number): { x: number; y: number } | null {
-    if (this.deps.loadable?.hasView(this.deps.activeSheet())) return null;
+    // A sort or a filter has no fill handle; rows hidden by hand fill with the
+    // rows around them, as in Excel.
+    const { sortKeys, filters } = this.deps.sheet();
+    const sortedOrFiltered = (sortKeys?.length ?? 0) > 0 || (filters?.length ?? 0) > 0;
+    if (sortedOrFiltered && this.deps.loadable?.hasView(this.deps.activeSheet())) return null;
     const src = this.fillSourceRect();
     if (!src) return null;
     const r = this.deps.screenRect(src.r1, src.c1, contentTop, scrollLeft);
@@ -2210,7 +2217,9 @@ export class InteractionSessions {
         : { ...rect, c0: this.deps.nextVisibleCol(rect.c0, -1) }
       : rect;
     const source = down ? { ...target, r1: target.r0 } : { ...target, c1: target.c0 };
-    this.fills.fill(source, target, { copy: true });
+    // With one cell, Ctrl+D and Ctrl+R copy the cell before it only, as in
+    // Excel; over a range they fill the rows hidden by hand in it too.
+    this.fills.fill(source, target, { copy: true }, false, !single);
     this.deps.scheduleRender();
   }
 

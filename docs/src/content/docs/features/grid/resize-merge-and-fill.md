@@ -101,6 +101,8 @@ A small fill handle sits at the bottom-right corner of the selection. Drag it **
 
 Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
 
+Rows hidden by hand (Hide Rows or a collapsed group) between the rows a fill covers fill too, and a series counts through them, as in Excel; the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R over a range all do this. With one cell selected, Ctrl/Cmd + D and Ctrl/Cmd + R copy only the cell before it. Under a sort or a filter the fill handle is hidden.
+
 While you drag, a tip beside the pointer shows the value the last cell will get, as in Excel, with Ctrl counted as you move. A cell that will get a formula shows no tip.
 
 Every new cell on screen also shows the value it will get, as faint text in the cell, so you see the whole series and catch a wrong pattern (a copy instead of a series, a step of 2) before you release. A cell that will get a formula shows nothing until it is written. Only the cells on screen are drawn, so a fill of 10,000 cells costs about half a millisecond per pointer move in Chromium. Esc ends the drag without filling, as in Excel.

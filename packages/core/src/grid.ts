@@ -979,6 +979,8 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      rowSpan: (first, last) => this.rowSpan(first, last),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
@@ -1140,6 +1142,7 @@ export class GridImpl implements Grid {
         this.screenRect(row, col, contentTop, scrollLeft),
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
+      rowSpan: (first, last) => this.rowSpan(first, last),
       clearSelection: () => this.clearSelection(),
       emitSelection: () => this.emitSelection(),
       scrollToCell: (addr) => this.scrollToCell(addr),
@@ -2021,6 +2024,32 @@ export class GridImpl implements Grid {
 
   private toViewRow(dataRow: number): number | null {
     return this.geometry.toViewRow(dataRow);
+  }
+
+  /**
+   * The data rows that view rows `first` to `last` span, with the rows hidden
+   * by hand (Hide Rows or a collapsed group) between them, as Excel's copy and
+   * fill take them. Null when a sort orders the view or a filter hides a row
+   * between them: then only the rows the view shows count, as in Excel.
+   */
+  private rowSpan(first: number, last: number): { first: number; last: number } | null {
+    const sheet = this.sheet();
+    if ((sheet.sortKeys?.length ?? 0) > 0) return null;
+    const start = this.toDataRow(first);
+    const end = this.toDataRow(last);
+    const gaps = end - start - (last - first);
+    if (gaps === 0) return { first: start, last: end };
+    const hidden = new Set<number>();
+    for (const row of sheet.hiddenRows ?? []) {
+      if (row > start && row < end) hidden.add(row);
+    }
+    for (const group of sheet.rowGroups ?? []) {
+      if (!group.collapsed) continue;
+      for (let row = Math.max(group.start, start + 1); row <= Math.min(group.end, end - 1); row++) {
+        hidden.add(row);
+      }
+    }
+    return hidden.size === gaps ? { first: start, last: end } : null;
   }
 
   /**

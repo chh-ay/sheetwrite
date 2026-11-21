@@ -45,6 +45,11 @@ export interface FillControllerDeps {
   activeSheet: () => SheetId;
   sheet: () => Sheet;
   toDataRow: (viewRow: number) => number;
+  /**
+   * The data rows view rows `first` to `last` span with the rows hidden by
+   * hand between them; null under a sort or a filter between them.
+   */
+  rowSpan: (first: number, last: number) => { first: number; last: number } | null;
   readOnly: () => boolean;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Undo the last local step. */
@@ -61,10 +66,25 @@ interface FillCell {
   readonly kind: "date" | "time" | null;
 }
 
-/** The source of a fill, read once: the selected rectangle and its cells, row by row. */
+/**
+ * The source of a fill, read once: the selected rectangle and its cells, row
+ * by row, and how its rows map to data rows.
+ */
 interface FillSource {
   readonly rect: SelRect;
   readonly cells: readonly FillCell[];
+  readonly dataRow: (row: number) => number;
+}
+
+/**
+ * A fill's source and target in the rows it covers: view rows, or data rows
+ * when rows hidden by hand lie among them (`hand`), which Excel fills too.
+ */
+interface FillRows {
+  readonly source: SelRect;
+  readonly target: SelRect;
+  readonly dataRow: (row: number) => number;
+  readonly hand: boolean;
 }
 
 /** A finished fill that Auto Fill Options can still redo. */
@@ -103,8 +123,17 @@ export class FillController {
   private readonly deps: FillControllerDeps;
   /** The source of the fill handle's drag, read when the drag starts. */
   private dragSource: FillSource | null = null;
-  /** The fill the dragged handle would write now: the new cells and their plan. */
-  private dragFill: { readonly output: SelRect; readonly plan: FillPlan } | null = null;
+  /** The drag's source in data rows, with the rows hidden by hand in it; read when needed. */
+  private handSource: FillSource | null = null;
+  /**
+   * The fill the dragged handle would write now: the new view cells, their
+   * plan, and the plan's row for a view row.
+   */
+  private dragFill: {
+    readonly output: SelRect;
+    readonly plan: FillPlan;
+    readonly row: (viewRow: number) => number;
+  } | null = null;
   private finished: FinishedFill | null = null;
   /** True while this controller commits or undoes, so its own changes keep the button. */
   private changing = false;
@@ -115,11 +144,13 @@ export class FillController {
 
   /** Read the source of a fill-handle drag once, so each pointer move only plans. */
   beginDrag(source: SelRect): void {
-    this.dragSource = this.read(source);
+    this.dragSource = this.read(source, this.deps.toDataRow);
+    this.handSource = null;
   }
 
   endDrag(): void {
     this.dragSource = null;
+    this.handSource = null;
     this.dragFill = null;
   }
 
@@ -129,19 +160,22 @@ export class FillController {
    * null when the drag adds no cells or that cell gets a formula.
    */
   drag(target: SelRect, options: FillOptions): string | null {
-    const source = this.dragSource;
-    const output = source ? outputOf(source.rect, target) : null;
-    if (!source || !output) {
+    const dragged = this.dragSource;
+    const output = dragged ? outputOf(dragged.rect, target) : null;
+    if (!dragged || !output) {
       this.dragFill = null;
       return null;
     }
+    const rows = this.rows(dragged.rect, target);
+    const source = rows.hand ? (this.handSource ??= this.read(rows.source, rows.dataRow)) : dragged;
     const vertical = output.c0 === source.rect.c0 && output.c1 === source.rect.c1;
     const plan = this.plan(source, vertical, options);
-    this.dragFill = { output, plan };
+    this.dragFill = { output, plan, row: rows.hand ? this.deps.toDataRow : (row) => row };
     // The far end of the fill, in its last row or column.
-    const row = vertical && output.r0 < source.rect.r0 ? output.r0 : output.r1;
-    const col = !vertical && output.c0 < source.rect.c0 ? output.c0 : output.c1;
-    return this.preview(row, col)?.text ?? null;
+    const end = outputOf(source.rect, rows.target) ?? output;
+    const row = vertical && end.r0 < source.rect.r0 ? end.r0 : end.r1;
+    const col = !vertical && end.c0 < source.rect.c0 ? end.c0 : end.c1;
+    return this.shown(plan, row, col)?.text ?? null;
   }
 
   /** The new cells of the dragged handle's fill, whose values show in place. */
@@ -156,8 +190,12 @@ export class FillController {
    */
   preview(row: number, col: number): { text: string; right: boolean } | null {
     const fill = this.dragFill;
-    if (!fill) return null;
-    const write = this.write(fill.plan, row, col);
+    return fill ? this.shown(fill.plan, fill.row(row), col) : null;
+  }
+
+  /** What cell (`row`, `col`) of `plan` will show; null for a formula. */
+  private shown(plan: FillPlan, row: number, col: number): { text: string; right: boolean } | null {
+    const write = this.write(plan, row, col);
     if (write.value.kind !== "literal") return null;
     const value = write.value.value;
     const align = write.style.align;
@@ -169,20 +207,29 @@ export class FillController {
 
   /**
    * Fill `target` from `source`. A fill-handle fill (`offerOptions`) keeps
-   * what Auto Fill Options needs to redo it. Returns whether it applied.
+   * what Auto Fill Options needs to redo it. Rows hidden by hand between the
+   * rows fill too, as in Excel, unless `throughHidden` is false. Returns
+   * whether it applied.
    */
-  fill(source: SelRect, target: SelRect, options: FillOptions = {}, offerOptions = false): boolean {
+  fill(
+    source: SelRect,
+    target: SelRect,
+    options: FillOptions = {},
+    offerOptions = false,
+    throughHidden = true,
+  ): boolean {
     if (this.deps.readOnly()) return false;
-    const dragged = this.dragSource;
+    const rows = this.rows(source, target, throughHidden);
+    const dragged = rows.hand ? this.handSource : this.dragSource;
     const read =
       dragged &&
-      dragged.rect.r0 === source.r0 &&
-      dragged.rect.c0 === source.c0 &&
-      dragged.rect.r1 === source.r1 &&
-      dragged.rect.c1 === source.c1
+      dragged.rect.r0 === rows.source.r0 &&
+      dragged.rect.c0 === rows.source.c0 &&
+      dragged.rect.r1 === rows.source.r1 &&
+      dragged.rect.c1 === rows.source.c1
         ? dragged
-        : this.read(source);
-    const applied = this.commit(read, target, options, null);
+        : this.read(rows.source, rows.dataRow);
+    const applied = this.commit(read, rows.target, options, null);
     this.finished =
       applied && offerOptions
         ? {
@@ -228,9 +275,10 @@ export class FillController {
     this.changing = true;
     try {
       this.deps.undo();
+      const rows = this.rows(finished.source, finished.target);
       const applied = this.commit(
-        this.read(finished.source),
-        finished.target,
+        this.read(rows.source, rows.dataRow),
+        rows.target,
         options,
         choice === "formats" || choice === "values" ? choice : null,
       );
@@ -251,16 +299,42 @@ export class FillController {
     this.finished = null;
   }
 
-  private read(rect: SelRect): FillSource {
+  /**
+   * `source` and `target` in the rows the fill covers. When rows hidden by
+   * hand lie between them, Excel fills them too, and the rectangles are then
+   * in data rows. Under a sort or a filter, and without `throughHidden`, the
+   * view rows.
+   */
+  private rows(source: SelRect, target: SelRect, throughHidden = true): FillRows {
+    const view = { source, target, dataRow: this.deps.toDataRow, hand: false };
+    const first = Math.min(source.r0, target.r0);
+    const last = Math.max(source.r1, target.r1);
+    const span = throughHidden ? this.deps.rowSpan(first, last) : null;
+    if (!span || span.last - span.first === last - first) return view;
+    const data = (rect: SelRect): SelRect => ({
+      ...rect,
+      r0: this.deps.toDataRow(rect.r0),
+      r1: this.deps.toDataRow(rect.r1),
+    });
+    return {
+      source: data(source),
+      target: data(target),
+      dataRow: (row) => row,
+      hand: true,
+    };
+  }
+
+  private read(rect: SelRect, dataRow: (row: number) => number): FillSource {
     const coordinates: Array<{ row: number; col: number }> = [];
     for (let row = rect.r0; row <= rect.r1; row++) {
       for (let col = rect.c0; col <= rect.c1; col++) {
-        coordinates.push({ row: this.deps.toDataRow(row), col });
+        coordinates.push({ row: dataRow(row), col });
       }
     }
     const columns = this.deps.sheet().columns;
     return {
       rect,
+      dataRow,
       cells: this.readCells(coordinates).map((cell, index) => ({
         ...cell,
         kind:
@@ -328,10 +402,13 @@ export class FillController {
       }
       series.set(line, detectFillSeries(lineCells, options));
     }
-    return { rect, vertical, at, series };
+    return { rect, vertical, at, series, dataRow: source.dataRow };
   }
 
-  /** What the fill writes into view cell (`row`, `col`), with the format of the source cell it repeats. */
+  /**
+   * What the fill writes into cell (`row`, `col`) in the plan's rows, with the
+   * format of the source cell it repeats.
+   */
   private write(plan: FillPlan, row: number, col: number): { value: CellValue; style: CellStyle } {
     const { rect, vertical } = plan;
     // The source cell this target repeats; series steps count along the fill axis.
@@ -351,7 +428,7 @@ export class FillController {
     if (cell.formula === null) {
       return { value: { kind: "literal", value: cell.resolved }, style: cell.style };
     }
-    const dRow = this.deps.toDataRow(row) - this.deps.toDataRow(fromRow);
+    const dRow = plan.dataRow(row) - plan.dataRow(fromRow);
     return {
       value: { kind: "formula", src: shiftA1Refs(cell.formula, dRow, col - fromCol) },
       style: cell.style,
@@ -378,7 +455,7 @@ export class FillController {
 
     const sheet = this.deps.activeSheet();
     const dataRows: number[] = [];
-    for (let row = output.r0; row <= output.r1; row++) dataRows.push(this.deps.toDataRow(row));
+    for (let row = output.r0; row <= output.r1; row++) dataRows.push(source.dataRow(row));
     const firstRow = dataRows[0];
     if (firstRow === undefined) return false;
     const startRow = dataRows.reduce((minimum, row) => Math.min(minimum, row), firstRow);
@@ -451,11 +528,11 @@ export class FillController {
     const sheet = this.deps.sheet();
     const rules = sheet.validationRules ?? [];
     const { rect } = source;
-    const first = this.deps.toDataRow(rect.r0);
+    const first = source.dataRow(rect.r0);
     const outputFirst = dataRows[0];
     if (rules.length === 0 || outputFirst === undefined) return [];
     for (let row = rect.r0 + 1; row <= rect.r1; row++) {
-      if (this.deps.toDataRow(row) !== first + row - rect.r0) return [];
+      if (source.dataRow(row) !== first + row - rect.r0) return [];
     }
     if (dataRows.some((row, index) => row !== outputFirst + index)) return [];
     const block: Range = {
@@ -518,4 +595,5 @@ interface FillPlan {
   readonly vertical: boolean;
   readonly at: (row: number, col: number) => FillCell;
   readonly series: ReadonlyMap<number, FillSeries>;
+  readonly dataRow: (row: number) => number;
 }

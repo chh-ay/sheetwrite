@@ -597,6 +597,94 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 });
+
+// Excel copies and fills the rows hidden with Hide Rows; only the rows a
+// filter hides stay out ("Copy visible cells only").
+describe("rows hidden by hand, as Excel's copy and fill take them", () => {
+  /** B1:B6 hold 1, 2 and blanks, C1 holds x, and row 3 is hidden. */
+  function hiddenRowGrid(): ReturnType<typeof makeGrid> {
+    const harness = makeGrid();
+    const set = (row: number, col: number, value: number | string | null): DocumentOp => ({
+      op: "set",
+      addr: { sheet: "s1", row, col },
+      value: { kind: "literal", value },
+    });
+    harness.store.applyTransaction({
+      patches: [
+        ...[0, 1, 2, 3, 4, 5].flatMap((row) => [
+          set(row, 1, row < 2 ? row + 1 : null),
+          set(row, 2, row === 0 ? "x" : null),
+        ]),
+      ],
+    });
+    harness.grid.actions.hideRows([2]);
+    return harness;
+  }
+  const value = (store: SheetwriteStore, row: number, col: number) =>
+    store.getCell({ sheet: "s1", row, col }).resolved;
+  const select = (grid: Grid, r0: number, c0: number, r1: number, c1: number): void => {
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: r0, col: c0 }, end: { row: r1, col: c1 } },
+    });
+  };
+  const ctrl = (host: HTMLElement, key: string): void => {
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+  };
+
+  it("copies the hidden row with the rows around it", async () => {
+    const { grid, store } = hiddenRowGrid();
+    let written: Record<string, Blob> = {};
+    Object.defineProperty(globalThis, "ClipboardItem", {
+      configurable: true,
+      value: class {
+        constructor(entries: Record<string, Blob>) {
+          written = entries;
+        }
+      },
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { write: () => Promise.resolve() },
+    });
+    store.applyTransaction({
+      patches: [2, 3].map((row) => ({
+        op: "set" as const,
+        addr: { sheet: "s1", row, col: 1 },
+        value: { kind: "literal" as const, value: row + 1 },
+      })),
+    });
+    // View rows 0 to 2 are sheet rows 1, 2 and 4: B3 is hidden between them.
+    select(grid, 0, 1, 2, 1);
+    expect(await grid.actions.copy()).toBe("done");
+    expect(await written["text/plain"]?.text()).toBe("1\r\n2\r\n3\r\n4");
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("fills the hidden row with the fill handle, Ctrl+D and Ctrl+R, a series counting through it", () => {
+    const { grid, store, scroller, workbook, host } = hiddenRowGrid();
+    select(grid, 0, 1, 1, 1);
+    // Drag B1:B2's handle to view row 3, sheet row 5.
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(3, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(3, 1, workbook)));
+    expect([2, 3, 4].map((row) => value(store, row, 1))).toEqual([3, 4, 5]);
+
+    select(grid, 0, 2, 3, 2);
+    ctrl(host, "d");
+    expect([1, 2, 3, 4].map((row) => value(store, row, 2))).toEqual(["x", "x", "x", "x"]);
+
+    select(grid, 0, 1, 3, 2);
+    ctrl(host, "r");
+    expect([0, 1, 2, 3, 4].map((row) => value(store, row, 2))).toEqual([1, 2, 3, 4, 5]);
+    grid.destroy();
+    store.dispose();
+  });
+});
+
 describe("pointer input: drag lifecycle", () => {
   it("pointercancel mid fill-drag clears the preview and commits nothing", () => {
     const { grid, store, scroller, workbook } = makeGrid();
