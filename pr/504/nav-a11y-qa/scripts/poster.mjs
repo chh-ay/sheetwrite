@@ -1,0 +1,12 @@
+import { chromium } from "/Users/chhay/learn/sheetwrite/node_modules/.bun/playwright@1.63.0/node_modules/playwright/index.mjs";
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+await ctx.addInitScript(() => localStorage.setItem("sheetwrite-theme", "dark"));
+const p = await ctx.newPage();
+await p.goto("http://127.0.0.1:4870/showcases/formula-assist/", { waitUntil: "load" });
+await p.waitForTimeout(1000);
+const img = p.locator('img[src*="wide-poster"]').first();
+console.log(await img.evaluate((i) => ({ visible: i.getClientRects().length > 0, parent: i.parentElement.tagName + "." + i.parentElement.className, alt: i.alt, rect: i.getBoundingClientRect().toJSON() })));
+await img.scrollIntoViewIfNeeded();
+await p.screenshot({ path: "shots/formula-assist-poster-1440-dark.png" });
+await b.close();
