@@ -99,23 +99,28 @@
 }
 
 /* ---- Blueprint figures (art/blueprint.tsx) ----------------------------------- */
-/* A dotted canvas inside the figure frame, on docs pages and showcases; boxes
-   on the surface colour with a coloured inline-start edge; connectors by kind.
-   Names and labels use the body face, which every page preloads; only code
-   lines use the mono face. Every label carries a halo in the canvas colour,
-   so it reads over the dots and the lines. */
-:is(.sw-art-figure, .sw-showcase__figure):has(.sw-blueprint) {
-  --bp-canvas: var(--sw-surface-0);
+/* Each drawing sits on its own dotted canvas inside the figure frame, on docs
+   pages and showcases; the note or caption sits under the canvas, on the
+   frame, in body text. Boxes on the surface colour, their text centred;
+   connectors by kind. Names and labels use the body face, which every page
+   preloads; only code lines use the mono face. Every label carries a halo in
+   the canvas colour, so it reads over the dots and the lines. */
+.sw-art-diagram__canvas {
   border-radius: var(--sw-radius-md);
   background:
     radial-gradient(circle at 1px 1px, var(--sw-border) 1px, transparent 1.5px) 0 0 / 16px 16px,
-    var(--bp-canvas);
+    var(--sw-surface-0);
 }
 .sw-blueprint {
+  --bp-canvas: var(--sw-surface-0);
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
+}
+/* A drawing narrower than its canvas (it never grows past its own size) sits in the middle. */
+.sw-art-diagram__canvas > .sw-blueprint {
+  margin-inline: auto;
 }
 .sw-blueprint text {
   font: 400 12px var(--sw-font-body);
@@ -126,19 +131,9 @@
   stroke: var(--sw-border-strong);
   stroke-width: 1;
 }
-.sw-blueprint .bp-node__edge {
-  fill: var(--sw-border-strong);
-  stroke: none;
-}
 .sw-blueprint [data-tone="accent"] .bp-node__box {
   fill: var(--sw-accent-soft);
   stroke: var(--sw-accent);
-}
-.sw-blueprint [data-tone="accent"] .bp-node__edge {
-  fill: var(--sw-accent);
-}
-.sw-blueprint [data-tone="danger"] .bp-node__edge {
-  fill: var(--sw-danger);
 }
 .sw-blueprint [data-tone="danger"] .bp-node__box {
   stroke: var(--sw-danger);
@@ -205,22 +200,20 @@
 }
 .sw-art-figure > figcaption {
   margin-top: var(--sw-space-3);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
   line-height: 1.5;
 }
-.sw-art-note {
+/* Two classes, so the reading column's paragraph margins don't pad the frame under it. */
+.sw-art-diagram > .sw-art-note {
   margin: var(--sw-space-3) 0 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
   line-height: 1.5;
 }
 .sw-blueprint [data-tone="lane"] .bp-node__box {
   fill: var(--sw-surface-2);
   stroke: var(--sw-border-strong);
-}
-.sw-blueprint [data-tone="lane"] .bp-node__edge {
-  display: none;
 }
 .sw-blueprint .bp-sheet__grid {
   fill: none;
@@ -247,7 +240,6 @@
 /* A card's blueprint picture (BlueprintCard): the card has no figure frame, so
    the picture draws the canvas and its dots itself. */
 .sw-blueprint.sw-blueprint--card {
-  --bp-canvas: var(--sw-surface-0);
   overflow: hidden;
   background: var(--bp-canvas);
 }

@@ -3,9 +3,17 @@
 // (art/blueprint.tsx) in a wide and a narrow layout.
 import type { JSX } from "solid-js";
 
-import { along, NARROW, node, WIDE, XlsxFlowFigure } from "./blueprint-figures.js";
+import { along, NARROW, node, XlsxFlowFigure } from "./blueprint-figures.js";
 import { FlowFigure, MergeFigure, PairsFigure, SequenceFigure } from "./blueprint-layouts.js";
-import { BlueprintDiagram, type BlueprintLayout } from "./blueprint.js";
+import {
+  BlueprintDiagram,
+  type BlueprintLayout,
+  linkGap,
+  nodeHeight,
+  nodeWidth,
+  SPACING,
+} from "./blueprint.js";
+import { BRACKET } from "./layout.js";
 
 /** Live recalculation showcase: which formulas each edit recalculates. */
 export function RecalculationDiagram(): JSX.Element {
@@ -45,73 +53,38 @@ const DATA_MODEL_TEXT = {
     "Orders has Order, Product, Region, Units and Amount. Many orders relate to one product through Orders[Product] and Products[Product ID], and to one region through Orders[Region] and Regions[Code]. The model pivot Revenue by group takes its rows from Category, Region or Manager, and its values from Orders: Revenue as SUM of Amount, Orders as COUNTA of Order, and Average order, a measure.",
 };
 
-function dataModelLayout(width: number, narrow: boolean): BlueprintLayout {
-  const gap = narrow ? 20 : 72;
-  const w = (width - 16 - 2 * gap) / 3;
-  const x = (index: number) => 8 + index * (w + gap);
-  const tables = [
-    node({
-      id: "products",
-      x: x(0),
-      y: 8,
-      w,
-      eyebrow: "One",
-      title: "Products",
-      lines: narrow ? ["Product ID"] : ["Product ID,", "Product, Category"],
-    }),
-    node({
-      id: "orders",
-      x: x(1),
-      y: 8,
-      w,
-      eyebrow: "Many",
-      title: "Orders",
-      lines: narrow ? ["Product,", "Region"] : ["Order, Product, Region,", "Units, Amount"],
-      tone: "accent",
-    }),
-    node({
-      id: "regions",
-      x: x(2),
-      y: 8,
-      w,
-      eyebrow: "One",
-      title: "Regions",
-      lines: narrow ? ["Code"] : ["Code,", "Region, Manager"],
-    }),
+const PRODUCTS_TABLE = { id: "products", eyebrow: "One", title: "Products" } as const;
+const ORDERS_TABLE = { id: "orders", eyebrow: "Many", title: "Orders", tone: "accent" } as const;
+const REGIONS_TABLE = { id: "regions", eyebrow: "One", title: "Regions" } as const;
+const MODEL_PIVOT = {
+  id: "pivot",
+  eyebrow: "Model pivot",
+  title: "Revenue by group",
+  lines: ["By Category, Region or Manager:", "Revenue, Orders, Average order"],
+} as const;
+
+/** The three tables in a row, each as wide as its text, the pivot under all three. */
+function dataModelWide(): BlueprintLayout {
+  const texts = [
+    { ...PRODUCTS_TABLE, lines: ["Product ID,", "Product, Category"] },
+    { ...ORDERS_TABLE, lines: ["Order, Product,", "Region, Units, Amount"] },
+    { ...REGIONS_TABLE, lines: ["Code,", "Region, Manager"] },
   ];
-  const top = Math.max(...tables.map((table) => table.rect.h));
-  const sized = tables.map((table) => ({ ...table, rect: { ...table.rect, h: top } }));
-  const pivot = node({
-    id: "pivot",
-    x: 8,
-    y: 8 + top + 64,
-    w: width - 16,
-    eyebrow: "Model pivot",
-    title: "Revenue by group",
-    lines: narrow
-      ? ["Rows: Category, Region or Manager", "Values: Revenue, Orders,", "Average order"]
-      : ["Rows: Category, Region or Manager", "Values: Revenue, Orders, Average order"],
+  const gaps = [linkGap(["Product"]), linkGap(["Region → Code"])];
+  const top = Math.max(...texts.map((table) => nodeHeight(table)));
+  let x = 0;
+  const tables = texts.map((table, index) => {
+    const placed = node({ ...table, x, y: 0, w: nodeWidth(table), h: top });
+    x += placed.rect.w + (gaps[index] ?? 0);
+    return placed;
   });
+  const pivot = node({ ...MODEL_PIVOT, x: 0, y: top + SPACING.row, w: x });
   return {
-    width,
-    height: pivot.rect.y + pivot.rect.h + 8,
-    nodes: [...sized, pivot],
+    nodes: [...tables, pivot],
     edges: [
-      {
-        from: "orders",
-        fromSide: "left",
-        to: "products",
-        kind: "side",
-        ...(narrow ? {} : { label: "Product", labelSide: "above" as const }),
-      },
-      {
-        from: "orders",
-        fromSide: "right",
-        to: "regions",
-        kind: "side",
-        ...(narrow ? {} : { label: "Region → Code", labelSide: "above" as const }),
-      },
-      ...sized.map((table) => ({
+      { from: "orders", fromSide: "left", to: "products", kind: "side", label: "Product" },
+      { from: "orders", fromSide: "right", to: "regions", kind: "side", label: "Region → Code" },
+      ...tables.map((table) => ({
         from: table.id,
         fromSide: "bottom" as const,
         to: "pivot",
@@ -122,14 +95,55 @@ function dataModelLayout(width: number, narrow: boolean): BlueprintLayout {
   };
 }
 
+/**
+ * On phones Orders sits on top, the two tables it relates to side by side
+ * under it, and the pivot under them; Orders reaches the pivot down its
+ * right side.
+ */
+function dataModelNarrow(): BlueprintLayout {
+  const width = NARROW - BRACKET;
+  const half = (width - SPACING.tile) / 2;
+  const orders = node({ ...ORDERS_TABLE, lines: ["Product,", "Region"], x: 0, y: 0, w: width });
+  const pair = [
+    { ...PRODUCTS_TABLE, lines: ["Product ID"] },
+    { ...REGIONS_TABLE, lines: ["Code"] },
+  ];
+  const rowY = orders.rect.h + SPACING.row;
+  const rowHeight = Math.max(...pair.map((table) => nodeHeight(table)));
+  const tables = pair.map((table, index) =>
+    node({ ...table, x: index * (half + SPACING.tile), y: rowY, w: half, h: rowHeight }),
+  );
+  const pivot = node({ ...MODEL_PIVOT, x: 0, y: rowY + rowHeight + SPACING.row, w: width });
+  return {
+    nodes: [orders, ...tables, pivot],
+    edges: [
+      ...tables.map((table) => ({
+        from: "orders",
+        fromSide: "bottom" as const,
+        t: along(orders, table.rect.x + table.rect.w / 2),
+        to: table.id,
+        kind: "side" as const,
+      })),
+      ...tables.map((table) => ({
+        from: table.id,
+        fromSide: "bottom" as const,
+        to: "pivot",
+        toT: along(pivot, table.rect.x + table.rect.w / 2),
+        kind: "main" as const,
+      })),
+      { from: "orders", fromSide: "right", toSide: "right", to: "pivot", kind: "main" },
+    ],
+  };
+}
+
 /** Data model showcase: Orders, the two tables it relates to, and the pivot over all three. */
 export function DataModelDiagram(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={dataModelLayout(NARROW, true)}
+      narrow={dataModelNarrow()}
       note="Average order is a measure: =SUM(Orders[Amount])/COUNT(Orders[Amount])."
       text={DATA_MODEL_TEXT}
-      wide={dataModelLayout(WIDE, false)}
+      wide={dataModelWide()}
     />
   );
 }
@@ -140,8 +154,8 @@ export function CommandModelDiagram(): JSX.Element {
     <MergeFigure
       note="The Targets sheet is a saved query that Data › Refresh All reloads."
       sources={[
-        { title: "Ribbon command", lines: ["Home › Editing", "› AutoSum"] },
-        { title: "Your toolbar", lines: ["Your own", "buttons"] },
+        { title: "Ribbon command", lines: ["Home › Editing › AutoSum"] },
+        { title: "Your toolbar", lines: ["Your own buttons"] },
       ]}
       steps={[
         { title: "grid.actions", lines: ["The same methods"], tone: "accent" },
@@ -159,22 +173,19 @@ export function CommandModelDiagram(): JSX.Element {
 function seamLayout(
   interfaces: readonly (readonly [name: string, methods: readonly string[]])[],
 ): BlueprintLayout {
-  let y = 8;
+  let y = 0;
   const nodes = interfaces.map(([name, methods], index) => {
-    const placed = node({
-      id: `seam-${index}`,
-      x: 8,
-      y,
-      w: 264,
+    const text = {
       ...(index === 0 ? { eyebrow: "Your host implements" } : {}),
       title: name,
       code: methods,
-      tone: "accent",
-    });
-    y += placed.rect.h + 16;
+    };
+    const placed = node({ id: `seam-${index}`, x: 0, y, w: 264, tone: "accent", ...text });
+    y += placed.rect.h + SPACING.tile;
     return placed;
   });
-  return { width: 280, height: y - 8, nodes, edges: [] };
+  const w = Math.max(...nodes.map((placed) => Math.max(placed.rect.w, nodeWidth(placed))));
+  return { nodes: nodes.map((placed) => ({ ...placed, rect: { ...placed.rect, w } })), edges: [] };
 }
 
 /** Showcase proof pages: the interfaces your host implements and Sheetwrite calls. */
@@ -250,7 +261,7 @@ export function PagingDiagram() {
         },
       }}
       steps={[
-        { title: "1,000,000 rows", lines: ["In pages of", "4,096 rows"] },
+        { title: "1,000,000 rows", lines: ["In pages of 4,096 rows"] },
         {
           title: "Pages in view",
           lines: ["And the pages near", "them stay in memory"],
