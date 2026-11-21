@@ -74,8 +74,8 @@ it("shows Excel's Average, Count and Sum in the shell status line", async () => 
   await grid.summarizeSelection();
   expect(piece.element.textContent).toContain("Count: 7");
   expect(piece.element.textContent).toContain("Sum: 22");
-  // The status line uses the grid's General number display, not full precision.
-  expect(piece.element.textContent).toMatch(/Average: 3\.66?7/);
+  // The status line shows numbers in Excel's General display, as Excel's does.
+  expect(piece.element.textContent).toContain("Average: 3.666666667");
   piece.destroy();
 });
 

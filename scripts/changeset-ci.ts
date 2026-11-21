@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { captureProcess } from "./script-io.js";
@@ -80,6 +80,40 @@ export function validateReleasePackageVersions(version: string, root = REPOSITOR
   }
 }
 
+const CHANGESET_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
+const CHANGESET_RELEASE = /^\s*["']?([^"':\s]+)["']?\s*:\s*(?:major|minor|patch|none)\s*$/;
+
+/**
+ * The packages a changeset names that are not published. Changesets never
+ * versions a private package, so such a changeset stays in `.changeset/`
+ * after every release.
+ */
+export function unpublishedChangesetPackages(
+  changeset: string,
+  publishable: readonly string[] = PUBLISHABLE_PACKAGE_ORDER,
+): string[] {
+  const frontmatter = CHANGESET_FRONTMATTER.exec(changeset)?.[1] ?? "";
+  return frontmatter.split(/\r?\n/).flatMap((line) => {
+    const name = CHANGESET_RELEASE.exec(line)?.[1];
+    return name === undefined || publishable.includes(name) ? [] : [name];
+  });
+}
+
+function assertChangesetsNamePublishedPackages(root = REPOSITORY_ROOT): void {
+  const directory = resolve(root, ".changeset");
+  const problems = readdirSync(directory)
+    .filter((file) => file.endsWith(".md") && file !== "README.md")
+    .flatMap((file) =>
+      unpublishedChangesetPackages(readFileSync(resolve(directory, file), "utf8")).map(
+        (name) => `${file} names ${name}`,
+      ),
+    );
+  if (problems.length === 0) return;
+  throw new Error(
+    `A changeset may name only published packages, because a changeset for a private package is never used up: ${problems.join("; ")}`,
+  );
+}
+
 async function main(): Promise<void> {
   const releaseVersion = releaseVersionFromHeadRef(process.env.GITHUB_HEAD_REF);
   if (releaseVersion !== undefined) {
@@ -87,6 +121,7 @@ async function main(): Promise<void> {
     console.log(`Release package versions match branch ${releaseVersion}`);
     return;
   }
+  assertChangesetsNamePublishedPackages();
   const comparison = changesetComparisonFromBaseRef(process.env.GITHUB_BASE_REF);
   const packageSizeHistoryVersion = packageSizeHistoryVersionFromHeadRef(
     process.env.GITHUB_HEAD_REF,

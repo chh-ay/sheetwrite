@@ -1124,7 +1124,8 @@ export interface GridEvents {
    * The selection changed; `null` when nothing is selected. `selection` is in
    * view rows; `sheetFocus` is its focus cell in sheet rows, which differ
    * under a filter, hidden rows or a view sort. Use the sheet address to
-   * store or look up data.
+   * store or look up data. After `goToCell` on a row the view hides,
+   * `selection` is null and `sheetFocus` is that cell.
    */
   selection: { selection: Selection | null; sheetFocus: CellAddress | null };
   /** The grid scrolled; reports the scroll offsets in CSS pixels and the visible rows and columns. */
@@ -1262,6 +1263,30 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /**
+   * Editable snapshot of the active cell, also when its row is hidden (see
+   * {@link goToCell}); null without an active cell.
+   */
+  getActiveCellInput(): CellInputSnapshot | null;
+  /**
+   * Make the cell at sheet address `addr` the active cell, as Excel's Name Box
+   * and Go To do. A cell whose row shows is selected and scrolled into view.
+   * A cell on a row a filter or Hide Rows hides becomes the active cell with
+   * nothing selected on screen: {@link getSelection} returns null, the
+   * `selection` event reports it as `sheetFocus`, Copy, Cut and Delete act on
+   * it, Up and Down move to the nearest row that shows, and Left and Right
+   * stay on its row. Typing, F2 and Backspace edit it in the spreadsheet
+   * shell's formula bar; a grid without a formula bar does nothing on them,
+   * as the cell has no place on screen for its editor. Returns false,
+   * changing nothing, for a cell outside the sheet.
+   */
+  goToCell(addr: CellAddress): boolean;
+  /**
+   * The active cell in sheet rows: the selection's active cell, or the cell
+   * {@link goToCell} made active on a hidden row; null without one.
+   */
+  getActiveSheetCell(): CellAddress | null;
   /**
    * The text a cell shows: its value through the cell's or the column's number
    * format, as the grid paints it. `addr` is a data address on any sheet.

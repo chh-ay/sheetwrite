@@ -9,6 +9,12 @@ export interface EditDraftSink {
   text(value: string): void;
   /** The cell edit closed, committed or cancelled. */
   end(): void;
+  /**
+   * Edit the active cell of a row the view hides (see `Grid.goToCell`), which
+   * has no cell editor: take the focus and start from `initial` typed, or
+   * from the cell's text with `null` (F2). False when the sink cannot.
+   */
+  edit?(initial: string | null): boolean;
 }
 
 /** What the shell's formula bar uses to type the cell's draft. */

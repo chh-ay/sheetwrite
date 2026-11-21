@@ -105,8 +105,11 @@ async function dropdown(): Promise<HTMLElement> {
   return dialog;
 }
 
-/** A browser clipboard whose rich format carries a cut's token, as a browser's does. */
-function stubClipboard(): void {
+/**
+ * A browser clipboard whose rich format carries a cut's token, as a browser's
+ * does. Returns a reader of its plain text.
+ */
+function stubClipboard(): () => Promise<string | undefined> {
   class ClipItem {
     readonly types: string[];
     constructor(private readonly entries: Record<string, Blob>) {
@@ -129,6 +132,7 @@ function stubClipboard(): void {
       read: () => Promise.resolve(items),
     },
   });
+  return async () => (await items[0]?.getType("text/plain"))?.text();
 }
 
 describe("AutoFilter in the grid", () => {
@@ -491,6 +495,25 @@ describe("AutoFilter in the grid", () => {
     expect(grid.hiddenRows()).toEqual([]);
     grid.undo();
     expect(grid.hiddenRows()).toEqual([2]);
+  });
+
+  it("copies and cuts the active cell of a hidden row, as Excel does", async () => {
+    const clipboardText = stubClipboard();
+    const { grid, store } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    // A3, banana, is on a row the filter hides; the Name Box goes there.
+    const banana = { sheet: "s1", row: 2, col: 0 };
+    expect(grid.goToCell(banana)).toBe(true);
+    expect(await grid.actions.copy()).toBe("done");
+    expect(await clipboardText()).toBe("banana");
+
+    expect(await grid.actions.cut()).toBe("done");
+    // Paste on A7: view row 5 shows sheet row 6, below the filtered range.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
+    expect(await grid.actions.paste()).toBe("done");
+    expect(store.getCell(banana).resolved).toBeNull();
+    expect(store.getCell({ sheet: "s1", row: 6, col: 0 }).resolved).toBe("banana");
   });
 
   it("reports the sheet address of edited and selected cells under a filter", () => {

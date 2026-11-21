@@ -39,6 +39,9 @@ docs/src/content/docs/reference/package-entry-points.md
 # Coverage
 coverage/
 
+# The large Enron development set, built by packages/formula-assist/bench/enron/build.ts --dev-large.
+packages/formula-assist/bench/enron/dev-large.json
+
 # Local agent and audit working files
 plans/
 
