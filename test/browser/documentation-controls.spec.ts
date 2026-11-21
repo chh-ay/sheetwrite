@@ -238,56 +238,76 @@ test("a code popover opens alike on focus and hover, holds while its link has fo
 const POPOVER_GAP_PX = 8;
 /** Layout rounds boxes to device pixels. */
 const POPOVER_GAP_TOLERANCE_PX = 1;
-/** How far from the scrolled code panel's left edge the run brings the symbol. */
+/** The panel's width cap: 35rem at the 16 px root size. */
+const POPOVER_MAX_WIDTH_PX = 560;
+/** How far from the scrolled code panel's left edge the 390 px run brings the symbol. */
 const SCROLLED_SYMBOL_INSET_PX = 16;
-/** Below 48rem code lines do not wrap, so the code panel scrolls. */
 const PHONE_VIEWPORT = { width: 390, height: 844 };
 
-test("on a phone a code popover opens 8 px from a scrolled-in symbol and inside the viewport", async ({
-  page,
-}) => {
-  await page.setViewportSize(PHONE_VIEWPORT);
-  await page.goto(INSTALLATION_URL);
-  await waitForHydration(page);
-  const trigger = page.locator('[data-sw-symbol="createGrid"]').filter({ visible: true }).first();
-  const panel = page.locator(
-    `[id="${await trigger.getAttribute("data-sw-code-popover-trigger")}"]`,
-  );
-
-  // Scroll the code panel so the symbol sits past its scrolled-off start.
-  const scroll = await trigger.evaluate((symbol, inset) => {
-    const code = symbol.closest("pre");
-    if (code === null) throw new Error("The symbol is not in a code panel.");
-    code.scrollLeft +=
-      symbol.getBoundingClientRect().left - code.getBoundingClientRect().left - inset;
-    const shown = symbol.getBoundingClientRect();
-    const hit = document.elementFromPoint(
-      shown.left + shown.width / 2,
-      shown.top + shown.height / 2,
+// Below 48rem code lines do not wrap: the code panel scrolls, and the 390 px
+// run scrolls it so the symbol sits past the panel's scrolled-off start.
+for (const { scrolled, ...viewport } of [
+  { width: 1440, height: 900, scrolled: false },
+  { width: 834, height: 1112, scrolled: false },
+  { ...PHONE_VIEWPORT, scrolled: true },
+]) {
+  test(`at ${viewport.width} px a code popover opens 8 px from its symbol and inside the viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(INSTALLATION_URL);
+    await waitForHydration(page);
+    const trigger = page.locator('[data-sw-symbol="createGrid"]').filter({ visible: true }).first();
+    const panel = page.locator(
+      `[id="${await trigger.getAttribute("data-sw-code-popover-trigger")}"]`,
     );
-    return { scrollLeft: code.scrollLeft, symbolOnTop: hit !== null && symbol.contains(hit) };
-  }, SCROLLED_SYMBOL_INSET_PX);
-  expect(scroll.scrollLeft).toBeGreaterThan(0);
-  expect(scroll.symbolOnTop).toBe(true);
+    if (scrolled) {
+      const scroll = await trigger.evaluate((symbol, inset) => {
+        const code = symbol.closest("pre");
+        if (code === null) throw new Error("The symbol is not in a code panel.");
+        const before = { scrollWidth: code.scrollWidth, clientWidth: code.clientWidth };
+        code.scrollLeft +=
+          symbol.getBoundingClientRect().left - code.getBoundingClientRect().left - inset;
+        const shown = symbol.getBoundingClientRect();
+        const panelBox = code.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          shown.left + shown.width / 2,
+          shown.top + shown.height / 2,
+        );
+        return {
+          ...before,
+          scrollLeft: code.scrollLeft,
+          insidePanel: shown.left >= panelBox.left && shown.right <= panelBox.right,
+          symbolOnTop: hit !== null && symbol.contains(hit),
+        };
+      }, SCROLLED_SYMBOL_INSET_PX);
+      expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
+      expect(scroll.scrollLeft).toBeGreaterThan(0);
+      expect(scroll.insidePanel).toBe(true);
+      expect(scroll.symbolOnTop).toBe(true);
+    }
 
-  await trigger.hover();
-  await expect(panel).toBeVisible();
-  const symbol = await trigger.boundingBox();
-  const box = await panel.boundingBox();
-  if (symbol === null || box === null) throw new Error("The symbol or its panel has no box.");
-  const gap =
-    box.y >= symbol.y + symbol.height
-      ? box.y - (symbol.y + symbol.height)
-      : symbol.y - (box.y + box.height);
-  expect(Math.abs(gap - POPOVER_GAP_PX)).toBeLessThanOrEqual(POPOVER_GAP_TOLERANCE_PX);
-  // code-popover-placement.test.ts owns the column choice; here the real panel stays on screen.
-  expect(
-    box.x >= 0 &&
-      box.y >= 0 &&
-      box.x + box.width <= PHONE_VIEWPORT.width &&
-      box.y + box.height <= PHONE_VIEWPORT.height,
-  ).toBe(true);
-});
+    await trigger.hover();
+    await expect(panel).toBeVisible();
+    const symbol = await trigger.boundingBox();
+    const box = await panel.boundingBox();
+    if (symbol === null || box === null) throw new Error("The symbol or its panel has no box.");
+    const opensBelow = box.y >= symbol.y + symbol.height;
+    const gap = opensBelow ? box.y - (symbol.y + symbol.height) : symbol.y - (box.y + box.height);
+    expect(Math.abs(gap - POPOVER_GAP_PX)).toBeLessThanOrEqual(POPOVER_GAP_TOLERANCE_PX);
+    // The panel starts at the symbol's column, unless that would push it past the viewport.
+    expect(box.x).toBeLessThanOrEqual(symbol.x + POPOVER_GAP_TOLERANCE_PX);
+    expect(box.x + box.width).toBeGreaterThan(symbol.x);
+    expect(
+      box.x >= 0 &&
+        box.y >= 0 &&
+        box.x + box.width <= viewport.width &&
+        box.y + box.height <= viewport.height,
+    ).toBe(true);
+    expect(box.width).toBeLessThanOrEqual(POPOVER_MAX_WIDTH_PX);
+  });
+}
 
 test.describe("on a touch screen", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: PHONE_VIEWPORT });
