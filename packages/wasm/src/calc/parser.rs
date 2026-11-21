@@ -731,6 +731,8 @@ pub(crate) fn parse_with_features(src: &str) -> ParseResult {
 }
 
 /// Bind a sheet token to its stable id while constructing its reference node.
+/// A formula of the same shape as one parsed before it gets a copy of that
+/// tree instead of a parse (`template`).
 pub(crate) fn parse_bound_with_features(
     src: &str,
     resolve: &SheetResolver<'_>,
@@ -750,6 +752,16 @@ pub(crate) fn parse_bound_with_features(
 fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let trimmed = src.trim();
     let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
+    // Only ingest binds references, and only ingest meets long runs of
+    // formulas of one shape, so only its parses look for a kept tree.
+    if sheets.is_some() && looks_for_shapes() {
+        return reuse_or_parse(body, || parse_body(body, sheets));
+    }
+    parse_body(body, sheets)
+}
+
+/// Parses formula text without its `=`.
+fn parse_body(body: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let mut parser = Parser {
         cursor: Cursor::over_text(body),
         features: ParseFeatures::default(),
