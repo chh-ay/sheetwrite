@@ -18,6 +18,7 @@ mod index;
 mod info;
 mod iteration;
 mod let_slots;
+mod lift;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;

@@ -195,7 +195,6 @@ mod volatile_recalculation {
             (7, "=RAND(1)", "#VALUE!"),
             (8, "=RANDBETWEEN(1/0,2)", "#DIV/0!"),
             (9, "=RANDBETWEEN(1,NA())", "#N/A"),
-            (10, "=RANDBETWEEN(A1:A1,2)", "#VALUE!"),
             (11, "=RANDBETWEEN(\"\",5)", "#VALUE!"),
         ];
         store.set_formula(sheet, 0, 0, "=RAND()", 0);

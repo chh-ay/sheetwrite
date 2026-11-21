@@ -151,6 +151,8 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
             Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
             args,
         ) => args.iter().any(|arg| ast_produces_array(arg, _shapes)),
+        // A function that takes one value, given an array there.
+        Ast::Func(func, args) => super::lift::lifts(*func, args, _shapes),
         _ => false,
     }
 }
@@ -394,7 +396,28 @@ impl CellStore {
             {
                 Some(Ok(self.branches_bound(args, formula_sheet, pass)))
             }
+            Ast::Func(func, args)
+                if super::lift::lifts(*func, args, pass.shapes(self.name_scope(formula_sheet))) =>
+            {
+                Some(self.lifted_bound(ast, formula_sheet, pass))
+            }
             _ => None,
+        }
+    }
+
+    /// The spill budget of a lifted call: its cells, or the unknown-size
+    /// charge when an argument's shape is known only after evaluation, as
+    /// for an operator.
+    fn lifted_bound(
+        &self,
+        ast: &Ast,
+        formula_sheet: usize,
+        pass: &mut EvalPass<'_>,
+    ) -> Result<usize, FormulaError> {
+        match self.matrix_shape(ast, formula_sheet, pass) {
+            Ok((_, _, cells)) => Ok(cells),
+            Err(FormulaError::Value) => Ok(UNKNOWN_SIZE_PRECHARGE),
+            Err(error) => Err(error),
         }
     }
 
@@ -585,6 +608,9 @@ impl CellStore {
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }
+            // One out-of-line call, as for the branch functions: the check
+            // that a function taking one value is lifted stays in the family.
+            Ast::Func(..) => self.eval_lifted_family(ast, sheet, pass, depth + 1)?,
             _ => return None,
         };
         Some(result.and_then(T::computed))
@@ -781,6 +807,11 @@ impl CellStore {
                 };
                 let cells = EvalMatrix::validate_shape(output_rows, output_cols, 1, 0)?;
                 return Ok((output_rows, output_cols, cells));
+            }
+            Ast::Func(func, args)
+                if super::lift::lifts(*func, args, pass.shapes(self.name_scope(formula_sheet))) =>
+            {
+                return self.lifted_shape(*func, args, formula_sheet, pass);
             }
             _ => {}
         }
