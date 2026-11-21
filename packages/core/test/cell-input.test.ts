@@ -165,4 +165,15 @@ describe("typing into a general column", () => {
     // Other columns keep the scalar text, so a number column reads it back.
     expect(cellEditText(0.12, "number", "0%")).toBe("0.12");
   });
+
+  // In US English, Excel's formula bar shows a time on the 12-hour clock,
+  // whatever the cell's format.
+  // https://learn.microsoft.com/en-us/answers/questions/5192081/why-does-excel-display-entries-in-am-or-pm-format
+  it("opens a time in the editor on the 12-hour clock", () => {
+    const [evening, eveningFormat] = entry("9:30 PM");
+    expect(cellEditText(evening as number, "general", eveningFormat!)).toBe("9:30:00 PM");
+    expect(cellEditText(0, "general", "h:mm AM/PM")).toBe("12:00:00 AM");
+    expect(cellEditText(21.5 / 24, "general", "h:mm")).toBe("9:30:00 PM");
+    expect(cellEditText(46_037.5, "general", "m/d/yyyy h:mm")).toBe("1/15/2026 12:00:00 PM");
+  });
 });

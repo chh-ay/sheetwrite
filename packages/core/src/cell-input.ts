@@ -37,8 +37,9 @@ const DATE_EDIT_CODES = ["yyyy-mm-dd", "yyyy-mm-dd hh:mm", "yyyy-mm-dd hh:mm:ss"
  * or a serial no such text reproduces, opens as {@link cellScalarToText}.
  *
  * In a `general` column, a number in a date, time or percent format opens as
- * Excel opens it (`1/15/2026`, `9:30:00`, `12%`), and text that would read
- * back as a number opens with Excel's leading apostrophe (`'007`).
+ * Excel opens it in US English (`1/15/2026`, `9:30:00 PM`, `12%`): a time is
+ * on the 12-hour clock whatever the cell's format. Text that would read back
+ * as a number opens with Excel's leading apostrophe (`'007`).
  */
 export function cellEditText(value: CellScalar, type: CellFormat, numberFormat?: string): string {
   if (type === "general") return generalEditText(value, numberFormat);
@@ -62,9 +63,9 @@ function generalEditText(value: CellScalar, numberFormat: string | undefined): s
   const kind = numberFormatDateKind(numberFormat);
   const text =
     kind === "date" || (kind === "time" && value >= 1)
-      ? formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss")
+      ? formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss AM/PM")
       : kind === "time"
-        ? formatNumber(value, "h:mm:ss")
+        ? formatNumber(value, "h:mm:ss AM/PM")
         : numberFormat?.endsWith("%")
           ? `${Number((value * 100).toPrecision(15))}%`
           : null;
