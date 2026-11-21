@@ -92,6 +92,40 @@ test("the landing loads no grid runtime, and its social image and version match 
   await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
 });
 
+test("every page starts with a skip link to its main content", async ({ page }) => {
+  for (const path of [
+    "/",
+    "/showcases/",
+    "/showcases/sort/",
+    "/react/",
+    "/docs/start/installation/",
+  ]) {
+    await page.goto(path);
+    await waitForHydration(page);
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: "Skip to content", exact: true });
+    await expect(skip, path).toBeFocused();
+    await expect(skip, path).toBeInViewport();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Tab");
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("#main-content") !== null),
+      path,
+    ).toBe(true);
+  }
+});
+
+test("type links in API signatures are underlined, not marked by colour alone", async ({
+  page,
+}) => {
+  await page.goto("/docs/api/charts/create-chart-renderer/");
+  const link = page.locator(".api-sig__type a").first();
+  await expect(link).toBeVisible();
+  expect(await link.evaluate((element) => getComputedStyle(element).textDecorationLine)).toBe(
+    "underline",
+  );
+});
+
 test("documentation pages render one heading and a canonical URL", async ({ page }) => {
   for (const route of [
     "start/installation/",

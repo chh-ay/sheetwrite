@@ -21,6 +21,8 @@ function currentSection(pathname: string): Section {
  * and the theme toggle. On phones the site links open from the menu button as
  * a native popover (open, close, Escape, light dismiss and focus come from the
  * browser, without script). The theme toggle's behaviour is in lib/shell.ts.
+ * Its first stop is the skip link: every page with this header has its main
+ * region at `#main-content`, as the docs shell does.
  */
 export function SiteTopbar(props: { readonly pathname: string }) {
   const section = () => currentSection(props.pathname);
@@ -30,6 +32,9 @@ export function SiteTopbar(props: { readonly pathname: string }) {
 
   return (
     <header class="sw-header" data-has-search="false">
+      <a class="sw-skip-link" href="#main-content">
+        Skip to content
+      </a>
       <a aria-label="Sheetwrite home" class="sw-header__brand" href="/">
         <BrandMark />
         <span>Sheetwrite</span>
