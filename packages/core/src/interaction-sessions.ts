@@ -1214,6 +1214,9 @@ export class InteractionSessions {
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
+    console.log(
+      `probe grid pointerdown active=${this.activePointerId} editor=${this.activeEditor?.constructor.name ?? "none"} button=${e.button} type=${e.pointerType}`,
+    );
     if (this.activePointerId !== null) return;
     // Primary button only. Touch contacts always report button 0; a pen barrel
     // button (non-zero) must not select, so the guard covers mouse AND pen.
@@ -1315,6 +1318,15 @@ export class InteractionSessions {
     // The dropdown arrow beside a selected list cell opens its list, or
     // closes it while it is open, as in Excel.
     const listCell = this.activeEditor === this.editor ? null : this.listButtonCellAt(px, py);
+    {
+      const f = this.deps.selection().focusCell;
+      const r = f
+        ? this.deps.screenRect(f.row, f.col, this.deps.contentTop(), this.deps.scroller.scrollLeft)
+        : null;
+      console.log(
+        `probe list px=${px} py=${py} focus=${JSON.stringify(f)} cell=${JSON.stringify(r)} rule=${f ? this.hasListRule(f.row, f.col) : false} hit=${JSON.stringify(listCell)}`,
+      );
+    }
     if (listCell) {
       e.preventDefault();
       if (this.activeEditor === this.validationEditor) this.cancelEditor();
@@ -2390,6 +2402,7 @@ export class InteractionSessions {
     this.cancelPointer();
     const scroller = this.deps.scroller;
     this.activePointerId = e.pointerId;
+    console.log(`probe drag start ${e.pointerId} ${new Error().stack?.split("\n")[2]?.trim()}`);
 
     const own = (ev: PointerEvent): boolean => ev.pointerId === this.activePointerId;
     this.dragMove = (ev) => {
@@ -2432,6 +2445,7 @@ export class InteractionSessions {
     this.dragCancel = null;
 
     const pointerId = this.activePointerId;
+    console.log(`probe drag end ${this.activePointerId}`);
     this.activePointerId = null;
     if (
       pointerId !== null &&
