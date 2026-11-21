@@ -173,6 +173,43 @@ test("a collapsed group is one labelled button that opens its labelled commands"
   await expect(button).toHaveAttribute("aria-expanded", "false");
 });
 
+test("running a command from a collapsed group's dropdown closes it", async ({ page }) => {
+  await page.setViewportSize({ width: 834, height: 900 });
+  await page.goto("/showcases/spreadsheet/");
+  await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
+  await page.getByRole("tab", { name: "Data" }).click();
+  const popups = page.locator(".sheetwrite-ribbon-popup");
+  const sortGroup = page.locator(
+    '.sheetwrite-ribbon-group[aria-label="Sort & Filter"] .sheetwrite-ribbon-group-button',
+  );
+
+  // Pointer: Custom Sort opens the Sort panel, and the dropdown is gone.
+  await sortGroup.click();
+  await expect(sortGroup).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Custom Sort" }).first().click();
+  await expect(page.locator(".sheetwrite-panel-host:not([hidden])")).toBeVisible();
+  await expect(popups).toHaveCount(0);
+  await expect(sortGroup).toHaveAttribute("aria-expanded", "false");
+
+  // Keyboard: the dropdown closes, and focus goes where the command leaves it,
+  // here the grid, not into the ribbon or nowhere.
+  await page.setViewportSize({ width: 1_000, height: 900 });
+  const showHide = page.locator(
+    '.sheetwrite-ribbon-group[aria-label="Show/Hide"] .sheetwrite-ribbon-group-button',
+  );
+  await showHide.focus();
+  await page.keyboard.press("Enter");
+  await expect(showHide).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Enter");
+  await expect(popups).toHaveCount(0);
+  const focus = await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return "nowhere";
+    return active.closest(".sheetwrite-ribbon") === null ? "outside the ribbon" : "in the ribbon";
+  });
+  expect(focus).toBe("outside the ribbon");
+});
+
 test.describe("on a touch screen", () => {
   test.use({ hasTouch: true });
 
