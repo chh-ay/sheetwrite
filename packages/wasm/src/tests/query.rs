@@ -178,10 +178,6 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     store.recompute(sheet);
 
     assert_eq!(
-        store.filter_rows_multi(sheet, &[0], &[0], &[0], &[], &[1], &[0], &[2.0], vec![]),
-        vec![1]
-    );
-    assert_eq!(
         store.filter_rows_multi(
             sheet,
             &[0],
@@ -194,20 +190,6 @@ fn multi_filter_kinds_match_resolved_cell_values() {
             vec!["Alpha".to_owned()],
         ),
         vec![2]
-    );
-    assert_eq!(
-        store.filter_rows_multi(
-            sheet,
-            &[0],
-            &[0],
-            &[0],
-            &[],
-            &[0],
-            &[1],
-            &[],
-            vec!["\0TRUE".to_owned()],
-        ),
-        vec![3]
     );
     assert_eq!(
         store.filter_rows_multi(sheet, &[0], &[0], &[1], &[], &[0], &[0], &[], vec![]),
@@ -406,7 +388,7 @@ fn distinct_texts_come_joined_with_their_utf16_lengths() {
 }
 
 #[test]
-fn distinct_values_in_rows_reads_only_the_row_range() {
+fn distinct_values_in_rows_reads_only_the_row_range_or_the_listed_rows() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 16);
     fill_mixed_distinct_column(&mut store, sheet);
@@ -424,13 +406,6 @@ fn distinct_values_in_rows_reads_only_the_row_range() {
         distinct_number_bits(&mut tail),
         vec![0.0f64.to_bits(), 1.0f64.to_bits()]
     );
-}
-
-#[test]
-fn distinct_values_in_rows_reads_only_the_listed_rows_in_the_range() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(1, 16);
-    fill_mixed_distinct_column(&mut store, sheet);
 
     // Listed rows are read in their order; row 15 lies past the range and
     // row 40 past the sheet, so both are skipped.

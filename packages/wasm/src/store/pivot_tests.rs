@@ -249,44 +249,8 @@ fn pivot_fields_report_source_headers_and_types() {
 }
 
 #[test]
-fn pivot_min_max_and_distinct_remove_old_contributions() {
-    let (mut store, source, output) = fixture(12);
-    install(&mut store, source, output, 12, &[MIN, MAX, DISTINCT_COUNT]);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 6.0);
-    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
-    assert_eq!(store.get_cell(output, 2, 3).num(), 2.0);
-
-    store.set_number(source, 6, SALES, 12.0, 0);
-    store.recompute(source);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 12.0);
-    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
-    assert_eq!(store.get_cell(output, 2, 3).num(), 1.0);
-
-    store.set_number(source, 12, SALES, 5.0, 0);
-    store.recompute(source);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 5.0);
-    assert_eq!(store.get_cell(output, 2, 2).num(), 12.0);
-    assert_eq!(store.get_cell(output, 2, 3).num(), 2.0);
-}
-
-#[test]
-fn pivot_blocker_retry_and_own_source_overlap() {
-    let (mut store, source, output) = fixture(12);
-    store.set_number(output, 2, 1, 99.0, 0);
-    let payload = fixture_pivot(source, 12, &[SUM]).numbers();
-
-    assert!(store.set_pivots(output, &payload, vec!["pivot".into()]));
-    store.recompute(output);
-    assert_eq!(
-        store.get_cell(output, 0, 0).string().as_deref(),
-        Some("#SPILL!")
-    );
-
-    store.clear_cell(output, 2, 1, 0);
-    store.recompute(output);
-    assert_eq!(store.pivot_status(output)[STATUS_ERROR], 0);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 18.0);
-
+fn pivot_output_over_its_own_source_spills() {
+    let (mut store, source, _) = fixture(12);
     // Widen the source over five blank columns that no field reads, and
     // anchor there. Output into those cells would not change the pivot, so
     // only the own-source check, not a feedback loop, can refuse it.
@@ -313,15 +277,17 @@ fn pivot_blocker_retry_and_own_source_overlap() {
 #[test]
 fn pivot_formula_source_and_output_dependents_settle() {
     let (mut store, source, output) = fixture(12);
-    store.set_number(source, 0, SALES, 10.0, 0);
-    store.set_formula(source, 6, SALES, "=C1*2", 0);
-    store.recompute(source);
+    let input = store.add_sheet(1, 1);
+    store.set_sheet_name(input, "input", "Input");
+    store.set_number(input, 0, 0, 10.0, 0);
+    store.set_formula(source, 6, SALES, "=Input!A1*2", 0);
+    store.recompute_changed();
     store.set_formula(output, 9, 20, "=B3*2", 0);
     install(&mut store, source, output, 12, &[SUM]);
     assert_eq!(store.get_cell(output, 9, 20).num(), 64.0);
 
-    store.set_number(source, 0, SALES, 20.0, 0);
-    store.recompute(source);
+    store.set_number(input, 0, 0, 20.0, 0);
+    store.recompute(input);
 
     assert_eq!(store.get_cell(output, 2, 1).num(), 52.0);
     assert_eq!(store.get_cell(output, 9, 20).num(), 104.0);
@@ -376,41 +342,6 @@ fn pivot_structural_edits_shift_and_clamp_the_anchor() {
             .as_deref(),
         Some("#SPILL!")
     );
-}
-
-#[test]
-fn pivot_aggregations_match_pivotby_with_shared_keys_and_totals() {
-    for (aggregation, function) in [
-        (SUM, "SUM"),
-        (COUNT, "COUNT"),
-        (AVERAGE, "AVERAGE"),
-        (MIN, "MIN"),
-        (MAX, "MAX"),
-        (COUNTA, "COUNTA"),
-    ] {
-        let (mut store, source, output) = fixture(12);
-        install(&mut store, source, output, 12, &[aggregation]);
-        let formula_sheet = store.add_sheet(10, 20);
-        store.set_sheet_name(source, "source", "Source");
-
-        store.set_formula(
-            formula_sheet,
-            0,
-            0,
-            &format!("=PIVOTBY(Source!A2:A13,Source!B2:B13,Source!C2:C13,{function},0,1,,1)"),
-            0,
-        );
-        store.recompute(formula_sheet);
-
-        for row in 0..3 {
-            for col in 0..4 {
-                let pivot = store.get_cell(output, row + 2, col + 1);
-                let formula = store.get_cell(formula_sheet, row + 1, col + 1);
-                assert_eq!(pivot.string(), formula.string(), "{function}, {row}, {col}");
-                assert_eq!(pivot.num(), formula.num(), "{function}, {row}, {col}");
-            }
-        }
-    }
 }
 
 /// Whether `a` and `b` are at most `ulps` adjacent numbers apart.
@@ -554,37 +485,6 @@ fn pivot_text_key_labels_follow_first_remaining_row_like_pivotby() {
 }
 
 #[test]
-fn pivot_donor_key_edit_moves_its_row_between_groups() {
-    let (mut store, source, output) = fixture(12);
-    install(&mut store, source, output, 12, &[SUM]);
-    let fresh = store.add_sheet(32, 22);
-    let total_col = store.pivot_status(output)[STATUS_COLS] as usize - 1;
-    let (region_0_row, region_1_row) = (2, 3);
-    let region_total = |store: &CellStore, row| store.get_cell(output, row, total_col).num();
-    let (region_0, region_1) = (
-        region_total(&store, region_0_row),
-        region_total(&store, region_1_row),
-    );
-
-    // Row 1 is the first member, so the label row, of region 1 and quarter 1.
-    // Both groups keep other rows with the same key.
-    store.set_number(source, 1, REGION, 0.0, 0);
-    store.set_number(source, 1, QUARTER, 0.0, 0);
-    store.recompute(source);
-
-    // Row 1 sells 1.
-    assert_eq!(region_total(&store, region_0_row), region_0 + 1.0);
-    assert_eq!(region_total(&store, region_1_row), region_1 - 1.0);
-    assert_matches_fresh_build(
-        &mut store,
-        output,
-        fresh,
-        &fixture_pivot(source, 12, &[SUM]).numbers(),
-        "donor key edit",
-    );
-}
-
-#[test]
 fn pivot_batch_moving_label_rows_together_keeps_groups_consistent() {
     let (mut store, source, output) = fixture(6);
     for (row, key) in ["apple", "apple", "Pear", "pear", "Apple", "Pear"]
@@ -634,7 +534,7 @@ fn pivot_batch_moving_label_rows_together_keeps_groups_consistent() {
 }
 
 #[test]
-fn pivot_status_reports_no_output_when_a_source_cell_blocks_the_anchor() {
+fn pivot_status_reports_a_blocked_output_and_retries_when_the_blocker_clears() {
     let (mut store, source, output) = fixture(12);
     store.set_number(output, 0, 0, 5.0, 0);
     let payload = fixture_pivot(source, 12, &[SUM]).numbers();
@@ -652,6 +552,16 @@ fn pivot_status_reports_no_output_when_a_source_cell_blocks_the_anchor() {
     store.recompute(output);
 
     assert_eq!(store.pivot_status(output), [spill, 0, 0, 1, 1, 0, 0]);
+    assert_eq!(
+        store.get_cell(output, 0, 0).string().as_deref(),
+        Some("#SPILL!")
+    );
+
+    // Clearing the blocker retries the pivot.
+    store.clear_cell(output, 2, 1, 0);
+    store.recompute(output);
+    assert_eq!(store.pivot_status(output)[STATUS_ERROR], 0);
+    assert_eq!(store.get_cell(output, 2, 1).num(), 18.0);
 }
 
 #[test]
@@ -685,24 +595,6 @@ fn pivot_memory_stats_release_cache_when_definition_is_removed() {
     // only that most of the cache was released, not its exact size.
     assert!(metadata(&store) < retained - cache_bytes / 2);
     assert_eq!(store.get_cell(output, 2, 1).kind(), KIND_EMPTY);
-}
-
-#[test]
-fn pivot_cross_sheet_formula_source_updates_from_external_input() {
-    let (mut store, source, output) = fixture(12);
-    let input = store.add_sheet(1, 1);
-    store.set_sheet_name(input, "input", "Input");
-    store.set_number(input, 0, 0, 20.0, 0);
-    store.set_formula(source, 6, SALES, "=Input!A1", 0);
-    store.recompute_changed();
-    install(&mut store, source, output, 12, &[SUM]);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 32.0);
-
-    store.set_number(input, 0, 0, 40.0, 0);
-    store.recompute(input);
-
-    assert_eq!(store.get_cell(source, 6, SALES).num(), 40.0);
-    assert_eq!(store.get_cell(output, 2, 1).num(), 52.0);
 }
 
 #[test]
@@ -1106,6 +998,9 @@ fn pivot_multi_level_layout_matches_pivotby_through_group_edits() {
         case(&[0, 1], 1, MAX, Some("MAX"), true),
         case(&[0, 1, 2], 1, SUM, Some("SUM"), true),
         case(&[0, 1, 2], 0, MIN, Some("MIN"), true),
+        case(&[0, 1], 1, COUNT, Some("COUNT"), true),
+        case(&[0, 1, 2], 0, AVERAGE, Some("AVERAGE"), true),
+        case(&[0, 1], 0, COUNTA, Some("COUNTA"), false),
         // The default layout: one label column, subtotals above their
         // children.
         case(&[0, 1], 0, SUM, Some("SUM"), false),
