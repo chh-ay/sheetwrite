@@ -77,7 +77,7 @@
   flex: none;
   padding-inline: var(--sw-space-1);
   color: var(--sw-fg-muted);
-  font: var(--sw-weight-medium) var(--sw-text-caption) var(--sw-font-mono);
+  font: var(--sw-weight-medium) var(--sw-text-small) var(--sw-font-mono);
 }
 
 .sw-svw-collaborators {

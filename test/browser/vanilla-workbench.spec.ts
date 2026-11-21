@@ -166,10 +166,34 @@ test("the Worker renderer is deep-linked and repaints a cached view after a sub-
   await expect.poll(() => canvasPainted(page, CANVAS), { timeout: 20_000 }).toBe(true);
   expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
 
-  // Two 4 px steps stay inside one row window even when the bottom row is only
-  // half hidden, so the second paint reuses the cached view.
+  // Two 4 px steps stay inside one row window, so the second paint reuses the
+  // cached view. Start where the next 9 px cross no row edge at the top or the
+  // bottom of the window, whatever the grid's height.
   const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
   const scrollTop = () => scroller.evaluate((element) => element.scrollTop);
+  const start = await scroller.evaluate(async (element, grid) => {
+    const rows = () =>
+      [...document.querySelectorAll(`${grid} [role="row"]`)]
+        .map((row) => row.getAttribute("aria-rowindex"))
+        .join();
+    const paint = () =>
+      new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const from = element.scrollTop;
+    for (let top = from; top < from + 120; top++) {
+      element.scrollTop = top;
+      await paint();
+      const before = rows();
+      element.scrollTop = top + 9;
+      await paint();
+      if (rows() === before) {
+        element.scrollTop = top;
+        await paint();
+        return top;
+      }
+    }
+    return null;
+  }, GRID);
+  expect(start).not.toBeNull();
   await scroller.hover();
   for (let step = 0; step < 2; step++) {
     const frame = await workerFrame(page);
