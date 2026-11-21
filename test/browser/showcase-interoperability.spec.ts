@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
 import fixtureManifest from "../../packages/xlsx/test/fixtures/manifest.json" with { type: "json" };
-import { expect, test } from "./fixtures.js";
+import { expect, fitsViewport, test } from "./fixtures.js";
 
 // The interoperability showcase in a real browser: XLSX and CSV through the
 // browser's own file, inflate and download paths. Each format's rules are
@@ -32,8 +32,13 @@ const HOSTILE_TEST_IDS = [
 interface CompatibilityTestSet {
   totalTests: number;
   publishedExamples: number;
+  formulaTests: number;
+  editSequenceTests: number;
+  workbookTests: number;
   localPassed: number;
   unsupported: number;
+  reviewedResults: number;
+  knownDifferences: number;
   checksum: string;
 }
 
@@ -69,12 +74,18 @@ function importedCell(page: Page, row: number, col: number): Promise<unknown> {
   );
 }
 
-test("the evidence vault reports the served checks; the lab tiles are tabs a link can open", async ({
+test("a link to #<lab> opens that lab; the evidence vault reports the served checks; the lab tiles are tabs", async ({
   page,
 }) => {
-  await bootInterop(page);
+  // The vault and the lab tiles need no live workbook, so the test does not wait for one.
+  await page.goto(`${ROUTE}#delimited`);
+  const delimited = page.getByTestId("interop-lab-delimited");
+  await expect(delimited).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#interop-lab-delimited-panel")).toBeVisible();
+  await expect(delimited).toBeInViewport();
+  await openLab(page, "vault");
   const vault = page.getByTestId("interop-lab-vault");
-  await expect(vault).toHaveAttribute("aria-selected", "true");
+  const vaultPanel = page.locator("#interop-lab-vault-panel");
 
   // Every figure comes from the checked results file the page links to.
   const href = await page.getByRole("link", { name: "Published checks" }).getAttribute("href");
@@ -87,6 +98,19 @@ test("the evidence vault reports the served checks; the lab tiles are tabs a lin
   await expect(figure).toContainText(
     `/ ${(testSet.totalTests - testSet.unsupported).toLocaleString("en-US")}`,
   );
+  // No known-difference count while there are none.
+  if (testSet.knownDifferences === 0) await expect(figure).not.toContainText("known difference");
+  for (const count of [testSet.formulaTests, testSet.editSequenceTests, testSet.workbookTests]) {
+    await expect(vaultPanel.locator(".sw-vault-kinds")).toContainText(
+      count.toLocaleString("en-US"),
+    );
+  }
+  await expect(vaultPanel).toContainText(
+    `${testSet.unsupported.toLocaleString("en-US")} checks don't apply`,
+  );
+  if (testSet.reviewedResults === 0) {
+    await expect(vaultPanel).toContainText("No results from Excel, Google Sheets and LibreOffice");
+  }
   await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveAttribute(
     "title",
     testSet.checksum,
@@ -107,11 +131,11 @@ test("the evidence vault reports the served checks; the lab tiles are tabs a lin
   await page.keyboard.press("Home");
   await expect(vault).toBeFocused();
 
+  // A hash change after load opens its lab too.
   await page.evaluate(() => {
-    window.location.hash = "delimited";
+    window.location.hash = "security";
   });
-  await expect(page.getByTestId("interop-lab-delimited")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("interop-lab-delimited")).toBeInViewport();
+  await expect(page.getByTestId("interop-lab-security")).toHaveAttribute("aria-selected", "true");
 });
 
 test("@portability a committed fixture imports with its coded warnings, and File › Import XLSX opens the native picker from the keyboard", async ({
@@ -122,13 +146,16 @@ test("@portability a committed fixture imports with its coded warnings, and File
   await openLab(page, "fixtures");
   const load = page.getByTestId("fixture-libreoffice-rich-load");
   await expect(load).toBeEnabled({ timeout: 20_000 });
+  await expect(page.getByTestId("interop-lab-fixtures")).toContainText("3 hashes match");
   await load.click();
-  await expect
-    .poll(() => sheetNames(page), { timeout: 15_000 })
-    .toEqual(["Calc", "Hidden", "Inputs"]);
+  await expect(page.getByTestId("interop-source")).toContainText("libreoffice-rich.xlsx", {
+    timeout: 15_000,
+  });
+  await expect.poll(() => sheetNames(page)).toEqual(["Calc", "Hidden", "Inputs"]);
   const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
   if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
   await openLab(page, "warnings");
+  await expect(page.getByTestId("interop-warning-count")).toContainText(fixture.file);
   const codes = await page
     .getByTestId("interop-warnings")
     .locator(".sw-si-warncode")
@@ -172,6 +199,8 @@ test("@portability a committed fixture imports with its coded warnings, and File
 test("one run stops every hostile file and limit in the browser", async ({ page }) => {
   await bootInterop(page);
   await openLab(page, "security");
+  const figure = page.getByTestId("interop-attacks-figure");
+  await expect(figure).toContainText("attacks, not run yet");
   await page.getByTestId("interop-hostile-run").click();
   for (const id of HOSTILE_TEST_IDS) {
     await expect(page.getByTestId(id), id).toHaveAttribute("data-state", "rejected", {
@@ -180,9 +209,18 @@ test("one run stops every hostile file and limit in the browser", async ({ page 
   }
   await expect(page.getByTestId("interop-abort-report")).toContainText("AbortError");
   await expect(page.getByTestId("interop-cellcap-report")).toContainText("XlsxResourceError");
+  await expect(page.getByTestId("interop-cellcap-report")).toContainText("maxCells");
   await expect(page.getByTestId("interop-csvcap-report")).toContainText(
     "DelimitedTextResourceError",
   );
+  await expect(figure).toContainText(`${HOSTILE_TEST_IDS.length}`);
+  await expect(figure).toContainText("attacks stopped in this run");
+  await expect(page.getByTestId("interop-lab-security")).toContainText(
+    `${HOSTILE_TEST_IDS.length} / ${HOSTILE_TEST_IDS.length} stopped`,
+  );
+  // On a phone the attacks become cards that fit the page.
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await fitsViewport(page)).toBe(true);
 });
 
 test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV demo loads 200,000 sales records", async ({
@@ -195,6 +233,7 @@ test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV 
     buffer: Buffer.from("customer,units,revenue\nAlder Design,12,3400\nHarbor Studio,7,2050"),
   });
   await expect(page.getByTestId("interop-status")).toContainText("Loaded: quarter-sales.csv");
+  await expect(page.getByTestId("interop-file-report")).toContainText("6 stored cells");
   await expect.poll(() => importedCell(page, 0, 0)).toBe("Alder Design");
   await expect.poll(() => importedCell(page, 1, 2)).toBe(2050);
 

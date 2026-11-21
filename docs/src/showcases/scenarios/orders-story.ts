@@ -65,6 +65,8 @@ export const STORY_SEASONALITY = [
   0.92, 0.88, 0.98, 1, 0.96, 0.84, 0.76, 0.78, 0.98, 1.12, 1.32, 1.46,
 ] as const;
 
+/** Zero-based calendar months of the Q4 peak (October to December). */
+export const PEAK_MONTHS_OF_YEAR = [9, 10, 11] as const;
 /** Zero-based calendar months of the summer lull (June to August). */
 export const LULL_MONTHS_OF_YEAR = [5, 6, 7] as const;
 

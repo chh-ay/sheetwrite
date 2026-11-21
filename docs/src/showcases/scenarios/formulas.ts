@@ -2,6 +2,7 @@ import type { ColumnarData, DocumentOp, Workbook } from "@sheetwrite/core";
 
 import {
   generateStoryOrders,
+  STORY_FIRST_YEAR,
   STORY_REGIONS,
   type StoryRegion,
   STORY_MONTHS,
@@ -29,6 +30,8 @@ const REGION_CODES: Readonly<Record<StoryRegion, string>> = {
   LATAM: "LATAM",
 };
 
+/** The ledger holds the second story year, 2026, so it shows one full year. */
+export const LEDGER_YEAR = STORY_FIRST_YEAR + 1;
 const LEDGER_MONTHS = 12;
 const LEDGER_FIRST_MONTH = STORY_MONTHS - LEDGER_MONTHS;
 

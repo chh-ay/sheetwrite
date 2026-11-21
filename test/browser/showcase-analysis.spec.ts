@@ -12,6 +12,10 @@ declare global {
 const SUMMARY = "summary";
 const PIVOT = "revenue-by-month";
 const CHART = "revenue-trend";
+/** The story's dip: EMEA in its price-change month. */
+const DIP_REGION = "EMEA";
+const DIP_MONTH = "2026-03";
+const REVENUE_INCREASE = 50_000;
 /** A chart about as wide as the docs figure workbook, in a window that shows all of it. */
 const WIDE_CHART = { width: 1_200, height: 420 };
 const WIDE_VIEWPORT = { width: 1_920, height: 1_080 };
@@ -23,12 +27,58 @@ async function open(page: Page) {
   });
 }
 
+/** The pivot's value for one month and region, found by its labels, not its position. */
+function pivotValue(page: Page, month: string, region: string) {
+  return page.evaluate(
+    ([sheet, id, rowLabel, colLabel]) => {
+      const result = window.__sheetwriteAnalysisGrid?.getPivotResult(sheet, id);
+      if (!result || result.status !== "ok") return null;
+      const at = (row: number, col: number) => result.cells[row * result.cols + col];
+      // Column labels and value captions share the header rows: search them all.
+      let col = -1;
+      for (let c = result.labelCols; c < result.cols; c++) {
+        for (let r = 0; r < result.headerRows; r++) if (at(r, c) === colLabel) col = c;
+      }
+      let row = -1;
+      for (let r = result.headerRows; r < result.rows; r++) {
+        if (at(r, result.labelCols - 1) === rowLabel) row = r;
+      }
+      return row < 0 || col < 0 ? null : Number(at(row, col));
+    },
+    [SUMMARY, PIVOT, month, region] as const,
+  );
+}
+
 function charts(page: Page) {
   return page.evaluate((sheet) => window.__sheetwriteAnalysisGrid?.getCharts(sheet) ?? [], SUMMARY);
 }
 
 const chart = (page: Page) => page.getByRole("group", { name: /Monthly revenue by region/ });
+const chartImage = (page: Page) =>
+  chart(page).getByRole("img", { name: /Monthly revenue by region/ });
 const chartObjects = (page: Page) => page.locator('[aria-roledescription="chart"]');
+
+test("editing an order moves its pivot total and redraws the chart", async ({ page }) => {
+  await open(page);
+  // One series per region, named from the pivot's region labels.
+  const description = await chartImage(page).locator("desc").textContent();
+  for (const region of ["Americas", "APAC", DIP_REGION, "LATAM"]) {
+    expect(description).toContain(region);
+  }
+  const before = (await pivotValue(page, DIP_MONTH, DIP_REGION)) ?? 0;
+  expect(before).toBeGreaterThan(0);
+  const drawnBefore = await chartImage(page).innerHTML();
+
+  await page.getByRole("button", { name: "Go to the order" }).click();
+  const revenue = Number(await page.getByRole("textbox", { name: "Formula bar" }).inputValue());
+  await page.keyboard.type(String(revenue + REVENUE_INCREASE));
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => pivotValue(page, DIP_MONTH, DIP_REGION))
+    .toBeCloseTo(before + REVENUE_INCREASE, 6);
+  await page.getByRole("tab", { name: "Summary" }).click();
+  await expect.poll(() => chartImage(page).innerHTML()).not.toBe(drawnBefore);
+});
 
 test("a selected chart moves with the arrow keys, deletes from its menu, stays at its cells on focus, and undo works", async ({
   page,
@@ -161,6 +211,7 @@ test("a chart and a PivotChart sit on the grid's themed background", async ({ pa
     }, scheme);
     await expect.poll(async () => (await colors()).grid.bg).not.toBe(previousBackground);
     const site = await colors();
+    expect(site.grid.bg).not.toBe("rgb(11, 11, 12)");
     expect(site.charts).toEqual([site.grid, site.grid]);
     previousBackground = site.grid.bg;
   }
