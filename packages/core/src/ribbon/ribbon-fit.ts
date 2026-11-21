@@ -4,10 +4,12 @@
 
 /**
  * How a group renders: `large` buttons with labels below; `medium` small
- * icons with labels beside them, stacked three high; `small` icons only;
- * `collapsed` one button that opens the whole group in a popup.
+ * icons with labels beside them, stacked three high; `collapsed` one button,
+ * the group's icon and name, that opens the whole group in a popup. No size
+ * drops the labels: an icon never stands alone, so a group that does not fit
+ * with its labels collapses instead.
  */
-type RibbonGroupSize = "large" | "medium" | "small" | "collapsed";
+type RibbonGroupSize = "large" | "medium" | "collapsed";
 
 export interface RibbonFitGroup {
   readonly id: string;
@@ -20,19 +22,14 @@ export interface RibbonFitStep {
   readonly size: RibbonGroupSize;
 }
 
-const SHRINK_SIZES: readonly RibbonGroupSize[] = ["medium", "small"];
-
 /**
  * Reductions in the order Excel applies them: every group, taken in
- * `reduceOrder`, gives up one size before any group gives up the next. So all
- * groups shrink before any group collapses, and the first groups in the order
- * shrink and collapse first.
+ * `reduceOrder`, shrinks to medium before any group collapses, and the first
+ * groups in the order shrink and collapse first.
  */
 export function ribbonFitSteps(reduceOrder: readonly RibbonFitGroup[]): RibbonFitStep[] {
   const steps: RibbonFitStep[] = [];
-  for (const size of SHRINK_SIZES) {
-    for (const group of reduceOrder) if (group.shrinks) steps.push({ id: group.id, size });
-  }
+  for (const group of reduceOrder) if (group.shrinks) steps.push({ id: group.id, size: "medium" });
   for (const group of reduceOrder) steps.push({ id: group.id, size: "collapsed" });
   return steps;
 }
