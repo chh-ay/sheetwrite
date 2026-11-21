@@ -16,6 +16,7 @@ import {
 } from "../src/functions.js";
 import {
   createGrid,
+  type ExternalLink,
   type Grid,
   initSheetwrite,
   isSheetwriteError,
@@ -107,6 +108,47 @@ describe("host formula functions", () => {
     ]);
     expect(taxed.getCell(address(0, 1)).resolved).toBe(EU_RATE);
     expect(plain.getCell(address(0, 1)).resolved).toBe("#NAME?");
+  });
+
+  it("recalculates only the formulas that read a link value a refresh changes", () => {
+    let calls = 0;
+    const seen = define(metadata("SEEN"), (value) => {
+      calls += 1;
+      return typeof value === "number" ? value : 0;
+    });
+    const rows = 20;
+    const grid = gridWith([seen], rows);
+    const links = (first: number, extra: number[] = []): ExternalLink[] => [
+      {
+        book: "Budget.xlsx",
+        target: "Budget.xlsx",
+        sheets: [
+          {
+            name: "Annual",
+            cells: [...Array.from({ length: rows }, (_, row) => row), ...extra].map((row) => ({
+              row,
+              col: 0,
+              value: row === 0 ? first : row,
+            })),
+          },
+        ],
+      },
+    ];
+    grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: links(100) }] });
+    for (let row = 0; row < rows; row += 1) {
+      setFormula(grid.store, row, 0, `=SEEN([Budget.xlsx]Annual!A${row + 1})`);
+    }
+
+    calls = 0;
+    grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: links(200) }] });
+    expect(calls).toBe(1);
+    expect(grid.store.getCell(address(0, 0)).resolved).toBe(200);
+
+    // A wider extent takes the full path: every reader recalculates.
+    calls = 0;
+    grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: links(300, [rows]) }] });
+    expect(calls).toBeGreaterThanOrEqual(rows);
+    expect(grid.store.getCell(address(0, 0)).resolved).toBe(300);
   });
 
   it("calculate with their inputs, survive memory release, and leave only formula text in snapshots", async () => {
