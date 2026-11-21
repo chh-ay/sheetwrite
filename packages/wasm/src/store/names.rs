@@ -176,32 +176,45 @@ pub(super) struct Definition {
     /// sheet reads the formula in place. [`NEVER_IN_PLACE`] for a formula
     /// that reads a table or holds a LAMBDA.
     reach: (u32, u32),
-    /// Whether a name `expression` uses can have another shape or facts on
-    /// some sheet than the ones worked out for it: a workbook formula that
-    /// uses a name some sheet defines in its own scope, directly or through
-    /// other names. Such a formula is read in a copy whose name shapes are
-    /// marked for the reading sheet, and its facts on those sheets are in
-    /// [`Self::sheet_facts`] ([`shapes`]).
-    sheet_shapes: bool,
+    /// `Some` when a name `expression` uses can have another shape or facts
+    /// on some sheet than the ones worked out for it: a workbook formula
+    /// that uses a name some sheet defines in its own scope, directly or
+    /// through other names. Such a formula is read in a copy whose name
+    /// shapes are marked for the reading sheet ([`shapes`]), and this holds
+    /// its facts as each sheet with names of its own reads it. One thin
+    /// pointer, so a formula that reads alike everywhere pays no more than
+    /// the flag it replaces.
+    sheet_shapes: Option<Box<SheetFacts>>,
     /// What the formula does that the formulas using the name inherit,
     /// worked out when the names are bound, as the workbook reads it.
     facts: NameFacts,
-    /// For a formula with [`Self::sheet_shapes`], its facts as each sheet
-    /// that defines a name in its own scope reads it; any other sheet reads
-    /// [`Self::facts`]. Worked out once per sheet when the names are bound,
-    /// so a read never works them out again for each path to the name.
-    sheet_facts: SheetFacts,
 }
 
-/// The facts of a formula by reading sheet: `(sheet, facts)` pairs.
-pub(super) type SheetFacts = Box<[(u32, NameFacts)]>;
+/// The facts of a formula with [`Definition::sheet_shapes`] as each sheet
+/// that defines a name in its own scope reads it: `(sheet, facts)` pairs.
+/// Any other sheet reads [`Definition::facts`]. Worked out once per sheet
+/// when the names are bound, so a read never works them out again for each
+/// path to the name.
+#[derive(Default, PartialEq, Eq)]
+pub(super) struct SheetFacts(Vec<(u32, NameFacts)>);
 
 impl Definition {
+    /// Whether the formula reads differently on some sheet; see
+    /// [`Self::sheet_shapes`].
+    const fn sheet_shapes(&self) -> bool {
+        self.sheet_shapes.is_some()
+    }
+
     /// The facts of the formula as a formula on `sheet` reads it.
     fn facts_on(&self, sheet: u32) -> NameFacts {
-        self.sheet_facts
-            .iter()
-            .find_map(|&(own, facts)| (own == sheet).then_some(facts))
+        self.sheet_shapes
+            .as_ref()
+            .and_then(|by_sheet| {
+                by_sheet
+                    .0
+                    .iter()
+                    .find_map(|&(own, facts)| (own == sheet).then_some(facts))
+            })
             .unwrap_or(self.facts)
     }
 }
@@ -429,10 +442,7 @@ impl<'a> NameScope<'a> {
                 NameFacts::ARRAY,
                 range.row_start != range.row_end || range.col_start != range.col_end,
             ),
-            Some(DefinedName::Formula(formula)) if formula.sheet_shapes => {
-                formula.facts_on(self.sheet)
-            }
-            Some(DefinedName::Formula(formula)) => formula.facts,
+            Some(DefinedName::Formula(formula)) => formula.facts_on(self.sheet),
         }
     }
 
@@ -1008,9 +1018,8 @@ impl CellStore {
             follows_names: true,
             plain: false,
             reach: NEVER_IN_PLACE,
-            sheet_shapes: false,
+            sheet_shapes: None,
             facts: NameFacts::default(),
-            sheet_facts: Box::new([]),
         };
         self.bindings.names.insert(
             name_scope,
@@ -1428,9 +1437,8 @@ impl CellStore {
             follows_names: true,
             plain: false,
             reach: NEVER_IN_PLACE,
-            sheet_shapes: false,
+            sheet_shapes: None,
             facts: NameFacts::default(),
-            sheet_facts: Box::new([]),
         };
         self.bindings.names.insert(
             scope,

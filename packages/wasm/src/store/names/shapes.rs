@@ -26,14 +26,14 @@ pub(crate) fn mark(ast: &mut Ast, names: NameScope<'_>) {
 /// Whether `formula` is read in a copy placed for the reading cell, since
 /// the shapes of the names in it depend on the reading sheet.
 pub(super) const fn read_in_copy(formula: &Definition) -> bool {
-    formula.sheet_shapes
+    formula.sheet_shapes()
 }
 
 /// Mark the names in `tree`, a copy of `formula` placed for a cell, for the
 /// sheet of `names` when their shapes depend on it. The caller's guard is
 /// up, so a use of the name inside its own formula reads as undefined.
 pub(super) fn mark_copy(tree: &mut Ast, formula: &Definition, names: NameScope<'_>) {
-    if formula.sheet_shapes {
+    if formula.sheet_shapes() {
         mark_uses(tree, names);
     }
 }
@@ -44,12 +44,12 @@ impl CellStore {
     /// work out each formula's [`NameFacts`], and find the workbook formulas
     /// whose shapes depend on the reading sheet
     /// ([`Definition::sheet_shapes`]); those get their facts as each sheet
-    /// with names of its own reads them too ([`Definition::sheet_facts`]).
-    /// One formula's marks and facts can depend on another's, so the marking
-    /// repeats until nothing changes, at most once more than there are
-    /// formulas: a longer run comes only from names that use each other,
-    /// which read as undefined. While a formula is marked, it reads itself
-    /// as empty, as a name met in its own formula reads as undefined.
+    /// with names of its own reads them too ([`SheetFacts`]). One formula's
+    /// marks and facts can depend on another's, so the marking repeats until
+    /// nothing changes, at most once more than there are formulas: a longer
+    /// run comes only from names that use each other, which read as
+    /// undefined. While a formula is marked, it reads itself as empty, as a
+    /// name met in its own formula reads as undefined.
     pub(super) fn mark_definition_shapes(&mut self) {
         let mut definitions = Vec::new();
         let mut scoped_sheets = Vec::new();
@@ -69,7 +69,9 @@ impl CellStore {
         for &(at, _) in &definitions {
             if let Some(formula) = self.bindings.names.formula_at_position(at) {
                 formula.facts = NameFacts::default();
-                formula.sheet_facts = Box::new([]);
+                if let Some(by_sheet) = &mut formula.sheet_shapes {
+                    **by_sheet = SheetFacts::default();
+                }
             }
         }
         for _ in 0..=definitions.len() {
@@ -84,23 +86,26 @@ impl CellStore {
                 let sheet_shapes =
                     sheet == super::NO_SHEET && uses_sheet_shaped_name(&expression, names.table());
                 if let Some(formula) = self.bindings.names.formula_at_position(at) {
-                    changed |= formula.sheet_shapes != sheet_shapes;
-                    formula.sheet_shapes = sheet_shapes;
+                    changed |= formula.sheet_shapes() != sheet_shapes;
+                    if !sheet_shapes {
+                        formula.sheet_shapes = None;
+                    } else if formula.sheet_shapes.is_none() {
+                        formula.sheet_shapes = Some(Box::default());
+                    }
                     formula.expression = expression;
                 }
                 let Some(id) = NameId::at(at.0) else {
                     continue;
                 };
                 let facts = name_facts(id, NameScope::new(&self.bindings, sheet));
-                let sheet_facts = if sheet_shapes {
-                    self.sheet_facts(id, &scoped_sheets)
-                } else {
-                    Box::new([])
-                };
+                let by_sheet = sheet_shapes.then(|| self.sheet_facts(id, &scoped_sheets));
                 if let Some(formula) = self.bindings.names.formula_at_position(at) {
-                    changed |= formula.facts != facts || formula.sheet_facts != sheet_facts;
+                    changed |= formula.facts != facts;
                     formula.facts = facts;
-                    formula.sheet_facts = sheet_facts;
+                    if let (Some(own), Some(worked_out)) = (&mut formula.sheet_shapes, by_sheet) {
+                        changed |= **own != worked_out;
+                        **own = worked_out;
+                    }
                 }
             }
             if !changed {
@@ -113,18 +118,20 @@ impl CellStore {
     /// reads it, rather than a definition of its own, reads it.
     fn sheet_facts(&self, id: NameId, sheets: &[u32]) -> SheetFacts {
         let Some(entry) = self.bindings.names.entry(id) else {
-            return Box::new([]);
+            return SheetFacts::default();
         };
-        sheets
-            .iter()
-            .filter(|&&sheet| {
-                entry
-                    .definitions
-                    .iter()
-                    .all(|(scope, _)| *scope != Some(sheet))
-            })
-            .map(|&sheet| (sheet, name_facts(id, NameScope::new(&self.bindings, sheet))))
-            .collect()
+        SheetFacts(
+            sheets
+                .iter()
+                .filter(|&&sheet| {
+                    entry
+                        .definitions
+                        .iter()
+                        .all(|(scope, _)| *scope != Some(sheet))
+                })
+                .map(|&sheet| (sheet, name_facts(id, NameScope::new(&self.bindings, sheet))))
+                .collect(),
+        )
     }
 }
 
@@ -198,7 +205,9 @@ fn uses_sheet_shaped_name(ast: &Ast, table: &super::NameTable) -> bool {
                 .iter()
                 .any(|(scope, definition)| match definition {
                     super::DefinedName::Range(_) => scope.is_some(),
-                    super::DefinedName::Formula(formula) => scope.is_some() || formula.sheet_shapes,
+                    super::DefinedName::Formula(formula) => {
+                        scope.is_some() || formula.sheet_shapes()
+                    }
                 })
         });
     }
