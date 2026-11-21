@@ -4,7 +4,7 @@ import { ContextMenu } from "../src/context-menu.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, GridActions, GridConfig } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { expectSameNode, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 let clipboardDescriptor: PropertyDescriptor | undefined;
@@ -215,7 +215,7 @@ describe("ContextMenu", () => {
     key(document.activeElement, "Enter");
     expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(4);
     expect(openMenus(host)).toHaveLength(0);
-    expect(document.activeElement).toBe(before);
+    expectSameNode(document.activeElement, before);
   });
 
   it("closes on the user's scroll, not on the page's own", () => {

@@ -28,6 +28,7 @@ import type {
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
 import {
   coveredPage,
+  expectSameNode,
   keepXlsxSlots,
   makeColumnarData,
   makeWorkbook,
@@ -1732,7 +1733,7 @@ describe("undo and redo selection", () => {
     tab.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
     expect(grid.getActiveSheet()).toBe("s2");
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 0, col: 0 } });
-    expect(document.activeElement).toBe(host);
+    expectSameNode(document.activeElement, host);
 
     grid.setActiveSheet("s1");
     expect(grid.getSelection()).toEqual(b3);

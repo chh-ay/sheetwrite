@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { mountGridWithData } from "./fixtures.js";
+import { expectSameNode, mountGridWithData } from "./fixtures.js";
 
 // Keys pressed while a command's code loads on first use act after the
 // command, where it left the focus. The AutoFilter's case is in
@@ -39,7 +39,7 @@ it("types the keys pressed while the find bar loads into its field", async () =>
   }
 
   expect(input?.value).toBe("ap");
-  expect(document.activeElement === input).toBe(true);
+  expectSameNode(document.activeElement, input);
   // The keys went to the find bar, not into A1.
   expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
   grid.destroy();

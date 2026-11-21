@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, GridConfig, Workbook } from "../src/types.js";
-import { elementAdded, mountHost } from "./fixtures.js";
+import { elementAdded, expectSameNode, mountHost } from "./fixtures.js";
 
 // Excel's AutoComplete: typing a text entry completes it from the entries
 // above and below in the column.
@@ -302,7 +302,7 @@ describe("Pick From Drop-down List", () => {
     const list = await elementAdded(host, ".sheetwrite-entry-list", HTMLDivElement);
     const options = [...list.querySelectorAll("[role=option]")].map((option) => option.textContent);
     expect(options).toEqual(["East", "North", "south", "West"]);
-    expect(document.activeElement === list).toBe(true);
+    expectSameNode(document.activeElement, list);
 
     for (const name of ["ArrowDown", "Enter"]) {
       list.dispatchEvent(

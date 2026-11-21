@@ -1,3 +1,4 @@
+import { expect } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { GridImpl } from "../src/grid.js";
@@ -211,4 +212,27 @@ export function pressLikeWebKit(target: HTMLElement): void {
     else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
   if (target.isConnected && !target.closest("[hidden]")) target.click();
+}
+
+/** One line naming a DOM node: its tag, id, classes, role and label. */
+function nodeName(node: unknown): string {
+  if (!(node instanceof Element)) return String(node);
+  const id = node.id ? `#${node.id}` : "";
+  const classes = [...node.classList].map((name) => `.${name}`).join("");
+  const role = node.getAttribute("role");
+  const label = node.getAttribute("aria-label");
+  return `<${node.localName}${id}${classes}${role ? ` role="${role}"` : ""}${label ? ` aria-label="${label}"` : ""}>`;
+}
+
+/**
+ * Expects `actual` to be the DOM node `expected` (or null), by identity. On a
+ * failure it names both nodes in one line: bun's diff of two DOM nodes walks
+ * the whole document and can run out of memory instead of failing.
+ */
+export function expectSameNode(actual: unknown, expected: unknown, message?: string): void {
+  const prefix = message ? `${message}: ` : "";
+  expect(
+    actual === expected,
+    `${prefix}expected ${nodeName(expected)}, got ${nodeName(actual)}`,
+  ).toBe(true);
 }

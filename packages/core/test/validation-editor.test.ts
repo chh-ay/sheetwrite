@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { DEFAULT_THEME } from "../src/grid.js";
 import type { CellScalar, DataValidationRule } from "../src/types.js";
 import { type BeginValidationEditOptions, ValidationEditor } from "../src/validation-editor.js";
+import { expectSameNode } from "./fixtures.js";
 
 const rect = { x: 20, y: 30, w: 120, h: 28 };
 const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 0 } };
@@ -102,11 +103,11 @@ describe("ValidationEditor", () => {
     expect(box?.style.top).toBe(`${rect.y + rect.h}px`);
     expect(input.style.height).toBe("");
     expect(current?.textContent).toBe("East");
-    expect(document.activeElement === input).toBe(true);
+    expectSameNode(document.activeElement, input);
 
     // Typing replaces the value: the box moves over the cell and filters the list.
     type(input, "s");
-    expect(input.parentElement).toBe(box);
+    expectSameNode(input.parentElement, box);
     expect(box?.style.top).toBe(`${rect.y}px`);
     expect(input.style.height).toBe(`${rect.h}px`);
     expect(shownItems()).toEqual(["South", "East", "West", "North-East", "South-West"]);
