@@ -34,6 +34,11 @@ it("fails closed on drifted scenarios, owner accounting and optimization evidenc
   expectRejections(fullArtifact, validate, [
     [(artifact) => artifact.scenarios.shift(), "missing resource scenario"],
     [
+      (artifact) =>
+        artifact.scenarios.push(structuredClone(must(artifact.scenarios[0], "scenario"))),
+      "duplicate resource scenario",
+    ],
+    [
       (artifact) => {
         const before = must(scenarioOf(artifact, "dense-ingest").phases.before, "before phase");
         before.jsOwners = [
