@@ -109,7 +109,7 @@ mod tests;
 #[cfg(feature = "formula-engine")]
 pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxError};
 #[cfg(feature = "formula-engine")]
-pub use formula_xlsx::convert_xlsx_formulas;
+pub use formula_xlsx::{convert_xlsx_formulas, xlsx_array_formulas};
 #[cfg(feature = "formula-engine")]
 pub use query::DistinctColumn;
 #[cfg(feature = "formula-engine")]

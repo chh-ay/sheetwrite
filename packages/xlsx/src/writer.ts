@@ -20,13 +20,18 @@ import {
 import { type DrawingChart, type PivotChartData } from "./chart-write.js";
 import { staticDashboard, warnStaticDashboards } from "./dashboard.js";
 import {
+  DYNAMIC_ARRAY_METADATA,
+  SHEET_METADATA_CONTENT,
+  SHEET_METADATA_REL,
+} from "./dynamic-array.js";
+import {
   EXTERNAL_LINK_CONTENT,
   EXTERNAL_LINK_REL,
   ExternalLinkExport,
   externalLinkPartXml,
 } from "./external-links.js";
 import { MAIN_NS, META_MARKER, META_STEM, RELATIONSHIPS_NS } from "./format.js";
-import { convertWorkbookFormulas } from "./formula.js";
+import { exportWorkbookFormulas } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import { preparePivots } from "./pivot.js";
 import { QUERY_TABLE_CONTENT, type QueryTableBinding } from "./query-table.js";
@@ -39,7 +44,7 @@ import {
   type XlsxCodecContext,
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
-import { quotedSheet } from "./writer-cells.js";
+import { quotedSheet, type SpillOutput } from "./writer-cells.js";
 import { writeSheet, type SheetWriteResult } from "./writer-sheet.js";
 import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip, zipChunks, type ZipPart } from "./zip.js";
@@ -396,6 +401,8 @@ export interface EngineContent {
   readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
   /** The rows each worksheet AutoFilter hides, by sheet; Excel stores them hidden. */
   readonly filteredRows?: ReadonlyMap<SheetId, readonly number[]>;
+  /** The installed spills of each worksheet, by sheet; Excel keeps their values in the covered cells. */
+  readonly spills?: ReadonlyMap<SheetId, readonly SpillOutput[]>;
 }
 
 /**
@@ -470,6 +477,7 @@ function* writeWorkbookParts(
   ];
   const workbookRelationships = [];
   let nextTableId = 1;
+  let dynamicArrays = false;
   for (const [index, sheet] of ordered.entries()) {
     checkAbort(context);
     const number = index + 1;
@@ -497,11 +505,13 @@ function* writeWorkbookParts(
         pivots?.sheetRelationships(exportSheet.id),
         dashboard?.charts ?? worksheetPivotCharts(sheet, content, pivots?.nativeIds),
         content.filteredRows?.get(sheet.id),
+        content.spills?.get(sheet.id),
       );
     }
     const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);
     yield { name: part, data: chunks(exportSheet) };
     if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
+    dynamicArrays ||= result.dynamicArrays;
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
     workbookRelationships.push({
       id: `rId${number}`,
@@ -587,6 +597,15 @@ function* writeWorkbookParts(
     ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
     ...(pivots?.pivotCaches(pivotIds) ?? []),
   ];
+  if (dynamicArrays) {
+    yield { name: "xl/metadata.xml", data: TEXT_ENCODER.encode(DYNAMIC_ARRAY_METADATA) };
+    overrides.push({ part: "xl/metadata.xml", contentType: SHEET_METADATA_CONTENT });
+    workbookRelationships.push({
+      id: `rId${workbookRelationships.length + 1}`,
+      type: SHEET_METADATA_REL,
+      target: "metadata.xml",
+    });
+  }
   yield { name: "xl/styles.xml", data: styles.toXml() };
   yield {
     name: "xl/workbook.xml",
@@ -624,8 +643,11 @@ export async function writeWorkbook(
   hook?: WorkbookWriteHookResolver,
   content?: EngineContent,
 ): Promise<Uint8Array> {
-  const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook, content), context);
+  const { formulas, arrayFormulas } = await exportWorkbookFormulas(snapshot);
+  return writeZip(
+    writeWorkbookParts(snapshot, { ...context, formulas, arrayFormulas }, hook, content),
+    context,
+  );
 }
 
 export async function* streamWorkbook(
@@ -634,6 +656,9 @@ export async function* streamWorkbook(
   hook?: WorkbookWriteHookResolver,
   content?: EngineContent,
 ): AsyncGenerator<Uint8Array> {
-  const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook, content), context);
+  const { formulas, arrayFormulas } = await exportWorkbookFormulas(snapshot);
+  yield* zipChunks(
+    writeWorkbookParts(snapshot, { ...context, formulas, arrayFormulas }, hook, content),
+    context,
+  );
 }

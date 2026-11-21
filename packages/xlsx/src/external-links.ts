@@ -36,8 +36,8 @@ export const EXTERNAL_LINK_REL = `${RELATIONSHIPS_NS}/externalLink`;
 const EXTERNAL_LINK_PATH_REL = `${RELATIONSHIPS_NS}/externalLinkPath`;
 export const EXTERNAL_LINK_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml";
-/** The errors that link values can hold; others are left out with a warning. */
-const ERROR_VALUES: Readonly<Record<string, true>> = {
+/** Excel's error values, which link values and cached formula results can hold. */
+export const ERROR_VALUES: Readonly<Record<string, true>> = {
   "#DIV/0!": true,
   "#NULL!": true,
   "#SPILL!": true,

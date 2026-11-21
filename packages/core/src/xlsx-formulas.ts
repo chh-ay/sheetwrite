@@ -7,6 +7,11 @@ import { formulaLexes } from "./formula-token-kinds.js";
 export interface XlsxFormulaEngine {
   /** Convert formulas between editor and OOXML spelling, in input order. */
   convert(formulas: string[], direction: "import" | "export"): string[];
+  /**
+   * The indices of the editor-spelling `formulas` whose result is an array,
+   * ascending. Each is read without a workbook, so a name never counts.
+   */
+  arrayFormulas(formulas: string[]): Uint32Array;
   /** Whether the engine's lexer reads all of `formula`; `copy` changes nothing in text it cannot read. */
   lexes(formula: string): boolean;
   /**
@@ -18,14 +23,8 @@ export interface XlsxFormulaEngine {
   copy(formula: string, rowDelta: number, colDelta: number): string;
 }
 
-/** Adapt the engine's sparse joined batch without round-tripping unchanged strings through WASM. */
-function convertSources(
-  engine: EngineInstance,
-  formulas: string[],
-  direction: "import" | "export",
-): string[] {
-  if (formulas.length === 0) return [];
-
+/** The formulas as one string and the UTF-16 end of each, as the engine's batch calls take them. */
+function joinedSources(formulas: string[]): { joined: string; ends: Uint32Array } {
   const ends = new Uint32Array(formulas.length);
   let length = 0;
   let position = 0;
@@ -36,13 +35,20 @@ function convertSources(
   if (length > 0xffff_ffff) {
     throw new RangeError("Sheetwrite: XLSX formula batch exceeds UTF-16 offset capacity");
   }
+  return { joined: formulas.join(""), ends };
+}
+
+/** Adapt the engine's sparse joined batch without round-tripping unchanged strings through WASM. */
+function convertSources(
+  engine: EngineInstance,
+  formulas: string[],
+  direction: "import" | "export",
+): string[] {
+  if (formulas.length === 0) return [];
+
+  const { joined, ends } = joinedSources(formulas);
   const indices = new Uint32Array(formulas.length);
-  const converted = engine.convertXlsxFormulas(
-    formulas.join(""),
-    ends,
-    direction === "export",
-    indices,
-  );
+  const converted = engine.convertXlsxFormulas(joined, ends, direction === "export", indices);
 
   const results = formulas.slice();
   let indexPosition = 0;
@@ -69,6 +75,11 @@ export function withXlsxFormulaEngine<T>(use: (formulas: XlsxFormulaEngine) => T
   return lendEngine((engine) =>
     use({
       convert: (formulas, direction) => convertSources(engine, formulas, direction),
+      arrayFormulas: (formulas) => {
+        if (formulas.length === 0) return new Uint32Array();
+        const { joined, ends } = joinedSources(formulas);
+        return engine.xlsxArrayFormulas(joined, ends);
+      },
       lexes: (formula) => formulaLexes(engine, formula),
       copy: (formula, rowDelta, colDelta) => engine.translateFormula(formula, rowDelta, colDelta),
     }),
