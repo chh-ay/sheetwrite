@@ -105,6 +105,32 @@ async function dropdown(): Promise<HTMLElement> {
   return dialog;
 }
 
+/** A browser clipboard whose rich format carries a cut's token, as a browser's does. */
+function stubClipboard(): void {
+  class ClipItem {
+    readonly types: string[];
+    constructor(private readonly entries: Record<string, Blob>) {
+      this.types = Object.keys(entries);
+    }
+    getType(type: string): Promise<Blob> {
+      const blob = this.entries[type];
+      return blob ? Promise.resolve(blob) : Promise.reject(new Error(`No ${type}`));
+    }
+  }
+  let items: ClipItem[] = [];
+  Object.defineProperty(globalThis, "ClipboardItem", { configurable: true, value: ClipItem });
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      write: (written: ClipItem[]) => {
+        items = written;
+        return Promise.resolve();
+      },
+      read: () => Promise.resolve(items),
+    },
+  });
+}
+
 describe("AutoFilter in the grid", () => {
   it("turns on for the current region with Ctrl+Shift+L and off again", () => {
     const { grid, host } = mount();
@@ -240,29 +266,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("cuts a filtered range as Excel does: the rows the filter hides move too", async () => {
-    // The clipboard's rich format carries the cut's token, as a browser's does.
-    class ClipItem {
-      readonly types: string[];
-      constructor(private readonly entries: Record<string, Blob>) {
-        this.types = Object.keys(entries);
-      }
-      getType(type: string): Promise<Blob> {
-        const blob = this.entries[type];
-        return blob ? Promise.resolve(blob) : Promise.reject(new Error(`No ${type}`));
-      }
-    }
-    let items: ClipItem[] = [];
-    Object.defineProperty(globalThis, "ClipboardItem", { configurable: true, value: ClipItem });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        write: (written: ClipItem[]) => {
-          items = written;
-          return Promise.resolve();
-        },
-        read: () => Promise.resolve(items),
-      },
-    });
+    stubClipboard();
     const { grid, store } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
@@ -299,6 +303,24 @@ describe("AutoFilter in the grid", () => {
     await loaded();
     expect(grid.getColumnFilters().size).toBe(0);
     expect(notice()?.hidden).toBe(true);
+  });
+
+  it("shows the rows Hide Rows hid, from the cut notice's Show them", async () => {
+    stubClipboard();
+    const { grid } = mount();
+    // Sheet row 2 (banana) is hidden; view rows 1 and 2 show apple and fig.
+    grid.hideRows([2]);
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    const notice = document.querySelector<HTMLElement>(".sheetwrite-action-status");
+    expect(notice?.textContent).toBe("This cut includes 1 hidden row. Show them");
+    notice?.querySelector("button")?.click();
+    expect(grid.hiddenRows()).toEqual([]);
+    grid.undo();
+    expect(grid.hiddenRows()).toEqual([2]);
   });
 
   it("reports the sheet address of edited and selected cells under a filter", () => {
