@@ -251,6 +251,20 @@ describe("result preview", () => {
     type(textarea, "=ROUND(");
     expect(preview()).toBe("");
   });
+
+  // Excel shows no result while a function name is still being typed (#1001).
+  it("shows nothing while the name at the caret is unfinished", async () => {
+    const { textarea } = beginEdit();
+    const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";
+
+    await typeUntilListed(textarea, "=AVER", "AVERAGE");
+    // Longer than the pause after which the preview calculates.
+    await Bun.sleep(300);
+    expect(preview()).toBe("");
+
+    type(textarea, "=AVERAGE(1,3)");
+    await waitFor(() => preview() === "= 2", "the preview once the call is written");
+  });
 });
 
 describe("fixes for live errors", () => {
