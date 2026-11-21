@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { numberFormatCode, numberFormatLabel, numberFormatParts } from "../src/format-presets.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -8,7 +9,6 @@ import type { CellStyle, Renderer } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
-  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -89,18 +89,18 @@ describe("Format Cells", () => {
       "Border",
       "Fill",
     ]);
-    expectSameNode(document.activeElement, tabs[0]!);
+    expectSame(document.activeElement, tabs[0]!);
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expectSameNode(document.activeElement, tabs[1]!);
+    expectSame(document.activeElement, tabs[1]!);
     expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
     const panels = [...dialog.querySelectorAll<HTMLElement>("[role=tabpanel]")];
     expect(panels.map((panel) => panel.hidden)).toEqual([true, false, true, true, true]);
     tabs[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expectSameNode(document.activeElement, tabs[4]!);
+    expectSame(document.activeElement, tabs[4]!);
 
     await answerDialog(host, "Cancel");
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
     expect(cell(0, 1).style).toEqual({});
   });
 
@@ -153,7 +153,7 @@ describe("Format Cells", () => {
     type("");
     dialog.querySelector<HTMLButtonElement>(".sheetwrite-dialog-default")!.click();
     expect(dialog.isConnected).toBe(true);
-    expectSameNode(document.activeElement, code);
+    expectSame(document.activeElement, code);
     type('0.0 "kg"');
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { type SheetTabRecord, SheetTabs, type SheetTabsOptions } from "../src/sheet-tabs.js";
 import type { SheetLifecycleResult } from "../src/types/grid.js";
-import { expectSameNode, pressLikeWebKit } from "./fixtures.js";
+import { pressLikeWebKit } from "./fixtures.js";
 
 const SHEETS: readonly SheetTabRecord[] = [
   { id: "a", name: "Sales" },
@@ -187,7 +188,7 @@ describe("SheetTabs", () => {
     inputText(input, "Cancelled");
     key(input, "Escape");
     expect(renames).toHaveLength(2);
-    expectSameNode(document.activeElement, tabButtons(host)[1]!);
+    expectSame(document.activeElement, tabButtons(host)[1]!);
 
     key(host, "F2");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
@@ -211,7 +212,7 @@ describe("SheetTabs", () => {
     inputText(input, "売上");
     key(input, "Enter");
     expect(renames).toEqual([]);
-    expectSameNode(host.querySelector(".sheetwrite-tab-input"), input);
+    expectSame(host.querySelector(".sheetwrite-tab-input"), input);
 
     input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "売上" }));
     key(input, "Enter");
@@ -240,7 +241,7 @@ describe("SheetTabs", () => {
     key(input, "Enter");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     const error = host.querySelector<HTMLElement>('[role="alert"]')!;
-    expectSameNode(document.activeElement, input);
+    expectSame(document.activeElement, input);
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toBe(error.id);
     expect(error.textContent).toBe(duplicateMessage);
@@ -301,15 +302,15 @@ describe("SheetTabs", () => {
     expect(menu.getAttribute("aria-label")).toBeTruthy();
     const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
     expect(items.length).toBeGreaterThan(1);
-    expectSameNode(document.activeElement, items[0]!);
+    expectSame(document.activeElement, items[0]!);
     key(items[0]!, "End");
-    expectSameNode(document.activeElement, items.at(-1)!);
+    expectSame(document.activeElement, items.at(-1)!);
     key(items.at(-1)!, "Home");
-    expectSameNode(document.activeElement, items[0]!);
+    expectSame(document.activeElement, items[0]!);
     key(items[0]!, "Escape");
     trigger = host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
     expect(host.querySelector('[role="menu"]')).toBeNull();
-    expectSameNode(document.activeElement, trigger);
+    expectSame(document.activeElement, trigger);
 
     trigger.click();
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
@@ -338,12 +339,12 @@ describe("SheetTabs", () => {
     key(hiddenChoices.querySelector("button")!, "Escape");
     expect(unhide.getAttribute("aria-expanded")).toBe("false");
     expect(hiddenChoices.hidden).toBe(true);
-    expectSameNode(document.activeElement, unhide);
+    expectSame(document.activeElement, unhide);
     unhide.click();
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(unhide.getAttribute("aria-expanded")).toBe("false");
     expect(hiddenChoices.hidden).toBe(true);
-    expectSameNode(document.activeElement, unhide);
+    expectSame(document.activeElement, unhide);
     unhide.click();
     expect(host.textContent).not.toContain("Secret");
     hiddenChoices.querySelector("button")!.click();
@@ -460,7 +461,7 @@ describe("SheetTabs", () => {
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     expect(input.value).toBe("Local draft");
     expect(input.dataset.sheetId).toBe("b");
-    expectSameNode(document.activeElement, input);
+    expectSame(document.activeElement, input);
     key(input, "Escape");
     expect(tabButtons(host).map((button) => button.textContent)).toEqual([
       "Summary",
@@ -490,7 +491,7 @@ describe("SheetTabs", () => {
       "c",
     );
     expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
-    expectSameNode(document.activeElement, tabButtons(host)[1]!);
+    expectSame(document.activeElement, tabButtons(host)[1]!);
     expect(tabButtons(host).map((button) => button.tabIndex)).toEqual([-1, 0]);
   });
 
@@ -523,7 +524,7 @@ describe("SheetTabs", () => {
     key(host, "F2");
     expect(host.querySelector("input")).toBeNull();
     key(host, "ArrowRight");
-    expectSameNode(document.activeElement, buttons[2]!);
+    expectSame(document.activeElement, buttons[2]!);
 
     tabs.setReadOnly(false);
     expect(host.querySelector('[aria-label="Add sheet"]')).not.toBeNull();

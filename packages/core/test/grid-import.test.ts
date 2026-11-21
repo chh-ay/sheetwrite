@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
+import { expectDifferent, expectSame } from "../../../test/expect-same.js";
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { MemoryPersistenceAdapter } from "../src/persistence.js";
 import { storeEngine } from "../src/store/engine-registry.js";
@@ -7,13 +8,7 @@ import { SyncCoordinator } from "../src/sync.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, WorkbookSnapshot } from "../src/types.js";
 import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
-import {
-  elementAdded,
-  expectSameNode,
-  keepXlsxSlots,
-  makeColumnarData,
-  makeWorkbook,
-} from "./fixtures.js";
+import { elementAdded, keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const IMPORTED: WorkbookSnapshot = {
   schemaVersion: 1,
@@ -85,7 +80,7 @@ it.each(["new", "s1"])(
     expect(grid.store.getCell({ sheet: id, row: 0, col: 0 }).resolved).toBe(42);
     expect(grid.exportSnapshot().sheets.map((sheet) => sheet.id)).toEqual([id]);
     expect(grid.getCellInput(1, 0)).toBeNull();
-    expectSameNode(host.querySelector(".sheetwrite-viewport"), viewport);
+    expectSame(host.querySelector(".sheetwrite-viewport"), viewport);
     expect(grid.getCommandState("undo").disabled).toBe(true);
     expect(grid.getCommandState("redo").disabled).toBe(true);
   },
@@ -122,7 +117,7 @@ it("releases the old engine storage after replacement", async () => {
   ).toBeGreaterThan(0);
 
   await grid.importWorkbook(IMPORTED);
-  expect(storeEngine(grid.store)).not.toBe(old);
+  expectDifferent(storeEngine(grid.store), old);
   const released = old.getRuntimeResourceSnapshot("teardown", "after-destroy");
   expect(released.wasm.logicalLiveBytes).toBe(0);
   expect(released.jsOwners).toEqual([]);

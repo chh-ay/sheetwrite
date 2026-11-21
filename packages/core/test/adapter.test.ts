@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import {
   applyChangedLiveGridOptions,
   createAdapterGridController,
@@ -69,7 +70,7 @@ for (const [retiredReadiness, currentPublication] of [
     setImmediate(turn.resolve);
     await turn.promise;
     expect(ready.map((event) => event.generation)).toEqual([2]);
-    expect(ready[0]?.grid ?? null).toBe(published.grid);
+    expectSame(ready[0]?.grid ?? null, published.grid);
     expect(failures).toEqual([]);
     controller.unmount();
     controller.unmount();
