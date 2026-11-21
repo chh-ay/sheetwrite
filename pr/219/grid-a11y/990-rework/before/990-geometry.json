@@ -1,0 +1,50 @@
+{
+  "320": {
+    "add": [
+      281,
+      311
+    ],
+    "tabs": [
+      26,
+      226
+    ],
+    "tabsScroll": [
+      285,
+      200
+    ],
+    "active": [
+      26,
+      110
+    ],
+    "status": [
+      232,
+      294
+    ],
+    "statusText": "Ready",
+    "centreOfAddIsAdd": false
+  },
+  "390": {
+    "add": [
+      281,
+      311
+    ],
+    "tabs": [
+      26,
+      296
+    ],
+    "tabsScroll": [
+      285,
+      270
+    ],
+    "active": [
+      26,
+      110
+    ],
+    "status": [
+      302,
+      364
+    ],
+    "statusText": "Ready",
+    "centreOfAddIsAdd": false
+  }
+}
