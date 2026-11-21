@@ -1,7 +1,7 @@
 //! Formula dependency indexes, affected-set growth, and depth/cycle checks.
 
 use std::cell::RefCell;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 
 use crate::formula_slots::{FormulaBits, FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use rustc_hash::FxHashSet;
@@ -202,9 +202,11 @@ struct RangeGroup {
 }
 
 impl DepIndex {
-    /// The groups whose ranges contain `cell`, in `matches`. Column and row
-    /// interval matches are intersected by sorting the row matches, so no
-    /// per-group scratch is needed.
+    /// The groups whose ranges contain `cell`, in `matches`, in column index
+    /// order (start, end and group, descending). Both axes are stabbed a step
+    /// at a time and the scan that ends first gives the candidates: ranges
+    /// that share their columns, as a SUM across each row does, would make a
+    /// column scan visit every range for every cell.
     fn collect_matching_range_groups(
         &self,
         cell: AbsCellKey,
@@ -218,14 +220,38 @@ impl DepIndex {
             return;
         };
 
-        collect_interval_matches(&sheet.col_intervals, cell.col, matches);
-        if matches.is_empty() {
+        let mut cols = IntervalStab::new(&sheet.col_intervals, cell.col);
+        let mut rows = IntervalStab::new(&sheet.row_intervals, cell.row);
+        let row_scan_ended = loop {
+            match cols.step() {
+                Stab::Done => break false,
+                Stab::Match(group) => matches.push(group),
+                Stab::Miss => {}
+            }
+            match rows.step() {
+                Stab::Done => break true,
+                Stab::Match(group) => row_matches.push(group),
+                Stab::Miss => {}
+            }
+        };
+        let contains = |group: &usize| {
+            self.range_groups
+                .get(*group)
+                .is_some_and(|stored| stored.range.contains(cell))
+        };
+        if !row_scan_ended {
+            matches.retain(contains);
             return;
         }
 
-        collect_interval_matches(&sheet.row_intervals, cell.row, row_matches);
-        row_matches.sort_unstable();
-        matches.retain(|group| row_matches.binary_search(group).is_ok());
+        matches.clear();
+        matches.extend(row_matches.iter().copied().filter(contains));
+        matches.sort_unstable_by_key(|&group| {
+            let columns = self.range_groups.get(group).map_or((0, 0), |stored| {
+                (stored.range.col_start, stored.range.col_end)
+            });
+            Reverse((columns, group))
+        });
     }
 
     /// The id of the group for `range` and the number of groups, when more
@@ -976,17 +1002,47 @@ fn run_removes<T>(run: &[(T, FormulaId)], reader: &FormulaId) -> bool {
         .is_ok()
 }
 
-fn collect_interval_matches(intervals: &[RangeInterval], point: u32, out: &mut Vec<usize>) {
-    out.clear();
-    let mut cursor = intervals.partition_point(|interval| interval.start <= point);
-    while cursor > 0 {
-        cursor -= 1;
-        let interval = intervals[cursor];
-        if interval.max_end < point {
-            break;
+/// One stabbing query of a sorted interval index, run a step at a time.
+struct IntervalStab<'a> {
+    intervals: &'a [RangeInterval],
+    point: u32,
+    cursor: usize,
+}
+
+/// What one step of an [`IntervalStab`] found.
+enum Stab {
+    Match(usize),
+    Miss,
+    Done,
+}
+
+impl<'a> IntervalStab<'a> {
+    fn new(intervals: &'a [RangeInterval], point: u32) -> Self {
+        let cursor = intervals.partition_point(|interval| interval.start <= point);
+        Self {
+            intervals,
+            point,
+            cursor,
         }
-        if interval.end >= point {
-            out.push(interval.group);
+    }
+
+    /// Looks at the next interval, by descending start, that starts at or
+    /// before the point. The scan is done once no earlier interval reaches it.
+    fn step(&mut self) -> Stab {
+        let Some(next) = self.cursor.checked_sub(1) else {
+            return Stab::Done;
+        };
+        let Some(interval) = self.intervals.get(next) else {
+            return Stab::Done;
+        };
+        if interval.max_end < self.point {
+            return Stab::Done;
+        }
+        self.cursor = next;
+        if interval.end >= self.point {
+            Stab::Match(interval.group)
+        } else {
+            Stab::Miss
         }
     }
 }
@@ -1999,6 +2055,41 @@ mod tests {
         }
         store.recompute(sheet);
         (store, sheet)
+    }
+
+    #[test]
+    fn range_matches_come_from_the_shorter_axis_in_column_index_order() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(12, 40);
+        // Row sums share their columns, column sums share their rows, and
+        // two blocks overlap both.
+        for row in 1..=40 {
+            store.set_formula(sheet, row - 1, 10, &format!("=SUM(A{row}:H{row})"), 0);
+        }
+        for col in b'A'..=b'H' {
+            let name = char::from(col);
+            let source = format!("=SUM({name}1:{name}30)");
+            store.set_formula(sheet, usize::from(col - b'A'), 11, &source, 0);
+        }
+        store.set_formula(sheet, 20, 11, "=SUM(B2:D9)", 0);
+        store.set_formula(sheet, 21, 11, "=SUM(C5:C40)", 0);
+        let index = build_dep_index(&store.sheets, &store.formula_slots);
+
+        let (mut matches, mut scratch) = (Vec::new(), Vec::new());
+        for row in 0..40 {
+            for col in 0..9 {
+                let cell = AbsCellKey::new(sheet, row, col);
+                index.collect_matching_range_groups(cell, &mut matches, &mut scratch);
+                let mut expected: Vec<usize> = (0..index.range_groups.len())
+                    .filter(|&group| index.range_groups[group].range.contains(cell))
+                    .collect();
+                expected.sort_unstable_by_key(|&group| {
+                    let range = index.range_groups[group].range;
+                    Reverse(((range.col_start, range.col_end), group))
+                });
+                assert_eq!(matches, expected, "cell {row}:{col}");
+            }
+        }
     }
 
     #[test]
