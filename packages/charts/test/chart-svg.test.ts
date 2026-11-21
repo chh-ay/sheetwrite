@@ -239,11 +239,27 @@ describe("renderChartSvg", () => {
       }
     });
 
-    // A scatter chart is the one kind with two value axes; its lowest y label
-    // and its first x label both sit at the corner where the axes meet.
-    it("keeps the scatter chart's x and y labels apart where the axes meet, at every width", () => {
+    /** A year of monthly revenue: category labels wider than their bands on narrow charts. */
+    const MONTHLY = seriesView(
+      "Revenue",
+      [532, 508, 579, 557, 518, 494, 545, 573, 629, 691, 764, 838].map((value) => value * 1_000),
+      {
+        categories: Array.from(
+          { length: 12 },
+          (_, month) => `2026-${String(month + 1).padStart(2, "0")}`,
+        ),
+        numberFormats: Array.from({ length: 12 }, () => "$#,##0"),
+      },
+    );
+
+    // Where the axes meet, a scatter chart's lowest y label sits beside its
+    // first x label, and a column chart's $0 beside its first category.
+    it.each<[ChartKind, ChartView]>([
+      ["scatter", chartView("scatter", [SPEND])],
+      ["column", chartView("column", [MONTHLY])],
+    ])("keeps the %s chart's labels apart where the axes meet, at every width", (_, view) => {
       for (const width of LENGTHS) {
-        const svg = renderChartSvg(chartView("scatter", [SPEND]), { width, height: 300 });
+        const svg = renderChartSvg(view, { width, height: 300 });
         const boxes = [
           ...svg.querySelectorAll(
             ".sheetwrite-chart-value-axis text, .sheetwrite-chart-category-axis text",

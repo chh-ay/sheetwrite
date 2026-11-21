@@ -583,6 +583,8 @@ function drawCategoryLabels(
     : Math.max(...labels.map((label) => textWidth(label))) + AXIS_LABEL_GAP;
   const stride = Math.max(1, Math.ceil(labelExtent / band));
 
+  // The right edge of the last horizontal label drawn.
+  let drawnRight = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < labels.length; index += stride) {
     const label = labels[index] ?? "";
     const center = (index + 0.5) * band;
@@ -598,13 +600,18 @@ function drawCategoryLabels(
         group,
       );
     } else {
+      const text = fitText(label, band * stride - AXIS_LABEL_GAP);
+      // A label wider than its band stays over the plot: past the plot's left
+      // edge, the first one ran into the value axis's lowest label ($0). Kept
+      // over the plot, it can reach the next label on a narrow chart; then
+      // that next label is left out.
+      const half = textWidth(text) / 2;
+      const x = Math.min(Math.max(plot.left + center, plot.left + half), plot.right - half);
+      if (x - half < drawnRight + AXIS_LABEL_GAP) continue;
+      drawnRight = x + half;
       context.svg.text(
-        fitText(label, band * stride - AXIS_LABEL_GAP),
-        {
-          x: plot.left + center,
-          y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE,
-          "text-anchor": "middle",
-        },
+        text,
+        { x, y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE, "text-anchor": "middle" },
         group,
       );
     }
