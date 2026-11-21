@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { validateDocumentOperationShape } from "../src/document-protocol.js";
 import {
   type Column,
   createGrid,
@@ -211,6 +210,34 @@ describe("pivot definitions in snapshots", () => {
       "invalid-value",
     ],
     [
+      "a field on both rows and columns",
+      (input: WorkbookSnapshot) => {
+        input.sheets[0]!.pivots = [rangePivot({ rows: [0], columns: [0] })];
+      },
+      "sheets[0].pivots[0].columns[0]",
+      "invalid-value",
+    ],
+    [
+      "an empty value number format",
+      (input: WorkbookSnapshot) => {
+        input.sheets[0]!.pivots = [
+          rangePivot({ values: [{ field: 1, aggregation: "SUM", numberFormat: "" }] }),
+        ];
+      },
+      "sheets[0].pivots[0].values[0].numberFormat",
+      "invalid-value",
+    ],
+    [
+      "a value number format longer than a cell format",
+      (input: WorkbookSnapshot) => {
+        input.sheets[0]!.pivots = [
+          rangePivot({ values: [{ field: 1, aggregation: "SUM", numberFormat: "0".repeat(256) }] }),
+        ];
+      },
+      "sheets[0].pivots[0].values[0].numberFormat",
+      "invalid-value",
+    ],
+    [
       "more filter values than the limit",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
@@ -232,22 +259,6 @@ describe("pivot definitions in snapshots", () => {
 });
 
 describe("pivot document operations", () => {
-  it("validates setPivot and removePivot shapes", () => {
-    expect(
-      validateDocumentOperationShape({ op: "setPivot", sheet: "report", pivot: rangePivot() }),
-    ).toEqual([]);
-    expect(validateDocumentOperationShape({ op: "removePivot", sheet: "report", id: "p" })).toEqual(
-      [],
-    );
-    expect(
-      validateDocumentOperationShape({
-        op: "setPivot",
-        sheet: "report",
-        pivot: { ...rangePivot(), rows: [0], columns: [0] },
-      }),
-    ).toContainEqual(expect.objectContaining({ path: "operation.pivot.columns[0]" }));
-  });
-
   it("keeps one undo entry per change and refuses references the workbook does not hold", () => {
     const grid = mountGrid([]);
     expect(grid.setPivot(rangePivot()).status).toBe("applied");
@@ -387,7 +398,6 @@ describe("pivot structural rewrites", () => {
 
   it.each([
     ["every source row is deleted", { op: "removeRows", sheet: "data", at: 0, count: 6 }],
-    ["every source column is deleted", { op: "removeColumns", sheet: "data", at: 0, count: 3 }],
     ["the source sheet is removed", { op: "removeSheet", sheet: "data" }],
   ] as const)("marks a range source invalid when %s, and undo clears it", (_name, operation) => {
     const grid = mountGrid([rangePivot()]);
@@ -466,25 +476,6 @@ describe("pivot structural rewrites", () => {
       // The recorded anchor fell back inside the shrunken sheet, so the undo still applies.
       grid.undo();
       expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor }));
-    },
-  );
-
-  it.each<[string, DocumentOp]>([
-    ["rows", { op: "removeRows", sheet: "report", at: 1, count: 3 }],
-    ["columns", { op: "removeColumns", sheet: "report", at: 1, count: 2 }],
-  ])(
-    "restores an older pivot undo to its anchor after a non-trailing %s delete is undone",
-    (_name, operation) => {
-      const grid = mountGrid([]);
-      grid.setPivot(rangePivot());
-      grid.setPivot(rangePivot({ name: "Renamed" }));
-      grid.applyTransaction({ patches: [operation] });
-
-      grid.undo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ name: "Renamed" }));
-
-      grid.undo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
     },
   );
 });

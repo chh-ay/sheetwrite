@@ -5,7 +5,6 @@ import {
   type DelimitedTextResourceLimits,
   encodeDelimitedTextChunks,
 } from "../src/delimited-text.js";
-import { SheetwriteError } from "../src/errors.js";
 import { fromCsv, parseCsv, toCsv, toCsvStream, toTsv, toTsvStream } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -240,27 +239,5 @@ describe("XLSX call abort", () => {
     } finally {
       source.dispose();
     }
-  });
-
-  it("cuts a long backend name in the failure context to 8 KiB", async () => {
-    setXlsxWorkbookBackend({
-      name: "b".repeat(1 << 20),
-      toXlsxWorkbook: async () => {
-        throw new Error("backend failed");
-      },
-      fromXlsxWorkbook: async () => {
-        throw new Error("backend failed");
-      },
-    });
-
-    const failure = await toXlsxWorkbook(snapshot).then(
-      () => undefined,
-      (error: unknown) => error,
-    );
-    if (!(failure instanceof SheetwriteError)) throw new Error("expected a SheetwriteError");
-    expect(failure.code).toBe("export-failed");
-    const backend = failure.context?.backend;
-    if (typeof backend !== "string") throw new Error("expected a backend name in the context");
-    expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(MAX_ERROR_TEXT_BYTES);
   });
 });

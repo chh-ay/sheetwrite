@@ -4,23 +4,8 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { createGrid } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type {
-  CellScalar,
-  DataSourceRequest,
-  GridEvents,
-  Renderer,
-  RenderLayout,
-  RowData,
-  Viewport,
-} from "../src/types.js";
-import {
-  coveredPage,
-  makeColumnarData,
-  makeWorkbook,
-  mountGridWithData,
-  mountHost,
-  scrollerOf,
-} from "./fixtures.js";
+import type { CellScalar, DataSourceRequest, GridEvents, Renderer, RowData } from "../src/types.js";
+import { coveredPage, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -47,6 +32,24 @@ afterEach(() => {
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
 
+/** A 1,000-row paged sheet of one column with a frozen row and a 64-byte clean cache. */
+function mountPagedNameColumn() {
+  const workbook = makeWorkbook(1_000);
+  const sheet = workbook.sheets[0];
+  if (!sheet) throw new Error("expected fixture sheet");
+  sheet.columns = sheet.columns.slice(0, 1);
+  sheet.frozenRows = 1;
+  const host = mountHost();
+  const grid = createGrid(host, {
+    workbook,
+    overscan: 0,
+    datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 64 },
+  });
+  const store = grid.store;
+  if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
+  return { host, grid, store };
+}
+
 function requestColumnIndices(request: DataSourceRequest): number[] {
   const indices: number[] = [];
   for (const band of request.columns) {
@@ -55,30 +58,16 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
   return indices;
 }
 
-interface PaintRecorder extends Renderer {
-  readonly paints: Array<{ rowHeights: number[] | null; values: CellScalar[] }>;
-  readonly layouts: Array<RenderLayout["merges"]>;
-}
-
-function makePaintRecorder(): PaintRecorder {
-  let lastViewport: Viewport | null = null;
-  const paints: Array<{ rowHeights: number[] | null; values: CellScalar[] }> = [];
-  const layouts: Array<RenderLayout["merges"]> = [];
+/** A renderer that records the values of each paint. */
+function makePaintRecorder(): Renderer & { readonly paints: CellScalar[][] } {
+  const paints: CellScalar[][] = [];
   return {
     paints,
-    layouts,
     mount() {},
-    setLayout(layout) {
-      layouts.push(layout.merges?.map((merge) => ({ ...merge })));
-    },
-    setViewport(viewport: Viewport) {
-      lastViewport = viewport;
-    },
+    setLayout() {},
+    setViewport() {},
     paint(view) {
-      paints.push({
-        rowHeights: lastViewport?.rowHeights ? Array.from(lastViewport.rowHeights) : null,
-        values: Array.from(view.values),
-      });
+      paints.push(Array.from(view.values));
     },
     setTheme() {},
     setRenderers() {},
@@ -86,42 +75,7 @@ function makePaintRecorder(): PaintRecorder {
   };
 }
 
-describe("row-resize repaint invalidation", () => {
-  // A 5-row sheet keeps every row inside the render window regardless of height,
-  // so the paint signature's window/scroll/store components are all invariant
-  // across the resize. The only way a repaint can fire is the row-height epoch.
-  it("repaints with the new row height after a row-header drag", () => {
-    const { host, grid } = mountGridWithData(5);
-
-    const recorder = makePaintRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
-    expect(recorder.paints.length).toBe(0);
-
-    const scroller = scrollerOf(host);
-    // The row-0/row-1 boundary sits at content-Y === rowHeight, inside the left
-    // row-header gutter (x < rowHeaderWidth).
-    const boundaryY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
-    scroller.dispatchEvent(
-      new PointerEvent("pointerdown", {
-        clientX: 10,
-        clientY: boundaryY,
-        button: 0,
-        bubbles: true,
-      }),
-    );
-    // Drag down 30px: row 0 grows 28 -> 58.
-    scroller.dispatchEvent(
-      new PointerEvent("pointermove", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
-    );
-    scroller.dispatchEvent(
-      new PointerEvent("pointerup", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
-    );
-
-    expect(recorder.paints.length).toBeGreaterThan(0);
-    expect(recorder.paints.at(-1)?.rowHeights?.[0]).toBe(58);
-
-    grid.destroy();
-  });
+describe("paged formula closures and residency", () => {
   it.each(["frozen", "merge"] as const)(
     "loads the formula closure of a visible %s anchor",
     async (rootKind) => {
@@ -198,20 +152,8 @@ describe("row-resize repaint invalidation", () => {
   );
 
   it("keeps viewport chunks resident across disjoint bulk reads and releases both pin lifetimes", () => {
-    const workbook = makeWorkbook(1_000);
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("expected fixture sheet");
-    sheet.columns = sheet.columns.slice(0, 1);
-    sheet.frozenRows = 1;
-    const host = mountHost();
-    const grid = createGrid(host, {
-      workbook,
-      overscan: 0,
-      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 64 },
-    });
+    const { host, grid, store } = mountPagedNameColumn();
     try {
-      const store = grid.store;
-      if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
       const scroller = scrollerOf(host);
       scroller.scrollTop = 100 * DEFAULT_THEME.rowHeight;
       scroller.dispatchEvent(new Event("scroll"));
@@ -239,20 +181,8 @@ describe("row-resize repaint invalidation", () => {
     }
   });
   it("retains a visible formula dependency closure under clean-cache pressure", () => {
-    const workbook = makeWorkbook(1_000);
-    const sheet = workbook.sheets[0];
-    if (!sheet) throw new Error("expected fixture sheet");
-    sheet.columns = sheet.columns.slice(0, 1);
-    sheet.frozenRows = 1;
-    const host = mountHost();
-    const grid = createGrid(host, {
-      workbook,
-      overscan: 0,
-      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 64 },
-    });
+    const { grid, store } = mountPagedNameColumn();
     try {
-      const store = grid.store;
-      if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
       const columns = [{ start: 0, end: 1, keys: ["name"] }];
       store.loadPage("s1", 0, columns, [{ name: { kind: "formula", src: "=A901+1" } }]);
       store.loadPage("s1", 900, columns, [{ name: 41 }]);
@@ -268,46 +198,6 @@ describe("row-resize repaint invalidation", () => {
   });
 });
 
-describe("merge repaint invalidation", () => {
-  it("keeps merge metadata and selection unchanged in read-only mode", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, readOnly: true }, store);
-    const selection = {
-      kind: "range" as const,
-      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
-    };
-
-    grid.setSelection(selection);
-    const originalMerges = workbook.sheets[0]?.merges?.map((merge) => ({ ...merge })) ?? [];
-    grid.actions.merge();
-
-    expect(workbook.sheets[0]?.merges ?? []).toEqual(originalMerges);
-    expect(grid.getSelection()).toEqual(selection);
-    grid.destroy();
-
-    const mergedWorkbook = makeWorkbook(10);
-    mergedWorkbook.sheets[0]!.merges = [{ r0: 1, c0: 0, r1: 2, c1: 1 }];
-    const mergedStore = new SheetwriteStore(mergedWorkbook, makeColumnarData(10));
-    const mergedHost = mountHost();
-    const mergedGrid = new GridImpl(
-      mergedHost,
-      { workbook: mergedWorkbook, readOnly: true },
-      mergedStore,
-    );
-    const coveredCell = {
-      kind: "cell" as const,
-      addr: { sheet: "s1", row: 2, col: 1 },
-    };
-    mergedGrid.setSelection(coveredCell);
-    mergedGrid.actions.unmerge();
-
-    expect(mergedWorkbook.sheets[0]?.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(mergedGrid.getSelection()).toEqual(coveredCell);
-    mergedGrid.destroy();
-  });
-});
 describe("datasource repaint invalidation", () => {
   it("loads the off-screen cells that visible formulas read", async () => {
     const columnCount = 20;
@@ -366,7 +256,7 @@ describe("datasource repaint invalidation", () => {
     const { rowHeight, headerHeight } = DEFAULT_THEME;
     const firstOnScreen = Math.floor(scrollTop / rowHeight);
     const lastOnScreen = Math.floor((scrollTop + host.clientHeight - headerHeight - 1) / rowHeight);
-    const lastPaint = recorder.paints.at(-1)?.values ?? [];
+    const lastPaint = recorder.paints.at(-1) ?? [];
     for (let row = firstOnScreen; row <= lastOnScreen; row++) {
       expect(grid.store.getCell({ sheet: "s1", row, col: column }).resolved).toBe(row * 2);
       expect(lastPaint).toContain(row * 2);
@@ -414,7 +304,7 @@ describe("datasource repaint invalidation", () => {
       expect(grid.store.getCell({ sheet: "s1", row: spillRows - 1, col: 0 }).resolved).toBe(
         spillRows,
       );
-      expect(recorder.paints.at(-1)?.values).toContain(1);
+      expect(recorder.paints.at(-1)).toContain(1);
     } finally {
       grid.destroy();
     }

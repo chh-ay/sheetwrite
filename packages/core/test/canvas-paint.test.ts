@@ -428,6 +428,36 @@ describe("paintFrame column styles", () => {
   });
 });
 
+describe("paintFrame AutoFilter header text", () => {
+  it("lays out header text before the filter button for every alignment, as Excel does", () => {
+    const layout = makeLayout(
+      ["a", "b", "c", "d"].map((key) => ({ key, header: key, width: 100, type: "text" as const })),
+    );
+    const styleIds = new Uint32Array(12);
+    styleIds[0] = 1;
+    styleIds[1] = 2;
+    const view = makeView(styleIds, [{}, { align: "right" }, { align: "center" }], [0, 1, 2, 3]);
+    (view.values as string[]).splice(0, 4, "Revenue", "Units", "Region of sale", "");
+
+    const ctx = render(view, layout, {
+      ...UNIFORM_VIEWPORT,
+      filterHeader: { row: 0, start: 0, end: 3 },
+    });
+
+    // Each 100 px cell's 16 px button starts at 82 px, and its text box ends there.
+    const text = (label: string) => ctx.fillTexts.find((call) => call.text === label);
+    expect(text("Revenue")?.x).toBe(82 - 6);
+    expect(text("Units")?.x).toBe(100 + 82 / 2);
+    // Left-aligned text clips at its own button, not under it in the empty cell beside.
+    expect(text("Region of sale")?.clips).toContainEqual({
+      x: 200,
+      y: HEADER_HEIGHT,
+      w: 82,
+      h: ROW_HEIGHT,
+    });
+  });
+});
+
 describe("layoutTextLines", () => {
   // One width unit per character, so expected breaks can be worked out by hand.
   const monospace = {

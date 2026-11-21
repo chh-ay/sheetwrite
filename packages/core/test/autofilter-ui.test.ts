@@ -213,6 +213,15 @@ describe("AutoFilter in the grid", () => {
     expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
   });
 
+  it("edits a header cell in its text box, which ends before the filter button, as Excel does", () => {
+    const { grid, host } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    press(host, "F2");
+    // B1 is 100 px wide; its 16 px button sits 2 px from the right edge.
+    expect(document.querySelector<HTMLElement>(".sheetwrite-editor")?.style.width).toBe("82px");
+  });
+
   it("groups only the numbers that show as dates in a mostly-date column, as Excel does", async () => {
     // Three dates of 2026, then 15%, $4.50 and a plain 7 in the same column.
     const rows = [

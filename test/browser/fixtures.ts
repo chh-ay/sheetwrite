@@ -1,7 +1,6 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import type { Grid } from "../../packages/core/src/types.js";
-import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 export { expect };
 export { siteUrl } from "./playwright.config.js";
@@ -113,4 +112,45 @@ export async function screenshotPixels(page: Page, image: Buffer): Promise<Uint8
     context.drawImage(source, 0, 0);
     return context.getImageData(0, 0, canvas.width, canvas.height).data;
   }, image.toString("base64"));
+}
+
+/**
+ * Returns whether an RGBA sample contains fully opaque paint that differs from
+ * its background. The most frequent opaque color is treated as the background.
+ */
+export function hasOpaqueForeground(rgba: ArrayLike<number>): boolean {
+  const opaqueColors = new Map<string, number>();
+  let opaquePixels = 0;
+  for (let offset = 0; offset + 3 < rgba.length; offset += 4) {
+    if (rgba[offset + 3] !== 255) continue;
+    opaquePixels += 1;
+    const key = `${rgba[offset]},${rgba[offset + 1]},${rgba[offset + 2]}`;
+    opaqueColors.set(key, (opaqueColors.get(key) ?? 0) + 1);
+  }
+  if (opaqueColors.size < 2) return false;
+  let dominantCount = 0;
+  for (const count of opaqueColors.values()) dominantCount = Math.max(dominantCount, count);
+  return dominantCount < opaquePixels;
+}
+
+/**
+ * Where the focus is against the grid host `grid`: on it, inside it, inside
+ * the shell part `part`, before or after it in the document, or nowhere.
+ */
+export function focusAt(page: Page, grid: string, part?: string): Promise<string> {
+  return page.evaluate(
+    ([gridSelector, partSelector]) => {
+      const active = document.activeElement;
+      const host = document.querySelector(gridSelector);
+      const region = partSelector === undefined ? null : document.querySelector(partSelector);
+      if (host === null || active === null || active === document.body) return "none";
+      if (active === host) return "grid";
+      if (region?.contains(active)) return "part";
+      if (host.contains(active)) return "inside";
+      return host.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING
+        ? "after"
+        : "before";
+    },
+    [grid, part] as const,
+  );
 }

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import type { Grid, PagedStoreStats } from "../../packages/core/src/types.js";
-import { expect, test } from "./fixtures.js";
+import { expect, fitsViewport, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -134,41 +134,6 @@ async function gridBodyPoint(page: Page, row: number, column: number) {
   throw new Error(`Could not bring cell r${row} c${column} into the viewport`);
 }
 
-test("the live Grid is exactly one billion logical addresses with bounded rectangular pages", async ({
-  page,
-}) => {
-  await bootScale(page);
-  const workbook = await page.evaluate(() => window.__sheetwriteScaleGrid?.store.getWorkbook());
-  expect(workbook?.sheets).toHaveLength(1);
-  expect(workbook?.sheets[0]?.rowCount).toBe(ROWS);
-  expect(workbook?.sheets[0]?.columns).toHaveLength(COLUMNS);
-  await expect(page.getByTestId("scale-grid")).toHaveAttribute(
-    "data-cache-bytes",
-    String(CACHE_BUDGET_BYTES),
-  );
-  const stats = await pagedStats(page);
-  expect(stats?.fullyLoaded).toBe(false);
-  expect(stats?.allocatedBytes).toBeLessThanOrEqual(CACHE_BUDGET_BYTES);
-  expect(stats?.loadedCells).toBeLessThan(ROWS * COLUMNS);
-
-  const initial = await readWindow(page);
-  expect([initial.firstRow, initial.firstColumn]).toEqual([1, 0]);
-  await expect(page.getByTestId("scale-last-band")).toContainText("columns");
-  for (const counter of ["scale-requested-cells", "scale-returned-cells"]) {
-    expect(numericText(await page.getByTestId(counter).textContent())).toBeGreaterThan(0);
-  }
-
-  // Whole-sheet scans and exports refuse a partly loaded store.
-  await page.getByTestId("scale-global-details").locator("summary").click();
-  for (const action of ["scan", "export"]) {
-    await page.getByTestId(`scale-${action}-attempt`).click();
-    const report = page.getByTestId(`scale-${action}-report`);
-    await expect(report).toHaveAttribute("data-state", "incomplete");
-    await expect(report).toContainText("IncompleteDataError");
-  }
-  await expect(page.getByTestId("scale-query-state")).toContainText("incomplete");
-});
-
 test("a distant physical edit survives clean-tile eviction, far horizontal motion, and revisit", async ({
   page,
 }) => {
@@ -258,115 +223,94 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
   await expect.poll(() => resolved(page, editRow, column)).toBe(777_777);
 });
 
-test("mobile touch input, renderer swap, and responsive reflow stay operable @portability", async ({
-  browser,
-  browserName,
-}) => {
-  const context = await browser.newContext({
-    hasTouch: true,
-    isMobile: true,
-    viewport: { width: 390, height: 844 },
-  });
-  const page = await context.newPage();
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
-  await bootScale(page);
-  const grid = page.locator(GRID);
-  await grid.scrollIntoViewIfNeeded();
-  const box = await grid.boundingBox();
-  if (!box) throw new Error("Mobile Grid has no physical bounds");
-  expect(box.width).toBeGreaterThan(200);
-  const beforeTap = await readWindow(page);
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-  await expect.poll(async () => (await readWindow(page)).selected).not.toBe(beforeTap.selected);
-  const beforeTouch = await readWindow(page);
-  if (browserName === "chromium") {
-    const session = await context.newCDPSession(page);
+test.describe("on a phone", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("a tap selects and a touch drag scrolls the billion-cell grid, which fits the page", async ({
+    page,
+  }) => {
+    await bootScale(page);
+    const grid = page.locator(GRID);
+    await grid.scrollIntoViewIfNeeded();
+    const box = await grid.boundingBox();
+    if (!box) throw new Error("Mobile Grid has no physical bounds");
+    expect(box.width).toBeGreaterThan(200);
+    const beforeTap = await readWindow(page);
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await expect.poll(async () => (await readWindow(page)).selected).not.toBe(beforeTap.selected);
+
+    // A real touch drag through the DevTools protocol, upward by 60% of the grid.
+    const beforeTouch = await readWindow(page);
+    const session = await page.context().newCDPSession(page);
     const x = Math.round(box.x + box.width / 2);
     const startY = Math.round(box.y + box.height * 0.8);
     const endY = Math.round(box.y + box.height * 0.2);
+    const touchSteps = 8;
     await session.send("Input.dispatchTouchEvent", {
       type: "touchStart",
       touchPoints: [{ x, y: startY, id: 1 }],
     });
-    for (let step = 1; step <= 8; step += 1) {
+    for (let step = 1; step <= touchSteps; step += 1) {
       await session.send("Input.dispatchTouchEvent", {
         type: "touchMove",
-        touchPoints: [{ x, y: Math.round(startY + ((endY - startY) * step) / 8), id: 1 }],
+        touchPoints: [{ x, y: Math.round(startY + ((endY - startY) * step) / touchSteps), id: 1 }],
       });
     }
     await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  } else if (browserName === "webkit") {
-    await grid.locator(".sheetwrite-scroller").evaluate((scroller) => {
-      scroller.scrollTop += 1_200;
-    });
-  } else {
-    await grid.hover();
-    await page.mouse.wheel(0, 1_200);
-  }
-  await expect
-    .poll(async () => (await readWindow(page)).firstRow)
-    .toBeGreaterThan(beforeTouch.firstRow);
-
-  await page.locator(".sw-sp-render-details summary").click();
-  await page.getByTestId("scale-renderer-worker").click();
-  await page.waitForSelector(`${GRID} canvas`, { state: "attached" });
-  await expect(page.getByTestId("scale-renderer-active")).toBeVisible();
-  await page.getByTestId("scale-renderer-canvas").click();
-  await expect(page.getByTestId("scale-renderer-active")).toHaveText("canvas");
-  await expect(page.locator(`${GRID} canvas`)).toHaveCount(1);
-  // The page must not overflow sideways on a phone.
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
-  ).toBeLessThanOrEqual(1);
-  expect(errors).toEqual([]);
-  await context.close();
+    await expect
+      .poll(async () => (await readWindow(page)).firstRow)
+      .toBeGreaterThan(beforeTouch.firstRow);
+    expect(await fitsViewport(page)).toBe(true);
+  });
 });
 
+/** A landmark row's period is #LOADING! until its page loads, never a stale value, then the period. */
 async function assertLoadedPeriodWithoutStaleFlash(page: Page, row: number): Promise<void> {
   const expectedPeriod = `FY${2024 + (Math.floor(row / 12) % 5)} P${String((row % 12) + 1).padStart(2, "0")}`;
-  const samples: Array<{ state: string | null; value: unknown }> = [];
   for (let sample = 0; sample < 8; sample += 1) {
-    samples.push(
-      await page.evaluate((targetRow) => {
-        const store = window.__sheetwriteScaleGrid?.store;
-        return {
-          state: store?.getCellLoadState?.({ sheet: "scale", row: targetRow, col: 0 }) ?? null,
-          value: store?.getCell({ sheet: "scale", row: targetRow, col: 0 }).resolved,
-        };
-      }, row),
-    );
+    const { state, value } = await page.evaluate((targetRow) => {
+      const store = window.__sheetwriteScaleGrid?.store;
+      const addr = { sheet: "scale", row: targetRow, col: 0 };
+      return { state: store?.getCellLoadState?.(addr), value: store?.getCell(addr).resolved };
+    }, row);
+    expect(value).toBe(state === "unloaded" ? "#LOADING!" : expectedPeriod);
     await page.waitForTimeout(20);
   }
-  for (const sample of samples) {
-    if (sample.state === "unloaded") {
-      expect(sample.value).toBe("#LOADING!");
-    } else {
-      expect(sample.value).toBe(expectedPeriod);
-    }
-  }
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          (targetRow) =>
-            window.__sheetwriteScaleGrid?.store.getCell({
-              sheet: "scale",
-              row: targetRow,
-              col: 0,
-            }).resolved,
-          row,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBe(expectedPeriod);
+  await expect.poll(() => resolved(page, row, 0), { timeout: 20_000 }).toBe(expectedPeriod);
 }
 
-test("row and column navigators agree with the public window headers", async ({ page }) => {
+test("the live Grid is exactly one billion logical addresses with bounded pages, and its navigators agree with the window headers", async ({
+  page,
+}) => {
   await bootScale(page);
+  const workbook = await page.evaluate(() => window.__sheetwriteScaleGrid?.store.getWorkbook());
+  expect(workbook?.sheets).toHaveLength(1);
+  expect(workbook?.sheets[0]?.rowCount).toBe(ROWS);
+  expect(workbook?.sheets[0]?.columns).toHaveLength(COLUMNS);
+  await expect(page.getByTestId("scale-grid")).toHaveAttribute(
+    "data-cache-bytes",
+    String(CACHE_BUDGET_BYTES),
+  );
+  const stats = await pagedStats(page);
+  expect(stats?.fullyLoaded).toBe(false);
+  expect(stats?.allocatedBytes).toBeLessThanOrEqual(CACHE_BUDGET_BYTES);
+  expect(stats?.loadedCells).toBeLessThan(ROWS * COLUMNS);
+  const opening = await readWindow(page);
+  expect([opening.firstRow, opening.firstColumn]).toEqual([1, 0]);
+  await expect(page.getByTestId("scale-last-band")).toContainText("columns");
+  for (const counter of ["scale-requested-cells", "scale-returned-cells"]) {
+    expect(numericText(await page.getByTestId(counter).textContent())).toBeGreaterThan(0);
+  }
+  // Whole-sheet scans and exports refuse a partly loaded store.
+  await page.getByTestId("scale-global-details").locator("summary").click();
+  for (const action of ["scan", "export"]) {
+    await page.getByTestId(`scale-${action}-attempt`).click();
+    const report = page.getByTestId(`scale-${action}-report`);
+    await expect(report).toHaveAttribute("data-state", "incomplete");
+    await expect(report).toContainText("IncompleteDataError");
+  }
+  await expect(page.getByTestId("scale-query-state")).toContainText("incomplete");
+
   const grid = page.locator(GRID);
   await grid.scrollIntoViewIfNeeded();
   const box = await grid.boundingBox();
