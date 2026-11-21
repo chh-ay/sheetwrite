@@ -156,14 +156,14 @@ describe("Rust LLVM normalization", () => {
       "SF:/repo/packages/wasm/src/calc.rs\nFNF:2\nFNH:2\nDA:1,3\nDA:2,0\nDA:3,2\nDA:4,1\nDA:5,1\nLF:5\nLH:4\nend_of_record",
       ROOT,
     );
-    const llvm = {
+    const llvm = (prodCount: number) => ({
       data: [
         {
           files: [{ filename: "/repo/packages/wasm/src/calc.rs" }],
           functions: [
             {
               name: "_RNv_prod",
-              count: 3,
+              count: prodCount,
               filenames: [
                 "/repo/packages/wasm/src/calc.rs",
                 "/toolchain/rustlib/src/thread_local.rs",
@@ -182,8 +182,8 @@ describe("Rust LLVM normalization", () => {
           ],
         },
       ],
-    };
-    expect(normalizeRustCoverage(llvm, lcov, ROOT)).toEqual([
+    });
+    expect(normalizeRustCoverage(llvm(3), lcov, ROOT)).toEqual([
       {
         path: "packages/wasm/src/calc.rs",
         lines: { covered: 2, total: 3 },
@@ -197,6 +197,9 @@ describe("Rust LLVM normalization", () => {
         ]),
       },
     ]);
+    expect(() => normalizeRustCoverage(llvm(Number.NaN), lcov, ROOT)).toThrow(
+      "finite non-negative integer",
+    );
     expect(() =>
       normalizeRustCoverage(
         { data: [{ files: [{ filename: "/repo/packages/wasm/src/eval.rs" }], functions: [] }] },
