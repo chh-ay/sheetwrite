@@ -155,7 +155,7 @@ describe("opening the panel", () => {
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");
     expect(byLabel(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
     // The search box has focus, so typing searches at once.
-    expect(document.activeElement).toBe(byLabel(panel, "Search commands or press keys"));
+    expect(document.activeElement === byLabel(panel, "Search commands or press keys")).toBe(true);
   });
 });
 
@@ -165,34 +165,28 @@ describe("Excel's defaults on each platform", () => {
   const FIREFOX_LINUX = "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0";
   const FIREFOX_WINDOWS =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0";
-  const ctrlCmdV = () => new KeyboardEvent("keydown", { key: "v", ctrlKey: true, metaKey: true });
 
-  for (const [platform, agent] of [
-    ["Linux x86_64", FIREFOX_LINUX],
-    ["Win32", FIREFOX_WINDOWS],
-  ] as const) {
-    it(`gives ${platform} only keys the page receives`, async () => {
+  it.each([
+    ["Linux x86_64", FIREFOX_LINUX, "Ctrl+Alt+V", null],
+    ["Win32", FIREFOX_WINDOWS, "Ctrl+Alt+V", null],
+    // Excel for Mac's Ctrl+Cmd+V opens Paste Special too, on macOS only.
+    ["MacIntel", SAFARI_MAC, "⌘⌥V, ⌃⌘V", "pasteSpecial"],
+  ] as const)(
+    "gives %s only Paste Special keys the page receives",
+    async (platform, agent, label, ctrlCmdV) => {
       setNavigator(platform, agent);
       const { grid, host } = setup();
       const panel = await open(grid, host);
 
       const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
-      expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe("Ctrl+Alt+V");
-      expect(panel.querySelector(".sheetwrite-keys-warning")).toBe(null);
-      expect(new Keymap().action(ctrlCmdV())).toBe(null);
-    });
-  }
-
-  it("gives macOS Excel for Mac's Ctrl+Cmd+V for Paste Special too", async () => {
-    setNavigator("MacIntel", SAFARI_MAC);
-    const { grid, host } = setup();
-    const panel = await open(grid, host);
-
-    const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
-    expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe("⌘⌥V, ⌃⌘V");
-    expect(pasteSpecial.querySelector(".sheetwrite-keys-warning")).toBe(null);
-    expect(new Keymap().action(ctrlCmdV())).toBe("pasteSpecial");
-  });
+      expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe(label);
+      // Firefox reserves no default; Safari keeps ⌘⇧3 for Date.
+      const warned = platform === "MacIntel" ? pasteSpecial : panel;
+      expect(warned.querySelector(".sheetwrite-keys-warning")).toBe(null);
+      const event = new KeyboardEvent("keydown", { key: "v", ctrlKey: true, metaKey: true });
+      expect(new Keymap().action(event)).toBe(ctrlCmdV);
+    },
+  );
 });
 
 describe("recording keys", () => {
@@ -234,11 +228,11 @@ describe("recording keys", () => {
     press(document.activeElement as HTMLElement, "Escape");
     expect(status(panel)).toBe("Stopped recording. Italic keeps Ctrl+I, Ctrl+3.");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).not.toBeNull();
-    expect(document.activeElement).toBe(byLabel(panel, "Change Ctrl+I for Italic"));
+    expect(document.activeElement === byLabel(panel, "Change Ctrl+I for Italic")).toBe(true);
 
     press(document.activeElement as HTMLElement, "Escape");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).toBeNull();
-    expect(document.activeElement).toBe(opener);
+    expect(document.activeElement === opener).toBe(true);
     expect(events).toEqual([]);
   });
 
@@ -257,12 +251,13 @@ describe("recording keys", () => {
       "Chrome and Edge use Ctrl+T to open a new tab, so the page never receives it.",
     );
     expect(events).toEqual([]);
-    // Still recording: the next keys are taken.
-    press(document.activeElement as HTMLElement, "k", {
+    // Still recording: the next keys are taken, and kept from the browser.
+    const taken = press(document.activeElement as HTMLElement, "k", {
       ctrlKey: true,
       altKey: true,
       code: "KeyK",
     });
+    expect(taken.defaultPrevented).toBe(true);
     expect(events).toEqual([{ bold: ["Mod+Alt+K", "Mod+2"] }]);
   });
 
@@ -284,36 +279,30 @@ describe("recording keys", () => {
 });
 
 describe("conflicts", () => {
-  it("names the other command and swaps the keys between the two as one change", async () => {
-    const { grid, host, events } = setup();
-    const panel = await open(grid, host);
-
-    record(panel, "Change Ctrl+B for Bold", "i", { ctrlKey: true, code: "KeyI" });
-    const prompt = panel.querySelector<HTMLElement>(".sheetwrite-keys-conflict")!;
-    expect(prompt.hidden).toBe(false);
-    expect(prompt.textContent).toContain("Ctrl+I is assigned to Italic.");
-    expect(document.activeElement).toBe(button(prompt, "Swap"));
-    expect(events).toEqual([]);
-
-    button(prompt, "Swap").click();
-    expect(events).toEqual([{ bold: ["Mod+I", "Mod+2"], italic: ["Mod+B", "Mod+3"] }]);
-    expect(grid.getShortcutLabel("italic")).toBe("Ctrl+B");
-    expect(prompt.hidden).toBe(true);
-  });
-
-  it("replaces the other command's keys, or cancels without a change", async () => {
+  it("names the other command, and cancels, swaps or replaces as one change", async () => {
     const { grid, host, events } = setup();
     const panel = await open(grid, host);
     const prompt = panel.querySelector<HTMLElement>(".sheetwrite-keys-conflict")!;
 
     record(panel, "Change Ctrl+B for Bold", "u", { ctrlKey: true, code: "KeyU" });
+    expect(prompt.textContent).toContain("Ctrl+U is assigned to Underline.");
+    expect(document.activeElement === button(prompt, "Swap")).toBe(true);
     button(prompt, "Cancel").click();
     expect(events).toEqual([]);
-    expect(grid.getShortcutLabel("bold")).toBe("Ctrl+B");
 
     record(panel, "Change Ctrl+B for Bold", "u", { ctrlKey: true, code: "KeyU" });
     button(prompt, "Replace").click();
-    expect(events).toEqual([{ bold: ["Mod+U", "Mod+2"], underline: ["Mod+4"] }]);
+    expect(events.at(-1)).toEqual({ bold: ["Mod+U", "Mod+2"], underline: ["Mod+4"] });
+    // Excel's default stays beside the new keys.
+    expect(panel.querySelector('tr[data-action="bold"] [data-default]')?.textContent).toBe(
+      "Ctrl+B, Ctrl+2",
+    );
+
+    record(panel, "Change Ctrl+U for Bold", "i", { ctrlKey: true, code: "KeyI" });
+    button(prompt, "Swap").click();
+    expect(prompt.hidden).toBe(true);
+    expect(events.at(-1)).toMatchObject({ bold: ["Mod+I", "Mod+2"], italic: ["Mod+U", "Mod+3"] });
+    expect(grid.getShortcutLabel("italic")).toBe("Ctrl+U");
   });
 
   it("shows a locked command read-only and never changes it through a conflict", async () => {
