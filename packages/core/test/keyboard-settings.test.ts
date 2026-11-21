@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { createGridController } from "../src/grid-controller.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
-import { DEFAULT_BINDINGS } from "../src/keymap.js";
+import { DEFAULT_BINDINGS, Keymap } from "../src/keymap.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, KeyboardOptions, Workbook } from "../src/types.js";
@@ -156,6 +156,42 @@ describe("opening the panel", () => {
     expect(byLabel(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
     // The search box has focus, so typing searches at once.
     expect(document.activeElement).toBe(byLabel(panel, "Search commands or press keys"));
+  });
+});
+
+describe("Excel's defaults on each platform", () => {
+  // Firefox reserves none of the defaults, so any warning comes from a default
+  // the operating system keeps, such as Ctrl with the Windows or Super key.
+  const FIREFOX_LINUX = "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0";
+  const FIREFOX_WINDOWS =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0";
+  const ctrlCmdV = () => new KeyboardEvent("keydown", { key: "v", ctrlKey: true, metaKey: true });
+
+  for (const [platform, agent] of [
+    ["Linux x86_64", FIREFOX_LINUX],
+    ["Win32", FIREFOX_WINDOWS],
+  ] as const) {
+    it(`gives ${platform} only keys the page receives`, async () => {
+      setNavigator(platform, agent);
+      const { grid, host } = setup();
+      const panel = await open(grid, host);
+
+      const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
+      expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe("Ctrl+Alt+V");
+      expect(panel.querySelector(".sheetwrite-keys-warning")).toBe(null);
+      expect(new Keymap().action(ctrlCmdV())).toBe(null);
+    });
+  }
+
+  it("gives macOS Excel for Mac's Ctrl+Cmd+V for Paste Special too", async () => {
+    setNavigator("MacIntel", SAFARI_MAC);
+    const { grid, host } = setup();
+    const panel = await open(grid, host);
+
+    const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
+    expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe("⌘⌥V, ⌃⌘V");
+    expect(pasteSpecial.querySelector(".sheetwrite-keys-warning")).toBe(null);
+    expect(new Keymap().action(ctrlCmdV())).toBe("pasteSpecial");
   });
 });
 

@@ -27,7 +27,7 @@ import {
   withBindings,
   withKeys,
 } from "./keyboard-settings-model.js";
-import { DEFAULT_BINDINGS } from "./keymap.js";
+import { defaultKeys } from "./keymap.js";
 import { checkStylePart } from "./style-parts.js";
 import type { Grid, GridConfig, KeyBindings, KeyboardAction, KeyShortcut } from "./types/grid.js";
 
@@ -340,7 +340,7 @@ class KeyboardSettingsPanel {
     const defaults = element(
       "td",
       "sheetwrite-keys-default",
-      DEFAULT_BINDINGS[action].map(keysLabel).join(", ") || "None",
+      defaultKeys(action).map(keysLabel).join(", ") || "None",
     );
     defaults.dataset.default = "";
 
