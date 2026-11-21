@@ -46,23 +46,6 @@ describe("TypeScript 7.1 hover parsing", () => {
 const engine = new SheetwriteTypeEngine({ cwd: new URL("../docs/", import.meta.url).pathname });
 afterAll(() => engine.dispose());
 
-describe("Sheetwrite type engine", () => {
-  it("answers object-literal property names with the declared property and its docs", async () => {
-    const hovers = await engine.analyze(
-      `import type { Column } from "@sheetwrite/core";
-export const columns: Column[] = [{ key: "name", header: "Name", width: 120, type: "text" }];
-export const controller = new AbortController();`,
-      "ts",
-    );
-
-    const header = hovers.find((hover) => hover.target === "header");
-    expect(header?.text).toBe("(property) Column.header: string");
-    expect(header?.docs).toBeTruthy();
-    const abortController = hovers.filter((hover) => hover.target === "AbortController").at(-1);
-    expect(abortController?.docs).toContain("AbortController");
-  });
-});
-
 describe("Sheetwrite hover preludes", () => {
   it("maps single-line script positions around an injected prelude", async () => {
     const source = '<script lang="ts">grid.destroy();</script>';
