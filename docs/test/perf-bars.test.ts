@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import { type PerfFigure, type PerfRow, perfVerdict } from "../src/lib/perf-bars.ts";
+import {
+  type PerfFigure,
+  type PerfRow,
+  perfVerdict,
+  renderPerfBars,
+} from "../src/lib/perf-bars.ts";
 import { parsePerfCompare } from "../src/lib/perf-compare.ts";
 
 // scripts/docs.test.ts renders the performance pages' figures from real
@@ -56,5 +61,41 @@ describe("release-note comparisons", () => {
       /mixes times and sizes/,
     );
     expect(() => parsePerfCompare(block("Import | 1 | 2"), "x")).toThrow(/is not a value/);
+  });
+});
+
+describe("linear byte axes", () => {
+  it("steps in round numbers of the largest value's unit", () => {
+    const sizes = (values: readonly number[]): PerfFigure => ({
+      id: "sizes",
+      title: "Download size",
+      unit: "bytes",
+      scale: "linear",
+      rowHeader: "Package",
+      groups: [
+        {
+          label: "npm",
+          rows: [
+            {
+              label: "@sheetwrite/formulas",
+              bars: values.map((value, index) => ({
+                label: `v${index}`,
+                role: "measured" as const,
+                stat: { value },
+              })),
+            },
+          ],
+        },
+      ],
+    });
+    // Tick labels join the number and its unit with a no-break space.
+    const ticks = (figure: PerfFigure): string[] =>
+      [...renderPerfBars(figure, () => "").matchAll(/class="perf-bars__tick"[^>]*>([^<]*)</g)].map(
+        ([, label]) => (label ?? "").replaceAll("\u00a0", " "),
+      );
+    // The delivery size figure's largest package, 571.7 KiB: not 204.8 / 409.6 / 614.4 KiB.
+    expect(ticks(sizes([482_510, 585_420]))).toEqual(["0", "200 KiB", "400 KiB", "600 KiB"]);
+    // A step below one unit keeps the digits it needs.
+    expect(ticks(sizes([1.4 * 1024 ** 2]))).toEqual(["0", "0.5 MiB", "1.0 MiB", "1.5 MiB"]);
   });
 });
