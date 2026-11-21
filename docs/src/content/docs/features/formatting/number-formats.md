@@ -116,7 +116,7 @@ The code `General` takes a cell out of its column's format.
 
 A number with no format, `General` or the Text format `@` shows as Excel's General format shows it: no thousands separators, up to 11 characters (the minus sign not counted), and scientific notation when its whole part does not fit or it is below 0.0001. So `2026` shows as `2026`, `0.0001234` as `0.0001234` and `123456789012` as `1.23457E+11`. In a narrow cell the number takes fewer decimals, then scientific notation, before it shows `####`.
 
-XLSX import keeps each cell's own format, so a column that mixes formats round-trips cell by cell.
+XLSX import keeps each cell's own format, so a column that mixes formats round-trips cell by cell. XLSX export writes a `text` column in the Text format `@`, and import reads a column in `@` as `text`, so typed numbers there stay text after a round trip.
 
 ### What typing stores
 

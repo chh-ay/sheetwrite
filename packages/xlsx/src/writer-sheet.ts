@@ -303,10 +303,12 @@ function appendSheetHeader(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesR
     for (const [index, column] of sheet.columns.entries()) {
       // The stored character width includes OOXML's five-pixel padding.
       const width = columnWidthCharacters(column.width);
-      const styleId = styles.register(
-        column.cellStyle,
-        column.cellStyle?.numberFormat ?? column.numberFormat,
-      );
+      // A `text` column is Excel's Text format, so typing there keeps text.
+      const numberFormat =
+        column.cellStyle?.numberFormat ??
+        column.numberFormat ??
+        (column.type === "text" ? "@" : undefined);
+      const styleId = styles.register(column.cellStyle, numberFormat);
       xml.append(
         `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${styleId ? ` style="${styleId}"` : ""}/>`,
       );

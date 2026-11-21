@@ -50,6 +50,18 @@ export function lastColumnDeclarations(spans: readonly number[]): Int32Array {
   return owners;
 }
 
+/**
+ * The column type a style's number format gives: `text` for Excel's Text
+ * format `@`, then `date`, `currency` or `number`; none for General.
+ */
+function formatType(record: ParsedCellStyle): Column["type"] | undefined {
+  if (record.date) return "date";
+  const format = record.numberFormat;
+  if (!format) return undefined;
+  if (format === "@") return "text";
+  return /[$€£¥]|currency/i.test(format) ? "currency" : "number";
+}
+
 export function parseColumns(
   root: XmlElement,
   styles: ParsedStyles,
@@ -86,13 +98,7 @@ export function parseColumns(
     }
     const styleText = xmlAttribute(element, "style");
     const style = styles.at(styleText === undefined ? 0 : parseUnsigned(styleText, "column style"));
-    const type: Column["type"] | undefined = style?.date
-      ? "date"
-      : style?.numberFormat
-        ? /[$€£¥]|currency/i.test(style.numberFormat)
-          ? "currency"
-          : "number"
-        : undefined;
+    const type = formatType(style);
     spans.push(min - 1, max - 1);
     definitions.push({
       ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
@@ -126,10 +132,8 @@ export function columnFromParsed(
   for (const styleIndex of cells?.styleIndices ?? []) {
     const record = styles.at(styleIndex);
     if (record.numberFormat) formats.add(record.numberFormat);
-    if (record.date) semanticTypes.add("date");
-    else if (record.numberFormat) {
-      semanticTypes.add(/[$€£¥]|currency/i.test(record.numberFormat) ? "currency" : "number");
-    }
+    const type = formatType(record);
+    if (type) semanticTypes.add(type);
   }
   if (definition?.type) semanticTypes.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
