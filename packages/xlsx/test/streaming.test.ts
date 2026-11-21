@@ -13,13 +13,13 @@ import {
   toXlsxWorkbookStream,
   type Workbook,
 } from "@sheetwrite/core";
-import { deflateSync, strToU8, unzipSync } from "fflate";
+import { deflateSync, strToU8, unzipSync, Zip, type ZipInputFile } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
-import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
-import { rawXlsx, rawZip, worksheet } from "./raw-opc.js";
+import { storedEntryFromBytes, validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
+import { FIXED_ZIP_TIME, rawXlsx, rawZip, worksheet } from "./raw-opc.js";
 import { book, cellsOf, patchEntries, sheet, sheetAt } from "./workbook-fixtures.js";
 
 beforeAll(async () => {
@@ -333,6 +333,75 @@ describe("ZIP raw entries", () => {
         createCodecContext("import", { resourceLimits: { maxCompressionRatio: 2 } }),
       ),
     ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
+  });
+});
+
+/** A ZIP with one deflate entry `a.xml` whose compressed bytes are `payload`, declared as `content`. */
+function deflateEntryZip(payload: Uint8Array<ArrayBuffer>, content: Uint8Array): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const archive = new Zip((error, chunk) => {
+    if (error) throw error;
+    chunks.push(chunk);
+  });
+  const file: ZipInputFile = {
+    filename: "a.xml",
+    compression: 8,
+    size: content.length,
+    crc: Bun.hash.crc32(content),
+    mtime: FIXED_ZIP_TIME,
+  };
+  archive.add(file);
+  file.ondata?.(null, payload, true);
+  archive.end();
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+async function readEntry(archive: Uint8Array): Promise<Uint8Array> {
+  return (await ZipReader.open(archive, createCodecContext("import"))).read("a.xml");
+}
+
+describe("ZIP inflate", () => {
+  // Many codec input slices, so zlib produces output before it fails.
+  const content = strToU8(letters(300_000));
+  const stream = deflateSync(content);
+
+  it("inflates deflate entries with the runtime DecompressionStream", async () => {
+    const runtime = globalThis.DecompressionStream;
+    const formats: string[] = [];
+    globalThis.DecompressionStream = class extends runtime {
+      constructor(format: CompressionFormat) {
+        formats.push(format);
+        super(format);
+      }
+    };
+    try {
+      expect(await readEntry(deflateEntryZip(stream, content))).toEqual(content);
+    } finally {
+      globalThis.DecompressionStream = runtime;
+    }
+    expect(formats).toContain("deflate-raw");
+  });
+
+  it("accepts and rejects deflate streams as fflate does", async () => {
+    // zlib rejects bytes after the final block; fflate ignores them.
+    const trailing = new Uint8Array(stream.length + 3);
+    trailing.set(stream);
+    trailing.set([1, 2, 3], stream.length);
+    expect(await readEntry(deflateEntryZip(trailing, content))).toEqual(content);
+    // An empty payload is no valid deflate stream, but fflate reads it as no bytes.
+    const empty = new Uint8Array(0);
+    expect(await readEntry(deflateEntryZip(empty, empty))).toEqual(empty);
+    await expect(readEntry(deflateEntryZip(stream.subarray(0, -16), content))).rejects.toThrow(
+      "Sheetwrite: invalid XLSX ZIP: deflate stream for a.xml is corrupt",
+    );
+  });
+
+  it("computes the zlib CRC-32 at every tail length", () => {
+    for (let length = 0; length <= 24; length++) {
+      const bytes = content.subarray(0, length);
+      expect(storedEntryFromBytes(bytes).crc32).toBe(Bun.hash.crc32(bytes));
+    }
+    expect(storedEntryFromBytes(content).crc32).toBe(Bun.hash.crc32(content));
   });
 });
 

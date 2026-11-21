@@ -127,7 +127,7 @@ const auditedExport: SheetwriteAddon = {
 await initSheetwrite({ addons: [xlsxAddon(), auditedExport] });
 ```
 
-Hosts can implement `XlsxWorkbookBackend`, `XlsxTableExportBackend`, or `XlsxTableImportBackend` to replace a role. `@sheetwrite/xlsx` is the only concrete implementation package. Its bounded OOXML codec owns OPC part resolution, XML tokenization, styles and worksheet mapping over the audited compression primitive `fflate`.
+Hosts can implement `XlsxWorkbookBackend`, `XlsxTableExportBackend`, or `XlsxTableImportBackend` to replace a role. `@sheetwrite/xlsx` is the only concrete implementation package. Its bounded OOXML codec owns OPC part resolution, XML tokenization, styles and worksheet mapping over the audited compression primitive `fflate`. Import inflates ZIP entries with the runtime's `DecompressionStream` when it has one; when that rejects an entry, `fflate` reads the entry again and decides, so the files that import do not depend on the runtime.
 
 ## Options and limits
 
