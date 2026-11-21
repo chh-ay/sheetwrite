@@ -5,6 +5,7 @@
 // remains the single spreadsheet keyboard/focus authority.
 
 import { createGridController, type GridController } from "../grid-controller.js";
+import { focusInto } from "../focus-exit.js";
 import { DEFAULT_THEME } from "../grid.js";
 import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { Scope } from "../scope.js";
@@ -295,6 +296,39 @@ export function createSpreadsheetShell(
 
   const status = createSelectionStatus(bottomRow, grid);
   lifetime.add(() => status.destroy());
+
+  // F6 and Shift+F6 move between the shell's parts, as Excel's F6 moves
+  // between the parts of its window: the ribbon or toolbar, the formula bar,
+  // the sheet, the sheet tabs and the status bar. Tab moves between cells
+  // inside the sheet, so F6 is also the sheet's way out. The status bar takes
+  // the focus only this way.
+  status.element.tabIndex = -1;
+  const regionKey = (event: KeyboardEvent): void => {
+    if (event.key !== "F6" || event.ctrlKey || event.metaKey || event.altKey) return;
+    // The cell editor, the find bar and the grid's dialogs keep their keys.
+    const target = event.target;
+    if (target instanceof Node && target !== gridHost && gridHost.contains(target)) return;
+    const regions = [toolbarRow, formulaBar.element, gridHost, tabHost, status.element].filter(
+      (region): region is HTMLElement => region !== null,
+    );
+    const at = regions.findIndex((region) => region.contains(document.activeElement));
+    const step = event.shiftKey ? -1 : 1;
+    const from = at === -1 ? regions.indexOf(gridHost) : at;
+    for (let offset = 1; offset < regions.length; offset++) {
+      const index = (((from + step * offset) % regions.length) + regions.length) % regions.length;
+      const region = regions[index];
+      if (region === undefined) continue;
+      if (region === status.element) {
+        region.focus();
+        break;
+      }
+      if (focusInto(region)) break;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  root.addEventListener("keydown", regionKey, true);
+  lifetime.add(() => root.removeEventListener("keydown", regionKey, true));
   lifetime.add(grid.on("active-sheet", () => refreshTabs()));
   // A tab update closes an open tab menu; a collaborator's cell edit must not.
   lifetime.add(
