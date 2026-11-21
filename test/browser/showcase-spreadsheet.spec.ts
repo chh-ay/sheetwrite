@@ -175,6 +175,34 @@ test("at 320 px the tabs scroll beside the layout buttons instead of under them 
   expect(await fitsViewport(page)).toBe(true);
 });
 
+test("the Data tab's large Sort labels break between whole phrases @portability", async ({
+  page,
+}) => {
+  await open(page, 1_440, 900);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await ribbon.getByRole("tab", { name: "Data", exact: true }).click();
+  for (const name of ["Sort A to Z", "Sort Z to A"]) {
+    const label = ribbon
+      .getByRole("button", { name, exact: true })
+      .locator(".sheetwrite-ribbon-label");
+    // The label's text, line by line, from where each character is drawn.
+    const lines = await label.evaluate((element) => {
+      const text = element.firstChild;
+      const content = text?.textContent ?? "";
+      const range = document.createRange();
+      const byTop = new Map<number, string>();
+      for (let index = 0; index < content.length && text !== null; index += 1) {
+        range.setStart(text, index);
+        range.setEnd(text, index + 1);
+        const top = Math.round(range.getBoundingClientRect().top);
+        byTop.set(top, (byTop.get(top) ?? "") + (content[index] ?? ""));
+      }
+      return [...byTop.values()].map((line) => line.replaceAll("\u00a0", " ").trim());
+    });
+    expect(lines).toEqual(["Sort", name.slice("Sort ".length)]);
+  }
+});
+
 for (const mode of ["full", "compact"] as const) {
   test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
     page,
