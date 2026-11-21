@@ -38,7 +38,8 @@ const ROWS = 30;
  * by A:D. With `nativeFormatsOnly`, the clipboard takes only plain text and
  * HTML, as Firefox's and Safari's do: a write with another format fails.
  */
-function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
+function cutHarness(options: { nativeFormatsOnly?: boolean; maxRowsPerSheet?: number } = {}) {
+  const refusals: string[] = [];
   const clip: { items: FakeClipboardItem[]; text: string } = { items: [], text: "" };
   Object.defineProperty(globalThis, "ClipboardItem", {
     configurable: true,
@@ -67,13 +68,19 @@ function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
     },
   });
 
-  const store = new SheetwriteStore({
-    activeSheet: "s1",
-    sheets: [
-      { ...sheet("s1", ROWS), name: "Data" },
-      { ...sheet("s2", ROWS), name: "Summary" },
-    ],
-  });
+  const store = new SheetwriteStore(
+    {
+      activeSheet: "s1",
+      sheets: [
+        { ...sheet("s1", ROWS), name: "Data" },
+        { ...sheet("s2", ROWS), name: "Summary" },
+      ],
+    },
+    undefined,
+    options.maxRowsPerSheet === undefined
+      ? {}
+      : { snapshotResourceLimits: { maxRowsPerSheet: options.maxRowsPerSheet } },
+  );
   const document = new DocumentController({
     store,
     loadable: store,
@@ -110,6 +117,10 @@ function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
     loadPasteSpecial: () => import("../src/paste-special.js"),
     askPasteSpecial: async () => null,
     sheetName: () => "Sheet 1",
+    onPasteRefused: (result) => {
+      if (result.status === "rejected") refusals.push(result.issues[0]?.message ?? "");
+      else refusals.push(result.status);
+    },
   });
   const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
 
@@ -124,6 +135,7 @@ function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
     clipboard,
     marks,
     clip,
+    refusals,
     at,
     value: (row: number, col: number, sheetId?: string) =>
       store.getCell(at(row, col, sheetId)).resolved,
@@ -510,5 +522,16 @@ describe("a paste past the sheet's last row", () => {
     expect(rowCount(h)).toBe(ROWS + 2);
     expect([h.value(ROWS - 1, 0), h.value(ROWS, 0), h.value(ROWS + 1, 0)]).toEqual([1, 2, 3]);
     expect(h.value(0, 0)).toBeNull();
+  });
+
+  it("is refused with the sheet's row limit, and changes nothing, when the sheet cannot grow", async () => {
+    harness = cutHarness({ maxRowsPerSheet: 40 });
+    const h = harness;
+    h.clip.text = Array.from({ length: 20 }, (_, row) => `${row}`).join("\n");
+    h.select(25, 0);
+    expect(await h.clipboard.paste()).toBe("rejected");
+    expect(rowCount(h)).toBe(ROWS);
+    expect(h.value(25, 0)).toBeNull();
+    expect(h.refusals).toEqual(["Data cannot grow to 45 rows: the limit is 40."]);
   });
 });

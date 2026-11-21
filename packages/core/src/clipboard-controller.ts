@@ -12,7 +12,6 @@ import {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
   DelimitedTextResourceError,
 } from "./delimited-text.js";
-import { DEFAULT_SNAPSHOT_RESOURCE_LIMITS } from "./document-protocol.js";
 import {
   cloneCellHyperlink,
   createHyperlinkId,
@@ -1780,11 +1779,6 @@ export class ClipboardController {
           ? sheetRows + addedRows - firstDataRow
           : this.deps.store.viewRowCount(activeSheet) - focus.row,
     );
-    // Rows a view sort or "visible rows only" maps cannot grow the sheet: a
-    // block that does not fit is refused, not cut off.
-    if (availableRows < height) {
-      throw new DelimitedTextResourceError("maxRows", availableRows, height, "parse");
-    }
     const grow: DocumentOp[] =
       addedRows > 0 ? [{ op: "addRows", sheet: activeSheet, at: sheetRows, count: addedRows }] : [];
     const hiddenRows =
@@ -1924,14 +1918,12 @@ export class ClipboardController {
 
   /**
    * The rows a block of `height` rows from sheet row `first` needs past the
-   * sheet's end. A block that would end past the most rows a sheet holds is
-   * refused, as too large a pasted text is.
+   * sheet's end. Past the most rows a sheet holds, the store refuses the
+   * added rows, and the grid says why ("cannot grow to 1,000,005 rows: the
+   * limit is 1,000,000").
    */
   private rowsToAdd(first: number, height: number): number {
-    const end = first + height;
-    const limit = DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet;
-    if (end > limit) throw new DelimitedTextResourceError("maxRows", limit, end, "parse");
-    return Math.max(0, end - this.deps.sheet().rowCount);
+    return Math.max(0, first + height - this.deps.sheet().rowCount);
   }
 
   /** How many of the `count` sheet rows from `first` a filter or Hide Rows hides. */
