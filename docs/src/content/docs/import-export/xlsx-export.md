@@ -65,6 +65,13 @@ spelling. For example, `=LET(x,1,x+1)` is written as
 All distinct formulas are converted in one batch per workbook. Literal-only
 workbooks and workbooks with only range names do not load the formula engine.
 
+A formula whose result is an array, such as `=SEQUENCE(3)` or `=A1:A3`, is
+written as an Excel dynamic array (`cm="1"`, `<f t="array">` and the
+`xl/metadata.xml` part), so Excel spills it instead of showing `=@SEQUENCE(3)`.
+Exporting a grid also writes each spill's range and the values in the cells it
+covers, as Excel does. Formulas with one value stay plain. Import reads Excel's
+dynamic arrays back as formulas that spill.
+
 | Feature | Workbook result |
 | --- | --- |
 | Worksheets, order and active sheet | Preserved. |

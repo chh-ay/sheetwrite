@@ -41,6 +41,9 @@ coverage/
 
 # The large Enron development set, built by packages/formula-assist/bench/enron/build.ts --dev-large.
 packages/formula-assist/bench/enron/dev-large.json
+# The whole-workbook Enron sets, built by build.ts --dev-large-whole and --held-out-whole.
+packages/formula-assist/bench/enron/dev-large-whole.json
+packages/formula-assist/bench/enron/heldout-whole.json
 
 # Local agent and audit working files
 plans/

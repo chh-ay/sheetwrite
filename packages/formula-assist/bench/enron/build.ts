@@ -1,9 +1,11 @@
 // Builds the Enron sample of the formula assist replay (see README.md in this
 // folder) from the corpus archive of Hermans and Murphy-Hill:
 //
-//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch>               dev.json, dev2.json
-//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --held-out    heldout.json
-//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --dev-large   dev-large.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch>                     dev.json, dev2.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --held-out          heldout.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --dev-large         dev-large.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --dev-large-whole   dev-large-whole.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --held-out-whole    heldout-whole.json
 //
 // The archive is https://ndownloader.figshare.com/files/3242531 (CC BY 4.0);
 // the script downloads it to <spreadsheets.7z> when that file is missing, and
@@ -15,6 +17,12 @@
 // earlier draw took. It is too large to commit (12 MB), so it is not: this
 // script builds it, and checks the result against its recorded SHA-256, so
 // every machine measures the same set.
+//
+// The `-whole` sets keep every cell of each workbook instead of the cells near
+// its formulas, and mark hidden sheets, so signals that read the whole
+// workbook are measured on all of it. `--dev-large-whole` is the seed-804
+// draw again, with the same workbooks and formulas; `--held-out-whole` draws
+// seed 805 from the spreadsheets no earlier draw took. Neither is committed.
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -51,6 +59,8 @@ const HELD_OUT_WORKBOOKS = 50;
 /** Seed of the large development draw, from the spreadsheets no earlier draw took. */
 const DEV_LARGE_SEED = 804;
 const DEV_LARGE_WORKBOOKS = 500;
+/** Seed of the whole-workbook held-out draw, from the spreadsheets no earlier draw took. */
+const HELD_OUT_WHOLE_SEED = 805;
 /**
  * SHA-256 of dev-large.json as the draw writes it. A different hash means the
  * sample changed (the reader reads the workbooks differently, or a sampling
@@ -58,6 +68,9 @@ const DEV_LARGE_WORKBOOKS = 500;
  * the old set are not compared with the new one.
  */
 const DEV_LARGE_SHA256 = "7d8c865d88238fe5495f881d6b950b8ab2a7edb0a8ebca12d192c320d2a4ad20";
+/** SHA-256 of dev-large-whole.json and heldout-whole.json as the draws write them. */
+const DEV_LARGE_WHOLE_SHA256 = "86cacd713713ca22871558d84c31a9d64a08b7533fcb6c53da3438ea230b3b84";
+const HELD_OUT_WHOLE_SHA256 = "266b79ed7a3a17313c164d85b9dfc34c0130d718ba19f03f02cb82091d75f132";
 /** A workbook needs this many formulas to be sampled. */
 const MIN_FORMULAS = 10;
 /** Formulas typed per workbook, at most. */
@@ -167,6 +180,8 @@ interface SampleSheet {
   rows: number;
   cols: number;
   cells: SampleCell[];
+  /** Set on hidden and very hidden sheets of the whole-workbook sets. */
+  hidden?: true;
 }
 
 interface SampleWorkbook {
@@ -273,11 +288,15 @@ function sampledValue(value: CellScalar): CellScalar {
     : value;
 }
 
-/** The sample of one workbook, or null when it has too few formulas. */
+/**
+ * The sample of one workbook, or null when it has too few formulas. With
+ * `whole`, it keeps every cell and marks hidden sheets.
+ */
 function sampleWorkbook(
   file: string,
   snapshot: WorkbookSnapshot,
   random: () => number,
+  whole: boolean,
 ): SampleWorkbook | null {
   const cells = cellMaps(snapshot);
   const formulas = cells.flatMap((map, sheet) =>
@@ -290,8 +309,8 @@ function sampleWorkbook(
   if (formulas.length < MIN_FORMULAS) return null;
 
   const targets = shuffled(formulas, random).slice(0, TARGETS_PER_WORKBOOK);
-  const kept: KeptCells[] = cells.map(() => new Set());
-  for (const target of targets) keepAround(snapshot, kept, target);
+  const kept: KeptCells[] = cells.map((map) => (whole ? new Set(map.keys()) : new Set()));
+  if (!whole) for (const target of targets) keepAround(snapshot, kept, target);
 
   const sheets = snapshot.sheets.map((sheet, index): SampleSheet => {
     const map = cells[index] ?? new Map<number, CellScalar>();
@@ -302,9 +321,15 @@ function sampleWorkbook(
         if (value === undefined || value === null) return [];
         return [[Math.floor(key / KEY_COLS), key % KEY_COLS, sampledValue(value)]];
       });
-    const rows = Math.max(1, ...sheetCells.map(([row]) => row + 1));
-    const cols = Math.max(1, ...sheetCells.map(([, col]) => col + 1));
-    return { name: sheet.name, rows, cols, cells: sheetCells };
+    // A loop, not Math.max(...cells): a whole sheet can hold more cells than a call takes arguments.
+    let rows = 1;
+    let cols = 1;
+    for (const [row, col] of sheetCells) {
+      rows = Math.max(rows, row + 1);
+      cols = Math.max(cols, col + 1);
+    }
+    const hidden = whole && (sheet.visibility ?? "visible") !== "visible";
+    return { name: sheet.name, rows, cols, cells: sheetCells, ...(hidden ? { hidden: true } : {}) };
   });
   return {
     file,
@@ -318,7 +343,7 @@ function sampleWorkbook(
 async function draw(
   archive: string,
   scratch: string,
-  options: { seed: number; count: number; exclude: ReadonlySet<string> },
+  options: { seed: number; count: number; exclude: ReadonlySet<string>; whole?: boolean },
 ): Promise<{ sampled: SampleWorkbook[]; refused: number }> {
   const random = seededRandom(options.seed);
   const spreadsheets = await distinctSpreadsheets(archive);
@@ -353,7 +378,7 @@ async function draw(
         refused++;
         continue;
       }
-      const workbook = sampleWorkbook(file, snapshot, random);
+      const workbook = sampleWorkbook(file, snapshot, random, options.whole ?? false);
       if (workbook !== null) sampled.push(workbook);
     }
   }
@@ -384,11 +409,29 @@ async function titlesIn(name: string): Promise<string[]> {
   );
 }
 
+/** Write a set that isn't committed, and check it against its recorded SHA-256. */
+async function writeChecked(
+  name: string,
+  seed: number,
+  workbooks: SampleWorkbook[],
+  sha256: string,
+): Promise<void> {
+  const written = await writeSet(name, seed, workbooks);
+  const digest = new Bun.CryptoHasher("sha256").update(await readFile(written)).digest("hex");
+  if (digest !== sha256) throw new Error(`${name}.json: SHA-256 ${digest}, recorded ${sha256}`);
+}
+
+const MODES = ["--held-out", "--dev-large", "--dev-large-whole", "--held-out-whole"];
+
 async function main(): Promise<void> {
   const [archive, scratch, mode] = process.argv.slice(2);
-  if (archive === undefined || scratch === undefined) {
+  if (
+    archive === undefined ||
+    scratch === undefined ||
+    (mode !== undefined && !MODES.includes(mode))
+  ) {
     throw new Error(
-      "Usage: bun build.ts <spreadsheets.7z> <scratch folder> [--held-out | --dev-large]",
+      `Usage: bun build.ts <spreadsheets.7z> <scratch folder> [${MODES.join(" | ")}]`,
     );
   }
   await ensureArchive(archive);
@@ -396,7 +439,7 @@ async function main(): Promise<void> {
   await initSheetwrite({ addons: [xlsxAddon()] });
 
   let report: { sampled: SampleWorkbook[]; refused: number };
-  if (mode === "--held-out" || mode === "--dev-large") {
+  if (mode !== undefined) {
     const exclude = new Set([...(await titlesIn("dev")), ...(await titlesIn("dev2"))]);
     const burned = await draw(archive, scratch, {
       seed: BURNED_HELD_OUT_SEED,
@@ -412,18 +455,36 @@ async function main(): Promise<void> {
         exclude,
       });
       await writeSet("heldout", HELD_OUT_SEED, report.sampled);
+    } else if (mode === "--held-out-whole") {
+      for (const title of await titlesIn("heldout")) exclude.add(title);
+      for (const title of await titlesIn("dev-large")) exclude.add(title);
+      report = await draw(archive, scratch, {
+        seed: HELD_OUT_WHOLE_SEED,
+        count: HELD_OUT_WORKBOOKS,
+        exclude,
+        whole: true,
+      });
+      await writeChecked(
+        "heldout-whole",
+        HELD_OUT_WHOLE_SEED,
+        report.sampled,
+        HELD_OUT_WHOLE_SHA256,
+      );
     } else {
       for (const title of await titlesIn("heldout")) exclude.add(title);
+      const whole = mode === "--dev-large-whole";
       report = await draw(archive, scratch, {
         seed: DEV_LARGE_SEED,
         count: DEV_LARGE_WORKBOOKS,
         exclude,
+        whole,
       });
-      const written = await writeSet("dev-large", DEV_LARGE_SEED, report.sampled);
-      const digest = new Bun.CryptoHasher("sha256").update(await readFile(written)).digest("hex");
-      if (digest !== DEV_LARGE_SHA256) {
-        throw new Error(`dev-large.json: SHA-256 ${digest}, recorded ${DEV_LARGE_SHA256}`);
-      }
+      await writeChecked(
+        whole ? "dev-large-whole" : "dev-large",
+        DEV_LARGE_SEED,
+        report.sampled,
+        whole ? DEV_LARGE_WHOLE_SHA256 : DEV_LARGE_SHA256,
+      );
     }
   } else {
     report = await draw(archive, scratch, {

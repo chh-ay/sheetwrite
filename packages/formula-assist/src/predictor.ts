@@ -1,8 +1,8 @@
 // The predictor: opens each signal for one formula edit and, on every key,
 // ranks their proposals into at most one suggestion. This module is the
-// add-on's lazy chunk; the add-on entry loads it on the first formula edit.
+// add-on's lazy chunk; the add-on entry loads it when a grid mounts.
 
-import type { FormulaEdit, FormulaSuggestion } from "@sheetwrite/core";
+import type { FormulaEdit, FormulaSuggestion, Store } from "@sheetwrite/core";
 import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
 import { CALIBRATION } from "./calibration.js";
@@ -19,8 +19,11 @@ import {
   SIGNALS,
   type SignalName,
 } from "./candidates.js";
+import { openColumn } from "./signals/column.js";
 import { openNeighbours } from "./signals/neighbours.js";
 import { openSyntax } from "./signals/syntax.js";
+import { openWorkbookFormulas } from "./signals/workbook.js";
+import { type BuildMode, WorkbookPatterns } from "./workbook-patterns.js";
 
 export { SIGNALS, type SignalName } from "./candidates.js";
 
@@ -39,17 +42,25 @@ export interface PredictionSession {
 /** Which signals a session uses; the benchmark turns them on one at a time. */
 export interface PredictorOptions {
   readonly signals: readonly SignalName[];
+  /** When the workbook's formulas are counted: in idle time (the default), or at once. */
+  readonly build?: BuildMode;
 }
 
 /** How each signal opens for one edit. */
 const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
   syntax: openSyntax,
+  column: openColumn,
+  workbook: openWorkbookFormulas,
 };
 
 /** The signals named in `signals`, opened for one edit. */
-export function openSignals(edit: FormulaEdit, signals: readonly SignalName[]): Signal[] {
-  return signals.map((name) => OPEN_SIGNAL[name](edit));
+export function openSignals(
+  edit: FormulaEdit,
+  signals: readonly SignalName[],
+  patterns: WorkbookPatterns | null,
+): Signal[] {
+  return signals.map((name) => OPEN_SIGNAL[name](edit, patterns));
 }
 
 const ALL_SIGNALS: PredictorOptions = { signals: SIGNALS };
@@ -71,8 +82,12 @@ class Session implements PredictionSession {
   /** Formulas the user dismissed in this edit; they are not suggested again. */
   private readonly dismissed = new Set<string>();
 
-  constructor(edit: FormulaEdit, options: PredictorOptions) {
-    this.signals = openSignals(edit, options.signals);
+  constructor(
+    edit: FormulaEdit,
+    signals: readonly SignalName[],
+    patterns: WorkbookPatterns | null,
+  ) {
+    this.signals = openSignals(edit, signals, patterns);
   }
 
   suggest(text: string, analysis: FormulaAnalysis): Prediction | null {
@@ -123,10 +138,24 @@ class Session implements PredictionSession {
   }
 }
 
-/** Open the suggestions of one formula edit. */
-export function openPrediction(
-  edit: FormulaEdit,
-  options: PredictorOptions = ALL_SIGNALS,
-): PredictionSession {
-  return new Session(edit, options);
+/** The predictor of one store's formula bars, and what it has counted of the store's workbook. */
+export interface Predictor {
+  /** Open the suggestions of one formula edit. */
+  open(edit: FormulaEdit): PredictionSession;
+  /** Stop following the workbook, and forget it. */
+  dispose(): void;
+}
+
+/**
+ * The predictor of the formula bars of `store`. It counts the workbook's
+ * formulas when the page is idle and follows the store's changes, so that an
+ * edit can draw on the whole workbook.
+ */
+export function attachPredictor(store: Store, options: PredictorOptions = ALL_SIGNALS): Predictor {
+  const counts = options.signals.includes("workbook");
+  const patterns = counts ? new WorkbookPatterns(store, options.build ?? "idle") : null;
+  return {
+    open: (edit) => new Session(edit, options.signals, patterns),
+    dispose: () => patterns?.dispose(),
+  };
 }

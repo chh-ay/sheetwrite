@@ -1,7 +1,9 @@
 //! OOXML spelling belongs beside the lexer, not in the workbook transport.
 
-use crate::calc::{parse_a1, Tok};
+use crate::calc::{parse, parse_a1, Tok};
+use crate::eval::{ast_produces_array, Shapes};
 use crate::formula_tokens::{lex_tolerant, Spanned};
+use crate::store::names::{Bindings, NameScope};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 // MS-XLSX §2.2.3 and §2.2.2 extend ISO/IEC 29500-1 §18.17.2.4:
@@ -553,6 +555,50 @@ pub fn convert_xlsx_formulas(
 ) -> Result<Vec<String>, wasm_bindgen::JsError> {
     changed_formula_batch(joined, ends, exporting, changed_indices)
         .map_err(wasm_bindgen::JsError::new)
+}
+
+/// The input indices of the batch's sources whose result is an array, in
+/// order. A source that does not parse is not one, and with no workbook a
+/// name stands for nothing.
+fn array_formula_batch(joined: &str, ends: &[u32]) -> Result<Vec<u32>, &'static str> {
+    let ascii = joined.is_ascii();
+    let bindings = Bindings::default();
+    let shapes = Shapes::top(NameScope::new(&bindings, 0));
+    let mut previous = (0, 0);
+    let mut arrays = Vec::new();
+    for (index, &end) in ends.iter().enumerate() {
+        let source = batch_source(joined, &mut previous, end, ascii)?;
+        if parse(source).is_ok_and(|ast| ast_produces_array(&ast, shapes)) {
+            arrays.push(
+                u32::try_from(index)
+                    .map_err(|_overflow| "XLSX formula batch has too many sources")?,
+            );
+        }
+    }
+    if previous.0 != joined.len() {
+        return Err("XLSX formula ends do not cover the joined source");
+    }
+    Ok(arrays)
+}
+
+/// Find the formulas of a joined batch whose result is an array, such as
+/// `=SEQUENCE(3)` or `=A1:A3`, which an XLSX file marks as dynamic arrays so
+/// Excel spills them. Each formula is read on its own, without a workbook, so
+/// a name that stands for a range does not count. The batch is split as in
+/// `convertXlsxFormulas`.
+#[wasm_bindgen(
+    js_name = xlsxArrayFormulas,
+    return_description = "The input index of each formula whose result is an array, ascending; throws when an end splits a surrogate pair or falls outside `joined`."
+)]
+pub fn xlsx_array_formulas(
+    #[wasm_bindgen(
+        param_description = "Every formula's text in editor spelling, one after another, without separators."
+    )]
+    joined: &str,
+    #[wasm_bindgen(param_description = "Where each formula ends in `joined`, as a UTF-16 offset.")]
+    ends: &[u32],
+) -> Result<Vec<u32>, wasm_bindgen::JsError> {
+    array_formula_batch(joined, ends).map_err(wasm_bindgen::JsError::new)
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ import { beforeAll, expect, it } from "bun:test";
 
 import {
   type FormulaSuggester,
+  type Grid,
   initSheetwrite,
   type SheetwriteAddonGridContext,
   SheetwriteStore,
@@ -57,18 +58,21 @@ function doubledColumn(): SheetwriteStore {
 }
 
 it("fetches the predictor when the grid mounts; an edit opened before it arrives waits for it", async () => {
-  const edit = await openFormulaEdit(doubledColumn(), { sheet: "s", row: 2, col: 1 });
+  const store = doubledColumn();
+  const edit = await openFormulaEdit(store, { sheet: "s", row: 2, col: 1 });
   const analysis = analyzeFormula("=", 1, edit.functions());
   let suggester: FormulaSuggester | undefined;
   const addon = formulaAssistAddon();
   const context = {
+    // The add-on reads only the grid's store.
+    grid: { store } as Partial<Grid> as Grid,
     formulaSuggestions: (registered: FormulaSuggester) => {
       suggester = registered;
       return () => undefined;
     },
   } as Partial<SheetwriteAddonGridContext<unknown>> as SheetwriteAddonGridContext<unknown>;
   // Mounting the grid starts the chunk's load, and an edit opens at once, before it arrives.
-  addon.grid?.(context);
+  const unmount = addon.grid?.(context);
   if (suggester === undefined) throw new Error("The add-on registered no suggester");
   const first = suggester.open(edit);
   // The predictor chunk is still loading: nothing shows, and Excel's keys apply.
@@ -84,4 +88,5 @@ it("fetches the predictor when the grid mounts; an edit opened before it arrives
   const next = suggester.open(edit);
   expect(next.suggest("=", analysis)?.text).toBe("A3*2");
   next.close();
+  unmount?.();
 });

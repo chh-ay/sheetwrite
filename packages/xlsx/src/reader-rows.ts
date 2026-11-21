@@ -2,11 +2,12 @@ import type { CellValue, SheetSnapshot, SnapshotCell } from "@sheetwrite/core";
 import { cellA1 } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
-import { parseCellReference } from "./cell-reference.js";
+import { parseCellRect, parseCellReference } from "./cell-reference.js";
 import { linkedFormula } from "./external-links.js";
 import { MAIN_NAMESPACES, META_MARKER, META_STEM } from "./format.js";
 import { OpcPackage } from "./opc.js";
 import { lastColumnDeclarations } from "./reader-columns.js";
+import { SpillAreas } from "./reader-spill-areas.js";
 import type { WorkbookSheetReference, ReaderResourceUsage, ColumnCells } from "./reader-types.js";
 import { CellStyleIndices } from "./reader-types.js";
 import { readerFailure, parseUnsigned, literalFromCell } from "./reader-values.js";
@@ -109,6 +110,9 @@ export async function ingestWorksheetRows(
   const collapsedRows = new Set<number>();
   let internalMetadata = false;
   const inheritedColumnStyles = new Map<number, string>();
+  // The areas of the dynamic arrays read so far that reach the current row:
+  // Sheetwrite computes the values Excel saved in their covered cells.
+  let spillAreas: SpillAreas | undefined;
   let columnStylesRead = false;
   let columnsPrecedeRows = false;
   const cellsBeforeSheet = usage.cells;
@@ -177,6 +181,7 @@ export async function ingestWorksheetRows(
     const rowStyle = xmlBoolean(xmlAttribute(rowElement, "customFormat"))
       ? xmlAttribute(rowElement, "s")
       : undefined;
+    spillAreas?.expire(row);
     let inferredCol = 0;
     for (const cellElement of xmlChildren(rowElement, "c")) {
       const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
@@ -199,6 +204,33 @@ export async function ingestWorksheetRows(
       if (formulaElement) {
         const formulaText = decodeXstring(formulaElement.text);
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
+        const cellMetadata = xmlAttribute(cellElement, "cm");
+        const dynamicArray =
+          formulaType === "array" &&
+          cellMetadata !== undefined &&
+          context.dynamicArrayMetadata?.has(cellMetadata) === true;
+        const spillArea = dynamicArray
+          ? parseCellRect(xmlAttribute(formulaElement, "ref") ?? "")
+          : undefined;
+        // Excel writes a spill's area from its formula's cell; another area
+        // is not this formula's, and its covered cells keep their values.
+        if (spillArea && spillArea.r0 === address.row && spillArea.c0 === address.col) {
+          spillAreas ??= new SpillAreas(context.limits.maxColumnsPerSheet);
+          const admitted = spillAreas.add({
+            ...spillArea,
+            r1: Math.min(spillArea.r1, context.limits.maxRowsPerSheet - 1),
+            c1: Math.min(spillArea.c1, context.limits.maxColumnsPerSheet - 1),
+          });
+          if (!admitted) {
+            emitWarning(rowContext, {
+              code: "unsupported-feature",
+              message:
+                "Dynamic array overlaps another spill; the values saved in its cells were kept",
+              sheet: reference.name,
+              cell: addressText,
+            });
+          }
+        }
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
           if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
@@ -211,7 +243,8 @@ export async function ingestWorksheetRows(
             }
           }
           value = null;
-        } else if (formulaType !== "normal") {
+        } else if (formulaType !== "normal" && !dynamicArray) {
+          // A legacy array formula (Ctrl+Shift+Enter) has no Sheetwrite equivalent.
           emitWarning(rowContext, {
             code: "unsupported-feature",
             message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
@@ -235,6 +268,8 @@ export async function ingestWorksheetRows(
         } else {
           value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
         }
+      } else if (spillAreas?.covers(address.row, address.col)) {
+        value = null;
       } else {
         value = literalFromCell(
           cellElement,
