@@ -2,53 +2,50 @@
 // formula bar and shows it as dimmed text, accepted with Tab. This entry only
 // registers the add-on; the predictor is a chunk of its own that starts
 // loading when a grid with the add-on mounts, so it is there by the first
-// formula edit, and is never part of the page's first load.
+// formula edit, and is never part of the page's first load. Once it is there,
+// it counts the workbook's formulas when the page is idle.
 
 import type {
   FormulaEdit,
   FormulaSuggester,
   FormulaSuggestionSession,
   SheetwriteAddon,
+  Store,
 } from "@sheetwrite/core";
 
 import type * as PredictorChunk from "./predictor.js";
 
 type PredictorModule = typeof PredictorChunk;
 
-let predictor: PredictorModule | null = null;
 let loading: Promise<PredictorModule> | null = null;
 
 /** Load the predictor once; a failed load is not kept, so the next edit tries again. */
 function loadPredictor(): Promise<PredictorModule> {
-  loading ??= import("./predictor.js").then(
-    (module) => {
-      predictor = module;
-      return module;
-    },
-    (error: unknown) => {
-      loading = null;
-      throw error;
-    },
-  );
+  loading ??= import("./predictor.js").catch((error: unknown) => {
+    loading = null;
+    throw error;
+  });
   return loading;
 }
+
+/** Without the predictor the bar keeps Excel's behaviour; the next edit loads it again. */
+function reportLoadFailure(error: unknown): void {
+  console.warn("Sheetwrite: formula assist could not load its predictor", error);
+}
+
+/** The predictor of a grid's store once the chunk is there; null after the grid is gone. */
+type Attach = (module: PredictorModule) => PredictorChunk.Predictor | null;
 
 /**
  * The session of an edit that started before the predictor loaded: it
  * suggests nothing until the chunk arrives, then forwards to the real one.
  */
-function pendingSession(edit: FormulaEdit): FormulaSuggestionSession {
+function pendingSession(edit: FormulaEdit, attach: Attach): FormulaSuggestionSession {
   let session: PredictorChunk.PredictionSession | null = null;
   let closed = false;
-  loadPredictor().then(
-    (module) => {
-      if (!closed) session = module.openPrediction(edit);
-    },
-    (error: unknown) => {
-      // Without the predictor the bar keeps Excel's behaviour; the next edit retries the load.
-      console.warn("Sheetwrite: formula assist could not load its predictor", error);
-    },
-  );
+  loadPredictor().then((module) => {
+    if (!closed) session = attach(module)?.open(edit) ?? null;
+  }, reportLoadFailure);
   return {
     suggest: (text, analysis) => session?.suggest(text, analysis) ?? null,
     feedback: (event) => session?.feedback(event),
@@ -59,17 +56,37 @@ function pendingSession(edit: FormulaEdit): FormulaSuggestionSession {
   };
 }
 
-const suggester: FormulaSuggester = {
-  open: (edit) => predictor?.openPrediction(edit) ?? pendingSession(edit),
-};
+/** The suggester of one grid, and what removes its predictor when the grid goes. */
+function gridSuggester(store: Store): { suggester: FormulaSuggester; dispose(): void } {
+  let predictor: PredictorChunk.Predictor | null = null;
+  let disposed = false;
+  const attach: Attach = (module) => {
+    if (!disposed) predictor ??= module.attachPredictor(store);
+    return predictor;
+  };
+  // An edit that opens before the chunk arrives suggests nothing until the next key, so
+  // fetch it now. A failed load is reported, and the first edit loads it again.
+  loadPredictor().then(attach, reportLoadFailure);
+  return {
+    suggester: { open: (edit) => predictor?.open(edit) ?? pendingSession(edit, attach) },
+    dispose: () => {
+      disposed = true;
+      predictor?.dispose();
+      predictor = null;
+    },
+  };
+}
 
 /**
  * The formula assist add-on. While a formula is typed in a grid's formula
  * bar, it shows the most likely rest of the formula as dimmed text after the
  * caret: Tab takes all of it, Ctrl+→ one word, and Esc hides it. It predicts
- * from the sheet itself, without network or AI: a formula that the cells
- * above and below, or left and right, agree on, and the formula's syntax. It
- * shows a suggestion only when it is confident, and nothing otherwise.
+ * from the workbook itself, without network or AI: a formula that the cells
+ * above and below, or left and right, agree on; the formula a run of cells in
+ * the column repeats; the workbook's most common formulas; the formula of
+ * the same cell on other sheets; and the formula's syntax. It shows a
+ * suggestion only when it is confident, and nothing otherwise. It reads
+ * visible sheets only and keeps what it counts in memory only.
  *
  * @example
  * ```ts
@@ -84,11 +101,13 @@ const suggester: FormulaSuggester = {
 export function formulaAssistAddon(): SheetwriteAddon {
   return {
     name: "formulaAssist",
-    grid: ({ formulaSuggestions }) => {
-      // An edit that opens before the chunk arrives suggests nothing until the next key, so
-      // fetch it now. A failed load is retried by the first edit, which reports it.
-      loadPredictor().catch(() => undefined);
-      return formulaSuggestions(suggester);
+    grid: ({ grid, formulaSuggestions }) => {
+      const { suggester, dispose } = gridSuggester(grid.store);
+      const remove = formulaSuggestions(suggester);
+      return () => {
+        remove();
+        dispose();
+      };
     },
   };
 }

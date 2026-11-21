@@ -45,8 +45,14 @@ export interface ReplaySession {
   close(): void;
 }
 
-/** Opens the session of one formula edit. */
-export type OpenReplaySession = (edit: FormulaEdit) => ReplaySession;
+/** The suggester of one workbook's edits, as `attachPredictor` gives it for the workbook's store. */
+export interface ReplaySuggester {
+  open(edit: FormulaEdit): ReplaySession;
+  dispose(): void;
+}
+
+/** Attaches a suggester to the store of one workbook. */
+export type AttachReplay = (store: SheetwriteStore) => ReplaySuggester;
 
 /** What one signal's suggestions did. */
 interface SignalTally {
@@ -362,19 +368,22 @@ function setCell(store: SheetwriteStore, cell: CellAddress, formula: string | nu
 
 /**
  * Type each target of `workbook` into the workbook without that cell, one at
- * a time, and add what happened to `counts`.
+ * a time, and add what happened to `counts`. The suggester follows the
+ * store's changes as it does in a grid, so clearing the cell takes its
+ * formula out of what the suggester counted before the edit opens.
  */
 export async function replayWorkbook(
   workbook: ReplayWorkbook,
-  open: OpenReplaySession,
+  attach: AttachReplay,
   counts: ReplayCounts,
 ): Promise<void> {
   const store = openReplayStore(workbook.snapshot);
+  const suggester = attach(store);
   try {
     for (const target of workbook.targets) {
       setCell(store, target.cell, null);
       const edit = await openFormulaEdit(store, target.cell);
-      const session = open(edit);
+      const session = suggester.open(edit);
       try {
         const keys = new TypedFormula(target.formula, session, edit, counts).type();
         counts.formulas++;
@@ -386,6 +395,7 @@ export async function replayWorkbook(
       }
     }
   } finally {
+    suggester.dispose();
     store.dispose();
   }
 }
@@ -393,9 +403,9 @@ export async function replayWorkbook(
 /** Replay every workbook of a set. */
 export async function replaySet(
   workbooks: Iterable<ReplayWorkbook> | AsyncIterable<ReplayWorkbook>,
-  open: OpenReplaySession,
+  attach: AttachReplay,
 ): Promise<ReplayCounts> {
   const counts = emptyCounts();
-  for await (const workbook of workbooks) await replayWorkbook(workbook, open, counts);
+  for await (const workbook of workbooks) await replayWorkbook(workbook, attach, counts);
   return counts;
 }
