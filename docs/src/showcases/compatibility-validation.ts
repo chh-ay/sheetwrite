@@ -152,11 +152,3 @@ export function collectMissingCompatibilityFiles(
     .filter((path) => !exists(path))
     .map((path) => `missing compatibility evidence file: ${path}`);
 }
-
-export function assertCompatibilityInventory(
-  records: readonly CompatibilityRecord[],
-  fixtures: readonly CompatibilityFixture[],
-): void {
-  const issues = collectCompatibilityIssues(records, fixtures);
-  if (issues.length > 0) throw new Error(issues.join("\n"));
-}

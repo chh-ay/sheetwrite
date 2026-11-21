@@ -53,6 +53,7 @@ enum Amount {
     Number(f64),
     Text,
     Blank,
+    Bool(bool),
     Error,
 }
 
@@ -72,6 +73,8 @@ struct MeasureFixture {
     scratch: usize,
     data: Vec<Order>,
     scratch_rows: usize,
+    /// Measures of the last `set_measures`; a pivot shows each of them.
+    measures: usize,
 }
 
 /// One measure cell of a pivot output and the labels that select its rows.
@@ -138,6 +141,7 @@ impl MeasureFixture {
                     (true, _) => Amount::Error,
                     (false, 0) => Amount::Blank,
                     (false, 1) => Amount::Text,
+                    (false, 2) => Amount::Bool(row % 2 == 0),
                     (false, value) => Amount::Number((value * 7 + row % 5) as f64),
                 },
                 qty: (random.next(5) + 1) as f64,
@@ -151,6 +155,7 @@ impl MeasureFixture {
             scratch,
             data,
             scratch_rows: 0,
+            measures: 0,
         };
         for row in 0..ROWS {
             fixture.write_order(row);
@@ -178,6 +183,7 @@ impl MeasureFixture {
     /// Sends measures `m0`, `m1`, … in the `setRelationships` measure record
     /// layout: `[id, homeTable, formula, "", name]`.
     fn set_measures(&mut self, formulas: &[&str]) {
+        self.measures = formulas.len();
         let strings = formulas
             .iter()
             .enumerate()
@@ -202,7 +208,7 @@ impl MeasureFixture {
         let mut strings: Vec<String> = vec!["pivot".into(), "orders".into()];
         strings.extend(COLUMN_IDS.map(String::from));
         let measure_strings = strings.len();
-        strings.extend((0..MEASURES.len()).map(|index| format!("m{index}")));
+        strings.extend((0..self.measures).map(|index| format!("m{index}")));
 
         let mut numbers = vec![0.0, MODEL_SOURCE, 1.0, COLUMN_IDS.len() as f64];
         for column in 0..COLUMN_IDS.len() {
@@ -213,8 +219,8 @@ impl MeasureFixture {
             numbers.push(fields.len() as f64);
             numbers.extend(fields.iter().map(|&field| field as f64));
         }
-        numbers.push(MEASURES.len() as f64);
-        for index in 0..MEASURES.len() {
+        numbers.push(self.measures as f64);
+        for index in 0..self.measures {
             numbers.extend([(measure_strings + index) as f64, MEASURE_VALUE, NO_NAME]);
         }
         numbers.extend([1.0, CHANNEL as f64, KEPT_CHANNELS.len() as f64]);
@@ -273,7 +279,7 @@ impl MeasureFixture {
                 compact_path(rows, self.output_value(out_row, 0), &mut outer)
             };
             for out_col in label_cols..out_cols {
-                let slot = (out_col - label_cols) % MEASURES.len();
+                let slot = (out_col - label_cols) % self.measures;
                 let col_labels = (0..columns.len())
                     .map(|row| self.output_value(row, out_col - slot))
                     .collect();
@@ -348,6 +354,7 @@ fn write_amount(store: &mut CellStore, sheet: usize, row: usize, col: usize, amo
         Amount::Number(number) => store.set_number(sheet, row, col, *number, 0),
         Amount::Text => store.set_string(sheet, row, col, "n/a", 0),
         Amount::Blank => store.clear_cell(sheet, row, col, 0),
+        Amount::Bool(value) => store.set_bool(sheet, row, col, *value, 0),
         Amount::Error => {
             store.set_formula(sheet, row, col, "=1/0", 0);
         }
@@ -547,12 +554,14 @@ fn calculate_removes_axis_field_filters() {
 /// Errors inside `CALCULATE` reach the enclosing expression, so `IFERROR`
 /// and `ISERROR` see them as in a cell formula: the error row of the base
 /// table, which `ALL` of the channel brings back, and a division by zero.
-const CALCULATE_ERROR_MEASURES: [&str; 5] = [
+/// `COUNTA` over the error row is that error too, not a count.
+const CALCULATE_ERROR_MEASURES: [&str; 6] = [
     "=CALCULATE(SUM(orders[amount]), ALL(orders[channel]))",
     "=IFERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])), -1)",
     "=ISERROR(CALCULATE(SUM(orders[amount]), ALL(orders[channel])))",
     "=IFERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])), -2)",
     "=ISERROR(CALCULATE(SUM(orders[qty])/0, ALL(orders[region])))",
+    "=CALCULATE(COUNTA(orders[amount]), ALL(orders[channel]))",
 ];
 
 #[test]
@@ -576,13 +585,18 @@ fn errors_inside_calculate_reach_iferror_and_iserror() {
                 _ => None,
             })
             .sum();
+        let filled = context
+            .iter()
+            .filter(|&&row| !matches!(fixture.data[row].amount, Amount::Blank))
+            .count();
         let expected = match (cell.slot, amount_error) {
-            (0, true) => Value::Error(FormulaError::DivZero),
+            (0 | 5, true) => Value::Error(FormulaError::DivZero),
             (0, false) => Value::Number(amount),
             (1, true) => Value::Number(-1.0),
             (1, false) => Value::Number(amount),
             (2, error) => Value::Bool(error),
             (3, _) => Value::Number(-2.0),
+            (5, false) => Value::Number(filled as f64),
             _ => Value::Bool(true),
         };
         errors += usize::from(amount_error && cell.slot == 0);

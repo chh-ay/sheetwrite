@@ -3,8 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { type PerfFigure, type PerfRow, perfVerdict } from "../src/lib/perf-bars.ts";
 import { parsePerfCompare } from "../src/lib/perf-compare.ts";
 
-// The release and performance pages render these figures from real captures in
-// scripts/docs.test.ts and scripts/release-performance-docs.test.ts.
+// scripts/docs.test.ts renders the performance pages' figures from real
+// captures.
 
 describe("performance bar verdicts", () => {
   it("never turns a run that did not complete into a verdict", () => {

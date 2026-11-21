@@ -240,14 +240,21 @@ function conditionalFormatXml(
 
 function indexSheetRows(sheet: SheetSnapshot) {
   const byRow = new Map<number, AbsoluteCell[]>();
+  // Blocks list their cells row by row, so most cells join the previous cell's row.
+  let lastRow = -1;
+  let rowCells: AbsoluteCell[] = [];
   for (const block of sheet.cells) {
     for (const source of block.cells) {
       const row = block.startRow + source.rowOffset;
       const col = block.startCol + source.colOffset;
       if (row < 0 || row >= sheet.rowCount || col < 0 || col >= sheet.columns.length) continue;
-      const rowCells = byRow.get(row) ?? [];
+      if (row !== lastRow) {
+        lastRow = row;
+        const known = byRow.get(row);
+        rowCells = known ?? [];
+        if (known === undefined) byRow.set(row, rowCells);
+      }
       rowCells.push({ row, col, source });
-      byRow.set(row, rowCells);
     }
   }
   return byRow;
