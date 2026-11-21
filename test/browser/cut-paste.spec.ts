@@ -25,14 +25,20 @@ async function open(page: Page, browserName: string): Promise<void> {
     if (message.text().startsWith("PROBE")) console.log(`${browserName} ${message.text()}`);
   });
   await page.addInitScript(() => {
-    const clipboard = navigator.clipboard as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const clipboard = navigator.clipboard as unknown as Record<
+      string,
+      (...args: unknown[]) => Promise<unknown>
+    >;
     for (const name of ["read", "readText", "write", "writeText"]) {
       const original = clipboard[name]?.bind(clipboard);
       if (!original) continue;
       clipboard[name] = async (...args: unknown[]) => {
         try {
           const result = await original(...args);
-          const types = name === "read" ? (result as ClipboardItem[]).map((item) => item.types.join(",")).join("|") : "";
+          const types =
+            name === "read"
+              ? (result as ClipboardItem[]).map((item) => item.types.join(",")).join("|")
+              : "";
           console.log(`PROBE ${name} ok ${types}`);
           return result;
         } catch (error) {
