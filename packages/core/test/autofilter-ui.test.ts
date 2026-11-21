@@ -436,6 +436,63 @@ describe("AutoFilter in the grid", () => {
     expect(grid.canPasteVisibleRows()).toBe(false);
   });
 
+  it("refuses Paste into visible rows only when the shown rows below are too few, and keeps the paste", async () => {
+    let clipboardText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([]),
+        readText: () => Promise.resolve(clipboardText),
+      },
+    });
+    const { grid, store } = mount();
+    grid.hideRows([8]);
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+
+    // Three rows on B8 of a 10-row sheet land on rows 8 to 10, the hidden B9 included.
+    clipboardText = "10\n20\n30";
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 7, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    expect([7, 8, 9].map(qty)).toEqual([10, 20, 30]);
+
+    // Only B8 and B10 show below, so the shown rows cannot hold the three
+    // values: the grid says so, and the paste stays as it was.
+    grid.actions.pasteVisibleRows();
+    expect(notice()?.textContent).toStartWith(
+      "Nothing was pasted: the paste has 3 rows, but only 2 visible rows are left from the selected cell down.",
+    );
+    expect([7, 8, 9].map(qty)).toEqual([10, 20, 30]);
+    expect(store.getWorkbook().sheets[0]!.rowCount).toBe(10);
+  });
+
+  it("refuses a paste under a view sort that runs past the view's last row", async () => {
+    let clipboardText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([]),
+        readText: () => Promise.resolve(clipboardText),
+      },
+    });
+    const { grid, store } = mount();
+    grid.setViewSort([{ col: 1, ascending: false }]);
+    const qty = () =>
+      Array.from({ length: 10 }, (_, row) => store.getCell({ sheet: "s1", row, col: 1 }).resolved);
+    const before = qty();
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+
+    // The second-last row of the sorted view has one row below it.
+    clipboardText = "1\n2\n3";
+    const row = grid.sheetRowOf(8)!;
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row, col: 1 } });
+    expect(await grid.actions.paste()).toBe("rejected");
+    expect(notice()?.textContent).toStartWith(
+      "Nothing was pasted: the paste has 3 rows, but only 2 rows are left from the selected cell down in the sorted view.",
+    );
+    expect(qty()).toEqual(before);
+  });
+
   it("pastes over more than 10,000 shown cells of a filtered range", async () => {
     // Excel fills one copied value into every shown cell of the selection,
     // however many; the paste is one operation, not one per cell.

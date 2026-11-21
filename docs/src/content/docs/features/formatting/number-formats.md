@@ -138,7 +138,7 @@ A column's `type` decides how a typed entry is read. The columns Sheetwrite make
 | `25:00`, `36:15:30` | 1.0416…, 1.5107… days | `[h]:mm:ss` |
 | `'007` | the text `007` | none |
 
-The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`; dates read month first. A month with one number is a day of this year when that day exists, else the first day of the month in that year, as in Excel. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
+The grouping and decimal separators follow the column's `numberLocale`, so `1.234,5` is 1234.5 in `de-DE`. A date in numbers reads in the order of that locale's short date: `15.01.2026` is 15 January in `de-DE`, and `1/15/2026` is 15 January in `en-US`. The cell gets that short date with a four-digit year, such as `dd.mm.yyyy` or `m/d/yyyy`. A month with one number is a day of this year when that day exists, else the first day of the month in that year, as in Excel. A cell that already has a number format keeps it. Imported and pasted-in cells keep their stored type; text pasted from another application is read as typed, except the cells that Excel's copy marks as text (its Text format), which paste as text, as in Excel. A `text` column keeps what is typed as text, a `number`, `currency` or `date` column reads numbers and its own kind, and the Text format `@` keeps any entry as text.
 
 The grid actions `setNumberFormat(code: string | null)` and `stepDecimals(direction: 1 | -1)` change the format of the selection. `setNumberFormat(null)` returns the cells to the column's format. `stepDecimals` shows one more (`1`) or one fewer (`-1`) decimal place than the focus cell does.
 
@@ -198,7 +198,9 @@ These examples use `"en-US"`, the formatter's default locale. Set `numberLocale`
 
 Numeric formats support fixed decimals, optional grouping, percent scaling, scientific exponents with an explicit width, quoted and escaped literals, and currency prefixes and suffixes.
 
-Up to four semicolon sections select the positive, negative, zero and text output. Sheetwrite accepts color directives such as `[Red]` as formatting metadata, but they do not change the canvas text color.
+Up to four semicolon sections select the positive, negative, zero and text output. A section's color paints the number in that color, as in Excel, and it takes priority over the cell's font color: one of the eight names `[Black]`, `[Blue]`, `[Cyan]`, `[Green]`, `[Magenta]`, `[Red]`, `[White]` and `[Yellow]`, or `[Color1]` to `[Color56]` from Excel's default palette. So `#,##0;[Red]-#,##0` shows -1200 as a red `-1,200`.
+
+A condition in brackets chooses a section instead of the sign: `[Red][<=100]0;[Blue][>100]0` shows 50 in red and 150 in blue. A number goes to the first section whose condition it meets. When the first two sections both have conditions, the third section takes the other numbers. When only the first section has one, the second section takes the other numbers. A section that only negative numbers meet, such as `[<0]`, shows the number without its minus sign, as the negative section does.
 
 ### Fractions and Text
 
@@ -215,6 +217,7 @@ UTC fields make date rendering the same in every host timezone. Locale-specific 
 ## Edge cases and limits
 
 - Fractional seconds, such as `ss.00`, are not supported.
+- A color in the text section, such as `[Red]@`, does not color text.
 - Formula errors are explicit values such as `#DIV/0!` and `#CYCLE!`. They are not non-finite numbers that the formatter hides. See [Formulas](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
 - Native boolean values use the normal cell style model and render as uppercase `TRUE` or `FALSE`. They are centered unless `CellStyle.align` overrides it.
 
