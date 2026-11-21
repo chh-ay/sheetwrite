@@ -11,6 +11,7 @@ import {
   publishedPackageFrom,
   verifyPublishedArtifacts,
 } from "./release-publish.js";
+import { assertPackagesOnRegistry } from "./release-registry-check.js";
 import { parseWorkflowContract } from "./workflow-contract.js";
 
 const SHA = "a".repeat(40);
@@ -119,6 +120,23 @@ describe("manual package release workflow", () => {
     expect(source).not.toMatch(
       /secrets\.(?:NODE_AUTH_TOKEN|NPM_TOKEN)|changeset publish|release-stage/,
     );
+  });
+
+  it("stops before any publication when npm lacks a package", async () => {
+    const identity = (await workflow()).jobs.identity?.steps ?? [];
+    expect(identity.at(-1)?.run).toBe("bun scripts/release-registry-check.ts");
+
+    const missing = assertPackagesOnRegistry(
+      ["@sheetwrite/core", "@sheetwrite/queries", "@sheetwrite/formula-assist"],
+      async (name) => name === "@sheetwrite/core",
+    );
+    await expect(missing).rejects.toThrow(
+      "Not on npm yet: @sheetwrite/queries, @sheetwrite/formula-assist.",
+    );
+    await expect(missing).rejects.toThrow("CONTRIBUTING.md");
+    await expect(
+      assertPackagesOnRegistry(["@sheetwrite/core"], async () => true),
+    ).resolves.toBeUndefined();
   });
 
   it("takes artifacts only from the newest passed develop push CI run of the commit", () => {
