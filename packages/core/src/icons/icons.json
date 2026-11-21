@@ -448,6 +448,10 @@
     "tabColor": {
       "column": 2,
       "row": 12
+    },
+    "pasteVisibleRows": {
+      "column": 0,
+      "row": 13
     }
   }
 }

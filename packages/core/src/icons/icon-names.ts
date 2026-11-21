@@ -113,6 +113,7 @@ export const ICON_NAMES = [
   "insertSheet",
   "moveCopySheet",
   "tabColor",
+  "pasteVisibleRows",
 ] as const;
 
 /** The name of one glyph on the command icon sheet; the key of `IconOverrides`. */

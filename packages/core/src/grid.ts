@@ -988,6 +988,8 @@ export class GridImpl implements Grid {
       toViewRow: (dataRow) => this.toViewRow(dataRow),
       rowSpan: (first, last) => this.rowSpan(first, last),
       commit: (patches, reason) => this.document.commit(patches, reason),
+      undo: () => this.undo(),
+      lastUndo: () => this.document.lastUndo,
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
       loadPasteSpecial: () => import("./paste-special.js"),
       askPasteSpecial: (ownCopy) =>
@@ -999,19 +1001,24 @@ export class GridImpl implements Grid {
       onValidationRefused: (refused, warned) => {
         this.validationRefusedNotice(refused, warned);
       },
+      onPasteRefused: (reason) => {
+        this.actionFeedback.show(`Nothing was pasted: ${reason}`);
+      },
       validationReads: () => storeEngine(this.store)?.validationReads,
-      // A paste too large to land says how large it is.
-      onTooLarge: (message) => this.actionFeedback.show(message),
-      // Excel's cut moves the rows a filter or Hide Rows hides without a word;
-      // say so. Show them clears the filters and shows the step's hidden rows,
-      // as one undo step.
+      // Excel's cut moves, and its paste writes into, the rows a filter or
+      // Hide Rows hides without a word; say so. Show them clears the filters
+      // and shows the step's hidden rows, as one undo step.
       onHiddenRowsMoved: (count, step, spans) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
         // The rows are the sheet's that is active now; Show them acts on it
         // even after a switch to another sheet.
         const sheetId = this.activeSheet;
         this.actionFeedback.show(
-          step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
+          step === "cut"
+            ? `This cut includes ${rows}.`
+            : step === "paste"
+              ? `This paste moved ${rows}.`
+              : `This paste wrote into ${rows}. Paste Options › Paste into visible rows only skips them.`,
           {
             label: "Show them",
             run: () => {
@@ -4354,6 +4361,7 @@ export class GridImpl implements Grid {
       paste: () => this.clipboard.paste(),
       pasteValues: () => this.clipboard.pasteValues(),
       pasteSpecial: (options) => this.clipboard.pasteSpecial(options),
+      pasteVisibleRows: () => this.clipboard.pasteShownRows(),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => {
         try {
@@ -4816,6 +4824,10 @@ export class GridImpl implements Grid {
 
   hiddenRows(): readonly number[] {
     return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
+  }
+
+  canPasteVisibleRows(): boolean {
+    return this.clipboard.canPasteShownRows;
   }
 
   sheetRowOf(viewRow: number): number | null {

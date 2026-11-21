@@ -3,8 +3,8 @@ import type { ClipboardOutcome, Grid } from "./types/grid.js";
 
 /**
  * What a user reads when a built-in command cannot finish. Outcomes not
- * listed here need no message here: "done" and "empty" have nothing to say,
- * and the grid explains "too-large" itself, with the paste's size.
+ * listed here need no message: "done" and "empty", and "rejected", which the
+ * grid has already explained.
  */
 const CLIPBOARD_MESSAGES: Partial<Record<ClipboardOutcome, string>> = {
   blocked:
@@ -22,7 +22,7 @@ function isClipboardOutcome(value: unknown): value is ClipboardOutcome {
     value === "empty" ||
     value === "blocked" ||
     value === "unsupported" ||
-    value === "too-large"
+    value === "rejected"
   );
 }
 

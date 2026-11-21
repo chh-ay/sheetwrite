@@ -40,7 +40,7 @@ import type {
 } from "./types/document.js";
 import type { ClipboardOutcome, PasteSpecialOptions } from "./types/grid.js";
 import type { Store } from "./types/store.js";
-import type { ChangeEvent } from "./types/transaction.js";
+import type { ApplyTransactionResult, ChangeEvent } from "./types/transaction.js";
 import { utf8ByteLength } from "./utf8.js";
 import {
   failingValidationRule,
@@ -68,14 +68,21 @@ export interface ClipboardControllerDeps {
   readOnly: () => boolean;
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
-  /** The view row of a data row; null for a row the view hides. */
+  /** The view row of a sheet row; `null` when a filter or the user hides it. */
   toViewRow: (dataRow: number) => number | null;
   /**
    * The data rows view rows `first` to `last` span with the rows hidden by
    * hand between them; null under a sort or a filter between them.
    */
   rowSpan: (first: number, last: number) => { first: number; last: number } | null;
-  commit: (patches: DocumentOp[], reason: CommitReason) => void;
+  commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
+  /** Undo the last local change, as Ctrl+Z does. */
+  undo: () => void;
+  /**
+   * The newest entry of the undo history, compared by identity: the edit the
+   * next {@link undo} reverts. `null` when there is none.
+   */
+  lastUndo: () => object | null;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
   /** Load Paste Special's code. */
@@ -96,17 +103,23 @@ export interface ClipboardControllerDeps {
   validationReads?: () => ValidationReads | undefined;
   /**
    * Called when a cut, then its paste, moves `count` rows that a filter or
-   * the user hides, which the selection did not show. `rows` are the active
-   * sheet's data rows the step covers: the cut's, and after the paste also
-   * the rows it landed on.
+   * the user hides, which the selection did not show (`cut`, `paste`), and
+   * when a pasted block writes into `count` hidden rows of its target, as
+   * Excel's paste does (`write`). `rows` are the active sheet's data rows the
+   * step covers: the cut's, after the paste also the rows it landed on, and
+   * the rows a pasted block wrote.
    */
   onHiddenRowsMoved?: (
     count: number,
-    step: "cut" | "paste",
+    step: "cut" | "paste" | "write",
     rows: readonly { readonly start: number; readonly end: number }[],
   ) => void;
-  /** Called with what the user reads when a paste is larger than a paste may be. */
-  onTooLarge?: (message: string) => void;
+  /**
+   * Called with why a paste was refused, so the user reads that nothing was
+   * pasted, and why: the grid refused its commit, or the clipboard holds more
+   * than a paste may have. `reason` is a sentence that starts in lower case.
+   */
+  onPasteRefused?: (reason: string) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -119,6 +132,16 @@ interface CellWrite {
    */
   text?: true;
 }
+
+/**
+ * The rows a pasted block takes: consecutive sheet rows (`sheet`), the
+ * view's rows (`view`), or the rows neither a filter nor Hide Rows hides
+ * (`shown`).
+ */
+type PasteRows = "sheet" | "view" | "shown";
+
+/** A paste's commit, or `null` when there was nothing to commit. */
+type PasteCommit = ApplyTransactionResult | null;
 
 /** The top-left cell a paste lands on, and the size of the selection it may repeat to fill. */
 interface PasteTarget extends CellRef {
@@ -215,39 +238,43 @@ function limited<T>(parse: () => T): T | DelimitedTextResourceError {
   }
 }
 
-/** What the user reads when a paste is larger than a paste may be. */
-function tooLargeMessage(error: DelimitedTextResourceError): string {
+/** Why a paste larger than a paste may be was refused, as the user reads it. */
+function tooLargeReason(error: DelimitedTextResourceError): string {
   const count = (value: number): string => value.toLocaleString("en-US");
   const megabytes = (bytes: number): string =>
     `${(bytes / (1024 * 1024)).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`;
   switch (error.resource) {
     case "maxRows":
-      return `This paste has ${count(error.actual)} rows. A paste can have at most ${count(error.limit)}.`;
+      return `this paste has ${count(error.actual)} rows, and a paste can have at most ${count(error.limit)}.`;
     case "maxColumns":
-      return `This paste has ${count(error.actual)} columns. A paste can have at most ${count(error.limit)}.`;
+      return `this paste has ${count(error.actual)} columns, and a paste can have at most ${count(error.limit)}.`;
     case "maxCells":
-      return `This paste has ${count(error.actual)} cells. A paste can have at most ${count(error.limit)}.`;
+      return `this paste has ${count(error.actual)} cells, and a paste can have at most ${count(error.limit)}.`;
     case "maxFieldBytes":
-      return `A cell of this paste has ${megabytes(error.actual)} of text. A cell can have at most ${megabytes(error.limit)}.`;
+      return `a cell of this paste has ${megabytes(error.actual)} of text, and a cell can have at most ${megabytes(error.limit)}.`;
     default:
-      return `This paste has ${megabytes(error.actual)} of text. A paste can have at most ${megabytes(error.limit)}.`;
+      return `this paste has ${megabytes(error.actual)} of text, and a paste can have at most ${megabytes(error.limit)}.`;
   }
 }
 
-/**
- * `paste`'s outcome; a paste larger than a paste may be is refused with
- * `"too-large"`, and `onTooLarge` tells the user why.
- */
-async function refusingTooLarge(
-  paste: Promise<ClipboardOutcome>,
-  onTooLarge: ((message: string) => void) | undefined,
-): Promise<ClipboardOutcome> {
-  try {
-    return await paste;
-  } catch (error) {
-    if (!(error instanceof DelimitedTextResourceError)) throw error;
-    onTooLarge?.(tooLargeMessage(error));
-    return "too-large";
+/** Why the grid refused a paste's commit, as the user reads it. */
+function commitRefusalReason(
+  result: Exclude<ApplyTransactionResult, { status: "applied" }>,
+): string {
+  switch (result.status) {
+    case "rejected":
+      return `${result.issues[0]?.message ?? "the change was refused"}.`;
+    case "conflict":
+      return "the sheet changed meanwhile. Paste again.";
+    case "noop":
+      switch (result.reason) {
+        case "read-only":
+          return "the sheet is read-only.";
+        case "incomplete-data":
+          return "the sheet is still loading. Paste again when it has loaded.";
+        default:
+          return "the paste does not fit on the sheet.";
+      }
   }
 }
 
@@ -732,6 +759,36 @@ function movesCellsOf(patch: DocumentOp, sheet: SheetId): boolean {
 }
 
 /**
+ * One sparse `setRange` that writes `cells` (sheet rows and columns) over
+ * their bounding range and leaves the range's other cells as they are, as one
+ * `set` per cell would, in one operation; nothing for no cells.
+ */
+function sparseCellsPatch(
+  sheet: SheetId,
+  cells: readonly { readonly row: number; readonly col: number; readonly write: CellWrite }[],
+): DocumentOp[] {
+  if (cells.length === 0) return [];
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  let left = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  for (const { row, col } of cells) {
+    top = Math.min(top, row);
+    bottom = Math.max(bottom, row);
+    left = Math.min(left, col);
+    right = Math.max(right, col);
+  }
+  const range = { sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+  const snapshot = cells.map(({ row, col, write }) => ({
+    rowOffset: row - top,
+    colOffset: col - left,
+    value: write.value,
+    ...(write.style === undefined ? {} : { style: write.style }),
+  }));
+  return [{ op: "setRange", range, cells: snapshot }];
+}
+
+/**
  * Translates between the current selection and clipboard payloads. Formula/ref
  * fidelity is restored only when a versioned private envelope carries the
  * controller's current in-memory token. Every other clipboard source is inert.
@@ -757,6 +814,27 @@ export class ClipboardController {
 
   /** True while the paste of a cut commits its move. */
   private movingCut = false;
+
+  /** The paste that runs now, so a write into hidden rows can offer it again. */
+  private runningPaste: (() => PasteCommit) | null = null;
+
+  /**
+   * The last change, when it is a paste that wrote into hidden rows: Paste
+   * into visible rows only pastes it again on the shown rows. Any other
+   * change ends the offer.
+   */
+  private hiddenRowsPaste: {
+    readonly sheet: SheetId;
+    readonly paste: () => PasteCommit;
+    /** The paste's undo entry, so only that paste is ever undone. */
+    readonly undoEntry: object | null;
+  } | null = null;
+
+  /**
+   * True while Paste into visible rows only undoes the last paste and pastes
+   * it again: the block then takes the shown rows.
+   */
+  private pastingShownRows = false;
 
   /**
    * The running copy or cut, and the running paste. A newer action of the
@@ -794,6 +872,7 @@ export class ClipboardController {
    * its sheet.
    */
   storeChanged(event: ChangeEvent): void {
+    if (!this.pastingShownRows) this.hiddenRowsPaste = null;
     const cut = this.pendingCut;
     if (!cut) return;
     const patches = event.transaction.patches;
@@ -902,11 +981,10 @@ export class ClipboardController {
 
   /**
    * Paste at the focus cell. Only the current controller's token restores rich
-   * formulas/refs; custom, HTML, and plain external inputs are inert. A paste
-   * larger than a paste may be is refused with `"too-large"`.
+   * formulas/refs; custom, HTML, and plain external inputs are inert.
    */
   paste(): Promise<ClipboardOutcome> {
-    return refusingTooLarge(this.pasteFrom(false), this.deps.onTooLarge);
+    return this.refusingTooLarge(this.pasteFrom(false));
   }
 
   /**
@@ -914,7 +992,7 @@ export class ClipboardController {
    * styles. For external text this is identical to {@link paste}.
    */
   pasteValues(): Promise<ClipboardOutcome> {
-    return refusingTooLarge(this.pasteFrom(true), this.deps.onTooLarge);
+    return this.refusingTooLarge(this.pasteFrom(true));
   }
 
   /**
@@ -924,7 +1002,22 @@ export class ClipboardController {
    * Excel, it is not available while a cut waits for its paste.
    */
   pasteSpecial(options: PasteSpecialOptions = {}): Promise<ClipboardOutcome> {
-    return refusingTooLarge(this.pasteSpecialFrom(options), this.deps.onTooLarge);
+    return this.refusingTooLarge(this.pasteSpecialFrom(options));
+  }
+
+  /**
+   * `paste`'s outcome. A clipboard that holds more than a paste may have is
+   * refused while it is read, before anything is written: the grid says how
+   * large it is, and the paste ends `rejected`.
+   */
+  private async refusingTooLarge(paste: Promise<ClipboardOutcome>): Promise<ClipboardOutcome> {
+    try {
+      return await paste;
+    } catch (error) {
+      if (!(error instanceof DelimitedTextResourceError)) throw error;
+      this.deps.onPasteRefused?.(tooLargeReason(error));
+      return "rejected";
+    }
   }
 
   private async pasteSpecialFrom(options: PasteSpecialOptions): Promise<ClipboardOutcome> {
@@ -945,8 +1038,7 @@ export class ClipboardController {
       if (payload.kind === "outcome") return payload.outcome;
       const target = this.pasteTarget();
       if (payload.kind === "cut" || !target || this.deps.readOnly()) return "empty";
-      this.applyPasteSpecial(special, payload, target, chosen);
-      return "done";
+      return this.runPaste(() => this.applyPasteSpecial(special, payload, target, chosen));
     } finally {
       read.close();
     }
@@ -1006,18 +1098,73 @@ export class ClipboardController {
       case "cut":
         return this.pasteCut(payload.cut, focus, valuesOnly);
       case "internal":
-        this.pasteInternal(payload.snapshot, focus, valuesOnly);
-        return "done";
+        return this.runPaste(() => this.pasteInternal(payload.snapshot, focus, valuesOnly));
       case "foreign":
-        this.pasteExternalSnapshot(payload.snapshot, focus, valuesOnly);
-        return "done";
+        return this.runPaste(() => this.pasteExternalSnapshot(payload.snapshot, focus, valuesOnly));
       case "html":
-        this.pasteExternalHtml(payload.grid, focus);
-        return "done";
+        return this.runPaste(() => this.pasteExternalHtml(payload.grid, focus));
       case "text":
-        this.pasteExternal(payload.text, focus);
-        return "done";
+        return this.runPaste(() => this.pasteExternal(payload.text, focus));
     }
+  }
+
+  /**
+   * Run `paste`, which a write into hidden rows can then offer again on the
+   * shown rows, and tell how it ended.
+   */
+  private runPaste(paste: () => PasteCommit): ClipboardOutcome {
+    this.runningPaste = paste;
+    try {
+      return this.pasteOutcome(paste());
+    } finally {
+      this.runningPaste = null;
+    }
+  }
+
+  /**
+   * How a paste's commit ended: `done` when it applied, `empty` when there
+   * was nothing to write. A commit the grid refused (a host's protection or
+   * admission, a document limit, a read-only or loading sheet) changed
+   * nothing: the grid says so, and the paste ends `rejected`.
+   */
+  private pasteOutcome(result: PasteCommit): ClipboardOutcome {
+    if (result === null) return "empty";
+    if (result.status === "applied") return "done";
+    if (result.status === "noop" && result.reason === "empty") return "empty";
+    this.deps.onPasteRefused?.(commitRefusalReason(result));
+    return "rejected";
+  }
+
+  /**
+   * Whether the last change is a paste on the active sheet that wrote into
+   * rows a filter or Hide Rows hides, which {@link pasteShownRows} can paste
+   * again on the shown rows only.
+   */
+  get canPasteShownRows(): boolean {
+    return this.hiddenRowsPaste?.sheet === this.deps.activeSheet() && !this.deps.readOnly();
+  }
+
+  /**
+   * Paste into visible rows only: undo the last paste, which wrote into
+   * hidden rows as Excel's paste does, and paste the same cells again on the
+   * rows the filter and Hide Rows show, skipping the hidden ones. The result
+   * is one undo step; a refused paste is said, as any paste's is. Returns
+   * false when the last change is not such a paste.
+   */
+  pasteShownRows(): boolean {
+    const last = this.hiddenRowsPaste;
+    if (!last || !this.canPasteShownRows) return false;
+    this.hiddenRowsPaste = null;
+    // Undo only that paste: never an edit the offer did not see.
+    if (last.undoEntry === null || this.deps.lastUndo() !== last.undoEntry) return false;
+    this.pastingShownRows = true;
+    try {
+      this.deps.undo();
+      this.pasteOutcome(last.paste());
+    } finally {
+      this.pastingShownRows = false;
+    }
+    return true;
   }
 
   /**
@@ -1151,8 +1298,9 @@ export class ClipboardController {
     if (!fits) return "empty";
 
     this.movingCut = true;
+    let result: ApplyTransactionResult;
     try {
-      this.deps.commit(
+      result = this.deps.commit(
         [
           {
             op: "moveCells",
@@ -1165,6 +1313,8 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
+    const outcome = this.pasteOutcome(result);
+    if (outcome !== "done") return outcome;
     if (cut.hidden > 0) {
       const landed = { start: firstRow, end: firstRow + rows - 1 };
       const cutRows = { start: cut.range.start.row, end: cut.range.end.row };
@@ -1181,7 +1331,7 @@ export class ClipboardController {
     snapshot: ClipboardSnapshot,
     focus: PasteTarget,
     valuesOnly: boolean,
-  ): void {
+  ): PasteCommit {
     // Copy shifts every relative formula ref by the block's rigid displacement.
     const targetAnchorRow = this.deps.toDataRow(focus.row);
     const deltaRow = targetAnchorRow - snapshot.anchor.row;
@@ -1201,7 +1351,7 @@ export class ClipboardController {
           }),
         ];
 
-    this.commitBlock(
+    return this.commitBlock(
       focus,
       snapshot.cells.length,
       (r) => snapshot.cells[r]?.length ?? 0,
@@ -1285,8 +1435,10 @@ export class ClipboardController {
    * The cells, in data rows and columns, that a paste of a `rows` × `cols`
    * block (after a transpose) fills at `target`: the selection when it is a
    * whole multiple of the block, which then repeats, as cells do. Null when a
-   * sorted view or hidden columns split them, or they pass the sheet's end:
-   * notes and rules then stay as they are.
+   * repeated block's shown rows are apart, a sorted view or hidden columns
+   * split them, or they pass the sheet's end: notes and rules then stay as
+   * they are. A block pasted once fills consecutive sheet rows, hidden ones
+   * included, or only the shown rows, as its cells do ({@link blockRows}).
    */
   private pasteArea(
     target: PasteTarget,
@@ -1299,10 +1451,19 @@ export class ClipboardController {
     const filledRows = repeat ? target.rows : rows;
     const filledCols = repeat ? target.cols : cols;
     const sheet = this.deps.activeSheet();
-    if (target.row + filledRows > this.deps.store.viewRowCount(sheet)) return null;
     const first = this.deps.toDataRow(target.row);
-    for (let row = 1; row < filledRows; row++) {
-      if (this.deps.toDataRow(target.row + row) !== first + row) return null;
+    const blockRows = filledRows === rows && filledCols === cols ? this.blockRows() : "view";
+    if (blockRows === "sheet") {
+      if (first + filledRows > this.deps.sheet().rowCount) return null;
+    } else {
+      const dataRows =
+        blockRows === "shown"
+          ? this.shownRowsFrom(target.row, filledRows).data
+          : Array.from({ length: filledRows }, (_, row) => this.deps.toDataRow(target.row + row));
+      if (target.row + filledRows > this.deps.store.viewRowCount(sheet)) return null;
+      if (dataRows.length < filledRows || dataRows.some((row, index) => row !== first + index)) {
+        return null;
+      }
     }
     const visible = this.deps.colIndices();
     const at = visible.indexOf(target.col);
@@ -1390,7 +1551,7 @@ export class ClipboardController {
     payload: Exclude<ClipboardPayload, { kind: "cut" | "outcome" }>,
     target: PasteTarget,
     options: PasteSpecialOptions,
-  ): void {
+  ): PasteCommit {
     const snapshot = payload.kind === "internal" ? payload.snapshot : null;
     const sheet = this.deps.activeSheet();
     const range = snapshot?.source ?? null;
@@ -1428,8 +1589,7 @@ export class ClipboardController {
         if (col === undefined || width === undefined) break;
         patches.push({ op: "setColumn", sheet, col, patch: { width } });
       }
-      this.deps.commit(patches, "paste");
-      return;
+      return this.deps.commit(patches, "paste");
     }
 
     const area = snapshot ? this.pasteArea(at, plan.height, plan.width, transpose) : null;
@@ -1450,10 +1610,9 @@ export class ClipboardController {
           ]
         : [];
     if (parts.content === null && parts.style === null) {
-      this.deps.commit(extras, "paste");
-      return;
+      return this.deps.commit(extras, "paste");
     }
-    this.commitBlock(
+    return this.commitBlock(
       at,
       plan.height,
       () => plan.width,
@@ -1472,9 +1631,9 @@ export class ClipboardController {
     snapshot: ClipboardSnapshot,
     focus: PasteTarget,
     valuesOnly: boolean,
-  ): void {
+  ): PasteCommit {
     const sheet = this.deps.sheet();
-    this.commitBlock(
+    return this.commitBlock(
       focus,
       snapshot.cells.length,
       (row) => snapshot.cells[row]!.length,
@@ -1486,9 +1645,9 @@ export class ClipboardController {
     );
   }
 
-  private pasteExternalHtml(grid: CellWrite[][], focus: PasteTarget): void {
+  private pasteExternalHtml(grid: CellWrite[][], focus: PasteTarget): PasteCommit {
     const sheet = this.deps.sheet();
-    this.commitBlock(
+    return this.commitBlock(
       focus,
       grid.length,
       (row) => grid[row]!.length,
@@ -1497,12 +1656,12 @@ export class ClipboardController {
     );
   }
 
-  private pasteExternal(text: string, focus: PasteTarget): void {
+  private pasteExternal(text: string, focus: PasteTarget): PasteCommit {
     const grid = parseTsv(text);
-    if (grid.length === 0) return;
+    if (grid.length === 0) return null;
     const sheet = this.deps.sheet();
 
-    this.commitBlock(
+    return this.commitBlock(
       focus,
       grid.length,
       (r) => grid[r]!.length,
@@ -1522,7 +1681,7 @@ export class ClipboardController {
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number, repeat: CellRef) => CellWrite | null,
     extraPatches: DocumentOp[] = [],
-  ): void {
+  ): PasteCommit {
     const width = height > 0 ? widthAt(0) : 0;
     let rectangular = width > 0;
     for (let r = 1; r < height && rectangular; r++) rectangular = widthAt(r) === width;
@@ -1531,16 +1690,17 @@ export class ClipboardController {
         ? { rows: target.rows / height, cols: target.cols / width }
         : { rows: 1, cols: 1 };
     if (repeats.rows === 1 && repeats.cols === 1) {
-      this.writeBlock(
+      return this.writeBlock(
         target,
         height,
         widthAt,
         (r, c, targetCol) => cellAt(r, c, targetCol, { row: 0, col: 0 }),
         extraPatches,
+        this.blockRows(),
       );
-      return;
     }
-    this.writeBlock(
+    // A block repeated over the selection fills its shown cells, as in Excel.
+    return this.writeBlock(
       target,
       height * repeats.rows,
       () => width * repeats.cols,
@@ -1551,9 +1711,43 @@ export class ClipboardController {
   }
 
   /**
+   * The rows a block pasted once takes: consecutive sheet rows, the rows a
+   * filter or Hide Rows hides included, as Excel's paste does (`sheet`); the
+   * shown rows only, for Paste into visible rows only (`shown`); or the
+   * view's rows under a view sort, whose sheet rows are not in view order
+   * (`view`).
+   */
+  private blockRows(): PasteRows {
+    if (this.pastingShownRows) return "shown";
+    return (this.deps.sheet().sortKeys?.length ?? 0) === 0 ? "sheet" : "view";
+  }
+
+  /**
+   * The first `count` rows from view row `viewRow` that neither a filter nor
+   * Hide Rows hides, as data rows and view rows.
+   */
+  private shownRowsFrom(
+    viewRow: number,
+    count: number,
+  ): { readonly data: number[]; readonly view: number[] } {
+    const hidden = new Set(this.deps.sheet().hiddenRows ?? []);
+    const viewRows = this.deps.store.viewRowCount(this.deps.activeSheet());
+    const data: number[] = [];
+    const view: number[] = [];
+    for (let row = viewRow; row < viewRows && data.length < count; row++) {
+      const dataRow = this.deps.toDataRow(row);
+      if (hidden.has(dataRow)) continue;
+      data.push(dataRow);
+      view.push(row);
+    }
+    return { data, view };
+  }
+
+  /**
    * Walk a `height`×`widthAt(r)` block anchored at `focus`, resolving each cell to
-   * a `set` patch via `cellAt`. Honors the view-row mapping, the visible-column
-   * order, the row limit, and merge-anchor skipping, then commits one transaction.
+   * a `set` patch via `cellAt`. Honors the row mapping (`rows`, see
+   * {@link blockRows}), the visible-column order, the row limit, and
+   * merge-anchor skipping, then commits one transaction.
    * A paste that keeps the target's validation rules checks its cells and
    * commits them in one check, so each list source is read once.
    */
@@ -1563,12 +1757,13 @@ export class ClipboardController {
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
     extraPatches: DocumentOp[] = [],
-  ): void {
+    rows: PasteRows = "view",
+  ): PasteCommit {
     const reads = this.deps.keepValidation?.() ? this.deps.validationReads?.() : undefined;
     if (reads) {
-      reads.check(() => this.writeCells(focus, height, widthAt, cellAt, extraPatches));
+      return reads.check(() => this.writeCells(focus, height, widthAt, cellAt, extraPatches, rows));
     } else {
-      this.writeCells(focus, height, widthAt, cellAt, extraPatches);
+      return this.writeCells(focus, height, widthAt, cellAt, extraPatches, rows);
     }
   }
 
@@ -1579,38 +1774,60 @@ export class ClipboardController {
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
     extraPatches: DocumentOp[] = [],
-  ): void {
+    rows: PasteRows = "view",
+  ): PasteCommit {
     const activeSheet = this.deps.activeSheet();
+    const firstDataRow = this.deps.toDataRow(focus.row);
+    const shown = rows === "shown" ? this.shownRowsFrom(focus.row, height) : null;
+    const rowIn = (list: readonly number[], r: number): number => {
+      const row = list[r];
+      if (row === undefined) throw new Error(`Paste has no shown row ${r}`);
+      return row;
+    };
+    const dataRowAt = shown
+      ? (r: number) => rowIn(shown.data, r)
+      : rows === "sheet"
+        ? (r: number) => firstDataRow + r
+        : (r: number) => this.deps.toDataRow(focus.row + r);
+    // The view row of block row `r`; `null` for a sheet row a filter hides.
+    const viewRowAt = shown
+      ? (r: number): number | null => rowIn(shown.view, r)
+      : rows === "sheet"
+        ? (r: number) => this.deps.toViewRow(firstDataRow + r)
+        : (r: number): number | null => focus.row + r;
     // With `paste.keepValidation`, a value a reject rule refuses is not pasted.
     const check = this.deps.keepValidation?.() ? this.validationCheck() : null;
     const writeAt = check
       ? (r: number, c: number, targetCol: number): CellWrite | null => {
           const write = cellAt(r, c, targetCol);
-          const addr = {
-            sheet: activeSheet,
-            row: this.deps.toDataRow(focus.row + r),
-            col: targetCol,
-          };
+          const addr = { sheet: activeSheet, row: dataRowAt(r), col: targetCol };
           return write && check.admits(write, addr) ? write : null;
         }
       : cellAt;
-    const rowLimit = this.deps.store.viewRowCount(activeSheet);
     const colIndices = this.deps.colIndices();
     const startPos = colIndices.indexOf(focus.col);
-    if (startPos < 0) return;
+    if (startPos < 0) return null;
 
-    const availableRows = Math.min(height, rowLimit - focus.row);
+    const availableRows = Math.min(
+      height,
+      shown
+        ? shown.data.length
+        : rows === "sheet"
+          ? this.deps.sheet().rowCount - firstDataRow
+          : this.deps.store.viewRowCount(activeSheet) - focus.row,
+    );
+    const hiddenRows = rows === "sheet" ? this.hiddenRowsIn(firstDataRow, availableRows) : 0;
+    // The sheet rows the block writes, for the hidden-rows notice's Show them.
+    const writtenRows = [{ start: firstDataRow, end: firstDataRow + availableRows - 1 }];
     const width = availableRows > 0 ? widthAt(0) : 0;
     const targetCols = colIndices.slice(startPos, startPos + width);
-    const firstDataRow = availableRows > 0 ? this.deps.toDataRow(focus.row) : -1;
     const rectangular =
       availableRows > 0 &&
       width > 0 &&
       targetCols.length === width &&
       targetCols.every((col, index) => col === focus.col + index) &&
       Array.from({ length: availableRows }, (_, row) => row).every(
-        (row) =>
-          widthAt(row) === width && this.deps.toDataRow(focus.row + row) === firstDataRow + row,
+        (row) => widthAt(row) === width && dataRowAt(row) === firstDataRow + row,
       );
     if (rectangular) {
       const values: CellScalar[] = new Array(availableRows * width);
@@ -1626,9 +1843,9 @@ export class ClipboardController {
       let canPack = true;
       for (let row = 0; row < availableRows && canPack; row++) {
         for (let col = 0; col < width; col++) {
-          const targetRow = focus.row + row;
+          const viewRow = viewRowAt(row);
           const targetCol = targetCols[col]!;
-          if (this.deps.mergeAnchorAt(targetRow, targetCol)) {
+          if (viewRow !== null && this.deps.mergeAnchorAt(viewRow, targetCol)) {
             canPack = false;
             break;
           }
@@ -1678,7 +1895,7 @@ export class ClipboardController {
           styleIds,
         };
 
-        this.deps.commit(
+        const result = this.deps.commit(
           [
             {
               op: "setBlock",
@@ -1697,34 +1914,66 @@ export class ClipboardController {
           "paste",
         );
         check?.report();
-        return;
+        this.wroteHiddenRows(result, hiddenRows, writtenRows);
+        return result;
       }
     }
 
-    const patches: DocumentOp[] = [];
+    // The cells go in one sparse `setRange` over their bounding rows and
+    // columns: one operation however many cells, so a paste over a filtered
+    // range or a merge stays within the transaction's operation limit.
+    const cells: { row: number; col: number; write: CellWrite }[] = [];
     for (let r = 0; r < height; r++) {
       const width = widthAt(r);
       for (let c = 0; c < width; c++) {
-        const targetRow = focus.row + r;
         const targetCol = colIndices[startPos + c];
-        if (targetRow >= rowLimit || targetCol === undefined) continue;
+        if (r >= availableRows || targetCol === undefined) continue;
 
-        const merge = this.deps.mergeAnchorAt(targetRow, targetCol);
-        if (merge && (merge.r0 !== targetRow || merge.c0 !== targetCol)) continue;
+        const viewRow = viewRowAt(r);
+        const merge = viewRow === null ? null : this.deps.mergeAnchorAt(viewRow, targetCol);
+        if (merge && (merge.r0 !== viewRow || merge.c0 !== targetCol)) continue;
 
         const write = writeAt(r, c, targetCol);
         if (!write) continue;
-        patches.push({
-          op: "set",
-          addr: { sheet: activeSheet, row: this.deps.toDataRow(targetRow), col: targetCol },
-          value: write.value,
-          style: write.style,
-        });
+        cells.push({ row: dataRowAt(r), col: targetCol, write });
       }
     }
 
-    this.deps.commit([...patches, ...extraPatches], "paste");
+    const result = this.deps.commit(
+      [...sparseCellsPatch(activeSheet, cells), ...extraPatches],
+      "paste",
+    );
     check?.report();
+    this.wroteHiddenRows(result, hiddenRows, writtenRows);
+    return result;
+  }
+
+  /** How many of the `count` sheet rows from `first` a filter or Hide Rows hides. */
+  private hiddenRowsIn(first: number, count: number): number {
+    const hiddenByUser = new Set(this.deps.sheet().hiddenRows ?? []);
+    let hidden = 0;
+    for (let row = first; row < first + count; row++) {
+      if (hiddenByUser.has(row) || this.deps.toViewRow(row) === null) hidden += 1;
+    }
+    return hidden;
+  }
+
+  /**
+   * After a paste wrote into `count` hidden rows: say so, and keep the paste,
+   * so Paste into visible rows only can paste it again on the shown rows.
+   */
+  private wroteHiddenRows(
+    result: ApplyTransactionResult,
+    count: number,
+    rows: readonly { readonly start: number; readonly end: number }[],
+  ): void {
+    // A refused or empty commit wrote nothing, and left no undo entry to replace.
+    if (count === 0 || result.status !== "applied") return;
+    const paste = this.runningPaste;
+    this.hiddenRowsPaste = paste
+      ? { sheet: this.deps.activeSheet(), paste, undoEntry: this.deps.lastUndo() }
+      : null;
+    this.deps.onHiddenRowsMoved?.(count, "write", rows);
   }
 
   /**
