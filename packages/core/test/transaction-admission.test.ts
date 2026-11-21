@@ -18,39 +18,34 @@ function reservation(log: string[], name: string): GridTransactionAdmissionReser
   };
 }
 
+/** Admits an empty transaction through two guards on a fresh grid. */
+function admitTwoGuards(log: string[]): GridTransactionAdmissionReservation {
+  const grid = {} as Grid;
+  for (const name of ["first", "second"]) {
+    registerGridTransactionAdmission(grid, {
+      reserve: () => ({ ok: true, reservation: reservation(log, name) }),
+    });
+  }
+  const admitted = beginGridTransactionAdmission(grid, []);
+  if (!admitted.ok) throw new Error("multi-guard admission unexpectedly rejected");
+  return admitted.reservation;
+}
+
 describe("grid transaction admission", () => {
   it("finishes or cancels every reservation exactly once", () => {
-    const grid = {} as Grid;
     const finishLog: string[] = [];
-    const cancelLog: string[] = [];
-    const disposers = ["first", "second"].map((name) =>
-      registerGridTransactionAdmission(grid, {
-        reserve: () => ({ ok: true, reservation: reservation(finishLog, name) }),
-      }),
-    );
-
-    const finished = beginGridTransactionAdmission(grid, []);
-    expect(finished.ok).toBe(true);
-    if (!finished.ok) throw new Error("multi-guard admission unexpectedly rejected");
-    finished.reservation.finish(outcome);
-    finished.reservation.finish(outcome);
-    finished.reservation.cancel();
+    const finished = admitTwoGuards(finishLog);
+    finished.finish(outcome);
+    finished.finish(outcome);
+    finished.cancel();
     expect(finishLog).toEqual(["first:finish:noop", "second:finish:noop"]);
 
-    for (const dispose of disposers) dispose();
-    const cancelDisposers = ["first", "second"].map((name) =>
-      registerGridTransactionAdmission(grid, {
-        reserve: () => ({ ok: true, reservation: reservation(cancelLog, name) }),
-      }),
-    );
-    const cancelled = beginGridTransactionAdmission(grid, []);
-    expect(cancelled.ok).toBe(true);
-    if (!cancelled.ok) throw new Error("multi-guard admission unexpectedly rejected");
-    cancelled.reservation.cancel();
-    cancelled.reservation.cancel();
-    cancelled.reservation.finish(outcome);
+    const cancelLog: string[] = [];
+    const cancelled = admitTwoGuards(cancelLog);
+    cancelled.cancel();
+    cancelled.cancel();
+    cancelled.finish(outcome);
     expect(cancelLog).toEqual(["first:cancel", "second:cancel"]);
-    for (const dispose of cancelDisposers) dispose();
   });
 
   it("cancels earlier reservations when a later guard rejects or throws", () => {

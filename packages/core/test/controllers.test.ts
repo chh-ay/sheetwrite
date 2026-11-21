@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { DocumentController } from "../src/document-controller.js";
+import { DocumentController, type DocumentControllerOptions } from "../src/document-controller.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { DocumentOp } from "../src/types.js";
@@ -10,18 +10,26 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
+function controllerFor(
+  store: SheetwriteStore,
+  options: Partial<DocumentControllerOptions> = {},
+): DocumentController {
+  return new DocumentController({
+    store,
+    loadable: store,
+    readOnly: () => false,
+    epoch: () => 0,
+    materializeVirtualColumns: (patches) => patches,
+    onMutationRejected: () => {},
+    onHistoryApplied: () => {},
+    ...options,
+  });
+}
+
 describe("DocumentController", () => {
   it("keeps an out-of-range sparse write a no-op without adding history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
-    const controller = new DocumentController({
-      store,
-      loadable: store,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {},
-    });
+    const controller = controllerFor(store);
 
     expect(
       controller.commit(
@@ -65,15 +73,7 @@ describe("DocumentController", () => {
           },
         ],
       });
-      const controller = new DocumentController({
-        store,
-        loadable: store,
-        readOnly: () => false,
-        epoch: () => 0,
-        materializeVirtualColumns: (patches) => patches,
-        onMutationRejected: () => {},
-        onHistoryApplied: () => {},
-      });
+      const controller = controllerFor(store);
 
       expect(
         controller.commit(
@@ -156,18 +156,12 @@ describe("DocumentController", () => {
       const expected = structuredClone(
         store.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values,
       );
-      const controller = new DocumentController({
-        store,
-        loadable: store,
+      const controller = controllerFor(store, {
         transactionResourceLimits,
-        readOnly: () => false,
-        epoch: () => 0,
-        materializeVirtualColumns: (patches) => patches,
         trustedResourceCallbacks: true,
         onMutationRejected: (issues) => {
           throw new Error(JSON.stringify(issues));
         },
-        onHistoryApplied: () => {},
       });
       const replay = store.on("change", (event) => {
         const patches: DocumentOp[] = JSON.parse(JSON.stringify(event.transaction.patches));
@@ -212,12 +206,8 @@ describe("DocumentController", () => {
           patch.value.value = oversizedValue;
         }
       };
-      const controller = new DocumentController({
-        store,
-        loadable: store,
+      const controller = controllerFor(store, {
         transactionResourceLimits,
-        readOnly: () => false,
-        epoch: () => 0,
         materializeVirtualColumns: (patches) => {
           if (mutationBoundary === "materialization") mutatePayload(patches);
           return patches;
@@ -226,8 +216,6 @@ describe("DocumentController", () => {
           if (mutationBoundary === "admission") mutatePayload(patches);
           return { ok: true, reservation: { cancel() {}, finish() {} } };
         },
-        onMutationRejected: () => {},
-        onHistoryApplied: () => {},
       });
       const addr = { sheet: "s1", row: 0, col: 0 };
       try {
@@ -244,6 +232,7 @@ describe("DocumentController", () => {
       }
     }
   });
+
   it("captures structural and range inverses for Store implementations without compact history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     store.applyTransaction({
@@ -261,16 +250,10 @@ describe("DocumentController", () => {
         },
       ],
     });
-    const controller = new DocumentController({
-      store,
+    const controller = controllerFor(store, {
       // A custom Store has no compact SheetwriteStore range snapshots. The
       // controller must still construct complete serializable inverses.
       loadable: null,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {},
     });
 
     expect(
@@ -374,15 +357,7 @@ describe("DocumentController", () => {
     store.applyTransaction({
       patches: [{ op: "set", addr: a1, value: { kind: "formula", src: "=A1/2+1" } }],
     });
-    const controller = new DocumentController({
-      store,
-      loadable: store,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {},
-    });
+    const controller = controllerFor(store);
 
     expect(store.getCell(a1).resolved).toBe("#CYCLE!");
 

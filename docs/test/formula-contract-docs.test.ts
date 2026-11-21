@@ -6,6 +6,7 @@ import {
   loadFormulaContractInventory,
   loadFormulaReferenceEntries,
   renderFormulaFunctionPages,
+  syntaxLiterals,
 } from "../../scripts/formula-docs.ts";
 import { FORMULA_FAMILY_CARDS, UNSUPPORTED_FORMULA_GROUPS } from "../src/lib/formula-overview.ts";
 
@@ -66,6 +67,14 @@ describe("generated formula documentation contract", () => {
         ).exec(tables)?.[0] ?? "";
       expect(row.includes("Full build")).toBe(!formula.builds.includes("@sheetwrite/wasm"));
     }
+  });
+
+  it("keeps each argument of a syntax line together and marks the optional ones", async () => {
+    const { families } = await generated();
+    const math = families.find((page) => page.table?.family === "math")?.table?.html ?? "";
+    expect(math).toContain(
+      '<span class="sw-code-function" data-pagefind-weight="10">SUM</span>(<span class="sw-formula-arg"><var>number1</var></span>, <span class="sw-formula-arg" data-optional>[<var>number2</var>]</span>, <span class="sw-formula-arg" data-optional>…</span>)',
+    );
   });
 
   it("gives every family a card with its count, its common functions and a link to all of them", async () => {
@@ -129,5 +138,17 @@ describe("generated formula documentation contract", () => {
       expect(section).toContain(`The cell shows <code>${group?.shows}</code>`);
       expect(section).toContain(`href="${group?.see.href}">${group?.see.label}</a>`);
     }
+  });
+
+  it("accepts argument names and rejects example values in a syntax line", () => {
+    expect(syntaxLiterals("range, criteria, [sum_range]")).toEqual([]);
+    expect(syntaxLiterals("known_y's, [known_x's], [const]")).toEqual([]);
+    expect(syntaxLiterals("probability, alpha, beta, [A], [B]")).toEqual([]);
+    expect(syntaxLiterals("rows, cols, lambda(row, col)")).toEqual([]);
+    expect(syntaxLiterals("number1, [number2], …")).toEqual([]);
+    expect(syntaxLiterals("25, A1:A3, 0")).toEqual(["25", "A1:A3", "0"]);
+    expect(syntaxLiterals('B2:B25, ">5"')).toEqual(["B2:B25", '">5"']);
+    expect(syntaxLiterals("Where do you want to look?")).toEqual(["Where do you want to look?"]);
+    expect(syntaxLiterals("array1, lambda_or_array<#>")).toEqual(["lambda_or_array<#>"]);
   });
 });

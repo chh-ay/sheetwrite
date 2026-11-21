@@ -48,7 +48,29 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
     [(result) => (sharedWorkload(result).output = "wrong")],
     [(result) => (analysis(result).output = 0)],
     [(result) => result.analysis.pop()],
+    [
+      (result) =>
+        (analysis(result).stat = {
+          ...analysis(result).stat,
+          mean: analysis(result).stat.mean + 1,
+        }),
+    ],
+    [
+      (result) => {
+        const { allocationStat } = analysis(result);
+        allocationStat.retainedBytes = {
+          ...allocationStat.retainedBytes,
+          mean: allocationStat.retainedBytes.mean + 1,
+        };
+      },
+    ],
     [(result) => firstEngine(result).initialization.samplesMs.pop()],
+    [
+      (result) => {
+        const { initialization } = firstEngine(result);
+        initialization.stat = { ...initialization.stat, mean: initialization.stat.mean + 1 };
+      },
+    ],
     [(result) => (firstEngine(result).wasm.sha256 = ZERO_DIGEST)],
     [(result) => (result.sourceDigest = ZERO_DIGEST)],
     [(result) => (firstEngine(result).shared.meta.commit = "0".repeat(40))],

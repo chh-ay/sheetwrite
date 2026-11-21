@@ -48,14 +48,8 @@ describe("clean-build export validation", () => {
       "@sheetwrite/core:./dist/index.js",
       "@sheetwrite/core:./styles.css",
     ]);
-  });
 
-  it("checks export targets inside fallback arrays, as the release check does", async () => {
-    const root = await exportFixture();
-    await writeFile(
-      join(root, "packages/core/dist/index.d.ts"),
-      "export declare const ready: boolean;\n",
-    );
+    // Fallback arrays are checked entry by entry, as the release check does.
     await writeFile(
       join(root, "packages/core/package.json"),
       `${JSON.stringify({

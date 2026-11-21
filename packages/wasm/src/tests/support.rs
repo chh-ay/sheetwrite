@@ -48,6 +48,155 @@ pub(crate) fn string(store: &CellStore, sheet: usize, row: usize, col: usize) ->
     store.get_cell(sheet, row, col).string()
 }
 
+/// What a cell shows: its text or error code, `TRUE` or `FALSE`, its number
+/// in Rust's shortest form, or "" when it is blank.
+pub(crate) fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
+    let cell = store.get_cell(sheet, row, col);
+    match cell.string() {
+        Some(text) => text,
+        None if cell.kind() == crate::types::KIND_EMPTY => String::new(),
+        None if cell.kind() == crate::types::KIND_BOOL => {
+            if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into()
+        }
+        None => cell.num().to_string(),
+    }
+}
+
+/// Writes `data` from A1 of `sheet`: `=` starts a formula, `'` starts text,
+/// a finite number is a number, "" leaves the cell blank and anything else
+/// is text.
+pub(crate) fn write_cells(store: &mut CellStore, sheet: usize, data: &[&[&str]]) {
+    for (row, cells) in data.iter().enumerate() {
+        for (col, &input) in cells.iter().enumerate() {
+            if input.starts_with('=') {
+                store.set_formula(sheet, row, col, input, 0);
+            } else if let Some(text) = input.strip_prefix('\'') {
+                store.set_string(sheet, row, col, text, 0);
+            } else if let Some(number) = input.parse::<f64>().ok().filter(|n| n.is_finite()) {
+                store.set_number(sheet, row, col, number, 0);
+            } else if !input.is_empty() {
+                store.set_string(sheet, row, col, input, 0);
+            }
+        }
+    }
+}
+
+/// Evaluates each `(formula, expected)` case in its own row of column `col`
+/// and reports every mismatch at once. `expected` is the text the cell
+/// shows; `~x` is a number within one unit in the last digit of `x`, for
+/// results that are published rounded, and `x±t` a number within `t` of `x`.
+pub(crate) fn assert_formulas<F: AsRef<str>>(
+    store: &mut CellStore,
+    sheet: usize,
+    col: usize,
+    cases: &[(F, &str)],
+) {
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, row, col, formula.as_ref(), 0);
+    }
+    store.commit_sources();
+    let mismatches: Vec<String> = cases
+        .iter()
+        .enumerate()
+        .filter_map(|(row, (formula, expected))| {
+            let actual = shown(store, sheet, row, col);
+            (!shows(&actual, expected)).then(|| {
+                format!(
+                    "{}: expected {expected:?}, got {actual:?}",
+                    formula.as_ref()
+                )
+            })
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
+}
+
+fn shows(actual: &str, expected: &str) -> bool {
+    if let Some((center_text, tolerance_text)) = expected.split_once('±') {
+        let (Ok(center), Ok(tolerance)) =
+            (center_text.parse::<f64>(), tolerance_text.parse::<f64>())
+        else {
+            return false;
+        };
+        return actual
+            .parse::<f64>()
+            .is_ok_and(|number| (number - center).abs() <= tolerance);
+    }
+    let Some(published) = expected.strip_prefix('~') else {
+        return actual == expected;
+    };
+    let (mantissa, exponent) = published.split_once('E').unwrap_or((published, "0"));
+    let decimals = mantissa
+        .split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len());
+    let (Ok(power), Ok(expected)) = (exponent.parse::<i32>(), published.parse::<f64>()) else {
+        return false;
+    };
+    let last_digit = power - decimals as i32;
+    actual
+        .parse::<f64>()
+        .is_ok_and(|number| (number - expected).abs() <= 10f64.powi(last_digit))
+}
+
+/// One sheet with `data` from A1 and the cases in the column after it.
+pub(crate) fn assert_results_on<F: AsRef<str>>(data: &[&[&str]], cases: &[(F, &str)]) {
+    let width = data.iter().map(|row| row.len()).max().unwrap_or(0);
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(width + 1, data.len().max(cases.len()).max(1));
+    write_cells(&mut store, sheet, data);
+    assert_formulas(&mut store, sheet, width, cases);
+}
+
+/// Sets the table `id` named `name` over the cells `[first_row, first_col,
+/// last_row, last_col]` of `sheet`, with a header row, no totals row and one
+/// column for each `(id, name)` of `columns`.
+pub(crate) fn set_header_table(
+    store: &mut CellStore,
+    (id, name): (&str, &str),
+    sheet: usize,
+    [first_row, first_col, last_row, last_col]: [usize; 4],
+    columns: &[(&str, &str)],
+) -> bool {
+    let (column_ids, column_names) = columns
+        .iter()
+        .map(|&(column_id, column_name)| (column_id.to_owned(), column_name.to_owned()))
+        .unzip();
+    store.set_table(
+        id,
+        name,
+        sheet,
+        first_row,
+        first_col,
+        last_row,
+        last_col,
+        true,
+        false,
+        column_ids,
+        column_names,
+    )
+}
+
+/// Formula evaluations that `recalculate` runs.
+pub(crate) fn evaluations(recalculate: impl FnOnce()) -> usize {
+    crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+    recalculate();
+    crate::eval::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
+}
+
+/// The tree of the formula at (`row`, `col`), as an address that changes
+/// when the formula is parsed or bound again.
+pub(crate) fn tree_address(
+    store: &CellStore,
+    sheet: usize,
+    row: u32,
+    col: u32,
+) -> Option<*const crate::calc::Ast> {
+    let entry = store.sheets[sheet]
+        .formulas
+        .get((row, col), &store.formula_slots)?;
+    entry.ast.as_ref().map(std::ptr::from_ref)
+}
+
 pub(super) struct DecodedWindow {
     pub(super) kinds: Vec<u8>,
     pub(super) string_index: Vec<i32>,

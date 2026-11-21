@@ -1,10 +1,10 @@
 import type { Page } from "@playwright/test";
 
-import type { ColumnFilter } from "../../packages/core/src/types.js";
 import { expect, nextFrames, test } from "./fixtures.js";
 
 // #735: Excel's AutoFilter, driven through the header buttons, the dropdown
-// and the keyboard on the Vue workbench's grid.
+// and the keyboard, and the validation list and checkbox editors (#726), on
+// the Vue workbench's grid in one boot.
 
 const SHEET = "autofilter";
 const ROWS: (string | number)[][] = [
@@ -53,18 +53,6 @@ async function open(page: Page) {
   await page.locator(".sw-demo-grid .sheetwrite").focus();
 }
 
-const grid = (page: Page) => page.locator(".sw-demo-grid .sheetwrite");
-const buttons = (page: Page) => page.locator(".sw-demo-grid .sheetwrite-autofilter-button");
-/** The glyphs drawn over the buttons, from the icon sheet. */
-const buttonGlyphs = (page: Page) =>
-  page.locator(".sw-demo-grid .sheetwrite-autofilter-glyph.sheetwrite-icon");
-const dropdown = (page: Page, header: string) =>
-  page.getByRole("dialog", { name: `Filter ${header}` });
-
-function filters(page: Page): Promise<[number, ColumnFilter][]> {
-  return page.evaluate(() => [...(window.__sheetwriteVueWorkbench?.grid.getColumnFilters() ?? [])]);
-}
-
 /** The Item column's text of every shown row, from the store's view. */
 function shownItems(page: Page): Promise<unknown[]> {
   return page.evaluate((sheet) => {
@@ -84,102 +72,88 @@ function shownItems(page: Page): Promise<unknown[]> {
   }, SHEET);
 }
 
-/** Click the filter button of header column `col` (0 or 1). */
-async function clickButton(page: Page, col: number) {
-  await nextFrames(page);
-  const box = await buttons(page).nth(col).boundingBox();
-  if (!box) throw new Error(`no filter button for column ${col}`);
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-}
-
-test("Ctrl+Shift+L shows the buttons; a value filter hides the unticked rows; the header stays", async ({
+test("AutoFilter (values, Number Filters, search, Clear) and validation editors from the header buttons and the keyboard", async ({
   page,
 }) => {
   await open(page);
-  await grid(page).press("ControlOrMeta+Shift+L");
-  await expect(buttons(page)).toHaveCount(2);
-  await expect(buttons(page).first()).toHaveAttribute("data-filtered", "false");
-  await expect(buttonGlyphs(page).first()).toHaveAttribute("data-icon", "filterArrow");
-  await clickButton(page, 0);
+  const grid = page.locator(".sw-demo-grid .sheetwrite");
+  const buttons = page.locator(".sw-demo-grid .sheetwrite-autofilter-button");
+  // The glyphs drawn over the buttons, from the icon sheet.
+  const glyphs = page.locator(".sw-demo-grid .sheetwrite-autofilter-glyph.sheetwrite-icon");
+  const itemDialog = page.getByRole("dialog", { name: "Filter Item" });
+  const qtyDialog = page.getByRole("dialog", { name: "Filter Qty" });
+  const itemValues = itemDialog.getByRole("listbox", { name: "Values of Item" });
+  const filters = () =>
+    page.evaluate(() => [...(window.__sheetwriteVueWorkbench?.grid.getColumnFilters() ?? [])]);
 
-  const dialog = dropdown(page, "Item");
-  await expect(dialog).toBeVisible();
-  const list = dialog.getByRole("listbox", { name: "Values of Item" });
-  await list.getByRole("option", { name: "banana" }).click();
-  await list.getByRole("option", { name: "fig" }).click();
-  await dialog.getByRole("button", { name: "OK" }).click();
-
-  await expect(dialog).toBeHidden();
+  // Ctrl+Shift+L shows the buttons; a value filter from a real pointer hit on
+  // the button over the canvas hides the unticked rows, and the header stays.
+  await grid.press("ControlOrMeta+Shift+L");
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.first()).toHaveAttribute("data-filtered", "false");
+  await expect(glyphs.first()).toHaveAttribute("data-icon", "filterArrow");
+  await nextFrames(page);
+  const box = await buttons.first().boundingBox();
+  if (!box) throw new Error("no filter button for the Item column");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(itemDialog).toBeVisible();
+  await itemValues.getByRole("option", { name: "banana" }).click();
+  await itemValues.getByRole("option", { name: "fig" }).click();
+  await itemDialog.getByRole("button", { name: "OK" }).click();
+  await expect(itemDialog).toBeHidden();
   await expect.poll(() => shownItems(page)).toEqual(["Item", "apple", "Apricot", "grape"]);
-  await expect(buttons(page).first()).toHaveAttribute("data-filtered", "true");
-  await expect(buttonGlyphs(page).first()).toHaveAttribute("data-icon", "filterActive");
+  await expect(buttons.first()).toHaveAttribute("data-filtered", "true");
+  await expect(glyphs.first()).toHaveAttribute("data-icon", "filterActive");
   // The header cell keeps the selection, as in Excel.
   await expect
     .poll(() => page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection()))
     .toEqual({ kind: "cell", addr: { sheet: SHEET, row: 0, col: 0 } });
-
   // Undo brings the rows back; redo hides them again.
-  await grid(page).press("ControlOrMeta+z");
+  await grid.press("ControlOrMeta+z");
   await expect.poll(() => shownItems(page)).toHaveLength(ROWS.length);
-  await grid(page).press("ControlOrMeta+Shift+z");
+  await grid.press("ControlOrMeta+Shift+z");
   await expect.poll(() => shownItems(page)).toHaveLength(4);
-
   // Ctrl+Shift+L again turns the AutoFilter off and removes its buttons.
-  await grid(page).press("ControlOrMeta+Shift+L");
-  await expect(buttons(page)).toHaveCount(0);
-  await expect(buttonGlyphs(page)).toHaveCount(0);
-});
+  await grid.press("ControlOrMeta+Shift+L");
+  await expect(buttons).toHaveCount(0);
+  await expect(glyphs).toHaveCount(0);
 
-test("a Number Filters condition and Clear Filter From, from the keyboard", async ({ page }) => {
-  await open(page);
-  await grid(page).press("ControlOrMeta+Shift+L");
-  // B1 is the Qty header: Alt+Down opens its dropdown.
-  await grid(page).press("ArrowUp");
-  await grid(page).press("Alt+ArrowDown");
-  const dialog = dropdown(page, "Qty");
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByRole("button", { name: "Number Filters" }).click();
-  await dialog.getByRole("menuitem", { name: "Greater Than…" }).click();
-  const form = dialog.getByRole("form", { name: "Custom AutoFilter for Qty" });
+  // B1 is the Qty header: Alt+Down opens its dropdown. A Number Filters
+  // condition, then Clear Filter From, each give the grid its focus back.
+  await grid.press("ArrowRight");
+  await grid.press("ControlOrMeta+Shift+L");
+  await grid.press("Alt+ArrowDown");
+  await expect(qtyDialog).toBeVisible();
+  await qtyDialog.getByRole("button", { name: "Number Filters" }).click();
+  await qtyDialog.getByRole("menuitem", { name: "Greater Than…" }).click();
+  const form = qtyDialog.getByRole("form", { name: "Custom AutoFilter for Qty" });
   await form.getByRole("textbox", { name: "Value 1" }).fill("10");
   await form.getByRole("textbox", { name: "Value 1" }).press("Enter");
-
   await expect
-    .poll(() => filters(page))
+    .poll(filters)
     .toEqual([[1, { kind: "custom", join: "and", conditions: [{ op: "gt", value: 10 }] }]]);
   await expect.poll(() => shownItems(page)).toEqual(["Item", "Apricot", "fig", "grape"]);
-  await expect(grid(page)).toBeFocused();
-
-  await grid(page).press("Alt+ArrowDown");
-  await dropdown(page, "Qty").getByRole("button", { name: 'Clear Filter From "Qty"' }).click();
-  await expect.poll(() => filters(page)).toEqual([]);
+  await expect(grid).toBeFocused();
+  await grid.press("Alt+ArrowDown");
+  await qtyDialog.getByRole("button", { name: 'Clear Filter From "Qty"' }).click();
+  await expect.poll(filters).toEqual([]);
   await expect.poll(() => shownItems(page)).toHaveLength(ROWS.length);
-
   // Escape closes the dropdown without a change and gives the grid its focus back.
-  await grid(page).press("Alt+ArrowDown");
-  await expect(dropdown(page, "Qty")).toBeVisible();
+  await grid.press("Alt+ArrowDown");
+  await expect(qtyDialog).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(dropdown(page, "Qty")).toBeHidden();
-  await expect(grid(page)).toBeFocused();
-});
+  await expect(qtyDialog).toBeHidden();
+  await expect(grid).toBeFocused();
 
-test("the dropdown is keyboard-usable: search, arrows, Space and Enter", async ({ page }) => {
-  await open(page);
-  await grid(page).press("ControlOrMeta+Shift+L");
-  await grid(page).press("ArrowUp");
-  await grid(page).press("ArrowLeft");
-  await grid(page).press("Alt+ArrowDown");
-  const dialog = dropdown(page, "Item");
-  await expect(dialog).toBeVisible();
-
-  const search = dialog.getByRole("searchbox", { name: "Search values of Item" });
-  await search.focus();
+  // The dropdown is keyboard-usable: search, arrows, Space and Enter.
+  await grid.press("ArrowLeft");
+  await grid.press("Alt+ArrowDown");
+  await expect(itemDialog).toBeVisible();
+  await itemDialog.getByRole("searchbox", { name: "Search values of Item" }).focus();
   await page.keyboard.type("ap");
   await page.keyboard.press("ArrowDown");
-  const list = dialog.getByRole("listbox", { name: "Values of Item" });
-  await expect(list).toBeFocused();
-  await expect(list.getByRole("option")).toHaveText([
+  await expect(itemValues).toBeFocused();
+  await expect(itemValues.getByRole("option")).toHaveText([
     "(Select All Search Results)",
     "Add current selection to filter",
     // Each value counts its rows.
@@ -193,4 +167,54 @@ test("the dropdown is keyboard-usable: search, arrows, Space and Enter", async (
   await page.keyboard.press(" ");
   await page.keyboard.press("Enter");
   await expect.poll(() => shownItems(page)).toEqual(["Item", "Apricot", "grape"]);
+
+  // Validation editors on the orders sheet. The rules are host configuration
+  // (public API); each editor opens through user input on the grid host.
+  const orderCell = (row: number) =>
+    page.evaluate(
+      (at) =>
+        window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: at, col: 0 })
+          .resolved,
+      row,
+    );
+  await page.evaluate(() => {
+    const vueGrid = window.__sheetwriteVueWorkbench?.grid;
+    if (!vueGrid) throw new Error("Vue grid is unavailable");
+    vueGrid.setActiveSheet("orders");
+    vueGrid.setValidationRule({
+      id: "browser-list",
+      range: { sheet: "orders", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      condition: { kind: "list", values: [1, 2, 3] },
+      policy: "reject",
+      helpText: "Choose an order ID",
+    });
+    vueGrid.setValidationRule({
+      id: "browser-checkbox",
+      range: { sheet: "orders", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+      condition: { kind: "checkbox", checkedValue: true, uncheckedValue: false },
+      policy: "reject",
+    });
+    vueGrid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
+  });
+  // #726: Alt+Down opens a list rule's list, as in Excel (F2 edits a list
+  // cell's text). Typing filters the open list; Enter stores the item the
+  // text names and closes it.
+  await grid.press("Alt+ArrowDown");
+  const choices = page.getByRole("listbox", { name: "Choices" });
+  await expect(choices).toBeVisible();
+  await page.keyboard.type("2");
+  await page.keyboard.press("Enter");
+  await expect(choices).toBeHidden();
+  await expect.poll(() => orderCell(0)).toBe(2);
+  // F2 on a checkbox cell opens its checkbox, which Space toggles.
+  await page.evaluate(() =>
+    window.__sheetwriteVueWorkbench?.grid.setSelection({
+      kind: "cell",
+      addr: { sheet: "orders", row: 1, col: 0 },
+    }),
+  );
+  await grid.press("F2");
+  await expect(page.getByRole("checkbox", { name: "Toggle checkbox" })).toBeVisible();
+  await page.keyboard.press(" ");
+  await expect.poll(() => orderCell(1)).toBe(true);
 });

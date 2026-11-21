@@ -4,7 +4,7 @@ import { MAX_CONDITIONAL_FORMAT_RULES } from "../src/conditional-format.js";
 import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ConditionalFormatRule, WorkbookSnapshot } from "../src/types.js";
+import type { ConditionalFormatRule } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -86,28 +86,15 @@ describe("conditional formula formats", () => {
   });
 
   it("rejects a 33rd renderer rule before snapshot allocation", () => {
-    const snapshot: WorkbookSnapshot = {
-      schemaVersion: 1,
-      workbook: { activeSheet: "s1" },
-      sheets: [
-        {
-          id: "s1",
-          name: "Sheet 1",
-          order: 0,
-          rowCount: 1,
-          columns: [{ key: "a", header: "A", width: 100, type: "number" }],
-          conditionalFormats: Array.from(
-            { length: MAX_CONDITIONAL_FORMAT_RULES + 1 },
-            (): ConditionalFormatRule => ({
-              range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-              when: { kind: "greaterThan", value: 0 },
-              style: { bold: true },
-            }),
-          ),
-          cells: [],
-        },
-      ],
-    };
+    const snapshot = new SheetwriteStore(makeWorkbook(1)).exportSnapshot();
+    snapshot.sheets[0]!.conditionalFormats = Array.from(
+      { length: MAX_CONDITIONAL_FORMAT_RULES + 1 },
+      (): ConditionalFormatRule => ({
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        when: { kind: "greaterThan", value: 0 },
+        style: { bold: true },
+      }),
+    );
     const validation = validateWorkbookSnapshot(snapshot);
     expect(validation.ok).toBe(false);
     if (!validation.ok) {

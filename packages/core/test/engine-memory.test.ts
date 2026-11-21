@@ -16,6 +16,23 @@ const address = (row: number, col: number) => ({ sheet: "s1", row, col });
 // while the release instantiates can free the store before the release asks it.
 const storesWithOpenRequests = new Set<SheetwriteStore>();
 
+/** Runs a probe in a fresh bun process and returns its JSON report. */
+async function runProbe(name: string, args: string[] = [], env?: Record<string, string>) {
+  const probe = new URL(name, import.meta.url).pathname;
+  const child = Bun.spawn(["bun", probe, ...args], {
+    env: { ...Bun.env, ...env },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  expect(exitCode, `${name} failed:\n${stderr}`).toBe(0);
+  return JSON.parse(stdout) as unknown;
+}
+
 describe("explicit engine memory release", () => {
   it("moves every live dense store without changing source, style, cached results, or events", async () => {
     const first = new SheetwriteStore(makeWorkbook(10));
@@ -82,52 +99,14 @@ describe("explicit engine memory release", () => {
     }
   });
 
-  it("shares concurrent release calls and keeps disposed stores and history safe", async () => {
-    const store = new SheetwriteStore(makeWorkbook(2));
-    const disposed = new SheetwriteStore(makeWorkbook(2));
-    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
-    const snapshot = disposed.captureRangeHistory(range);
-    if (!snapshot) throw new Error("Expected a compact history resource");
-
-    disposed.dispose();
-
-    try {
-      const first = releaseEngineMemory();
-      expect(releaseEngineMemory()).toBe(first);
-      await first;
-
-      // Retained disposed facades/resources must not retain an old glue memory cache.
-      expect(disposed.getWorkbook().sheets).toHaveLength(1);
-      expect(() => snapshot.toDocumentOp(range)).toThrow("already disposed");
-      snapshot.dispose();
-      disposed.dispose();
-
-      store.applyTransaction({
-        patches: [{ op: "set", addr: address(0, 1), value: { kind: "literal", value: 7 } }],
-      });
-      expect(store.getCell(address(0, 1)).resolved).toBe(7);
-    } finally {
-      store.dispose();
-    }
-  });
-
   it("drops the retired linear memory while disposed facades stay reachable", async () => {
     // Concurrent JIT compilations keep the values they profiled alive until they
     // finish, and sibling suites keep starting them, so the probe runs alone and
     // compiles on the main thread: only the product's own references remain.
-    const probe = new URL("./engine-release-lifetime-probe.ts", import.meta.url).pathname;
-    const process = Bun.spawn(["bun", probe], {
-      env: { ...Bun.env, BUN_JSC_useConcurrentJIT: "0" },
-      stdout: "pipe",
-      stderr: "pipe",
+    const report = await runProbe("./engine-release-lifetime-probe.ts", [], {
+      BUN_JSC_useConcurrentJIT: "0",
     });
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
-      process.exited,
-    ]);
-    expect(exitCode, `Memory release lifetime probe failed:\n${stderr}`).toBe(0);
-    expect(JSON.parse(stdout)).toEqual({ stores: 1, freed: true });
+    expect(report).toEqual({ stores: 1, freed: true });
   });
 
   it("finishes a release when a store that waits for a page load is disposed", async () => {
@@ -146,6 +125,7 @@ describe("explicit engine memory release", () => {
       return wait;
     });
     const release = releaseEngineMemory();
+    expect(releaseEngineMemory()).toBe(release);
     await asked.promise;
 
     // Without the fix this await never settles and the test runner times out.
@@ -157,15 +137,8 @@ describe("explicit engine memory release", () => {
 
   for (const engine of ["wasm", "formulas"]) {
     it(`keeps ${engine} stores and history atomic on failure and waits for datasource loads`, async () => {
-      const probe = new URL("./engine-memory-probe.ts", import.meta.url).pathname;
-      const process = Bun.spawn(["bun", probe, engine], { stdout: "pipe", stderr: "pipe" });
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(process.stdout).text(),
-        new Response(process.stderr).text(),
-        process.exited,
-      ]);
-      expect(exitCode, `Memory release probe failed:\n${stderr}`).toBe(0);
-      expect(JSON.parse(stdout)).toEqual({ engine, atomic: true, waitedForPage: true });
+      const report = await runProbe("./engine-memory-probe.ts", [engine]);
+      expect(report).toEqual({ engine, atomic: true, waitedForPage: true });
     });
   }
 

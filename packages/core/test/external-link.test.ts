@@ -44,9 +44,9 @@ const names: ExternalLinkName[] = [
   { name: "Local", refersTo: "=Annual!$C$11", sheet: "Annual" },
 ];
 
-function linkedStore(externalLinks: ExternalLink[] | undefined): SheetwriteStore {
+function linkedStore(externalLinks: ExternalLink[]): SheetwriteStore {
   const workbook = makeWorkbook(8);
-  if (externalLinks) workbook.externalLinks = externalLinks;
+  workbook.externalLinks = externalLinks;
   return new SheetwriteStore(workbook);
 }
 
@@ -57,8 +57,8 @@ function resolvedAfter(store: SheetwriteStore, src: string): unknown {
 }
 
 describe("external formula text", () => {
-  it("finds every live external-data call outside quoted text", () => {
-    for (const name of [
+  it("finds other workbooks and live-data calls outside quoted text", () => {
+    const live = [
       "DDE",
       "RTD",
       "WEBSERVICE",
@@ -68,27 +68,26 @@ describe("external formula text", () => {
       "CUBESET",
       "CUBESETCOUNT",
       "CUBERANKEDMEMBER",
-    ]) {
-      expect(formulaCallsExternalData(`IF(1,_xlfn.${name.toLowerCase()} ("a"),0)`)).toBe(true);
-      expect(formulaCallsExternalData(`"${name}(1)"&A1`)).toBe(false);
-    }
-    expect(formulaCallsExternalData('RTD"x"(1)')).toBe(true);
-  });
-
-  it("finds other workbooks and live-data calls outside quoted text", () => {
-    const cases: [formula: string, external: boolean][] = [
-      ["SUM(A1:B2)", false],
-      ['IF(C2>500,"high","low")', false],
-      ['"RTD(1)"&A1', false],
-      ['Sheet1!A1+"[x]"', false],
-      ["'It''s'!A1", false],
-      ['RTD("prog",,"x")', true],
-      ['A1&"x"&DDE("a","b")', true],
-      ["'[1]Sheet 1'!A1", true],
-      ["[Book.xlsx]Sheet1!A1", true],
     ];
-    for (const [formula, external] of cases) {
+    // [formula, names another workbook or calls live data, calls live data]
+    const cases: [formula: string, external: boolean, liveData: boolean][] = [
+      ["SUM(A1:B2)", false, false],
+      ['IF(C2>500,"high","low")', false, false],
+      ['Sheet1!A1+"[x]"', false, false],
+      ["'It''s'!A1", false, false],
+      ['RTD("prog",,"x")', true, true],
+      ['A1&"x"&DDE("a","b")', true, true],
+      ['RTD"x"(1)', true, true],
+      ["'[1]Sheet 1'!A1", true, false],
+      ["[Book.xlsx]Sheet1!A1", true, false],
+      ...live.flatMap((name): [string, boolean, boolean][] => [
+        [`IF(1,_xlfn.${name.toLowerCase()} ("a"),0)`, true, true],
+        [`"${name}(1)"&A1`, false, false],
+      ]),
+    ];
+    for (const [formula, external, liveData] of cases) {
       expect(formulaContainsExternalReference(formula), formula).toBe(external);
+      expect(formulaCallsExternalData(formula), formula).toBe(liveData);
     }
   });
 
@@ -120,6 +119,7 @@ describe("external workbook links", () => {
       expect(resolvedAfter(store, "=[Budget.xlsx]Annual!C13")).toBe(true);
       expect(resolvedAfter(store, "=ISNA([Budget.xlsx]Annual!C14)")).toBe(true);
       expect(resolvedAfter(store, "=[Sales.xlsx]Annual!C10")).toBe("#REF!");
+      expect(store.exportSnapshot().workbook.externalLinks).toEqual([budget]);
     } finally {
       store.dispose();
     }
@@ -140,24 +140,14 @@ describe("external workbook links", () => {
       store.dispose();
     }
 
-    // Without values for the link, a name is `#REF!`, as in Excel.
-    const unlinked = linkedStore(undefined);
+    // Without values for the link, a name is `#REF!`, as in Excel, and the
+    // empty link list is not saved.
+    const unlinked = linkedStore([]);
     try {
       expect(resolvedAfter(unlinked, "=Budget.xlsx!Total")).toBe("#REF!");
+      expect(unlinked.exportSnapshot().workbook.externalLinks).toBeUndefined();
     } finally {
       unlinked.dispose();
-    }
-  });
-
-  it("keeps the links in snapshots and drops an empty list", () => {
-    const store = linkedStore([budget]);
-    const empty = linkedStore([]);
-    try {
-      expect(store.exportSnapshot().workbook.externalLinks).toEqual([budget]);
-      expect(empty.exportSnapshot().workbook.externalLinks).toBeUndefined();
-    } finally {
-      store.dispose();
-      empty.dispose();
     }
   });
 

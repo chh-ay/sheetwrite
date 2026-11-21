@@ -108,6 +108,7 @@ it("writes a floor only from an A/A report of one engine", () => {
   ]) {
     expect(() => noiseFloorFromAaResults(report, AA_PATH)).toThrow();
   }
+  expect(FLOOR.source).toEqual({ sha: AA_SHA, engineSha256: AA_ENGINE, cpus: AA_CPUS });
   expect(parseReaderNoiseFloor(FLOOR, FLOOR_PATH)).toEqual(FLOOR);
 });
 

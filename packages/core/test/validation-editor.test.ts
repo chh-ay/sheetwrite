@@ -69,26 +69,11 @@ describe("ValidationEditor", () => {
     return { editor, commits, texts, input, cancels: () => cancels };
   }
 
-  it("filters the items by the typed text anywhere in them, ignoring case", () => {
-    const { editor, commits, input } = openList({ filter: "w" });
-    expect(document.activeElement).toBe(input);
-    type(input, "we");
-    expect(shownItems()).toEqual(["West", "South-West"]);
-    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
-
-    press(input, "ArrowDown");
-    press(input, "ArrowDown");
-    expect(
-      document.getElementById(input.getAttribute("aria-activedescendant") ?? "")?.textContent,
-    ).toBe("South-West");
-    press(input, "Enter");
-    expect(commits).toEqual([{ value: "South-West", navigate: "down" }]);
-    editor.destroy();
-  });
-
   it("starts on the cell's value and stores the text when no item is highlighted", () => {
     let list = openList();
     expect(shownItems()).toEqual(regions);
+    const active = list.input.getAttribute("aria-activedescendant") ?? "";
+    expect(document.getElementById(active)?.textContent).toBe("East");
     press(list.input, "Tab");
     expect(list.commits).toEqual([{ value: "East", navigate: "right" }]);
 
@@ -106,6 +91,26 @@ describe("ValidationEditor", () => {
     expect(list.cancels()).toBe(1);
     expect(list.commits).toEqual([]);
     list.editor.destroy();
+  });
+
+  // #1095: Excel keeps the cell's value in sight while its list is open.
+  it("leaves the cell in sight when opened without typing, until the first typed text", () => {
+    const { editor, input } = openList();
+    const box = input.parentElement;
+    const current = document.querySelector('[role="option"][aria-selected="true"]');
+    // Nothing covers the cell: the list opens below it, its own value highlighted.
+    expect(box?.style.top).toBe(`${rect.y + rect.h}px`);
+    expect(input.style.height).toBe("");
+    expect(current?.textContent).toBe("East");
+    expect(document.activeElement === input).toBe(true);
+
+    // Typing replaces the value: the box moves over the cell and filters the list.
+    type(input, "s");
+    expect(input.parentElement).toBe(box);
+    expect(box?.style.top).toBe(`${rect.y}px`);
+    expect(input.style.height).toBe(`${rect.h}px`);
+    expect(shownItems()).toEqual(["South", "East", "West", "North-East", "South-West"]);
+    editor.destroy();
   });
 
   it("renders a keyboard-toggleable checkbox with checked state", () => {
