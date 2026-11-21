@@ -471,6 +471,14 @@ impl SpillState {
         self.ranges.keys().copied()
     }
 
+    /// The ranges of the installed spills, each with the anchor that owns it.
+    pub(crate) fn installed_ranges(&self) -> impl Iterator<Item = SpillRange> + '_ {
+        self.ranges
+            .values()
+            .copied()
+            .filter(|range| self.owner(range.anchor) == Some(range.anchor))
+    }
+
     /// Visits each attempted anchor whose range contains any of `cells`, once.
     /// A changed cell inside a spill range invalidates that anchor, so the scan
     /// stops as soon as every range has been hit.

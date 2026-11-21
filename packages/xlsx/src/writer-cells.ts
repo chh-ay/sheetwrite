@@ -1,7 +1,15 @@
-import type { CellStyle, SheetSnapshot, SnapshotCell, WorkbookSnapshot } from "@sheetwrite/core";
+import type {
+  CellScalar,
+  CellStyle,
+  SheetSnapshot,
+  SnapshotCell,
+  WorkbookSnapshot,
+} from "@sheetwrite/core";
 import { cellA1 } from "@sheetwrite/core";
 import { formulaCallsExternalData } from "@sheetwrite/core/external-links";
 
+import { DYNAMIC_ARRAY_CELL_METADATA } from "./dynamic-array.js";
+import { ERROR_VALUES } from "./external-links.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
 import type { AbsoluteCell } from "./writer.js";
@@ -18,12 +26,54 @@ function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["v
   return `${quotedSheet(target.name)}!${cellA1(source.target.row, source.target.col)}`;
 }
 
+/** One installed spill and the values it shows, as core computes them for an export. */
+export interface SpillOutput {
+  readonly row: number;
+  readonly col: number;
+  readonly rows: number;
+  readonly cols: number;
+  /** Every covered cell's value, row by row: the formula's own value first. */
+  readonly values: readonly CellScalar[];
+}
+
+/** Columns per row in a `SheetDynamicArrays` key; above any sheet's column count. */
+const SPILL_KEY_COLUMNS = 2 ** 24;
+
+/** The key of the cell at `row`, `col` in `SheetDynamicArrays.spills`. */
+export function spillKey(row: number, col: number): number {
+  return row * SPILL_KEY_COLUMNS + col;
+}
+
+/** A worksheet's dynamic arrays while its cells are written. */
+export interface SheetDynamicArrays {
+  /** The installed spills, by `spillKey` of their formula cell. */
+  readonly spills: ReadonlyMap<number, SpillOutput>;
+  /** Set once a cell is written as a dynamic array. */
+  written: boolean;
+}
+
+/** The `t` attribute and `<v>` element of a formula's cached value, as Excel writes them. */
+function cachedValue(value: CellScalar | undefined): { type: string; element: string } {
+  if (value === undefined || value === null) return { type: "", element: "" };
+  if (typeof value === "number") return { type: "", element: `<v>${value}</v>` };
+  if (typeof value === "boolean") return { type: ' t="b"', element: `<v>${value ? 1 : 0}</v>` };
+  if (Object.hasOwn(ERROR_VALUES, value)) return { type: ' t="e"', element: `<v>${value}</v>` };
+  return { type: ' t="str"', element: `<v>${escapeXml(encodeXstring(value))}</v>` };
+}
+
+/**
+ * A cell, written as Excel stores it. A formula whose result is an array, or
+ * that `arrays` lists as an installed spill, is written as a dynamic array:
+ * `cm` names the dynamic-array metadata and `<f>` covers the spill. Only an
+ * installed spill has a cached value; Excel calculates the rest on load.
+ */
 export function cellXml(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   cell: AbsoluteCell,
   styles: StylesRegistry,
   context: XlsxCodecContext,
+  arrays: SheetDynamicArrays,
 ): string {
   const column = sheet.columns[cell.col];
   if (!column) throw new RangeError(`Sheetwrite: XLSX cell column ${cell.col} is out of range`);
@@ -57,7 +107,22 @@ export function cellXml(
       formula = converted.startsWith("=") ? converted.slice(1) : converted;
       formula = context.externalFormula?.(formula) ?? formula;
     }
-    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
+    const text = escapeXml(encodeXstring(formula));
+    const spill =
+      value.kind === "formula" ? arrays.spills.get(spillKey(cell.row, cell.col)) : undefined;
+    if (
+      spill === undefined &&
+      (value.kind !== "formula" || context.arrayFormulas?.has(value.src) !== true)
+    ) {
+      return `<c r="${reference}"${styleAttribute}><f>${text}</f></c>`;
+    }
+    arrays.written = true;
+    const area =
+      spill && (spill.rows > 1 || spill.cols > 1)
+        ? `${reference}:${cellA1(spill.row + spill.rows - 1, spill.col + spill.cols - 1)}`
+        : reference;
+    const cached = cachedValue(spill?.values[0]);
+    return `<c r="${reference}"${styleAttribute}${cached.type} cm="${DYNAMIC_ARRAY_CELL_METADATA}"><f t="array" ref="${area}">${text}</f>${cached.element}</c>`;
   }
   if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
   if (typeof value.value === "string") {

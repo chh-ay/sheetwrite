@@ -1,6 +1,7 @@
 import type { WorkbookSnapshot } from "@sheetwrite/core";
 import { DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS, validateSheetName } from "@sheetwrite/core";
 
+import { dynamicArrayCellMetadata } from "./dynamic-array.js";
 import { readExternalLinks, type ImportedExternalLinks } from "./external-links.js";
 import { MAIN_NAMESPACES, META_STEM } from "./format.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
@@ -59,6 +60,10 @@ export async function loadWorkbookPackage(
   const themePart = workbookRelationships.find(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
+  const metadataPart = workbookRelationships.find(
+    (relationship) =>
+      relationshipTypeMatches(relationship.type, "sheetMetadata") && !relationship.external,
+  )?.target;
 
   // Before the sheets, whose formulas name the links by index.
   const externalLinks = await readExternalLinks(
@@ -73,7 +78,7 @@ export async function loadWorkbookPackage(
     const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
     if (
       relationship.external ||
-      ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
+      ["worksheet", "styles", "sharedStrings", "theme", "sheetMetadata"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       ) ||
       (isRetainedRelationship("workbook", relationship.type) &&
@@ -104,6 +109,15 @@ export async function loadWorkbookPackage(
   if (sharedStringsPart) await packageFile.load([sharedStringsPart]);
   const sharedStrings = parseSharedStrings(packageFile, sharedStringsPart, context);
   if (sharedStringsPart) packageFile.release([sharedStringsPart]);
+
+  // Excel's dynamic arrays are formula cells whose `cm` names this part's metadata.
+  if (metadataPart) {
+    await packageFile.load([metadataPart]);
+    const metadataRoot = packageFile.readXml(metadataPart);
+    packageFile.release([metadataPart]);
+    assertXmlRoot(metadataRoot, "metadata", MAIN_NAMESPACES, metadataPart);
+    context.dynamicArrayMetadata = dynamicArrayCellMetadata(metadataRoot);
+  }
   return {
     packageFile,
     workbookPart,

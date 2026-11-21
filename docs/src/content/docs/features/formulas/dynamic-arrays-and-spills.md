@@ -113,12 +113,15 @@ disappear. Clear or move the blocking value to let the formula spill again. This
 Microsoft's [nonblank spill range rule](https://support.microsoft.com/en-us/excel/how-to-correct-a-spill-error).
 Structural and metadata changes invalidate ownership and recompute it.
 
-Snapshots and XLSX export serialize only the anchor formula. Children recompute after
-hydration. Internal rich copy preserves the anchor formula while treating children as
+Snapshots serialize only the anchor formula. Children recompute after hydration. XLSX
+export marks the anchor as an Excel dynamic array, and a grid's export also writes the
+children's values, as Excel does; XLSX import reads Excel's dynamic arrays back as anchor
+formulas and drops those values. Internal rich copy preserves the anchor formula while treating children as
 derived blanks on paste; external TSV receives the displayed spill values. History snapshots
 likewise restore the anchor and recompute children, so undo never persists stale projections.
-Unsupported OOXML array/data-table formula records remain inert source text with an explicit
-warning rather than being silently treated as Sheetwrite spills.
+Legacy OOXML array formulas (Ctrl+Shift+Enter, without the dynamic-array flag) and data-table
+formula records remain inert source text with an explicit warning rather than being silently
+treated as Sheetwrite spills.
 
 ## Editing a spill
 
