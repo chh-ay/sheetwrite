@@ -99,10 +99,7 @@
   min-height: 28px;
 }
 
-/* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css.
-   When the row is narrow, the status gives up its width first (see below), so
-   the tabs and the Add sheet button stay whole; only then does the strip
-   scroll. */
+/* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css. */
 .sheetwrite-shell-tabs {
   display: flex;
   align-items: stretch;
@@ -111,13 +108,8 @@
   min-width: 0;
 }
 
-/* The status truncates with an ellipsis before it reaches the sheet tabs. Its
-   large shrink factor makes it shrink ahead of the tabs. */
 .sheetwrite-shell-status {
-  flex: 0 1000 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   white-space: nowrap;
   opacity: 0.72;
   padding-left: 12px;

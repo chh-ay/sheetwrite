@@ -2,4 +2,4 @@
 "@sheetwrite/core": patch
 ---
 
-On a narrow screen the shell's status text no longer covers the Add sheet button. The status shrinks first and ends with an ellipsis, so the sheet tabs and the + button stay whole; only when the tabs alone are wider than the row does their strip scroll.
+On a narrow screen the Add sheet (+) button stays whole and in view. When the sheet tabs and + do not fit, the tab strip scrolls sideways, as Excel's narrow window does: + stays at the strip's right edge, and the active tab scrolls into view beside it. The status keeps its whole word.
