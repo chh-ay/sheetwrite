@@ -28,12 +28,48 @@ enum DistinctKey<'a> {
     Text(&'a str),
 }
 
+const STAMP_WORD_BITS: usize = 64;
+const STAMP_WORDS_INITIAL: usize = 64;
+
+/// One bit per string-pool id, so a scan that only lists values dedupes
+/// dictionary-encoded text without hashing or comparing a single character,
+/// in a 32nd of the memory [`PoolIdSlots`] zero-fills.
+///
+/// Words are zero-filled when the marks grow. Growth doubles the current word
+/// count (with an initial floor) or reaches the requested id, whichever is larger.
+struct PoolIdStamps {
+    words: Vec<u64>,
+}
+
+impl PoolIdStamps {
+    const fn new() -> Self {
+        Self { words: Vec::new() }
+    }
+
+    /// Marks `id`; true when it was not marked yet.
+    fn insert(&mut self, id: u32) -> bool {
+        let index = id as usize;
+        let word = index / STAMP_WORD_BITS;
+        if word >= self.words.len() {
+            let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
+            self.words.resize(doubled.max(word + 1), 0);
+        }
+        let Some(bits) = self.words.get_mut(word) else {
+            return false;
+        };
+        let mask = 1u64 << (index % STAMP_WORD_BITS);
+        let fresh = *bits & mask == 0;
+        *bits |= mask;
+        fresh
+    }
+}
+
 const SLOTS_INITIAL: usize = 4_096;
 
-/// Each string-pool id's slot in a distinct scan's output, so text that is
-/// already dictionary-encoded dedupes and counts without hashing or comparing
-/// a single character. 0 marks an id the scan has not met; slot `s` is
-/// stored as `s + 1`.
+/// Each string-pool id's slot in a counted distinct scan's output, so text
+/// that is already dictionary-encoded dedupes and counts without hashing or
+/// comparing a single character. 0 marks an id the scan has not met; slot
+/// `s` is stored as `s + 1`.
 ///
 /// Slots are zero-filled when they grow. Growth doubles the current length
 /// (with an initial floor) or reaches the requested id, whichever is larger.
@@ -982,8 +1018,9 @@ impl CellStore {
     /// those outside the range are skipped: an `AutoFilter` lists the rows the
     /// other column filters keep. A zero `limit` returns every value;
     /// otherwise the scan stops at `limit` values. With `counted` it reads on
-    /// past them, so each listed value's count covers every row, as the
-    /// `AutoFilter` dropdown shows it.
+    /// past them, so each listed value's count covers every row, and it gives
+    /// each value's count and first style, as the `AutoFilter` dropdown shows
+    /// them; without, those stay empty.
     #[wasm_bindgen(js_name = distinctValuesInRows)]
     #[expect(
         clippy::too_many_arguments,
@@ -1083,22 +1120,30 @@ struct DistinctLimit {
     counted: bool,
 }
 
-/// The distinct resolved values of `col` over `rows`, in first-seen order,
-/// with the style of each one's first cell and how many of the rows read hold
-/// it.
+/// The distinct resolved values of `col` over `rows`, in first-seen order. A
+/// `counted` scan also gives the style of each one's first cell and how many
+/// of the rows read hold it, and keeps each pool id's slot to count it. A
+/// scan that only lists stops at `limit` values and marks pool ids with one
+/// bit, so it never zero-fills four bytes per id of the string pool. Both are
+/// one function, so the dropdown's counted scan runs the code that listing
+/// calls (the cell editor's completion, the pivot field list) keep optimized.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,
     col: usize,
     rows: impl Iterator<Item = usize> + Clone,
-    limit: DistinctLimit,
+    reach: DistinctLimit,
 ) -> DistinctColumn {
+    let DistinctLimit {
+        values: limit,
+        counted,
+    } = reach;
     let mut out;
     let text_at = |index: usize| {
         resolved_text(data, &store.strings, index, &store.formula_slots).unwrap_or_default()
     };
     // Stored text carries a pool id that stands for its value, so the scan
-    // dedupes it through one slot per id instead of hashing the characters.
+    // dedupes it by id instead of hashing the characters.
     // Text without an id — the sentinel a formula error reports reads back as
     // plain text — still has to meet pooled text by content, so the first
     // such cell restarts the scan on content hashing. The restart is rare and
@@ -1107,12 +1152,13 @@ fn distinct_over(
     loop {
         out = DistinctColumn::default();
         let mut id_slots = PoolIdSlots::new();
+        let mut id_stamps = PoolIdStamps::new();
         let mut key_slots: FxHashMap<DistinctKey<'_>, usize> = FxHashMap::default();
         let mut needs_content = false;
         for row in rows.clone() {
             let next = out.kinds.len();
-            let full = limit.values != 0 && next >= limit.values;
-            if full && !limit.counted {
+            let full = limit != 0 && next >= limit;
+            if full && !counted {
                 break;
             }
             let index = col * data.cells.row_count() + row;
@@ -1137,7 +1183,8 @@ fn distinct_over(
                 _ => Met::Key(DistinctKey::Blank),
             };
             let found = match met {
-                Met::Id(id) => id_slots.slot(id, next, full),
+                Met::Id(id) if counted => id_slots.slot(id, next, full),
+                Met::Id(id) => id_stamps.insert(id).then_some(next),
                 Met::Key(key) if full => key_slots.get(&key).copied(),
                 Met::Key(key) => Some(*key_slots.entry(key).or_insert(next)),
             };
@@ -1148,7 +1195,13 @@ fn distinct_over(
                         *count = count.saturating_add(1);
                     }
                 }
-                Some(_) => push_entry(&mut out, store, data, index, kind),
+                Some(_) => {
+                    if counted {
+                        out.styles.push(data.cells.style_at(index));
+                        out.counts.push(1);
+                    }
+                    push_entry(&mut out, store, data, index, kind);
+                }
                 None => {}
             }
         }
@@ -1165,8 +1218,7 @@ fn distinct_over(
     out
 }
 
-/// Lists the value of the cell at `index`, of resolved `kind`, as a new entry
-/// held by one row so far.
+/// Lists the value of the cell at `index`, of resolved `kind`, as a new entry.
 fn push_entry(
     out: &mut DistinctColumn,
     store: &CellStore,
@@ -1175,8 +1227,6 @@ fn push_entry(
     kind: u8,
 ) {
     out.kinds.push(kind);
-    out.styles.push(data.cells.style_at(index));
-    out.counts.push(1);
     match kind {
         1 => out
             .numbers
@@ -1290,8 +1340,8 @@ fn resolved_text<'a>(
 }
 
 /// Distinct-value scan result for one column: parallel kind/number/text
-/// arrays, and the style of each value's first cell, whose buffers are
-/// surrendered once through the `take*` accessors.
+/// arrays, and from a counted scan the style of each value's first cell and
+/// its count, whose buffers are surrendered once through the `take*` accessors.
 ///
 /// The texts are kept end to end in one string with their UTF-16 lengths, so
 /// JavaScript decodes them in one call and slices them. Decoding one string
@@ -1374,13 +1424,15 @@ impl DistinctColumn {
     }
 
     /// Surrenders the style id of each value's first cell, one per kind tag,
-    /// which gives the number format the value shows with.
+    /// which gives the number format the value shows with. Empty unless the
+    /// scan was counted.
     #[wasm_bindgen(js_name = takeStyles)]
     pub fn take_styles(&mut self) -> Vec<u32> {
         std::mem::take(&mut self.styles)
     }
 
-    /// Surrenders how many of the scanned rows hold each value, one per kind tag.
+    /// Surrenders how many of the scanned rows hold each value, one per kind
+    /// tag. Empty unless the scan was counted.
     #[wasm_bindgen(js_name = takeCounts)]
     pub fn take_counts(&mut self) -> Vec<u32> {
         std::mem::take(&mut self.counts)

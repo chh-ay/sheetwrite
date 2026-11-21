@@ -412,7 +412,7 @@ fn distinct_values_in_rows_reads_only_the_row_range() {
     fill_mixed_distinct_column(&mut store, sheet);
 
     // Rows 11..14 hold "Alpha", a formula that evaluates to "Alpha", and "Beta".
-    let mut middle = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, None, false);
+    let mut middle = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, None, true);
     assert_eq!(middle.take_kinds(), vec![2, 2]);
     assert_eq!(middle.take_texts(), vec!["Alpha", "Beta"]);
     assert_eq!(middle.take_counts(), vec![2, 1]);
