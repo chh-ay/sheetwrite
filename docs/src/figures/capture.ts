@@ -516,7 +516,7 @@ const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
   // The cut cells' moving border and the cell the paste would move them to.
   "cut-paste": { x: 240, y: 140 },
   // Each dialog from its tabs or its first group, without the window's edges.
-  "paste-special": { dialog: { x: 20, y: 0 } },
+  "paste-special": { dialog: { x: 16, y: 0 } },
   "data-validation": { dialog: { x: 12, y: 44 } },
   "format-cells": { dialog: { x: 12, y: 44 } },
   "keyboard-shortcuts": { dialog: { x: 12, y: 44 } },
