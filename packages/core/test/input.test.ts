@@ -513,6 +513,39 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
+  it("refuses a paste wider than a sheet with a plain message, and resolves", async () => {
+    const { grid, store, host } = makeGrid();
+    // One row of 16,385 cells, one more than a paste may have.
+    const text = "\t".repeat(16_384);
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () =>
+          Promise.resolve([
+            {
+              types: ["text/plain"],
+              getType: () => Promise.resolve(new Blob([text], { type: "text/plain" })),
+            },
+          ]),
+      },
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    const status = () => host.querySelector(".sheetwrite-action-status")?.textContent;
+    const message =
+      "Nothing was pasted: this paste has 16,385 columns, and a paste can have at most 16,384.";
+
+    expect(await grid.actions.paste()).toBe("rejected");
+    expect(status()).toBe(message);
+    expect(await grid.actions.pasteSpecial({ paste: "values" })).toBe("rejected");
+    expect(await grid.actions.pasteValues()).toBe("rejected");
+    expect(status()).toBe(message);
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+    grid.destroy();
+    store.dispose();
+  });
+
   it("clears contents with Delete and keeps the cells' formats, as Excel does, in a merge too", () => {
     const { grid, store, host } = makeGrid();
     const cell = (row: number, col: number) => ({ sheet: "s1", row, col });

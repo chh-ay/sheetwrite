@@ -493,4 +493,21 @@ describe("column types of an imported sheet", () => {
       literal("x"),
     ]);
   });
+
+  // A `text` column is Excel's Text format, `@`, so typed numbers stay text.
+  // https://support.microsoft.com/en-us/office/available-number-formats-in-excel-0afe8f52-97db-41f1-b972-4b46e9f1e8d2
+  it("writes a text column in the Text format and reads it back as text", async () => {
+    const orders = sheet("orders", "Orders", [["007", 5]], {
+      columns: [
+        { key: "id", header: "A", width: 80, type: "text" },
+        { key: "qty", header: "B", width: 80, type: "general" },
+      ],
+    });
+    const imported = await backend.fromXlsxWorkbook(await backend.toXlsxWorkbook(book([orders])));
+    expect(sheetAt(imported).columns.map((column) => [column.type, column.numberFormat])).toEqual([
+      ["text", "@"],
+      ["general", undefined],
+    ]);
+    expect(valuesOf(imported)).toEqual([literal("007"), literal(5)]);
+  });
 });
