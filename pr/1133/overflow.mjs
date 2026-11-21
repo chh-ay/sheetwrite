@@ -38,7 +38,8 @@ for (const theme of ["light", "dark"]) for (const width of [1440, 834, 390]) {
     const list = await page.locator(".sheetwrite-tab-list").boundingBox();
     if (box && list) {
       const top = Math.min(box.y, list.y) - 8, bottom = Math.max(box.y + box.height, list.y + list.height) + 8;
-      await page.screenshot({ path: `${out}/${theme}-${width}-list.png`, clip: { x: Math.max(0, box.x), y: Math.max(0, top), width: box.width, height: bottom - top } });
+      const left = Math.max(0, Math.min(box.x, list.x) - 8), right = Math.min(width, Math.max(box.x + box.width, list.x + list.width) + 8);
+      await page.screenshot({ path: `${out}/${theme}-${width}-list.png`, clip: { x: left, y: Math.max(0, top), width: right - left, height: bottom - top } });
     }
   }
   await ctx.close();
