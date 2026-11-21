@@ -187,13 +187,20 @@ function intern(list: string[], index: Map<string, number>, id: string): number 
 }
 
 /** Log state of one diff: sheet slots in the kernel and who last changed sheet settings. */
-interface Tracking {
+export interface Tracking {
   kernel: DiffKernel;
   slots: Map<SheetId, number>;
   authors: string[];
   authorIndex: Map<string, number>;
   sheetAuthors: Map<SheetId, number>;
   workbookAuthor: number;
+}
+
+/** A version's sheet as the diff kernel sees it. */
+export interface SheetShape {
+  id: SheetId;
+  rowCount: number;
+  colCount: number;
 }
 
 function sheetOf(operation: DocumentOp): SheetId | undefined {
@@ -213,7 +220,7 @@ function sheetOf(operation: DocumentOp): SheetId | undefined {
 }
 
 /** Cells that an operation writes, as a rectangle, or `null` for other operations. */
-function writtenCells(
+export function writtenCells(
   operation: DocumentOp,
 ): { sheet: SheetId; r0: number; c0: number; r1: number; c1: number } | null {
   switch (operation.op) {
@@ -440,7 +447,7 @@ function sheetChanges(before: Workbook, after: Workbook, state: Tracking): Histo
 }
 
 /** Rectangle pieces of one window: each lies inside one row and one column segment. */
-interface Piece {
+export interface Piece {
   /** Offsets inside the window. */
   row: number;
   col: number;
@@ -480,7 +487,7 @@ function pieces(
   row0: number,
   rows: number,
   cols: number,
-  earlier: Sheet | undefined,
+  earlier: SheetShape | undefined,
 ): Piece[] {
   const out: Piece[] = [];
 
@@ -493,7 +500,7 @@ function pieces(
         beforeRow !== HISTORY_DIFF_NONE &&
         beforeCol !== HISTORY_DIFF_NONE &&
         beforeRow + rowCount <= earlier.rowCount &&
-        beforeCol + colCount <= earlier.columns.length;
+        beforeCol + colCount <= earlier.colCount;
 
       out.push({
         row: row - row0,
@@ -503,6 +510,41 @@ function pieces(
         beforeRow: known ? beforeRow : HISTORY_DIFF_NONE,
         beforeCol: known ? beforeCol : HISTORY_DIFF_NONE,
       });
+    }
+  }
+
+  return out;
+}
+
+/** Rows of the later version that one scan window holds. */
+function windowRows(cols: number): number {
+  return Math.max(1, Math.floor(WINDOW_CELLS / cols));
+}
+
+/**
+ * Every piece that a scan of `later` compares, in scan order, with `row` as
+ * the later sheet row. Callers use it to know which earlier cells each later
+ * cell is compared with.
+ */
+export function comparedPieces(
+  state: Tracking,
+  later: SheetShape,
+  earlier: SheetShape | undefined,
+): Piece[] {
+  const slot = state.slots.get(later.id);
+  if (slot === undefined || later.rowCount === 0 || later.colCount === 0) {
+    return [];
+  }
+
+  const rowSegments = Uint32Array.from(state.kernel.rowSegments(slot));
+  const colSegments = Uint32Array.from(state.kernel.colSegments(slot));
+  const step = windowRows(later.colCount);
+  const out: Piece[] = [];
+
+  for (let row0 = 0; row0 < later.rowCount; row0 += step) {
+    const rows = Math.min(step, later.rowCount - row0);
+    for (const part of pieces(rowSegments, colSegments, row0, rows, later.colCount, earlier)) {
+      out.push({ ...part, row: row0 + part.row });
     }
   }
 
@@ -560,7 +602,7 @@ function scan(
   signal: AbortSignal | undefined,
 ): HistoryDiffCursor | undefined {
   const { kernel } = state;
-  const earlierSheets = new Map(earlier.sheets.map((sheet) => [sheet.id, sheet]));
+  const earlierSheets = new Map(shapesOf(earlier).map((sheet) => [sheet.id, sheet]));
 
   for (let index = start.sheet; index < later.sheets.length; index++) {
     const sheet = later.sheets[index];
@@ -570,15 +612,15 @@ function scan(
     }
 
     const cols = sheet.columns.length;
-    const windowRows = Math.max(1, Math.floor(WINDOW_CELLS / cols));
+    const step = windowRows(cols);
     const rowSegments = Uint32Array.from(kernel.rowSegments(slot));
     const colSegments = Uint32Array.from(kernel.colSegments(slot));
     const resuming = index === start.sheet;
 
-    for (let row0 = resuming ? start.row : 0; row0 < sheet.rowCount; row0 += windowRows) {
+    for (let row0 = resuming ? start.row : 0; row0 < sheet.rowCount; row0 += step) {
       signal?.throwIfAborted();
 
-      const rows = Math.min(windowRows, sheet.rowCount - row0);
+      const rows = Math.min(step, sheet.rowCount - row0);
       if (!kernel.loadAfter(transferOf(after, sheet.id, row0, 0, rows, cols))) {
         throw new HistoryError("integrity", "The diff kernel rejected a rebuilt window");
       }
@@ -627,7 +669,13 @@ function scan(
   return undefined;
 }
 
-function cellIn(store: SheetwriteStore, sheet: SheetId, row: number, col: number): HistoryDiffCell {
+/** One cell of a rebuilt version as a diff detail. */
+export function cellIn(
+  store: SheetwriteStore,
+  sheet: SheetId,
+  row: number,
+  col: number,
+): HistoryDiffCell {
   const addr = { sheet, row, col };
   const cell = store.getCell(addr);
   const formula = store.getFormula(addr);
@@ -639,39 +687,46 @@ function cellIn(store: SheetwriteStore, sheet: SheetId, row: number, col: number
   };
 }
 
+/** The sheets of a rebuilt version, as the diff kernel sees them. */
+export function shapesOf(workbook: Workbook): SheetShape[] {
+  return workbook.sheets.map((sheet) => ({
+    id: sheet.id,
+    rowCount: sheet.rowCount,
+    colCount: sheet.columns.length,
+  }));
+}
+
 /**
- * One page of the difference between two rebuilt versions. The kernel module
- * loads on the first call; both stores stay owned by the caller.
+ * Load the kernel module and feed it the log between two versions with the
+ * sheets `earlier` and `later`: sheet slots, row and column axis maps, and
+ * who wrote what. The caller frees `kernel` of the result.
  */
-export async function diffStores(input: DiffInput): Promise<HistoryDiffPage> {
-  const { request } = input;
+export async function trackLog(
+  earlier: readonly SheetShape[],
+  later: readonly SheetShape[],
+  commits: AsyncIterable<CommittedTransaction>,
+  request: HistoryDiffRequest,
+): Promise<Tracking> {
   const size = diffPageSize(request);
   const { DiffKernel, loadHistoryKernel } = await import("@sheetwrite/wasm/history");
   await loadHistoryKernel(request.kernel);
   request.signal?.throwIfAborted();
 
-  const before = engineOf(input.before);
-  const after = engineOf(input.after);
-  const earlier = input.before.getWorkbook();
-  const later = input.after.getWorkbook();
-  const start = startAt(request.cursor, later.sheets.length);
+  const state: Tracking = {
+    kernel: new DiffKernel(size),
+    slots: new Map(),
+    authors: [],
+    authorIndex: new Map(),
+    sheetAuthors: new Map(),
+    workbookAuthor: HISTORY_DIFF_NONE,
+  };
 
-  const kernel = new DiffKernel(size);
   try {
-    const state: Tracking = {
-      kernel,
-      slots: new Map(),
-      authors: [],
-      authorIndex: new Map(),
-      sheetAuthors: new Map(),
-      workbookAuthor: HISTORY_DIFF_NONE,
-    };
-
-    for (const sheet of earlier.sheets) {
-      state.slots.set(sheet.id, kernel.addSheet(sheet.rowCount, sheet.columns.length, true));
+    for (const sheet of earlier) {
+      state.slots.set(sheet.id, state.kernel.addSheet(sheet.rowCount, sheet.colCount, true));
     }
 
-    for await (const commit of input.commits) {
+    for await (const commit of commits) {
       const author = intern(state.authors, state.authorIndex, commit.authorId);
       for (const operation of commit.operations) {
         track(state, operation, author);
@@ -680,28 +735,71 @@ export async function diffStores(input: DiffInput): Promise<HistoryDiffPage> {
     }
 
     // A sheet the retained log does not explain is compared by position.
-    for (const sheet of later.sheets) {
+    for (const sheet of later) {
       if (!state.slots.has(sheet.id)) {
-        const known = earlier.sheets.some((candidate) => candidate.id === sheet.id);
-        state.slots.set(sheet.id, kernel.addSheet(sheet.rowCount, sheet.columns.length, known));
+        const known = earlier.some((candidate) => candidate.id === sheet.id);
+        state.slots.set(sheet.id, state.kernel.addSheet(sheet.rowCount, sheet.colCount, known));
       }
     }
+  } catch (error) {
+    state.kernel.free();
+    throw error;
+  }
 
-    const [beforeStyles, afterStyles] = styleTables(before, after);
-    kernel.setStyles(beforeStyles, afterStyles);
+  return state;
+}
 
-    const cursor = scan(state, before, after, earlier, later, start, request.signal);
+/** Two rebuilt versions, whole or sparse, compared under one tracked log. */
+export interface TrackedInput {
+  before: SheetwriteStore;
+  after: SheetwriteStore;
+  logComplete: boolean;
+  request: HistoryDiffRequest;
+}
 
-    return page(state, input, later, earlier, cursor);
+/**
+ * One page of the difference between two rebuilt versions whose log `state`
+ * holds. Both stores and the kernel stay owned by the caller.
+ */
+export function diffTracked(state: Tracking, input: TrackedInput): HistoryDiffPage {
+  const { request } = input;
+  const before = engineOf(input.before);
+  const after = engineOf(input.after);
+  const earlier = input.before.getWorkbook();
+  const later = input.after.getWorkbook();
+  const start = startAt(request.cursor, later.sheets.length);
+
+  const [beforeStyles, afterStyles] = styleTables(before, after);
+  state.kernel.setStyles(beforeStyles, afterStyles);
+
+  const cursor = scan(state, before, after, earlier, later, start, request.signal);
+
+  return page(state, input, later, earlier, cursor);
+}
+
+/**
+ * One page of the difference between two rebuilt versions. The kernel module
+ * loads on the first call; both stores stay owned by the caller.
+ */
+export async function diffStores(input: DiffInput): Promise<HistoryDiffPage> {
+  const state = await trackLog(
+    shapesOf(input.before.getWorkbook()),
+    shapesOf(input.after.getWorkbook()),
+    input.commits,
+    input.request,
+  );
+
+  try {
+    return diffTracked(state, input);
   } finally {
-    kernel.free();
+    state.kernel.free();
   }
 }
 
 /** Read the page out of the kernel, with details for its cells. */
 function page(
   state: Tracking,
-  input: DiffInput,
+  input: TrackedInput,
   later: Workbook,
   earlier: Workbook,
   cursor: HistoryDiffCursor | undefined,

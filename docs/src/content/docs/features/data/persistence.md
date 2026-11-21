@@ -209,6 +209,17 @@ loads the first time a diff runs, so a grid that never compares versions downloa
 nothing for it. Pass `kernel` to load its WASM from a URL your bundler emitted for
 `@sheetwrite/wasm/history/wasm`.
 
+Checkpoint cell pages are content-addressed, so the compare reads only the pages
+that can differ. A page of the later version is skipped when all its cells meet,
+through the log's row and column alignment, one page of the earlier version with the
+same content ID, and neither version's log tail writes them. The other pages, and the
+pages their cells meet, are rebuilt; the rest of each version stays empty. The result
+is the same as rebuilding both versions whole. Both versions are rebuilt whole when a
+version's log tail holds an operation other than cell writes, styles, clears, notes
+and row metadata, or when more than a quarter of the pages would be read. A changed
+cell that holds a formula or a reference takes its calculated value from the whole
+version. A small change of a large workbook reads a few pages instead of all of them.
+
 | Page field | Contents |
 | --- | --- |
 | `cells` | Changed cells as typed columns: `sheet` (index into `sheetIds`), `row`, `col`, `beforeRow`, `beforeCol`, `flags` and `author` (index into `authors`). |
