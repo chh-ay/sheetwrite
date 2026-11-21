@@ -431,6 +431,7 @@ export function InteropStage() {
                 ref={(element) => {
                   gridHost = element;
                 }}
+                role="group"
               />
               <div
                 class="sheetwrite-shell-row sheetwrite-shell-bottom-row"

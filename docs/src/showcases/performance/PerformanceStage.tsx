@@ -399,6 +399,7 @@ export function PerformanceStage(props: PerformanceStageProps) {
             ref={(element) => {
               host = element;
             }}
+            role="group"
           />
           <Show when={evictionWatch()}>
             {(watch) => (
