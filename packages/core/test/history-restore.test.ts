@@ -1,7 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { HistoryArchive, MemoryHistoryStorage } from "../src/history-archive.js";
-import type { HistoryStorageAdapter, HistoryVersion } from "../src/history-archive.js";
+import type {
+  HistoryGetRequest,
+  HistoryLimits,
+  HistoryStorageAdapter,
+  HistoryVersion,
+} from "../src/history-archive.js";
 import {
   type CommittedTransaction,
   createGridFromSnapshot,
@@ -111,9 +116,10 @@ interface Session {
 async function session(
   storage: HistoryStorageAdapter = new MemoryHistoryStorage(),
   dataName = "Data",
+  limits: Partial<HistoryLimits> = {},
 ): Promise<Session> {
   const adapter = new MemoryPersistenceAdapter(snapshot(dataName));
-  const archive = await HistoryArchive.open({ documentId: DOCUMENT, storage });
+  const archive = await HistoryArchive.open({ documentId: DOCUMENT, storage, limits });
   await archive.initialize(snapshot(dataName), 0);
 
   const journal = new Journal(archive);
@@ -389,14 +395,24 @@ describe("restore the workbook", () => {
       },
     ];
 
-    for (const [index, scope] of scopes.entries()) {
+    // Default limits keep every edit in the log tail, so the restore rebuilds the
+    // version whole; a checkpoint every one or two commits lets a restore at the
+    // synchronized head read only the pages that differ.
+    const cadences: Array<Partial<HistoryLimits>> = [
+      {},
+      { checkpointTransactions: 1 },
+      { checkpointTransactions: 2 },
+    ];
+    for (const [index, [scope, limits]] of scopes
+      .flatMap((scope) => cadences.map((limits) => [scope, limits] as const))
+      .entries()) {
       let seed = 7 + index;
       const random = () => {
         seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
         return seed / 2_147_483_648;
       };
 
-      const { archive, alice } = await session();
+      const { archive, alice } = await session(new MemoryHistoryStorage(), "Data", limits);
       await edit(alice, [
         { op: "addRows", sheet: "data", at: 8, count: 192 },
         ...edits(random, 120),
@@ -454,7 +470,61 @@ describe("restore external links", () => {
   });
 });
 
+/** Memory storage that counts the cell pages it hands out. */
+class PageCountingStorage extends MemoryHistoryStorage {
+  cellPageReads = 0;
+
+  override async get(request: HistoryGetRequest) {
+    const response = await super.get(request);
+    if ("bytes" in response && response.kind === "cells") {
+      this.cellPageReads += 1;
+    }
+
+    return response;
+  }
+}
+
 describe("restore through sync", () => {
+  it("restores a document at the archive head from the pages that differ", async () => {
+    const storage = new PageCountingStorage();
+    // A checkpoint after every commit, so the version's checkpoint holds every row.
+    const { archive, alice } = await session(storage, "Data", { checkpointTransactions: 1 });
+    await edit(alice, [
+      { op: "addRows", sheet: "data", at: 8, count: 200 },
+      ...Array.from({ length: 200 }, (_, row) => set("data", 8 + row, 1, row)),
+    ]);
+    const version = await archive.saveVersion("Long", "alice", 0);
+    await edit(alice, [set("data", 2, 0, 33), set("data", 150, 1, -1)]);
+
+    const fresh = await HistoryArchive.open({ documentId: DOCUMENT, storage });
+    let reads = storage.cellPageReads;
+    await fresh.readVersion(version.id);
+    const wholeReads = storage.cellPageReads - reads;
+
+    reads = storage.cellPageReads;
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+
+    expect(storage.cellPageReads - reads).toBeLessThan(wholeReads);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([3, 142]);
+    alice.grid.undo();
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([33, -1]);
+  });
+
+  it("restores a cell that the version's log tail wrote and a later edit put back", async () => {
+    const { archive, alice } = await session(new MemoryHistoryStorage(), "Data", {
+      checkpointTransactions: 2,
+    });
+    await edit(alice, [set("data", 5, 0, -1)]);
+    const version = await archive.saveVersion("Tail", "alice", 0);
+    // The next checkpoint holds A6 as it was before the version, like the version's checkpoint.
+    await edit(alice, [set("data", 5, 0, 6)]);
+
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+    expect(value(alice.grid, "data", 5, 0)).toBe(-1);
+  });
+
   it("sends a restore larger than one server version as one atomic batch", async () => {
     const { adapter, archive, journal, alice } = await session();
     const rows = 20_000;

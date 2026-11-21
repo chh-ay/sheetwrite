@@ -481,3 +481,82 @@ export function calculatedDetails(
 
   return calculated;
 }
+
+/** What a restore at the head reads and rewrites; see `selectRestorePages`. */
+export interface RestorePages {
+  /** Cell pages of the version to read, per version manifest sheet. */
+  read: ReadonlyArray<ReadonlySet<string>>;
+  /** Per sheet, the page rectangles where the version and the head can differ. */
+  changed: ReadonlyMap<SheetId, Rect[]>;
+}
+
+/**
+ * Pages where `version` and `head` can hold different cells, by position: a
+ * page whose content ID differs between their checkpoints (an absent page is
+ * empty), or that either log tail writes. Every other page holds the same
+ * cells in both. `undefined` when a sheet is new, gone or reshaped, or when
+ * more than a quarter of the version's pages would be read; the restore then
+ * rebuilds the version whole.
+ */
+export function selectRestorePages(
+  version: CheckpointManifest,
+  head: CheckpointManifest,
+  versionWrites: TailWrites,
+  headWrites: TailWrites,
+): RestorePages | undefined {
+  if (version.sheets.length !== head.sheets.length) {
+    return undefined;
+  }
+
+  const heads = new Map(head.sheets.map((sheet) => [sheetId(sheet), sheet]));
+  let budget = Math.floor(storedPages(version) * MAX_PAGE_SHARE);
+  const read: Array<Set<string>> = [];
+  const changed = new Map<SheetId, Rect[]>();
+
+  for (const sheet of version.sheets) {
+    const id = sheetId(sheet);
+    const current = heads.get(id);
+    const reshaped =
+      !current ||
+      current.rowCount !== sheet.rowCount ||
+      JSON.stringify(current.fields.columns) !== JSON.stringify(sheet.fields.columns);
+    if (reshaped) {
+      return undefined;
+    }
+
+    const grid = new PageGrid(sheet);
+    const currentIds = new PageGrid(current).ids;
+    const positions = new Set<number>();
+    for (const position of new Set([...grid.ids.keys(), ...currentIds.keys()])) {
+      if (grid.ids.get(position) !== currentIds.get(position)) {
+        positions.add(position);
+      }
+    }
+    for (const rect of [...(versionWrites.get(id) ?? []), ...(headWrites.get(id) ?? [])]) {
+      for (const position of grid.overlapping(rect)) {
+        positions.add(position);
+      }
+    }
+
+    const pages = grid.stored(positions);
+    budget -= pages.size;
+    if (budget < 0) {
+      return undefined;
+    }
+
+    read.push(pages);
+    changed.set(
+      id,
+      [...positions].map((position) => {
+        const cells = grid.extent(position);
+        return {
+          ...cells,
+          r1: Math.min(cells.r1, sheet.rowCount - 1),
+          c1: Math.min(cells.c1, sheet.colCount - 1),
+        };
+      }),
+    );
+  }
+
+  return { read, changed };
+}

@@ -186,6 +186,14 @@ document operations, so the undo step and the synchronized transaction grow with
 rows that are written. The comparison runs on the history kernel; `kernel` sets where
 its WASM comes from, as in `diffVersions`.
 
+In a shared document whose `SyncCoordinator` is at the archive head (its server version
+is the head's revision), the grid holds the head. The restore then reads only the
+checkpoint pages where the version and the head differ, or that their log tails write,
+and writes those cells again; it does not rebuild the whole version. It rebuilds the
+version whole when a log tail holds operations other than cell writes, styles, clears,
+notes and row metadata, when a sheet is added, removed or reshaped, or when more than a
+quarter of the version's pages differ.
+
 | Scope | Restores | Keeps current |
 | --- | --- | --- |
 | `{ kind: "workbook" }` | Every sheet (re-creating removed sheets with their IDs and removing later ones), sheet order, names, table relationships, calculation options | Retained OOXML parts (`xlsxSource`), as undo does |
