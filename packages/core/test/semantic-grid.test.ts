@@ -197,7 +197,7 @@ it("updates aria-rowcount when rows are inserted", () => {
   try {
     grid.applyTransaction({ patches: [{ op: "addRows", sheet: "s1", at: 0, count: 2 }] });
 
-    expect(host.getAttribute("aria-rowcount")).toBe("6");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-rowcount")).toBe("6");
   } finally {
     globalThis.requestAnimationFrame = requestFrame;
     grid.destroy();

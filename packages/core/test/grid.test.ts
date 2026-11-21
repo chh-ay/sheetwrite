@@ -1032,7 +1032,7 @@ describe("Grid.setMinColumns", () => {
     const columnCount = (options: Partial<GridOptions>) => {
       const host = mountHost();
       const grid = new GridImpl(host, { workbook: makeWorkbook(5), ...options });
-      const count = host.getAttribute("aria-colcount");
+      const count = host.querySelector('[role="grid"]')?.getAttribute("aria-colcount");
       grid.destroy();
       return count;
     };
@@ -1048,15 +1048,15 @@ describe("Grid.setMinColumns", () => {
     const one = { key: "a", header: "A", width: 100, type: "text" as const };
     added.addSheet({ id: "later", name: "Later", rowCount: 5, columns: [one] });
     added.setActiveSheet("later");
-    expect(later.getAttribute("aria-colcount")).toBe("9");
+    expect(later.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("9");
     added.destroy();
 
     const host = mountHost();
     const grid = new GridImpl(host, { workbook: makeWorkbook(5), presentation: "data-grid" });
     grid.setMinColumns(5);
-    expect(host.getAttribute("aria-colcount")).toBe("5");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("5");
     grid.setMinColumns(undefined);
-    expect(host.getAttribute("aria-colcount")).toBe("3");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("3");
     grid.destroy();
   });
 

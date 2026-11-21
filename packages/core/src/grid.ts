@@ -3494,8 +3494,7 @@ export class GridImpl implements Grid {
       this.interactions.reconcile("read-only");
       this.notes.dismiss();
     }
-    if (readOnly) this.host.setAttribute("aria-readonly", "true");
-    else this.host.removeAttribute("aria-readonly");
+    this.ariaMirror.setReadOnly(readOnly);
 
     this.resetFindBar();
     this.emitCommandStateChange();
