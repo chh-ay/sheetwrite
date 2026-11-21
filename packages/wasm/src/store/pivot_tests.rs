@@ -238,6 +238,49 @@ fn pivot_formula_free_output_survives_edits() {
 }
 
 #[test]
+fn pivot_source_edit_reports_each_changed_output_cell_once() {
+    let (mut store, source, output) = fixture(60);
+    install(&mut store, source, output, 60, &[SUM]);
+    // The value cell of row 6's group; the edit also changes its totals.
+    let (row, col) = (2, 1);
+    let before = store.get_cell(output, row, col).num();
+
+    store.set_recalculation_tracking(true);
+    store.begin_mutation();
+    store.set_number(source, 6, SALES, 106.0, 0);
+    store.commit_sources();
+    assert_ne!(
+        store.get_cell(output, row, col).num(),
+        before,
+        "the edit changes the output"
+    );
+
+    // Chart tracking matches these rectangles; a cell listed twice is matched twice.
+    let sheet = u32::try_from(output).unwrap();
+    let (cell_row, cell_col) = (u32::try_from(row).unwrap(), u32::try_from(col).unwrap());
+    let report = store.recalculated_rects();
+    let (rects, rest) = report.as_chunks::<5>();
+    assert!(rest.is_empty(), "whole rectangles: {report:?}");
+    assert!(
+        rects.iter().any(|rect| rect[0] == sheet
+            && (rect[1]..rect[2]).contains(&cell_row)
+            && (rect[3]..rect[4]).contains(&cell_col)),
+        "the changed output cell is reported: {report:?}"
+    );
+    let overlap = |a: &[u32; 5], b: &[u32; 5]| {
+        a[0] == b[0] && a[1] < b[2] && b[1] < a[2] && a[3] < b[4] && b[3] < a[4]
+    };
+    for (index, first) in rects.iter().enumerate() {
+        for second in &rects[index + 1..] {
+            assert!(
+                !overlap(first, second),
+                "a cell is reported twice: {report:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn pivot_output_over_its_own_source_spills() {
     let (mut store, source, _) = fixture(12);
     // Widen the source over five blank columns that no field reads, and

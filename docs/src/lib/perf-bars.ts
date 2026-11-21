@@ -302,15 +302,32 @@ function niceStep(largest: number): number {
   return multiple * power;
 }
 
+/** The binary unit a byte axis up to `largest` counts in, so its ticks are round in that unit. */
+function byteAxisUnit(largest: number): { readonly size: number; readonly name: string } {
+  if (largest >= 1024 ** 3) return { size: 1024 ** 3, name: "GiB" };
+  if (largest >= 1024 ** 2) return { size: 1024 ** 2, name: "MiB" };
+  if (largest >= 1024) return { size: 1024, name: "KiB" };
+  return { size: 1, name: "B" };
+}
+
 function linearAxis(values: readonly number[], unit: PerfUnit): Axis {
   const largest = Math.max(...values.filter((value) => value > 0), 1);
-  const step = unit === "bytes" ? niceStep(largest / 1024 ** 2) * 1024 ** 2 : niceStep(largest);
+  // A byte axis steps in round numbers of its own unit (200 KiB, not 0.2 MiB
+  // shown as 204.8 KiB), and its labels show only the digits the step needs.
+  const bytes = unit === "bytes" ? byteAxisUnit(largest) : undefined;
+  const step =
+    bytes === undefined ? niceStep(largest) : niceStep(largest / bytes.size) * bytes.size;
   const top = Math.ceil(largest / step) * step;
   const count = Math.round(top / step);
   const at = (value: number): number => (Math.max(0, value) / top) * 100;
+  const label = (value: number): string => {
+    if (bytes === undefined) return formatPerfValue(value, unit);
+    const digits = Math.max(0, -Math.floor(Math.log10(step / bytes.size)));
+    return `${grouped(value / bytes.size, digits)}${UNIT_SPACE}${bytes.name}`;
+  };
   const ticks = Array.from({ length: count + 1 }, (_, index) => ({
     at: (index / count) * 100,
-    label: index === 0 ? "0" : formatPerfValue(step * index, unit),
+    label: index === 0 ? "0" : label(step * index),
   }));
   return { at, ticks, note: "Linear scale from 0" };
 }
