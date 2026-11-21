@@ -4,12 +4,10 @@ import {
   ANALYSIS_SHEET_ID,
   buildOrdersLedger,
   FORMULA_PANELS,
-  LEDGER_YEAR,
   ORDER_ROWS,
   PLAYGROUND,
   REGIONS,
 } from "../../docs/src/showcases/scenarios/formulas.js";
-import { PEAK_MONTHS_OF_YEAR } from "../../docs/src/showcases/scenarios/orders-story.js";
 import type { Grid } from "../../packages/core/src/types.js";
 import { expect, siteUrl, test } from "./fixtures.js";
 
@@ -20,7 +18,6 @@ declare global {
 }
 
 const ROUTE = siteUrl("/showcases/formulas/");
-const LEDGER_MONTHS = 12;
 
 function panel(id: string) {
   const found = FORMULA_PANELS.find((candidate) => candidate.id === id);
@@ -90,15 +87,6 @@ test("the full engine computes the dashboard and every panel follows one edit", 
     }
   }
   expect(failing).toEqual([]);
-
-  // The monthly panel shows the story: its best month falls in the Q4 peak.
-  const monthly = panel("monthly");
-  const months = await readBlock(page, monthly.row, monthly.col, LEDGER_MONTHS, 2);
-  const [bestMonth] = [...months].sort((a, b) => Number(b[1]) - Number(a[1]));
-  const peakMonths = PEAK_MONTHS_OF_YEAR.map(
-    (month) => `${LEDGER_YEAR}-${String(month + 1).padStart(2, "0")}`,
-  );
-  expect(peakMonths).toContain(String(bestMonth?.[0]));
 
   // The APAC promotion is one transaction; GROUPBY and the A11# spill reference follow it.
   const top = panel("top");

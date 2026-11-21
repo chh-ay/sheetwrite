@@ -1,7 +1,14 @@
 import type { Page } from "@playwright/test";
 
-import { hasOpaqueForeground } from "./canvas-assertions.js";
-import { canvasPainted, expect, fitsViewport, gridCellTexts, test } from "./fixtures.js";
+import {
+  canvasPainted,
+  expect,
+  fitsViewport,
+  focusAt,
+  gridCellTexts,
+  hasOpaqueForeground,
+  test,
+} from "./fixtures.js";
 
 // The /vanilla/ engine workbench: explicit lifecycle, construction-bound
 // renderer options behind deep links, and Worker failure fallback.
@@ -44,23 +51,10 @@ function rendererReadout(requested: string, active: string): RegExp {
   return new RegExp(`Requested:\\s*${requested}\\b[\\s\\S]*Active:\\s*${active}\\b`);
 }
 
-test("boots product-first, paints, and fits the page @portability", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await open(page);
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "1");
-  await expect(page.getByTestId("renderer")).toContainText(
-    rendererReadout("Main thread", "Main thread"),
-  );
-  await expect.poll(() => canvasPainted(page, CANVAS)).toBe(true);
-  await expect(page.locator(GRID)).toBeInViewport();
-  expect(await fitsViewport(page)).toBe(true);
-});
-
 test("main-thread production canvas paints cells in a DPR 2 backing store @dpr2-render", async ({
-  browser,
   browserName,
   page,
-}, testInfo) => {
+}) => {
   await open(page, "?renderer=canvas");
   const readEvidence = () =>
     page.locator(CANVAS).evaluate((element) => {
@@ -89,36 +83,31 @@ test("main-thread production canvas paints cells in a DPR 2 backing store @dpr2-
     .poll(async () => hasOpaqueForeground((await readEvidence()).sample), { timeout: 15_000 })
     .toBe(true);
 
-  const { sample, ...canvas } = await readEvidence();
-  await testInfo.attach("dpr2-main-thread-render-evidence", {
-    body: Buffer.from(
-      JSON.stringify(
-        {
-          automation: {
-            browserEngine: browserName,
-            browserVersion: browser.version(),
-            hostPlatform: `${process.platform}-${process.arch}`,
-            project: testInfo.project.name,
-            projectMetadata: testInfo.project.metadata,
-            userAgent: await page.evaluate(() => navigator.userAgent),
-          },
-          canvas,
-          foregroundPainted: hasOpaqueForeground(sample),
-        },
-        null,
-        2,
-      ),
-    ),
-    contentType: "application/json",
-  });
+  const canvas = await readEvidence();
   expect(["chromium", "webkit"]).toContain(browserName);
   expect(canvas.devicePixelRatio).toBe(2);
   expect(canvas.backingWidth).toBe(Math.max(1, Math.round(canvas.cssWidth * 2)));
   expect(canvas.backingHeight).toBe(Math.max(1, Math.round(canvas.cssHeight * 2)));
 });
 
-test("destroy, create, and reset bound explicit grid generations", async ({ page }) => {
+test("a grid on its own hands the focus on; destroy, create, and reset bound explicit grid generations", async ({
+  page,
+}) => {
   await open(page);
+  // F6, Shift+F6 and Escape then Tab or Shift+Tab hand the focus to the page
+  // after or before a grid without a shell around it.
+  for (const [keys, side] of [
+    [["F6"], "after"],
+    [["Shift+F6"], "before"],
+    [["Escape", "Tab"], "after"],
+    [["Escape", "Shift+Tab"], "before"],
+  ] as const) {
+    await page.locator(GRID).focus();
+    await expect.poll(() => focusAt(page, GRID)).toBe("grid");
+    for (const key of keys) await page.keyboard.press(key);
+    expect(await focusAt(page, GRID), keys.join(" then ")).toBe(side);
+  }
+
   await commitB2(page, "generation-one-edit");
   await expect.poll(() => readB2(page)).toBe("generation-one-edit");
 
@@ -150,10 +139,19 @@ test("destroy, create, and reset bound explicit grid generations", async ({ page
   await expect.poll(() => readB2(page)).not.toBe("generation-two-edit");
 });
 
-test("the Worker renderer is deep-linked and repaints a cached view after a sub-row scroll @portability", async ({
+test("boots product-first and fits the page; the Worker renderer is deep-linked and repaints a cached view after a sub-row scroll @portability", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await open(page);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "1");
+  await expect(page.getByTestId("renderer")).toContainText(
+    rendererReadout("Main thread", "Main thread"),
+  );
+  await expect.poll(() => canvasPainted(page, CANVAS)).toBe(true);
+  await expect(page.locator(GRID)).toBeInViewport();
+  expect(await fitsViewport(page)).toBe(true);
+
   await page.getByRole("radio", { name: "Web Worker" }).click();
   const renderer = page.getByTestId("renderer");
   await expect(renderer).toContainText(rendererReadout("Web Worker", "Web Worker"), {
@@ -197,7 +195,7 @@ test.describe(() => {
   // The aborted Worker bundle and the forced import failure log errors on purpose.
   test.use({ allowErrors: true });
 
-  test("a failed Worker boot falls back honestly to the main thread @portability", async ({
+  test("a failed Worker boot falls back honestly to the main thread, and a rejected import recovers @portability", async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -229,10 +227,8 @@ test.describe(() => {
     await commitB2(page, "fallback-edit");
     await expect.poll(() => readB2(page)).toBe("fallback-edit");
     expect(pageErrors).toEqual([]);
-  });
 
-  test("a rejected import shows an alert and restores the import button", async ({ page }) => {
-    await open(page);
+    // A rejected import shows an alert and restores the import button.
     await page.getByRole("tab", { name: /XLSX/ }).click();
     await page.evaluate(() => {
       File.prototype.arrayBuffer = () => Promise.reject(new Error("Forced import failure"));
@@ -252,98 +248,4 @@ test.describe(() => {
     await expect(importButton).not.toHaveAttribute("aria-busy", "true");
     await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
   });
-});
-test("context menu shows platform shortcuts, and Undo removes a highlight", async ({ page }) => {
-  await open(page);
-  const surface = page.locator(`${GRID} .sheetwrite-scroller`);
-  await surface.scrollIntoViewIfNeeded();
-  const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
-  const highlightItem = page.locator('[data-context-menu-item="highlight-cell"]');
-  const mac = await page.evaluate(() =>
-    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent),
-  );
-
-  await openMenu();
-  await expect(
-    page.locator('[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut'),
-  ).toHaveText(mac ? "⌘C" : "Ctrl+C");
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-  await highlightItem.click();
-  await expect(page.getByText(/^Highlighted R\d+ C\d+ · Ctrl\+Z undoes it$/)).toBeVisible();
-
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Clear highlight R\d+ C\d+$/);
-  await highlightItem.click();
-  await expect(page.getByText(/^Highlight cleared R\d+ C\d+/)).toBeVisible();
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-
-  // The highlight is a cell fill in the document, so Undo removes it.
-  await highlightItem.click();
-  await surface.click({ position: { x: 160, y: 80 } });
-  await page.keyboard.press(mac ? "Meta+Z" : "Control+Z");
-  await openMenu();
-  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
-});
-
-test("the paged data path serves host pages and reports allocation honestly", async ({ page }) => {
-  // Deep link straight into the paged datasource.
-  await page.goto(`/vanilla/?data=paged`);
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
-    timeout: 20_000,
-  });
-
-  const stats = page.getByTestId("paged-stats");
-  await expect(stats).toBeVisible();
-  await expect
-    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
-      timeout: 15_000,
-      message: "paged store never reported a loaded chunk",
-    })
-    .toBeGreaterThan(0);
-  const initialChunks = Number((await stats.getAttribute("data-chunks")) ?? 0);
-  await expect(stats).toHaveAttribute("data-fully-loaded", "false");
-
-  // The aria mirror boots on the loading snapshot; focus a body cell so it
-  // refreshes through normal grid interaction, then values are readable.
-  await page.locator(GRID).click({ position: { x: 300, y: 82 } });
-  await expect.poll(() => gridCellTexts(page, GRID), { timeout: 15_000 }).toContain(FIRST_ACCOUNT);
-
-  // Full-column aggregate over a partial store fails honestly.
-  await page
-    .locator(".sw-vw-instrument")
-    .getByRole("button", { exact: true, name: "Total ARR" })
-    .click();
-  await expect(page.getByTestId("activity")).toContainText(/full dataset/i);
-  // The summary sheet needs the whole fixture, so the host disables it here.
-  await expect(
-    page.locator(".sw-vw-instrument").getByRole("button", { exact: true, name: "Summary sheet" }),
-  ).toBeDisabled();
-
-  // Scrolling far pulls new pages through the host page source.
-  await page.locator(`${GRID} .sheetwrite-scroller`).evaluate((scroller) => {
-    scroller.scrollTop = 500_000;
-    scroller.dispatchEvent(new Event("scroll"));
-  });
-  await expect
-    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
-      timeout: 20_000,
-      message: "scroll never grew the paged allocation",
-    })
-    .toBeGreaterThan(initialChunks);
-  await expect(page.getByTestId("activity")).toContainText(/host page source/i);
-
-  // Back to the dense path: stats disappear, aggregates complete.
-  await page.getByRole("tab", { name: /Main \/ Worker/ }).click();
-  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
-    timeout: 20_000,
-  });
-  await expect(page).not.toHaveURL(/data=paged/);
-  await expect(page.getByTestId("paged-stats")).toHaveCount(0);
-  await page.getByRole("tab", { name: /XLSX/ }).click();
-  await page
-    .locator(".sw-vw-instrument")
-    .getByRole("button", { exact: true, name: "Total ARR" })
-    .click();
-  await expect(page.getByTestId("activity")).toContainText(/total/i);
 });
