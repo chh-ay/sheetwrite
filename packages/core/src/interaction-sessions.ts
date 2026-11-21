@@ -1132,7 +1132,6 @@ export class InteractionSessions {
   }
 
   fillHandleScreen(contentTop: number, scrollLeft: number): { x: number; y: number } | null {
-    if (this.deps.loadable?.hasView(this.deps.activeSheet())) return null;
     const src = this.fillSourceRect();
     if (!src) return null;
     const r = this.deps.screenRect(src.r1, src.c1, contentTop, scrollLeft);

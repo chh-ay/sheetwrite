@@ -267,6 +267,24 @@ describe("pointer input: touch policy", () => {
 
     const at = (row: number) => ({ sheet: "s1", row, col: 1 });
 
+    it("fills only the rows a filter shows, from the fill handle, as Excel does", () => {
+      const { grid, store, scroller, workbook } = makeGrid();
+      // Tokyo is in sheet rows 1, 4 and 7, which the view shows as rows 0 to 2.
+      grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+
+      // One number copies, as in Excel; the hidden rows between keep their values.
+      expect([1, 2, 3, 4, 5, 6, 7].map((row) => store.getCell(at(row)).resolved)).toEqual([
+        10.5, 20.5, 30.5, 10.5, 50.5, 60.5, 10.5,
+      ]);
+      grid.destroy();
+      store.dispose();
+    });
+
     it("shows the value the last cell will get beside the dragged fill handle, as Excel does", () => {
       const { grid, store, scroller, workbook, host } = makeGrid();
       store.applyTransaction({
