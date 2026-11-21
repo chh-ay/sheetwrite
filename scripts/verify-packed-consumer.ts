@@ -67,12 +67,14 @@ const auditedLicenseOverrides: Record<string, string> = {
 const OPTIONAL_PACKAGES = [
   "@sheetwrite/xlsx",
   "@sheetwrite/charts",
+  "@sheetwrite/formula-assist",
   "@sheetwrite/queries",
 ] as const;
 /** Packages that ship compiled output, never their source or tests. */
 const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
   "@sheetwrite/xlsx": true,
   "@sheetwrite/charts": true,
+  "@sheetwrite/formula-assist": true,
   "@sheetwrite/queries": true,
 };
 const packageSpecs: PackageSpec[] = [
@@ -135,6 +137,10 @@ const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/charts",
     extraFiles: ["dist/addon.d.ts", "dist/addon.js", "dist/view-cache.d.ts", "dist/view-cache.js"],
+  },
+  {
+    directory: "packages/formula-assist",
+    extraFiles: ["dist/predictor.js"],
   },
   { directory: "packages/react" },
   { directory: "packages/vue" },

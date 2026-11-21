@@ -414,6 +414,13 @@ export const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>>
   ],
   "@sheetwrite/xlsx": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
   "@sheetwrite/charts": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
+  "@sheetwrite/formula-assist": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/predictor.js",
+  ],
   "@sheetwrite/react": [
     "README.md",
     "LICENSE",

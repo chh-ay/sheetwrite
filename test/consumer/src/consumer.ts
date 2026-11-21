@@ -5,6 +5,7 @@ import * as Shell from "@sheetwrite/core/shell";
 import * as Worker from "@sheetwrite/core/worker";
 import * as Xlsx from "@sheetwrite/xlsx";
 import * as Charts from "@sheetwrite/charts";
+import * as FormulaAssist from "@sheetwrite/formula-assist";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as SvelteAdapter from "@sheetwrite/svelte";
 import * as VueAdapter from "@sheetwrite/vue";
@@ -60,6 +61,7 @@ const publicEntries: readonly Record<string, unknown>[] = [
   Worker,
   Xlsx,
   Charts,
+  FormulaAssist,
   ReactAdapter,
   SvelteAdapter,
   VueAdapter,
@@ -99,7 +101,14 @@ const canonicalTableAddon: SheetwriteAddon = {
     context.xlsx({ tableExport: canonicalTableExporter, tableImport: canonicalTableImporter });
   },
 };
-void initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), canonicalTableAddon] });
+void initSheetwrite({
+  addons: [
+    Xlsx.xlsxAddon(),
+    Charts.chartsAddon(),
+    FormulaAssist.formulaAssistAddon(),
+    canonicalTableAddon,
+  ],
+});
 void canonicalOperation;
 void canonicalDatasource;
 void toXlsxTable;

@@ -44,6 +44,7 @@ const SCENE_ORDER = [
   "version-history",
   "performance",
   "formulas",
+  "formula-assist",
   "collaboration",
   "database",
   "host-rows",
@@ -58,6 +59,8 @@ type SceneOwnerId = (typeof SCENE_ORDER)[number];
 const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   performance: "Fly the live grid across a billion addresses and watch what stays loaded.",
   formulas: "GROUPBY, PIVOTBY, LAMBDA and regex over an order ledger, recalculated on every edit.",
+  "formula-assist":
+    "Type = under a column of totals and the formula bar suggests the next one. Tab takes it.",
   database: "IndexedDB snapshots, commits, compaction, and reload recovery.",
   "host-rows":
     "Your store owns the rows. Sort the view, filter and edit; every delta names the record.",
@@ -101,6 +104,7 @@ function ownerGroup(owner: HubOwner): HubGroup {
   if (owner.kind === "framework") return "framework";
   if (
     owner.id === "formulas" ||
+    owner.id === "formula-assist" ||
     owner.id === "functions" ||
     owner.id === "recalculation" ||
     owner.id === "analysis" ||

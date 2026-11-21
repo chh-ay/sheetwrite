@@ -44,6 +44,16 @@ Merged changesets update one version pull request. Merging it does not publish. 
 
 If the GitHub release step fails after npm publication, re-run that failed "Publish npm packages" run. Do not start a new run from a later `develop` commit to repair it, because only packages published from the release commit go into the release. The rerun finds the versions on npm, creates the missing tags, and creates or updates `v<version>`.
 
+The workflow cannot publish the first version of a new package. It publishes with npm trusted publishing, and npm accepts a trusted publisher only for a package that is already on npm. In the first release that includes a new package, a maintainer does these steps after the version commit passes CI on `develop`:
+
+1. Find the newest successful CI run for the version commit: `gh run list --workflow ci.yml --branch develop --event push --status success --commit <sha>`.
+2. Download its tarballs: `gh run download <run-id> --name canonical-release-artifacts --dir <directory>`.
+3. Publish the new package from that directory, for example `npm publish <directory>/sheetwrite-<name>-<version>.tgz --access public --tag latest --provenance=false`. Use this tarball and no other one: the workflow compares the npm integrity with the canonical tarball and stops when they are different. Only this first version has no provenance.
+4. On npmjs.com, add the trusted publisher to the new package: repository `chh-ay/sheetwrite`, workflow `release.yml`, environment `npm-release`.
+5. Start the "Publish npm packages" workflow. It finds the new version on npm, checks its integrity and does not publish it again.
+
+If the workflow starts before these steps, it publishes the packages that come before the new package in dependency order and then stops with an error. Do steps 1 to 4, then re-run the failed run.
+
 Before a release, two local checks repeat the release path on your machine. `bun run release:verify` builds the canonical tarballs into `test-results/release-artifacts` (or, with `-- --artifacts <directory>`, verifies tarballs built before), and then runs the dependency audit, the packed and bundler consumers and the size report against them. `bun run release:audit` verifies the tarballs already in `test-results/release-artifacts`, runs only the dependency audit, and writes its evidence to `test-results/dependency-audit`.
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.

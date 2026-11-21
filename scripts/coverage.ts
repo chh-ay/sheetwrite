@@ -27,6 +27,7 @@ const TYPESCRIPT_ROOTS = [
   "packages/svelte/src",
   "packages/xlsx/src",
   "packages/charts/src",
+  "packages/formula-assist/src",
   "packages/queries/src",
 ] as const;
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".svelte"]);

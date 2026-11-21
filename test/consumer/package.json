@@ -13,6 +13,7 @@
   "dependencies": {
     "@sheetwrite/charts": "file:artifacts/sheetwrite-charts-0.6.1.tgz",
     "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.6.1.tgz",
+    "@sheetwrite/formula-assist": "file:artifacts/sheetwrite-formula-assist-0.6.1.tgz",
     "@sheetwrite/formulas": "file:artifacts/sheetwrite-formulas-0.6.1.tgz",
     "@sheetwrite/queries": "file:artifacts/sheetwrite-queries-0.6.1.tgz",
     "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.6.1.tgz",
