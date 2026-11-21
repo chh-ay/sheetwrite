@@ -1,0 +1,62 @@
+docs-figure-fit.spec.ts on develop 2ba48db30 (docs build:test), Chromium
+  3 failed
+
+1440 px: 2027 defects
+834 px: 2027 defects
+390 px: 2085 defects
+
+defects by kind (all widths):
+   1921 "…" is N from its box's side and N from its top or bottom
+   1882 "…" sits N px across and N px down from its box's centre
+   1577 "…" sits N px from the picture's edge
+    538 boxes "…" and "…" are N apart
+     48 padding left N, right N, top N, bottom N
+     45 boxes at (N, N) and (N, N) are N apart
+     18 the drawing is N from the frame's edge
+     12 padding left N, right N, top N, bottom N px
+      9 "…"N"…" sits N px from the picture's edge
+      9 "…"N"…" sits N px across and N px down from its box's centre
+      9 "…"N"…" is N from its box's side and N from its top or bottom
+      5 boxes "…" and "…"N"…" are N apart
+
+first 40 defects:
+/docs/concepts/calculation-engine/ What happens on an edit: "Transaction" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ What happens on an edit: "Store" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ What happens on an edit: "Dependency index" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ What happens on an edit: "Recalculate" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ What happens on an edit: "Transaction" is 14 from its box's side and 10 from its top or bottom
+/docs/concepts/calculation-engine/ What happens on an edit: "Transaction" sits -13.3 px across and -3.9 px down from its box's centre
+/docs/concepts/calculation-engine/ What happens on an edit: "Store" is 14 from its box's side and 3 from its top or bottom
+/docs/concepts/calculation-engine/ What happens on an edit: "Store" sits -15.2 px across and 3.4 px down from its box's centre
+/docs/concepts/calculation-engine/ What happens on an edit: "Dependency index" is 14 from its box's side and 3 from its top or bottom
+/docs/concepts/calculation-engine/ What happens on an edit: "Dependency index" sits -9.2 px across and 3.4 px down from its box's centre
+/docs/concepts/calculation-engine/ What happens on an edit: "Recalculate" is 14 from its box's side and 3 from its top or bottom
+/docs/concepts/calculation-engine/ What happens on an edit: "Recalculate" sits -18.5 px across and 3.4 px down from its box's centre
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "The spill" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1:A4 hold 1 to 4" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A cell is in the way" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1 shows #SPILL!" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "The spill" is 14 from its box's side and 2 from its top or bottom
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "The spill" sits -124.1 px across and 3.9 px down from its box's centre
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1:A4 hold 1 to 4" is 14 from its box's side and 10 from its top or bottom
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1:A4 hold 1 to 4" sits -81.8 px across and -4.4 px down from its box's centre
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A cell is in the way" is 14 from its box's side and 2 from its top or bottom
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A cell is in the way" sits -99.3 px across and 3.9 px down from its box's centre
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1 shows #SPILL!" is 14 from its box's side and 10 from its top or bottom
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: "A1 shows #SPILL!" sits -78.4 px across and -12.2 px down from its box's centre
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: boxes "The spill" and "A cell is in the way" are 16 apart
+/docs/concepts/calculation-engine/ A spill, and a blocked spill: boxes "A1:A4 hold 1 to 4" and "A1 shows #SPILL!" are 16 apart
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "Before the page loads" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows #LOADING!" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "The page arrives" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows 1,250" sits 7.8 px from the picture's edge
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "Before the page loads" is 14 from its box's side and 2 from its top or bottom
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "Before the page loads" sits -88.5 px across and 3.9 px down from its box's centre
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows #LOADING!" is 14 from its box's side and 10 from its top or bottom
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows #LOADING!" sits -67.1 px across and -12.2 px down from its box's centre
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "The page arrives" is 14 from its box's side and 2 from its top or bottom
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "The page arrives" sits -103 px across and 3.9 px down from its box's centre
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows 1,250" is 14 from its box's side and 10 from its top or bottom
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: "B1 shows 1,250" sits -85.7 px across and -12.2 px down from its box's centre
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: boxes "Before the page loads" and "The page arrives" are 16 apart
+/docs/concepts/calculation-engine/ A formula that reads cells not loaded yet: boxes "B1 shows #LOADING!" and "B1 shows 1,250" are 16 apart

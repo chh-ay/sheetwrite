@@ -1,0 +1,11 @@
+== first-load JS (develop head vs PR)
+page	base files gz	base inline gz	new files gz	new inline gz
+/docs/	25179	1478	25179	1478	same
+/docs/start/installation/	30509	1707	30509	1707	same
+/docs/concepts/runtime-ownership/	25179	1533	25179	1533	same
+/docs/import-export/	25179	1545	25179	1545	same
+/docs/frameworks/	25179	1525	25179	1525	same
+/showcases/	24739	726	24739	726	same
+/showcases/formulas/	35591	726	35591	726	same
+/docs/features/collaboration/	25179	1532	25179	1532	same
+/docs/releases/0.7.0/	25179	1574	25179	1574	same
