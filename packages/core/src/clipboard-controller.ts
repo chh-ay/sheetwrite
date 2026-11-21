@@ -79,9 +79,15 @@ export interface ClipboardControllerDeps {
   validationReads?: () => ValidationReads | undefined;
   /**
    * Called when a cut, then its paste, moves `count` rows that a filter or
-   * the user hides, which the selection did not show.
+   * the user hides, which the selection did not show. `rows` are the active
+   * sheet's data rows the step covers: the cut's, and after the paste also
+   * the rows it landed on.
    */
-  onHiddenRowsMoved?: (count: number, step: "cut" | "paste") => void;
+  onHiddenRowsMoved?: (
+    count: number,
+    step: "cut" | "paste",
+    rows: readonly { readonly start: number; readonly end: number }[],
+  ) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -607,7 +613,10 @@ export class ClipboardController {
       const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
-      if (hidden > 0) this.deps.onHiddenRowsMoved?.(hidden, "cut");
+      if (hidden > 0) {
+        const rows = { start: source.start.row, end: source.end.row };
+        this.deps.onHiddenRowsMoved?.(hidden, "cut", [rows]);
+      }
       return "done";
     } finally {
       write.close();
@@ -877,7 +886,15 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
-    if (cut.hidden > 0) this.deps.onHiddenRowsMoved?.(cut.hidden, "paste");
+    if (cut.hidden > 0) {
+      const landed = { start: firstRow, end: firstRow + rows - 1 };
+      const cutRows = { start: cut.range.start.row, end: cut.range.end.row };
+      this.deps.onHiddenRowsMoved?.(
+        cut.hidden,
+        "paste",
+        cut.range.sheet === this.deps.activeSheet() ? [cutRows, landed] : [landed],
+      );
+    }
     return "done";
   }
 
