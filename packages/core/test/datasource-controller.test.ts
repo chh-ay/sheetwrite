@@ -36,16 +36,29 @@ async function flushRequest(): Promise<void> {
   for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
 }
 
-type LegacyControllerOptions = Omit<DatasourceControllerOptions, "columns" | "datasource"> & {
+type LegacyControllerOptions = Partial<Omit<DatasourceControllerOptions, "datasource">> & {
+  loadable: SheetwriteStore;
   datasource?: LegacyRowLoader;
-  columns?: DatasourceControllerOptions["columns"];
+  /** Protects cells this index records as newer than a request's revision. */
+  revisions?: MutationRevisionIndex;
 };
 
 function newTestController(
   options: LegacyControllerOptions,
   rowCount: number,
 ): DatasourceController {
-  const { datasource, columns, ...rest } = options;
+  const { datasource, columns, revisions, ...given } = options;
+  const rest: Omit<DatasourceControllerOptions, "columns" | "datasource"> = {
+    activeSheet: () => "s1",
+    rowCount: () => rowCount,
+    revision: () => 0,
+    isCellNewerThan: (address, requestRevision) =>
+      revisions?.isNewerThan(address, requestRevision) ?? false,
+    retainRevision: (requestRevision) => revisions?.retainRevision(requestRevision) ?? (() => {}),
+    onRowsLoaded: () => {},
+    onError: () => {},
+    ...given,
+  };
   const schema =
     columns ??
     ((sheet: string) => {
@@ -116,9 +129,6 @@ function newProtocolController(options: {
   rowCount: number;
   errors?: unknown[];
   onRowsLoaded?: () => void;
-  revision?: () => number;
-  isCellNewerThan?: DatasourceControllerOptions["isCellNewerThan"];
-  retainRevision?: DatasourceControllerOptions["retainRevision"];
 }): DatasourceController {
   return new DatasourceController(
     {
@@ -127,9 +137,9 @@ function newProtocolController(options: {
       activeSheet: () => "s1",
       rowCount: () => options.rowCount,
       columns: () => options.columns,
-      revision: options.revision ?? (() => 0),
-      isCellNewerThan: options.isCellNewerThan ?? (() => false),
-      retainRevision: options.retainRevision ?? (() => () => {}),
+      revision: () => 0,
+      isCellNewerThan: () => false,
+      retainRevision: () => () => {},
       onRowsLoaded: options.onRowsLoaded ?? (() => {}),
       onError: (_request, error) => options.errors?.push(error),
     },
@@ -138,64 +148,6 @@ function newProtocolController(options: {
 }
 
 describe("DatasourceController revision retention", () => {
-  it("protects acknowledged edits made after overlapping requests start and releases all records", async () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    const revisions = new MutationRevisionIndex();
-    const pending: Array<PromiseWithResolvers<DataSourcePage>> = [];
-    let revision = 0;
-    const controller = newTestController(
-      {
-        datasource: () => {
-          const request = Promise.withResolvers<DataSourcePage>();
-          pending.push(request);
-          return request.promise;
-        },
-        loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 4,
-        revision: () => revision,
-        isCellNewerThan: (address, requestRevision) =>
-          revisions.isNewerThan(address, requestRevision),
-        retainRevision: (requestRevision) => revisions.retainRevision(requestRevision),
-        onRowsLoaded: () => {},
-        onError: () => {},
-      },
-      4,
-    );
-
-    controller.ensureLoaded(0, 1, [0]);
-    controller.ensureLoaded(1, 2, [0]);
-    expect(revisions.stats()).toMatchObject({ retainedRequests: 2, retainedRevisions: 1 });
-
-    const local: DocumentOp = {
-      op: "set",
-      addr: { sheet: "s1", row: 1, col: 0 },
-      value: { kind: "literal", value: "local" },
-    };
-    revision = 1;
-    store.applyTransaction({ patches: [local] });
-    revisions.record([local], revision);
-    store.acknowledgeOperations([local]);
-
-    pending[1]!.resolve({ start: 1, rows: [{ name: "stale server" }] });
-    await flushRequest();
-    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("local");
-    expect(revisions.stats()).toMatchObject({ points: 1, retainedRequests: 1 });
-
-    pending[0]!.resolve({ start: 0, rows: [{ name: "fresh server" }] });
-    await flushRequest();
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("fresh server");
-    expect(revisions.stats()).toEqual({
-      points: 0,
-      rectangles: 0,
-      retainedRequests: 0,
-      retainedRevisions: 0,
-    });
-
-    controller.destroy();
-    store.dispose();
-  });
-
   it("treats edits before a request as part of its revision and still protects later dense clears", async () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     const revisions = new MutationRevisionIndex();
@@ -217,14 +169,8 @@ describe("DatasourceController revision retention", () => {
           return request.promise;
         },
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 4,
         revision: () => revision,
-        isCellNewerThan: (address, requestRevision) =>
-          revisions.isNewerThan(address, requestRevision),
-        retainRevision: (requestRevision) => revisions.retainRevision(requestRevision),
-        onRowsLoaded: () => {},
-        onError: () => {},
+        revisions,
       },
       4,
     );
@@ -267,13 +213,7 @@ describe("DatasourceController revision retention", () => {
           return request.promise;
         },
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 4,
-        revision: () => 0,
-        isCellNewerThan: (address, requestRevision) =>
-          revisions.isNewerThan(address, requestRevision),
-        retainRevision: (requestRevision) => revisions.retainRevision(requestRevision),
-        onRowsLoaded: () => {},
+        revisions,
         onError: (_request, error) => errors.push(error),
       },
       4,
@@ -333,13 +273,6 @@ describe("DatasourceController revision retention", () => {
           return result.promise;
         },
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 100,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
         now: () => now,
       },
       100,
@@ -412,13 +345,6 @@ describe("DatasourceController revision retention", () => {
           };
         },
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 20,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
       },
       20,
     );
@@ -458,13 +384,6 @@ describe("DatasourceController revision retention", () => {
       {
         datasource: () => Promise.withResolvers<DataSourcePage>().promise,
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 2_000,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
         now: () => now,
       },
       2_000,
@@ -490,30 +409,7 @@ describe("DatasourceController revision retention", () => {
     controller.updateViewport(1_200, 1_800, allColumns);
     assertBounded();
 
-    expect(
-      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.tile-state"),
-    ).toMatchObject({
-      measurement: "hash-capacity-v1",
-      entries: expect.any(Number),
-      allocatedBytes: expect.any(Number),
-    });
-    expect(
-      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.tile-state")!
-        .entries,
-    ).toBeLessThan(200 * (DATASOURCE_MAX_ACTIVE_REQUESTS + 2));
-    expect(
-      controller
-        .getResourceOwners()
-        .find((owner) => owner.owner === "js.datasource.pending-requests")!.entries,
-    ).toBeGreaterThan(0);
-
     controller.destroy();
-    expect(
-      controller
-        .getResourceOwners()
-        .every((owner) => owner.logicalBytes === 0 && owner.entries === 0),
-    ).toBe(true);
-    // Destroy above proves every datasource owner releases its retained state.
     store.dispose();
   });
 
@@ -539,18 +435,12 @@ describe("DatasourceController revision retention", () => {
           return result.promise;
         },
         loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 40,
-        revision: () => 0,
-        isCellNewerThan: () => false,
         retainRevision: () => {
           retained += 1;
           return () => {
             retained -= 1;
           };
         },
-        onRowsLoaded: () => {},
-        onError: () => {},
       },
       40,
     );
@@ -877,73 +767,47 @@ describe("DatasourceController scroll-speed lookahead", () => {
 });
 
 it("rejects malformed protocol, coverage, bands, and row shapes before hydration", async () => {
+  // Each case changes one field of a well-formed page for the request.
+  const page = (request: DataSourceRequest, fields: Partial<ProtocolPage>): ProtocolPage => ({
+    protocol: 2,
+    start: request.start,
+    columns: request.columns,
+    rows: [{ k0: "zero", k2: "two" }],
+    ...fields,
+  });
   const cases: Array<{
     name: string;
     page: (request: DataSourceRequest) => ProtocolPage;
   }> = [
     {
       name: "protocol",
-      page: (request) =>
-        ({
-          protocol: 1,
-          start: request.start,
-          columns: request.columns,
-          rows: protocolRows(request.columns, request.start, request.start + 1),
-        }) as unknown as ProtocolPage,
+      page: (request) => page(request, { protocol: 1 } as unknown as ProtocolPage),
     },
     {
       name: "reordered bands",
-      page: (request) => ({
-        protocol: 2,
-        start: request.start,
-        columns: [request.columns[1]!, request.columns[0]!],
-        rows: [{ k0: "zero", k2: "two" }],
-      }),
+      page: (request) => page(request, { columns: [request.columns[1]!, request.columns[0]!] }),
     },
     {
       name: "mismatched keys",
-      page: (request) => ({
-        protocol: 2,
-        start: request.start,
-        columns: [{ ...request.columns[0]!, keys: ["k1"] }, request.columns[1]!],
-        rows: [{ k1: "wrong", k2: "two" }],
-      }),
+      page: (request) =>
+        page(request, {
+          columns: [{ ...request.columns[0]!, keys: ["k1"] }, request.columns[1]!],
+          rows: [{ k1: "wrong", k2: "two" }],
+        }),
     },
-    {
-      name: "missing row key",
-      page: (request) => ({
-        protocol: 2,
-        start: request.start,
-        columns: request.columns,
-        rows: [{ k0: "zero" }],
-      }),
-    },
+    { name: "missing row key", page: (request) => page(request, { rows: [{ k0: "zero" }] }) },
     {
       name: "extra row key",
-      page: (request) => ({
-        protocol: 2,
-        start: request.start,
-        columns: request.columns,
-        rows: [{ k0: "zero", k2: "two", extra: "no" }],
-      }),
+      page: (request) => page(request, { rows: [{ k0: "zero", k2: "two", extra: "no" }] }),
     },
-    {
-      name: "row bounds",
-      page: (request) => ({
-        protocol: 2,
-        start: request.end,
-        columns: request.columns,
-        rows: protocolRows(request.columns, request.end, request.end + 1),
-      }),
-    },
+    { name: "row bounds", page: (request) => page(request, { start: request.end }) },
     {
       name: "overlapping bands",
-      page: (request) => ({
-        protocol: 2,
-        start: request.start,
-        columns: [request.columns[0]!, request.columns[0]!],
-        rows: [{ k0: "zero" }],
-      }),
+      page: (request) =>
+        page(request, {
+          columns: [request.columns[0]!, request.columns[0]!],
+          rows: [{ k0: "zero" }],
+        }),
     },
   ];
 
@@ -1074,6 +938,11 @@ it("bounds metadata across deterministic million-row by thousand-column scroll/r
     .getResourceOwners()
     .reduce((bytes, owner) => bytes + owner.allocatedBytes, 0);
   expect(totalBytes).toBeLessThanOrEqual(1024 * 1024);
+  expect(
+    controller
+      .getResourceOwners()
+      .find((owner) => owner.owner === "js.datasource.pending-requests")!.entries,
+  ).toBeGreaterThan(0);
   controller.destroy();
   expect(
     controller

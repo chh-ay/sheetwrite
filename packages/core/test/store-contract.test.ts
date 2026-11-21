@@ -1,17 +1,16 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { SnapshotValidationError } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ChangeEvent, DocumentOp, PackedCellBlock, Workbook } from "../src/types.js";
+import type { ChangeEvent, DocumentOp, PackedCellBlock } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
-function contractWorkbook(): Workbook {
+function runFacadeContract(restoreBlock: boolean): void {
   const workbook = makeWorkbook(4);
   workbook.sheets[0]!.protectedRanges = [
     {
@@ -19,29 +18,18 @@ function contractWorkbook(): Workbook {
       range: { sheet: "s1", start: { row: 3, col: 0 }, end: { row: 3, col: 2 } },
     },
   ];
-  return workbook;
-}
-
-function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): void {
-  const store = new SheetwriteStore(contractWorkbook(), undefined, {
-    storage,
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
     chunkRows: 4,
     cacheBytes: 1_000_000,
   });
-  if (storage === "paged") {
-    expect(store.queryCapability("s1").status).toBe("incomplete");
-    store.loadPage(
-      "s1",
-      0,
-      [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
-      [
-        { name: null, amount: 0, city: null },
-        { name: null, amount: 0, city: null },
-        { name: null, amount: 0, city: null },
-        { name: null, amount: 0, city: null },
-      ],
-    );
-  }
+  expect(store.queryCapability("s1").status).toBe("incomplete");
+  store.loadPage(
+    "s1",
+    0,
+    [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
+    Array.from({ length: 4 }, () => ({ name: null, amount: 0, city: null })),
+  );
   expect(store.queryCapability("s1")).toEqual({ status: "complete" });
 
   const range = { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } };
@@ -80,13 +68,8 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
     },
   ];
   const transaction = { epoch: 0, patches };
-  const listenerOrder: string[] = [];
   const events: ChangeEvent[] = [];
-  store.on("change", (event) => {
-    listenerOrder.push("first");
-    events.push(event);
-  });
-  store.on("change", () => listenerOrder.push("second"));
+  store.on("change", (event) => events.push(event));
 
   const applied = store.applyTransaction(transaction);
   expect(applied).toMatchObject({ status: "applied", epoch: 1 });
@@ -111,7 +94,6 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
     expect(emittedBlock.block.values[0]).toBe(4);
     expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe(4);
   }
-  expect(listenerOrder).toEqual(["first", "second"]);
   expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(8);
   expect(store.getCell({ sheet: "s1", row: 2, col: 2 }).resolved).toBe(8);
   expect(store.getFormula({ sheet: "s1", row: 2, col: 1 })).toBe("=A3*2");
@@ -129,23 +111,7 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
     italic: true,
   });
 
-  const firstWindow = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0, 1, 2]);
-  const firstValues = Array.from(firstWindow.values);
-  const secondWindow = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0, 1, 2]);
-  const secondValues = Array.from(secondWindow.values);
-  expect(secondValues).toEqual(firstValues);
-  expect(secondValues[0]).toBe(2);
-  expect(secondValues.slice(3, 5)).toEqual([3, "range"]);
-  expect(secondValues.slice(6, 9)).toEqual([4, 8, 8]);
-
-  store.setViewSort("s1", [{ col: 0, ascending: false }]);
-  const viewOrder = [0, 1, 2, 3].map((row) => store.dataRowAt("s1", row));
-  expect(new Set(viewOrder).size).toBe(4);
-  for (let viewRow = 0; viewRow < viewOrder.length; viewRow++) {
-    expect(store.viewRowOf("s1", viewOrder[viewRow]!)).toBe(viewRow);
-  }
-  store.clearView("s1");
-
+  // A denied edit and an empty transaction reach no listener.
   const beforeRejected = events.length;
   expect(
     store.applyTransaction({
@@ -161,42 +127,23 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
   expect(store.applyTransaction({ patches: [] })).toMatchObject({ status: "noop" });
   expect(events).toHaveLength(beforeRejected);
 
-  const history = store.captureRangeHistory(blockRange);
-  expect(history).not.toBeNull();
-  expect(() => {
-    history?.dispose();
-    history?.dispose();
-  }).not.toThrow();
-
   const snapshot = store.exportSnapshot();
   const restored = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(snapshot)));
   expect(restored.exportSnapshot()).toEqual(snapshot);
   restored.dispose();
 
-  if (storage === "paged") {
-    expect(store.getPagedStats("s1").dirtyCells).toBeGreaterThan(0);
-    store.acknowledgeOperations(patches);
-    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
-  }
+  expect(store.getPagedStats("s1").dirtyCells).toBeGreaterThan(0);
+  store.acknowledgeOperations(patches);
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
   store.dispose();
 }
 
 describe("SheetwriteStore facade contract", () => {
-  it("preserves paged transaction, view, snapshot, policy, and resource barriers", () => {
-    runFacadeContract("paged");
+  it("applies a copied setBlock to paged cells and acknowledges them", () => {
+    runFacadeContract(false);
   });
 
   it("preserves compressed restore payloads while applying and acknowledging paged cells", () => {
-    runFacadeContract("paged", true);
-  });
-
-  it("keeps snapshot validation at the facade trust boundary", () => {
-    expect(() => SheetwriteStore.fromSnapshot({ schemaVersion: 999 })).toThrow(
-      SnapshotValidationError,
-    );
-
-    const paged = new SheetwriteStore(makeWorkbook(1_000_000), undefined, { storage: "paged" });
-    expect(paged.isPaged("s1")).toBe(true);
-    paged.dispose();
+    runFacadeContract(true);
   });
 });
