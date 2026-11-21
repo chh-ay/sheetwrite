@@ -1,0 +1,84 @@
+
+Running 3 tests using 1 worker
+
+  ✘  1 [chromium] › test/browser/sheet-tab-overflow.spec.ts:56:1 › overflowing tabs show labelled scroll arrows that scroll by a sheet @portability (5.8s)
+  ✘  2 [chromium] › test/browser/sheet-tab-overflow.spec.ts:84:1 › a right-click, the context menu key or a long press on an arrow lists every sheet (30.1s)
+  ✘  3 [chromium] › test/browser/sheet-tab-overflow.spec.ts:121:1 › tabs that fit show no scroll arrows (6.2s)
+
+
+  1) [chromium] › test/browser/sheet-tab-overflow.spec.ts:56:1 › overflowing tabs show labelled scroll arrows that scroll by a sheet @portability 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('.sheetwrite-shell-tabs').getByRole('button', { name: 'Show earlier sheets' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('.sheetwrite-shell-tabs').getByRole('button', { name: 'Show earlier sheets' }) with timeout 5000ms
+      - waiting for locator('.sheetwrite-shell-tabs').getByRole('button', { name: 'Show earlier sheets' })
+
+
+      61 |   const previous = strip.getByRole("button", { name: "Show earlier sheets" });
+      62 |   const next = strip.getByRole("button", { name: "Show later sheets" });
+    > 63 |   await expect(previous).toBeVisible();
+         |                          ^
+      64 |   await expect(next).toBeVisible();
+      65 |   // An icon never stands alone: a name, and a tooltip that names the list too.
+      66 |   await expect(next).toHaveAttribute("title", /list of all sheets/);
+        at /home/vvin/checkouts/tabscroll-base/test/browser/sheet-tab-overflow.spec.ts:63:26
+
+    Error Context: test-results/playwright/sheet-tab-overflow-overflo-458d4-roll-by-a-sheet-portability-chromium/error-context.md
+
+  2) [chromium] › test/browser/sheet-tab-overflow.spec.ts:84:1 › a right-click, the context menu key or a long press on an arrow lists every sheet 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('.sheetwrite-shell-tabs').getByRole('button', { name: 'Show later sheets' })
+
+
+      90 |   const list = page.getByRole("group", { name: "All sheets" });
+      91 |
+    > 92 |   await next.click({ button: "right" });
+         |              ^
+      93 |   await expect(list).toBeVisible();
+      94 |   await expect(list.getByRole("button")).toHaveCount(9);
+      95 |   await expect(list.getByRole("button", { name: "Sales" })).toHaveAttribute("aria-current", "true");
+        at /home/vvin/checkouts/tabscroll-base/test/browser/sheet-tab-overflow.spec.ts:92:14
+
+    Error Context: test-results/playwright/sheet-tab-overflow-a-right-38bcd--an-arrow-lists-every-sheet-chromium/error-context.md
+
+  3) [chromium] › test/browser/sheet-tab-overflow.spec.ts:121:1 › tabs that fit show no scroll arrows 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.sheetwrite-shell-tabs .sheetwrite-tab-scroll')
+    Expected: 2
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.sheetwrite-shell-tabs .sheetwrite-tab-scroll') with timeout 5000ms
+      - waiting for locator('.sheetwrite-shell-tabs .sheetwrite-tab-scroll')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      121 | test("tabs that fit show no scroll arrows", async ({ page }) => {
+      122 |   await open(page, 1_440, []);
+    > 123 |   await expect(page.locator(".sheetwrite-shell-tabs .sheetwrite-tab-scroll")).toHaveCount(2);
+          |                                                                               ^
+      124 |   await expect(page.locator(".sheetwrite-shell-tabs .sheetwrite-tab-scroll:visible")).toHaveCount(
+      125 |     0,
+      126 |   );
+        at /home/vvin/checkouts/tabscroll-base/test/browser/sheet-tab-overflow.spec.ts:123:79
+
+    Error Context: test-results/playwright/sheet-tab-overflow-tabs-that-fit-show-no-scroll-arrows-chromium/error-context.md
+
+  3 failed
+    [chromium] › test/browser/sheet-tab-overflow.spec.ts:56:1 › overflowing tabs show labelled scroll arrows that scroll by a sheet @portability 
+    [chromium] › test/browser/sheet-tab-overflow.spec.ts:84:1 › a right-click, the context menu key or a long press on an arrow lists every sheet 
+    [chromium] › test/browser/sheet-tab-overflow.spec.ts:121:1 › tabs that fit show no scroll arrows 
