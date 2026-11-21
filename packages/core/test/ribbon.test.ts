@@ -535,6 +535,41 @@ it("fills from a palette pick and clears with No Fill", async () => {
   expect(cell(0, 0).style.backgroundColor).toBeUndefined();
 });
 
+it("ties a one-letter word to its neighbour, so a large label breaks only between phrases", async () => {
+  const { control, openTab } = await setup();
+  openTab("Data");
+  const ascending = control("Sort A to Z");
+  const label = ascending.querySelector(".sheetwrite-ribbon-label");
+  // "Sort" / "A to Z" on two lines; the name and tooltip keep plain spaces.
+  expect(label?.textContent).toBe("Sort A\u00a0to\u00a0Z");
+  expect(ascending.title).toBe("Sort A to Z");
+  const descending = control("Sort Z to A").querySelector(".sheetwrite-ribbon-label");
+  expect(descending?.textContent).toBe("Sort Z\u00a0to\u00a0A");
+  expect(control("Custom Sort").querySelector(".sheetwrite-ribbon-label")?.textContent).toBe(
+    "Custom Sort",
+  );
+});
+
+it("names a folded group on at most two lines, never stranding a one-letter word", async () => {
+  const { host, openTab } = await setup();
+  openTab("Data");
+  const folded = (group: string) =>
+    host.querySelector(
+      `.sheetwrite-ribbon-group[aria-label="${group}"] > .sheetwrite-ribbon-group-button .sheetwrite-ribbon-label`,
+    )?.textContent;
+  expect(folded("Get & Transform Data")).toBe("Get & Transform\nData");
+  expect(folded("Queries & Connections")).toBe("Queries\n& Connections");
+  expect(folded("Sort & Filter")).toBe("Sort\n& Filter");
+  expect(folded("Data Tools")).toBe("Data\nTools");
+  openTab("Home");
+  expect(folded("Clipboard")).toBe("Clipboard");
+  // The line feed is not part of the name.
+  const button = host.querySelector<HTMLElement>(
+    '.sheetwrite-ribbon-group[aria-label="Clipboard"] > .sheetwrite-ribbon-group-button',
+  );
+  expect(button?.getAttribute("aria-label")).toBe("Clipboard");
+});
+
 it("opens on Home when the File tab shows, as Excel does", async () => {
   const { host } = await setup(false, undefined, true, { keyboardSettings: true });
   const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];

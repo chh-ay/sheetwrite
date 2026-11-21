@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- On the 0.7.0 release page, the Format Cells card shows the Category list and the Sample at full size, without the tabs; its text was drawn at about 0.72× and was hard to read. The Data model card shows the panel's title and the relationship from Orders to Regions with its key check, instead of the tables list, whose bullets sat on the panel's border, over a mostly empty card.
 - The installation page lists the error texts that Chromium, Firefox and Safari show when the WebAssembly file does not load (a 404, an HTML page instead of the file, a Content Security Policy without `'wasm-unsafe-eval'`, a failed request) and how to fix each, so a search for the error finds it. A wrong MIME type only slows the start, and the page says so.
 - The docs build fits in Node's default heap again. Code-sample hovers read the API manifest (`public-api.json`, 1.4 MB) once for the whole build; every generated API page started its own read while the first was still running, so about 760 copies (2 GB) were in memory at once and `bun run --filter @sheetwrite/docs build` ran out of memory on a 16 GB machine. The build's peak memory is 3.0 GB instead of 5.1 GB, and its output is the same.
 - The data tools showcase, the only one without a picture of how it works, has a section with a blueprint figure of what its guarded columns do with an edit that breaks their rule: Units rejects −5, Freight saves $350 with a warning, and Order ID is locked.
