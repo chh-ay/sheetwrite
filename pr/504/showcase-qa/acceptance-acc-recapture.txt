@@ -1,0 +1,12 @@
+queries-dark-1x.avif identical
+queries-dark-2x.avif identical
+queries-light-1x.avif identical
+queries-light-2x.avif identical
+sort-dark-1x.avif identical
+sort-dark-2x.avif identical
+sort-light-1x.avif identical
+sort-light-2x.avif identical
+version-history-dark-1x.avif identical
+version-history-dark-2x.avif identical
+version-history-light-1x.avif identical
+version-history-light-2x.avif identical
