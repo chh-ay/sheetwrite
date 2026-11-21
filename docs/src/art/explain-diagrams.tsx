@@ -276,3 +276,32 @@ export function FormattingDiagram() {
     />
   );
 }
+
+/** Data tools: what each guarded column does with an edit that breaks its rule. */
+export function DataGuardsDiagram() {
+  return (
+    <FanFigure
+      source={{ title: "An edit to a guarded column", lines: ["Checked before", "it is stored"] }}
+      text={{
+        title: "What the guarded columns do with an edit",
+        description:
+          "Each edit to a guarded column is checked before it is stored. Units takes a whole number from 1 to 250, so −5 is rejected. Freight above $200 is saved, with a warning to review it, so $350 lands with a warning. Order ID is locked: only a manager can change it.",
+      }}
+      tiles={[
+        {
+          eyebrow: "Units",
+          title: "−5 rejected",
+          lines: ["A whole number", "from 1 to 250"],
+          tone: "danger",
+        },
+        { eyebrow: "Freight", title: "$350 saved", lines: ["With a warning", "to review it"] },
+        {
+          eyebrow: "Order ID",
+          title: "Locked",
+          lines: ["Only a manager", "can change it"],
+          tone: "muted",
+        },
+      ]}
+    />
+  );
+}
