@@ -5,10 +5,11 @@
  * rather than with the work the user can see: row-bridge inserts over a large
  * identity array, command-state derivation for a large selection, commit
  * admission and change capture for one large block, the offline commit queue,
- * offline rebase, validation lookups, CSV import, undo of a large clear, a
- * paged revisiting round-trip after eviction, cold WASM initialization in
- * Node, and a row-border drag that resizes one row of a 100-, 100,000- or
- * 1,000,000-row sheet.
+ * remote versions applied to a sheet of formulas, one local transaction of
+ * scattered cell edits on that sheet, offline rebase, validation lookups, CSV
+ * import, undo of a large clear, a paged revisiting round-trip after
+ * eviction, cold WASM initialization in Node, and a row-border drag that
+ * resizes one row of a 100-, 100,000- or 1,000,000-row sheet.
  *
  * Each scenario validates its own result before the sample is accepted, so a
  * fast scenario that computes the wrong answer fails the run instead of
@@ -104,12 +105,19 @@ const COMMAND_STATE_SELECTED_OBSERVATIONS = ["undo"] as const;
 /** Rows read per bounded window when a scenario verifies a whole block. */
 const VERIFY_WINDOW_ROWS = 256;
 
+/** Number columns A-H of the row-sum sheet; column I sums them. */
+const REMOTE_NUMBER_COLUMNS = 8;
+/** Cells one scattered local transaction writes, each in column A of its own row. */
+const SCATTERED_EDIT_CELLS = 300;
+
 export const CORE_PATH_SCENARIOS = [
   "row-bridge-insert",
   "command-state-select",
   "setblock-admission",
   "setblock-detailed-capture",
   "sync-offline-queue",
+  "sync-remote-versions",
+  "local-scattered-edits",
   "rebase-large",
   "validation-sparse",
   "csv-import",
@@ -147,6 +155,8 @@ interface CorePathScale {
   readonly blockRows: number;
   readonly blockColumns: number;
   readonly offlineCommits: number;
+  /** Rows of the row-sum sheet, each with one SUM formula. */
+  readonly remoteRows: number;
   readonly rebaseBlockRows: number;
   readonly rebaseBlockColumns: number;
   readonly rebaseInsertOperations: number;
@@ -167,6 +177,7 @@ const FULL_SCALE: CorePathScale = {
   blockRows: 1_000,
   blockColumns: 1_000,
   offlineCommits: 5_000,
+  remoteRows: 10_000,
   rebaseBlockRows: 1_000,
   rebaseBlockColumns: 100,
   rebaseInsertOperations: 50,
@@ -188,6 +199,7 @@ const SMOKE_SCALE: CorePathScale = {
   blockRows: 100,
   blockColumns: 100,
   offlineCommits: 200,
+  remoteRows: 200,
   rebaseBlockRows: 100,
   rebaseBlockColumns: 100,
   rebaseInsertOperations: 10,
@@ -220,6 +232,10 @@ function samplePlan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
       return { warmup: 1, iters: 3, gcBetween: true };
     case "sync-offline-queue":
       return { warmup: 5, iters: smoke ? 20 : FULL_SCALE.offlineCommits, gcBetween: false };
+    case "sync-remote-versions":
+      return { warmup: smoke ? 2 : 20, iters: smoke ? 20 : 200, gcBetween: false };
+    case "local-scattered-edits":
+      return { warmup: 2, iters: smoke ? 5 : 21, gcBetween: false };
     case "rebase-large":
       return { warmup: 1, iters: 3, gcBetween: false };
     case "validation-sparse":
@@ -818,6 +834,149 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
     samplesMs,
     { queuedCommits: queued, admittedOperations: queued },
     "every commit is applied, the queue holds every commit at server version 0, and capacity stays available",
+  );
+}
+
+/** A grid whose `rows` rows hold 1 to 8 in columns A-H and their SUM in column I. */
+function mountRowSums(rows: number): MountedGrid & { readonly columns: Column[] } {
+  const columns = numberColumns(REMOTE_NUMBER_COLUMNS + 1);
+  const mounted = mountGrid({ workbook: workbook(rows, columns) });
+  const values = new Array<CellScalar>(rows * columns.length).fill(null);
+  const formulas: Array<[number, string]> = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < REMOTE_NUMBER_COLUMNS; col += 1) {
+      values[row * columns.length + col] = col + 1;
+    }
+    formulas.push([row * columns.length + REMOTE_NUMBER_COLUMNS, `=SUM(A${row + 1}:H${row + 1})`]);
+  }
+  const block: PackedCellBlock = { rowCount: rows, colCount: columns.length, values, formulas };
+  assertApplied(
+    mounted.grid.applyTransaction({
+      patches: [{ op: "setBlock", range: sheetRange(rows, columns.length), block }],
+    }).status,
+    "row-sum sheet setup",
+  );
+  return { ...mounted, columns };
+}
+
+/**
+ * Remote versions of one cell edit each, applied through a SyncCoordinator to
+ * a sheet whose every row sums its number columns. Only the edited row's sum
+ * reads the edit, so a version should cost about what a local edit costs.
+ */
+async function applyRemoteVersions(
+  scale: CorePathScale,
+  plan: SamplePlan,
+): Promise<CorePathScenarioResult> {
+  const rows = scale.remoteRows;
+  const mounted = mountRowSums(rows);
+  const { grid, columns } = mounted;
+  const snapshot: WorkbookSnapshot = {
+    schemaVersion: 1,
+    documentId: DOCUMENT_ID,
+    version: 0,
+    workbook: { activeSheet: SHEET },
+    sheets: [{ id: SHEET, name: "Core paths", order: 0, rowCount: rows, columns, cells: [] }],
+  };
+  const coordinator = new SyncCoordinator(grid, new MemoryPersistenceAdapter(snapshot), {
+    documentId: DOCUMENT_ID,
+    serverVersion: 0,
+  });
+
+  // Each version writes a new value to column A of a different row.
+  const editedRow = (version: number): number => (version * 7) % rows;
+  const samplesMs: number[] = [];
+  let version = 0;
+  for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
+    version += 1;
+    const operation: DocumentOp = {
+      op: "set",
+      addr: cellAddress(editedRow(version), 0),
+      value: { kind: "literal", value: version },
+    };
+    const started = now();
+    await coordinator.applyVersionedOperation({ version, operations: [operation] });
+    const elapsed = now() - started;
+    if (iteration >= plan.warmup) samplesMs.push(elapsed);
+  }
+
+  if (coordinator.serverVersion !== version) {
+    fail(`the grid reached server version ${coordinator.serverVersion}, expected ${version}`);
+  }
+  // Columns B-H hold 2 to 8, so a row sums to its column A value plus 35.
+  const lastRow = editedRow(version);
+  if (resolvedCell(grid, lastRow, REMOTE_NUMBER_COLUMNS) !== version + 35) {
+    fail(`row ${lastRow} does not sum the last remote value`);
+  }
+  if (resolvedCell(grid, rows - 1, REMOTE_NUMBER_COLUMNS) !== 36) {
+    fail("a row that no version edited does not keep its sum");
+  }
+  coordinator.destroy();
+  mounted.destroy();
+
+  return scenarioResult(
+    "sync-remote-versions",
+    `one remote version of one cell edit applied to a sheet of ${rows.toLocaleString("en-US")} SUM formulas`,
+    samplesMs,
+    { remoteVersions: plan.iters, formulas: rows },
+    "every version is applied in order, the last edited row sums its new value, and an unedited row keeps its sum",
+  );
+}
+
+/**
+ * One local transaction that writes one cell, in one of columns A-H, of each
+ * of `SCATTERED_EDIT_CELLS` rows spread over the row-sum sheet. Each cell has
+ * one reader, so the transaction should cost about its cells' readers, not
+ * the sheet.
+ */
+function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const rows = scale.remoteRows;
+  const cells = Math.min(SCATTERED_EDIT_CELLS, rows);
+  const mounted = mountRowSums(rows);
+  const { grid } = mounted;
+  // 37 is prime to the row count, so the rows of one transaction differ.
+  const editedRow = (generation: number, cell: number): number => (cell * 37 + generation) % rows;
+  const editedColumn = (cell: number): number => cell % REMOTE_NUMBER_COLUMNS;
+  let generation = 0;
+  let patches: DocumentOp[] = [];
+  const samplesMs = collect(
+    () => assertApplied(grid.applyTransaction({ patches }).status, "scattered edits"),
+    {
+      warmup: plan.warmup,
+      iters: plan.iters,
+      before: () => {
+        generation += 1;
+        patches = Array.from({ length: cells }, (_, cell) => ({
+          op: "set" as const,
+          addr: cellAddress(editedRow(generation, cell), editedColumn(cell)),
+          value: { kind: "literal" as const, value: generation },
+        }));
+      },
+    },
+  );
+
+  // Each checked row holds the last value and sums its columns A-H.
+  for (const cell of [0, cells - 1]) {
+    const row = editedRow(generation, cell);
+    let sum = 0;
+    for (let col = 0; col < REMOTE_NUMBER_COLUMNS; col += 1) {
+      sum += Number(resolvedCell(grid, row, col));
+    }
+    if (
+      resolvedCell(grid, row, editedColumn(cell)) !== generation ||
+      resolvedCell(grid, row, REMOTE_NUMBER_COLUMNS) !== sum
+    ) {
+      fail(`row ${row} does not sum the last scattered edit`);
+    }
+  }
+  mounted.destroy();
+
+  return scenarioResult(
+    "local-scattered-edits",
+    `one transaction of ${cells} one-cell edits on scattered rows of a sheet of ${rows.toLocaleString("en-US")} SUM formulas`,
+    samplesMs,
+    { editedCells: cells, formulas: rows },
+    "the first and last edited rows of the last transaction sum their new values",
   );
 }
 
@@ -1597,6 +1756,8 @@ export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   "setblock-admission": (scale, plan) => applyOneBlock(scale, plan, false),
   "setblock-detailed-capture": (scale, plan) => applyOneBlock(scale, plan, true),
   "sync-offline-queue": queueOfflineCommits,
+  "sync-remote-versions": applyRemoteVersions,
+  "local-scattered-edits": applyScatteredEdits,
   "rebase-large": rebaseBlockAcrossInserts,
   "validation-sparse": writeSparseRangeWithRules,
   "csv-import": importCsvText,

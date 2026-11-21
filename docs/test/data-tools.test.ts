@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import {
   createDataToolsScenario,
+  DATA_SHEET,
   type DataToolsScenario,
 } from "../src/showcases/scenarios/data-tools.js";
 
@@ -46,5 +47,34 @@ test("clear view preserves independent manual and grouped visibility", async () 
     hiddenRows: 0,
     hiddenColumns: 0,
     collapsed: false,
+  });
+});
+
+test("mutation receipts distinguish rejected, warned and host-authorized stored edits", async () => {
+  scenario = createDataToolsScenario(host);
+  await scenario.ready;
+  expect(scenario.snapshot().error).toBeNull();
+  scenario.filter("APAC", "Atlas");
+  scenario.probe("units");
+  const cell = (col: number) =>
+    scenario?.grid()?.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved;
+  expect(cell(4)).toBe(1);
+  expect(scenario.snapshot().probes.units).toMatchObject({ outcome: "rejected", stored: "1" });
+  scenario.probe("freight");
+  expect(cell(5)).toBe(350);
+  expect(scenario.snapshot().probes.freight).toMatchObject({ outcome: "warned", stored: "350" });
+  scenario.probe("order");
+  expect(cell(0)).toBe("ORD-10001");
+  expect(scenario.snapshot().probes.order).toMatchObject({ outcome: "rejected" });
+  scenario.run("manager");
+  expect(scenario.snapshot().events[0]).toMatchObject({
+    api: "Host role state",
+    tone: "info",
+  });
+  scenario.probe("order");
+  expect(cell(0)).toBe("MANAGER-REVIEW");
+  expect(scenario.snapshot().probes.order).toMatchObject({
+    outcome: "saved",
+    stored: "MANAGER-REVIEW",
   });
 });

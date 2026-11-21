@@ -686,6 +686,25 @@ describe("SheetwriteStore", () => {
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(6);
     store.dispose();
   });
+
+  it("gives each cell of a packed block the style its table id names", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    const italic: CellStyle = { italic: true };
+    const bold: CellStyle = { bold: true };
+    const styleTable = [italic, {}, bold, { bold: true }, { color: "#ff0000" }];
+    const styleIds = [2, 0, 1, 3, 2, 0];
+    const range = { sheet: "s1", start: addr(0, 0), end: addr(1, 2) };
+    const block = { rowCount: 2, colCount: 3, values: [1, 2, 3, 4, 5, 6], styleTable, styleIds };
+    expect(store.applyTransaction({ patches: [{ op: "setBlock", range, block }] }).status).toBe(
+      "applied",
+    );
+
+    const shown = [0, 1, 2, 3, 4, 5].map(
+      (offset) => store.getCell(addr(Math.floor(offset / 3), offset % 3)).style,
+    );
+    expect(shown).toEqual([bold, italic, {}, bold, bold, italic]);
+    store.dispose();
+  });
 });
 
 describe("datasource row hydration", () => {

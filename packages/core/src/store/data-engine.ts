@@ -2890,6 +2890,10 @@ export class StoreDataEngine {
     const numbers = new Float64Array(cellCount);
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
+    // Interning builds a key from every style field, so each table entry is
+    // interned once, on first use, instead of once per cell. First use keeps
+    // the order in which the dictionary assigns ids.
+    const tableIds: Array<number | undefined> = new Array(styleTable.length);
 
     const texts: string[] = [];
     for (let offset = 0; offset < cellCount; offset++) {
@@ -2897,10 +2901,14 @@ export class StoreDataEngine {
       writeScalarWire(kinds, numbers, offset, value);
       if (typeof value === "string") texts.push(value);
 
-      const styleId = styleIds === undefined ? undefined : styleIds[offset];
-      wasmStyles[offset] = this.styles.intern(
-        styleId === undefined ? undefined : styleTable[styleId],
-      );
+      const styleId = styleIds?.[offset];
+      if (styleId === undefined) continue;
+      let id = tableIds[styleId];
+      if (id === undefined) {
+        id = this.styles.intern(styleTable[styleId]);
+        tableIds[styleId] = id;
+      }
+      wasmStyles[offset] = id;
     }
 
     const formulas = block.formulas ?? [];
@@ -3073,7 +3081,7 @@ export class StoreDataEngine {
     const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
     const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
 
-    if (remoteLoad) this.wasm.beginPageLoad();
+    if (remoteLoad) this.wasm.beginRemoteLoad();
     try {
       if (replayPivotSources) this.releaseReplayedPivotOutputs(patches);
       for (const patch of patches) {

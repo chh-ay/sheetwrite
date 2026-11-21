@@ -46,76 +46,70 @@ interface MutableContract {
   [key: string]: unknown;
 }
 
-interface MutationCase {
-  name: string;
-  mutate: (contract: MutableContract) => void;
-  expectedIssue: string;
-}
-
-const MUTATIONS: MutationCase[] = [
-  {
-    name: "rejects an unknown top-level field",
-    mutate: (contract) => {
+const MUTATIONS: [string, (contract: MutableContract) => void, string][] = [
+  [
+    "rejects an unknown top-level field",
+    (contract) => {
       contract.unreviewedCapability = true;
     },
-    expectedIssue: "contract.unreviewedCapability: unknown field",
-  },
-  {
-    name: "rejects a version outside the closed protocol",
-    mutate: (contract) => {
+    "contract.unreviewedCapability: unknown field",
+  ],
+  [
+    "rejects a version outside the closed protocol",
+    (contract) => {
       contract.version = 2;
     },
-    expectedIssue: "contract.version: expected constant 1",
-  },
-  {
-    name: "rejects insecure public source links",
-    mutate: (contract) => {
+    "contract.version: expected constant 1",
+  ],
+  [
+    "rejects an unrecognized engine build",
+    (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
+      if (formula) formula.builds = ["@sheetwrite/unknown"];
+    },
+    "value is outside the closed enum",
+  ],
+  [
+    "rejects insecure public source links",
+    (contract) => {
       const source = contract.sources["microsoft-excel-functions"];
       if (source) source.link = "http://example.invalid/functions";
     },
-    expectedIssue: "string does not match ^https://",
-  },
-  {
-    name: "pins LET as required-supported",
-    mutate: (contract) => {
+    "string does not match ^https://",
+  ],
+  [
+    "pins LET as required-supported",
+    (contract) => {
       const letEntry = contract.functions.find((entry) => entry.canonical === "LET");
       if (letEntry) letEntry.contractStatus = "supported";
     },
-    expectedIssue: "LET must remain required-supported",
-  },
-  {
-    name: "rejects repository-escaping evidence paths",
-    mutate: (contract) => {
+    "LET must remain required-supported",
+  ],
+  [
+    "rejects repository-escaping evidence paths",
+    (contract) => {
       const profile = contract.implementationProfiles["implemented-assisted"];
       const evidence = profile?.evidence as Record<string, unknown> | undefined;
       if (evidence) evidence.paths = ["../outside"];
     },
-    expectedIssue: "string does not match ^(packages|test|scripts)/",
-  },
-  {
-    name: "rejects an unrecognized engine build",
-    mutate: (contract) => {
-      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
-      if (formula) formula.builds = ["@sheetwrite/unknown"];
-    },
-    expectedIssue: "value is outside the closed enum",
-  },
-  {
-    name: "rejects moving an optional distribution into the default build",
-    mutate: (contract) => {
+    "string does not match ^(packages|test|scripts)/",
+  ],
+  [
+    "rejects moving an optional distribution into the default build",
+    (contract) => {
       const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
       if (formula) formula.builds.push("@sheetwrite/wasm");
     },
-    expectedIssue: "parser/inventory drift: missing NORM.DIST",
-  },
-  {
-    name: "rejects a built function that formula help would not list",
-    mutate: (contract) => {
+    "parser/inventory drift: missing NORM.DIST",
+  ],
+  [
+    "rejects a built function that formula help would not list",
+    (contract) => {
       const formula = contract.functions.find((entry) => entry.canonical === "POW");
       if (formula) formula.implementation = "parser-declared-target";
     },
-    expectedIssue: "assist/inventory drift: missing POW",
-  },
+    "assist/inventory drift: missing POW",
+  ],
 ];
 
 describe("formula capability contract", () => {
@@ -136,14 +130,12 @@ describe("formula capability contract", () => {
     });
   });
 
-  for (const mutation of MUTATIONS) {
-    test(mutation.name, async () => {
-      const candidate = structuredClone(INVENTORY);
-      mutation.mutate(candidate);
-      const result = await validateFormulaContractRepository(ROOT, candidate);
-      expect(result.issues.some((issue) => issue.includes(mutation.expectedIssue))).toBe(true);
-    });
-  }
+  test.each(MUTATIONS)("%s", async (_name, mutate, expectedIssue) => {
+    const candidate = structuredClone(INVENTORY);
+    mutate(candidate);
+    const result = await validateFormulaContractRepository(ROOT, candidate);
+    expect(result.issues).toContainEqual(expect.stringContaining(expectedIssue));
+  });
 
   // Engine selection is process-global; isolation protects both initialization
   // paths from whichever package another test initialized first.

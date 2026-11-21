@@ -181,13 +181,8 @@ describe("Move or Copy", () => {
 
     expect(grid.copySheet("a").status).toBe("applied");
     expect(names()).toContain("Sales (3)");
-  });
-
-  it("removes the copy on undo", () => {
-    grid.copySheet("b");
-    expect(names()).toEqual(["Sales", "Costs", "Costs (2)", "Old", "Notes"]);
     grid.undo();
-    expect(names()).toEqual(["Sales", "Costs", "Old", "Notes"]);
+    expect(names()).toEqual(["Sales", "Costs", "Sales (2)", "Old", "Notes"]);
   });
 });
 

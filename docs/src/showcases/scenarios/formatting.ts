@@ -8,7 +8,7 @@ import type {
 import { fromXlsxWorkbook, initSheetwrite, toXlsxWorkbook } from "@sheetwrite/core";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
-const FORMATTING_SHEET = "budget";
+export const FORMATTING_SHEET = "budget";
 export const FORMAT_OPTIONS = [
   { label: "General", code: "General" },
   { label: "Number", code: "#,##0.00" },

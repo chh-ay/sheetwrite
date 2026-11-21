@@ -528,9 +528,10 @@ const PAGE_SHOTS: readonly Shot[] = [
   },
   // The formula assist demo's stage and budget: March's total in D13, whose
   // neighbours left and right agree, so `=` in the formula bar shows the rest.
+  // The Formula assist page shows it at the panel size.
   {
     name: "formula-assist",
-    size: "app",
+    size: "panel",
     query: {},
     stagePage: "assist.html",
     steps: async (page) => {
@@ -682,11 +683,13 @@ const CARD_CROPS: Readonly<Record<string, CardCrop>> = {
   // The cell editor with the rest of Americas selected, among the Region entries it matches.
   autocomplete: { parts: [], cells: { top: 0, left: 0, bottom: 4, right: 2 } },
   // The formula bar's ghost text over the first rows of the March column it sums,
-  // faintly filled: the assist grid's columns A to D under the formula bar.
+  // faintly filled: the assist grid's columns A to D under the formula bar, on
+  // the app-sized stage the card was laid out for.
   "formula-assist": {
     parts: [],
     area: { x: 0, y: 67, width: 420, height: 178 },
     cutThrough: [".sheetwrite-shell-formula"],
+    stage: "app",
   },
 };
 

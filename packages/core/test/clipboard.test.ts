@@ -1,27 +1,34 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { parseTsv, rowsToTsv } from "../src/clipboard.js";
 import { DocumentController } from "../src/document-controller.js";
+import { validateDocumentOperationShape } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
+import { rebaseDocumentOperations } from "../src/rebase.js";
+import { encodeRowOrder } from "../src/row-order.js";
 import { Scope } from "../src/scope.js";
-import { SelectionModel } from "../src/selection.js";
+import { SelectionModel, type SelRect } from "../src/selection.js";
 import { SheetwriteStore } from "../src/store.js";
 import type {
   CellAddress,
-  CellScalar,
+  CellFormat,
   CellStyle,
-  CellValue,
   DocumentOp,
+  PasteSpecialOptions,
   Range,
-  Sheet,
   Store,
 } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, range, sheet } from "./fixtures.js";
+
+// Excel, "Move or copy cells and cell contents" and "Paste options":
+// https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e
+// https://support.microsoft.com/en-us/excel/paste-options
 
 beforeAll(async () => {
   await initSheetwrite();
 });
+
 describe("clipboard TSV", () => {
   it("serializes a block, quoting fields with tabs/newlines/quotes", () => {
     expect(rowsToTsv([["a", 1, null]])).toBe("a\t1\t");
@@ -46,138 +53,6 @@ describe("clipboard TSV", () => {
   });
 });
 
-/**
- * In-memory {@link Store} stand-in exercising exactly the reads the controller
- * makes (`getCell`, `getFormula`, `viewRowCount`) plus a patch sink standing in
- * for `commit`. Formula patches are stored verbatim (never evaluated); literal
- * patches resolve to their own value. Enough to prove the controller's shift,
- * verbatim, values-only, and external-TSV behaviors without the WASM engine.
- */
-class FakeStore {
-  private readonly cells = new Map<
-    string,
-    { value: CellValue; resolved: CellScalar; style: CellStyle }
-  >();
-  readonly rowCount = 100;
-
-  private key(addr: CellAddress): string {
-    return `${addr.sheet}:${addr.row}:${addr.col}`;
-  }
-
-  seed(
-    row: number,
-    col: number,
-    value: CellValue,
-    resolved: CellScalar,
-    style: CellStyle = {},
-  ): void {
-    this.cells.set(this.key({ sheet: "s1", row, col }), { value, resolved, style });
-  }
-
-  getCell(addr: CellAddress): { resolved: CellScalar; style: CellStyle } {
-    const cell = this.cells.get(this.key(addr));
-    return { resolved: cell?.resolved ?? null, style: cell?.style ?? {} };
-  }
-
-  getFormula(addr: CellAddress): string | null {
-    const cell = this.cells.get(this.key(addr));
-    return cell?.value.kind === "formula" ? cell.value.src : null;
-  }
-
-  getRefTarget(addr: CellAddress): CellAddress | null {
-    const cell = this.cells.get(this.key(addr));
-    return cell?.value.kind === "ref" ? cell.value.target : null;
-  }
-
-  viewRowCount(): number {
-    return this.rowCount;
-  }
-
-  apply(patches: DocumentOp[]): void {
-    for (const patch of patches) {
-      if (patch.op === "set") {
-        const resolved = patch.value.kind === "literal" ? patch.value.value : null;
-        this.cells.set(this.key(patch.addr), {
-          value: patch.value,
-          resolved,
-          style: patch.style ?? {},
-        });
-        continue;
-      }
-      if (patch.op === "setBlock") {
-        const formulas = new Map(patch.block.formulas ?? []);
-        const refs = new Map(patch.block.refs ?? []);
-        const styles = patch.block.styleTable ?? [];
-        const styleIds = patch.block.styleIds;
-        for (let row = 0; row < patch.block.rowCount; row++) {
-          for (let col = 0; col < patch.block.colCount; col++) {
-            const offset = row * patch.block.colCount + col;
-            const value: CellValue = formulas.has(offset)
-              ? { kind: "formula", src: formulas.get(offset)! }
-              : refs.has(offset)
-                ? { kind: "ref", target: refs.get(offset)! }
-                : { kind: "literal", value: patch.block.values[offset]! };
-            const addr = {
-              sheet: patch.range.sheet,
-              row: Math.min(patch.range.start.row, patch.range.end.row) + row,
-              col: Math.min(patch.range.start.col, patch.range.end.col) + col,
-            };
-            this.cells.set(this.key(addr), {
-              value,
-              resolved: value.kind === "literal" ? value.value : null,
-              style: styleIds ? (styles[styleIds[offset]!] ?? {}) : {},
-            });
-          }
-        }
-        continue;
-      }
-      if (patch.op === "clearRange") {
-        const r0 = Math.min(patch.range.start.row, patch.range.end.row);
-        const r1 = Math.max(patch.range.start.row, patch.range.end.row);
-        const c0 = Math.min(patch.range.start.col, patch.range.end.col);
-        const c1 = Math.max(patch.range.start.col, patch.range.end.col);
-        for (let row = r0; row <= r1; row++) {
-          for (let col = c0; col <= c1; col++) {
-            const addr = { sheet: patch.range.sheet, row, col };
-            const existing = this.cells.get(this.key(addr));
-            this.cells.set(this.key(addr), {
-              value:
-                patch.contents === false
-                  ? (existing?.value ?? { kind: "literal", value: null })
-                  : { kind: "literal", value: null },
-              resolved: patch.contents === false ? (existing?.resolved ?? null) : null,
-              style: patch.style === false ? (existing?.style ?? {}) : {},
-            });
-          }
-        }
-      }
-      if (patch.op === "moveCells") {
-        // Moves each cell verbatim; reference rewriting is the engine's.
-        const r0 = Math.min(patch.range.start.row, patch.range.end.row);
-        const r1 = Math.max(patch.range.start.row, patch.range.end.row);
-        const c0 = Math.min(patch.range.start.col, patch.range.end.col);
-        const c1 = Math.max(patch.range.start.col, patch.range.end.col);
-        const moved: Array<
-          [CellAddress, { value: CellValue; resolved: CellScalar; style: CellStyle }]
-        > = [];
-        for (let row = r0; row <= r1; row++) {
-          for (let col = c0; col <= c1; col++) {
-            const key = this.key({ sheet: patch.range.sheet, row, col });
-            const cell = this.cells.get(key);
-            this.cells.delete(key);
-            if (!cell) continue;
-            moved.push([
-              { sheet: patch.to.sheet, row: patch.to.row + row - r0, col: patch.to.col + col - c0 },
-              cell,
-            ]);
-          }
-        }
-        for (const [addr, cell] of moved) this.cells.set(this.key(addr), cell);
-      }
-    }
-  }
-}
-
 class FakeClipboardItem {
   readonly types: string[];
 
@@ -191,568 +66,440 @@ class FakeClipboardItem {
   }
 }
 
-interface Harness {
-  controller: ClipboardController;
-  /** The grid scope the controller runs under; closing it is the grid's destroy. */
-  lifetime: Scope;
-  store: FakeStore;
-  sheet: Sheet;
-  selection: SelectionModel;
-  /** CommitReasons the controller passed to `deps.commit`, in order. */
-  commitReasons: string[];
-  select: (row: number, col: number) => void;
-  setSystemClipboard: (text: string) => void;
-  setReadOnly: (value: boolean) => void;
-  /** The cut marks the controller reported, in order. */
-  cutMarks: Array<Range | null>;
-  /** Why the controller refused each paste, in order. */
-  refusals: string[];
+/** Replace the browser clipboard with `value`. */
+function useClipboard(value: object): void {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value });
 }
 
-function makeHarness(
+/** A clipboard item that holds `text` as `type`. */
+function item(type: string, text: string): FakeClipboardItem {
+  return new FakeClipboardItem({ [type]: new Blob([text], { type }) });
+}
+
+const ROWS = 30;
+const harnesses: Array<{ close: () => void }> = [];
+afterEach(() => {
+  for (const harness of harnesses.splice(0)) harness.close();
+});
+
+/**
+ * A grid's clipboard over a real store with sheets `s1` ("Data") and `s2`
+ * ("Summary"), both 30 rows by A:D of `columnType` (number by default). With
+ * `nativeFormatsOnly`, the clipboard takes only plain text and HTML, as
+ * Firefox's and Safari's do: a write with another format fails.
+ */
+function clipboardHarness(
   options: {
-    mergeAnchorAt?: (
-      row: number,
-      col: number,
-    ) => {
-      r0: number;
-      c0: number;
-      r1: number;
-      c1: number;
-    } | null;
-    toDataRow?: (viewRow: number) => number;
+    nativeFormatsOnly?: boolean;
+    maxRowsPerSheet?: number;
+    columnType?: CellFormat;
+    mergeAnchorAt?: (row: number, col: number) => SelRect | null;
+    /** Give the controller a store without the packed read, as a custom store may be. */
+    perCellReads?: boolean;
   } = {},
-): Harness {
-  const clip: { text: string; items: FakeClipboardItem[] } = { text: "", items: [] };
+) {
+  const clip: { items: FakeClipboardItem[]; text: string } = { items: [], text: "" };
   Object.defineProperty(globalThis, "ClipboardItem", {
     configurable: true,
     value: FakeClipboardItem,
   });
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: {
-      write: (items: FakeClipboardItem[]) => {
-        clip.items = items;
-        return Promise.resolve();
-      },
-      read: () => Promise.resolve(clip.items),
-      writeText: (text: string) => {
-        clip.text = text;
-        return Promise.resolve();
-      },
-      readText: () => Promise.resolve(clip.text),
+  useClipboard({
+    write: (items: FakeClipboardItem[]) => {
+      const native = ["text/plain", "text/html"];
+      if (
+        options.nativeFormatsOnly &&
+        items.some((written) => written.types.some((type) => !native.includes(type)))
+      ) {
+        return Promise.reject(new DOMException("Type not supported", "NotAllowedError"));
+      }
+      clip.items = items;
+      return Promise.resolve();
     },
+    read: () => Promise.resolve(clip.items),
+    writeText: (text: string) => {
+      clip.text = text;
+      return Promise.resolve();
+    },
+    readText: () => Promise.resolve(clip.text),
   });
 
-  const store = new FakeStore();
+  const typed = (id: string, name: string) => {
+    const base = sheet(id, ROWS);
+    const columns = base.columns.map((column) => ({
+      ...column,
+      type: options.columnType ?? column.type,
+    }));
+    return { ...base, name, columns };
+  };
+  const store = new SheetwriteStore(
+    { activeSheet: "s1", sheets: [typed("s1", "Data"), typed("s2", "Summary")] },
+    undefined,
+    options.maxRowsPerSheet === undefined
+      ? {}
+      : { snapshotResourceLimits: { maxRowsPerSheet: options.maxRowsPerSheet } },
+  );
+  const document = new DocumentController({
+    store,
+    loadable: store,
+    readOnly: () => false,
+    epoch: () => 0,
+    materializeVirtualColumns: (patches) => patches,
+    onMutationRejected: () => {},
+    onHistoryApplied: () => {},
+  });
+  const selection = new SelectionModel(ROWS, 0, 3);
   const lifetime = new Scope();
-  const sheet = makeWorkbook(100).sheets[0]!; // columns: name(text), amount(number), city(text)
-  const selection = new SelectionModel(100, 0, 2);
-  let readOnly = false;
-
-  const commitReasons: string[] = [];
-  const cutMarks: Array<Range | null> = [];
+  let activeSheet = "s1";
+  const marks: Array<Range | null> = [];
   const refusals: string[] = [];
-  const controller = new ClipboardController({
+  const asked: boolean[] = [];
+  const sheetOf = (id: string) =>
+    store.getWorkbook().sheets.find((candidate) => candidate.id === id)!;
+  const reads = options.perCellReads
+    ? (new Proxy(store, {
+        get: (target, key) => {
+          if (key === "getClipboardWindow") return undefined;
+          const value: unknown = Reflect.get(target, key, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as Store)
+    : store;
+  const clipboard = new ClipboardController({
     lifetime,
-    store: store as unknown as Store,
+    store: reads,
     selection: () => selection,
-    activeSheet: () => "s1",
-    sheet: () => sheet,
-    colIndices: () => [0, 1, 2],
-    readOnly: () => readOnly,
+    activeSheet: () => activeSheet,
+    sheet: () => sheetOf(activeSheet),
+    colIndices: () => [0, 1, 2, 3],
+    readOnly: () => false,
     mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
-    toDataRow: options.toDataRow ?? ((viewRow) => viewRow),
-    toViewRow: (dataRow) => dataRow,
+    toDataRow: (row) => row,
+    toViewRow: (row) => row,
     undo: () => {
       throw new Error("This harness has no undo history");
     },
     lastUndo: () => null,
-    // A harness with its own row order stands for a sorted or filtered view.
-    rowSpan: (first, last) => (options.toDataRow ? null : { first, last }),
-    commit: (patches, reason) => {
-      commitReasons.push(reason);
-      store.apply(patches);
-      for (const patch of patches) {
-        if (patch.op === "setHyperlink") {
-          const links = sheet.hyperlinks ?? [];
-          const index = links.findIndex((candidate) => candidate.id === patch.hyperlink.id);
-          if (index < 0) sheet.hyperlinks = [...links, structuredClone(patch.hyperlink)];
-          else {
-            const next = [...links];
-            next[index] = structuredClone(patch.hyperlink);
-            sheet.hyperlinks = next;
-          }
-        } else if (patch.op === "removeHyperlink") {
-          sheet.hyperlinks = sheet.hyperlinks?.filter((candidate) => candidate.id !== patch.id);
-        }
-      }
-      return { status: "applied", epoch: 0, transaction: { patches } };
-    },
-    onCutChange: (range) => cutMarks.push(range),
-    onPasteRefused: (reason) => refusals.push(reason),
+    rowSpan: (first, last) => ({ first, last }),
+    commit: (patches, reason) => document.commit(patches, reason),
+    onCutChange: (cut) => marks.push(cut),
     loadPasteSpecial: () => import("../src/paste-special.js"),
-    askPasteSpecial: async () => null,
-    sheetName: () => "Sheet 1",
-  });
-
-  return {
-    controller,
-    lifetime,
-    store,
-    sheet,
-    selection,
-    commitReasons,
-    cutMarks,
-    refusals,
-    select: (row, col) => selection.selectCell(row, col),
-    setReadOnly: (value) => {
-      readOnly = value;
+    askPasteSpecial: async (ownCopy) => {
+      asked.push(ownCopy);
+      return null;
     },
-    setSystemClipboard: (text) => {
-      clip.text = text;
-      clip.items = [];
+    sheetName: (id) => sheetOf(id)?.name,
+    onPasteRefused: (reason) => refusals.push(reason),
+  });
+  const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
+
+  const at = (row: number, col: number, sheetId = "s1"): CellAddress => ({
+    sheet: sheetId,
+    row,
+    col,
+  });
+  const select = (r0: number, c0: number, r1 = r0, c1 = c0) => {
+    selection.selectCell(r0, c0);
+    if (r1 !== r0 || c1 !== c0) selection.extendTo(r1, c1);
+  };
+  const harness = {
+    store,
+    document,
+    clipboard,
+    lifetime,
+    marks,
+    refusals,
+    asked,
+    clip,
+    at,
+    select,
+    sheetOf,
+    value: (row: number, col: number, sheetId?: string) =>
+      store.getCell(at(row, col, sheetId)).resolved,
+    formula: (row: number, col: number, sheetId?: string) =>
+      store.getFormula(at(row, col, sheetId)),
+    style: (row: number, col: number) => store.getCell(at(row, col)).style,
+    apply: (patches: DocumentOp[]) => document.commit(patches, "api"),
+    /** Set a cell of `s1`; a string that starts with `=` is a formula. */
+    set: (row: number, col: number, input: number | string, style?: CellStyle) =>
+      document.commit(
+        [
+          {
+            op: "set",
+            addr: at(row, col),
+            value:
+              typeof input === "string" && input.startsWith("=")
+                ? { kind: "formula", src: input }
+                : { kind: "literal", value: input },
+            style,
+          },
+        ],
+        "edit-programmatic",
+      ),
+    copy: async (r0: number, c0: number, r1 = r0, c1 = c0) => {
+      select(r0, c0, r1, c1);
+      expect(await clipboard.copy()).toBe("done");
+    },
+    paste: (row: number, col: number) => {
+      select(row, col);
+      return clipboard.paste();
+    },
+    pasteSpecial: (options: PasteSpecialOptions, row: number, col: number) => {
+      select(row, col);
+      return clipboard.pasteSpecial(options);
+    },
+    showSheet: (id: string) => {
+      activeSheet = id;
+    },
+    close: () => {
+      stopListening();
+      lifetime.close();
+      document.destroy();
+      store.dispose();
     },
   };
+  harnesses.push(harness);
+  return harness;
 }
 
 describe("ClipboardController", () => {
-  let h: Harness;
-  beforeEach(() => {
-    h = makeHarness();
-  });
-
-  it("copy + paste re-anchors relative refs by the paste displacement", async () => {
-    // Formula at B2 (row 1, col 1); copy, paste two rows down to B4 (row 3).
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
-    h.select(1, 1);
-    await h.controller.copy();
-
-    h.select(3, 1);
-    await h.controller.paste();
-
-    // Relative A1 shifts +2 rows -> A3; absolute-row B$2 keeps its row, same column.
-    expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A3+B$2");
-  });
-
   it("repeats a copied cell over a larger selection, shifting each copy, as Excel does", async () => {
-    h.store.seed(1, 1, { kind: "formula", src: "=A2" }, 0);
-    h.select(1, 1);
-    await h.controller.copy();
+    const h = clipboardHarness();
+    h.set(1, 1, "=A2+B$2");
+    await h.copy(1, 1);
 
-    h.selection.selectCell(3, 1);
-    h.selection.extendTo(5, 2);
-    await h.controller.paste();
+    h.select(3, 1, 5, 2);
+    await h.clipboard.paste();
 
-    expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A4");
-    expect(h.store.getFormula({ sheet: "s1", row: 5, col: 1 })).toBe("=A6");
-    expect(h.store.getFormula({ sheet: "s1", row: 4, col: 2 })).toBe("=B5");
-  });
-
-  it("keeps the source intact when the clipboard rejects a cut", async () => {
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
-    h.select(1, 1);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: () => Promise.reject(new Error("clipboard denied")),
-        readText: () => Promise.resolve(""),
-      },
-    });
-
-    await h.controller.cut();
-
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
+    // Relative A2 shifts with each copy; absolute-row B$2 keeps its row.
+    expect([h.formula(3, 1), h.formula(5, 1), h.formula(4, 2)]).toEqual([
+      "=A4+B$2",
+      "=A6+B$2",
+      "=B5+C$2",
+    ]);
   });
 
   it("marks the captured source when selection changes during the clipboard write", async () => {
+    const h = clipboardHarness();
     const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: () => pendingWrite,
-        readText: () => Promise.resolve(""),
-      },
-    });
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
-    h.store.seed(3, 1, { kind: "literal", value: "keep" }, "keep");
+    useClipboard({ writeText: () => pendingWrite, readText: () => Promise.resolve("") });
+    h.set(1, 1, "=A1+B$2");
+    h.set(3, 1, "keep");
     h.select(1, 1);
 
-    const cut = h.controller.cut();
+    const cut = h.clipboard.cut();
     h.select(3, 1);
     finishWrite();
     await cut;
 
-    expect(h.cutMarks).toEqual([
-      { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
-    ]);
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
-    expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("keep");
-    expect(h.commitReasons).toEqual([]);
+    expect(h.marks).toEqual([range("s1", 1, 1, 1, 1)]);
+    expect(h.formula(1, 1)).toBe("=A1+B$2");
+    expect(h.value(3, 1)).toBe("keep");
   });
 
   it("lets a newer paste stop an older one that is still reading", async () => {
+    const h = clipboardHarness();
     const reads: Array<(text: string) => void> = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        readText: () => {
-          const read = Promise.withResolvers<string>();
-          reads.push(read.resolve);
-          return read.promise;
-        },
+    useClipboard({
+      readText: () => {
+        const read = Promise.withResolvers<string>();
+        reads.push(read.resolve);
+        return read.promise;
       },
     });
 
-    h.select(3, 1);
-    const older = h.controller.paste();
-    h.select(5, 1);
-    const newer = h.controller.paste();
+    const older = h.paste(3, 1);
+    const newer = h.paste(5, 1);
     reads[1]?.("new");
     reads[0]?.("old");
 
     expect(await older).toBe("empty");
     expect(await newer).toBe("done");
-    expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 5, col: 1 }).resolved).toBe("new");
-    expect(h.commitReasons).toEqual(["paste"]);
+    expect([h.value(3, 1), h.value(5, 1)]).toEqual([null, "new"]);
+  });
+
+  it("copies bounded hyperlink metadata with a new stable identity and translated range", async () => {
+    const h = clipboardHarness();
+    const link = {
+      target: { kind: "external" as const, url: "https://example.com/report" },
+      display: "Report",
+      style: { color: "#123456", underline: true },
+    };
+    h.apply([
+      {
+        op: "setHyperlink",
+        sheet: "s1",
+        hyperlink: { id: "source-link", range: range("s1", 0, 0, 0, 0), ...link },
+      },
+    ]);
+    await h.copy(0, 0);
+    await h.paste(2, 0);
+
+    const links = h.sheetOf("s1").hyperlinks ?? [];
+    expect(links).toHaveLength(2);
+    expect(links[1]).toMatchObject({ range: range("s1", 2, 0, 2, 0), ...link });
+    expect(links[1]!.id).not.toBe("source-link");
+  });
+
+  it("preserves signed numbers from external paste", async () => {
+    const h = clipboardHarness();
+    h.clip.text = "text\t-1\r\ntext\t+1";
+    await h.paste(0, 0);
+
+    expect([h.value(0, 1), h.value(1, 1)]).toEqual([-1, 1]);
+  });
+
+  it("serializes covered merge cells as blanks", async () => {
+    const h = clipboardHarness({
+      mergeAnchorAt: (row, col) => (row === 0 && col <= 1 ? { r0: 0, c0: 0, r1: 0, c1: 1 } : null),
+    });
+    h.set(0, 0, "anchor");
+    h.set(0, 1, "covered");
+    await h.copy(0, 0, 0, 1);
+    await h.paste(2, 0);
+
+    expect([h.value(2, 0), h.value(2, 1)]).toEqual(["anchor", null]);
   });
 
   it("keeps a cut source when the grid closes before the clipboard accepts it", async () => {
+    const h = clipboardHarness();
     const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: () => pendingWrite,
-        readText: () => Promise.resolve(""),
-      },
-    });
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
+    useClipboard({ writeText: () => pendingWrite, readText: () => Promise.resolve("") });
+    h.set(1, 1, "=A1+B$2");
     h.select(1, 1);
 
-    const cut = h.controller.cut();
+    const cut = h.clipboard.cut();
     h.lifetime.close();
     finishWrite();
 
     expect(await cut).toBe("empty");
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
-    expect(h.commitReasons).toEqual([]);
-  });
-
-  it("does not clear a read-only cut source", async () => {
-    h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
-    h.select(1, 1);
-    h.setReadOnly(true);
-
-    await h.controller.cut();
-
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
   });
 
   it("pasteValues writes the resolved literal and no formula", async () => {
-    // Formula resolving to 15 at C1 (row 0, col 2).
-    h.store.seed(0, 2, { kind: "formula", src: "=A1+B$2" }, 15);
-    h.select(0, 2);
-    await h.controller.copy();
+    const h = clipboardHarness();
+    h.set(0, 2, "=5*3");
+    await h.copy(0, 2);
 
     h.select(2, 2);
-    await h.controller.pasteValues();
+    await h.clipboard.pasteValues();
 
-    const target = { sheet: "s1", row: 2, col: 2 };
-    expect(h.store.getCell(target).resolved).toBe(15);
-    expect(h.store.getFormula(target)).toBeNull();
-  });
-
-  it("copies bounded hyperlink metadata with a new stable identity and translated range", async () => {
-    h.sheet.hyperlinks = [
-      {
-        id: "source-link",
-        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-        target: { kind: "external", url: "https://example.com/report" },
-        display: "Report",
-        style: { color: "#123456", underline: true },
-      },
-    ];
-    h.select(0, 0);
-    await h.controller.copy();
-    h.select(2, 0);
-    await h.controller.paste();
-    expect(h.sheet.hyperlinks).toHaveLength(2);
-    expect(h.sheet.hyperlinks![1]).toMatchObject({
-      range: { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 0 } },
-      target: { kind: "external", url: "https://example.com/report" },
-      display: "Report",
-      style: { color: "#123456", underline: true },
-    });
-    expect(h.sheet.hyperlinks![1]!.id).not.toBe("source-link");
-  });
-
-  it("preserves signed numbers from external paste", async () => {
-    h.setSystemClipboard("text\t-1\r\ntext\t+1");
-    h.select(0, 0);
-    await h.controller.paste();
-
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(-1);
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(1);
+    expect([h.value(2, 2), h.formula(2, 2)]).toEqual([15, null]);
   });
 
   it("neutralizes injection prefixes in external text, never producing a formula", async () => {
-    h.setSystemClipboard("=SUM(A1)\tsafe");
-    h.select(0, 0);
-    await h.controller.paste();
+    const h = clipboardHarness();
+    h.clip.text = "=SUM(A1)\tsafe";
+    await h.paste(0, 0);
 
-    const target = { sheet: "s1", row: 0, col: 0 };
-    expect(h.store.getCell(target).resolved).toBe("'=SUM(A1)");
-    expect(h.store.getFormula(target)).toBeNull();
-  });
-
-  it("preserves formulas and refs from the packed clipboard read", async () => {
-    Object.assign(h.store, {
-      getClipboardWindow: () => ({
-        sheet: "s1",
-        viewRows: { start: 0, end: 1 },
-        dataRows: new Uint32Array([0]),
-        cols: [0, 1],
-        values: [7, 42],
-        styleIds: new Uint32Array([0, 1]),
-        styles: [{ bold: true }, { italic: true }],
-        formulas: [{ offset: 0, source: "=B1" }],
-        refs: [{ offset: 1, target: { sheet: "s1", row: 1, col: 1 } }],
-        ffiCalls: 1,
-        transferredElements: 2,
-      }),
-    });
-    h.selection.selectCell(0, 0);
-    h.selection.extendTo(0, 1);
-    await h.controller.copy();
-
-    h.select(2, 0);
-    await h.controller.paste();
-
-    expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({ bold: true });
-    expect(h.store.getRefTarget({ sheet: "s1", row: 2, col: 1 })).toEqual({
-      sheet: "s1",
-      row: 1,
-      col: 1,
-    });
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).style).toEqual({ italic: true });
-  });
-
-  it("serializes covered merge cells as blanks", async () => {
-    h = makeHarness({
-      mergeAnchorAt: (row, col) => (row === 0 && col <= 1 ? { r0: 0, c0: 0, r1: 0, c1: 1 } : null),
-    });
-    h.store.seed(0, 0, { kind: "literal", value: "anchor" }, "anchor");
-    h.store.seed(0, 1, { kind: "literal", value: "covered" }, "covered");
-    h.selection.selectCell(0, 0);
-    h.selection.extendTo(0, 1);
-    await h.controller.copy();
-    h.select(2, 0);
-    await h.controller.paste();
-
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("anchor");
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBeNull();
+    expect([h.value(0, 0), h.formula(0, 0)]).toEqual(["'=SUM(A1)", null]);
   });
 
   it("resolves 'blocked' on a rejected readText and leaves the store unchanged", async () => {
-    h.store.seed(1, 1, { kind: "literal", value: "keep" }, "keep");
-    h.select(1, 1);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: () => Promise.resolve(),
-        readText: () => Promise.reject(new Error("read denied")),
-      },
-    });
+    const h = clipboardHarness();
+    h.set(1, 1, "keep");
+    useClipboard({ readText: () => Promise.reject(new Error("read denied")) });
 
-    await expect(h.controller.paste()).resolves.toBe("blocked");
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("keep");
+    await expect(h.paste(1, 1)).resolves.toBe("blocked");
+    expect(h.value(1, 1)).toBe("keep");
   });
 
-  it("round-trips formulas and styles through the browser custom clipboard format", async () => {
-    Object.defineProperty(globalThis, "ClipboardItem", {
-      configurable: true,
-      value: FakeClipboardItem,
-    });
-    let written: FakeClipboardItem | null = null;
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        write: (items: FakeClipboardItem[]) => {
-          written = items[0] ?? null;
-          return Promise.resolve();
+  it.each([false, true])(
+    "round-trips formulas, refs and styles through the browser custom clipboard format (per-cell reads: %p)",
+    async (perCellReads) => {
+      const h = clipboardHarness({ perCellReads });
+      h.set(0, 0, "=B1", { bold: true, backgroundColor: "#abcdef" });
+      h.apply([
+        {
+          op: "set",
+          addr: h.at(0, 1),
+          value: { kind: "ref", target: h.at(1, 1) },
+          style: { italic: true },
         },
-        read: () => Promise.resolve(written ? [written] : []),
-        writeText: () => Promise.reject(new Error("text fallback should not run")),
-        readText: () => Promise.reject(new Error("text fallback should not run")),
-      },
-    });
-    h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7, {
-      bold: true,
-      backgroundColor: "#abcdef",
-    });
-    h.select(0, 0);
+      ]);
+      await h.copy(0, 0, 0, 1);
 
-    await expect(h.controller.copy()).resolves.toBe("done");
-    // Assigned by the awaited clipboard.write callback; TS cannot follow that async side effect.
-    const captured = written as unknown as FakeClipboardItem;
-    const types = captured.types;
-    expect(types).toContain("text/plain");
-    expect(types).toContain("text/html");
-    expect(types).toContain(`web ${SHEETWRITE_CLIPBOARD_MIME}`);
-
-    h.select(2, 0);
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({
-      bold: true,
-      backgroundColor: "#abcdef",
-    });
-  });
+      expect(h.clip.items[0]?.types.sort()).toEqual([
+        "text/html",
+        "text/plain",
+        `web ${SHEETWRITE_CLIPBOARD_MIME}`,
+      ]);
+      await expect(h.paste(2, 0)).resolves.toBe("done");
+      expect(h.formula(2, 0)).toBe("=B3");
+      expect(h.style(2, 0)).toEqual({ bold: true, backgroundColor: "#abcdef" });
+      expect(h.store.getRefTarget(h.at(2, 1))).toEqual(h.at(1, 1));
+      expect(h.style(2, 1)).toEqual({ italic: true });
+    },
+  );
 
   it("exports safe colors and both text decorations in copied HTML", async () => {
-    h.store.seed(0, 0, { kind: "literal", value: "styled" }, "styled", {
+    const h = clipboardHarness();
+    h.set(0, 0, "styled", {
       underline: true,
       strikethrough: true,
       color: "red;background-image:url(https://example.test/pixel)",
       backgroundColor: "#123456",
     });
-    h.select(0, 0);
-    await h.controller.copy();
-    const [copied] = await navigator.clipboard.read();
-    if (!copied) throw new Error("copied clipboard entry missing");
-    const html = await (await copied.getType("text/html")).text();
+    await h.copy(0, 0);
+    const html = await (await h.clip.items[0]!.getType("text/html")).text();
 
     expect(html).not.toContain("background-image");
     expect(html).toContain("background-color:#123456");
     expect(html).toContain("text-decoration:underline line-through");
   });
+
   it("hardens every dangerous prefix in plain and preferred HTML while trusted private cells stay exact", async () => {
-    Object.defineProperty(globalThis, "ClipboardItem", {
-      configurable: true,
-      value: FakeClipboardItem,
-    });
-    let written: FakeClipboardItem | null = null;
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        write: (items: FakeClipboardItem[]) => {
-          written = items[0] ?? null;
-          return Promise.resolve();
-        },
-        read: () => Promise.resolve(written ? [written] : []),
-        writeText: () => Promise.reject(new Error("text fallback should not run")),
-        readText: () => Promise.reject(new Error("text fallback should not run")),
-      },
-    });
+    const h = clipboardHarness();
     const originals = [
       ["=cmd", "+1", "-1"],
       ["@x", "\tx", "\rx"],
     ];
-    for (let row = 0; row < originals.length; row++) {
-      for (let column = 0; column < originals[row]!.length; column++) {
-        const value = originals[row]![column]!;
-        h.store.seed(row, column, { kind: "literal", value }, value);
-      }
-    }
-    h.select(0, 0);
-    h.selection.extendTo(1, 2);
+    h.apply(
+      originals.flatMap((row, r) =>
+        row.map((value, c): DocumentOp => ({
+          op: "set",
+          addr: h.at(r, c),
+          value: { kind: "literal", value },
+        })),
+      ),
+    );
+    await h.copy(0, 0, 1, 2);
 
-    await expect(h.controller.copy()).resolves.toBe("done");
-    const captured = written as unknown as FakeClipboardItem;
+    const copied = h.clip.items[0]!;
     const expected = originals.map((row) => row.map((value) => `'${value}`));
-    const plain = await (await captured.getType("text/plain")).text();
-    expect(parseTsv(plain)).toEqual(expected);
-
-    const html = await (await captured.getType("text/html")).text();
+    expect(parseTsv(await (await copied.getType("text/plain")).text())).toEqual(expected);
+    const html = await (await copied.getType("text/html")).text();
     const document = new DOMParser().parseFromString(html, "text/html");
     expect(Array.from(document.querySelectorAll("td"), (cell) => cell.textContent)).toEqual(
       expected.flat(),
     );
     expect(document.querySelector("[data-sheetwrite-formula]")).toBeNull();
-
-    const privateType = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
-    const envelope = JSON.parse(await (await captured.getType(privateType)).text()) as {
-      cells: Array<Array<{ value: { kind: string; value?: CellScalar } }>>;
-    };
+    // Another grid reads the exact cells from the private format.
+    const envelope = JSON.parse(
+      await (await copied.getType(`web ${SHEETWRITE_CLIPBOARD_MIME}`)).text(),
+    ) as { cells: Array<Array<{ value: { value?: unknown } }>> };
     expect(envelope.cells.map((row) => row.map((cell) => cell.value.value))).toEqual(originals);
 
-    h.select(10, 0);
-    await expect(h.controller.paste()).resolves.toBe("done");
-    for (let row = 0; row < originals.length; row++) {
-      for (let column = 0; column < originals[row]!.length; column++) {
-        expect(h.store.getCell({ sheet: "s1", row: row + 10, col: column }).resolved).toBe(
-          originals[row]![column]!,
-        );
-      }
-    }
-  });
-
-  it("falls back from an unavailable web custom format to safe HTML plus text", async () => {
-    Object.defineProperty(globalThis, "ClipboardItem", {
-      configurable: true,
-      value: FakeClipboardItem,
-    });
-    const writes: FakeClipboardItem[] = [];
-    let textWrites = 0;
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        write: ([item]: FakeClipboardItem[]) => {
-          writes.push(item!);
-          return item!.types.some((type) => type.startsWith("web "))
-            ? Promise.reject(new Error("custom format unavailable"))
-            : Promise.resolve();
-        },
-        writeText: () => {
-          textWrites++;
-          return Promise.resolve();
-        },
-      },
-    });
-    h.store.seed(0, 0, { kind: "literal", value: "<safe>" }, "<safe>");
-    h.select(0, 0);
-
-    await expect(h.controller.copy()).resolves.toBe("done");
-    expect(writes).toHaveLength(2);
-    expect(writes[1]!.types.sort()).toEqual(["text/html", "text/plain"]);
-    expect(textWrites).toBe(0);
+    await expect(h.paste(10, 0)).resolves.toBe("done");
+    expect(originals.map((row, r) => row.map((_, c) => h.value(r + 10, c)))).toEqual(originals);
   });
 
   it("pastes every external HTML formula as inert text, including nested dangerous calls", async () => {
+    const h = clipboardHarness();
     const html =
       '<table><tbody><tr><td data-formula="=A1+1" style="font-weight:bold;color:#123456">2</td>' +
       '<td data-formula="=IF(1,WEBSERVICE(&quot;https://example.test&quot;),0)">' +
       '<img src=x onerror="globalThis.__clipboardExecuted=true">formula</td></tr></tbody></table>';
-    const item = new FakeClipboardItem({
-      "text/html": new Blob([html], { type: "text/html" }),
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([item]),
-        readText: () => Promise.reject(new Error("HTML should be handled first")),
-      },
-    });
-    h.select(1, 0);
+    h.clip.items = [item("text/html", html)];
 
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("'=A1+1");
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).style).toMatchObject({
-      bold: true,
-      color: "#123456",
-    });
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toStartWith(
-      "'=IF(1,WEBSERVICE",
-    );
+    await expect(h.paste(1, 0)).resolves.toBe("done");
+    expect([h.formula(1, 0), h.value(1, 0)]).toEqual([null, "'=A1+1"]);
+    expect(h.style(1, 0)).toMatchObject({ bold: true, color: "#123456" });
+    expect(h.formula(1, 1)).toBeNull();
+    expect(h.value(1, 1)).toStartWith("'=IF(1,WEBSERVICE");
     expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
   });
 
   it("keeps the cells Excel's HTML marks as text as text in general columns, as Excel does", async () => {
-    for (const column of h.sheet.columns) column.type = "general";
+    const h = clipboardHarness({ columnType: "general" });
     // Excel marks a cell in its Text format with mso-number-format:"\@", in a
     // class of the page's style sheet or in the cell's style, and writes x:str
     // on a cell whose value is a string.
@@ -761,158 +508,80 @@ describe("ClipboardController", () => {
       "<tr><td class=xl65>007</td><td style='mso-number-format:\"\\@\"'>1/15/2026</td><td x:str>15%</td></tr>" +
       "<tr><td>007</td><td>1/15/2026</td><td>15%</td></tr>" +
       "</table></body></html>";
-    const item = new FakeClipboardItem({
-      "text/html": new Blob([html], { type: "text/html" }),
-      "text/plain": new Blob(["007\t1/15/2026\t15%\r\n007\t1/15/2026\t15%\r\n"], {
-        type: "text/plain",
+    h.clip.items = [
+      new FakeClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob(["007\t1/15/2026\t15%\r\n007\t1/15/2026\t15%\r\n"], {
+          type: "text/plain",
+        }),
       }),
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { read: () => Promise.resolve([item]) },
-    });
-    const cell = (row: number, col: number) => h.store.getCell({ sheet: "s1", row, col });
+    ];
+    const row = (r: number) => [0, 1, 2].map((col) => h.value(r, col));
+    const formats = (r: number) => [0, 1, 2].map((col) => h.style(r, col).numberFormat);
 
-    h.select(1, 0);
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect([0, 1, 2].map((col) => cell(1, col).resolved)).toEqual(["007", "1/15/2026", "15%"]);
-    expect([0, 1, 2].map((col) => cell(1, col).style.numberFormat)).toEqual(["@", "@", "@"]);
+    await expect(h.paste(1, 0)).resolves.toBe("done");
+    expect(row(1)).toEqual(["007", "1/15/2026", "15%"]);
+    expect(formats(1)).toEqual(["@", "@", "@"]);
     // Cells without the mark still read as General reads a typed entry.
-    expect([0, 1, 2].map((col) => cell(2, col).resolved)).toEqual([7, 46037, 0.15]);
+    expect(row(2)).toEqual([7, 46037, 0.15]);
 
     // Paste Values keeps the text and leaves the format.
     h.select(5, 0);
-    await expect(h.controller.pasteValues()).resolves.toBe("done");
-    expect([0, 1, 2].map((col) => cell(5, col).resolved)).toEqual(["007", "1/15/2026", "15%"]);
-    expect([0, 1, 2].map((col) => cell(5, col).style.numberFormat)).toEqual([
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    await expect(h.clipboard.pasteValues()).resolves.toBe("done");
+    expect(row(5)).toEqual(["007", "1/15/2026", "15%"]);
+    expect(formats(5)).toEqual([undefined, undefined, undefined]);
   });
 
   it("parses signed HTML numbers into a number column before guarding formula text", async () => {
-    const item = new FakeClipboardItem({
-      "text/html": new Blob(["<table><tr><td>-5</td></tr><tr><td>+1</td></tr></table>"], {
-        type: "text/html",
-      }),
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { read: () => Promise.resolve([item]) },
-    });
-    // Column 1 is the number column.
-    h.select(1, 1);
+    const h = clipboardHarness();
+    h.clip.items = [item("text/html", "<table><tr><td>-5</td></tr><tr><td>+1</td></tr></table>")];
 
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(-5);
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(1);
+    await expect(h.paste(1, 1)).resolves.toBe("done");
+    expect([h.value(1, 1), h.value(2, 1)]).toEqual([-5, 1]);
   });
 
   it("does not trust another controller's private clipboard token", async () => {
-    let written: FakeClipboardItem | null = null;
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        write: ([item]: FakeClipboardItem[]) => {
-          written = item ?? null;
-          return Promise.resolve();
-        },
-      },
-    });
-    h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7);
-    h.select(0, 0);
-    await h.controller.copy();
-    const captured = written as unknown as FakeClipboardItem;
+    const h = clipboardHarness();
+    h.set(0, 0, "=B1");
+    await h.copy(0, 0);
 
-    const other = makeHarness();
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([captured]),
-        readText: () => Promise.reject(new Error("custom payload should be handled first")),
-      },
-    });
-    other.select(3, 0);
-    await expect(other.controller.paste()).resolves.toBe("done");
-    expect(other.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBeNull();
-    expect(other.store.getCell({ sheet: "s1", row: 3, col: 0 }).resolved).toBe("'=B1");
+    const other = clipboardHarness();
+    other.clip.items = h.clip.items;
+    await expect(other.paste(3, 0)).resolves.toBe("done");
+    expect([other.formula(3, 0), other.value(3, 0)]).toEqual([null, "'=B1"]);
   });
 
+  const envelope = (cells: unknown[][]) =>
+    JSON.stringify({
+      version: 3,
+      token: "untrusted-token-value",
+      anchor: { row: 0, col: 0 },
+      cells,
+      hyperlinks: [],
+      tsv: "",
+      cut: false,
+    });
+
   it("uses resolved literals for pasteValues from an untrusted rich payload", async () => {
-    const item = new FakeClipboardItem({
-      [SHEETWRITE_CLIPBOARD_MIME]: new Blob(
-        [
-          JSON.stringify({
-            version: 3,
-            token: "untrusted-token-value",
-            anchor: { row: 0, col: 0 },
-            cells: [
-              [
-                {
-                  value: { kind: "formula", src: "=A1+1" },
-                  resolved: 7,
-                  style: { italic: true },
-                },
-              ],
-            ],
-            hyperlinks: [],
-            tsv: "7",
-            cut: false,
-          }),
-        ],
-        { type: SHEETWRITE_CLIPBOARD_MIME },
-      ),
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([item]),
-        readText: () => Promise.reject(new Error("custom payload should be handled first")),
-      },
-    });
+    const h = clipboardHarness();
+    const cell = { value: { kind: "formula", src: "=A1+1" }, resolved: 7, style: { italic: true } };
+    h.clip.items = [item(SHEETWRITE_CLIPBOARD_MIME, envelope([[cell]]))];
     h.select(5, 0);
 
-    await expect(h.controller.pasteValues()).resolves.toBe("done");
-    expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).resolved).toBe(7);
-    expect(h.store.getFormula({ sheet: "s1", row: 5, col: 0 })).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({});
+    await expect(h.clipboard.pasteValues()).resolves.toBe("done");
+    expect([h.value(5, 0), h.formula(5, 0), h.style(5, 0)]).toEqual([7, null, {}]);
   });
 
   describe("applies the pasted-text limits to HTML and another grid's payload", () => {
     const tooWide = 16_385;
-    const offer = (type: string, text: string) => {
-      const item = new FakeClipboardItem({ [type]: new Blob([text], { type }) });
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: {
-          read: () => Promise.resolve([item]),
-          readText: () => Promise.reject(new Error("the rich payload should be read first")),
-        },
-      });
-    };
-    const envelope = (cells: unknown[][]) =>
-      JSON.stringify({
-        version: 3,
-        token: "untrusted-token-value",
-        anchor: { row: 0, col: 0 },
-        cells,
-        hyperlinks: [],
-        tsv: "",
-        cut: false,
-      });
     const literal = { value: { kind: "literal", value: "x" }, resolved: "x", style: {} };
     const padding = " ".repeat(32 * 1024 * 1024);
     const wide = "this paste has 16,385 columns, and a paste can have at most 16,384.";
     const large = "this paste has more than 32 MB of text, the most a paste can have.";
+    const wideHtml = `<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`;
 
     it.each([
-      [
-        "HTML wider than a sheet",
-        "text/html",
-        `<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`,
-        wide,
-      ],
+      ["HTML wider than a sheet", "text/html", wideHtml, wide],
       [
         "HTML over the byte limit",
         "text/html",
@@ -932,194 +601,89 @@ describe("ClipboardController", () => {
         large,
       ],
     ])("refuses %s, as pasted text is refused", async (_name, type, text, reason) => {
-      offer(type, text);
-      h.select(1, 0);
+      const h = clipboardHarness();
+      h.clip.items = [item(type, text)];
 
-      expect(await h.controller.paste()).toBe("rejected");
+      expect(await h.paste(1, 0)).toBe("rejected");
       expect(h.refusals).toEqual([reason]);
-      expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).not.toBe("x");
+      expect(h.value(1, 0)).not.toBe("x");
     });
 
     it("refuses an oversized payload in Paste Special too", async () => {
-      offer(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(tooWide).fill(literal)]));
-      h.select(1, 0);
+      const h = clipboardHarness();
+      h.clip.items = [item(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(tooWide).fill(literal)]))];
 
-      expect(await h.controller.pasteSpecial({ paste: "values" })).toBe("rejected");
+      expect(await h.pasteSpecial({ paste: "values" }, 1, 0)).toBe("rejected");
       expect(h.refusals).toEqual([wide]);
     });
 
     it("pastes the text beside HTML past the limits, as Excel's large HTML gives way to its text", async () => {
-      const item = new FakeClipboardItem({
-        "text/html": new Blob([`<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`], {
-          type: "text/html",
+      const h = clipboardHarness();
+      h.clip.items = [
+        new FakeClipboardItem({
+          "text/html": new Blob([wideHtml], { type: "text/html" }),
+          "text/plain": new Blob(["from text"], { type: "text/plain" }),
         }),
-        "text/plain": new Blob(["from text"], { type: "text/plain" }),
-      });
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: { read: () => Promise.resolve([item]) },
-      });
-      h.select(1, 0);
+      ];
 
-      await expect(h.controller.paste()).resolves.toBe("done");
-      expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("from text");
+      await expect(h.paste(1, 0)).resolves.toBe("done");
+      expect(h.value(1, 0)).toBe("from text");
     });
 
     it("pastes this grid's own copy whatever the size of its payload", async () => {
-      let written: FakeClipboardItem | undefined;
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: {
-          write: ([item]: FakeClipboardItem[]) => {
-            written = item;
-            return Promise.resolve();
-          },
-        },
-      });
-      h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7);
-      h.select(0, 0);
-      await h.controller.copy();
+      const h = clipboardHarness();
+      h.set(0, 0, "=B1");
+      await h.copy(0, 0);
       const type = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
-      // The write happens in a callback, which narrowing does not see.
-      const captured = written as FakeClipboardItem | undefined;
-      if (!captured) throw new Error("the copy wrote nothing");
-      const json = await (await captured.getType(type)).text();
-      offer(type, `${json}${padding}`);
-      h.select(3, 0);
+      const json = await (await h.clip.items[0]!.getType(type)).text();
+      h.clip.items = [item(type, `${json}${padding}`)];
 
-      await expect(h.controller.paste()).resolves.toBe("done");
-      expect(h.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBe("=B4");
+      await expect(h.paste(3, 0)).resolves.toBe("done");
+      expect(h.formula(3, 0)).toBe("=B4");
     });
   });
 });
 
 describe("spill clipboard commands", () => {
+  /** B2 holds =SEQUENCE(3), which spills into B3:B4. */
   function spillHarness() {
-    const fake = makeHarness();
-    fake.lifetime.close();
-    const workbook = makeWorkbook(10);
-    const sheet = workbook.sheets[0];
-    if (sheet === undefined) throw new Error("Missing clipboard fixture sheet");
-    const store = new SheetwriteStore(workbook);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 1 },
-          value: { kind: "formula", src: "=SEQUENCE(3)" },
-        },
-      ],
-    });
-    const document = new DocumentController({
-      store,
-      loadable: store,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {},
-    });
-    const selection = new SelectionModel(10, 0, 2);
-    const lifetime = new Scope();
-    const clipboard = new ClipboardController({
-      lifetime,
-      store,
-      selection: () => selection,
-      activeSheet: () => "s1",
-      sheet: () => sheet,
-      colIndices: () => [0, 1, 2],
-      readOnly: () => false,
-      mergeAnchorAt: () => null,
-      toDataRow: (row) => row,
-      toViewRow: (row) => row,
-      undo: () => {
-        throw new Error("This harness has no undo history");
-      },
-      lastUndo: () => null,
-      rowSpan: (first, last) => ({ first, last }),
-      commit: (patches, reason) => {
-        return document.commit(patches, reason);
-      },
-      onCutChange: () => {},
-      loadPasteSpecial: () => import("../src/paste-special.js"),
-      askPasteSpecial: async () => null,
-      sheetName: () => "Sheet 1",
-    });
-    const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
-    return {
-      store,
-      document,
-      clipboard,
-      selection,
-      close: () => {
-        stopListening();
-        lifetime.close();
-        document.destroy();
-        store.dispose();
-      },
-    };
+    const h = clipboardHarness();
+    h.set(1, 1, "=SEQUENCE(3)");
+    return h;
   }
 
   it("does not cut or move a projected child without its anchor", async () => {
-    const harness = spillHarness();
-    try {
-      harness.selection.selectCell(2, 1);
-      expect(await harness.clipboard.cut()).toBe("empty");
-      expect(harness.document.canUndo).toBe(false);
-      expect(harness.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(2);
-      harness.selection.selectCell(6, 1);
-      expect(await harness.clipboard.paste()).toBe("empty");
-      expect(harness.store.getCell({ sheet: "s1", row: 6, col: 1 }).resolved).toBeNull();
-    } finally {
-      harness.close();
-    }
+    const h = spillHarness();
+    h.select(2, 1);
+    expect(await h.clipboard.cut()).toBe("empty");
+    expect(h.value(2, 1)).toBe(2);
+    expect(await h.paste(6, 1)).toBe("empty");
+    expect(h.value(6, 1)).toBeNull();
   });
 
   it("moves the anchor's formula on paste, with undo and redo", async () => {
-    const harness = spillHarness();
-    const anchor = { sheet: "s1", row: 1, col: 1 };
-    const destination = { ...anchor, row: 6 };
-    try {
-      harness.selection.selectCell(1, 1);
-      expect(await harness.clipboard.cut()).toBe("done");
-      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
-      expect(harness.document.canUndo).toBe(false);
-      harness.selection.selectCell(6, 1);
-      expect(await harness.clipboard.paste()).toBe("done");
-      expect(harness.store.getFormula(destination)).toBe("=SEQUENCE(3)");
-      expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
-      expect(harness.store.getCell(anchor).resolved).toBeNull();
-      harness.document.undo();
-      expect(harness.store.getCell(destination).resolved).toBeNull();
-      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
-      harness.document.redo();
-      expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
-    } finally {
-      harness.close();
-    }
+    const h = spillHarness();
+    h.select(1, 1);
+    expect(await h.clipboard.cut()).toBe("done");
+    expect(h.value(2, 1)).toBe(2);
+    expect(await h.paste(6, 1)).toBe("done");
+    expect([h.formula(6, 1), h.value(8, 1), h.value(1, 1)]).toEqual(["=SEQUENCE(3)", 3, null]);
+    h.document.undo();
+    expect([h.value(6, 1), h.value(2, 1)]).toEqual([null, 2]);
+    h.document.redo();
+    expect(h.value(8, 1)).toBe(3);
   });
 
   it("pastes clipboard values into projected children and restores the spill on undo", async () => {
-    const harness = spillHarness();
-    const source = { sheet: "s1", row: 0, col: 0 };
-    const child = { sheet: "s1", row: 2, col: 1 };
-    try {
-      harness.store.applyTransaction({
-        patches: [{ op: "set", addr: source, value: { kind: "literal", value: 99 } }],
-      });
-      harness.selection.selectCell(0, 0);
-      expect(await harness.clipboard.copy()).toBe("done");
-      harness.selection.selectCell(2, 1);
-      expect(await harness.clipboard.paste()).toBe("done");
-      expect(harness.store.getCell(child).resolved).toBe(99);
-      expect(harness.store.getCell({ ...child, row: 1 }).resolved).toBe("#SPILL!");
-      harness.document.undo();
-      expect(harness.store.getCell(child).resolved).toBe(2);
-      harness.document.redo();
-      expect(harness.store.getCell(child).resolved).toBe(99);
-    } finally {
-      harness.close();
-    }
+    const h = spillHarness();
+    h.set(0, 0, 99);
+    await h.copy(0, 0);
+    expect(await h.paste(2, 1)).toBe("done");
+    expect([h.value(2, 1), h.value(1, 1)]).toEqual([99, "#SPILL!"]);
+    h.document.undo();
+    expect(h.value(2, 1)).toBe(2);
+    h.document.redo();
+    expect(h.value(2, 1)).toBe(99);
   });
 });
 
@@ -1166,5 +730,466 @@ describe("SheetwriteStore clipboard bulk reads", () => {
     } finally {
       store.dispose();
     }
+  });
+});
+
+describe("cut and paste", () => {
+  it("marks the cells on cut and moves them, with every reference, on paste (#756)", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+    h.set(1, 0, 2);
+    h.set(0, 1, "=A1*10");
+    h.set(5, 3, "=A1+A2");
+
+    h.select(0, 0, 1, 0);
+    expect(await h.clipboard.cut()).toBe("done");
+    // Nothing changes until the paste.
+    expect([h.value(0, 0), h.value(1, 0)]).toEqual([1, 2]);
+    expect(h.marks).toEqual([range("s1", 0, 0, 1, 0)]);
+
+    expect(await h.paste(19, 0)).toBe("done");
+    expect([h.value(19, 0), h.value(20, 0), h.value(0, 0), h.value(1, 0)]).toEqual([
+      1,
+      2,
+      null,
+      null,
+    ]);
+    expect([h.formula(0, 1), h.formula(5, 3), h.value(5, 3)]).toEqual(["=A20*10", "=A20+A21", 3]);
+    expect(h.marks.at(-1)).toBeNull();
+
+    // One undo step puts everything back, and redo moves it again.
+    h.document.undo();
+    expect([h.value(0, 0), h.value(1, 0), h.value(19, 0)]).toEqual([1, 2, null]);
+    expect([h.formula(0, 1), h.formula(5, 3)]).toEqual(["=A1*10", "=A1+A2"]);
+    h.document.redo();
+    expect([h.formula(5, 3), h.value(20, 0)]).toEqual(["=A20+A21", 2]);
+
+    // The pasted cut is used up, as in Excel.
+    expect(await h.paste(25, 0)).toBe("empty");
+  });
+
+  it("keeps a moved formula pointing at the same cells", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 4);
+    h.set(0, 2, 5);
+    h.set(0, 1, "=A1+C1");
+
+    h.select(0, 0, 0, 1);
+    await h.clipboard.cut();
+    await h.paste(9, 2);
+
+    expect([h.formula(9, 3), h.value(9, 3)]).toEqual(["=C10+C1", 9]);
+  });
+
+  it("moves a block onto part of itself", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+    h.set(1, 0, 2);
+    h.set(2, 0, 3);
+    h.set(0, 3, "=SUM(A1:A3)");
+
+    h.select(0, 0, 2, 0);
+    await h.clipboard.cut();
+    await h.paste(1, 0);
+
+    expect([h.value(0, 0), h.value(1, 0), h.value(2, 0), h.value(3, 0)]).toEqual([null, 1, 2, 3]);
+    expect(h.formula(0, 3)).toBe("=SUM(A2:A4)");
+  });
+
+  it("replaces the cells it lands on, and undo brings them back", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+    h.set(2, 2, 5);
+    h.set(4, 1, "=C3");
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    await h.paste(2, 2);
+    expect([h.value(2, 2), h.formula(4, 1)]).toEqual([1, "=#REF!"]);
+
+    h.document.undo();
+    expect([h.value(0, 0), h.value(2, 2), h.formula(4, 1), h.value(4, 1)]).toEqual([
+      1,
+      5,
+      "=C3",
+      5,
+    ]);
+  });
+
+  it("moves cells, notes and hyperlinks to another sheet", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 3);
+    h.set(1, 0, "=A1*2");
+    h.set(0, 3, "=A2+1");
+    h.apply([
+      { op: "setNote", addr: h.at(0, 0), text: "checked" },
+      {
+        op: "setHyperlink",
+        sheet: "s1",
+        hyperlink: {
+          id: "link",
+          range: range("s1", 1, 0, 1, 0),
+          target: { kind: "external", url: "https://example.com/" },
+        },
+      },
+    ]);
+
+    h.select(0, 0, 1, 0);
+    await h.clipboard.cut();
+    h.showSheet("s2");
+    expect(await h.paste(4, 1)).toBe("done");
+
+    expect(h.value(0, 0)).toBeNull();
+    expect([h.formula(5, 1, "s2"), h.value(5, 1, "s2")]).toEqual(["=B5*2", 6]);
+    expect(h.formula(0, 3)).toBe("=Summary!B6+1");
+    expect(h.sheetOf("s1").notes ?? []).toEqual([]);
+    expect(h.sheetOf("s2").notes).toEqual([{ addr: h.at(4, 1, "s2"), text: "checked" }]);
+    expect(h.sheetOf("s1").hyperlinks ?? []).toEqual([]);
+    expect(h.sheetOf("s2").hyperlinks?.map((link) => link.range)).toEqual([
+      range("s2", 5, 1, 5, 1),
+    ]);
+  });
+
+  it("ends the cut on Esc, a new copy or another edit, and the ended cut does not paste", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    expect(h.clipboard.cancelCut()).toBe(true);
+    expect(h.clipboard.cancelCut()).toBe(false);
+    expect(h.marks).toEqual([expect.anything(), null]);
+    expect(await h.paste(5, 0)).toBe("empty");
+    expect(h.value(0, 0)).toBe(1);
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    h.set(3, 3, 7);
+    expect(h.marks.at(-1)).toBeNull();
+    expect(await h.clipboard.paste()).toBe("empty");
+
+    await h.clipboard.cut();
+    expect(await h.clipboard.copy()).toBe("done");
+    expect(h.marks.at(-1)).toBeNull();
+    // The copy pastes as a copy; the source stays.
+    expect(await h.paste(5, 0)).toBe("done");
+    expect([h.value(0, 0), h.value(5, 0)]).toEqual([1, 1]);
+  });
+
+  it.each<[string, DocumentOp]>([
+    [
+      "sort",
+      {
+        op: "permuteRows",
+        range: range("s1", 0, 0, 2, 3),
+        encoding: "u32le-base64-v1",
+        order: encodeRowOrder(new Uint32Array([2, 0, 1])),
+      },
+    ],
+    [
+      "edit",
+      { op: "set", addr: { sheet: "s1", row: 1, col: 0 }, value: { kind: "literal", value: 9 } },
+    ],
+    ["clear", { op: "clearRange", range: range("s1", 0, 0, 2, 3) }],
+    ["format", { op: "setRangeStyle", range: range("s1", 0, 0, 2, 3), style: { bold: true } }],
+    ["note", { op: "setNote", addr: { sheet: "s1", row: 0, col: 0 }, text: "peer" }],
+  ])(
+    "ends the cut when a peer's %s reaches its cells, and not for other cells (#1074)",
+    async (_name, change) => {
+      const h = clipboardHarness();
+      for (const row of [0, 1, 2]) h.set(row, 0, row + 1);
+      h.select(0, 0, 1, 0);
+      await h.clipboard.cut();
+
+      // A peer's edit beside the cut, or on another sheet, leaves it waiting.
+      h.store.applyTransaction(
+        { patches: [{ op: "set", addr: h.at(5, 2), value: { kind: "literal", value: 1 } }] },
+        { source: "remote" },
+      );
+      h.store.applyTransaction(
+        { patches: [{ op: "set", addr: h.at(0, 0, "s2"), value: { kind: "literal", value: 1 } }] },
+        { source: "remote" },
+      );
+      expect(h.marks).toHaveLength(1);
+
+      expect(h.store.applyTransaction({ patches: [change] }, { source: "remote" }).status).toBe(
+        "applied",
+      );
+      expect(h.marks.at(-1)).toBeNull();
+      const before = [h.value(0, 0), h.value(1, 0), h.value(10, 0)];
+      h.select(10, 0);
+      expect(await h.clipboard.paste()).toBe("empty");
+      expect([h.value(0, 0), h.value(1, 0), h.value(10, 0)]).toEqual(before);
+    },
+  );
+
+  it("pastes another app's clipboard as a plain paste and ends the cut", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    h.clip.items = [item("text/plain", "42")];
+    expect(await h.paste(5, 0)).toBe("done");
+
+    expect([h.value(0, 0), h.value(5, 0)]).toEqual([1, 42]);
+    expect(h.marks.at(-1)).toBeNull();
+  });
+
+  it("moves validation and conditional-format rules inside the block, and undo puts them back", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 4);
+    h.set(0, 1, 1);
+    const format = {
+      range: range("s1", 0, 0, 2, 0),
+      when: { kind: "formula" as const, source: "=A1>B1" },
+      style: { bold: true },
+    };
+    const rule = (id: string, at: Range, values: number[]): DocumentOp => ({
+      op: "setValidationRule",
+      sheet: "s1",
+      rule: { id, range: at, condition: { kind: "list", values }, policy: "warn" },
+    });
+    h.apply([
+      rule("moved", range("s1", 0, 0, 2, 0), [1, 2, 3, 4]),
+      rule("replaced", range("s1", 9, 2, 9, 2), [5]),
+      { op: "setSheetMeta", sheet: "s1", patch: { conditionalFormats: [format] } },
+    ]);
+
+    // A1:B5 lands on C10:D14.
+    h.select(0, 0, 4, 1);
+    await h.clipboard.cut();
+    expect(await h.paste(9, 2)).toBe("done");
+
+    const moved = h.sheetOf("s1");
+    expect(moved.validationRules?.map((rule) => [rule.id, rule.range])).toEqual([
+      ["moved", range("s1", 9, 2, 11, 2)],
+    ]);
+    expect(moved.conditionalFormats).toEqual([
+      { ...format, range: range("s1", 9, 2, 11, 2), when: { kind: "formula", source: "=C10>D10" } },
+    ]);
+
+    h.document.undo();
+    const restored = h.sheetOf("s1");
+    expect(
+      [...(restored.validationRules ?? [])]
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((rule) => [rule.id, rule.range]),
+    ).toEqual([
+      ["moved", range("s1", 0, 0, 2, 0)],
+      ["replaced", range("s1", 9, 2, 9, 2)],
+    ]);
+    expect(restored.conditionalFormats).toEqual([format]);
+  });
+
+  it("does not paste values after a cut, as Excel greys out Paste Special", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    h.select(5, 0);
+    expect(await h.clipboard.pasteValues()).toBe("empty");
+    expect(h.value(5, 0)).toBeNull();
+    // The cut still waits for its paste.
+    expect(await h.clipboard.paste()).toBe("done");
+    expect([h.value(0, 0), h.value(5, 0)]).toEqual([null, 1]);
+  });
+
+  it("moves the cut cells and keeps a copy's formulas in browsers without custom formats (#921)", async () => {
+    const h = clipboardHarness({ nativeFormatsOnly: true });
+    h.set(0, 0, "a");
+    h.set(0, 1, 1);
+    h.set(1, 0, "=B1*2");
+
+    h.select(0, 0, 1, 1);
+    expect(await h.clipboard.cut()).toBe("done");
+    // The fallback writes plain text and HTML; writeText would replace them.
+    expect(h.clip.text).toBe("");
+    expect(await h.paste(0, 2)).toBe("done");
+    expect([h.value(0, 0), h.value(0, 1), h.value(0, 2), h.value(0, 3)]).toEqual([
+      null,
+      null,
+      "a",
+      1,
+    ]);
+    expect(h.formula(1, 2)).toBe("=D1*2");
+
+    await h.copy(0, 2, 1, 3);
+    expect(await h.paste(10, 0)).toBe("done");
+    expect(h.formula(11, 0)).toBe("=B11*2");
+  });
+
+  it("adds the rows a cut needs to move past the last row", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+    h.set(1, 0, 2);
+    h.set(2, 0, 3);
+    h.select(0, 0, 2, 0);
+    await h.clipboard.cut();
+    expect(await h.paste(ROWS - 1, 0)).toBe("done");
+    expect(h.sheetOf("s1").rowCount).toBe(ROWS + 2);
+    expect([h.value(ROWS - 1, 0), h.value(ROWS, 0), h.value(ROWS + 1, 0)]).toEqual([1, 2, 3]);
+    expect(h.value(0, 0)).toBeNull();
+  });
+
+  it("is refused with the sheet's row limit, and changes nothing, when the sheet cannot grow", async () => {
+    const h = clipboardHarness({ maxRowsPerSheet: 40 });
+    h.clip.text = Array.from({ length: 20 }, (_, row) => `${row}`).join("\n");
+    expect(await h.paste(25, 0)).toBe("rejected");
+    expect([h.sheetOf("s1").rowCount, h.value(25, 0)]).toEqual([ROWS, null]);
+    expect(h.refusals).toEqual(["Data cannot grow to 45 rows: the limit is 40."]);
+  });
+});
+
+describe("moveCells operation", () => {
+  const move: DocumentOp = {
+    op: "moveCells",
+    range: range("s1", 0, 0, 1, 0),
+    to: { sheet: "s2", row: 4, col: 1 },
+  };
+
+  it("is a valid document operation", () => {
+    expect(validateDocumentOperationShape(move)).toEqual([]);
+    expect(validateDocumentOperationShape({ ...move, to: { sheet: "s2", row: -1 } })).not.toEqual(
+      [],
+    );
+  });
+
+  it("conflicts with concurrent work on either sheet, and not with other sheets", () => {
+    const onTarget: DocumentOp = {
+      op: "set",
+      addr: { sheet: "s2", row: 20, col: 3 },
+      value: { kind: "literal", value: 1 },
+    };
+    const elsewhere: DocumentOp = { ...onTarget, addr: { sheet: "s3", row: 0, col: 0 } };
+
+    expect(rebaseDocumentOperations([onTarget], [move]).status).toBe("conflict");
+    expect(rebaseDocumentOperations([elsewhere], [move]).status).toBe("rebased");
+  });
+});
+
+describe("Paste Special", () => {
+  it("adds copied values to the target's numbers and keeps the target's formats, as one undo step", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 10, { bold: true });
+    h.set(1, 0, "=A1*2");
+    h.set(0, 2, 1, { italic: true });
+    h.set(1, 2, "=5");
+    await h.copy(0, 0, 1, 0);
+
+    expect(await h.pasteSpecial({ paste: "values", operation: "add" }, 0, 2)).toBe("done");
+    expect([h.value(0, 2), h.value(1, 2)]).toEqual([11, 25]);
+    // A number stays a number; a formula on either side becomes a formula.
+    expect([h.formula(0, 2), h.formula(1, 2)]).toEqual([null, "=(5)+20"]);
+    expect(h.style(0, 2)).toEqual({ italic: true });
+
+    h.document.undo();
+    expect([h.value(0, 2), h.formula(1, 2)]).toEqual([1, "=5"]);
+  });
+
+  it("transposes, skips blanks and shifts each formula by its own move", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 1);
+    h.set(1, 0, "=A1");
+    h.set(1, 1, 4);
+    h.set(5, 2, "keep");
+    await h.copy(0, 0, 1, 1);
+
+    expect(await h.pasteSpecial({ transpose: true, skipBlanks: true }, 4, 2)).toBe("done");
+    // A1:B2 lands on C5:D6 turned: A2 moves to D5, and its =A1 follows to =D4.
+    expect([h.value(4, 2), h.formula(4, 3), h.value(5, 3)]).toEqual([1, "=D4", 4]);
+    // B1 is blank, so C6 keeps its value.
+    expect(h.value(5, 2)).toBe("keep");
+  });
+
+  it("pastes formats, notes, column widths or validation alone", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 7, { bold: true, numberFormat: "0.00" });
+    h.apply([
+      { op: "setNote", addr: h.at(0, 0), text: "Checked" },
+      { op: "setColumn", sheet: "s1", col: 0, patch: { width: 150 } },
+      {
+        op: "setValidationRule",
+        sheet: "s1",
+        rule: {
+          id: "rule-1",
+          range: range("s1", 0, 0, 0, 0),
+          condition: { kind: "any" },
+          policy: "reject",
+        },
+      },
+    ]);
+    h.set(3, 2, 3);
+    await h.copy(0, 0);
+    const meta = () => h.sheetOf("s1");
+
+    expect(await h.pasteSpecial({ paste: "formats" }, 3, 2)).toBe("done");
+    expect([h.value(3, 2), h.style(3, 2)]).toEqual([3, { bold: true, numberFormat: "0.00" }]);
+    expect(await h.pasteSpecial({ paste: "comments" }, 3, 2)).toBe("done");
+    expect(meta().notes?.map((note) => [note.addr.row, note.addr.col, note.text])).toEqual([
+      [0, 0, "Checked"],
+      [3, 2, "Checked"],
+    ]);
+    expect(await h.pasteSpecial({ paste: "columnWidths" }, 3, 2)).toBe("done");
+    expect(meta().columns[2]?.width).toBe(150);
+    expect(await h.pasteSpecial({ paste: "validation" }, 3, 2)).toBe("done");
+    expect(meta().validationRules?.map((rule) => rule.range)).toEqual([
+      range("s1", 0, 0, 0, 0),
+      range("s1", 3, 2, 3, 2),
+    ]);
+    expect(h.value(3, 2)).toBe(3);
+  });
+
+  it("links to the copied cells: absolute for one cell, with the sheet's name from another sheet", async () => {
+    const h = clipboardHarness();
+    h.set(0, 0, 5);
+    h.set(1, 0, 6);
+    await h.copy(0, 0);
+    expect(await h.pasteSpecial({ link: true }, 0, 3)).toBe("done");
+    expect(h.formula(0, 3)).toBe("=$A$1");
+
+    await h.copy(0, 0, 1, 0);
+    h.showSheet("s2");
+    expect(await h.pasteSpecial({ link: true }, 2, 1)).toBe("done");
+    expect([h.formula(2, 1, "s2"), h.formula(3, 1, "s2")]).toEqual(["=Data!A1", "=Data!A2"]);
+    expect([h.value(2, 1, "s2"), h.value(3, 1, "s2")]).toEqual([5, 6]);
+  });
+
+  it("carries notes and conditional formats with Paste, as Excel's All, and merges them on request", async () => {
+    const h = clipboardHarness();
+    const rule = (r0: number, r1: number) => ({
+      range: range("s1", r0, 0, r1, 0),
+      when: { kind: "greaterThan" as const, value: 1 },
+      style: { bold: true },
+    });
+    h.set(0, 0, 2);
+    h.apply([
+      { op: "setNote", addr: h.at(0, 0), text: "Source" },
+      { op: "setNote", addr: h.at(10, 0), text: "Target" },
+      { op: "setSheetMeta", sheet: "s1", patch: { conditionalFormats: [rule(0, 0), rule(9, 11)] } },
+    ]);
+    await h.copy(0, 0);
+    const meta = () => h.sheetOf("s1");
+
+    expect(await h.paste(10, 0)).toBe("done");
+    expect(meta().notes?.find((note) => note.addr.row === 10)?.text).toBe("Source");
+    // A10:A12's rule gives up A11, which takes the copied rule.
+    expect(
+      meta().conditionalFormats?.map((format) => [format.range.start.row, format.range.end.row]),
+    ).toEqual([
+      [0, 0],
+      [9, 9],
+      [11, 11],
+      [10, 10],
+    ]);
+
+    expect(await h.pasteSpecial({ paste: "allMergingConditionalFormats" }, 9, 0)).toBe("done");
+    expect(meta().conditionalFormats?.length).toBe(5);
+
+    // With `ask`, the dialog chooses; Cancel pastes nothing.
+    expect(await h.pasteSpecial({ ask: true }, 15, 0)).toBe("empty");
+    expect(h.asked).toEqual([true]);
+    expect(h.value(15, 0)).toBeNull();
   });
 });

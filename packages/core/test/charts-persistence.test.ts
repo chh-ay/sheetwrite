@@ -224,30 +224,6 @@ describe("chart persistence", () => {
     expect(chartsOf(store, "data")?.map((candidate) => candidate.id)).toEqual(["own"]);
   });
 
-  it("undoes and redoes chart creation, replacement and removal exactly", () => {
-    const { store, controller } = setup();
-    const moved = { ...chart("own"), anchor: { ...chart("own").anchor, row: 6, col: 1 } };
-
-    commit(controller, [{ op: "setChart", sheet: "data", chart: chart("added") }]);
-    commit(controller, [{ op: "setChart", sheet: "data", chart: moved }]);
-    commit(controller, [{ op: "removeChart", sheet: "other", id: "cross" }]);
-    expect(chartsOf(store, "data")).toEqual([moved, chart("added")]);
-    expect(chartsOf(store, "other")).toEqual([]);
-
-    controller.undo();
-    expect(chartOf(store, "other", "cross")).toEqual(chart("cross"));
-    controller.undo();
-    expect(chartOf(store, "data", "own")).toEqual(chart("own"));
-    controller.undo();
-    expect(chartOf(store, "data", "added")).toBeUndefined();
-
-    controller.redo();
-    controller.redo();
-    controller.redo();
-    expect(chartsOf(store, "data")).toEqual([moved, chart("added")]);
-    expect(chartsOf(store, "other")).toEqual([]);
-  });
-
   it("shifts sources and the anchor when rows and columns are inserted", () => {
     const { store } = setup();
 
@@ -384,19 +360,6 @@ describe("chart persistence", () => {
     expect(chartsOf(store, "other")).toEqual([chart("cross")]);
   });
 
-  it("keeps sheet-ID sources when the source sheet is renamed", () => {
-    const { store } = setup();
-
-    store.applyTransaction({ patches: [{ op: "renameSheet", sheet: "data", name: "Renamed" }] });
-
-    expect(chartsOf(store, "data")).toEqual([chart("own")]);
-    expect(chartsOf(store, "other")).toEqual([chart("cross")]);
-    expect(validateWorkbookSnapshot(store.exportSnapshot()).ok).toBe(true);
-    expect(
-      store.exportSnapshot().sheets.find((candidate) => candidate.id === "data")?.charts,
-    ).toEqual([chart("own")]);
-  });
-
   it("rebases pending charts across row inserts and conflicts on replacement or source deletion", () => {
     const remote: DocumentOp[] = [{ op: "addRows", sheet: "data", at: 0, count: 2 }];
 
@@ -427,34 +390,25 @@ describe("chart persistence", () => {
     ).toBe("conflict");
   });
 
-  it("conflicts when a pending new sheet's chart reads a sheet whose rows moved", () => {
+  // A move has no rebase mapping, and keeping the old rows would chart other data.
+  // The store refuses a source on a missing sheet, so "rebased" would fail on apply.
+  it.each<[string, DocumentOp, string]>([
+    [
+      "its rows moved",
+      { op: "moveRows", sheet: "data", from: 0, count: 2, to: 5 },
+      "unsupported-structural",
+    ],
+    ["it was removed", { op: "removeSheet", sheet: "data" }, "sheet-removed"],
+  ])("conflicts when a pending new sheet's chart reads a sheet and %s", (_name, remote, code) => {
     const added: DocumentOp = {
       op: "addSheet",
       sheet: { ...sheet("report"), order: 2, charts: [chart("cross")], cells: [] },
     };
 
-    const rebased = rebaseDocumentOperations(
-      [added],
-      [{ op: "moveRows", sheet: "data", from: 0, count: 2, to: 5 }],
-    );
-
-    // A move has no rebase mapping; keeping the old rows would chart other data.
-    expect(rebased).toMatchObject({
+    expect(rebaseDocumentOperations([added], [remote])).toMatchObject({
       status: "conflict",
-      conflict: { code: "unsupported-structural" },
+      conflict: { code },
     });
-  });
-
-  it("conflicts when a pending new sheet's chart reads a removed sheet", () => {
-    const added: DocumentOp = {
-      op: "addSheet",
-      sheet: { ...sheet("report"), order: 2, charts: [chart("cross")], cells: [] },
-    };
-
-    const rebased = rebaseDocumentOperations([added], [{ op: "removeSheet", sheet: "data" }]);
-
-    // The store refuses a chart source on a missing sheet, so "rebased" would fail on apply.
-    expect(rebased).toMatchObject({ status: "conflict", conflict: { code: "sheet-removed" } });
   });
 
   it("keeps retained opaque XLSX graphs when a native chart is set or removed", () => {

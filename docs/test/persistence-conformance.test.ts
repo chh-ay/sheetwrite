@@ -112,6 +112,10 @@ describe("IndexedDB showcase adapter", () => {
     expect(await adapter.commitBatch(request)).toMatchObject({ status: "duplicate", version: 2 });
     const conflict = await adapter.commitBatch({ ...request, clientMutationId: "batch-m2" });
     expect(conflict).toMatchObject({ status: "conflict", currentVersion: 2 });
+    if (conflict.status === "conflict") {
+      const since = conflict.operationsSinceBase?.map((entry) => entry.clientMutationId);
+      expect(since).toEqual(["batch-m1", "batch-m1"]);
+    }
     // The stale batch stored nothing.
     expect(adapter.stats()).toMatchObject({ currentVersion: 2, tailLength: 2 });
     expect((await adapter.load("persistence-conformance")).version).toBe(2);

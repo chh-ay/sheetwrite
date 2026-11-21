@@ -225,6 +225,18 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/features/formulas/custom-functions/": [
     { after: "registration", picture: "custom-functions" },
   ],
+  "/docs/features/formulas/formula-assist/": [
+    {
+      after: AFTER_LEAD,
+      shot: {
+        name: "formula-assist",
+        size: "panel",
+        alt: "An equals sign typed in the formula bar for March's total, with the rest of a SUM over the March column shown dimmed after the caret, and that column faintly filled in the grid.",
+        caption:
+          "The suggestion shows dimmed after the caret, and the range it names is filled on the grid. Tab takes it.",
+      },
+    },
+  ],
   "/docs/features/formulas/formula-help/": [
     { after: AFTER_LEAD, picture: "formula-help" },
     {
@@ -274,6 +286,13 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/reference/compatibility-limits/": [{ after: AT_START, picture: "limits" }],
   "/docs/reference/document-operations/": [{ after: "snapshots-and-rebase", picture: "rebase" }],
   "/docs/reference/events/": [{ after: "event-direction", picture: "event-direction" }],
+  "/docs/performance/benchmark-protocol/": [
+    { after: "matched-local-regression-check", picture: "regression-check" },
+  ],
+  "/docs/performance/memory/": [
+    { after: "release-retained-engine-memory", picture: "engine-memory-release" },
+  ],
+  "/docs/releases/": [{ after: AFTER_LEAD, picture: "releases" }],
   "/docs/releases/0.5.0/": [{ after: AFTER_LEAD, picture: "release-0.5.0" }],
   "/docs/releases/0.5.1/": [{ after: AFTER_LEAD, picture: "release-0.5.1" }],
   "/docs/releases/0.5.2/": [{ after: AFTER_LEAD, picture: "release-0.5.2" }],

@@ -66,6 +66,7 @@ import {
   ZOOM_MAX,
   CELL_TEXT_HORIZONTAL_PADDING,
   DEFAULT_DISTINCT_VALUES_LIMIT,
+  TAB_BAR_HEIGHT,
 } from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
@@ -196,7 +197,7 @@ import type {
   TransactionResourceLimits,
 } from "./types/transaction.js";
 import { hasInputMessage } from "./validation-rule.js";
-import { seedWidgetTheme } from "./widget-theme.js";
+import { seedWidgetTheme, tabBarFont } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
 /** Platform fallback used when no reliable browser scroll clamp can be measured. */
@@ -699,6 +700,8 @@ export class GridImpl implements Grid {
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
   private readonly sidePanels = new ScopeSlot(this.lifetime);
+  /** The panel `sidePanels` holds open, which `trimMemory` asks to trim. */
+  private openSidePanel: GridPanel | null = null;
   /** Engine generation of this grid's store; traps from its reads stop that instance only. */
   private readonly engineGeneration: number;
   /** Set once the engine stopped; read-only stays on until the host recreates the grid. */
@@ -826,7 +829,7 @@ export class GridImpl implements Grid {
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
     );
 
-    this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
+    this.tabBarHeight = opts.config?.tabs !== false ? TAB_BAR_HEIGHT : 0;
 
     this.document = new DocumentController({
       store: this.store,
@@ -1352,6 +1355,14 @@ export class GridImpl implements Grid {
       filteredRows: () => {
         const { autoFilter, filters } = this.sheet();
         return autoFilter && (filters?.length ?? 0) > 0 ? autoFilterBody(autoFilter) : undefined;
+      },
+      // Header text ends before the filter buttons, as in Excel.
+      filterHeader: () => {
+        const range = this.sheet().autoFilter?.range;
+        const row = range ? this.toViewRow(range.start.row) : null;
+        return range && row !== null
+          ? { row, start: range.start.col, end: range.end.col }
+          : undefined;
       },
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
@@ -1881,7 +1892,7 @@ export class GridImpl implements Grid {
   private syncTabBarTheme(): void {
     const bar = this.tabBar;
     if (!bar) return;
-    bar.style.setProperty("--sheetwrite-tab-font", this.baseTheme.font);
+    bar.style.setProperty("--sheetwrite-tab-font", tabBarFont(this.baseTheme.font));
     bar.style.setProperty("--sheetwrite-tab-bg", this.baseTheme.bg);
     bar.style.setProperty("--sheetwrite-tab-fg", this.baseTheme.headerFg);
     bar.style.setProperty("--sheetwrite-tab-border", this.baseTheme.gridLine);
@@ -3538,7 +3549,7 @@ export class GridImpl implements Grid {
     this.sheetTabs = null;
     this.tabBar?.remove();
     this.tabBar = null;
-    this.tabBarHeight = config?.tabs !== false ? 28 : 0;
+    this.tabBarHeight = config?.tabs !== false ? TAB_BAR_HEIGHT : 0;
     if (this.tabBarHeight > 0) this.buildTabBar();
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;
@@ -4069,6 +4080,7 @@ export class GridImpl implements Grid {
     const wasOpen = this.sidePanels.active;
     const hadFocus = this.panelHost.contains(document.activeElement);
     this.sidePanels.close();
+    this.openSidePanel = panel;
 
     const isOpen = panel !== null;
     // The panel focuses its first control while it mounts; a hidden host refuses focus.
@@ -5140,6 +5152,7 @@ export class GridImpl implements Grid {
 
   trimMemory(): void {
     if (this.lifetime.closed) return;
+    this.openSidePanel?.trimMemory?.();
 
     // A worker drops its strings only when the host reader drops its own, so
     // the next frame resends them. A store without an engine sends no pool ids.

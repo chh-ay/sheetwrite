@@ -1,4 +1,4 @@
-import { Inflate, Zip, ZipDeflate, type ZipInputFile } from "fflate";
+import { Deflate, Inflate, Zip, type ZipInputFile } from "fflate";
 
 import {
   assertResource,
@@ -53,14 +53,9 @@ export function markStoredEntryVerified(entry: StoredZipEntry): void {
 
 /** Build a stored entry when only part of an opaque XML drawing is modelled. */
 export function storedEntryFromBytes(data: Uint8Array): StoredZipEntry {
-  let checksum = 0xffffffff;
-  for (const byte of data) {
-    checksum = (CRC_TABLE[(checksum ^ byte) & 0xff] ?? 0) ^ (checksum >>> 8);
-  }
-
   return {
     method: 0,
-    crc32: (checksum ^ 0xffffffff) >>> 0,
+    crc32: (updateCrc32(0xffffffff, data) ^ 0xffffffff) >>> 0,
     compressedSize: data.length,
     uncompressedSize: data.length,
     data,
@@ -100,9 +95,7 @@ export function validateStoredEntry(entry: StoredZipEntry, context: XlsxCodecCon
   const accept = (chunk: Uint8Array): void => {
     written += chunk.byteLength;
     if (written > entry.uncompressedSize) fail("retained inflated size exceeds declaration");
-    for (let index = 0; index < chunk.length; index++) {
-      checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-    }
+    checksum = updateCrc32(checksum, chunk);
   };
   const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
   try {
@@ -342,15 +335,124 @@ function preflightExpansion(bytes: Uint8Array, context: XlsxCodecContext): void 
   }
 }
 
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < table.length; n++) {
+/** Slice-by-8 CRC-32 tables: table `k` holds the CRC of a byte followed by `k` zero bytes. */
+const CRC_TABLES = (() => {
+  const tables = new Uint32Array(8 * 256);
+  for (let n = 0; n < 256; n++) {
     let value = n;
     for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-    table[n] = value >>> 0;
+    tables[n] = value;
   }
-  return table;
+  for (let index = 256; index < tables.length; index++) {
+    const previous = tables[index - 256] ?? 0;
+    tables[index] = (previous >>> 8) ^ (tables[previous & 0xff] ?? 0);
+  }
+  return tables;
 })();
+
+/** Continue a CRC-32 register over `data`; start at `0xffffffff` and invert the result. */
+function updateCrc32(checksum: number, data: Uint8Array): number {
+  const table = CRC_TABLES;
+  let index = 0;
+  for (const end = data.length - 7; index < end; index += 8) {
+    const word =
+      checksum ^
+      ((data[index] ?? 0) |
+        ((data[index + 1] ?? 0) << 8) |
+        ((data[index + 2] ?? 0) << 16) |
+        ((data[index + 3] ?? 0) << 24));
+    checksum =
+      (table[1792 + (word & 0xff)] ?? 0) ^
+      (table[1536 + ((word >>> 8) & 0xff)] ?? 0) ^
+      (table[1280 + ((word >>> 16) & 0xff)] ?? 0) ^
+      (table[1024 + (word >>> 24)] ?? 0) ^
+      (table[768 + (data[index + 4] ?? 0)] ?? 0) ^
+      (table[512 + (data[index + 5] ?? 0)] ?? 0) ^
+      (table[256 + (data[index + 6] ?? 0)] ?? 0) ^
+      (table[data[index + 7] ?? 0] ?? 0);
+  }
+  for (; index < data.length; index++) {
+    checksum = (table[(checksum ^ (data[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
+  }
+  return checksum;
+}
+
+let nativeInflate: boolean | undefined;
+
+/** Bun, Node 20.12+, Chrome 103+, Firefox 113+ and Safari 16.4+ inflate raw deflate natively. */
+function hasNativeInflate(): boolean {
+  if (nativeInflate === undefined) {
+    try {
+      nativeInflate = new DecompressionStream("deflate-raw") instanceof DecompressionStream;
+    } catch {
+      nativeInflate = false;
+    }
+  }
+  return nativeInflate;
+}
+
+/** The runtime's raw deflate stream, or undefined where the runtime has none. */
+function nativeDeflate(): CompressionStream | undefined {
+  try {
+    return new CompressionStream("deflate-raw");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Run `input` through the runtime's zlib. The stream pulls the next input chunk only after its
+ * output is read, so one chunk bounds the output that the caller has not checked yet.
+ */
+async function* pipeNative(
+  stream: CompressionStream | DecompressionStream,
+  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
+): AsyncGenerator<Uint8Array<ArrayBuffer>> {
+  const writer = stream.writable.getWriter();
+  const reader = stream.readable.getReader();
+  void (async () => {
+    try {
+      for await (const chunk of input) {
+        // Web streams take no views of shared memory.
+        const { buffer, byteOffset, byteLength } = chunk;
+        await writer.write(
+          buffer instanceof ArrayBuffer
+            ? new Uint8Array(buffer, byteOffset, byteLength)
+            : chunk.slice(),
+        );
+      }
+      await writer.close();
+    } catch (error) {
+      // An input failure (an abort, a limit or a read error) reaches the reader through the abort.
+      await writer.abort(error).catch(() => undefined);
+    }
+  })();
+  try {
+    for (let step = await reader.read(); !step.done; step = await reader.read()) {
+      yield step.value;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+/**
+ * Deflate at fflate level 6: the default, and the `native` compression where the runtime has no
+ * `CompressionStream`.
+ */
+function* deflateFflate(input: Iterable<Uint8Array>): Generator<Uint8Array<ArrayBuffer>> {
+  const pending: Uint8Array<ArrayBuffer>[] = [];
+  const deflater = new Deflate({ level: 6 }, (chunk) => {
+    pending.push(chunk);
+  });
+  for (const piece of input) {
+    deflater.push(piece);
+    yield* pending;
+    pending.length = 0;
+  }
+  deflater.push(new Uint8Array(0), true);
+  yield* pending;
+}
 
 /** Seekable ZIP reader: only the directory and one requested part are resident. */
 export class ZipReader {
@@ -431,20 +533,23 @@ export class ZipReader {
 
   async *chunks(name: string): AsyncGenerator<Uint8Array> {
     const entry = this.#entry(name);
-    let written = 0;
-    let checksum = 0xffffffff;
-    const pending: Uint8Array[] = [];
-    const accept = (chunk: Uint8Array): void => {
-      written += chunk.length;
-      if (written > entry.uncompressedSize) fail(`inflated size exceeds declaration for ${name}`);
-      for (let index = 0; index < chunk.length; index++) {
-        checksum = (CRC_TABLE[(checksum ^ (chunk[index] ?? 0)) & 0xff] ?? 0) ^ (checksum >>> 8);
-      }
-      if (chunk.length) pending.push(chunk);
-    };
     if (entry.method === 0 && entry.compressedSize !== entry.uncompressedSize)
       fail(`stored size mismatch for ${name}`);
-    const inflater = entry.method === 8 ? new Inflate(accept) : undefined;
+    let written = 0;
+    let checksum = 0xffffffff;
+    const data = entry.method === 8 ? this.#inflate(entry, name) : this.#payload(entry);
+    for await (const chunk of data) {
+      written += chunk.length;
+      if (written > entry.uncompressedSize) fail(`inflated size exceeds declaration for ${name}`);
+      checksum = updateCrc32(checksum, chunk);
+      yield chunk;
+    }
+    if (written !== entry.uncompressedSize) fail(`inflated size mismatch for ${name}`);
+    if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail(`CRC mismatch for ${name}`);
+  }
+
+  /** The compressed bytes of an entry, in codec input slices. */
+  async *#payload(entry: ZipEntry): AsyncGenerator<Uint8Array> {
     const readBytes = 256 * 1024;
     for (let rangeOffset = 0; rangeOffset < entry.compressedSize; rangeOffset += readBytes) {
       const range = await this.#range(
@@ -452,25 +557,57 @@ export class ZipReader {
         Math.min(readBytes, entry.compressedSize - rangeOffset),
       );
       for (let offset = 0; offset < range.length; offset += CODEC_INPUT_CHUNK_BYTES) {
-        const chunk = range.subarray(offset, offset + CODEC_INPUT_CHUNK_BYTES);
-        const isFinal = rangeOffset + offset + chunk.length === entry.compressedSize;
-        try {
-          if (inflater) inflater.push(chunk, isFinal);
-          else accept(chunk);
-        } catch (error) {
-          if (error instanceof TypeError && error.message.startsWith("Sheetwrite:")) throw error;
-          throw new TypeError(
-            boundedErrorText(`Sheetwrite: invalid XLSX ZIP: deflate stream for ${name} is corrupt`),
-            { cause: error },
-          );
-        }
-        yield* pending;
-        pending.length = 0;
+        yield range.subarray(offset, offset + CODEC_INPUT_CHUNK_BYTES);
       }
     }
-    if (inflater && entry.compressedSize === 0) inflater.push(new Uint8Array(0), true);
-    if (written !== entry.uncompressedSize) fail(`inflated size mismatch for ${name}`);
-    if ((checksum ^ 0xffffffff) >>> 0 !== entry.crc32) fail(`CRC mismatch for ${name}`);
+  }
+
+  /**
+   * Native zlib inflates when the runtime has it. When zlib rejects a stream, fflate inflates it
+   * again and decides, so accepted input and error text do not depend on the runtime.
+   */
+  async *#inflate(entry: ZipEntry, name: string): AsyncGenerator<Uint8Array> {
+    let produced = 0;
+    if (hasNativeInflate()) {
+      try {
+        for await (const chunk of pipeNative(
+          new DecompressionStream("deflate-raw"),
+          this.#payload(entry),
+        )) {
+          produced += chunk.length;
+          yield chunk;
+        }
+        return;
+      } catch (error) {
+        if (isAbort(this.context, error)) throw error;
+      }
+    }
+    // fflate output repeats the bytes that zlib produced before it failed; skip them.
+    let skip = produced;
+    const pending: Uint8Array[] = [];
+    const inflater = new Inflate((chunk) => {
+      if (skip >= chunk.length) {
+        skip -= chunk.length;
+      } else {
+        pending.push(chunk.subarray(skip));
+        skip = 0;
+      }
+    });
+    let consumed = 0;
+    const push = (chunk: Uint8Array): void => {
+      consumed += chunk.length;
+      try {
+        inflater.push(chunk, consumed === entry.compressedSize);
+      } catch (error) {
+        fail(`deflate stream for ${name} is corrupt`, error);
+      }
+    };
+    if (entry.compressedSize === 0) push(new Uint8Array(0));
+    for await (const chunk of this.#payload(entry)) {
+      push(chunk);
+      yield* pending;
+      pending.length = 0;
+    }
   }
 
   async read(name: string): Promise<Uint8Array> {
@@ -494,10 +631,10 @@ const ZIP_OUTPUT_CHUNK_BYTES = 64 * 1024;
 const ENTRY_OVERHEAD_BYTES = 256;
 
 /** Pull-driven ZIP encoding; pending codec output is drained after each bounded push. */
-export function* zipChunks(
+export async function* zipChunks(
   parts: Iterable<ZipPart>,
   context: XlsxCodecContext,
-): Generator<Uint8Array> {
+): AsyncGenerator<Uint8Array> {
   const pending: Uint8Array[] = [];
   let outputBytes = 0;
   let totalBytes = 0;
@@ -564,31 +701,50 @@ export function* zipChunks(
         }
         file.ondata(null, new Uint8Array(0), true);
       } else {
-        const file = new ZipDeflate(name, { level: 6 });
-        file.mtime = DOS_EPOCH;
+        const file: ZipInputFile = {
+          filename: name,
+          compression: 8,
+          size: 0,
+          crc: 0,
+          mtime: DOS_EPOCH,
+        };
         archive.add(file);
         yield* drain();
+        if (!file.ondata) throw new Error(`Sheetwrite: ZIP output handler missing for ${name}`);
         let entryBytes = 0;
+        let checksum = 0xffffffff;
         const chunks = part.data instanceof Uint8Array ? [part.data] : part.data;
-        for (const chunk of chunks) {
-          // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
-          for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
-            checkAbort(context);
-            const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
-            entryBytes += piece.length;
-            totalBytes += piece.length;
-            assertResource(context, "maxEntryUncompressedBytes", entryBytes);
-            assertResource(context, "maxTotalUncompressedBytes", totalBytes);
-            assertResource(
-              context,
-              "maxOutputBytes",
-              totalBytes + names.size * ENTRY_OVERHEAD_BYTES,
-            );
-            file.push(piece);
-            yield* drain();
+        // The codec pulls each piece only after the limits allow it.
+        const pieces = function* (): Generator<Uint8Array> {
+          for (const chunk of chunks) {
+            // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
+            for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
+              checkAbort(context);
+              const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
+              entryBytes += piece.length;
+              totalBytes += piece.length;
+              assertResource(context, "maxEntryUncompressedBytes", entryBytes);
+              assertResource(context, "maxTotalUncompressedBytes", totalBytes);
+              assertResource(
+                context,
+                "maxOutputBytes",
+                totalBytes + names.size * ENTRY_OVERHEAD_BYTES,
+              );
+              checksum = updateCrc32(checksum, piece);
+              yield piece;
+            }
           }
+        };
+        // fflate is the default: its bytes are the same in every runtime.
+        const native = context.options?.compression === "native" ? nativeDeflate() : undefined;
+        const compressed = native ? pipeNative(native, pieces()) : deflateFflate(pieces());
+        for await (const chunk of compressed) {
+          file.ondata(null, chunk, false);
+          yield* drain();
         }
-        file.push(new Uint8Array(0), true);
+        file.crc = (checksum ^ 0xffffffff) >>> 0;
+        file.size = entryBytes;
+        file.ondata(null, new Uint8Array(0), true);
       }
       yield* drain();
     }
@@ -603,7 +759,10 @@ export function* zipChunks(
  * Buffered API: parts are materialized and sorted by name for canonical archives.
  * Streams cannot sort because styles and content types depend on every worksheet.
  */
-export function writeZip(parts: Iterable<ZipPart>, context: XlsxCodecContext): Uint8Array {
+export async function writeZip(
+  parts: Iterable<ZipPart>,
+  context: XlsxCodecContext,
+): Promise<Uint8Array> {
   const materialized: ZipPart[] = [];
   for (const part of parts) {
     if ("stored" in part || part.data instanceof Uint8Array) {
@@ -621,7 +780,8 @@ export function writeZip(parts: Iterable<ZipPart>, context: XlsxCodecContext): U
   }
   materialized.sort((left, right) => left.name.localeCompare(right.name));
   const sources: Iterable<ZipPart> = materialized;
-  const chunks = [...zipChunks(sources, context)];
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of zipChunks(sources, context)) chunks.push(chunk);
   const size = chunks.reduce((total, chunk) => total + chunk.length, 0);
   const output = new Uint8Array(size);
   let offset = 0;

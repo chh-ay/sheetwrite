@@ -8,7 +8,7 @@ import {
 } from "@sheetwrite/core";
 
 export const DATA_ROWS = 4800;
-const DATA_SHEET = "operations";
+export const DATA_SHEET = "operations";
 const GROUP_END = 23;
 const TRACE_LIMIT = 24;
 const HIDDEN_ROWS = [24, 25, 26] as const;

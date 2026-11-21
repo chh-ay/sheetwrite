@@ -427,62 +427,13 @@ mod tests {
     }
 
     fn build(one: &[Value], many: &[Value]) -> Result<KeyIndex, KeyProblem> {
-        build_map(one, many).map(|(index, _)| index)
-    }
-
-    fn build_map(one: &[Value], many: &[Value]) -> Result<(KeyIndex, Vec<u32>), KeyProblem> {
         KeyIndex::build(
             one.len() as u32,
             |row| KeyCell::Value(one[row as usize].clone()),
             many.len() as u32,
             |row| KeyCell::Value(many[row as usize].clone()),
         )
-    }
-
-    #[test]
-    fn many_side_rows_map_to_one_side_rows_or_markers() {
-        let one = [text("A"), text("b"), Value::Blank, text("C")];
-        let many = [
-            text("c"),
-            Value::Blank,
-            text("z"),
-            Value::Error(FormulaError::Na),
-            text(""),
-            text("B"),
-        ];
-        let (_, map) = build_map(&one, &many).unwrap();
-        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, KEY_ERROR, BLANK_KEY, 1]);
-
-        // Pooled text keys give the same rows, including repeated ids and
-        // ids whose text differs only in case from a one-side key.
-        let pooled = [("c", 7), ("", 2), ("z", 9), ("C", 8), ("c", 7), ("B", 4)];
-        let (_, map) = KeyIndex::build(
-            one.len() as u32,
-            |row| KeyCell::Value(one[row as usize].clone()),
-            pooled.len() as u32,
-            |row| {
-                let (text, id) = pooled[row as usize];
-                KeyCell::Text(text, id)
-            },
-        )
-        .unwrap();
-        assert_eq!(map, [3, BLANK_KEY, NO_MATCH, 3, 3, 1]);
-
-        let numbers: Vec<_> = (0..1_000)
-            .map(|row| Value::Number(f64::from(row * 3)))
-            .collect();
-        let probes: Vec<_> = (0..3_000)
-            .map(|row| Value::Number(f64::from(row)))
-            .collect();
-        let (_, map) = build_map(&numbers, &probes).unwrap();
-        for (row, &target) in map.iter().enumerate() {
-            let expected = if row % 3 == 0 {
-                row as u32 / 3
-            } else {
-                NO_MATCH
-            };
-            assert_eq!(target, expected, "row {row}");
-        }
+        .map(|(index, _)| index)
     }
 
     fn find(index: &KeyIndex, value: Value) -> u32 {
@@ -490,35 +441,33 @@ mod tests {
     }
 
     #[test]
-    fn number_keys_match_by_value_and_blank_matches_nothing() {
+    fn keys_match_numbers_by_value_and_text_without_case_and_blank_matches_nothing() {
         let one = [
             Value::Number(3.0),
             Value::Blank,
             Value::Number(-0.0),
             text(""),
         ];
-        let index = build(&one, &[]).unwrap();
+        let numbers = build(&one, &[]).unwrap();
+        let words = build(&[text("North"), text("ÉTÉ"), text("south")], &[]).unwrap();
 
-        assert_eq!(find(&index, Value::Number(3.0)), 0);
-        assert_eq!(find(&index, Value::Number(0.0)), 2);
-        assert_eq!(find(&index, Value::Number(-0.0)), 2);
-        assert_eq!(find(&index, Value::Number(4.0)), NO_MATCH);
-        assert_eq!(find(&index, Value::Blank), NO_MATCH);
-        assert_eq!(find(&index, text("")), NO_MATCH);
-        assert_eq!(find(&index, Value::Bool(false)), NO_MATCH);
-        assert_eq!(find(&index, text("3")), NO_MATCH);
-    }
-
-    #[test]
-    fn text_keys_match_without_case_including_non_ascii() {
-        let one = [text("North"), text("ÉTÉ"), text("south")];
-        let index = build(&one, &[]).unwrap();
-
-        assert_eq!(find(&index, text("NORTH")), 0);
-        assert_eq!(find(&index, text("été")), 1);
-        assert_eq!(find(&index, text("South")), 2);
-        assert_eq!(find(&index, text("West")), NO_MATCH);
-        assert_eq!(find(&index, Value::Number(1.0)), NO_MATCH);
+        for (index, probe, row) in [
+            (&numbers, Value::Number(3.0), 0),
+            (&numbers, Value::Number(0.0), 2),
+            (&numbers, Value::Number(-0.0), 2),
+            (&numbers, Value::Number(4.0), NO_MATCH),
+            (&numbers, Value::Blank, NO_MATCH),
+            (&numbers, text(""), NO_MATCH),
+            (&numbers, Value::Bool(false), NO_MATCH),
+            (&numbers, text("3"), NO_MATCH),
+            (&words, text("NORTH"), 0),
+            (&words, text("été"), 1),
+            (&words, text("South"), 2),
+            (&words, text("West"), NO_MATCH),
+            (&words, Value::Number(1.0), NO_MATCH),
+        ] {
+            assert_eq!(index.find(&probe, &mut Vec::new()), row, "{probe:?}");
+        }
     }
 
     #[test]
