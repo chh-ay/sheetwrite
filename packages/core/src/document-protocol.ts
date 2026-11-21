@@ -3764,6 +3764,41 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 }
 
 /**
+ * A snapshot that `validateWorkbookSnapshot` accepted, with its JSON size as
+ * measured before that check. Only Sheetwrite builds one, around a snapshot
+ * nothing else holds, so a store built from it repeats only the checks that
+ * depend on its own options instead of walking every cell again.
+ */
+export class CheckedSnapshot {
+  constructor(
+    readonly snapshot: WorkbookSnapshot,
+    readonly serializedBytes: number,
+  ) {}
+}
+
+/**
+ * The checks of `validateWorkbookSnapshot` that depend on `options`, for a
+ * snapshot it accepted with other options: the resource preflight and the
+ * byte limit. Validation keeps known fields only, so the snapshot is no larger
+ * than the measured input; an input over the limit gets the full validation.
+ */
+export function recheckSnapshotResources(
+  checked: CheckedSnapshot,
+  options: SnapshotValidationOptions = {},
+): DocumentValidationResult {
+  const resolved = resolveSnapshotValidationOptions(options);
+  if ("code" in resolved) return { ok: false, errors: [resolved] };
+  if (checked.serializedBytes > resolved.limits.maxSerializedBytes) {
+    return validateWorkbookSnapshot(checked.snapshot, options);
+  }
+
+  const resourceIssue = preflightSnapshotResources(checked.snapshot, resolved);
+  return resourceIssue
+    ? { ok: false, errors: [resourceIssue] }
+    : { ok: true, value: checked.snapshot };
+}
+
+/**
  * Validate and canonically order a schema-1 snapshot without hydrating runtime state.
  *
  * @param input - A snapshot from outside your code, such as parsed JSON.
