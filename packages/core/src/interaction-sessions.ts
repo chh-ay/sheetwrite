@@ -1,5 +1,5 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
-import { filterButtonRect, filterTextWidth } from "./canvas-paint.js";
+import { cellAlign, filterButtonRect, filterTextWidth, fontFor } from "./canvas-paint.js";
 import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellEntry } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
@@ -8,7 +8,13 @@ import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
 import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
-import { type EditCompletion, EditController, type EditNavigate, type EditRect } from "./editor.js";
+import {
+  type EditCompletion,
+  EditController,
+  type EditNavigate,
+  type EditorLook,
+  type EditRect,
+} from "./editor.js";
 import { type AutoFillChoice, FillController, type FillTip } from "./fill-controller.js";
 import { focusOutside } from "./focus-exit.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
@@ -925,6 +931,13 @@ export class InteractionSessions {
       ),
       label: this.editorLabel(editCell.row, editCell.col),
       theme: this.deps.theme(),
+      look: this.editorLook(
+        column,
+        this.deps.store.getCell(dataAddr).style,
+        // A formula edits left-aligned under General alignment, as in Excel;
+        // a typed entry is not a value yet, so only a column type aligns it.
+        initial !== undefined || formula !== null ? null : current,
+      ),
       focus,
       onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
       onCancel: () => this.endEditor(),
@@ -937,6 +950,25 @@ export class InteractionSessions {
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
     this.deps.editDraft.text(this.editor.value);
+  }
+
+  /**
+   * How the cell editor shows the cell, as Excel's in-cell editor does: the
+   * cell's font, colour and alignment over its column's. Under General
+   * alignment the text being edited aligns by Excel's rule for it: `shown`
+   * is the value the editor opened on, or null for a typed entry or a
+   * formula, which edit left-aligned unless the column type is numeric.
+   */
+  private editorLook(column: Column, own: CellStyle, shown: CellScalar): EditorLook {
+    const style = column.cellStyle === undefined ? own : { ...column.cellStyle, ...own };
+    const theme = this.deps.theme();
+    const lines = [style.underline ? "underline" : "", style.strikethrough ? "line-through" : ""];
+    return {
+      align: cellAlign(style, shown, column.type),
+      font: fontFor(theme, style, this.deps.zoom()),
+      color: style.color ?? theme.fg,
+      decoration: lines.filter(Boolean).join(" ") || "none",
+    };
   }
 
   /** Excel's message for a formula that does not parse, with what is wrong with it. */

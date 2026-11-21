@@ -10,7 +10,7 @@ import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
 import { toggleReferenceAnchors } from "./formula-references.js";
 import { type FormulaDiagnostic, formulaEntry } from "./formula-syntax.js";
-import type { CellFormat } from "./types/cell.js";
+import type { CellAlign, CellFormat } from "./types/cell.js";
 import type { CellMode } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 
@@ -72,6 +72,18 @@ export interface EditRect {
   h: number;
 }
 
+/**
+ * How the edited cell looks, which the editor keeps while it is open, as
+ * Excel's in-cell editor does: the text's alignment, its CSS font and
+ * colour, and its underline or strikethrough.
+ */
+export interface EditorLook {
+  readonly align: CellAlign;
+  readonly font: string;
+  readonly color: string;
+  readonly decoration: string;
+}
+
 export interface BeginEditOptions {
   row: number;
   col: number;
@@ -89,6 +101,8 @@ export interface BeginEditOptions {
   /** Accessible name derived from the semantic or positional column header. */
   label: string;
   theme: Theme;
+  /** The cell's look; without it the editor shows the theme's font, left-aligned. */
+  look?: EditorLook;
   /**
    * Focus the editor. False opens it as the cell's view of a draft that
    * another edit surface, such as a formula bar, is typing; it takes focus
@@ -220,6 +234,16 @@ export class EditController {
     ta.style.setProperty("--sheetwrite-font", opts.theme.font);
     ta.style.setProperty("--sheetwrite-fg", opts.theme.fg);
     ta.style.setProperty("--sheetwrite-bg", opts.theme.bg);
+    // The cell's own formatting is content, not theme: it goes on inline, as
+    // the canvas paints it, so the text does not jump when the edit starts or ends.
+    const look = opts.look;
+    if (look !== undefined) {
+      const { style } = ta;
+      style.font = look.font;
+      style.color = look.color;
+      style.textAlign = look.align;
+      style.textDecoration = look.decoration;
+    }
 
     this.host.appendChild(ta);
     this.textarea = ta;
