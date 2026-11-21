@@ -33,8 +33,12 @@ class FakeClipboardItem {
 
 const ROWS = 30;
 
-/** A grid's clipboard over a real store with sheets `s1` and `s2`, both 30 rows by A:D. */
-function cutHarness() {
+/**
+ * A grid's clipboard over a real store with sheets `s1` and `s2`, both 30 rows
+ * by A:D. With `nativeFormatsOnly`, the clipboard takes only plain text and
+ * HTML, as Firefox's and Safari's do: a write with another format fails.
+ */
+function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
   const clip: { items: FakeClipboardItem[]; text: string } = { items: [], text: "" };
   Object.defineProperty(globalThis, "ClipboardItem", {
     configurable: true,
@@ -44,6 +48,13 @@ function cutHarness() {
     configurable: true,
     value: {
       write: (items: FakeClipboardItem[]) => {
+        const native = ["text/plain", "text/html"];
+        if (
+          options.nativeFormatsOnly &&
+          items.some((item) => item.types.some((type) => !native.includes(type)))
+        ) {
+          return Promise.reject(new DOMException("Type not supported", "NotAllowedError"));
+        }
         clip.items = items;
         return Promise.resolve();
       },
@@ -407,6 +418,49 @@ describe("cut and paste", () => {
     // The cut still waits for its paste.
     expect(await h.clipboard.paste()).toBe("done");
     expect([h.value(0, 0), h.value(5, 0)]).toEqual([null, 1]);
+  });
+});
+
+describe("cut and paste in browsers without custom clipboard formats", () => {
+  it("moves the cut cells and keeps a copy's formulas (#921)", async () => {
+    harness = cutHarness({ nativeFormatsOnly: true });
+    const h = harness;
+    h.set(0, 0, "a");
+    h.set(0, 1, 1);
+    h.set(1, 0, "=B1*2");
+
+    h.select(0, 0, 1, 1);
+    expect(await h.clipboard.cut()).toBe("done");
+    h.select(0, 3);
+    expect(await h.clipboard.paste()).toBe("done");
+    expect([h.value(0, 0), h.value(0, 1)]).toEqual([null, null]);
+    expect([h.value(0, 3), h.value(0, 4)]).toEqual(["a", 1]);
+    expect(h.formula(1, 3)).toBe("=E1*2");
+
+    h.select(0, 3, 1, 4);
+    expect(await h.clipboard.copy()).toBe("done");
+    h.select(10, 0);
+    expect(await h.clipboard.paste()).toBe("done");
+    expect(h.formula(11, 0)).toBe("=B11*2");
+  });
+
+  it("pastes another application's copy made after the cut as a plain paste", async () => {
+    harness = cutHarness({ nativeFormatsOnly: true });
+    const h = harness;
+    h.set(0, 0, 1);
+
+    h.select(0, 0);
+    await h.clipboard.cut();
+    h.clip.items = [
+      new FakeClipboardItem({
+        "text/plain": new Blob(["42"], { type: "text/plain" }),
+        "text/html": new Blob(["<table><tr><td>42</td></tr></table>"], { type: "text/html" }),
+      }),
+    ];
+    h.select(5, 0);
+    expect(await h.clipboard.paste()).toBe("done");
+    expect([h.value(0, 0), h.value(5, 0)]).toEqual([1, 42]);
+    expect(h.marks.at(-1)).toBeNull();
   });
 });
 

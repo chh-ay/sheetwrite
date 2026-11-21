@@ -137,6 +137,37 @@ const EMPTY: ClipboardPayload = { kind: "outcome", outcome: "empty" };
 export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
 const SHEETWRITE_WEB_CLIPBOARD_FORMAT = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
 
+/**
+ * The attribute on the HTML table of a copy or cut that holds its token.
+ * Firefox and Safari keep only plain text and HTML on the clipboard, so a
+ * grid finds its own copy or cut by this marker there.
+ */
+const CLIPBOARD_TOKEN_ATTRIBUTE = "data-sheetwrite-clipboard";
+const CLIPBOARD_TOKEN_PATTERN = new RegExp(
+  `\\b${CLIPBOARD_TOKEN_ATTRIBUTE}="([0-9a-f]{16,256})"`,
+  "u",
+);
+
+/** The token an HTML copy from a grid carries, or `null` for HTML from elsewhere. */
+function clipboardToken(html: string): string | null {
+  return CLIPBOARD_TOKEN_PATTERN.exec(html)?.[1] ?? null;
+}
+
+/** Whether two clipboard texts hold the same cells; browsers may change line endings. */
+function sameClipboardText(left: string, right: string): boolean {
+  const lines = (text: string) => text.replaceAll("\r\n", "\n").replace(/\n$/u, "");
+  return lines(left) === lines(right);
+}
+
+/** The text of the first clipboard item that holds `type`, or `null` when none does. */
+async function readClipboardType(
+  items: readonly ClipboardItem[],
+  type: string,
+): Promise<string | null> {
+  const item = items.find((candidate) => candidate.types.includes(type));
+  return item ? (await item.getType(type)).text() : null;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -171,8 +202,8 @@ function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type
   return { value: parseExternalInput(source, type), style: cell.style };
 }
 
-function clipboardHtml(snapshot: ClipboardSnapshot): string {
-  let html = "<table><tbody>";
+function clipboardHtml(snapshot: ClipboardSnapshot, token: string): string {
+  let html = `<table ${CLIPBOARD_TOKEN_ATTRIBUTE}="${token}"><tbody>`;
   for (const row of snapshot.cells) {
     html += "<tr>";
     for (const cell of row) {
@@ -622,7 +653,7 @@ export class ClipboardController {
     const clipboard = navigator.clipboard;
     if (typeof clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
       const plain = new Blob([snapshot.tsv], { type: "text/plain" });
-      const html = new Blob([clipboardHtml(snapshot)], { type: "text/html" });
+      const html = new Blob([clipboardHtml(snapshot, token)], { type: "text/html" });
       try {
         await clipboard.write([
           new ClipboardItem({
@@ -770,8 +801,10 @@ export class ClipboardController {
 
   /**
    * Read what the clipboard holds. Every read awaits; a read whose scope
-   * closed meanwhile gives nothing. A payload other than the waiting cut ends
-   * the cut.
+   * closed meanwhile gives nothing. This grid's own copy or cut is found by
+   * its token: in the custom format where the browser keeps one (Chromium),
+   * else in the HTML. A payload other than the waiting cut ends the cut, so a
+   * copy in another application since the cut is a plain paste, as in Excel.
    */
   private async readPayload(
     read: Scope,
@@ -794,33 +827,24 @@ export class ClipboardController {
           const envelope = parseClipboardJson(await (await item.getType(customType)).text());
           if (read.closed) return EMPTY;
           if (!envelope) continue;
-          if (this.pendingCut?.token === envelope.token)
-            return { kind: "cut", cut: this.pendingCut };
-          // A cut that was pasted or ended does not paste again, as in Excel.
-          if (this.endedCutToken === envelope.token) return EMPTY;
+          const own = this.ownPayload(envelope.token, null);
+          if (own) return own;
           this.endCut();
-          return this.trusted?.token === envelope.token
-            ? { kind: "internal", snapshot: this.trusted.snapshot }
-            : { kind: "foreign", snapshot: envelope.snapshot };
+          return { kind: "foreign", snapshot: envelope.snapshot };
         }
+
+        const html = await readClipboardType(items, "text/html");
+        const text = await readClipboardType(items, "text/plain");
+        if (read.closed) return EMPTY;
+        const token = html === null ? null : clipboardToken(html);
+        const own = token === null ? null : this.ownPayload(token, text);
+        if (own) return own;
 
         // The clipboard no longer holds the cut: this is a plain paste.
         this.endCut();
-        for (const item of items) {
-          if (!item.types.includes("text/html")) continue;
-          const html = await (await item.getType("text/html")).text();
-          if (read.closed) return EMPTY;
-          const grid = parseClipboardHtml(html, valuesOnly);
-          if (!grid) continue;
-          return { kind: "html", grid };
-        }
-
-        for (const item of items) {
-          if (!item.types.includes("text/plain")) continue;
-          const text = await (await item.getType("text/plain")).text();
-          if (read.closed || text.length === 0) return EMPTY;
-          return { kind: "text", text };
-        }
+        const grid = html === null ? null : parseClipboardHtml(html, valuesOnly);
+        if (grid) return { kind: "html", grid };
+        if (text !== null) return text.length === 0 ? EMPTY : { kind: "text", text };
       } catch {
         richReadFailed = true;
       }
@@ -838,6 +862,23 @@ export class ClipboardController {
     } catch {
       return { kind: "outcome", outcome: "blocked" };
     }
+  }
+
+  /**
+   * The payload of this grid's own copy or cut with `token`, or `null` when
+   * the token is another's. A cut that was pasted or ended does not paste
+   * again, as in Excel. `text` is the clipboard's plain text, when it has
+   * one: text that differs from the copy's was changed in another
+   * application, so the paste is a plain one.
+   */
+  private ownPayload(token: string, text: string | null): ClipboardPayload | null {
+    if (this.endedCutToken === token) return EMPTY;
+    const trusted = this.trusted;
+    if (trusted?.token !== token) return null;
+    if (text !== null && !sameClipboardText(text, trusted.snapshot.tsv)) return null;
+    if (this.pendingCut?.token === token) return { kind: "cut", cut: this.pendingCut };
+    this.endCut();
+    return { kind: "internal", snapshot: trusted.snapshot };
   }
 
   /**
