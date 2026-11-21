@@ -16,6 +16,8 @@ test("a refresh brings new orders and a changed step into the tables", async ({ 
 
   // New orders reach the workbook only through a refresh.
   await page.getByRole("button", { name: /new orders arrive/ }).click();
+  await expect(page.getByText("New orders in the feed: Refresh All to load them")).toBeVisible();
+  await expect(matched).toHaveCount(0);
   expect(await count()).toBe(shipped);
   await refreshAll();
   const withNewOrders = await count();

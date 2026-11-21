@@ -56,6 +56,7 @@ a:not([class]) > .sw-icon:last-child {
   --sw-icon-mask-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12h15M13.5 6l6 6-6 6'/%3E%3C/svg%3E");
   --sw-icon-mask-arrow-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.5 12h-15M10.5 6l-6 6 6 6'/%3E%3C/svg%3E");
   --sw-icon-mask-external: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 3.5h7v7M20.5 3.5l-9 9M18 14v4.5a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2H10'/%3E%3C/svg%3E");
+  --sw-icon-mask-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 6V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2H6'/%3E%3Crect x='9.5' y='9.5' width='11' height='11' rx='2'/%3E%3Crect x='18' y='18' width='3.5' height='3.5' rx='.5' fill='black' stroke='none'/%3E%3C/svg%3E");
 }
 
 /* A mask icon in the current text colour: set --sw-icon-mask to one of the

@@ -27,6 +27,24 @@ test("suggests a row total from its neighbours and Tab takes it @portability", a
   await expect(ghost).toHaveCount(0);
 });
 
+test("going back to a filled cell and typing = starts a new formula", async ({ page }) => {
+  await openShowcase(page, 1440, 900);
+  const target = page.getByRole("button", { name: "Finance's total" });
+  const bar = page.getByRole("textbox", { name: "Formula bar" });
+  const ghost = page.locator(".sheetwrite-formula-ghost");
+  await target.click();
+  await page.keyboard.type("=");
+  await expect(ghost).toHaveText("SUM(B6:G6)");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await expect(bar).toHaveValue("=SUM(B6:G6)");
+
+  await target.click();
+  await page.keyboard.type("=");
+  await expect(bar).toHaveValue("=");
+  await expect(ghost).toHaveText("SUM(B6:G6)");
+});
+
 test("loads the demo video only when the reader reaches it, without layout shift", async ({
   page,
 }) => {

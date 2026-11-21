@@ -142,38 +142,46 @@
   display: flex;
   gap: var(--sw-space-4);
 }
-.sw-terminal__tabs button,
-.sw-terminal__copy {
+.sw-terminal__tabs button {
+  margin-bottom: calc(var(--sw-border-width) * -1);
+  padding: var(--sw-space-3) 0;
   border: 0;
+  border-bottom: var(--sw-focus-ring-width) solid transparent;
   background: transparent;
   color: var(--sw-fg-muted);
   font: var(--sw-weight-medium) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
   cursor: pointer;
 }
-.sw-terminal__tabs button {
-  margin-bottom: calc(var(--sw-border-width) * -1);
-  padding: var(--sw-space-3) 0;
-  border-bottom: var(--sw-focus-ring-width) solid transparent;
-}
-.sw-terminal__tabs button:hover,
-.sw-terminal__copy:hover {
+.sw-terminal__tabs button:hover {
   color: var(--sw-fg-strong);
 }
 .sw-terminal__tabs button[aria-selected="true"] {
   color: var(--sw-fg-strong);
   border-bottom-color: var(--sw-accent);
 }
+/* The same button as the Expressive Code copy button on the code blocks
+   (base.css): an icon in a bordered square, the label for screen readers.
+   That icon is a one-colour mask, so this one draws its accent part in the
+   icon's colour too. */
 .sw-terminal__copy {
-  display: inline-flex;
-  gap: var(--sw-space-1-5);
-  align-items: center;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   margin-left: auto;
-  padding: var(--sw-space-1-5) var(--sw-space-2);
+  padding: 0;
+  border: var(--sw-border-width) solid var(--sw-border-strong);
   border-radius: var(--sw-radius-sm);
-  font-family: var(--sw-font-body);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-muted);
+  --sw-icon-accent: currentColor;
+  cursor: pointer;
+  transition: background-color 140ms ease;
 }
 .sw-terminal__copy:hover {
-  background: var(--sw-surface-1);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
 }
 .sw-prose .sw-terminal__body,
 .sw-terminal__body {

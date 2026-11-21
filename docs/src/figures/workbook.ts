@@ -477,6 +477,9 @@ function dashboardSheet(): SheetSnapshot {
     columns: [],
     pivots: [BY_PRODUCT, BY_MONTH],
     charts: [MONTHLY_CHART],
+    // Each item is as tall as what it shows: the pivot's five rows fill four
+    // rows of the layout, and the Region slicer, one row of buttons at this
+    // width, takes the two rows under it.
     dashboard: {
       items: [
         {
@@ -489,7 +492,7 @@ function dashboardSheet(): SheetSnapshot {
         },
         {
           id: "units",
-          box: { x: 4, y: 0, w: 3, h: 3 },
+          box: { x: 4, y: 0, w: 4, h: 3 },
           kind: "kpi",
           measure: "units",
           title: "Units sold",
@@ -497,7 +500,7 @@ function dashboardSheet(): SheetSnapshot {
         },
         {
           id: "target",
-          box: { x: 7, y: 0, w: 2, h: 3 },
+          box: { x: 8, y: 0, w: 4, h: 3 },
           kind: "kpi",
           measure: "attainment",
           title: "Target",
@@ -505,14 +508,14 @@ function dashboardSheet(): SheetSnapshot {
         },
         {
           id: "region",
-          box: { x: 9, y: 0, w: 3, h: 3 },
+          box: { x: 7, y: 7, w: 5, h: 2 },
           kind: "slicer",
           field: { table: "regions", column: "region" },
           selected: ["Americas", "EMEA"],
           title: "Region",
         },
         { id: "chart", box: { x: 0, y: 3, w: 7, h: 6 }, kind: "chart", chart: MONTHLY_CHART.id },
-        { id: "products", box: { x: 7, y: 3, w: 5, h: 6 }, kind: "pivot", pivot: BY_PRODUCT.id },
+        { id: "products", box: { x: 7, y: 3, w: 5, h: 4 }, kind: "pivot", pivot: BY_PRODUCT.id },
       ],
     },
     cells: [],

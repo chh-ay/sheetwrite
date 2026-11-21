@@ -326,7 +326,9 @@ export function createFormulaBar(
   };
   const onFocus = (): void => {
     size();
-    assist.attach(input, null);
+    // The grid's theme, as the cell editor's help gets: the bar sits outside
+    // the grid, so the guide cannot inherit the grid's colours.
+    assist.attach(input, grid.getTheme());
   };
   const onBlur = (): void => assist.detach();
 

@@ -581,8 +581,18 @@ function drawCategoryLabels(
   const labelExtent = vertical
     ? LINE_HEIGHT
     : Math.max(...labels.map((label) => textWidth(label))) + AXIS_LABEL_GAP;
-  const stride = Math.max(1, Math.ceil(labelExtent / band));
+  const fitStride = Math.max(1, Math.ceil(labelExtent / band));
+  // A horizontal label wider than its band moves right, by up to half the
+  // difference, to stay over the plot (below). The stride leaves room for
+  // that move, so the labels keep one spacing along the axis.
+  const widest = labelExtent - AXIS_LABEL_GAP;
+  const stride =
+    vertical || widest <= band
+      ? fitStride
+      : Math.max(fitStride, Math.ceil((1.5 * widest + AXIS_LABEL_GAP) / band - 0.5));
 
+  // The right edge of the last horizontal label drawn.
+  let drawnRight = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < labels.length; index += stride) {
     const label = labels[index] ?? "";
     const center = (index + 0.5) * band;
@@ -598,13 +608,17 @@ function drawCategoryLabels(
         group,
       );
     } else {
+      const text = fitText(label, band * stride - AXIS_LABEL_GAP);
+      // A label wider than its band stays over the plot: past the plot's left
+      // edge, the first one ran into the value axis's lowest label ($0). A
+      // label that would still reach the one before it is left out.
+      const half = textWidth(text) / 2;
+      const x = Math.min(Math.max(plot.left + center, plot.left + half), plot.right - half);
+      if (x - half < drawnRight + AXIS_LABEL_GAP) continue;
+      drawnRight = x + half;
       context.svg.text(
-        fitText(label, band * stride - AXIS_LABEL_GAP),
-        {
-          x: plot.left + center,
-          y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE,
-          "text-anchor": "middle",
-        },
+        text,
+        { x, y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE, "text-anchor": "middle" },
         group,
       );
     }
