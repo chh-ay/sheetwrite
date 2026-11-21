@@ -10,6 +10,7 @@
       "@sheetwrite/core",
       "@sheetwrite/xlsx",
       "@sheetwrite/charts",
+      "@sheetwrite/formula-assist",
       "@sheetwrite/react",
       "@sheetwrite/vue",
       "@sheetwrite/svelte"

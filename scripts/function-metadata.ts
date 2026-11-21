@@ -23,7 +23,7 @@ async function renderFunctionMetadataModule(repositoryRoot: string): Promise<str
   const [inventory, engineTypes, engineCalc, reference] = await Promise.all([
     loadFormulaContractInventory(repositoryRoot),
     readFile(join(repositoryRoot, "packages/wasm/src/types.rs"), "utf8"),
-    readFile(join(repositoryRoot, "packages/wasm/src/calc.rs"), "utf8"),
+    readFile(join(repositoryRoot, "packages/wasm/src/calc/functions.rs"), "utf8"),
     loadFormulaReferenceEntries(repositoryRoot),
   ]);
   return renderFunctionMetadata(

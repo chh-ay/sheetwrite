@@ -17,6 +17,7 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/xlsx",
   "@sheetwrite/queries",
   "@sheetwrite/charts",
+  "@sheetwrite/formula-assist",
   "@sheetwrite/react",
   "@sheetwrite/vue",
   "@sheetwrite/svelte",
@@ -190,6 +191,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
+  "scripts/wasm-relocations.test.ts",
   "scripts/snake-case-internals.test.ts",
 ] as const;
 
@@ -224,6 +226,7 @@ export const COVERED_PACKAGE_TEST_ROOTS = [
   "packages/svelte/test",
   "packages/xlsx/test",
   "packages/charts/test",
+  "packages/formula-assist/test",
   "packages/queries/test",
 ] as const;
 

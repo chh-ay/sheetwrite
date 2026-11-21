@@ -22,8 +22,8 @@ const packageDirectories = [
   "packages/vue",
   "packages/svelte",
 ];
-// The fixtures use every release package except @sheetwrite/formulas.
-const RELEASE_PACKAGE_COUNT = packageDirectories.length + 1;
+// The fixtures use every release package except @sheetwrite/formulas and @sheetwrite/formula-assist.
+const RELEASE_PACKAGE_COUNT = packageDirectories.length + 2;
 const sourceManifests = await Promise.all(
   packageDirectories.map(async (directory) =>
     JSON.parse(await readFile(join(repositoryRoot, directory, "package.json"), "utf8")),

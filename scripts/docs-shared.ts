@@ -41,6 +41,7 @@ export const MIGRATION_ROUTES = {
 export const PACKAGE_DIRECTORIES: Readonly<Record<string, string>> = {
   "@sheetwrite/charts": "packages/charts",
   "@sheetwrite/core": "packages/core",
+  "@sheetwrite/formula-assist": "packages/formula-assist",
   "@sheetwrite/formulas": "packages/formulas",
   "@sheetwrite/queries": "packages/queries",
   "@sheetwrite/react": "packages/react",

@@ -16,6 +16,7 @@ import {
   type FormulaTableNames,
 } from "./formula-analysis.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
+import { FormulaGhost } from "./formula-ghost.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
 import type { FormulaReference } from "./formula-references.js";
 import { formulaEntry, formulaTokens } from "./formula-syntax.js";
@@ -49,6 +50,11 @@ export interface AssistDeps {
   cell: () => Readonly<CellAddress> | null;
   /** The store whose sheets and functions the formula uses. */
   store: Store;
+  /**
+   * Show the suggestions of the store's formula suggester as ghost text: the
+   * formula bar does; the cell editor keeps Excel's AutoComplete instead.
+   */
+  suggestions?: boolean;
 }
 
 /** The ARIA a text field gets while it controls the function list. */
@@ -328,6 +334,11 @@ function textLine(className: string, text: string): HTMLElement {
   return line;
 }
 
+/** Fill alpha of the ranges a suggestion names: fainter than typed references until it is taken. */
+const GHOST_FILL_ALPHA = "22";
+/** A suggestion is announced to screen readers once it has held this long, not on every key. */
+const ANNOUNCE_DELAY_MS = 400;
+
 /** Formula help bound to one editor field at a time. */
 export class FormulaHelp {
   private readonly deps: AssistDeps;
@@ -353,6 +364,14 @@ export class FormulaHelp {
   /** The call at the caret and the errors shown, which the guide reads. */
   private call: FormulaCall | null = null;
   private diagnostics: readonly FormulaDiagnostic[] = [];
+  /** Ghost text from the store's formula suggester, in fields that show suggestions. */
+  private ghost: FormulaGhost | null = null;
+  /** The analysis of the field's text at its last update, which the ghost's keys read. */
+  private analysis: FormulaAnalysis | null = null;
+  /** Tells screen readers about a suggestion once it has held for `ANNOUNCE_DELAY_MS`. */
+  private ghostStatus: HTMLDivElement | null = null;
+  private announceTimer: ReturnType<typeof setTimeout> | undefined;
+  private announced = "";
   /** The fix of the first error shown, which the guide offers and Tab applies. */
   private fix: FormulaFix | null = null;
 
@@ -372,6 +391,18 @@ export class FormulaHelp {
     this.field = field;
     this.names = formulaNames(this.deps.store, this.deps.sheet(), this.deps.cell());
     this.mountLayer(field, theme);
+    if (this.deps.suggestions === true) {
+      this.ghost = new FormulaGhost({
+        store: this.deps.store,
+        cell: this.deps.cell,
+        functions: () => this.functions,
+      });
+      const status = document.createElement("div");
+      status.className = "sheetwrite-formula-ghost-status";
+      status.setAttribute("role", "status");
+      this.layer?.append(status);
+      this.ghostStatus = status;
+    }
     field.setAttribute("aria-autocomplete", "list");
     if (field instanceof HTMLInputElement) {
       field.setAttribute("role", "combobox");
@@ -417,6 +448,12 @@ export class FormulaHelp {
     this.guideText = "";
     this.completion = null;
     this.dismissedText = null;
+    this.ghost?.close();
+    clearTimeout(this.announceTimer);
+    this.ghostStatus = null;
+    this.announced = "";
+    this.ghost = null;
+    this.analysis = null;
   }
 
   /** Show help for the field's current text and caret. */
@@ -432,6 +469,7 @@ export class FormulaHelp {
 
     const cursor = field.selectionStart ?? text.length;
     const analysis = analyzeFormula(text, cursor, this.functions, this.names);
+    this.analysis = analysis;
     const nameFixes = misspelledNames(text, analysis, this.names);
     const diagnostics = shownDiagnostics(
       [...analysis.diagnostics, ...nameFixes.keys()].sort((left, right) => left.from - right.from),
@@ -439,10 +477,21 @@ export class FormulaHelp {
       text.length,
     );
     if (this.dismissedText !== null && this.dismissedText !== text) this.dismissedText = null;
+    const collapsed = field.selectionStart === field.selectionEnd;
+    const ghost = this.ghost?.update(text, collapsed ? cursor : -1, analysis) ?? null;
 
-    this.paintReferences(analysis.references);
-    this.paintText(field, text, analysis.references, diagnostics);
+    this.announce(ghost?.text ?? "");
+    const painted =
+      ghost === null
+        ? analysis
+        : analyzeFormula(text + ghost.text, text.length, this.functions, this.names);
+    this.paintReferences(painted.references, text.length);
+    this.paintText(field, text, analysis.references, diagnostics, ghost?.text ?? "");
     this.showCompletion(this.dismissedText === null ? analysis.completion : null);
+    if (ghost !== null && ghost.listIndex !== null && this.completion !== null) {
+      this.activeIndex = ghost.listIndex;
+      this.renderActive();
+    }
     this.call = analysis.call;
     this.diagnostics = diagnostics;
     const first = diagnostics[0];
@@ -455,12 +504,14 @@ export class FormulaHelp {
   }
 
   /**
-   * Keys that drive the open function list, and Tab, which applies the fix
-   * the guide offers while the list is closed. Returns true only when help
-   * used the key, so the editor's own Enter, Tab and Escape still work.
+   * Keys that drive the open function list; while it is closed, the ghost's
+   * keys, then Tab, which applies the fix the guide offers. A shown ghost
+   * takes Tab first, as the user sees it. Returns true only when help used
+   * the key, so the editor's own Enter, Tab and Escape still work.
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     if (this.completion === null) {
+      if (this.ghostKey(event)) return true;
       const fix = this.fix;
       if (event.key !== "Tab" || event.shiftKey || fix === null) return false;
       event.preventDefault();
@@ -481,12 +532,52 @@ export class FormulaHelp {
         return true;
       case "Escape":
         event.preventDefault();
+        if (this.field !== null) this.ghost?.dismiss(this.field.value);
         this.dismissedText = this.field?.value ?? null;
         this.update();
         return true;
       default:
         return false;
     }
+  }
+
+  /** The ghost's keys, while the function list is closed and the caret is at the end of the text. */
+  private ghostKey(event: KeyboardEvent): boolean {
+    const field = this.field;
+    const analysis = this.analysis;
+    if (this.ghost === null || field === null || analysis === null) return false;
+
+    const text = field.value;
+    if (field.selectionStart !== text.length || field.selectionEnd !== text.length) return false;
+    const next = this.ghost.keyDown(event, text, analysis);
+    if (next === null) return false;
+
+    event.preventDefault();
+    if (next === text) {
+      this.update();
+      return true;
+    }
+    field.value = next;
+    field.setSelectionRange(next.length, next.length);
+    // The editor and the formula bar react to input: drafts, sizing, help.
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  /** Announce `ghost` once it has held for a moment; a cleared ghost clears the status at once. */
+  private announce(ghost: string): void {
+    clearTimeout(this.announceTimer);
+    const status = this.ghostStatus;
+    if (status === null || ghost === this.announced) return;
+    if (ghost === "") {
+      this.announced = "";
+      status.textContent = "";
+      return;
+    }
+    this.announceTimer = setTimeout(() => {
+      this.announced = ghost;
+      status.textContent = `Suggestion: ${ghost}. Tab to accept.`;
+    }, ANNOUNCE_DELAY_MS);
   }
 
   /** Follow the field after it moves (scroll, resize). */
@@ -574,6 +665,8 @@ export class FormulaHelp {
 
   private clear(): void {
     this.deps.highlightCells(null);
+    this.ghost?.hide();
+    this.announce("");
     this.mirror?.remove();
     this.mirror = null;
     this.cancelPreview();
@@ -585,14 +678,18 @@ export class FormulaHelp {
     this.field?.removeAttribute("aria-invalid");
   }
 
-  /** Fill each referenced range on the grid with its reference's colour. */
-  private paintReferences(references: readonly FormulaReference[]): void {
+  /**
+   * Fill each referenced range on the grid with its reference's colour; the
+   * ranges a suggestion names, from `suggestedFrom` on, more faintly.
+   */
+  private paintReferences(references: readonly FormulaReference[], suggestedFrom: number): void {
     const ranges: HighlightRange[] = [];
     for (const reference of references) {
       const sheet = reference.sheet === null ? this.deps.sheet() : this.sheetNamed(reference.sheet);
       if (sheet === null) continue;
 
-      const color = `${referenceColor(reference)}${RANGE_FILL_ALPHA}`;
+      const alpha = reference.from >= suggestedFrom ? GHOST_FILL_ALPHA : RANGE_FILL_ALPHA;
+      const color = `${referenceColor(reference)}${alpha}`;
       ranges.push({ sheet, start: reference.start, end: reference.end, color });
     }
 
@@ -612,13 +709,14 @@ export class FormulaHelp {
     text: string,
     references: readonly FormulaReference[],
     diagnostics: readonly FormulaDiagnostic[],
+    ghost: string,
   ): void {
     const marks: MirrorMark[] = [
       ...references.map((reference) => ({ ...reference, color: referenceColor(reference) })),
       ...diagnostics.map((diagnostic) => ({ ...diagnostic, error: true })),
     ];
     this.mirror ??= new TextMirror(field);
-    this.mirror.render(text, marks);
+    this.mirror.render(text, marks, ghost);
   }
 
   private showCompletion(completion: FormulaCompletion | null): void {

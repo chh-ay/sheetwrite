@@ -119,6 +119,18 @@ export const SHOWCASE_ISLANDS = {
     load: () =>
       import("./interop/labs/InteropLabs.js").then(({ InteropLabs }) => withProps(InteropLabs)),
   },
+  "showcase-formula-assist-video": {
+    source: "src/showcases/formula-assist/DemoVideo.tsx",
+    load: () =>
+      import("./formula-assist/DemoVideo.js").then(({ DemoVideo }) => withProps(DemoVideo)),
+  },
+  "showcase-formula-assist": {
+    source: "src/showcases/formula-assist/FormulaAssistStage.tsx",
+    load: () =>
+      import("./formula-assist/FormulaAssistStage.js").then(({ FormulaAssistStage }) =>
+        withProps(FormulaAssistStage),
+      ),
+  },
   "showcase-sort": {
     source: "src/showcases/sort/SortStage.tsx",
     load: () => import("./sort/SortStage.js").then(({ SortStage }) => withProps(SortStage)),

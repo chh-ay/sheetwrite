@@ -105,8 +105,11 @@ export class TextMirror {
     this.layer = layer;
   }
 
-  /** Draw `text` with `marks`, then align the layer with the field. */
-  render(text: string, marks: readonly MirrorMark[]): void {
+  /**
+   * Draw `text` with `marks`, then `ghost` dimmed after it (a suggestion the
+   * field does not hold yet), then align the layer with the field.
+   */
+  render(text: string, marks: readonly MirrorMark[], ghost = ""): void {
     const spans = runs(text.length, marks).map(({ from, to, color, error }) => {
       const span = document.createElement("span");
       span.textContent = text.slice(from, to);
@@ -115,8 +118,12 @@ export class TextMirror {
       return span;
     });
 
+    const suggested = document.createElement("span");
+    suggested.className = "sheetwrite-formula-ghost";
+    suggested.textContent = ghost;
     // A trailing newline needs a character after it to take up a line.
-    this.layer.replaceChildren(...spans, text.endsWith("\n") ? " " : "");
+    const trailer = text.endsWith("\n") && ghost === "" ? " " : "";
+    this.layer.replaceChildren(...spans, ...(ghost === "" ? [] : [suggested]), trailer);
     this.sync();
   }
 
