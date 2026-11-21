@@ -108,6 +108,24 @@ test("documentation pages render one heading and a canonical URL", async ({ page
   }
 });
 
+test("docs prose keeps about 78 characters a line at every width", async ({ page }) => {
+  for (const width of [834, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/docs/features/grid/editing-and-clipboard/");
+    // Characters per line of each paragraph of three or more lines; the last
+    // line of a paragraph is short, so this is a little under a full line.
+    const perLine = await page.locator("article.sw-prose > p").evaluateAll((paragraphs) =>
+      paragraphs.flatMap((paragraph) => {
+        const lineHeight = Number.parseFloat(getComputedStyle(paragraph).lineHeight);
+        const lines = Math.round(paragraph.getBoundingClientRect().height / lineHeight);
+        return lines >= 3 ? [Math.round((paragraph.textContent ?? "").trim().length / lines)] : [];
+      }),
+    );
+    expect(perLine.length, `${width} px`).toBeGreaterThan(5);
+    expect(Math.max(...perLine), `${width} px`).toBeLessThanOrEqual(85);
+  }
+});
+
 test("framework tabs synchronize and persist across guides", async ({ page }) => {
   await page.goto("/docs/start/installation/");
   await waitForHydration(page);
