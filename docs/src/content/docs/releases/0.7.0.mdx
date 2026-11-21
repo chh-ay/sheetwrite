@@ -61,7 +61,7 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
     workbook, sheet or range.
   </Card>
   <Card title="Formula help" screenshot="card-formula-help" size="highlight" alt="A SUMIFS formula typed in the formula bar, and the argument guide under it with the current argument in bold." href="/docs/features/formulas/">
-    Autocomplete, an argument guide, live syntax errors, reference colours and Explain Formula
+    Formula AutoComplete, an argument guide, live syntax errors, reference colours and Explain Formula
     in the cell editor and the formula bar.
   </Card>
   <Card title="Compact ribbon" screenshot="card-compact-ribbon" size="highlight" alt="The compact ribbon: each group is a menu, and the Number menu is open under it." href="/docs/features/grid/">
@@ -140,6 +140,8 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
 - Multi-level category labels, as Excel draws them, kept in XLSX as `c:multiLvlStrRef`.
 - XLSX import and export read and write Excel column, bar, line, area, pie, doughnut and scatter
   charts.
+- XLSX export marks spilling formulas as dynamic arrays, so Excel spills them instead of showing
+  `=@SEQUENCE(3)`, and a `text` column round-trips in Excel's Text format `@`.
 
 ## Data
 
@@ -187,15 +189,17 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
 ## Formulas
 
 - Defined-name formulas, named LAMBDAs and a Name Manager.
-- Formula help in the cell editor and the formula bar: autocomplete, an argument guide, live
-  syntax errors, reference colours and Formulas › Explain Formula. Alt+Enter adds a line break, and both
-  editors grow to eight lines.
-- Formula assist, the new `@sheetwrite/formula-assist` package, shows the likely rest of a
-  formula as ghost text in the formula bar. It learns from the neighbouring cells, the column's
-  pattern and the formulas of the workbook's visible sheets, in memory only, and shows a
-  suggestion only when it is at least 90% sure. Tab takes it, Ctrl+→ (⌥→ on macOS) takes one
-  word, Esc hides it, and the ranges it names get a faint fill. On a held-out set of real
-  workbooks it saves 62.0% of keystrokes, with 0.7% of suggestions wrong. See
+- Formula help in the cell editor and the formula bar: Formula AutoComplete, an argument guide,
+  live syntax errors, reference colours and Formulas › Explain Formula. Alt+Enter adds a line
+  break, and both editors grow to eight lines.
+- Formula assist, the new `@sheetwrite/formula-assist` package installed with
+  `initSheetwrite({ addons: [formulaAssistAddon()] })`, shows the likely rest of a formula as
+  ghost text in the formula bar. It learns from the neighbouring cells, the column's pattern and
+  the formulas of the workbook's visible sheets, in memory only. It shows a suggestion only when
+  the benchmark measured it right at least 90% of the time, and 98% for suggestions from the rest
+  of the workbook. Tab takes it, Ctrl+→ (⌥→ on macOS) takes one word, Esc hides it, and the
+  ranges it names get a faint fill. On a held-out set of real workbooks it saves 62.0% of
+  keystrokes, with 0.7% of suggestions wrong. See
   [Formula assist](/docs/features/formulas/formula-assist/).
 - Custom JavaScript functions with metadata install with `functionsAddon([...])` and appear in
   Formulas › Insert Function.
@@ -213,8 +217,8 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
 - `grid.trimMemory()` gives back memory an open grid can build again.
 - Moving rows or columns moves the cells, as Excel's Insert Cut Cells does, and every reference
   follows them.
-- `grid.sheetRowOf` and `grid.viewRowOf` map between view rows and sheet rows, and the
-  `edit-begin`, `edit-commit` and `selection` events carry the sheet address too.
+- `grid.sheetRowOf` and `grid.viewRowOf` map between displayed rows and data rows, and the
+  `edit-begin`, `edit-commit` and `selection` events carry the cell's data-row address too.
 
 ## Excel editing
 
@@ -232,7 +236,13 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
   Options paste Values, Formulas, Formatting, Transpose or Paste Link in one click.
 - **Fill**: the fill handle continues Excel's series, shows each new value while it drags, and
   offers Auto Fill Options after the fill.
+- **Paste over hidden rows**: a pasted block over a filtered range or hidden rows writes into
+  every sheet row, the hidden rows included, as in Excel, and says how many hidden rows it wrote.
+  Paste Options › Paste into visible rows only (`grid.actions.pasteVisibleRows()`) pastes on the
+  shown rows instead.
 - **Insert and Delete** shift cells right, down, left or up, as in Excel.
+- **Delete** and `grid.actions.clearContents()` clear values and keep the cells' formats, as
+  Excel's Delete does.
 
 ### Validation and formats
 
@@ -241,8 +251,11 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
   bounds. A list cell shows a dropdown arrow, typing filters its list, and a rejected value shows
   Excel's Stop, Warning or Information alert.
 - **Format Cells**: Ctrl+1 opens a dialog with Number, Alignment, Font, Border and Fill, and the
-  selected cells preview the new format until OK or Cancel. Fraction and Text formats work as in
-  Excel.
+  selected cells preview the new format until OK or Cancel. Fraction, Text and elapsed-time
+  formats work as in Excel.
+- **General**: new sheets, `addSheet` without `columns`, XLSX imports and adapter columns without
+  `type` use the new `general` column type, which reads typing as Excel does. A number with no
+  format shows as Excel's General: `2026`, not `2,026`, and `1.23457E+11` for a long number.
 
 ### Keys and typing
 
@@ -253,7 +266,8 @@ call. Read the [breaking changes](#breaking-changes) before you upgrade.
   `key-bindings-change` for you to store.
 - **AutoComplete**: typing a text entry completes it from the column, and several matches show
   in a list. Alt+Down opens Excel's Pick From Drop-down List.
-- **Find**: Excel's wildcards and Find Options, Find All, workbook search, and a preview of what
+- **Find**: Excel's wildcards and Find Options, Find All and workbook search. Find matches a
+  number by the text the cell shows (`$4.50`, `15%`), selects each match, and previews what
   Replace all will change.
 - **Formula editor**: the formula list offers names, tables, columns and argument values; a
   formula that doesn't parse is refused with Excel's message; live errors offer a one-click fix.
@@ -460,17 +474,25 @@ name, a name another sheet holds in any case, and another sheet's id.
 
 ### Excel's keys, search, paste and validation
 
-- New default keys, such as Ctrl+B, Ctrl+1 and Ctrl+Alt+V, throw `shortcut-conflict` for a host
-  key that already uses one. Rebind the action or set it to `null`. See
+- A host key that uses a new default key, such as Ctrl+B, Ctrl+1 or Ctrl+Alt+V, now throws
+  `shortcut-conflict`. Rebind the action or set it to `null`. See
   [Keyboard defaults](/docs/start/upgrade-to-0-7-0/#keyboard-defaults).
 - A selection's active cell is the cell it started from, reported as `active`.
 - Cut no longer empties its cells; the paste moves them with the new `moveCells` operation, and
   the `"cut"` commit reason is gone. Servers that check operation kinds must accept it.
 - Search treats `*` and `?` as wildcards, looks in formulas unless `lookIn: "values"`, and
-  searches only a selection of more than one cell.
+  searches only a selection of more than one cell. A number in a number format matches by its
+  text, and Find selects the match.
 - A paste brings the copied cells' validation rules. `paste.keepValidation: true` keeps the
   target's rules, as 0.6 did.
 - `DataValidationCondition`, `ColumnFilter` and `SheetNameIssueCode` have new members.
+
+### New `general` column type
+
+Columns Sheetwrite makes are `general`, not `text`, and read typing as Excel's General format
+does. Handle `general` where your code switches on `Column.type`, and update collaborating
+clients together: a 0.6 peer refuses a snapshot or patch with a `general` column. See
+[Editing, filters and sheets](/docs/start/upgrade-to-0-7-0/#editing-filters-and-sheets).
 
 ### Errors and cancellation
 
