@@ -27,7 +27,7 @@ for (const theme of ["light", "dark"]) for (const width of [1440, 1240, 834, 600
   const group = page.locator('.sheetwrite-ribbon-group[aria-label="Show/Hide"] .sheetwrite-ribbon-group-button');
   let name = "show-hide-open";
   if (await group.isVisible()) await group.click();
-  else if (await more(page).isVisible()) { await page.keyboard.press("Escape"); await ribbon.evaluate((e) => e.scrollIntoView({ block: "start" })); await page.waitForTimeout(300); await more(page).click(); name = "more-open"; }
+  else if (await more(page).isVisible()) { if ((await page.locator(".sheetwrite-ribbon-popup").count()) > 0) await page.keyboard.press("Escape"); await ribbon.evaluate((e) => e.scrollIntoView({ block: "start" })); await page.waitForTimeout(300); await more(page).click(); name = "more-open"; }
   else name = undefined;
   if (name !== undefined) {
     await page.waitForTimeout(300);

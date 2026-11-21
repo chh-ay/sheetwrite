@@ -1,0 +1,35 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 [chromium] › test/browser/ribbon-labels.spec.ts:176:1 › running a command from a collapsed group's dropdown closes it (6.1s)
+
+
+  1) [chromium] › test/browser/ribbon-labels.spec.ts:176:1 › running a command from a collapsed group's dropdown closes it 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.sheetwrite-ribbon-popup')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.sheetwrite-ribbon-popup') with timeout 5000ms
+      - waiting for locator('.sheetwrite-ribbon-popup')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      189 |   await page.getByRole("button", { name: "Custom Sort" }).first().click();
+      190 |   await expect(page.locator(".sheetwrite-panel-host:not([hidden])")).toBeVisible();
+    > 191 |   await expect(popups).toHaveCount(0);
+          |                        ^
+      192 |   await expect(sortGroup).toHaveAttribute("aria-expanded", "false");
+      193 |
+      194 |   // Keyboard: the dropdown closes, and focus goes where the command leaves it,
+        at /home/vvin/checkouts/ribbon-base/test/browser/ribbon-labels.spec.ts:191:24
+
+    Error Context: test-results/playwright/ribbon-labels-running-a-co-2a899--group-s-dropdown-closes-it-chromium/error-context.md
+
+  1 failed
+    [chromium] › test/browser/ribbon-labels.spec.ts:176:1 › running a command from a collapsed group's dropdown closes it 
