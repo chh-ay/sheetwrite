@@ -116,8 +116,9 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   flushFrames();
 
   const id = mirror(host).id;
-  expect(mirror(host).getAttribute("role")).toBe("rowgroup");
-  expect(host.getAttribute("aria-rowcount")).toBe(String(ROW_COUNT + 1));
+  expect(mirror(host).getAttribute("role")).toBe("grid");
+  expect(host.getAttribute("role")).toBe("group");
+  expect(mirror(host).getAttribute("aria-rowcount")).toBe(String(ROW_COUNT + 1));
   expect(host.getAttribute("aria-activedescendant")).toBe(`${id}-0-0`);
   // A spreadsheet shows blank columns after the sheet's own.
   const headers = [...mirror(host).querySelectorAll('[role="columnheader"]')].slice(0, 3);
@@ -214,6 +215,30 @@ it("writes the mirror and aria-activedescendant of a synchronous paint in the sa
   expect(host.getAttribute("aria-activedescendant")).toBe(`${id}-2-1`);
   expect(gridCell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
   expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
+});
+
+it("owns only rows in the grid role, and not the host's chrome", () => {
+  const { host } = mount();
+  const grid = host.querySelector('[role="grid"]');
+
+  expect(grid === mirror(host)).toBe(true);
+  const owned = [...mirror(host).children].map((child) => child.getAttribute("role"));
+  expect(new Set(owned)).toEqual(new Set(["row"]));
+  expect(mirror(host).getAttribute("aria-label")).toBe(host.getAttribute("aria-label"));
+});
+
+it("names no missing element when the active cell is outside the mirrored window", () => {
+  const { grid, host } = mount();
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+  flushFrames();
+
+  scrollTo(host, SCROLLED_ROWS);
+  flushFrames();
+
+  expect(host.hasAttribute("aria-activedescendant")).toBe(false);
+  scrollTo(host, 0);
+  flushFrames();
+  expect(host.getAttribute("aria-activedescendant")).toBe(`${mirror(host).id}-0-0`);
 });
 
 it("leaves the host clean when a listener destroys the grid during a paint", () => {

@@ -21,9 +21,9 @@ requestAnimationFrame(() => {
 
 | Element | role | ARIA attributes | Text |
 | --- | --- | --- | --- |
-| Host `#grid` | `grid` | `aria-multiselectable="true"` `aria-rowcount="3"` `aria-colcount="2"` `aria-label="Spreadsheet grid"` `aria-activedescendant="sheetwrite-grid-1-0-0"` | |
+| Host `#grid` | `group` | `aria-label="Spreadsheet grid"` `aria-activedescendant="sheetwrite-grid-1-0-0"` | |
 | Canvas, scroller, overlay | | `aria-hidden="true"` | |
-| Mirror `div.sheetwrite-aria#sheetwrite-grid-1` | `rowgroup` | | |
+| Mirror `div.sheetwrite-aria#sheetwrite-grid-1` | `grid` | `aria-multiselectable="true"` `aria-rowcount="3"` `aria-colcount="2"` `aria-label="Spreadsheet grid"` | |
 | Header row | `row` | `aria-rowindex="1"` | |
 | Header cells | `columnheader` | `aria-colindex="1"`, `"2"` | A, B |
 | Data row 1 | `row` | `aria-rowindex="2"` | |
@@ -74,19 +74,18 @@ requestAnimationFrame(() => {
 
 </details>
 
-## The host grid
+## The host
 
-`createGrid` annotates the host element as the grid:
+The host holds the grid's chrome as well as its cells: the toolbar or ribbon,
+the sheet tabs, the find bar and the side panels. A `grid` may own only rows,
+so the host is a labelled `group` that keeps the keyboard focus, and the mirror
+inside it is the `grid`. `createGrid` annotates the host element:
 
 | Attribute | Value |
 | --- | --- |
-| `role` | `"grid"` |
-| `aria-multiselectable` | `"true"` |
-| `aria-rowcount` | total rows **+ 1** (the column-letter header counts as a row) |
-| `aria-colcount` | number of visible columns |
-| `aria-readonly` | `"true"` when the grid is `readOnly` (omitted otherwise) |
+| `role` | `"group"` |
 | `aria-label` | `"Spreadsheet grid"` (default; not overwritten if you set your own) |
-| `aria-activedescendant` | the id of the focused cell in the mirror |
+| `aria-activedescendant` | the id of the focused cell in the mirror; absent while the focused cell is outside the mirrored window |
 
 The visual layers — the scroller, the overlay, and the `<canvas>` — are all marked
 `aria-hidden="true"`, so screen readers ignore the pixels and read the mirror.
@@ -94,7 +93,17 @@ The visual layers — the scroller, the overlay, and the `<canvas>` — are all 
 ## The SR-only mirror
 
 Alongside the host the grid appends a visually-hidden `<div class="sheetwrite-aria">`
-with a unique id (`sheetwrite-grid-<n>`) and `role="rowgroup"`. It contains:
+with a unique id (`sheetwrite-grid-<n>`) and `role="grid"`. It carries the grid's attributes:
+
+| Attribute | Value |
+| --- | --- |
+| `aria-multiselectable` | `"true"` |
+| `aria-rowcount` | total rows **+ 1** (the column-letter header counts as a row) |
+| `aria-colcount` | number of visible columns |
+| `aria-readonly` | `"true"` when the grid is `readOnly` (omitted otherwise) |
+| `aria-label` | the host's `aria-label` |
+
+It contains:
 
 - A **header row** — `role="row"`, `aria-rowindex="1"` — whose cells are
   `role="columnheader"` with a 1-based `aria-colindex`. Spreadsheet presentation
@@ -118,10 +127,11 @@ as the paint: in the frame that shows a scroll, a key or an edit, and before
 Sketch of the emitted structure:
 
 ```html partial="illustrative output or schema" title="Illustrative excerpt"
-<div role="grid" aria-multiselectable="true" aria-rowcount="100001" aria-colcount="5"
+<div role="group" aria-label="Spreadsheet grid"
      aria-activedescendant="sheetwrite-grid-1-0-0" tabindex="0">
   <!-- canvas / scroller / overlay, all aria-hidden -->
-  <div class="sheetwrite-aria" id="sheetwrite-grid-1" role="rowgroup">
+  <div class="sheetwrite-aria" id="sheetwrite-grid-1" role="grid" aria-label="Spreadsheet grid"
+       aria-multiselectable="true" aria-rowcount="100001" aria-colcount="5">
     <div role="row" aria-rowindex="1">
       <div role="columnheader" aria-colindex="1">A</div>
       <div role="columnheader" aria-colindex="2">B</div>

@@ -399,7 +399,6 @@ export function PerformanceStage(props: PerformanceStageProps) {
             ref={(element) => {
               host = element;
             }}
-            role="grid"
           />
           <Show when={evictionWatch()}>
             {(watch) => (
