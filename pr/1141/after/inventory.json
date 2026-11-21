@@ -1,0 +1,210 @@
+[
+ {
+  "key": "no panel|Home|dense row|Increase Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Decrease Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Bold",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Italic",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Underline",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Strikethrough",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Borders",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Fill Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Font Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Top Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Middle Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Bottom Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Wrap Text",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Align Left",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Align Right",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Merge & Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Accounting Number Format",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "no panel|Home|dense row|Percent Style",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "no panel|Home|dense row|Comma Style",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "no panel|Home|dense row|Increase Decimal",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "no panel|Home|dense row|Decrease Decimal",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=large|Zoom Out",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=large|Zoom In",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=medium|Zoom Out",
+  "widths": "840..640 (11)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=medium|Zoom In",
+  "widths": "840..640 (11)"
+ },
+ {
+  "key": "panel|Home|dense row|Increase Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Decrease Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Bold",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Italic",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Underline",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Strikethrough",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Borders",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Fill Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Font Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Top Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Middle Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Bottom Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Wrap Text",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Align Left",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Align Right",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Merge & Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Accounting Number Format",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "panel|Home|dense row|Percent Style",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "panel|Home|dense row|Comma Style",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "panel|Home|dense row|Increase Decimal",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "panel|Home|dense row|Decrease Decimal",
+  "widths": "1440..920 (27)"
+ },
+ {
+  "key": "panel|View|group Zoom size=large|Zoom Out",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|View|group Zoom size=large|Zoom In",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|View|group Zoom size=medium|Zoom Out",
+  "widths": "840..640 (11)"
+ },
+ {
+  "key": "panel|View|group Zoom size=medium|Zoom In",
+  "widths": "840..640 (11)"
+ }
+]

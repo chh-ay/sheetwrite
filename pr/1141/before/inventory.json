@@ -1,0 +1,570 @@
+[
+ {
+  "key": "no panel|Home|dense row|Increase Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Decrease Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Bold",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Italic",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Underline",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Strikethrough",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Borders",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Fill Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Font Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Top Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Middle Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Bottom Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Wrap Text",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Align Left",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Align Right",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Merge & Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Accounting Number Format",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Percent Style",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Comma Style",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Increase Decimal",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Home|dense row|Decrease Decimal",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=large|Zoom Out",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=large|Zoom In",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "no panel|Data|group Show/Hide size=small|Hide Rows",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "no panel|Data|group Show/Hide size=small|Unhide Rows",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "no panel|Data|group Show/Hide size=small|Hide Columns",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "no panel|Data|group Show/Hide size=small|Unhide Columns",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "no panel|Home|group Editing size=small|AutoSum",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "no panel|Home|group Editing size=small|Clear",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "no panel|Home|group Editing size=small|Sort & Filter",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "no panel|Home|group Editing size=small|Find",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "no panel|Data|group Outline size=small|Group",
+  "widths": "1040..860 (10)"
+ },
+ {
+  "key": "no panel|Data|group Outline size=small|Ungroup",
+  "widths": "1040..860 (10)"
+ },
+ {
+  "key": "no panel|Data|group Data Tools size=small|Data Validation",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "no panel|Data|group Data Tools size=small|Data Model",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "no panel|Data|group Data Tools size=small|Measures",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "no panel|Home|group Cells size=small|Insert",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "no panel|Home|group Cells size=small|Delete",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "no panel|Home|group Cells size=small|Format",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "no panel|Home|group Clipboard size=small|Paste",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "no panel|Home|group Clipboard size=small|Cut",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "no panel|Home|group Clipboard size=small|Copy",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "no panel|Data|group Queries & Connections size=small|Refresh All",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "no panel|Data|group Queries & Connections size=small|Queries & Connections",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "no panel|Home|group Undo size=small|Undo",
+  "widths": "900..720 (10)"
+ },
+ {
+  "key": "no panel|Home|group Undo size=small|Redo",
+  "widths": "900..720 (10)"
+ },
+ {
+  "key": "no panel|Data|group Get & Transform Data size=small|Get Data",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Sort A to Z",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Sort Z to A",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Custom Sort",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Sort View A to Z",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Sort View Z to A",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Filter",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Clear",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|Data|group Sort & Filter size=small|Reapply",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "no panel|File|tab row|Keyboard shortcuts",
+  "widths": "840..320 (27)"
+ },
+ {
+  "key": "no panel|Home|tab row|Keyboard shortcuts",
+  "widths": "840..320 (27)"
+ },
+ {
+  "key": "no panel|Insert|tab row|Keyboard shortcuts",
+  "widths": "840..380 (24)"
+ },
+ {
+  "key": "no panel|Formulas|tab row|Keyboard shortcuts",
+  "widths": "840..480 (19)"
+ },
+ {
+  "key": "no panel|Data|tab row|Keyboard shortcuts",
+  "widths": "840..540 (16)"
+ },
+ {
+  "key": "no panel|View|tab row|Keyboard shortcuts",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=medium|Zoom Out",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "no panel|View|group Zoom size=medium|Zoom In",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "no panel|Insert|group Notes size=small|Note",
+  "widths": "720..460 (14)"
+ },
+ {
+  "key": "no panel|Insert|group Links size=small|Link",
+  "widths": "700..460 (13)"
+ },
+ {
+  "key": "no panel|Insert|group Dashboard size=small|New Dashboard",
+  "widths": "680..460 (12)"
+ },
+ {
+  "key": "no panel|Insert|group Charts size=small|Chart",
+  "widths": "600..460 (8)"
+ },
+ {
+  "key": "no panel|Insert|group Tables size=small|PivotTable",
+  "widths": "560..460 (6)"
+ },
+ {
+  "key": "no panel|Insert|group Rows & Columns size=small|Insert",
+  "widths": "520..460 (4)"
+ },
+ {
+  "key": "no panel|Insert|group Rows & Columns size=small|Delete",
+  "widths": "520..460 (4)"
+ },
+ {
+  "key": "panel|Home|dense row|Increase Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Decrease Font Size",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Bold",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Italic",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Underline",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Strikethrough",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Borders",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Fill Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Font Color",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Top Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Middle Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Bottom Align",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Wrap Text",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Align Left",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Align Right",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Merge & Center",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Accounting Number Format",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Percent Style",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Comma Style",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Increase Decimal",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Home|dense row|Decrease Decimal",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|View|group Zoom size=large|Zoom Out",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|View|group Zoom size=large|Zoom In",
+  "widths": "1440..860 (30)"
+ },
+ {
+  "key": "panel|Data|group Show/Hide size=small|Hide Rows",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "panel|Data|group Show/Hide size=small|Unhide Rows",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "panel|Data|group Show/Hide size=small|Hide Columns",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "panel|Data|group Show/Hide size=small|Unhide Columns",
+  "widths": "1240..860 (20)"
+ },
+ {
+  "key": "panel|Home|group Editing size=small|AutoSum",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "panel|Home|group Editing size=small|Clear",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "panel|Home|group Editing size=small|Sort & Filter",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "panel|Home|group Editing size=small|Find",
+  "widths": "1080..880 (11)"
+ },
+ {
+  "key": "panel|Data|group Outline size=small|Group",
+  "widths": "1040..860 (10)"
+ },
+ {
+  "key": "panel|Data|group Outline size=small|Ungroup",
+  "widths": "1040..860 (10)"
+ },
+ {
+  "key": "panel|Data|group Data Tools size=small|Data Validation",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "panel|Data|group Data Tools size=small|Data Model",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "panel|Data|group Data Tools size=small|Measures",
+  "widths": "980..860 (7)"
+ },
+ {
+  "key": "panel|Home|group Cells size=small|Insert",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "panel|Home|group Cells size=small|Delete",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "panel|Home|group Cells size=small|Format",
+  "widths": "960..860 (6)"
+ },
+ {
+  "key": "panel|Home|group Clipboard size=small|Paste",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "panel|Home|group Clipboard size=small|Cut",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "panel|Home|group Clipboard size=small|Copy",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "panel|Data|group Queries & Connections size=small|Refresh All",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "panel|Data|group Queries & Connections size=small|Queries & Connections",
+  "widths": "920..860 (4)"
+ },
+ {
+  "key": "panel|Home|group Undo size=small|Undo",
+  "widths": "900..720 (10)"
+ },
+ {
+  "key": "panel|Home|group Undo size=small|Redo",
+  "widths": "900..720 (10)"
+ },
+ {
+  "key": "panel|Data|group Get & Transform Data size=small|Get Data",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Sort A to Z",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Sort Z to A",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Custom Sort",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Sort View A to Z",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Sort View Z to A",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Filter",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Clear",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|Data|group Sort & Filter size=small|Reapply",
+  "widths": "860..860 (1)"
+ },
+ {
+  "key": "panel|File|tab row|Keyboard shortcuts",
+  "widths": "840..320 (27)"
+ },
+ {
+  "key": "panel|Home|tab row|Keyboard shortcuts",
+  "widths": "840..320 (27)"
+ },
+ {
+  "key": "panel|Insert|tab row|Keyboard shortcuts",
+  "widths": "840..380 (24)"
+ },
+ {
+  "key": "panel|Formulas|tab row|Keyboard shortcuts",
+  "widths": "840..480 (19)"
+ },
+ {
+  "key": "panel|Data|tab row|Keyboard shortcuts",
+  "widths": "840..540 (16)"
+ },
+ {
+  "key": "panel|View|tab row|Keyboard shortcuts",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "panel|View|group Zoom size=medium|Zoom Out",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "panel|View|group Zoom size=medium|Zoom In",
+  "widths": "840..560 (15)"
+ },
+ {
+  "key": "panel|Insert|group Notes size=small|Note",
+  "widths": "720..460 (14)"
+ },
+ {
+  "key": "panel|Insert|group Links size=small|Link",
+  "widths": "700..460 (13)"
+ },
+ {
+  "key": "panel|Insert|group Dashboard size=small|New Dashboard",
+  "widths": "680..460 (12)"
+ },
+ {
+  "key": "panel|Insert|group Charts size=small|Chart",
+  "widths": "600..460 (8)"
+ },
+ {
+  "key": "panel|Insert|group Tables size=small|PivotTable",
+  "widths": "560..460 (6)"
+ },
+ {
+  "key": "panel|Insert|group Rows & Columns size=small|Insert",
+  "widths": "520..460 (4)"
+ },
+ {
+  "key": "panel|Insert|group Rows & Columns size=small|Delete",
+  "widths": "520..460 (4)"
+ }
+]
