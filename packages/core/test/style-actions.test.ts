@@ -1,12 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellChange, DocumentOp, Grid } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
-  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -177,7 +177,7 @@ describe("StyleActions merge policy", () => {
 
       await answerDialog(host, "OK");
       expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
-      expectSameNode(document.activeElement, host);
+      expectSame(document.activeElement, host);
       expect(merges(grid)).toEqual([{ r0: 5, c0: 0, r1: 5, c1: 1 }]);
       expect(grid.store.getCell(a6)).toMatchObject({ resolved: "m1", style: { align: "center" } });
       expect(grid.store.getCell(b6).resolved).toBeNull();
@@ -236,7 +236,7 @@ describe("StyleActions merge policy", () => {
       expect(merges(grid)).toEqual([]);
       expect(grid.store.getCell(a6).resolved).toBe("m1");
       expect(grid.store.getCell(b6).resolved).toBe("m2");
-      expectSameNode(document.activeElement, host);
+      expectSame(document.activeElement, host);
       expect(dialog.isConnected).toBe(false);
       grid.destroy();
     });

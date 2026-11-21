@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { setChartRendererFactory } from "../src/chart-backend.js";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -10,7 +11,7 @@ import type {
   GridOptions,
   Workbook,
 } from "../src/types.js";
-import { expectSameNode, makeWorkbook } from "./fixtures.js";
+import { makeWorkbook } from "./fixtures.js";
 
 const ROW_HEIGHT = DEFAULT_THEME.rowHeight;
 /** Column widths of `makeWorkbook`: name, amount, city. */
@@ -263,7 +264,7 @@ describe("object layer editing", () => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement)) throw new Error("expected a focused menu row");
     focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expectSameNode(document.activeElement, frame);
+    expectSame(document.activeElement, frame);
 
     press(frame, "ContextMenu");
     expect(menuRows(grid)).toEqual(["editChart", "deleteChart"]);
@@ -282,7 +283,7 @@ describe("object layer editing", () => {
     expect(activated).toEqual([{ sheet: "s1", id: "c1" }]);
 
     press(frame, "Escape");
-    expectSameNode(document.activeElement, hostOf(grid));
+    expectSame(document.activeElement, hostOf(grid));
     expect(frame.classList.contains("sheetwrite-object-selected")).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -7,7 +8,6 @@ import type { CellStyle, CellValue, DocumentOp, Grid } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
-  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -299,7 +299,7 @@ describe("the cell editor", () => {
     await answerDialog(host, "OK");
     const field = editor();
     expect(value(3, 2)).toBe("Phnom Penh");
-    expectSameNode(document.activeElement, field);
+    expectSame(document.activeElement, field);
     expect([field?.selectionStart, field?.selectionEnd]).toEqual([11, 12]);
     press("Escape");
 
@@ -487,12 +487,12 @@ describe("insert and delete keys", () => {
     ]);
     // A wide range defaults to Shift cells down; the focus starts on the chosen option.
     expect(choices[1]!.checked).toBe(true);
-    expectSameNode(document.activeElement, choices[1]!);
+    expectSame(document.activeElement, choices[1]!);
     choices[2]!.checked = true;
     await answerDialog(host, "OK");
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBe("Customer 1");
-    expectSameNode(document.activeElement, host);
+    expectSame(document.activeElement, host);
 
     // A tall range defaults to Shift cells left.
     select(0, 1, 3, 1);
