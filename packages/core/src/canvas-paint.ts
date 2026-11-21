@@ -1,6 +1,6 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { automaticTextColor } from "./color-contrast.js";
-import { formatNumber } from "./number-format.js";
+import { formatGeneral, formatNumber, GENERAL_WIDTH, showsGeneral } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
@@ -884,6 +884,28 @@ function clipCell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
   ctx.clip();
 }
 
+/**
+ * A General number narrowed to fit `available` pixels, as Excel narrows it in
+ * a narrow column: fewer decimals, then scientific notation. Null when the
+ * format is not General or no form fits, where Excel shows `####`. Only a
+ * number that overflows its cell gets here.
+ */
+function narrowGeneral(
+  ctx: Ctx,
+  value: number,
+  format: string | undefined,
+  locale: string | undefined,
+  available: number,
+): string | null {
+  if (!showsGeneral(format)) return null;
+  for (let width = GENERAL_WIDTH - 1; width > 0; width--) {
+    const text = formatGeneral(value, width, locale);
+    if (text === null) return null;
+    if (ctx.measureText(text).width <= available) return text;
+  }
+  return null;
+}
+
 function paintCell(
   ctx: Ctx,
   theme: Theme,
@@ -968,13 +990,14 @@ function paintCell(
         ? "right"
         : "left");
   const numeric = typeof value === "number";
+  const numberFormat = effective.numberFormat ?? column?.numberFormat;
   let text =
     typeof value === "boolean"
       ? value
         ? "TRUE"
         : "FALSE"
       : numeric
-        ? formatNumber(value, effective.numberFormat ?? column?.numberFormat, column?.numberLocale)
+        ? formatNumber(value, numberFormat, column?.numberLocale)
         : value;
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
@@ -990,7 +1013,9 @@ function paintCell(
     const mayOverflow = text.length * state.digitWidth > availableTextWidth * 0.8;
     const exactWidth = mayOverflow ? ctx.measureText(text).width : 0;
     if (exactWidth > availableTextWidth) {
-      text = "#".repeat(Math.max(1, Math.floor(availableTextWidth / state.hashWidth)));
+      text =
+        narrowGeneral(ctx, value, numberFormat, column?.numberLocale, availableTextWidth) ??
+        "#".repeat(Math.max(1, Math.floor(availableTextWidth / state.hashWidth)));
     }
   }
 

@@ -241,6 +241,7 @@ export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats
 export function trimNumberFormatCaches(): void {
   formatCache.clear();
   numberFormatterCache.clear();
+  decimalSeparators.clear();
   dateTimeFormatterCache.clear();
   numberTextCache.clear();
   numberTextGroups = 0;
@@ -799,6 +800,94 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
 /** Excel's explicit "no format" code; a cell can carry it to opt out of its column's format. */
 const GENERAL_CODE_RE = /^general$/i;
 
+/** The characters Excel's General format fills in a standard-width cell. */
+export const GENERAL_WIDTH = 11;
+
+/** Each locale's decimal separator, for General text. */
+const decimalSeparators = new Map<string, string>();
+
+function decimalSeparator(locale: string): string {
+  let separator = decimalSeparators.get(locale);
+  if (separator === undefined) {
+    separator =
+      defaultFormatter(locale)
+        .formatToParts(1.5)
+        .find((part) => part.type === "decimal")?.value ?? ".";
+    decimalSeparators.set(locale, separator);
+  }
+  return separator;
+}
+
+/** `digits` without the zeros that end its fraction, and without a bare decimal point. */
+function trimFraction(digits: string): string {
+  if (!digits.includes(".")) return digits;
+  let end = digits.length;
+  while (digits.charCodeAt(end - 1) === 48) end--;
+  if (digits.charCodeAt(end - 1) === 46) end--;
+  return digits.slice(0, end);
+}
+
+/**
+ * `magnitude` in General's scientific notation in at most `width` characters:
+ * up to 5 decimals, trailing zeros dropped, and a two-digit exponent at least
+ * (`1.23457E+11`, `1E-05`). Null when even `1E+11` does not fit.
+ */
+function generalScientific(magnitude: number, width: number): string | null {
+  for (let decimals = Math.min(5, Math.max(0, width - 6)); decimals >= 0; decimals--) {
+    const exponential = magnitude.toExponential(decimals);
+    const e = exponential.indexOf("e");
+    const power = Number(exponential.slice(e + 1));
+    const text = `${trimFraction(exponential.slice(0, e))}E${power < 0 ? "-" : "+"}${String(Math.abs(power)).padStart(2, "0")}`;
+    if (text.length <= width) return text;
+  }
+  return null;
+}
+
+/**
+ * A number as Excel's General format shows it in a cell `width` characters
+ * wide, the minus sign not counted: no thousands separators, and rounded to
+ * the digits that fit. A number whose whole part does not fit, or that is
+ * below 0.0001, shows in scientific notation. A standard-width cell holds
+ * 11 characters, so `123456789012` shows as `1.23457E+11` and `1/3` as
+ * `0.333333333`. Excel shows no negative zero.
+ *
+ * @param value - The number to show.
+ * @param width - The characters the cell holds; Excel's standard width holds 11.
+ * @param locale - BCP 47 locale for the decimal separator; defaults to `en-US`.
+ * @returns The text, or null when no form fits, where Excel shows `####`.
+ */
+export function formatGeneral(
+  value: number,
+  width = GENERAL_WIDTH,
+  locale = "en-US",
+): string | null {
+  if (!Number.isFinite(value)) return "";
+  if (value === 0) return "0";
+  const magnitude = Math.abs(value);
+  const exponent = Math.floor(Math.log10(magnitude));
+  let text: string | null = null;
+  if (exponent >= -4 && exponent < width) {
+    // The whole part and the decimal point take their places first.
+    const fixed = trimFraction(magnitude.toFixed(Math.max(0, width - Math.max(exponent, 0) - 2)));
+    if (fixed.length <= width && fixed !== "0") text = fixed;
+  }
+  text ??= generalScientific(magnitude, width);
+  if (text === null) return null;
+  const separator = decimalSeparator(locale);
+  if (separator !== ".") text = text.replace(".", separator);
+  return value < 0 ? `-${text}` : text;
+}
+
+/**
+ * Whether a number shows in Excel's General format under `format`: no code,
+ * `General`, or the Text format `@`, which shows a number as General does.
+ */
+export function showsGeneral(format: string | undefined): boolean {
+  return (
+    !format || GENERAL_CODE_RE.test(format) || compileFormat(format).numberSections.length === 0
+  );
+}
+
 /**
  * Deterministic Excel-style number/date formatter. Supports explicit locale
  * separators, percent/scientific notation, UTC date/time tokens, four-section
@@ -836,11 +925,11 @@ export function formatNumber(value: number | string, format?: string, locale = "
 
 /** Uncached format core; `formatNumber` owns the shared text cache. */
 function renderNumberText(value: number, code: string | undefined, locale: string): string {
-  if (!code) return defaultFormatter(locale).format(value);
+  if (!code) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
 
   const format = compileFormat(code);
   // The Text format, `@` alone, shows a number as General would.
-  if (format.numberSections.length === 0) return defaultFormatter(locale).format(value);
+  if (format.numberSections.length === 0) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
   const { section, magnitude } = sectionFor(value, format);
   if (section.fraction) return renderFraction(magnitude, section.fraction, locale);
   if (section.dateTokens) return renderDate(magnitude, section.dateTokens, locale);
