@@ -16,10 +16,15 @@ import type { SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
-import type { SheetId } from "./types/coordinates.js";
+import type { Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
+import {
+  type CopiedValidation,
+  copiedValidation,
+  validationPastePatches,
+} from "./validation-transfer.js";
 
 /**
  * How Auto Fill Options redoes a fill: Copy Cells, Fill Series, Fill
@@ -345,7 +350,9 @@ export class FillController {
   /**
    * Write the fill into the new cells of `target`. `keep` keeps the targets'
    * own values ("formats", Fill Formatting Only) or formats ("values", Fill
-   * Without Formatting).
+   * Without Formatting). The new cells take the source's data validation
+   * rules in place of their own, except with Fill Without Formatting: Excel
+   * counts a cell's validation with its formats.
    */
   private commit(
     source: FillSource,
@@ -376,10 +383,9 @@ export class FillController {
       : null;
 
     const metadata = this.deps.sheet();
-    // Validation and protection require per-cell operations for policy issue indices.
-    const scalarWrites = Boolean(
-      metadata.validationRules?.length || metadata.protectedRanges?.length,
-    );
+    // Protection requires per-cell operations for policy issue indices. A fill
+    // is not checked against validation rules, as in Excel.
+    const scalarWrites = Boolean(metadata.protectedRanges?.length);
     const patches: DocumentOp[] = [];
     const cells: SnapshotCell[] = [];
     for (let r = output.r0; r <= output.r1; r++) {
@@ -403,17 +409,95 @@ export class FillController {
       start: { row: startRow, col: output.c0 },
       end: { row: endRow, col: output.c1 },
     };
+    const rules =
+      keep === "values" ? [] : this.validationPatches(source, output, vertical, dataRows);
     const wasChanging = this.changing;
     this.changing = true;
     try {
       const outcome = this.deps.commit(
-        scalarWrites ? patches : [{ op: "setRange", range, cells }],
+        scalarWrites ? [...patches, ...rules] : [{ op: "setRange", range, cells }, ...rules],
         "fill",
       );
       return outcome.status === "applied";
     } finally {
       this.changing = wasChanging;
     }
+  }
+
+  /**
+   * The rule changes of a fill, through the paste's transfer: each new cell
+   * takes the validation rules of the source cell it repeats, in place of its
+   * own, as Excel's fill does. A rule over the whole source along the fill
+   * covers the new cells as one range. None when a sorted view splits the
+   * rows, as for a paste.
+   */
+  private validationPatches(
+    source: FillSource,
+    output: SelRect,
+    vertical: boolean,
+    dataRows: readonly number[],
+  ): DocumentOp[] {
+    const sheet = this.deps.sheet();
+    const rules = sheet.validationRules ?? [];
+    const { rect } = source;
+    const first = this.deps.toDataRow(rect.r0);
+    const outputFirst = dataRows[0];
+    if (rules.length === 0 || outputFirst === undefined) return [];
+    for (let row = rect.r0 + 1; row <= rect.r1; row++) {
+      if (this.deps.toDataRow(row) !== first + row - rect.r0) return [];
+    }
+    if (dataRows.some((row, index) => row !== outputFirst + index)) return [];
+    const block: Range = {
+      sheet: sheet.id,
+      start: { row: first, col: rect.c0 },
+      end: { row: first + rect.r1 - rect.r0, col: rect.c1 },
+    };
+    // Along the fill: where the source starts, its length, and the new cells.
+    const [from, length, start, end] = vertical
+      ? [rect.r0, rect.r1 - rect.r0 + 1, output.r0, output.r1]
+      : [rect.c0, rect.c1 - rect.c0 + 1, output.c0, output.c1];
+    const pieces: CopiedValidation[] = [];
+    for (const piece of copiedValidation(rules, block)) {
+      const [lo, hi] = vertical ? piece.rows : piece.cols;
+      const place = (a: number, b: number): void => {
+        const along = [a - start, b - start] as const;
+        pieces.push({
+          rule: piece.rule,
+          rows: vertical ? along : piece.rows,
+          cols: vertical ? piece.cols : along,
+          at: piece.at,
+        });
+      };
+      if (lo === 0 && hi === length - 1) {
+        place(start, end);
+        continue;
+      }
+      // One run of new cells per repeat of the source, joined where they touch.
+      let run: [number, number] | null = null;
+      for (let tile = start; tile <= end;) {
+        const offset = (((tile - from) % length) + length) % length;
+        const tileEnd = Math.min(end, tile + length - 1 - offset);
+        const a = tile + Math.max(lo, offset) - offset;
+        const b = tile + Math.min(hi, offset + tileEnd - tile) - offset;
+        if (a <= b) {
+          if (run && run[1] + 1 === a) run[1] = b;
+          else {
+            if (run) place(run[0], run[1]);
+            run = [a, b];
+          }
+        }
+        tile = tileEnd + 1;
+      }
+      if (run) place(run[0], run[1]);
+    }
+    const rows = output.r1 - output.r0 + 1;
+    const cols = output.c1 - output.c0 + 1;
+    return validationPastePatches(
+      sheet,
+      pieces,
+      { rows, cols },
+      { row: outputFirst, col: output.c0, rows, cols },
+    );
   }
 }
 

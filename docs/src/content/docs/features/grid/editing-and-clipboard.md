@@ -133,9 +133,11 @@ To supply your own editor, see [Host-supplied editors](/docs/features/grid/custo
 
 ## Clipboard interoperability
 
-Copy and cut always produce injection-hardened TSV. Where the browser exposes `ClipboardItem`, they also write sanitized `text/html` and Sheetwrite's private `application/x-sheetwrite+json` payload. The private payload keeps formula source and cell styles for same-app round trips. The HTML contains only escaped table markup, plain cell text, safe `data-sheetwrite-formula` attributes, and a bounded style subset. No pasted HTML goes into the document.
+Copy and cut always produce injection-hardened TSV. Where the browser exposes `ClipboardItem`, they also write sanitized `text/html`, and where the browser keeps custom formats (Chromium), Sheetwrite's private `application/x-sheetwrite+json` payload. The HTML contains only escaped table markup, plain cell text, safe `data-sheetwrite-formula` attributes, a bounded style subset, and a random token on the table. No pasted HTML goes into the document.
 
-Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then plain TSV:
+A grid keeps its last copy or cut, with formula source and cell styles, in memory. A paste whose clipboard carries that copy's token, in the private payload or in the HTML, pastes it with its formulas and styles, or moves the cells of a cut. This works the same in Chromium, Firefox and Safari, whose clipboards keep only plain text and HTML. A token from another grid, or HTML whose text was changed in another app, pastes as external content.
+
+Other content pastes from the private payload, then sanitized HTML tables, then plain TSV:
 
 - HTML parsing uses an inert `DOMParser` document. It accepts only cell text, safe formula attributes, and supported inline styles.
 - External formulas that contain control characters become text.
