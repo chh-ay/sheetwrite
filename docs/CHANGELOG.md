@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The data tools showcase, the only one without a picture of how it works, has a section with a blueprint figure of what its guarded columns do with an edit that breaks their rule: Units rejects −5, Freight saves $350 with a warning, and Order ID is locked.
+- The proof cards of the vanilla, React, Vue and Svelte workbenches (`/vanilla/`, `/react/`, `/vue/`, `/svelte/`) are blueprint pictures, like the other showcases, and their titles and text are in plain words ("Create and destroy" instead of "Explicit lifecycle"). They were the last pictures in the old card style, so `Art.tsx` and the old art classes in `art.css` are gone. The database and collaboration proof cards are in plain words too ("A retry is applied once" instead of "Idempotent retries").
 - Search ranks the pages whose title or a heading holds a query of several words as one phrase above the rest, and opens on that heading: "find all" finds "Options and Find All in the find bar" on the Search page before the text functions page, which only mentions FIND.
 - On the 404 page, the Home card's title and text sat lower than the other two cards', whose text runs to two lines. The three titles now start on the same line.
 - Inline code is never smaller than 12 px: inside table headers, small labels and captions it was 10–11 px (the "Referenced by" labels, the collaboration and compatibility tables). The mini ribbon's group labels are 12 px instead of 10.4 px, and the "Open the checked interactive result" link of each compatibility result takes a 44 px target on phones.
