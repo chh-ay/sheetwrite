@@ -225,6 +225,13 @@ function generalDate(text: string): GeneralNumber | null {
 
 const DATE_THEN_TIME = /^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm]?)?)$/;
 const FRACTION = /^(-?)(\d+)\s+(\d+)\/(\d+)$/;
+/**
+ * The longest text the fraction, time and date forms read. The longest of
+ * them, `September 30, 2026 12:59:59 PM`, has 30 characters; past this
+ * limit a pasted or stored string skips them, so their backtracking stays
+ * bounded (`DATE_THEN_TIME` is quadratic in the text's length).
+ */
+const MAX_DATE_TEXT_LENGTH = 40;
 
 /**
  * The number Excel's General format reads from `text` (trimmed, not empty,
@@ -234,6 +241,7 @@ const FRACTION = /^(-?)(\d+)\s+(\d+)\/(\d+)$/;
 export function parseGeneralNumber(text: string, locale?: string): GeneralNumber | null {
   const number = generalNumber(text, separatorsOf(locale));
   if (number !== null) return number;
+  if (text.length > MAX_DATE_TEXT_LENGTH) return null;
 
   const fraction = FRACTION.exec(text);
   if (fraction) {

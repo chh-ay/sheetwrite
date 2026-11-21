@@ -29,6 +29,7 @@ export const REPLAY_SETS = [
   "fixtures",
   "enron-dev",
   "enron-dev2",
+  "enron-dev-large",
   "enron-heldout",
 ] as const;
 
@@ -243,11 +244,19 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
 }
 
 /**
- * One set of the Enron sample: `dev` and `dev2` to tune on, `heldout` for the
- * gate only (see enron/README.md).
+ * One set of the Enron sample: `dev`, `dev2` and `dev-large` to tune on,
+ * `heldout` for the gate only (see enron/README.md). `dev-large` is not
+ * committed; enron/build.ts builds it.
  */
-async function* enronWorkbooks(set: "dev" | "dev2" | "heldout"): AsyncGenerator<ReplayWorkbook> {
+async function* enronWorkbooks(
+  set: "dev" | "dev2" | "dev-large" | "heldout",
+): AsyncGenerator<ReplayWorkbook> {
   const path = new URL(`./enron/${set}.json`, import.meta.url);
+  if (!(await Bun.file(path).exists())) {
+    throw new Error(
+      `${path.pathname} is missing: build it with bench/enron/build.ts --dev-large (see enron/README.md)`,
+    );
+  }
   const sample: unknown = JSON.parse(await readFile(path, "utf8"));
   if (!isEnronSample(sample)) throw new Error(`${path.pathname} is not an Enron sample file`);
 
@@ -314,5 +323,7 @@ export function replayWorkbooks(set: ReplaySetName): AsyncGenerator<ReplayWorkbo
       return enronWorkbooks("heldout");
     case "enron-dev2":
       return enronWorkbooks("dev2");
+    case "enron-dev-large":
+      return enronWorkbooks("dev-large");
   }
 }

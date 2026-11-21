@@ -36,6 +36,7 @@ The row "Excel floor" uses no signal: only the function list, as Excel has it. `
 | --- | --- | --- |
 | `enron-dev` | 50 workbooks of the Enron sample (see `enron/README.md`) | Tune here |
 | `enron-dev2` | 50 more, a burned held-out set | Tune here |
+| `enron-dev-large` | 500 more, not committed: `enron/build.ts --dev-large` builds it. Run it with `--set enron-dev-large`. | Tune here |
 | `enron-heldout` | 50 workbooks neither development set nor a burned draw holds | Gate only, never read while tuning |
 | `conformance` | Every formula case of the conformance corpus | Regression floor |
 | `fixtures` | Every formula of the XLSX fixtures | Wrong-suggestion ceiling |

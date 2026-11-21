@@ -260,6 +260,9 @@ function makeHarness(
     readOnly: () => readOnly,
     mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
     toDataRow: options.toDataRow ?? ((viewRow) => viewRow),
+    toViewRow: (dataRow) => dataRow,
+    // A harness with its own row order stands for a sorted or filtered view.
+    rowSpan: (first, last) => (options.toDataRow ? null : { first, last }),
     commit: (patches, reason) => {
       commitReasons.push(reason);
       store.apply(patches);
@@ -999,6 +1002,8 @@ describe("spill clipboard commands", () => {
       readOnly: () => false,
       mergeAnchorAt: () => null,
       toDataRow: (row) => row,
+      toViewRow: (row) => row,
+      rowSpan: (first, last) => ({ first, last }),
       commit: (patches, reason) => {
         document.commit(patches, reason);
       },

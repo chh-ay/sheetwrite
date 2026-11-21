@@ -42,10 +42,41 @@ type Contradiction = "none" | "single" | "pair";
  * A number written in the formula itself, outside references: the `31` of
  * `=D11*31`. Neighbours copied across days or months often differ in it.
  */
-const LITERAL_NUMBER = /(?<![A-Za-z$\d.:])\d+(?:\.\d+)?(?![\d.]*[A-Za-z(])/;
-
 function hasLiteralNumber(formula: string): boolean {
-  return LITERAL_NUMBER.test(formula.replace(/"[^"]*"/g, '""'));
+  const text = formula.replace(/"[^"]*"/g, '""');
+  // One pass over runs of digits and dots, so a long run costs its length once (#219: a
+  // backtracking pattern took quadratic time on a long digit run followed by a letter).
+  let index = 0;
+  while (index < text.length) {
+    if (!isDigit(text.charCodeAt(index))) {
+      index++;
+      continue;
+    }
+    const start = index;
+    while (index < text.length && isDigitOrDot(text.charCodeAt(index))) index++;
+    // A run inside a reference (`D11`, `$D$11`, `1:3`) or followed by a letter or `(` (`1E5`,
+    // a name) is not a number of the formula's own.
+    if (
+      !NOT_BEFORE_NUMBER.test(text.charAt(start - 1)) &&
+      !NOT_AFTER_NUMBER.test(text.charAt(index))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Characters that make a following digit run part of a reference or a name. */
+const NOT_BEFORE_NUMBER = /[A-Za-z$.:]/;
+/** Characters that make a preceding digit run part of a name or a number in E notation. */
+const NOT_AFTER_NUMBER = /[A-Za-z(]/;
+
+function isDigit(code: number): boolean {
+  return code >= 48 && code <= 57;
+}
+
+function isDigitOrDot(code: number): boolean {
+  return isDigit(code) || code === 46;
 }
 
 /**
