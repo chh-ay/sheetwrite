@@ -98,9 +98,13 @@ function cutHarness(options: { nativeFormatsOnly?: boolean } = {}) {
     mergeAnchorAt: () => null,
     toDataRow: (row) => row,
     toViewRow: (row) => row,
+    undo: () => {
+      throw new Error("This harness has no undo history");
+    },
+    lastUndo: () => null,
     rowSpan: (first, last) => ({ first, last }),
     commit: (patches, reason) => {
-      document.commit(patches, reason);
+      return document.commit(patches, reason);
     },
     onCutChange: (range) => marks.push(range),
     loadPasteSpecial: () => import("../src/paste-special.js"),

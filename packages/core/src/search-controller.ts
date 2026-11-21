@@ -1,10 +1,12 @@
-import { cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellScalarToText, formulaBarText, parseCellInput } from "./cell-input.js";
 import { getEngine } from "./engine.js";
+import { isGeneralCode } from "./general-format.js";
+import { formatNumber } from "./number-format.js";
 import { findMatcher, replaceInText } from "./search-replace.js";
 import type { SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import type { CellScalar, CellValue } from "./types/cell.js";
+import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type {
@@ -258,6 +260,26 @@ function engineSearchText(value: CellScalar): string | null {
 }
 
 /**
+ * The text Find compares for a number in a number format other than General,
+ * as Excel's Find does: the formula bar's text (`1/15/2026`, `15%`) when it
+ * looks in formulas, the shown text (`$4.50`) when it looks in values. Null
+ * for anything else, and for a number the formula bar shows as stored, which
+ * the engine compares as it is.
+ */
+function formattedNumberText(
+  value: CellScalar | undefined,
+  format: string | undefined,
+  locale: string | undefined,
+  lookIn: "formulas" | "values",
+): string | null {
+  if (typeof value !== "number" || isGeneralCode(format)) return null;
+  return lookIn === "values" ? formatNumber(value, format, locale) : formulaBarText(value, format);
+}
+
+/** Rows a formatted-number pass reads at once, so a large sheet is read in bounded windows. */
+const FORMATTED_SCAN_ROWS = 16_384;
+
+/**
  * Owns find state and match scanning, then asks the grid shell to reveal and
  * repaint the active match.
  */
@@ -331,7 +353,11 @@ export class SearchController {
     sheet: SheetId,
     matches: SearchMatchSet,
   ): boolean {
-    if (patch.op === "setNote" || patch.op === "setRangeStyle") return true;
+    if (patch.op === "setNote") return true;
+    // A number format changes the text a number shows, and so what matches.
+    if (patch.op === "setRangeStyle") {
+      return patch.style !== null && patch.style.numberFormat === undefined;
+    }
     if (patch.op !== "set") return false;
     if (patch.addr.sheet !== sheet) return true;
     if (patch.value.kind !== "literal") return false;
@@ -339,7 +365,8 @@ export class SearchController {
     // A cell outside the searched selection is never a match.
     if (!this.inScope(sheet, patch.addr.row, patch.addr.col)) return true;
 
-    const text = engineSearchText(this.deps.store.getCell(patch.addr).resolved);
+    const cell = this.deps.store.getCell(patch.addr);
+    const text = this.formattedText(patch.addr, cell) ?? engineSearchText(cell.resolved);
     if (text === null) return false;
     if (!this.searchOpts.matchCase && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery)))
       return false;
@@ -587,8 +614,15 @@ export class SearchController {
    */
   private valueOf({ addr, kind, after }: ReplaceChange): CellValue {
     if (kind === "formula" && after.startsWith("=")) return { kind: "formula", src: after };
-    const column = this.deps.sheet(addr.sheet).columns[addr.col];
-    return parseCellInput(after, column?.type ?? "text");
+    const type = this.deps.sheet(addr.sheet).columns[addr.col]?.type ?? "text";
+    const value = parseCellInput(after, type);
+    // A number column reads `25%` or `1/16/2026`, the text of a formatted
+    // number, as General reads it; the cell keeps its format.
+    if (type !== "text" && value.kind === "literal" && typeof value.value === "string") {
+      const general = parseCellInput(after, "general");
+      if (general.kind === "literal" && typeof general.value === "number") return general;
+    }
+    return value;
   }
 
   /** The change that rewrites a note's text, or null when nothing in it matches. */
@@ -664,10 +698,26 @@ export class SearchController {
     replacement: string,
     cell: Pick<ResolvedCell, "resolved" | "style">,
   ): Planned | null {
-    const text = cellScalarToText(cell.resolved);
+    // A formatted number is replaced in the text Find compared.
+    const text = this.formattedText(addr, cell) ?? cellScalarToText(cell.resolved);
     const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;
     return { change: { addr, kind: "value", before: text, after: next }, style: cell.style };
+  }
+
+  /** {@link formattedNumberText} of one cell, in its own format or its column's. */
+  private formattedText(
+    addr: CellAddress,
+    cell: Pick<ResolvedCell, "resolved" | "style">,
+  ): string | null {
+    if (typeof cell.resolved !== "number") return null;
+    const column = this.deps.sheet(addr.sheet).columns[addr.col];
+    return formattedNumberText(
+      cell.resolved,
+      cell.style.numberFormat ?? column?.numberFormat,
+      column?.numberLocale,
+      this.searchOpts.lookIn === "values" ? "values" : "formulas",
+    );
   }
 
   /** The sheet's place in the tab order. */
@@ -827,9 +877,11 @@ export class SearchController {
   /** Row-major `[row, col, ...]` pairs of the cells whose text matches. */
   private scanCells(sheetId: SheetId, query: string, opts: SearchOptions): Uint32Array {
     const lookIn = opts.lookIn === "values" ? "values" : "formulas";
-    // Fast path: scan the columnar store in WASM (no per-cell JS materialization).
+    // Fast path: scan the columnar store in WASM (no per-cell JS materialization),
+    // then correct it for numbers in a number format, which it reads as stored.
     if (this.deps.loadable) {
-      return this.deps.loadable.searchCellsFlat(sheetId, query, { ...opts, lookIn });
+      const found = this.deps.loadable.searchCellsFlat(sheetId, query, { ...opts, lookIn });
+      return this.withFormattedNumbers(this.deps.loadable, sheetId, query, opts, found);
     }
 
     // Fallback for a non-SheetwriteStore store: bulk-read the sheet and scan in JS.
@@ -849,17 +901,97 @@ export class SearchController {
     const n = cols.length;
     for (let r = 0; r < sheet.rowCount; r++) {
       for (let c = 0; c < n; c++) {
-        const v = view.values[r * n + c];
+        const index = r * n + c;
+        const v = view.values[index];
         if (v === null || v === undefined || v === "") continue;
+        const column = sheet.columns[cols[c]!];
         const formula = formulas
           ? this.deps.store.getFormula({ sheet: sheetId, row: r, col: cols[c]! })
           : null;
-        if (matches(formula ?? String(v))) {
+        const shown = formattedNumberText(
+          v,
+          view.styles[view.styleIds[index] ?? 0]?.numberFormat ?? column?.numberFormat,
+          column?.numberLocale,
+          lookIn,
+        );
+        if (matches(formula ?? shown ?? String(v))) {
           pairs.push(r, cols[c]!);
         }
       }
     }
     return Uint32Array.from(pairs);
+  }
+
+  /**
+   * The engine's matches, corrected for numbers in a number format other than
+   * General: the engine compares a number as stored (`0.15`), Excel the text
+   * Find reads for it (`15%`). Sheets without such formats keep the engine's
+   * matches unread. Otherwise only the columns that can hold them are read,
+   * in bounded windows, and only formatted numbers are compared.
+   */
+  private withFormattedNumbers(
+    store: SheetwriteStore,
+    sheetId: SheetId,
+    query: string,
+    opts: SearchOptions,
+    found: Uint32Array,
+  ): Uint32Array {
+    const sheet = this.deps.sheet(sheetId);
+    const searched = opts.columns ?? sheet.columns.map((_, index) => index);
+    // A cell's own format can sit in any column; a column's format only in its own.
+    const styles = storeEngine(store)?.styleTable();
+    const cellFormats =
+      styles === undefined || styles.some((style: CellStyle) => !isGeneralCode(style.numberFormat));
+    const cols = cellFormats
+      ? searched
+      : searched.filter((col) => !isGeneralCode(sheet.columns[col]?.numberFormat));
+    if (cols.length === 0 || sheet.rowCount === 0) return found;
+
+    const lookIn = opts.lookIn === "values" ? "values" : "formulas";
+    const width = sheet.columns.length;
+    const engineMatches = new Set<number>();
+    for (let offset = 0; offset < found.length; offset += 2) {
+      engineMatches.add((found[offset] ?? 0) * width + (found[offset + 1] ?? 0));
+    }
+    const matches = findMatcher(query, opts);
+    // Cells whose match differs from the engine's, by `row * width + col`.
+    const corrected = new Map<number, boolean>();
+    for (let start = 0; start < sheet.rowCount; start += FORMATTED_SCAN_ROWS) {
+      const end = Math.min(sheet.rowCount, start + FORMATTED_SCAN_ROWS);
+      const view = store.getDataWindow(sheetId, { start, end }, cols);
+      for (let index = 0; index < view.values.length; index++) {
+        const col = cols[index % cols.length]!;
+        const column = sheet.columns[col];
+        const text = formattedNumberText(
+          view.values[index],
+          view.styles[view.styleIds[index] ?? 0]?.numberFormat ?? column?.numberFormat,
+          column?.numberLocale,
+          lookIn,
+        );
+        if (text === null) continue;
+        const row = start + Math.floor(index / cols.length);
+        const key = row * width + col;
+        const engineMatched = engineMatches.has(key);
+        if (matches(text) === engineMatched) continue;
+        // In formulas, a formula cell is found by its formula, as the engine read it.
+        if (lookIn === "formulas" && store.getFormula({ sheet: sheetId, row, col }) !== null) {
+          continue;
+        }
+        corrected.set(key, !engineMatched);
+      }
+    }
+    if (corrected.size === 0) return found;
+
+    const pairs: number[] = [];
+    for (let offset = 0; offset < found.length; offset += 2) {
+      const row = found[offset] ?? 0;
+      const col = found[offset + 1] ?? 0;
+      if (corrected.get(row * width + col) !== false) pairs.push(row, col);
+    }
+    for (const [key, matched] of corrected) {
+      if (matched) pairs.push(Math.floor(key / width), key % width);
+    }
+    return sortPairs(Uint32Array.from(pairs), false);
   }
 
   /**

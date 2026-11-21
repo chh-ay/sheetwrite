@@ -137,6 +137,8 @@ Without `wholeCell`, a pattern can match anywhere in the cell's text, as in Exce
 
 By default a formula cell is searched by its formula text, like Excel's default **Look in: Formulas**. So `grid.search("A1")` finds a cell holding `=A1*2`. Pass `lookIn: "values"` to search formula results instead. Cells without a formula are searched by their value either way. `lookIn: "notes"` searches the text of cell notes instead of the cells.
 
+A number in a number format other than General is searched by its text, as in Excel. Look in: Formulas reads the formula bar's text: `1/15/2026` for a date, `15%` for a percentage, `4.5` for an amount. Look in: Values reads the text the cell shows, such as `$4.50`. So `15%` finds a cell that holds 0.15 in the format `0%`, and `0.15` does not. Replace rewrites that text and reads the result back as typed, so `1/15` → `1/16` gives the next day.
+
 Replace follows the same rules. It replaces the whole run a wildcard pattern matches, and `*` takes the longest run it can. When looking in formulas, `replaceCurrent` and `replaceAll` rewrite formula text, as Excel's Replace does. A replacement that leaves a formula the engine cannot read leaves that cell unchanged. Reference cells are never rewritten. When looking in notes, they rewrite the note text and leave the cells as they are.
 
 ## Styles
