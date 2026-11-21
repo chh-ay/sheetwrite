@@ -8,3 +8,5 @@ IF takes an array or a range as its condition, as in Excel. `=IF(A1:A3>1,"big","
 - The condition and both branches broadcast to one shape. A single value, row or column repeats; an array with fewer rows or columns than the result, and more than one, gives `#N/A` in the cells outside it. A missing `value_if_false` gives FALSE and an empty branch gives 0 in each cell. An error in the condition stays in its own cell.
 - IFERROR, IFNA, IFS, SWITCH and CHOOSE take arrays the same way: `=IFERROR(A1:A3/B1:B3,0)`, `=SWITCH(A1:A3,1,"one","other")` and `=CHOOSE({1,2},B1:B3,A1:A3)` spill one result for each element.
 - A branch can be a range or an array: `=IF(A1>0,A1:A3,0)` spills the range when A1 is positive. A scalar condition still evaluates only the branch it takes.
+- FILTER, SORT and the other array functions take such an IF: `=SORT(IF(A1>0,A1:A3,B1:B3))` sorts the range IF returns.
+- An empty fallback in IFERROR or IFNA gives 0, as in Excel: `=IFERROR(1/0,)` shows 0. Before, the cell was empty.
