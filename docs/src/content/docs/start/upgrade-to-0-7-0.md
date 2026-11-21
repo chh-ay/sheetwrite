@@ -1,6 +1,6 @@
 ---
 title: Upgrade to 0.7.0
-description: Replace the removed sort, revision and add-on registration APIs, accept the new document operations, rebind keys that Excel's defaults now take, update error handling, search, paste and validation code and direct engine calls, and review the behavior that changes in 0.7.0.
+description: Replace removed APIs, accept the new document operations, keys and column type, and review the behavior that changes in 0.7.0.
 ---
 
 > [!NOTE]
@@ -84,16 +84,23 @@ checks every operation or commit reason must accept them; see
 `@sheetwrite/core/history` lists, reads and restores versions through a
 `HistoryStorageAdapter`. See
 [Opt-in version archives](/docs/features/data/persistence/#opt-in-version-archives)
-and [Migrating from `RevisionCoordinator`](/docs/features/collaboration/#migrating-from-revisioncoordinator).
+and [Restoring versions](/docs/features/collaboration/#restoring-versions).
 
 | Removed | Use instead |
 | --- | --- |
 | `RevisionCoordinator`, `RevisionCoordinatorOptions`, `RevisionCoordinatorEvent` | `HistoryArchive.open({ documentId, storage })` |
 | `RevisionAdapter` | `HistoryStorageAdapter`, or the built-in `MemoryHistoryStorage` and `IndexedDbHistoryStorage` |
+| `RevisionAdapter.listRevisions` | `HistoryStorageAdapter` (`list`) behind `HistoryArchive.listVersions` |
+| `RevisionAdapter.loadRevision` | `HistoryArchive.readVersion` |
+| `RevisionAdapter.restoreRevision` | `HistoryArchive.restoreVersion`; the restore is an ordinary commit through `PersistenceAdapter.commit` or `commitBatch` |
 | `RevisionCoordinator.list()`, `RevisionSummary` | `HistoryArchive.listVersions()`, which returns `HistoryVersion` pages |
 | `RevisionCoordinator.preview()` | `HistoryArchive.readVersion()`, then `createGridFromSnapshot(host, snapshot, { readOnly: true })` |
 | `RevisionCoordinator.restore()`, `RevisionRestoreRequest`, `RevisionRestoreResponse` | `HistoryArchive.restoreVersion(grid, id, scope, { sync })` |
 | The `revision-failed` error code and the `revision` error operation | `HistoryError` codes |
+
+A server that kept revisions as full snapshots can serve them through a
+`HistoryStorageAdapter`, or start a history archive from its current snapshot
+with `HistoryArchive.initialize` and record commits with `CommitJournal`.
 
 Before:
 
@@ -159,8 +166,10 @@ export function connect(grid: Grid, adapter: PersistenceAdapter, userId: string)
 
 0.7.0 adds these document operations: `permuteRows` (sort), `moveCells`
 (cut and paste, and Insert and Delete that shift cells), `setRelationship`
-and `removeRelationship` (data model), `setQuery` and `removeQuery` (saved
-queries) and `setDashboardItem` and `removeDashboardItem` (dashboards).
+and `removeRelationship` (data model), `setMeasure` and `removeMeasure`
+(measures), `setExternalLinks` (linked workbooks), `setQuery` and
+`removeQuery` (saved queries) and `setDashboardItem` and `removeDashboardItem`
+(dashboards). A sheet can have `kind: "dashboard"`.
 `setSheetMeta` can carry `tabColor`. The commit reasons `"sort"` and
 `"restore"` are new, and `"cut"` is no longer emitted: cut leaves its cells in
 place until the paste moves them. `RowBridgeMetadataDelta.metadata` can be
@@ -229,9 +238,10 @@ await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] })
 | `setXlsxWorkbookBackend`, `setXlsxTableImportBackend`, `setXlsxTableExportBackend` | An add-on whose `setup` calls `context.xlsx({ workbook, tableImport, tableExport })` |
 | `initSheetwrite(source, engine)` | `initSheetwrite({ source, engine })` |
 
-Custom functions, saved queries, the version history commands and external
-links are new in 0.7.0 and install the same way: `functionsAddon`,
-`queriesAddon`, `historyAddon` and `externalLinksAddon`.
+Custom functions, saved queries, the version history commands, external
+links and formula assist are new in 0.7.0 and install the same way:
+`functionsAddon`, `queriesAddon`, `historyAddon`, `externalLinksAddon` and
+`formulaAssistAddon` (from `@sheetwrite/formula-assist`).
 
 Add-ons set up once, in list order. A name listed twice in one call rejects
 with `invalid-argument`; a name installed by an earlier call is kept. Settings
@@ -488,8 +498,10 @@ The grid's keys follow Excel. These default keys are new, and each is a
 | Shift+F11 | `insertSheet` |
 
 Backspace is no longer a `clearContents` key: it clears only the active cell
-and opens the editor, as in Excel. Delete still clears the selection. Enter and
-Tab move the active cell instead of opening the editor; F2 opens it.
+and opens the editor, as in Excel. Delete still clears the selection's values,
+and now keeps their formats, as Excel's Delete does; in 0.6 it also removed
+number formats and styles. `grid.actions.clearContents()` does the same. Enter
+and Tab move the active cell instead of opening the editor; F2 opens it.
 
 Before:
 
@@ -564,7 +576,8 @@ Search works as Excel's Find does. See [Search](/docs/features/grid/search/).
 | `*` and `?` in a query matched themselves | They are wildcards: `*` matches any run of characters and `?` one character. Search for a literal one with `~*` or `~?`. |
 | A formula cell matched by its result | It matches by its formula text unless `lookIn: "values"`. Replace rewrites formula text. |
 | `search` searched the whole sheet | With more than one cell selected on the active sheet, it searches only the selection. Select one cell, or pass `within: "workbook"`, to search more. |
-| `search`, `findNext` and `findPrev` moved a highlight | They also select the match and scroll to it, so typing after Find edits that cell. |
+| A number matched by its stored value (`0.15` found a cell showing `15%`) | A number in a number format matches by its text: Look in Formulas by the formula bar's text (`15%`), Look in Values by the shown text (`$4.50`). |
+| `search`, `findNext`, `findPrev` and `replaceCurrent` moved a highlight | They also select the match and scroll to it, so typing after Find edits that cell. |
 
 Before:
 
@@ -732,7 +745,7 @@ the sort on the table's header buttons.
 | `SUBTOTAL` accepts codes 101 to 111 and skips hidden rows; `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows; a subtotal does not count another subtotal. |
 | Paste, fill and conditional-format rules rewrite references with the engine's rules: `=SUM(A:A)` pasted one column right is `=SUM(B:B)`, and a reference that leaves the sheet becomes `#REF!`. `shiftA1Refs` needs `initSheetwrite()` first. |
 | XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. |
-| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. A transaction whose `addRows` or `addColumns` would pass `maxRowsPerSheet`, `maxColumnsPerSheet`, `maxLogicalCellsPerSheet` or, for a dense sheet, `maxDenseCells` is rejected with a `resource-limit` issue that names the limit. Insert Row and Insert Column show the limit in an alert. |
+| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. A transaction whose `addRows` or `addColumns` would pass `maxRowsPerSheet`, `maxColumnsPerSheet`, `maxLogicalCellsPerSheet` or `maxLocalPagedCells` is rejected with a `resource-limit` issue that names the limit. Insert Row and Insert Column show the limit in an alert. |
 | A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. |
 | A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references. Renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. |
 | Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does. References follow the moved cells instead of becoming `#REF!`. A range loses a moved row at its edge and grows by one that lands inside it. A move that would split a table is refused. |
@@ -768,12 +781,16 @@ the sort on the table's header buttons.
 | A cut over a filtered range moves the rows the filter hides too, as in Excel. Copy, delete, formatting and the fill handle still act only on the rows the filter shows. | Nothing. |
 | A pasted block over a filtered range or rows hidden with Hide Rows writes into consecutive sheet rows, the hidden rows included, as in Excel, and says "This paste wrote into N hidden rows". In 0.6 it wrote only into the rows a filter showed. One copied value pasted over a filtered selection still fills only the shown cells. The context menu's Paste Options then offers Paste into visible rows only (`grid.actions.pasteVisibleRows()`, new context-menu action `pasteVisibleRows`). | Nothing. Under a view sort a block still takes the shown rows. A host's own context menu can add `{ action: "pasteVisibleRows" }`. |
 | New sheets from the + button, Insert and Shift+F11 start with columns A to Z and 1,000 rows, instead of one column and 100 rows. The + button adds the sheet after the active one. | Nothing. A sheet added with `addSheet` without `columns` fills the grid's width with empty columns. |
+| A number with no format, `General` or `@` shows as Excel's General: `2026`, not `2,026`, and `1.23457E+11` for a long number. | Update tests that expected thousands separators or three decimals. |
+| XLSX export writes a `text` column in Excel's Text format `@`, and import reads an `@` column as `text`. | Nothing; `007` keeps its zero through a round trip. |
+| The Name Box goes to a cell on a hidden row. While that cell is active, the `selection` event has `selection: null` and names the cell in `sheetFocus`. | Handle `selection: null` with a `sheetFocus` where you read the selection event. |
+| A paste the grid refuses, a paste too large for the sheet included, resolves the new `ClipboardOutcome` `"rejected"` instead of `"done"` or rejecting. | Add the case where you `switch` over `ClipboardOutcome`. |
 
 ### setBlock cell arrays
 
 | Change | What to do |
 | --- | --- |
-| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change. Every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation. Getters there are still rejected without running. `store.applyTransaction` returns and emits a copy of a transaction that contains `setBlock`. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
+| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy. Validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change. Every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation. Getters there are still rejected without running. `store.applyTransaction` returns and emits a copy of a transaction that contains `setBlock`. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
 
 ### Dense workbooks past maxDenseCells
 
