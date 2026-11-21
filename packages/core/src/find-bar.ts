@@ -1,7 +1,13 @@
 import { colToA1 } from "./a1.js";
 import { actionFeedbackFor } from "./action-feedback.js";
 import { checkStylePart } from "./style-parts.js";
-import type { Grid, ReplaceChange, SearchOptions, SearchResult } from "./types/grid.js";
+import type {
+  Grid,
+  ReplaceChange,
+  ReplacePreview,
+  SearchOptions,
+  SearchResult,
+} from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
@@ -9,6 +15,8 @@ import { seedWidgetTheme } from "./widget-theme.js";
 const RESULT_ROW_HEIGHT = 24;
 /** Rows drawn beyond the list's visible height, so a fast scroll shows no gap. */
 const RESULT_OVERSCAN = 4;
+/** How long typing must pause before the Replace all preview is planned again. */
+const PREVIEW_DELAY_MS = 150;
 
 /** Counter label: empty when idle, "No results", or "<active+1> of <total>". */
 function formatCount(result: SearchResult): string {
@@ -19,17 +27,22 @@ function formatCount(result: SearchResult): string {
   return `${result.active + 1} of ${result.matches.length}`;
 }
 
-/** Replace all's summary: "8 cells, 2 of them formulas", "3 notes" or "Nothing to replace". */
-function previewSummary(changes: readonly ReplaceChange[]): string {
-  const count = changes.length;
+/**
+ * Replace all's summary: "8 cells, 2 of them formulas", "3 notes" or "Nothing
+ * to replace", and how many of them the list shows when it shows fewer.
+ */
+function previewSummary({ changes, total: count, formulas }: ReplacePreview): string {
   if (count === 0) return "Nothing to replace";
-  if (changes[0]?.kind === "note") return `${count} ${count === 1 ? "note" : "notes"}`;
+  const listed =
+    changes.length < count ? `; the first ${changes.length.toLocaleString("en-US")} listed` : "";
+  const total = count.toLocaleString("en-US");
+  if (changes[0]?.kind === "note") return `${total} ${count === 1 ? "note" : "notes"}${listed}`;
 
-  const cells = `${count} ${count === 1 ? "cell" : "cells"}`;
-  const formulas = changes.filter((change) => change.kind === "formula").length;
-  if (formulas === 0) return cells;
-  if (formulas === count) return `${cells}, ${count === 1 ? "a formula" : "all formulas"}`;
-  return `${cells}, ${formulas} of them ${formulas === 1 ? "a formula" : "formulas"}`;
+  const cells = `${total} ${count === 1 ? "cell" : "cells"}`;
+  if (formulas === 0) return `${cells}${listed}`;
+  if (formulas === count) return `${cells}, ${count === 1 ? "a formula" : "all formulas"}${listed}`;
+  const some = formulas.toLocaleString("en-US");
+  return `${cells}, ${some} of them ${formulas === 1 ? "a formula" : "formulas"}${listed}`;
 }
 
 /** A unique element ID for ARIA references inside one find bar. */
@@ -203,6 +216,8 @@ export class FindBar {
   private options: SearchOptions = {};
   /** The changes the Replace all preview lists, in its row order. */
   private changes: ReplaceChange[] = [];
+  /** The planned preview that waits for typing to pause. */
+  private previewTimer: ReturnType<typeof setTimeout> | undefined;
   private result: SearchResult = { query: "", matches: [], active: -1 };
   private unsubscribe: (() => void) | null = null;
 
@@ -228,6 +243,7 @@ export class FindBar {
   }
 
   close(): void {
+    clearTimeout(this.previewTimer);
     if (this.elements) {
       this.elements.el.style.display = "none";
       this.elements.findAll.el.hidden = true;
@@ -244,6 +260,7 @@ export class FindBar {
   }
 
   destroy(): void {
+    clearTimeout(this.previewTimer);
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.elements?.el.remove();
@@ -367,13 +384,13 @@ export class FindBar {
     if (preview) {
       el.append(preview.el);
       replace?.input.addEventListener("input", () => {
-        this.renderPreview();
+        this.schedulePreview();
       });
       el.addEventListener("focusin", () => {
-        this.renderPreview();
+        this.schedulePreview();
       });
-      el.addEventListener("focusout", (e) => {
-        this.renderPreview(e.relatedTarget);
+      el.addEventListener("focusout", () => {
+        this.schedulePreview();
       });
     }
     el.append(options.panel, findAll.el);
@@ -563,7 +580,7 @@ export class FindBar {
     if (!elements) return;
     elements.count.textContent = formatCount(result);
     if (!elements.findAll.el.hidden) this.renderFindAll();
-    this.renderPreview();
+    this.schedulePreview();
   }
 
   private renderFindAll(): void {
@@ -589,21 +606,34 @@ export class FindBar {
   }
 
   /**
-   * Show what Replace all will change while the replace field has text or
-   * focus: a summary, and each cell or note with its text before and after.
-   * `focused` is the element that has, or is getting, the focus.
+   * Plan the preview once typing or focus changes pause, so a burst of keys
+   * plans it once: each plan runs the replacement over every match.
    */
-  private renderPreview(focused: EventTarget | null = document.activeElement): void {
+  private schedulePreview(): void {
+    clearTimeout(this.previewTimer);
+    this.previewTimer = setTimeout(() => {
+      this.renderPreview();
+    }, PREVIEW_DELAY_MS);
+  }
+
+  /**
+   * Show what Replace all will change while the replace field has text or
+   * focus: a summary, and the first changes, each cell or note with its text
+   * before and after.
+   */
+  private renderPreview(): void {
     const preview = this.elements?.preview;
     const replaceInput = this.elements?.replaceInput;
     if (!preview || !replaceInput) return;
+    const focused = document.activeElement;
     const engaged =
       replaceInput.value !== "" ||
       (focused instanceof Node && (focused === replaceInput || preview.el.contains(focused)));
     preview.el.hidden = !this.result.query || !engaged;
     if (preview.el.hidden) return;
 
-    const changes = this.grid.previewReplaceAll(replaceInput.value);
+    const planned = this.grid.previewReplaceAll(replaceInput.value);
+    const { changes } = planned;
     this.changes = changes;
     const active = this.result.matches[this.result.active];
     const activeRow = active
@@ -615,7 +645,7 @@ export class FindBar {
     const names = new Map(
       this.grid.store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]),
     );
-    preview.show(changes.length, activeRow, previewSummary(changes), (index) => {
+    preview.show(changes.length, activeRow, previewSummary(planned), (index) => {
       const change = changes[index];
       if (!change) return [];
       const { addr } = change;

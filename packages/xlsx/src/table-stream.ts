@@ -189,7 +189,7 @@ function projectionSource(
             key: `column${index + 1}`,
             header: `Column ${index + 1}`,
             width: column?.width ?? 0,
-            type: "text" as const,
+            type: "general" as const,
             ...(column?.numberFormat ? { numberFormat: column.numberFormat } : {}),
           };
         }),

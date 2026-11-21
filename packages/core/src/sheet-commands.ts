@@ -37,7 +37,7 @@ export function newSheetShape(): Pick<SheetSnapshot, "rowCount" | "columns"> {
   const columns: Column[] = [];
   for (let col = 0; col < NEW_SHEET_COLUMNS; col++) {
     const label = colToA1(col);
-    columns.push({ key: label, header: label, width: NEW_SHEET_COLUMN_WIDTH, type: "text" });
+    columns.push({ key: label, header: label, width: NEW_SHEET_COLUMN_WIDTH, type: "general" });
   }
   return { rowCount: NEW_SHEET_ROWS, columns };
 }
