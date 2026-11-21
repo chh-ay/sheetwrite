@@ -14,10 +14,9 @@ import { type OpcRelationship } from "./opc.js";
 import type { ParsedAutoFilter } from "./reader-autofilter.js";
 import { type SharedFormulaGroup } from "./shared-formula.js";
 
-/** Columns' style records and numeric literals, gathered as rows stream past. */
+/** Columns' style records, gathered as rows stream past. */
 export interface ColumnCells {
   readonly styleIndices: Set<number>;
-  hasNumericValue: boolean;
 }
 
 const INITIAL_STYLE_INDEX_CAPACITY = 1_024;

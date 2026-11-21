@@ -1,5 +1,5 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
-import { parseCellInput } from "./cell-input.js";
+import { parseCellEntry } from "./cell-input.js";
 import { isCellFontFamily, isCellVerticalAlign, sanitizeCellStyle } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
@@ -84,9 +84,15 @@ export interface ClipboardControllerDeps {
   validationReads?: () => ValidationReads | undefined;
   /**
    * Called when a cut, then its paste, moves `count` rows that a filter or
-   * the user hides, which the selection did not show.
+   * the user hides, which the selection did not show. `rows` are the active
+   * sheet's data rows the step covers: the cut's, and after the paste also
+   * the rows it landed on.
    */
-  onHiddenRowsMoved?: (count: number, step: "cut" | "paste") => void;
+  onHiddenRowsMoved?: (
+    count: number,
+    step: "cut" | "paste",
+    rows: readonly { readonly start: number; readonly end: number }[],
+  ) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -242,10 +248,29 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellValue {
-  const parsed = parseCellInput(source, type);
+/** One style object per number format a paste gives, so a block's cells share it. */
+const formatStyles = new Map<string, CellStyle>();
 
-  return parsed.kind === "formula" ? { kind: "literal", value: `'${parsed.src}` } : parsed;
+function formatStyle(numberFormat: string): CellStyle {
+  let style = formatStyles.get(numberFormat);
+  if (style === undefined) {
+    style = { numberFormat };
+    formatStyles.set(numberFormat, style);
+  }
+  return style;
+}
+
+/**
+ * Text from elsewhere read as typed input for the target column: a formula
+ * lands as inert text, and in a `general` column a number gets the format
+ * Excel's General gives it (`12%` in `0%`).
+ */
+function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellWrite {
+  const parsed = parseCellEntry(source, type);
+  const { value, numberFormat } = parsed;
+  if (value.kind === "formula") return { value: { kind: "literal", value: `'${value.src}` } };
+  // A paste reads many cells; the parsed entry is the write when it has no format.
+  return numberFormat === undefined ? parsed : { value, style: formatStyle(numberFormat) };
 }
 
 /**
@@ -265,7 +290,12 @@ function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type
     return { value, style: cell.style };
   }
 
-  return { value: parseExternalInput(source, type), style: cell.style };
+  const parsed = parseExternalInput(source, type);
+  const style =
+    parsed.style && cell.style?.numberFormat === undefined
+      ? { ...cell.style, ...parsed.style }
+      : cell.style;
+  return { value: parsed.value, style };
 }
 
 function clipboardHtml(snapshot: ClipboardSnapshot, token: string): string {
@@ -721,7 +751,10 @@ export class ClipboardController {
       const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
-      if (hidden > 0) this.deps.onHiddenRowsMoved?.(hidden, "cut");
+      if (hidden > 0) {
+        const rows = { start: source.start.row, end: source.end.row };
+        this.deps.onHiddenRowsMoved?.(hidden, "cut", [rows]);
+      }
       return "done";
     } finally {
       write.close();
@@ -1027,7 +1060,15 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
-    if (cut.hidden > 0) this.deps.onHiddenRowsMoved?.(cut.hidden, "paste");
+    if (cut.hidden > 0) {
+      const landed = { start: firstRow, end: firstRow + rows - 1 };
+      const cutRows = { start: cut.range.start.row, end: cut.range.end.row };
+      this.deps.onHiddenRowsMoved?.(
+        cut.hidden,
+        "paste",
+        cut.range.sheet === this.deps.activeSheet() ? [cutRows, landed] : [landed],
+      );
+    }
     return "done";
   }
 
@@ -1360,9 +1401,8 @@ export class ClipboardController {
       focus,
       grid.length,
       (r) => grid[r]!.length,
-      (r, c, targetCol): CellWrite => ({
-        value: parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
-      }),
+      (r, c, targetCol): CellWrite =>
+        parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
     );
   }
 
@@ -1473,6 +1513,10 @@ export class ClipboardController {
       const refs: Array<[number, { sheet: SheetId; row: number; col: number }]> = [];
       const styleTable: CellStyle[] = [];
       const styleLookup = new Map<string, number>();
+      // Most cells share a style object (none, or one per pasted format), so
+      // the id is found by identity before the style is serialized.
+      const styleIdOf = new Map<CellStyle, number>();
+      const noStyle: CellStyle = {};
       const styleIds: number[] = new Array(availableRows * width);
       let canPack = true;
       for (let row = 0; row < availableRows && canPack; row++) {
@@ -1501,13 +1545,17 @@ export class ClipboardController {
             values[offset] = write.value.value;
           }
 
-          const style = write.style ?? {};
-          const styleKey = JSON.stringify(style);
-          let styleId = styleLookup.get(styleKey);
+          const style = write.style ?? noStyle;
+          let styleId = styleIdOf.get(style);
           if (styleId === undefined) {
-            styleId = styleTable.length;
-            styleLookup.set(styleKey, styleId);
-            styleTable.push(style);
+            const styleKey = JSON.stringify(style);
+            styleId = styleLookup.get(styleKey);
+            if (styleId === undefined) {
+              styleId = styleTable.length;
+              styleLookup.set(styleKey, styleId);
+              styleTable.push(style);
+            }
+            styleIdOf.set(style, styleId);
           }
 
           styleIds[offset] = styleId;

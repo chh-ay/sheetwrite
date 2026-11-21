@@ -11,6 +11,7 @@ import {
   type FillOptions,
   type FillSeries,
 } from "./fill-series.js";
+import { numberFormatDateKind } from "./general-entry.js";
 import type { SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -69,18 +70,6 @@ interface FinishedFill {
   readonly target: SelRect;
   readonly options: FillOptions;
   readonly dates: boolean;
-}
-
-/**
- * Whether a number format shows a date (day or year parts), so one cell fills
- * by days, or only a time, so one cell fills by hours.
- */
-function dateKind(format: string | undefined): "date" | "time" | null {
-  if (format === undefined) return null;
-  const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
-  if (/[#0?]/.test(visible)) return null;
-  if (/[dy]/i.test(visible)) return "date";
-  return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
 }
 
 /** The part of `target` that is new: the cells beyond the source along the fill. */
@@ -261,7 +250,7 @@ export class FillController {
         kind:
           columns[coordinates[index]?.col ?? -1]?.type === "date"
             ? "date"
-            : dateKind(cell.style.numberFormat),
+            : numberFormatDateKind(cell.style.numberFormat),
       })),
     };
   }

@@ -1,6 +1,6 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
 import type { CellCommand } from "./cell-commands.js";
-import { cellEditText, parseCellInput } from "./cell-input.js";
+import { cellEditText, parseCellEntry } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
@@ -19,7 +19,7 @@ import type { SheetKey } from "./sheet-commands.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
-import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
+import type { CellFormat, CellScalar, CellStyle, CellValue, Column } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DataValidationRule, DocumentOp, Sheet } from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
@@ -357,7 +357,7 @@ export class InteractionSessions {
         viewAddress: { sheet: address.sheet, row: viewRow, col: address.col },
         column,
         value,
-        text: formula ?? cellEditText(value, column.type),
+        text: formula ?? cellEditText(value, column.type, this.numberFormatAt(address, column)),
         label: this.editorLabel(viewRow, address.col),
       });
     }
@@ -561,27 +561,28 @@ export class InteractionSessions {
       const viewRow = this.deps.toViewRow(address.row);
       if (viewRow === null) return;
       const column = this.deps.sheet().columns[address.col];
-      const value =
+      const parsed =
         typeof input === "string"
-          ? parseCellInput(
+          ? parseCellEntry(
               input,
               column?.type ?? "text",
-              this.deps.store.getCell(address).style.numberFormat ??
-                column?.cellStyle?.numberFormat ??
-                column?.numberFormat,
+              this.numberFormatAt(address, column),
+              column?.numberLocale,
             )
-          : input;
+          : { value: input };
+      const value = parsed.value;
       // An entry keeps the cell's formatting, as in Excel; a `set` without a
-      // style would clear it.
+      // style would clear it. A General entry gives an unformatted cell the
+      // format that shows it as typed.
       const patches: DocumentOp[] =
         navigate === "stay"
-          ? this.selectionFill(address, viewRow, value)
+          ? this.selectionFill(address, viewRow, value, parsed.numberFormat)
           : [
               {
                 op: "set",
                 addr: { ...address },
                 value,
-                style: this.deps.store.getCell(address).style,
+                style: this.entryStyle(address, column, parsed.numberFormat),
               },
             ];
       const entry: CellEntry = { address, value, patches, navigate };
@@ -655,6 +656,32 @@ export class InteractionSessions {
   private entryText(value: CellValue, type: CellFormat): string {
     if (value.kind === "formula") return value.src;
     return value.kind === "literal" ? cellEditText(value.value, type) : "";
+  }
+
+  /** A cell's effective number format: its own, then its column's. */
+  private numberFormatAt(
+    addr: Readonly<CellAddress>,
+    column: Column | undefined,
+  ): string | undefined {
+    return (
+      this.deps.store.getCell(addr).style.numberFormat ??
+      column?.cellStyle?.numberFormat ??
+      column?.numberFormat
+    );
+  }
+
+  /** The style an entry stores: the cell's own, in `entryFormat` when its format is General. */
+  private entryStyle(
+    addr: Readonly<CellAddress>,
+    column: Column | undefined,
+    entryFormat: string | undefined,
+  ): CellStyle {
+    const style = this.deps.store.getCell(addr).style;
+    if (entryFormat === undefined) return style;
+    const current = this.numberFormatAt(addr, column);
+    return current === undefined || current === "General"
+      ? { ...style, numberFormat: entryFormat }
+      : style;
   }
 
   /**
@@ -736,7 +763,10 @@ export class InteractionSessions {
 
     const formula = this.deps.store.getFormula(dataAddr);
     const current = this.deps.store.getCell(dataAddr).resolved;
-    const text = initial ?? formula ?? cellEditText(current, column.type);
+    const text =
+      initial ??
+      formula ??
+      cellEditText(current, column.type, this.numberFormatAt(dataAddr, column));
     const contentTop = this.deps.contentTop();
 
     this.cancelPointer();
@@ -950,7 +980,9 @@ export class InteractionSessions {
     address: Readonly<CellAddress>,
     viewRow: number,
     value: CellValue,
+    entryFormat?: string,
   ): DocumentOp[] {
+    const columns = this.deps.sheet().columns;
     const patches: DocumentOp[] = [];
     this.deps.selection().forEachRect((rect) => {
       for (let row = rect.r0; row <= rect.r1; row++) {
@@ -962,7 +994,7 @@ export class InteractionSessions {
           patches.push({
             op: "set",
             addr,
-            style: this.deps.store.getCell(addr).style,
+            style: this.entryStyle(addr, columns[col], entryFormat),
             value:
               value.kind === "formula"
                 ? {
@@ -976,7 +1008,14 @@ export class InteractionSessions {
     });
     return patches.length > 0
       ? patches
-      : [{ op: "set", addr: { ...address }, value, style: this.deps.store.getCell(address).style }];
+      : [
+          {
+            op: "set",
+            addr: { ...address },
+            value,
+            style: this.entryStyle(address, columns[address.col], entryFormat),
+          },
+        ];
   }
 
   private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
@@ -1087,7 +1126,6 @@ export class InteractionSessions {
   }
 
   fillHandleScreen(contentTop: number, scrollLeft: number): { x: number; y: number } | null {
-    if (this.deps.loadable?.hasView(this.deps.activeSheet())) return null;
     const src = this.fillSourceRect();
     if (!src) return null;
     const r = this.deps.screenRect(src.r1, src.c1, contentTop, scrollLeft);

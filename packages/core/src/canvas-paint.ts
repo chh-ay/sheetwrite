@@ -962,7 +962,9 @@ function paintCell(
     effective.align ??
     (typeof value === "boolean"
       ? "center"
-      : column?.type === "number" || column?.type === "currency"
+      : column?.type === "number" ||
+          column?.type === "currency" ||
+          (column?.type === "general" && typeof value === "number")
         ? "right"
         : "left");
   const numeric = typeof value === "number";
