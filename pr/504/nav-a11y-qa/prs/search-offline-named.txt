@@ -1,0 +1,51 @@
+PASS 1 "createGrid" /docs/api/core/create-grid/ | /docs/api/core-adapter/create-grid-controller/ | /docs/api/core/create-grid-from-snapshot/
+PASS 1 "initSheetwrite" /docs/api/core/init-sheetwrite/ | /docs/api/core/init-sheetwrite-options/ | /docs/api/charts/charts-addon/
+PASS 1 "XLOOKUP" /docs/reference/formula-functions/lookup-reference/ | /docs/performance/release-comparison/ | /docs/features/formulas/lookup-criteria-and-financial/
+PASS 1 "VLOOKUP" /docs/reference/formula-functions/lookup-reference/ | /docs/api/core-functions/formula-completion-kind/ | /docs/api/core-functions/formula-completion-item/
+PASS 1 "SUMIFS" /docs/reference/formula-functions/math/ | /docs/features/formulas/ | /docs/features/formulas/lookup-criteria-and-financial/
+PASS 1 "LAMBDA" /docs/reference/formula-functions/logical-control/ | /docs/features/formulas/analysis-formulas/ | /docs/api/core/named-range-snapshot/
+PASS 1 "INDIRECT" /docs/reference/formula-functions/lookup-reference/ | /docs/features/formulas/offset-and-indirect/ | /docs/features/formulas/
+PASS 1 "SheetwriteGrid" /docs/api/react/sheetwrite-grid/ | /docs/api/vue/sheetwrite-grid/ | /docs/api/svelte/sheetwrite-grid/
+PASS 1 "conditional formatting" /docs/features/formatting/conditional-formats/ | /docs/features/formatting/ | /docs/features/formatting/number-formats/
+PASS 1 "pivot table" /docs/features/analysis/pivot-tables/ | /docs/releases/0.6.0/ | /docs/features/analysis/
+PASS 1 "import xlsx" /docs/import-export/xlsx-import/ | /docs/api/core/xlsx-table-import-backend/ | /docs/import-export/xlsx-export/
+PASS 2 "export to excel" /docs/reference/compatibility-results/ | /docs/import-export/xlsx-export/ | /docs/tutorials/excel-in-nodejs/
+PASS 1 "csv" /docs/import-export/csv-and-tsv/ | /docs/import-export/ | /docs/releases/0.5.2/
+PASS 1 "undo redo" /docs/features/grid/editing-and-clipboard/ | /docs/features/grid/grid-methods/ | /docs/features/grid/toolbar-and-ribbon/
+PASS 1 "keyboard shortcuts" /docs/features/grid/keyboard-shortcuts/ | /docs/features/grid/selection-and-keyboard/ | /docs/features/grid/
+PASS 1 "#SPILL!" /docs/features/formulas/dynamic-arrays-and-spills/ | /docs/concepts/calculation-engine/ | /docs/features/analysis/pivot-tables/
+PASS 2 "#REF!" /docs/reference/formula-functions/lookup-reference/ | /docs/features/formulas/authoring-and-references/ | /docs/features/formulas/offset-and-indirect/
+PASS 1 "custom function" /docs/features/formulas/custom-functions/ | /docs/reference/formula-functions/date-time/ | /docs/reference/formula-functions/database/
+FAIL 0 "how do I freeze rows" /docs/features/grid/toolbar-and-ribbon/ | /docs/features/analysis/charts/ | /docs/releases/0.6.0/
+PASS 1 "how do I add a dropdown list to a cell" /docs/features/data/validation-protection-and-notes/ | /docs/features/data/autofilter/ | /docs/releases/0.7.0/
+PASS 1 first "how do I use sheetwrite with react" /docs/frameworks/react/ | /docs/api/react-styles-css/ | /docs/api/react/
+PASS 1 "dark theme" /docs/features/formatting/styles/ | /docs/features/analysis/charts/ | /docs/features/grid/toolbar-and-ribbon/
+PASS 1 "charts" /docs/features/analysis/charts/ | /docs/api/charts/chart-change-event/ | /docs/api/charts/charts-addon/
+FAIL 0 "real-time collaboration" 
+PASS 1 "number format" /docs/features/formatting/number-formats/ | /docs/features/formatting/ | /docs/api/core/format-number/
+PASS 1 "large xlsx file streaming" /docs/import-export/large-files-and-streaming/ | /docs/import-export/ | /docs/tutorials/excel-in-nodejs/
+PASS 1 "web worker" /docs/features/worker-rendering/ | /docs/features/ | /docs/start/installation/
+PASS 1 "upgrade to 0.7.0" /docs/start/upgrade-to-0-7-0/ | /docs/start/ | /docs/releases/
+PASS 1 "merge cells" /docs/features/grid/resize-merge-and-fill/ | /docs/features/formatting/ | /docs/features/grid/context-menu/
+PASS 1 "autofilter" /docs/features/data/autofilter/ | /docs/api/core/auto-filter/ | /docs/features/data/
+PASS 1 "copy and paste" /docs/features/grid/editing-and-clipboard/ | /docs/features/grid/context-menu/ | /docs/features/data/autofilter/
+FAIL 5 "WebAssembly failed to load" /docs/api/wasm-history/load-history-kernel/ | /docs/performance/memory/ | /docs/releases/0.5.0/
+PASS 2 "screen reader" /docs/releases/0.6.1/ | /docs/features/accessibility/ | /docs/features/formulas/formula-assist/
+PASS 1 "libreoffice" /docs/import-export/libreoffice-compatibility/ | /docs/import-export/ | /docs/features/formatting/fonts-and-alignment/
+PASS 1 "datasource" /docs/features/data/datasources/ | /docs/api/core/data-source/ | /docs/features/grid/options-and-presentation/
+PASS 1 first "react" /docs/frameworks/react/ | /docs/tutorials/excel-in-react/ | /docs/frameworks/
+PASS 1 first "vue" /docs/frameworks/vue/ | /docs/tutorials/excel-in-vue/ | /docs/frameworks/
+PASS 1 first "svelte" /docs/frameworks/svelte/ | /docs/tutorials/excel-in-svelte/ | /docs/frameworks/
+PASS 1 first "vanilla" /docs/frameworks/vanilla/ | /docs/frameworks/ | /docs/start/
+PASS 1 first "how do I use sheetwrite with vue" /docs/frameworks/vue/ | /docs/api/vue/ | /docs/api/vue-styles-css/
+PASS 1 first "how do I use sheetwrite with svelte" /docs/frameworks/svelte/ | /docs/api/svelte/ | /docs/api/svelte-styles-css/
+PASS 1 first "sheetwrite in vanilla javascript" /docs/frameworks/vanilla/ | /docs/tutorials/excel-in-javascript/ | /docs/frameworks/
+PASS 1 first "react grid" /docs/frameworks/react/ | /docs/api/react-styles-grid-css/ | /docs/tutorials/excel-in-react/
+PASS 1 first "how do I add a chart" /docs/features/analysis/charts/ | /docs/api/charts/charts-addon/ | /docs/releases/0.7.0/
+PASS 1 first "how do I use pivot tables" /docs/features/analysis/pivot-tables/ | /docs/releases/0.6.0/ | /docs/features/analysis/
+PASS 1 first "how to use conditional formatting" /docs/features/formatting/conditional-formats/ | /docs/features/formatting/ | /docs/features/formatting/number-formats/
+PASS 1 first "how do I import an xlsx file" /docs/import-export/xlsx-import/ | /docs/import-export/large-files-and-streaming/ | /docs/tutorials/excel-in-javascript/
+PASS 1 first "custom editors" /docs/features/grid/custom-editors/ | /docs/features/grid/options-and-presentation/ | /docs/features/grid/
+PASS 1 "keyboard shortcuts in vue" /docs/features/grid/keyboard-shortcuts/ | /docs/releases/0.5.2/ | /docs/features/grid/toolbar-and-ribbon/
+PASS 1 first "number formats" /docs/features/formatting/number-formats/ | /docs/features/formatting/ | /docs/api/core/format-number/
+top 3: 47/50; first where a guide is named: 15/15
