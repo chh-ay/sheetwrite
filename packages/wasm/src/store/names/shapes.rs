@@ -77,41 +77,51 @@ impl CellStore {
         for _ in 0..=definitions.len() {
             let mut changed = false;
             for &(at, sheet) in &definitions {
-                let Some(formula) = self.bindings.names.formula_at_position(at) else {
-                    continue;
-                };
-                let mut expression = std::mem::replace(&mut formula.expression, Ast::Missing);
-                let names = NameScope::new(&self.bindings, sheet);
-                changed |= mark_uses(&mut expression, names);
-                let sheet_shapes =
-                    sheet == super::NO_SHEET && uses_sheet_shaped_name(&expression, names.table());
-                if let Some(formula) = self.bindings.names.formula_at_position(at) {
-                    changed |= formula.sheet_shapes() != sheet_shapes;
-                    if !sheet_shapes {
-                        formula.sheet_shapes = None;
-                    } else if formula.sheet_shapes.is_none() {
-                        formula.sheet_shapes = Some(Box::default());
-                    }
-                    formula.expression = expression;
-                }
-                let Some(id) = NameId::at(at.0) else {
-                    continue;
-                };
-                let facts = name_facts(id, NameScope::new(&self.bindings, sheet));
-                let by_sheet = sheet_shapes.then(|| self.sheet_facts(id, &scoped_sheets));
-                if let Some(formula) = self.bindings.names.formula_at_position(at) {
-                    changed |= formula.facts != facts;
-                    formula.facts = facts;
-                    if let (Some(own), Some(worked_out)) = (&mut formula.sheet_shapes, by_sheet) {
-                        changed |= **own != worked_out;
-                        **own = worked_out;
-                    }
-                }
+                changed |= self.mark_definition(at, sheet, &scoped_sheets);
             }
             if !changed {
                 return;
             }
         }
+    }
+
+    /// One step of [`Self::mark_definition_shapes`] for the definition at
+    /// `at`, whose scope is `sheet`: mark the names in its formula, and work
+    /// out whether its shapes depend on the reading sheet and its facts,
+    /// per sheet of `scoped_sheets` when they do. Returns whether anything
+    /// changed.
+    fn mark_definition(&mut self, at: (usize, usize), sheet: u32, scoped_sheets: &[u32]) -> bool {
+        let Some(formula) = self.bindings.names.formula_at_position(at) else {
+            return false;
+        };
+        let mut expression = std::mem::replace(&mut formula.expression, Ast::Missing);
+        let names = NameScope::new(&self.bindings, sheet);
+        let mut changed = mark_uses(&mut expression, names);
+        let sheet_shapes =
+            sheet == super::NO_SHEET && uses_sheet_shaped_name(&expression, names.table());
+        if let Some(formula) = self.bindings.names.formula_at_position(at) {
+            changed |= formula.sheet_shapes() != sheet_shapes;
+            if !sheet_shapes {
+                formula.sheet_shapes = None;
+            } else if formula.sheet_shapes.is_none() {
+                formula.sheet_shapes = Some(Box::default());
+            }
+            formula.expression = expression;
+        }
+        let Some(id) = NameId::at(at.0) else {
+            return changed;
+        };
+        let facts = name_facts(id, NameScope::new(&self.bindings, sheet));
+        let by_sheet = sheet_shapes.then(|| self.sheet_facts(id, scoped_sheets));
+        if let Some(formula) = self.bindings.names.formula_at_position(at) {
+            changed |= formula.facts != facts;
+            formula.facts = facts;
+            if let (Some(own), Some(worked_out)) = (&mut formula.sheet_shapes, by_sheet) {
+                changed |= **own != worked_out;
+                **own = worked_out;
+            }
+        }
+        changed
     }
 
     /// The facts of the workbook formula of `id` as each of `sheets` that
