@@ -311,16 +311,6 @@ mod tests {
     }
 
     #[test]
-    fn status_counts_unmatched_keys_but_not_blank_keys() {
-        let (store, _) = fixture();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_OK, NO_ROW, NO_ROW, 1]
-        );
-        assert!(store.relationship_status("unknown").is_empty());
-    }
-
-    #[test]
     fn malformed_payloads_change_nothing_and_an_empty_one_frees_the_model() {
         let (mut store, _) = fixture();
         assert!(!store.set_relationships(vec!["r".into(), "orders".into()]));

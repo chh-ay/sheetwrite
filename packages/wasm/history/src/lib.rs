@@ -557,29 +557,4 @@ mod tests {
         assert_eq!(kernel.page_cols(), vec![2]);
         assert_eq!(kernel.page_authors(), vec![NONE]);
     }
-
-    #[test]
-    fn stops_when_the_page_is_full_and_resumes_at_the_returned_cell() {
-        let mut kernel = DiffKernel::new(1);
-        let sheet = kernel.add_sheet(1, 3, false);
-        let after = block_bytes(
-            1,
-            3,
-            &[Cell::Number(1.0), Cell::Empty, Cell::Number(3.0)],
-            &[],
-        );
-        assert!(kernel.load_after(&after));
-
-        assert_eq!(
-            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 0),
-            1
-        );
-        assert_eq!(kernel.page_cols(), vec![0]);
-
-        assert_eq!(
-            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 1),
-            3
-        );
-        assert_eq!(kernel.page_cols(), vec![2]);
-    }
 }

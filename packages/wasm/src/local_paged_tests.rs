@@ -47,53 +47,33 @@ fn column(store: &CellStore, sheet: usize, rows: usize, col: usize) -> ColumnCel
 }
 
 #[test]
-fn a_local_sheet_is_not_reported_as_paged() {
-    let (store, dense, local) = twin_sheets(SHORT_ROWS);
-    assert!(!store.is_paged(dense));
-    assert!(!store.is_paged(local));
-    assert!(store.range_fully_loaded(local, 0, 0, SHORT_ROWS - 1, COLS - 1));
-    assert_eq!(store.paged_stats(local)[4], 1.0, "fully loaded");
-}
-
-#[test]
-fn range_reads_on_a_local_sheet_match_the_dense_sheet() {
-    let (mut store, dense, local) = twin_sheets(ROWS);
-    for sheet in [dense, local] {
-        store.set_number(sheet, 5, 0, 1_000.0, 0);
-        store.recompute(sheet);
-    }
-    assert_eq!(
-        store.get_cell(local, 0, 2).num(),
-        store.get_cell(dense, 0, 2).num()
-    );
-}
-
-#[test]
-fn numeric_sorts_on_a_local_sheet_match_the_dense_sheet() {
+fn sorts_on_a_local_sheet_match_the_dense_sheet() {
     for rows in [SORT_ROWS, SHORT_ROWS] {
         let (store, dense, local) = twin_sheets(rows);
         for ascending in [true, false] {
             assert_eq!(
                 store.sort_rows(local, 0, ascending),
                 store.sort_rows(dense, 0, ascending),
-                "{rows} rows, ascending {ascending}"
+                "numbers, {rows} rows, ascending {ascending}"
             );
         }
+        assert_eq!(
+            store.sort_rows(local, 1, true),
+            store.sort_rows(dense, 1, true),
+            "text and blanks, {rows} rows"
+        );
     }
-}
-
-#[test]
-fn mixed_sorts_on_a_local_sheet_match_the_dense_sheet() {
-    let (store, dense, local) = twin_sheets(ROWS);
-    assert_eq!(
-        store.sort_rows(local, 1, true),
-        store.sort_rows(dense, 1, true)
-    );
 }
 
 #[test]
 fn edits_on_a_local_sheet_keep_no_dirty_overlay() {
     let (mut store, dense, local) = twin_sheets(SHORT_ROWS);
+    // A local sheet is not paged: it loads no pages and is always loaded.
+    assert!(!store.is_paged(dense));
+    assert!(!store.is_paged(local));
+    assert!(store.range_fully_loaded(local, 0, 0, SHORT_ROWS - 1, COLS - 1));
+    assert_eq!(store.paged_stats(local)[4], 1.0, "fully loaded");
+
     for sheet in [dense, local] {
         store.set_number(sheet, 2, 0, 42.0, 0);
         assert!(store.clear_range(sheet, 3, 0, 4, 1, true, false));
@@ -172,6 +152,8 @@ fn lookups_on_a_local_sheet_match_the_dense_sheet() {
         "=COUNTIF(B1:B9000,\"k1*\")",
     ];
     for sheet in [dense, local] {
+        // An edit the range reads, so `=SUM(A1:A9000)` in C1 reads again.
+        store.set_number(sheet, 5, 0, 1_000.0, 0);
         for (row, source) in lookups.iter().enumerate() {
             store.set_formula(sheet, row + 1, 2, source, 0);
             // A second formula over the same range shares the pass's index.
@@ -179,13 +161,14 @@ fn lookups_on_a_local_sheet_match_the_dense_sheet() {
         }
         store.recompute(sheet);
     }
+    let cell = |sheet, row| {
+        let out = store.get_cell(sheet, row, 2);
+        (out.kind(), out.num(), out.string())
+    };
+    assert_eq!(cell(local, 0), cell(dense, 0), "=SUM(A1:A9000)");
     for (index, source) in lookups.iter().enumerate() {
         for row in [index + 1, index + 21] {
-            let cell = |sheet| {
-                let out = store.get_cell(sheet, row, 2);
-                (out.kind(), out.num(), out.string())
-            };
-            assert_eq!(cell(local), cell(dense), "{source}");
+            assert_eq!(cell(local, row), cell(dense, row), "{source}");
         }
     }
 }

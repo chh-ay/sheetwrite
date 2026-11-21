@@ -1520,15 +1520,16 @@ fn related_pivot_output_over_a_related_table_spills() {
 }
 
 /// The fixture with named sheets, its SUM pivot at A1 of `Output`, and a
-/// `Report` sheet for formulas that read the pivot.
-fn pivot_data_fixture() -> (CellStore, usize, usize) {
+/// `Report` sheet for formulas that read the pivot:
+/// `(store, source, output, report)`.
+fn pivot_data_fixture() -> (CellStore, usize, usize, usize) {
     let (mut store, source, output) = fixture(12);
     let report = store.add_sheet(4, 20);
     store.set_sheet_name(source, "source", "Source");
     store.set_sheet_name(output, "output", "Output");
     store.set_sheet_name(report, "report", "Report");
     install(&mut store, source, output, 12, &[SUM]);
-    (store, source, report)
+    (store, source, output, report)
 }
 
 fn report_cell(store: &mut CellStore, report: usize, formula: &str) -> CellOut {
@@ -1544,7 +1545,7 @@ fn report_cell(store: &mut CellStore, report: usize, formula: &str) -> CellOut {
 /// and sells `r`.
 #[test]
 fn getpivotdata_reads_the_value_cell_of_the_named_items() {
-    let (mut store, _, report) = pivot_data_fixture();
+    let (mut store, _, _, report) = pivot_data_fixture();
     let cases: &[(&str, f64)] = &[
         // Every row: 1 + 2 + ... + 12.
         ("=GETPIVOTDATA(\"Sales\",Output!A1)", 78.0),
@@ -1585,7 +1586,7 @@ fn getpivotdata_reads_the_value_cell_of_the_named_items() {
 /// field the pivot does not show, and an unknown data field are `#REF!`.
 #[test]
 fn getpivotdata_shows_ref_for_what_the_pivot_does_not_show() {
-    let (mut store, _, report) = pivot_data_fixture();
+    let (mut store, _, _, report) = pivot_data_fixture();
     for formula in [
         "=GETPIVOTDATA(\"Sales\",Output!Z20)",
         "=GETPIVOTDATA(\"Sales\",Report!B2)",
@@ -1612,37 +1613,12 @@ fn getpivotdata_shows_ref_for_what_the_pivot_does_not_show() {
     );
 }
 
-/// A formula on another sheet follows an edit of the pivot's source.
-#[test]
-fn getpivotdata_follows_source_edits() {
-    let (mut store, source, report) = pivot_data_fixture();
-    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
-    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
-
-    // Row 1 (region 1) sells 101 instead of 1.
-    store.set_number(source, 1, SALES, 101.0, 0);
-    store.recompute(source);
-
-    assert_eq!(store.get_cell(report, 0, 0).num(), 136.0);
-}
-
-/// The fixture's pivot at A1 of `Output`, and a `Report` sheet for
-/// GETPIVOTDATA formulas: `(store, source, output, report)`.
-fn pivot_reader_fixture() -> (CellStore, usize, usize, usize) {
-    let (mut store, source, output) = fixture(12);
-    let report = store.add_sheet(4, 20);
-    store.set_sheet_name(output, "output", "Output");
-    store.set_sheet_name(report, "report", "Report");
-    install(&mut store, source, output, 12, &[SUM]);
-    (store, source, output, report)
-}
-
 /// GETPIVOTDATA depends on its pivot, as in Excel; it is not volatile. An
 /// edit that changes no pivot output does not recalculate it, so it reads
 /// no output cell.
 #[test]
 fn getpivotdata_skips_edits_that_leave_its_pivot_unchanged() {
-    let (mut store, _, output, report) = pivot_reader_fixture();
+    let (mut store, _, output, report) = pivot_data_fixture();
     let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
     assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
     let entry = store.sheets[report]
@@ -1664,7 +1640,7 @@ fn getpivotdata_skips_edits_that_leave_its_pivot_unchanged() {
 /// installed again after the formula.
 #[test]
 fn getpivotdata_follows_pivot_definition_changes() {
-    let (mut store, source, output, report) = pivot_reader_fixture();
+    let (mut store, source, output, report) = pivot_data_fixture();
     let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
     assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
 
@@ -1689,7 +1665,7 @@ fn getpivotdata_follows_pivot_definition_changes() {
 /// and a reader on the pivot's own sheet follows it too.
 #[test]
 fn getpivotdata_follows_source_edits_on_any_sheet() {
-    let (mut store, source, output, report) = pivot_reader_fixture();
+    let (mut store, source, output, report) = pivot_data_fixture();
     let formula = "=GETPIVOTDATA(\"Sales\",$A$1,\"Region\",0)";
     store.set_formula(output, 0, 20, formula, 0);
     let across = "=GETPIVOTDATA(\"Sales\",Output!B2)";
