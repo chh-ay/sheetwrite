@@ -258,11 +258,63 @@ describe("createNameBox", () => {
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
     });
 
-    // A cell whose row the filter hides cannot be selected.
+    // A cell whose row the filter hides becomes the active cell, as in Excel.
     enter("A3");
-    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
+    expect(input.value).toBe("A3");
+    expect(grid.getSelection()).toBeNull();
+    expect(grid.getActiveSheetCell()).toEqual({ sheet: "s1", row: 2, col: 0 });
 
     piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("edits, clears and leaves a cell on a hidden row, as Excel's Go To does", () => {
+    const { grid, store, host } = makeGrid();
+    const nameBox = createNameBox(host, grid, {});
+    const bar = createFormulaBar(host, grid, {});
+    const box = nameBox.element as HTMLInputElement;
+    const field = bar.element as HTMLTextAreaElement;
+    const press = (target: HTMLElement, key: string): void => {
+      target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    };
+    const a3 = { sheet: "s1", row: 2, col: 0 };
+    const sheetFocus: unknown[] = [];
+    grid.on("selection", (event) => sheetFocus.push(event.sheetFocus));
+
+    // Only the Tokyo rows show: sheet rows 2, 5, 8 and so on. A3 is hidden.
+    grid.filterBy(2, "Tokyo");
+    expect(grid.goToCell(a3)).toBe(true);
+    expect(sheetFocus.at(-1)).toEqual(a3);
+    expect(box.value).toBe("A3");
+    expect(field.value).toBe("Customer 2");
+
+    // Typing on the grid edits the cell in the formula bar; Enter stores it.
+    press(host, "x");
+    expect(document.activeElement).toBe(field);
+    expect(field.value).toBe("x");
+    press(field, "Enter");
+    expect(store.getCell(a3).resolved).toBe("x");
+
+    // Delete clears it.
+    press(host, "Delete");
+    expect(store.getCell(a3).resolved).toBeNull();
+
+    // Right stays on the hidden row; Down goes to the next row that shows (A5).
+    press(host, "ArrowRight");
+    expect(box.value).toBe("B3");
+    press(host, "ArrowDown");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(box.value).toBe("B5");
+
+    // A clear filter shows the hidden active cell's row, which it then selects.
+    expect(grid.goToCell(a3)).toBe(true);
+    grid.clearView();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: a3 });
+
+    bar.destroy();
+    nameBox.destroy();
     grid.destroy();
     store.dispose();
   });
