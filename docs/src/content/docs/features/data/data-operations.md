@@ -167,11 +167,11 @@ matches spreadsheet behavior: clearing a filter removes the query, but explicit
 hidden rows and collapsed groups remain a separate visibility state. Use
 `showRows()` and `setGroupCollapsed(start, false)` to reverse those states.
 
-Because a view reorders or hides rows, two features that depend on a stable
-row-to-cell mapping are disabled while a view is active:
+Because a view reorders or hides rows, the features that depend on the
+row-to-cell mapping change while a view is active:
 
 - **Merged cells** are not drawn (the layout reports no merges under a view).
-- **Drag-to-fill** is unavailable under a sort or a filter (the fill handle is hidden). With only rows hidden by hand or collapsed groups, the fill handle works and fills those rows too, as in Excel.
+- **Drag-to-fill** fills the rows a filter shows, and under a sort the rows in the order they show; rows hidden by hand or by a collapsed group fill too, as in Excel. See [Resize, merge and fill](/docs/features/grid/resize-merge-and-fill/).
 
 Call `clearView()` to remove sort/filter state; also show hidden rows / expand
 row groups if you need the full natural data order.

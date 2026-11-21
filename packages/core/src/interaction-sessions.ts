@@ -1129,11 +1129,6 @@ export class InteractionSessions {
   }
 
   fillHandleScreen(contentTop: number, scrollLeft: number): { x: number; y: number } | null {
-    // A sort or a filter has no fill handle; rows hidden by hand fill with the
-    // rows around them, as in Excel.
-    const { sortKeys, filters } = this.deps.sheet();
-    const sortedOrFiltered = (sortKeys?.length ?? 0) > 0 || (filters?.length ?? 0) > 0;
-    if (sortedOrFiltered && this.deps.loadable?.hasView(this.deps.activeSheet())) return null;
     const src = this.fillSourceRect();
     if (!src) return null;
     const r = this.deps.screenRect(src.r1, src.c1, contentTop, scrollLeft);

@@ -101,7 +101,7 @@ A small fill handle sits at the bottom-right corner of the selection. Drag it **
 
 Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
 
-Rows hidden by hand (Hide Rows or a collapsed group) between the rows a fill covers fill too, and a series counts through them, as in Excel; the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R over a range all do this. With one cell selected, Ctrl/Cmd + D and Ctrl/Cmd + R copy only the cell before it. Under a sort or a filter the fill handle is hidden.
+Rows hidden by hand (Hide Rows or a collapsed group) between the rows a fill covers fill too, and a series counts through them, as in Excel; the fill handle, Ctrl/Cmd + D and Ctrl/Cmd + R over a range all do this. With one cell selected, Ctrl/Cmd + D and Ctrl/Cmd + R copy only the cell before it. Rows a filter hides are not filled (see below).
 
 While you drag, a tip beside the pointer shows the value the last cell will get, as in Excel, with Ctrl counted as you move. A cell that will get a formula shows no tip.
 
@@ -152,7 +152,7 @@ See [Formulas → Point mode and reference rewriting](/docs/features/formulas/au
 ## Edge cases and limits
 
 - Merges are **not drawn while a sort or filter view is active**, because the display order no longer maps cleanly to the merged region. Clear the view to see them again. See [Data operations](/docs/features/data/data-operations/#display-views).
-- Drag-to-fill is unavailable while a sort or filter view is active (the handle is hidden). When `readOnly` is on, the handle still shows, but a fill changes nothing.
+- While a filter hides rows, the fill handle fills only the rows that show, as in Excel; the hidden rows between keep their values. Rows hidden with Hide Rows fill, as in Excel. Under a view sort it fills the rows in the order they show. When `readOnly` is on, the handle still shows, but a fill changes nothing.
 - A resize preview does not change the document. Only the release commits.
 
 ## See also
