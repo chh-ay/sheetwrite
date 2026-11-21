@@ -233,9 +233,10 @@ impl CellStore {
 
     /// Marks changed output cells dirty so the formulas reading them, and
     /// pivots whose source holds them, update. Returns whether any changed.
+    /// The pass that follows reports them to chart tracking as dirty seeds:
+    /// output cells have no source value, so the report lists each one once.
     pub(super) fn mark_pivot_cells_dirty(&mut self, owner: usize, changed: Vec<CellKey>) -> bool {
         let any = !changed.is_empty();
-        self.record_recalculated_cells(owner, &changed);
         self.sheets[owner].formulas.mark_cells_dirty(changed);
         any
     }
