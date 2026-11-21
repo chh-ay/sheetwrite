@@ -1041,25 +1041,6 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
 }
 
 /**
- * The text a cell shows before it is fitted to its width: TRUE or FALSE, a
- * number in its format (General when it has none), or the text itself. The
- * canvas paints it and the screen-reader mirror reads it, so both say the
- * same. Numbers come from the formatted-text cache.
- *
- * @param value - The cell's resolved value.
- * @param format - The cell's number-format code, from its style or its column.
- * @param locale - The column's number locale.
- */
-export function cellDisplayText(
-  value: string | number | boolean,
-  format: string | undefined,
-  locale: string | undefined,
-): string {
-  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-  return typeof value === "number" ? formatNumber(value, format, locale) : value;
-}
-
-/**
  * Deterministic Excel-style number/date formatter. Supports explicit locale
  * separators, percent/scientific notation, UTC date/time tokens, four-section
  * positive/negative/zero/text codes, fractions (`# ?/?`, `# ??/16`), quoted

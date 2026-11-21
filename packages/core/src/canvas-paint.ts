@@ -1,7 +1,7 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { automaticTextColor } from "./color-contrast.js";
 import { formatGeneral, GENERAL_WIDTH, isGeneralCode } from "./general-format.js";
-import { cellDisplayText, numberFormatColor } from "./number-format.js";
+import { formatNumber, numberFormatColor } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
@@ -883,6 +883,25 @@ function clipCell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
   ctx.beginPath();
   ctx.rect(x, y, Math.max(0, w), Math.max(0, h));
   ctx.clip();
+}
+
+/**
+ * The text a cell shows before it is fitted to its width: TRUE or FALSE, a
+ * number in its format (General when it has none), or the text itself. The
+ * canvas paints it and the screen-reader mirror reads it, so both say the
+ * same. Numbers come from the formatted-text cache.
+ *
+ * @param value - The cell's resolved value.
+ * @param format - The cell's number-format code, from its style or its column.
+ * @param locale - The column's number locale.
+ */
+export function cellDisplayText(
+  value: string | number | boolean,
+  format: string | undefined,
+  locale: string | undefined,
+): string {
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return typeof value === "number" ? formatNumber(value, format, locale) : value;
 }
 
 /**

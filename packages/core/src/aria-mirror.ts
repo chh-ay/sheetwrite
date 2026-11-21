@@ -1,4 +1,4 @@
-import { cellDisplayText } from "./number-format.js";
+import { cellDisplayText } from "./canvas-paint.js";
 import type { CellRef } from "./selection.js";
 import type { Column } from "./types/cell.js";
 import type { Selection } from "./types/coordinates.js";
