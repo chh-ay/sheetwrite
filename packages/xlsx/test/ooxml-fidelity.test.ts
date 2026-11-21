@@ -329,6 +329,32 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(warnings).toContainEqual(expect.objectContaining({ code: "validation-loss" }));
   });
 
+  it("drops a validation rule whose formula is longer than Excel's 255 characters and keeps the import", async () => {
+    const long = `LEN(C1)=${"1+".repeat(150)}1`;
+    const rule = (attributes: string, sqref: string, formulas: string) =>
+      `<dataValidation ${attributes} showErrorMessage="1" sqref="${sqref}">${formulas}</dataValidation>`;
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:D1"/><sheetData/><dataValidations count="4">${[
+          rule('type="custom"', "A1", `<formula1>${long}</formula1>`),
+          rule('type="list"', "B1", `<formula1>${long}</formula1>`),
+          rule(
+            'type="whole" operator="between"',
+            "C1",
+            `<formula1>0</formula1><formula2>${long}</formula2>`,
+          ),
+          rule('type="custom"', "D1", "<formula1>ISNUMBER(D1)</formula1>"),
+        ].join("")}</dataValidations>`,
+      ),
+      { onWarning },
+    );
+    expect(sheetAt(imported).validationRules).toMatchObject([
+      { condition: { kind: "custom", formula: "=ISNUMBER(D1)" } },
+    ]);
+    expect(warnings.filter((warning) => warning.code === "validation-loss")).toHaveLength(3);
+  });
+
   it("round-trips the error alert and the input message of a validation rule", async () => {
     const { warnings, onWarning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(

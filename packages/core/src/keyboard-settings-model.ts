@@ -35,6 +35,7 @@ export const COMMAND_GROUPS: readonly {
       ["cut", "Cut"],
       ["paste", "Paste"],
       ["pasteValues", "Paste Values"],
+      ["pasteSpecial", "Paste Special"],
     ],
   },
   {
