@@ -18,9 +18,12 @@ import type {
 } from "./types/transaction.js";
 import {
   type CheckpointLog,
+  type CheckpointManifest,
   type HistoryRecordReader,
   readCheckpoint,
+  readCheckpointCells,
   readCheckpointLog,
+  readCheckpointManifest,
   writeCheckpoint,
 } from "./version-history/checkpoint.js";
 import {
@@ -38,11 +41,23 @@ import {
   strings,
 } from "./version-history/codec.js";
 import {
+  cellIn,
   diffPageSize,
   diffStores,
+  diffTracked,
   type HistoryDiffPage,
   type HistoryDiffRequest,
+  trackLog,
+  type Tracking,
 } from "./version-history/diff.js";
+import {
+  addTailWrites,
+  calculatedDetails,
+  manifestShapes,
+  selectedPages,
+  selectPages,
+  type TailWrites,
+} from "./version-history/page-compare.js";
 import {
   type RebuiltVersion,
   RebuiltVersionCache,
@@ -517,6 +532,20 @@ async function* commitsAfter(
   }
 }
 
+/** A leased version and the record reader of its lease. */
+interface LeasedVersion {
+  version: HistoryVersion;
+  read: HistoryRecordReader;
+}
+
+/** What a compare by page reads before any cell page: checkpoint manifests and tail writes. */
+interface PageInputs {
+  earlier: CheckpointManifest;
+  later: CheckpointManifest;
+  earlierWrites: TailWrites;
+  laterWrites: TailWrites;
+}
+
 /**
  * Opt-in archive of named and automatic versions for one document. It stores
  * content-addressed checkpoints plus the committed transactions since each
@@ -873,9 +902,11 @@ export class HistoryArchive {
    * last `readVersion` or restore, and compared in bounded windows by the
    * history diff kernel, a separate WASM module that loads on the first diff.
    * Rows and columns are aligned through the structural operations of the log,
-   * so an inserted row does not make the rows below it changed. A diff keeps
-   * nothing between pages: pass `cursor` to continue, and each page rebuilds
-   * the versions that the archive does not keep.
+   * so an inserted row does not make the rows below it changed. Only the
+   * checkpoint pages that can differ are read and rebuilt (see
+   * `selectPages`); the result is the same as rebuilding both versions whole.
+   * A diff keeps nothing between pages: pass `cursor` to continue, and each
+   * page rebuilds what it needs again.
    */
   async diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage> {
     diffPageSize(request);
@@ -889,20 +920,172 @@ export class HistoryArchive {
 
         const log = await intervalLog(later, earlier.revision, read, this.limits);
         const commits = commitsAfter(log.transactions, earlier.revision, read, this.limits);
+        const tracked = { logComplete: log.complete, request };
 
-        return this.withRebuiltVersion(earlier, readEarlier, signal, false, (before) =>
-          this.withRebuiltVersion(later, read, signal, false, (after) =>
-            diffStores({
-              before: before.store,
-              after: after.store,
-              commits,
-              logComplete: log.complete,
-              request,
-            }),
-          ),
+        const byPage = await this.pageInputs(earlier, readEarlier, later, read);
+        if (!byPage) {
+          return this.withRebuiltVersion(earlier, readEarlier, signal, false, (before) =>
+            this.withRebuiltVersion(later, read, signal, false, (after) =>
+              diffStores({ ...tracked, before: before.store, after: after.store, commits }),
+            ),
+          );
+        }
+
+        const state = await trackLog(
+          manifestShapes(byPage.earlier),
+          manifestShapes(byPage.later),
+          commits,
+          request,
         );
+        try {
+          return await this.diffByPage(
+            state,
+            byPage,
+            { version: earlier, read: readEarlier },
+            { version: later, read },
+            tracked,
+          );
+        } finally {
+          state.kernel.free();
+        }
       }),
     );
+  }
+
+  /**
+   * Compare two versions under a tracked log by rebuilding only the cell pages
+   * that can differ; see `selectPages`. When too many pages differ, the whole
+   * versions are compared under the same log.
+   */
+  private async diffByPage(
+    state: Tracking,
+    inputs: PageInputs,
+    earlier: LeasedVersion,
+    later: LeasedVersion,
+    tracked: { logComplete: boolean; request: HistoryDiffRequest },
+  ): Promise<HistoryDiffPage> {
+    const { signal } = tracked.request;
+    const selection = selectPages(
+      state,
+      inputs.earlier,
+      inputs.later,
+      inputs.earlierWrites,
+      inputs.laterWrites,
+    );
+
+    if (!selection) {
+      return this.withRebuiltVersion(earlier.version, earlier.read, signal, false, (before) =>
+        this.withRebuiltVersion(later.version, later.read, signal, false, (after) =>
+          diffTracked(state, { ...tracked, before: before.store, after: after.store }),
+        ),
+      );
+    }
+
+    const before = await this.sparseVersion(inputs.earlier, selection.earlier, earlier, signal);
+    try {
+      const after = await this.sparseVersion(inputs.later, selection.later, later, signal);
+      try {
+        const page = diffTracked(state, { ...tracked, before: before.store, after: after.store });
+        await this.calculate(page, "before", before.store, earlier, signal);
+        await this.calculate(page, "after", after.store, later, signal);
+        return page;
+      } finally {
+        after.free();
+      }
+    } finally {
+      before.free();
+    }
+  }
+
+  /**
+   * What a compare by page needs from two leased versions: their checkpoint
+   * manifests and the cells their log tails write. `undefined` when a tail
+   * holds an operation that a compare by page cannot follow; the versions are
+   * then compared whole.
+   */
+  private async pageInputs(
+    earlier: HistoryVersion,
+    readEarlier: HistoryRecordReader,
+    later: HistoryVersion,
+    read: HistoryRecordReader,
+  ): Promise<PageInputs | undefined> {
+    const earlierWrites = await this.tailWrites(earlier.tail, readEarlier);
+    const laterWrites = earlierWrites && (await this.tailWrites(later.tail, read));
+    if (!earlierWrites || !laterWrites) {
+      return undefined;
+    }
+
+    return {
+      earlier: await this.manifestOf(earlier, readEarlier),
+      later: await this.manifestOf(later, read),
+      earlierWrites,
+      laterWrites,
+    };
+  }
+
+  /** The cells a log tail writes, or `undefined` when it holds an operation a compare by page cannot follow. */
+  private async tailWrites(
+    tail: readonly string[],
+    read: HistoryRecordReader,
+  ): Promise<TailWrites | undefined> {
+    const writes: TailWrites = new Map();
+    for (const id of tail) {
+      const commit = await readCommit(id, read, this.limits);
+      if (!addTailWrites(writes, commit.operations)) {
+        return undefined;
+      }
+    }
+
+    return writes;
+  }
+
+  /** Read a leased version's checkpoint manifest and check that it belongs to this document. */
+  private async manifestOf(
+    version: HistoryVersion,
+    read: HistoryRecordReader,
+  ): Promise<CheckpointManifest> {
+    const manifest = await readCheckpointManifest(version.checkpoint, read, this.limits);
+    if (manifest.documentId !== this.documentId) {
+      throw new HistoryError("integrity", "History checkpoint belongs to another document");
+    }
+
+    return manifest;
+  }
+
+  /** Rebuild a version from only the cell pages in `pages`; other cells are empty. */
+  private async sparseVersion(
+    manifest: CheckpointManifest,
+    pages: ReadonlyArray<ReadonlySet<string>>,
+    { version, read }: LeasedVersion,
+    signal: AbortSignal | undefined,
+  ): Promise<RebuiltVersion> {
+    const checkpoint = await readCheckpointCells(manifest, read, this.limits, selectedPages(pages));
+
+    return rebuildVersion(checkpoint, version.tail, read, this.limits, signal);
+  }
+
+  /**
+   * A sparse version holds the right sources and styles, but a formula or a
+   * reference needs the whole version for its calculated value. Take those
+   * values of the page's `side` from the whole version, kept or rebuilt.
+   */
+  private async calculate(
+    page: HistoryDiffPage,
+    side: "before" | "after",
+    sparse: SheetwriteStore,
+    { version, read }: LeasedVersion,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    const cells = calculatedDetails(page, side, sparse);
+    if (cells.length === 0) {
+      return;
+    }
+
+    await this.withRebuiltVersion(version, read, signal, false, ({ store }) => {
+      for (const { detail, sheet, row, col } of cells) {
+        detail[side] = cellIn(store, sheet, row, col);
+      }
+    });
   }
 
   /**
