@@ -46,7 +46,7 @@ export interface ReplaySession {
 }
 
 /** The suggester of one workbook's edits, as `attachPredictor` gives it for the workbook's store. */
-export interface ReplaySuggester {
+interface ReplaySuggester {
   open(edit: FormulaEdit): ReplaySession;
   dispose(): void;
 }

@@ -56,6 +56,12 @@ const CONTENT_KEPT: ReadonlySet<DocumentOp["op"]> = new Set([
   "removeTable",
 ]);
 
+/** One shape and how many counted cells hold it; every such cell refers to this one object. */
+interface Shape {
+  readonly text: string;
+  count: number;
+}
+
 /** How far the count of one visible sheet has got. */
 interface SheetCount {
   readonly id: SheetId;
@@ -68,7 +74,7 @@ interface SheetCount {
    * The shape of each counted formula cell, by key. A change event names the
    * cell but not the formula it held before, so the count keeps it here.
    */
-  readonly shapes: Map<number, string>;
+  readonly shapes: Map<number, Shape>;
 }
 
 /** How the count runs: in idle slices in a browser, or at once for a benchmark or a test. */
@@ -93,7 +99,8 @@ function sheetOf(op: DocumentOp): SheetId | null {
  * most 100,000 counted cells and 5,000 shapes of up to 256 characters.
  */
 export class WorkbookPatterns {
-  private readonly totals = new Map<string, number>();
+  /** The shapes counted, in the order they were first counted. */
+  private readonly totals = new Map<string, Shape>();
   private readonly sheets = new Map<SheetId, SheetCount>();
   private cells = 0;
   private byCount: (readonly [string, number])[] | null = [];
@@ -111,12 +118,14 @@ export class WorkbookPatterns {
 
   /** How many formulas of the visible sheets have `shape`, counted so far. */
   count(shape: string): number {
-    return this.totals.get(shape) ?? 0;
+    return this.totals.get(shape)?.count ?? 0;
   }
 
   /** The shapes counted so far, the most common first. */
   common(): readonly (readonly [string, number])[] {
-    this.byCount ??= [...this.totals].sort((left, right) => right[1] - left[1]);
+    this.byCount ??= [...this.totals.values()]
+      .map((shape) => [shape.text, shape.count] as const)
+      .sort((left, right) => right[1] - left[1]);
     return this.byCount;
   }
 
@@ -172,15 +181,15 @@ export class WorkbookPatterns {
   private forget(id: SheetId): void {
     const sheet = this.sheets.get(id);
     if (sheet === undefined) return;
-    for (const shape of sheet.shapes.values()) this.addTotal(shape, -1);
+    for (const shape of sheet.shapes.values()) this.release(shape);
     this.cells -= sheet.shapes.size;
     this.sheets.delete(id);
   }
 
-  private addTotal(shape: string, delta: number): void {
-    const count = (this.totals.get(shape) ?? 0) + delta;
-    if (count > 0) this.totals.set(shape, count);
-    else this.totals.delete(shape);
+  /** One cell fewer holds `shape`; a shape no cell holds is forgotten. */
+  private release(shape: Shape): void {
+    shape.count--;
+    if (shape.count === 0) this.totals.delete(shape.text);
     this.byCount = null;
   }
 
@@ -188,11 +197,17 @@ export class WorkbookPatterns {
   private add(sheet: SheetCount, formula: string, row: number, col: number): void {
     if (formula.length > MAX_FORMULA || this.cells >= MAX_CELLS || formula.includes("#REF!"))
       return;
-    const shape = shapeOf(formula, row, col);
-    if (!this.totals.has(shape) && this.totals.size >= MAX_SHAPES) return;
+    const text = shapeOf(formula, row, col);
+    let shape = this.totals.get(text);
+    if (shape === undefined) {
+      if (this.totals.size >= MAX_SHAPES) return;
+      shape = { text, count: 0 };
+      this.totals.set(text, shape);
+    }
+    shape.count++;
     sheet.shapes.set(row * COLUMNS + col, shape);
     this.cells++;
-    this.addTotal(shape, 1);
+    this.byCount = null;
   }
 
   /** Stop counting the formula of `row`, `col` on `sheet`, if it is counted. */
@@ -202,7 +217,7 @@ export class WorkbookPatterns {
     if (shape === undefined) return;
     sheet.shapes.delete(key);
     this.cells--;
-    this.addTotal(shape, -1);
+    this.release(shape);
   }
 
   /** Keep the counts current with one commit. */
