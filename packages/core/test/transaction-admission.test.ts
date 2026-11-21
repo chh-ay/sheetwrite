@@ -32,6 +32,24 @@ function admitTwoGuards(log: string[]): GridTransactionAdmissionReservation {
 }
 
 describe("grid transaction admission", () => {
+  it("keeps a later guard when an earlier guard's dispose runs twice", () => {
+    const grid = {} as Grid;
+    const log: string[] = [];
+    const disposeFirst = registerGridTransactionAdmission(grid, {
+      reserve: () => ({ ok: true, reservation: reservation(log, "first") }),
+    });
+    disposeFirst();
+    registerGridTransactionAdmission(grid, {
+      reserve: () => ({ ok: true, reservation: reservation(log, "second") }),
+    });
+    disposeFirst();
+
+    const admitted = beginGridTransactionAdmission(grid, []);
+    if (!admitted.ok) throw new Error("admission unexpectedly rejected");
+    admitted.reservation.finish(outcome);
+    expect(log).toEqual(["second:finish:noop"]);
+  });
+
   it("finishes or cancels every reservation exactly once", () => {
     const finishLog: string[] = [];
     const finished = admitTwoGuards(finishLog);

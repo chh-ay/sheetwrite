@@ -5,7 +5,7 @@
 //! corpus (`scripts/conformance/formula-evidence.ts`) are left to it.
 
 use crate::store::CellStore;
-use crate::tests::support::{assert_formulas, assert_results_on, write_cells};
+use crate::tests::support::{assert_formulas, assert_results_on, shown, write_cells};
 
 /// `Data!A1:A3` = 1, 2, 3; `B1:B3` = 10, 20, 30; `C1:C3` = 4, 5, 6;
 /// `D1:D2` = 5 and "x"; `E3` = `=D1*2`. Every other cell is blank.
@@ -15,18 +15,51 @@ const DATA: &[&[&str]] = &[
     &["3", "30", "6", "", "=D1*2"],
 ];
 
-/// Evaluates the cases in sheet `Report` of a workbook whose sheet `Data`
-/// holds [`DATA`].
-fn assert_results(cases: &[(&str, &str)]) {
+/// A workbook whose sheet `Data` holds [`DATA`], with an empty sheet
+/// `Report` of `report_cols` × `report_rows` cells for the cases. Returns
+/// the store and the report sheet.
+fn data_workbook(report_cols: usize, report_rows: usize) -> (CellStore, usize) {
     const DATA_COLS: usize = 6;
     const DATA_ROWS: usize = 12;
     let mut store = CellStore::new();
-    let report = store.add_sheet(2, cases.len());
+    let report = store.add_sheet(report_cols, report_rows);
     let data = store.add_sheet(DATA_COLS, DATA_ROWS);
     store.set_sheet_name(report, "report", "Report");
     store.set_sheet_name(data, "data", "Data");
     write_cells(&mut store, data, DATA);
+    (store, report)
+}
+
+/// Evaluates the cases in sheet `Report` of a workbook whose sheet `Data`
+/// holds [`DATA`].
+fn assert_results(cases: &[(&str, &str)]) {
+    let (mut store, report) = data_workbook(2, cases.len());
     assert_formulas(&mut store, report, 0, cases);
+}
+
+/// A formula, the width of the array it spills, and the cells it shows,
+/// row by row.
+type SpillCase<'a> = (&'a str, usize, &'a [&'a str]);
+
+/// Evaluates each formula alone at `Report!A1` of its own workbook and
+/// compares the array it spills, read row by row, with the expected cells.
+/// Reports all mismatches at once.
+fn assert_spills(cases: &[SpillCase<'_>]) {
+    const REPORT_SIZE: usize = 8;
+    let mismatches: Vec<String> = cases
+        .iter()
+        .filter_map(|&(formula, cols, expected)| {
+            let (mut store, report) = data_workbook(REPORT_SIZE, REPORT_SIZE);
+            store.set_formula(report, 0, 0, formula, 0);
+            store.commit_sources();
+            let actual: Vec<String> = (0..expected.len())
+                .map(|index| shown(&store, report, index / cols, index % cols))
+                .collect();
+            (actual != expected)
+                .then(|| format!("{formula}: expected {expected:?}, got {actual:?}"))
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
 }
 
 #[cfg(feature = "analysis")]
@@ -2474,4 +2507,128 @@ fn text_functions_follow_excel_edge_rules() {
         ("=CODE(MID(TRIM(\"a\"&CHAR(10)&\"b\"),2,1))", "10"),
         ("=LEN(TRIM(\"a\"&CHAR(9)&\"  b\"))", "4"),
     ]);
+}
+
+/// Microsoft Support, "IF function" and "Guidelines and examples of array
+/// formulas": an array condition evaluates IF once for each element and
+/// returns an array. Every argument broadcasts to the largest row and column
+/// count; an argument with fewer rows or columns than that, and more than
+/// one, gives #N/A in the cells outside it. A missing `value_if_false` gives
+/// FALSE and an empty branch gives 0 in each element, and an error in the
+/// condition stays in its element. IFERROR, IFNA, IFS, SWITCH and CHOOSE
+/// take array arguments the same way; `IF({1,0},…)` and `CHOOSE({1,2},…)`
+/// build the two-column table of the VLOOKUP examples. A scalar condition
+/// returns the branch it takes, so the untaken branch's oversized SEQUENCE
+/// never runs.
+const BRANCH_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
+    ("=IF({TRUE,FALSE},1)", 2, &["1", "FALSE"]),
+    ("=IF({TRUE,FALSE},,2)", 2, &["0", "2"]),
+    ("=IF({TRUE,FALSE},1,)", 2, &["1", "0"]),
+    (
+        "=IF(Data!A1:A3>1,\"big\",\"small\")",
+        1,
+        &["small", "big", "big"],
+    ),
+    ("=IF(Data!A1:A3>1,Data!B1:B3)", 1, &["FALSE", "20", "30"]),
+    (
+        "=IF({TRUE;FALSE},{1,2,3},0)",
+        3,
+        &["1", "2", "3", "0", "0", "0"],
+    ),
+    ("=IF({TRUE,FALSE,TRUE},{1,2})", 3, &["1", "FALSE", "#N/A"]),
+    ("=IF({TRUE,FALSE},{1,2,3},{4,5,6})", 3, &["1", "5", "#N/A"]),
+    (
+        "=IF({1,0,#DIV/0!,\"x\"},\"y\",\"n\")",
+        4,
+        &["y", "n", "#DIV/0!", "#VALUE!"],
+    ),
+    ("=IF(Data!D1:D3,\"y\",\"n\")", 1, &["y", "#VALUE!", "n"]),
+    ("=IF(TRUE,Data!A1:A3)", 1, &["1", "2", "3"]),
+    (
+        "=FILTER(IF(Data!A1>0,Data!A1:A3,Data!B1:B3),{TRUE;FALSE;TRUE})",
+        1,
+        &["1", "3"],
+    ),
+    (
+        "=SORT(IF(Data!A1>0,Data!A1:A3,Data!B1:B3),1,-1)",
+        1,
+        &["3", "2", "1"],
+    ),
+    ("=IF(Data!A2>1,{1,2},SEQUENCE(2000000))", 2, &["1", "2"]),
+    ("=SUM(IF(Data!A1:A3>1,Data!B1:B3))", 1, &["50"]),
+    ("=INDEX(IF({TRUE,FALSE},1),1,1)", 1, &["1"]),
+    ("=INDEX(IF({TRUE,FALSE},1),1,2)", 1, &["FALSE"]),
+    ("=INDEX(IF(Data!A1:A3>1,\"big\"),1)", 1, &["FALSE"]),
+    ("=INDEX(IF(Data!A1:A3>1,\"big\"),2)", 1, &["big"]),
+    (
+        "=VLOOKUP(20,IF({1,0},Data!B1:B3,Data!A1:A3),2,FALSE)",
+        1,
+        &["2"],
+    ),
+    ("=IFERROR({1,#DIV/0!,3},\"x\")", 3, &["1", "x", "3"]),
+    (
+        "=IFERROR(Data!A1:A3/(Data!A1:A3-2),\"none\")",
+        1,
+        &["-1", "none", "3"],
+    ),
+    ("=IFERROR(1/{1,0},{\"a\",\"b\"})", 2, &["1", "b"]),
+    ("=IFERROR(SEQUENCE(0),\"none\")", 1, &["none"]),
+    ("=IFNA({1,#N/A,#DIV/0!},\"na\")", 3, &["1", "na", "#DIV/0!"]),
+    ("=IFERROR(1/0,)", 1, &["0"]),
+    ("=IFNA(NA(),)", 1, &["0"]),
+    ("=IFERROR({1,#N/A},)", 2, &["1", "0"]),
+    (
+        "=IFS(Data!A1:A3>2,\"big\",Data!A1:A3>1,\"mid\")",
+        1,
+        &["#N/A", "mid", "big"],
+    ),
+    ("=IFS({TRUE,FALSE},1,TRUE,2)", 2, &["1", "2"]),
+    (
+        "=SWITCH(Data!A1:A3,1,\"one\",2,\"two\",\"many\")",
+        1,
+        &["one", "two", "many"],
+    ),
+    ("=SWITCH({1,2},2,\"two\")", 2, &["#N/A", "two"]),
+    ("=SWITCH(2,1,\"a\",2,{10,20})", 2, &["10", "20"]),
+    ("=CHOOSE({1,2},\"a\",\"b\")", 2, &["a", "b"]),
+    ("=CHOOSE({1,3},\"a\",\"b\")", 2, &["a", "#VALUE!"]),
+    (
+        "=CHOOSE({1,2},Data!A1:A3,Data!B1:B3)",
+        2,
+        &["1", "10", "2", "20", "3", "30"],
+    ),
+    (
+        "=VLOOKUP(20,CHOOSE({1,2},Data!B1:B3,Data!A1:A3),2,FALSE)",
+        1,
+        &["2"],
+    ),
+];
+
+#[test]
+fn branch_functions_take_array_arguments_element_by_element() {
+    assert_spills(BRANCH_FUNCTION_RESULTS);
+}
+
+/// A scalar condition evaluates only the branch it takes: the SEQUENCE in
+/// the untaken branch builds no array. The second formula takes that branch
+/// and shows that the count sees it.
+#[test]
+fn a_scalar_condition_evaluates_only_the_branch_it_takes() {
+    let result_and_arrays_built = |formula: &str| {
+        let (mut store, report) = data_workbook(1, 1);
+        store.set_formula(report, 0, 0, formula, 0);
+        super::matrix::reset_matrix_resource_stats();
+        store.commit_sources();
+        let [_, _, arrays_built] = super::matrix::matrix_resource_stats();
+        (shown(&store, report, 0, 0), arrays_built)
+    };
+
+    assert_eq!(
+        result_and_arrays_built("=IF(Data!A1>0,1,SUM(SEQUENCE(1000)))"),
+        ("1".to_owned(), 0)
+    );
+    assert_eq!(
+        result_and_arrays_built("=IF(Data!A1<0,1,SUM(SEQUENCE(1000)))"),
+        ("500500".to_owned(), 1)
+    );
 }

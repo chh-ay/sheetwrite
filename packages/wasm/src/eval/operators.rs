@@ -87,13 +87,18 @@ pub(crate) fn comparison(op: CmpOp, left: &Value, right: &Value) -> Value {
     })
 }
 
-enum Operand {
+/// An element-wise argument: one value, or an array that broadcasts to the
+/// shape of the whole call (operators and the lifted branch functions).
+pub(super) enum Operand {
+    /// One value, the same in every element.
     Scalar(Value),
+    /// An array, read through [`Operand::at`].
     Array(EvalMatrix),
 }
 
 impl Operand {
-    fn bytes(&self) -> usize {
+    /// The bytes the operand holds, charged against the array byte budget.
+    pub(super) fn bytes(&self) -> usize {
         match self {
             Self::Scalar(Value::Text(text)) => text.len(),
             Self::Scalar(_) => 0,
@@ -111,14 +116,17 @@ impl Operand {
         }
     }
 
-    const fn shape(&self) -> (usize, usize) {
+    /// Rows and columns; a value is one cell.
+    pub(super) const fn shape(&self) -> (usize, usize) {
         match self {
             Self::Scalar(_) => (1, 1),
             Self::Array(matrix) => (matrix.rows, matrix.cols),
         }
     }
 
-    fn at(&self, row: usize, col: usize) -> Option<&Value> {
+    /// The element at `row`, `col` of the broadcast shape: a single row or
+    /// column repeats along its axis, and `None` lies outside the operand.
+    pub(super) fn at(&self, row: usize, col: usize) -> Option<&Value> {
         match self {
             Self::Scalar(value) => Some(value),
             Self::Array(matrix) => matrix.get(
