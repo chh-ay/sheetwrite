@@ -1,0 +1,7 @@
+/docs/features/grid/custom-editors/ -> /docs/api/core-browser-history/indexed-db-history-storage/#indexed-db-history-storage-list: no element with id "indexed-db-history-storage-list"
+/docs/features/grid/toolbar-and-ribbon/ -> /docs/api/core/grid-command-state/#examples: no element with id "examples"
+/docs/import-export/csv-and-tsv/ -> /showcases/interoperability/#delimited: no element with id "delimited"
+/docs/import-export/csv-and-tsv/ -> /showcases/interoperability/#limits: no element with id "limits"
+/docs/import-export/large-files-and-streaming/ -> /showcases/interoperability/#limits: no element with id "limits"
+/docs/import-export/libreoffice-compatibility/ -> /showcases/interoperability/#contract: no element with id "contract"
+/docs/import-export/xlsx-import/ -> /showcases/interoperability/#fixtures: no element with id "fixtures"

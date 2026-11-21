@@ -1,0 +1,20 @@
+probe.ts(155,28): error TS2339: Property 'open' does not exist on type 'HistoryArchive'.
+probe.ts(205,14): error TS2339: Property 'css' does not exist on type 'Grid'.
+probe.ts(236,19): error TS2339: Property 'PasteSpecial' does not exist on type 'Range'.
+probe.ts(301,19): error TS2339: Property 'Merge' does not exist on type 'Range'.
+probe.ts(314,19): error TS2339: Property 'Insert' does not exist on type 'Range'.
+probe.ts(315,19): error TS2339: Property 'Delete' does not exist on type 'Range'.
+probe.ts(330,29): error TS2339: Property 'fromSnapshot' does not exist on type 'SheetwriteStore'.
+probe.ts(335,23): error TS2339: Property 'setBlock' does not exist on type 'CellStore'.
+probe.ts(337,23): error TS2339: Property 'sortRows' does not exist on type 'CellStore'.
+probe.ts(338,23): error TS2339: Property 'canDirtyCell' does not exist on type 'CellStore'.
+probe.ts(339,28): error TS2339: Property 'byteLength' does not exist on type 'SourceSnapshot'.
+probe.ts(347,13): error TS2314: Generic type 'SimpleColumn<Row>' requires 1 type argument(s).
+probe.ts(378,25): error TS2339: Property 'sortBy' does not exist on type 'SheetwriteStore'.
+probe.ts(379,25): error TS2339: Property 'sortByMulti' does not exist on type 'SheetwriteStore'.
+probe.ts(380,14): error TS2339: Property 'setSort' does not exist on type 'Grid'.
+probe.ts(381,14): error TS2339: Property 'sortByMulti' does not exist on type 'Grid'.
+probe.ts(385,23): error TS2339: Property 'setColumnNumbers' does not exist on type 'CellStore'.
+probe.ts(386,24): error TS2339: Property 'clearPage' does not exist on type 'DiffKernel'.
+probe.ts(387,24): error TS2339: Property 'pageLength' does not exist on type 'DiffKernel'.
+probe.ts(404,14): error TS2339: Property 'config' does not exist on type 'Grid'.

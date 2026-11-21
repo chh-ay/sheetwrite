@@ -1,0 +1,6 @@
+{"engine":"default","page":"features/formulas/lookup-criteria-and-financial.md:71","claim":"SUMIF sum range must have exactly the criteria range's shape (no top-left extension)","formula":"=SUMIF(A1:A3,\">0\",B1)","result":60,"below":null}
+{"engine":"default","page":"features/formulas/lookup-criteria-and-financial.md:90","claim":"INDEX with a zero row returns #VALUE!","formula":"=INDEX(A1:B3,0,2)","result":"#SPILL!","below":null}
+{"engine":"default","page":"features/formulas/operators.md:110 / concepts/calculation-engine.md:72","claim":"A space intersection with no overlap returns #NULL!","formula":"=SUM(A1:A2 C1:C2)","result":"#NULL!","below":null}
+{"engine":"full","page":"features/formulas/lookup-criteria-and-financial.md:71","claim":"SUMIF sum range must have exactly the criteria range's shape (no top-left extension)","formula":"=SUMIF(A1:A3,\">0\",B1)","result":60,"below":null}
+{"engine":"full","page":"features/formulas/lookup-criteria-and-financial.md:90","claim":"INDEX with a zero row returns #VALUE!","formula":"=INDEX(A1:B3,0,2)","result":"#SPILL!","below":null}
+{"engine":"full","page":"features/formulas/operators.md:110 / concepts/calculation-engine.md:72","claim":"A space intersection with no overlap returns #NULL!","formula":"=SUM(A1:A2 C1:C2)","result":"#NULL!","below":null}

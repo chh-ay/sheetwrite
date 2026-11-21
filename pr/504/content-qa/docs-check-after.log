@@ -1,0 +1,3 @@
+$ bun scripts/docs-cli.ts check
+context canceled
+Documentation contract check passed

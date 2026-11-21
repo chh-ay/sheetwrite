@@ -1,0 +1,8 @@
+(pass) performance pages > lifts a one-section page's headings to sit right under its title [0.27ms]
+(pass) performance pages > moves every figure out of its page into a static asset, leaving a placeholder [12.73ms]
+(pass) adapter documentation contract > fails when GridOptions or the Vue emits drift from the contract [2.70ms]
+
+ 22 pass
+ 0 fail
+ 146 expect() calls
+Ran 22 tests across 1 file. [14.94s]

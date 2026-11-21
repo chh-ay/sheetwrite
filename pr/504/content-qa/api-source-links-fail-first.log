@@ -1,0 +1,23 @@
+bun test v1.4.4 (38afee6c8)
+
+scripts/docs.test.ts:
+388 |     const chartsPage = await renderSymbolPage(
+389 |       { name: "@sheetwrite/charts", entryPoints: [chartsEntry] },
+390 |       chartsEntry,
+391 |       chartAnchor,
+392 |     );
+393 |     expect(chartsPage).toContain(
+                             ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<a href=\"https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L10\"><code>packages/core/src/types/chart.ts#L10</code></a>"
+Received: "---\ntitle: \"ChartAnchor | @sheetwrite/charts\"\ndescription: \"ChartAnchor interface in @sheetwrite/charts: ChartAnchor summary.\"\nkind: \"interface\"\n---\n<!-- api-export:@sheetwrite/charts|.|ChartAnchor -->\n\nChartAnchor summary.\n\n<dl class=\"api-metadata\" data-pagefind-ignore>\n<div><dt>Source</dt><dd><a href=\"https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/dist/types/chart.d.ts#L7\"><code>packages/core/dist/types/chart.d.ts#L7</code></a></dd></div>\n</dl>\n\n## Members\n\n<h3 class=\"api-member-group\">Properties</h3>\n\n<div class=\"api-cards\">\n\n<article class=\"api-card api-member\" id=\"chart-anchor-row\" data-member=\"row\" data-pagefind-weight=\"1\">\n<div class=\"api-card__head\">\n\n```ts-member generated\nrow: number;\n```\n\n</div>\n\n</article>\n</div>\n\n\n## Declaration\n\n<details class=\"api-declaration\" data-pagefind-ignore>\n<summary>View full TypeScript declaration</summary>\n\n```ts generated\ninterface ChartAnchor {\n  row: number;\n}\n```\n\n</details>\n"
+
+      at <anonymous> (/home/vvin/checkouts/dcq-content/scripts/docs.test.ts:393:24)
+(fail) API reference pages > links Source to a file in the repository, never to build output [348.65ms]
+
+ 0 pass
+ 21 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.13s]

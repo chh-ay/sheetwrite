@@ -1,0 +1,18 @@
+docs/.qa-fences/snippets/fence-093.ts(22,7): error TS18004: No value exists in scope for the shorthand property 'addr'. Either declare one or provide an initializer.
+docs/.qa-fences/snippets/fence-094.ts(26,18): error TS1361: 'SyncCoordinator' cannot be used as a value because it was imported using 'import type'.
+docs/.qa-fences/snippets/fence-136.ts(13,3): error TS18004: No value exists in scope for the shorthand property 'datasource'. Either declare one or provide an initializer.
+docs/.qa-fences/snippets/fence-142.ts(28,18): error TS1361: 'SyncCoordinator' cannot be used as a value because it was imported using 'import type'.
+docs/.qa-fences/snippets/fence-252.ts(12,43): error TS18004: No value exists in scope for the shorthand property 'datasource'. Either declare one or provide an initializer.
+docs/.qa-fences/snippets/fence-253.ts(18,3): error TS18004: No value exists in scope for the shorthand property 'datasource'. Either declare one or provide an initializer.
+docs/.qa-fences/snippets/fence-254.ts(12,23): error TS2307: Cannot find module '@sheetwrite/core/worker?worker&url' or its corresponding type declarations.
+docs/.qa-fences/snippets/fence-265.ts(12,15): error TS2451: Cannot redeclare block-scoped variable 'columns'.
+docs/.qa-fences/snippets/fence-265.ts(13,15): error TS2451: Cannot redeclare block-scoped variable 'rows'.
+docs/.qa-fences/snippets/fence-265.ts(44,9): error TS2451: Cannot redeclare block-scoped variable 'columns'.
+docs/.qa-fences/snippets/fence-265.ts(44,18): error TS2451: Cannot redeclare block-scoped variable 'rows'.
+docs/.qa-fences/snippets/fence-267.ts(12,15): error TS2451: Cannot redeclare block-scoped variable 'columns'.
+docs/.qa-fences/snippets/fence-267.ts(13,15): error TS2451: Cannot redeclare block-scoped variable 'rows'.
+docs/.qa-fences/snippets/fence-267.ts(33,9): error TS2451: Cannot redeclare block-scoped variable 'columns'.
+docs/.qa-fences/snippets/fence-267.ts(33,18): error TS2451: Cannot redeclare block-scoped variable 'rows'.
+docs/.qa-fences/snippets/fence-287.ts(24,18): error TS1361: 'SyncCoordinator' cannot be used as a value because it was imported using 'import type'.
+docs/.qa-fences/snippets/fence-288.ts(14,33): error TS2554: Expected 0-1 arguments, but got 2.
+docs/.qa-fences/snippets/fence-303.ts(13,21): error TS2307: Cannot find module '@sheetwrite/wasm/wasm?url' or its corresponding type declarations.

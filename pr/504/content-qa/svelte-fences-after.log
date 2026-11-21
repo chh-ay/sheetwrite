@@ -1,0 +1,24 @@
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence00.svelte:30:8
+Error: Can only bind to state or props
+https://svelte.dev/e/bind_invalid_value (svelte)
+
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence02.svelte:35:11
+Error: Type '{ columns: readonly SimpleColumn<Record<string, CellScalar>>[]; defaultRows: readonly Record<string, CellScalar>[]; onGridChange: (event: ChangeEvent) => void; onReady: ({ grid, generation, reason }: GridReadyEvent) => void; }' is not assignable to type 'SheetwriteProps<Record<string, CellScalar>, RowBridgeId> | undefined'.
+  Type '{ columns: readonly SimpleColumn<Record<string, CellScalar>>[]; defaultRows: readonly Record<string, CellScalar>[]; onGridChange: (event: ChangeEvent) => void; onReady: ({ grid, generation, reason }: GridReadyEvent) => void; }' is not assignable to type 'Omit<SheetwriteGridProps<RowBridgeId>, "workbook" | "data" | "rowBridge" | "datasource" | "height" | "fill"> & { fill: true; height?: undefined; } & { ...; }'.
+    Property 'fill' is missing in type '{ columns: readonly SimpleColumn<Record<string, CellScalar>>[]; defaultRows: readonly Record<string, CellScalar>[]; onGridChange: (event: ChangeEvent) => void; onReady: ({ grid, generation, reason }: GridReadyEvent) => void; }' but required in type '{ fill: true; height?: undefined; }'. (ts)
+
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence04.svelte:48:7
+Warn: `grid` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence04.svelte:37:10
+Error: Cannot find module or type declarations for side-effect import of '@sheetwrite/svelte/styles.css'. (ts)
+
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence05.svelte:31:10
+Error: Cannot find module or type declarations for side-effect import of '@sheetwrite/svelte/styles.css'. (ts)
+
+/home/vvin/checkouts/dcq-content/docs/.qa-svelte/Fence07.svelte:32:8
+Error: Cannot find module or type declarations for side-effect import of '@sheetwrite/svelte/styles.css'. (ts)
+
+====================================
+svelte-check found 5 errors and 1 warning in 5 files
