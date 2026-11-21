@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
-import { replaceInText } from "../src/search-replace.js";
+import { findMatcher, replaceInText } from "../src/search-replace.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
@@ -35,6 +35,45 @@ describe("replaceInText", () => {
     expect(replaceInText("a*e", "a~*e", "ok")).toBe("ok");
     expect(replaceInText("abc", "*", "X")).toBe("X");
     expect(replaceInText("abc", "a?", "X", { wholeCell: true })).toBeNull();
+  });
+  it("matches wildcards leftmost and longest, without empty matches", () => {
+    expect(replaceInText("xaybzaqb", "a*b", "-")).toBe("x-");
+    expect(replaceInText("abab", "a?", "-")).toBe("--");
+    expect(replaceInText("ABC abc", "b*", "-")).toBe("A-");
+    expect(replaceInText("ABC abc", "b?", "-", { matchCase: true })).toBe("ABC a-");
+    expect(replaceInText("a😀b", "a?b", "-")).toBe("-");
+    expect(replaceInText("x", "*", "-", { wholeCell: true })).toBe("-");
+    expect(replaceInText("xy", "x", "-", { wholeCell: true })).toBeNull();
+    expect(replaceInText("x~y", "~y", "-")).toBe("x-");
+    expect(replaceInText("a?c abc", "a~?c", "-")).toBe("- abc");
+    expect(replaceInText("one two three", "t*e", "-")).toBe("one -");
+    expect(replaceInText("one two three", "t?o*e", "-")).toBe("one -");
+    expect(replaceInText("x😀b", "?b", "-")).toBe("x-");
+    expect(replaceInText("ab*", "b~*", "-")).toBe("a-");
+    expect(findMatcher("c*r 1?", { wholeCell: true })("Customer 12")).toBe(true);
+    expect(findMatcher("c*r 1?", { wholeCell: true })("Customer 123")).toBe(false);
+    expect(findMatcher("*o?e", { wholeCell: true })("one done")).toBe(true);
+    expect(findMatcher("??", { wholeCell: true })("😀x")).toBe(true);
+    expect(findMatcher("a*b*c")("xxaxxbxxc")).toBe(true);
+  });
+  it("finds and replaces wildcards in time linear in the text", () => {
+    // A backtracking matcher scans to the end of the text from every `a`
+    // after the first match: quadratic for one `*`.
+    const text = `ab${"a".repeat(32_000)}`;
+    const note = "a".repeat(32_000);
+    const started = performance.now();
+    expect(replaceInText(text, "a*b", "X")).toBe(`X${"a".repeat(32_000)}`);
+    expect(findMatcher("a*b")(note)).toBe(false);
+    expect(findMatcher("*a*", { wholeCell: true })(note)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(250);
+  });
+  it("stays linear with two stars, where backtracking is cubic", () => {
+    // Short text: a backtracking matcher takes seconds on it already.
+    const text = `aab${"a".repeat(2_000)}`;
+    const started = performance.now();
+    expect(replaceInText(text, "a*a*b", "X")).toBe(`X${"a".repeat(2_000)}`);
+    expect(findMatcher("a*a*b")(text.slice(3))).toBe(false);
+    expect(performance.now() - started).toBeLessThan(250);
   });
 });
 
@@ -359,17 +398,41 @@ describe("previewReplaceAll", () => {
     grid.search("A1");
 
     // `A1)` would break =A1&B1, so neither the preview nor Replace all touch it.
-    const changes = grid.previewReplaceAll("A1)");
-    expect(changes).toEqual([
-      { addr: A(0, 0), kind: "value", before: "A1 total", after: "A1) total" },
-      { addr: A(2, 0), kind: "formula", before: '="A1"', after: '="A1)"' },
-    ]);
+    expect(grid.previewReplaceAll("A1)")).toEqual({
+      changes: [
+        { addr: A(0, 0), kind: "value", before: "A1 total", after: "A1) total" },
+        { addr: A(2, 0), kind: "formula", before: '="A1"', after: '="A1)"' },
+      ],
+      total: 2,
+      formulas: 1,
+    });
     expect(store.getCell(A(0, 0)).resolved).toBe("A1 total");
 
-    expect(grid.replaceAll("A1)").replaced).toBe(changes.length);
+    expect(grid.replaceAll("A1)").replaced).toBe(2);
     expect(store.getCell(A(0, 0)).resolved).toBe("A1) total");
     expect(store.getFormula(A(1, 0))).toBe("=A1&B1");
     expect(store.getFormula(A(2, 0))).toBe('="A1)"');
+    grid.destroy();
+  });
+
+  it("lists the first 1,000 changes and counts them all", () => {
+    const rows = 1_005;
+    const workbook = makeWorkbook(rows);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: Array.from({ length: rows }, (_, row) => ({
+        op: "set" as const,
+        addr: A(row, 0),
+        value: { kind: "literal" as const, value: "dup" },
+      })),
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.search("dup");
+
+    const preview = grid.previewReplaceAll("one");
+    expect(preview.total).toBe(rows);
+    expect(preview.changes).toHaveLength(1_000);
+    expect(preview.changes.at(-1)).toMatchObject({ addr: A(999, 0), after: "one" });
     grid.destroy();
   });
 });

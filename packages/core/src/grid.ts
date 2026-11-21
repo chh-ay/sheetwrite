@@ -178,7 +178,7 @@ import type {
   GridOptions,
   GridPanel,
   GridPresentation,
-  ReplaceChange,
+  ReplacePreview,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -992,14 +992,26 @@ export class GridImpl implements Grid {
         this.validationRefusedNotice(refused, warned);
       },
       validationReads: () => storeEngine(this.store)?.validationReads,
-      // Excel's cut moves the rows a filter hides without a word; say so.
-      onHiddenRowsMoved: (count, step) => {
+      // Excel's cut moves the rows a filter or Hide Rows hides without a word;
+      // say so. Show them clears the filters and shows the step's hidden rows,
+      // as one undo step.
+      onHiddenRowsMoved: (count, step, spans) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
         this.actionFeedback.show(
           step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
           {
             label: "Show them",
-            run: () => this.actions.clearFilters(),
+            run: () => {
+              const sheet = this.sheet();
+              const shown = [...(sheet.hiddenRows ?? [])].filter((row) =>
+                spans.some(({ start, end }) => row >= start && row <= end),
+              );
+              const patches = rowVisibilityPatches(sheet, shown, false);
+              if ((sheet.filters?.length ?? 0) > 0) {
+                patches.push({ op: "setSheetMeta", sheet: sheet.id, patch: { filters: [] } });
+              }
+              if (patches.length > 0) this.document.commit(patches, "structure");
+            },
           },
         );
       },
@@ -2342,8 +2354,8 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
-  previewReplaceAll(replacement: string): ReplaceChange[] {
-    return this.searchController.previewReplaceAll(replacement);
+  previewReplaceAll(replacement: string, limit?: number): ReplacePreview {
+    return this.searchController.previewReplaceAll(replacement, limit);
   }
 
   getShortcutLabel(action: KeyboardAction): string {

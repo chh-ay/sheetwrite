@@ -375,3 +375,70 @@ fn value_information(func: Func, value: Value) -> Value {
 
     Value::number(number)
 }
+
+impl CellStore {
+    /// The `IS*` tests, `TYPE`, `N`, `T`, and the cell information functions.
+    #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
+    pub(super) fn eval_information_family(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if matches!(
+            func,
+            Func::IsBlank
+                | Func::IsNumber
+                | Func::IsText
+                | Func::IsLogical
+                | Func::IsError
+                | Func::IsErr
+                | Func::IsNa
+                | Func::Type
+                | Func::N
+                | Func::T
+        ) {
+            if args.len() != 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            return match func {
+                Func::IsBlank => Value::Bool(matches!(value, Value::Blank)),
+                Func::IsNumber => Value::Bool(matches!(value, Value::Number(_))),
+                Func::IsText => Value::Bool(matches!(value, Value::Text(_))),
+                Func::IsLogical => Value::Bool(matches!(value, Value::Bool(_))),
+                Func::IsError => Value::Bool(matches!(value, Value::Error(_))),
+                Func::IsErr => Value::Bool(matches!(
+                    value,
+                    Value::Error(error) if error != FormulaError::Na
+                )),
+                Func::IsNa => Value::Bool(value == Value::Error(FormulaError::Na)),
+                Func::Type => Value::number(match value {
+                    Value::Number(_) | Value::Blank => 1.0,
+                    Value::Text(_) => 2.0,
+                    Value::Bool(_) => 4.0,
+                    Value::Error(_) => 16.0,
+                }),
+                Func::N => match value {
+                    Value::Number(number) => Value::number(number),
+                    Value::Bool(flag) => Value::number(if flag { 1.0 } else { 0.0 }),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Text(_) | Value::Blank => Value::Number(0.0),
+                },
+                Func::T => match value {
+                    Value::Text(text) => Value::Text(text),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Number(_) | Value::Bool(_) | Value::Blank => Value::text(""),
+                },
+                _ => unreachable!(),
+            };
+        }
+        self.eval_info_func(func, args, sheet, pass, depth + 1)
+    }
+}

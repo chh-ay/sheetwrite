@@ -175,7 +175,10 @@ describe("FindBar options and Find All", () => {
 });
 
 describe("FindBar Replace all preview", () => {
-  it("shows what Replace all will change before it applies, as one undo step", () => {
+  /** Waits out the preview's debounce. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+
+  it("shows what Replace all will change before it applies, as one undo step", async () => {
     const host = mountHost();
     const grid = createGrid(host, {
       workbook: makeWorkbook(3),
@@ -207,6 +210,7 @@ describe("FindBar Replace all preview", () => {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     replacement.value = "Grace";
     replacement.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle();
 
     expect(preview.hidden).toBe(false);
     expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
@@ -225,6 +229,7 @@ describe("FindBar Replace all preview", () => {
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
     expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
     expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Grace"');
+    await settle();
     expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
       "Nothing to replace",
     );
@@ -232,6 +237,36 @@ describe("FindBar Replace all preview", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
     expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Ada"');
 
+    bar.destroy();
+    grid.destroy();
+  });
+
+  it("plans the preview once typing pauses, not on every key", async () => {
+    const host = mountHost();
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(2),
+      data: { rowCount: 2, columns: { name: ["Ada", "Bob"], amount: [1, 2], city: ["", ""] } },
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    let plans = 0;
+    const preview = grid.previewReplaceAll.bind(grid);
+    grid.previewReplaceAll = (replacement) => {
+      plans += 1;
+      return preview(replacement);
+    };
+    const bar = new FindBar(host, DEFAULT_THEME, grid);
+    bar.open({ replace: true });
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
+    const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
+    input.value = "Ada";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    for (const text of ["G", "Gr", "Gra"]) {
+      replacement.value = text;
+      replacement.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    expect(plans).toBe(0);
+    await settle();
+    expect(plans).toBe(1);
     bar.destroy();
     grid.destroy();
   });
