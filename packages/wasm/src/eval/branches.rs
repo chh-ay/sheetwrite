@@ -89,6 +89,21 @@ impl Branching {
         }
     }
 
+    /// Whether an unlifted call of `count` arguments can return argument
+    /// `index` as it is: a branch, a value, a result, a choice, or the value
+    /// IFERROR and IFNA test.
+    fn returns_argument(self, index: usize, count: usize) -> bool {
+        match self {
+            Self::If | Self::Choose => index > 0,
+            Self::IfError | Self::IfNa => true,
+            Self::Ifs => !index.is_multiple_of(2),
+            Self::Switch => {
+                let pairs_end = switch_pairs_end(count);
+                ((2..pairs_end).contains(&index) && index.is_multiple_of(2)) || index == pairs_end
+            }
+        }
+    }
+
     /// The scalar rule of the function. `element` gives the value of an
     /// argument; the rule asks only for the arguments it needs, in order.
     fn pick(self, args: &[Ast], mut element: impl FnMut(usize) -> Value) -> Pick {
@@ -225,10 +240,12 @@ impl CellStore {
         Ok(EvalMatrix::new(1, 1, vec![value]))
     }
 
-    /// The array shape of a lifted `call` before evaluation: the largest row
-    /// and column count of its arguments. A call that takes one argument has
-    /// the shape of the argument it takes, unknown until it runs, so it has
-    /// no static shape (#VALUE!).
+    /// The array shape of a branching `call` before evaluation. A lifted
+    /// call has the largest row and column count of its arguments. A call
+    /// that returns one argument has the shape its candidates share: the
+    /// arguments it can return, and FALSE for IF without `value_if_false`.
+    /// Candidates of different shapes leave the shape unknown until the call
+    /// runs (#VALUE!). An error result needs no shape: callers pass it on.
     pub(super) fn branches_shape(
         &self,
         call: &Ast,
@@ -238,22 +255,41 @@ impl CellStore {
         let Ast::Func(func, args) = call else {
             return Err(FormulaError::Value);
         };
-        let names = self.name_scope(formula_sheet);
-        let lifted = Branching::of(*func)
-            .is_some_and(|kind| kind.takes(args.len()) && kind.lifts(args, pass.shapes(names)));
-        if !lifted {
-            return Err(FormulaError::Value);
-        }
+        let kind = Branching::of(*func)
+            .filter(|kind| kind.takes(args.len()))
+            .ok_or(FormulaError::Value)?;
+        let lifted = kind.lifts(args, pass.shapes(self.name_scope(formula_sheet)));
 
+        let implicit_false = matches!(kind, Branching::If) && args.len() == 2;
+        let mut first = implicit_false.then_some((1, 1, 1));
+        let mut same = true;
         let (mut rows, mut cols) = (1, 1);
-        for arg in args {
-            if ast_produces_array(arg, pass.shapes(names)) {
-                let (arg_rows, arg_cols, _) = self.matrix_shape(arg, formula_sheet, pass)?;
-                rows = rows.max(arg_rows);
-                cols = cols.max(arg_cols);
+        for (index, arg) in args.iter().enumerate() {
+            if lifted || kind.returns_argument(index, args.len()) {
+                let shape = self.argument_shape(arg, formula_sheet, pass)?;
+                same &= *first.get_or_insert(shape) == shape;
+                rows = rows.max(shape.0);
+                cols = cols.max(shape.1);
             }
         }
+        if !lifted && !same {
+            return Err(FormulaError::Value);
+        }
         Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?))
+    }
+
+    /// The shape of one argument before evaluation; a value is one cell.
+    fn argument_shape(
+        &self,
+        arg: &Ast,
+        formula_sheet: usize,
+        pass: &mut EvalPass<'_>,
+    ) -> Result<ArrayShape, FormulaError> {
+        if ast_produces_array(arg, pass.shapes(self.name_scope(formula_sheet))) {
+            self.matrix_shape(arg, formula_sheet, pass)
+        } else {
+            Ok((1, 1, 1))
+        }
     }
 
     /// The spill budget a branching call charges before it runs: the largest

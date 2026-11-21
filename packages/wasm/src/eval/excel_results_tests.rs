@@ -495,78 +495,90 @@ fn text_functions_follow_excel_edge_rules() {
 /// build the two-column table of the VLOOKUP examples. A scalar condition
 /// returns the branch it takes, so the untaken branch's oversized SEQUENCE
 /// never runs.
+const BRANCH_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
+    ("=IF({TRUE,FALSE},1)", 2, &["1", "FALSE"]),
+    ("=IF({TRUE,FALSE},,2)", 2, &["0", "2"]),
+    ("=IF({TRUE,FALSE},1,)", 2, &["1", "0"]),
+    (
+        "=IF(Data!A1:A3>1,\"big\",\"small\")",
+        1,
+        &["small", "big", "big"],
+    ),
+    ("=IF(Data!A1:A3>1,Data!B1:B3)", 1, &["FALSE", "20", "30"]),
+    (
+        "=IF({TRUE;FALSE},{1,2,3},0)",
+        3,
+        &["1", "2", "3", "0", "0", "0"],
+    ),
+    ("=IF({TRUE,FALSE,TRUE},{1,2})", 3, &["1", "FALSE", "#N/A"]),
+    ("=IF({TRUE,FALSE},{1,2,3},{4,5,6})", 3, &["1", "5", "#N/A"]),
+    (
+        "=IF({1,0,#DIV/0!,\"x\"},\"y\",\"n\")",
+        4,
+        &["y", "n", "#DIV/0!", "#VALUE!"],
+    ),
+    ("=IF(Data!D1:D3,\"y\",\"n\")", 1, &["y", "#VALUE!", "n"]),
+    ("=IF(TRUE,Data!A1:A3)", 1, &["1", "2", "3"]),
+    (
+        "=FILTER(IF(Data!A1>0,Data!A1:A3,Data!B1:B3),{TRUE;FALSE;TRUE})",
+        1,
+        &["1", "3"],
+    ),
+    (
+        "=SORT(IF(Data!A1>0,Data!A1:A3,Data!B1:B3),1,-1)",
+        1,
+        &["3", "2", "1"],
+    ),
+    ("=IF(Data!A2>1,{1,2},SEQUENCE(2000000))", 2, &["1", "2"]),
+    ("=SUM(IF(Data!A1:A3>1,Data!B1:B3))", 1, &["50"]),
+    ("=INDEX(IF({TRUE,FALSE},1),1,1)", 1, &["1"]),
+    ("=INDEX(IF({TRUE,FALSE},1),1,2)", 1, &["FALSE"]),
+    ("=INDEX(IF(Data!A1:A3>1,\"big\"),1)", 1, &["FALSE"]),
+    ("=INDEX(IF(Data!A1:A3>1,\"big\"),2)", 1, &["big"]),
+    (
+        "=VLOOKUP(20,IF({1,0},Data!B1:B3,Data!A1:A3),2,FALSE)",
+        1,
+        &["2"],
+    ),
+    ("=IFERROR({1,#DIV/0!,3},\"x\")", 3, &["1", "x", "3"]),
+    (
+        "=IFERROR(Data!A1:A3/(Data!A1:A3-2),\"none\")",
+        1,
+        &["-1", "none", "3"],
+    ),
+    ("=IFERROR(1/{1,0},{\"a\",\"b\"})", 2, &["1", "b"]),
+    ("=IFERROR(SEQUENCE(0),\"none\")", 1, &["none"]),
+    ("=IFNA({1,#N/A,#DIV/0!},\"na\")", 3, &["1", "na", "#DIV/0!"]),
+    (
+        "=IFS(Data!A1:A3>2,\"big\",Data!A1:A3>1,\"mid\")",
+        1,
+        &["#N/A", "mid", "big"],
+    ),
+    ("=IFS({TRUE,FALSE},1,TRUE,2)", 2, &["1", "2"]),
+    (
+        "=SWITCH(Data!A1:A3,1,\"one\",2,\"two\",\"many\")",
+        1,
+        &["one", "two", "many"],
+    ),
+    ("=SWITCH({1,2},2,\"two\")", 2, &["#N/A", "two"]),
+    ("=SWITCH(2,1,\"a\",2,{10,20})", 2, &["10", "20"]),
+    ("=CHOOSE({1,2},\"a\",\"b\")", 2, &["a", "b"]),
+    ("=CHOOSE({1,3},\"a\",\"b\")", 2, &["a", "#VALUE!"]),
+    (
+        "=CHOOSE({1,2},Data!A1:A3,Data!B1:B3)",
+        2,
+        &["1", "10", "2", "20", "3", "30"],
+    ),
+    (
+        "=VLOOKUP(20,CHOOSE({1,2},Data!B1:B3,Data!A1:A3),2,FALSE)",
+        1,
+        &["2"],
+    ),
+];
+
 #[test]
 fn branch_functions_take_array_arguments_element_by_element() {
-    assert_spills(&[
-        ("=IF({TRUE,FALSE},1)", 2, &["1", "FALSE"]),
-        ("=IF({TRUE,FALSE},,2)", 2, &["0", "2"]),
-        ("=IF({TRUE,FALSE},1,)", 2, &["1", "0"]),
-        (
-            "=IF(Data!A1:A3>1,\"big\",\"small\")",
-            1,
-            &["small", "big", "big"],
-        ),
-        ("=IF(Data!A1:A3>1,Data!B1:B3)", 1, &["FALSE", "20", "30"]),
-        (
-            "=IF({TRUE;FALSE},{1,2,3},0)",
-            3,
-            &["1", "2", "3", "0", "0", "0"],
-        ),
-        ("=IF({TRUE,FALSE,TRUE},{1,2})", 3, &["1", "FALSE", "#N/A"]),
-        ("=IF({TRUE,FALSE},{1,2,3},{4,5,6})", 3, &["1", "5", "#N/A"]),
-        (
-            "=IF({1,0,#DIV/0!,\"x\"},\"y\",\"n\")",
-            4,
-            &["y", "n", "#DIV/0!", "#VALUE!"],
-        ),
-        ("=IF(Data!D1:D3,\"y\",\"n\")", 1, &["y", "#VALUE!", "n"]),
-        ("=IF(TRUE,Data!A1:A3)", 1, &["1", "2", "3"]),
-        ("=IF(Data!A2>1,{1,2},SEQUENCE(2000000))", 2, &["1", "2"]),
-        ("=SUM(IF(Data!A1:A3>1,Data!B1:B3))", 1, &["50"]),
-        ("=INDEX(IF({TRUE,FALSE},1),1,1)", 1, &["1"]),
-        ("=INDEX(IF({TRUE,FALSE},1),1,2)", 1, &["FALSE"]),
-        ("=INDEX(IF(Data!A1:A3>1,\"big\"),1)", 1, &["FALSE"]),
-        ("=INDEX(IF(Data!A1:A3>1,\"big\"),2)", 1, &["big"]),
-        (
-            "=VLOOKUP(20,IF({1,0},Data!B1:B3,Data!A1:A3),2,FALSE)",
-            1,
-            &["2"],
-        ),
-        ("=IFERROR({1,#DIV/0!,3},\"x\")", 3, &["1", "x", "3"]),
-        (
-            "=IFERROR(Data!A1:A3/(Data!A1:A3-2),\"none\")",
-            1,
-            &["-1", "none", "3"],
-        ),
-        ("=IFERROR(1/{1,0},{\"a\",\"b\"})", 2, &["1", "b"]),
-        ("=IFERROR(SEQUENCE(0),\"none\")", 1, &["none"]),
-        ("=IFNA({1,#N/A,#DIV/0!},\"na\")", 3, &["1", "na", "#DIV/0!"]),
-        (
-            "=IFS(Data!A1:A3>2,\"big\",Data!A1:A3>1,\"mid\")",
-            1,
-            &["#N/A", "mid", "big"],
-        ),
-        ("=IFS({TRUE,FALSE},1,TRUE,2)", 2, &["1", "2"]),
-        (
-            "=SWITCH(Data!A1:A3,1,\"one\",2,\"two\",\"many\")",
-            1,
-            &["one", "two", "many"],
-        ),
-        ("=SWITCH({1,2},2,\"two\")", 2, &["#N/A", "two"]),
-        ("=SWITCH(2,1,\"a\",2,{10,20})", 2, &["10", "20"]),
-        ("=CHOOSE({1,2},\"a\",\"b\")", 2, &["a", "b"]),
-        ("=CHOOSE({1,3},\"a\",\"b\")", 2, &["a", "#VALUE!"]),
-        (
-            "=CHOOSE({1,2},Data!A1:A3,Data!B1:B3)",
-            2,
-            &["1", "10", "2", "20", "3", "30"],
-        ),
-        (
-            "=VLOOKUP(20,CHOOSE({1,2},Data!B1:B3,Data!A1:A3),2,FALSE)",
-            1,
-            &["2"],
-        ),
-    ]);
+    assert_spills(BRANCH_FUNCTION_RESULTS);
 }
 
 /// A scalar condition evaluates only the branch it takes: the SEQUENCE in
