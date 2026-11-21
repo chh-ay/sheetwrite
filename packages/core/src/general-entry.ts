@@ -274,3 +274,34 @@ export function numberFormatDateKind(format: string | undefined): "date" | "time
   if (/[dy]/i.test(visible)) return "date";
   return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
 }
+
+/** Three lowercase letters as one number: `jan` and `Jan` give the same key. */
+function letterKey(text: string): number {
+  return (
+    ((text.charCodeAt(0) | 0x20) << 16) |
+    ((text.charCodeAt(1) | 0x20) << 8) |
+    (text.charCodeAt(2) | 0x20)
+  );
+}
+
+const MONTH_KEYS = new Set(MONTHS.map(letterKey));
+
+/**
+ * Whether General could read `text` (trimmed, not empty) as a number, date or
+ * time: it starts with a digit, a sign, `(`, a decimal point or a currency
+ * symbol, or with the first three letters of an English month. Most text
+ * fails on its first character, so it skips the parser without allocating.
+ */
+export function mayBeGeneralNumber(text: string): boolean {
+  const first = text.charCodeAt(0);
+  if (first >= 0x30 && first <= 0x39) return true;
+  // + - ( . ,
+  if (first === 0x2b || first === 0x2d || first === 0x28 || first === 0x2e || first === 0x2c) {
+    return true;
+  }
+  // $ £ ¥ €
+  if (first === 0x24 || first === 0xa3 || first === 0xa5 || first === 0x20ac) return true;
+  const lower = first | 0x20;
+  if (lower < 0x61 || lower > 0x7a || text.length < 3) return false;
+  return MONTH_KEYS.has(letterKey(text));
+}

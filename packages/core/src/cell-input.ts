@@ -1,5 +1,5 @@
 import { parseDateInput } from "./date-serial.js";
-import { numberFormatDateKind, parseGeneralNumber } from "./general-entry.js";
+import { mayBeGeneralNumber, numberFormatDateKind, parseGeneralNumber } from "./general-entry.js";
 import { formatNumber } from "./number-format.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
@@ -180,13 +180,22 @@ export function parseCellEntry(
   if (trimmed.length > 1 && trimmed.startsWith("=")) {
     return { value: { kind: "formula", src: trimmed } };
   }
-  if (BOOLEAN_TEXT.test(trimmed)) {
+  if ((trimmed.length === 4 || trimmed.length === 5) && BOOLEAN_TEXT.test(trimmed)) {
     return { value: { kind: "literal", value: trimmed.toUpperCase() === "TRUE" } };
   }
-  // Most entries are plain decimals, which need no other reading where `.` is the decimal point.
+  // Most text cannot be a number, date or time from its first character.
+  if (!mayBeGeneralNumber(trimmed)) return { value: { kind: "literal", value: raw } };
+  // Plain decimals and percentages, the common numbers, need no other reading
+  // where `.` is the decimal point.
   if (locale === undefined || locale === "en-US") {
-    const plain = parsePlainDecimal(trimmed, 0, trimmed.length);
-    if (plain !== undefined) return { value: { kind: "literal", value: plain } };
+    const end = trimmed.length;
+    const percent = trimmed.charCodeAt(end - 1) === PERCENT_CODE_UNIT;
+    const plain = parsePlainDecimal(trimmed, 0, percent ? end - 1 : end, percent ? 2 : 0);
+    if (plain !== undefined) {
+      const value: CellValue = { kind: "literal", value: plain };
+      if (!percent) return { value };
+      return { value, numberFormat: trimmed.includes(".") ? "0.00%" : "0%" };
+    }
   }
   const number = parseGeneralNumber(trimmed, locale);
   if (number === null) return { value: { kind: "literal", value: raw } };
@@ -241,6 +250,7 @@ const NINE_CODE_UNIT = 0x39;
 const PLUS_CODE_UNIT = 0x2b;
 const MINUS_CODE_UNIT = 0x2d;
 const DOT_CODE_UNIT = 0x2e;
+const PERCENT_CODE_UNIT = 0x25;
 /** Significant digits whose integer value is exact in a double (below 2^53). */
 const MAX_EXACT_DIGITS = 15;
 /** Powers of ten that are exact in a double, as literals so no rounding enters. */
@@ -255,11 +265,18 @@ const EXACT_POWERS_OF_TEN: readonly number[] = [
  * when the span is a plain decimal: an optional sign, digits with at most one
  * point, nothing else, at most 15 significant digits and 22 decimals.
  * `undefined` for any other span, which then takes the string path.
+ * `shift` divides by that power of ten more, so `12.5` with 2 reads 0.125 for
+ * `12.5%`.
  *
  * The result equals `Number()`: the digits form an exact integer below 2^53
  * and the power of ten is exact, so one IEEE division rounds correctly.
  */
-export function parsePlainDecimal(text: string, start: number, end: number): number | undefined {
+export function parsePlainDecimal(
+  text: string,
+  start: number,
+  end: number,
+  shift = 0,
+): number | undefined {
   let index = start;
   const sign = text.charCodeAt(index);
   const negative = sign === MINUS_CODE_UNIT;
@@ -285,7 +302,7 @@ export function parsePlainDecimal(text: string, start: number, end: number): num
       return undefined;
     }
   }
-  const scale = EXACT_POWERS_OF_TEN[decimals];
+  const scale = EXACT_POWERS_OF_TEN[decimals + shift];
   if (!hasDigit || scale === undefined) return undefined;
   const magnitude = mantissa / scale;
   return negative ? -magnitude : magnitude;
