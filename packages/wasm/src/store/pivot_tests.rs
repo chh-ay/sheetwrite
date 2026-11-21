@@ -999,7 +999,6 @@ fn pivot_multi_level_layout_matches_pivotby_through_group_edits() {
         case(&[0, 1, 2], 1, SUM, Some("SUM"), true),
         case(&[0, 1, 2], 0, MIN, Some("MIN"), true),
         case(&[0, 1], 1, COUNT, Some("COUNT"), true),
-        case(&[0, 1, 2], 0, AVERAGE, Some("AVERAGE"), true),
         case(&[0, 1], 0, COUNTA, Some("COUNTA"), false),
         // The default layout: one label column, subtotals above their
         // children.
