@@ -1958,9 +1958,9 @@ pub(super) fn circular_components(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cmp::Reverse;
     use crate::store::CellStore;
     use crate::types::Value;
+    use std::cmp::Reverse;
 
     type IntervalRow = (u32, u32, usize, u32);
 
