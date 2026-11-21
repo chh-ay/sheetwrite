@@ -1025,7 +1025,16 @@ export function validateFormulaCapture(
   baseline?: FormulaBenchmarkResult,
 ): void {
   if (baseline === undefined) {
-    validateFormulaEvidence(matrix, candidate, candidate.mode, false);
+    // A release baseline's engine may predate expanded rows; see runWorkloads in formula-bench.ts.
+    const olderEngine =
+      candidate.mode === "full" && candidate.source?.baselineContext !== undefined;
+    validateFormulaEvidence(
+      matrix,
+      candidate,
+      candidate.mode,
+      false,
+      olderEngine ? regressionBaselineWorkloadKeys(matrix, candidate) : undefined,
+    );
   } else if (candidate.mode === "smoke") {
     validateFormulaBaselineBinding(matrix, candidate, baseline);
   } else {
