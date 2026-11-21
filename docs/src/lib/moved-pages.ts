@@ -19,7 +19,7 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
     anchors: {
       "limitation-the-mirror-reflects-the-visible-window":
         "/docs/features/accessibility/#limitation-the-mirror-reflects-the-visible-window",
-      "the-host-grid": "/docs/features/accessibility/#the-host-grid",
+      "the-host-grid": "/docs/features/accessibility/#the-host",
       "the-sr-only-mirror": "/docs/features/accessibility/#the-sr-only-mirror",
     },
   },

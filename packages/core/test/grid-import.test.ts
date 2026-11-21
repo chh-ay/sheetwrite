@@ -213,7 +213,8 @@ it("offers the accessible File command only with a backend and imports the chose
     toXlsxWorkbook: async () => new Uint8Array(),
   });
   grid.setConfig({ ribbon: { mode: "compact" } });
-  await elementAdded(host, '.sheetwrite-ribbon [aria-label="Import XLSX"]', HTMLButtonElement);
+  // The ribbon opens on Home; File's panel is built when the tab is chosen.
+  await elementAdded(host, '.sheetwrite-ribbon[data-mode="compact"]', HTMLDivElement);
   const nextFileTab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
     (tab) => tab.textContent === "File",
   );

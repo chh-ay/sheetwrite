@@ -123,6 +123,8 @@ interface CardCrop {
   readonly stage?: ShotSize;
   /** An element whose full width the card shows: a side panel, whose list markers hang at its edge. */
   readonly across?: string;
+  /** Changes to the view before the card's box is measured, such as a shorter list. */
+  readonly steps?: (page: Page) => Promise<void>;
 }
 
 /** A point in the grid element: the middle of a cell by its row and column from 0. */
@@ -565,10 +567,28 @@ const SECTION_CROPS: Readonly<
  */
 const PANEL = ".sheetwrite-panel-host";
 const PANEL_HEADER = ".sheetwrite-panel-header";
+/**
+ * The Format Cells card's dialog width: its fields then fill the card at 1×,
+ * 376 px (the card's 400 px less its two 12 px margins) inside the dialog's
+ * 16 px padding and 1 px border on each side.
+ */
+const FORMAT_CELLS_CARD_DIALOG_WIDTH = 410;
 const CARD_CROPS: Readonly<Record<string, CardCrop>> = {
-  // The panel's title and the tables in the model.
+  // The panel's title and the relationship from Orders to Regions with its key
+  // check. The Tables list above it is taken out of the layout, and the
+  // relationship's Edit and Delete buttons are hidden.
   "data-model": {
-    parts: [PANEL_HEADER, ".sheetwrite-panel-body > .sheetwrite-panel-section >> nth=0"],
+    parts: [
+      PANEL_HEADER,
+      ".sheetwrite-panel-body > .sheetwrite-panel-section >> nth=1 >> .sheetwrite-panel-note",
+    ],
+    steps: async (page) => {
+      await page
+        .locator(".sheetwrite-panel-body > .sheetwrite-panel-section >> nth=0")
+        .evaluate((tables) => ((tables as HTMLElement).style.display = "none"));
+      await settle(page);
+    },
+    hide: [".sheetwrite-panel-body > .sheetwrite-panel-section >> nth=1 >> button"],
     across: PANEL,
   },
   // The panel's title, the range and its header row choice.
@@ -617,8 +637,27 @@ const CARD_CROPS: Readonly<Record<string, CardCrop>> = {
       ".sheetwrite-dialog-choice:has-text('In-cell dropdown')",
     ],
   },
+  // The Number tab's Category list, cut to its first four categories, and the
+  // Sample of the selected cell in that category. The dialog is laid out as
+  // wide as the card, so they show at full size.
   "format-cells": {
-    parts: [".sheetwrite-format-cells-tabs", ".sheetwrite-format-cells-panel select >> nth=0"],
+    parts: [
+      ".sheetwrite-format-cells-panel >> nth=0 >> .sheetwrite-dialog-field >> nth=0",
+      ".sheetwrite-format-cells-panel >> nth=0 >> .sheetwrite-dialog-field >> nth=1",
+    ],
+    steps: async (page) => {
+      await page
+        .locator(".sheetwrite-format-cells-dialog")
+        .evaluate(
+          (dialog, width) => ((dialog as HTMLElement).style.width = `${width}px`),
+          FORMAT_CELLS_CARD_DIALOG_WIDTH,
+        );
+      await page
+        .locator(".sheetwrite-format-cells-panel >> nth=0 >> select >> nth=0")
+        .evaluate((list) => ((list as HTMLSelectElement).size = 4));
+      await settle(page);
+    },
+    stage: "sectionTablet",
   },
   // The search box that takes keys, and the Copy and Cut commands with their keys.
   "keyboard-shortcuts": {
@@ -955,6 +994,7 @@ async function captureCard(
   scale: number,
   png: string,
 ) {
+  await crop.steps?.(page);
   for (const selector of crop.hide ?? []) {
     await page.locator(selector).evaluateAll((elements) => {
       for (const element of elements) (element as HTMLElement).style.visibility = "hidden";
@@ -972,7 +1012,9 @@ async function captureCard(
     CARD_MAX_SCALE,
   );
   if (fit < CARD_MIN_SCALE) {
-    throw new Error(`${shot.name} fits its card only at ${fit.toFixed(2)}×; show fewer parts`);
+    throw new Error(
+      `${shot.name}'s ${Math.round(box.width)}×${Math.round(box.height)} px parts fit its card only at ${fit.toFixed(2)}×; show fewer parts`,
+    );
   }
   const background = await backgroundBehind(page, crop.parts[0] ?? ".sheetwrite-shell-grid");
   const image = await page.screenshot({ clip: box, animations: "disabled" });

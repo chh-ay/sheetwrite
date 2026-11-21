@@ -37,6 +37,18 @@ function cell(page: Page, sheet: string, row: number, col: number) {
   );
 }
 
+test("File › Keyboard Shortcuts opens the shortcuts panel", async ({ page }) => {
+  await open(page);
+  await page.getByRole("tab", { name: "File", exact: true }).click();
+  await page.getByRole("button", { name: "Keyboard Shortcuts" }).click();
+  const panel = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(panel).toBeVisible();
+  await panel
+    .getByRole("searchbox", { name: "Search commands or press keys" })
+    .fill("paste special");
+  await expect(panel).toContainText("Paste Special");
+});
+
 test("ribbon commands edit the workbook and AutoSum totals the ledger", async ({ page }) => {
   await open(page);
   const ribbon = page.getByRole("region", { name: "Ribbon" });
@@ -175,6 +187,34 @@ test("at 320 px the tabs scroll beside the layout buttons instead of under them 
   expect(await fitsViewport(page)).toBe(true);
 });
 
+test("the Data tab's large Sort labels break between whole phrases @portability", async ({
+  page,
+}) => {
+  await open(page, 1_440, 900);
+  const ribbon = page.getByRole("region", { name: "Ribbon" });
+  await ribbon.getByRole("tab", { name: "Data", exact: true }).click();
+  for (const name of ["Sort A to Z", "Sort Z to A"]) {
+    const label = ribbon
+      .getByRole("button", { name, exact: true })
+      .locator(".sheetwrite-ribbon-label");
+    // The label's text, line by line, from where each character is drawn.
+    const lines = await label.evaluate((element) => {
+      const text = element.firstChild;
+      const content = text?.textContent ?? "";
+      const range = document.createRange();
+      const byTop = new Map<number, string>();
+      for (let index = 0; index < content.length && text !== null; index += 1) {
+        range.setStart(text, index);
+        range.setEnd(text, index + 1);
+        const top = Math.round(range.getBoundingClientRect().top);
+        byTop.set(top, (byTop.get(top) ?? "") + (content[index] ?? ""));
+      }
+      return [...byTop.values()].map((line) => line.replaceAll("\u00a0", " ").trim());
+    });
+    expect(lines).toEqual(["Sort", name.slice("Sort ".length)]);
+  }
+});
+
 for (const mode of ["full", "compact"] as const) {
   test(`${mode} ribbon keeps tab, menu and toggle keyboard semantics @portability`, async ({
     page,
@@ -197,7 +237,12 @@ for (const mode of ["full", "compact"] as const) {
     await expect(insert).toBeFocused();
     await expect(insert).toHaveAttribute("aria-selected", "true");
     await insert.press("Home");
+    // The tab list's Home key goes to its first tab, File.
+    const file = ribbon.getByRole("tab", { name: "File", exact: true });
+    await expect(file).toBeFocused();
+    await file.press("ArrowRight");
     await expect(home).toBeFocused();
+    await expect(home).toHaveAttribute("aria-selected", "true");
 
     await select(page, "B2");
     const bold = ribbon.getByRole("button", { name: "Bold", exact: true });

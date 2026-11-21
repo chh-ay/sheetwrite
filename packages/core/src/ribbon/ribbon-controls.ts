@@ -102,6 +102,24 @@ function iconButton(
   return button;
 }
 
+/**
+ * A label's shown text, with each one-letter word tied by a no-break space to
+ * the word after it, or to the word before it when it ends the label. A large
+ * button's label then breaks only between whole phrases, as Excel's two-line
+ * labels do: "Sort" / "A to Z", never "Sort A to" / "Z".
+ */
+function wrappedLabel(label: string): string {
+  const words = label.split(" ");
+  let text = words[0] ?? "";
+  for (let index = 1; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    const tied =
+      words[index - 1]?.length === 1 || (word.length === 1 && index === words.length - 1);
+    text += `${tied ? "\u00a0" : " "}${word}`;
+  }
+  return text;
+}
+
 function commandButton(
   label: string,
   iconName: IconName,
@@ -112,7 +130,7 @@ function commandButton(
   if (large) button.dataset.large = "";
   const text = document.createElement("span");
   text.className = "sheetwrite-ribbon-label";
-  text.textContent = label;
+  text.textContent = wrappedLabel(label);
   button.append(text);
   return button;
 }

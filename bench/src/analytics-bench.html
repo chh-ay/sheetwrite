@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite analytics benchmark</title>
+    <style>
+      body {
+        margin: 0;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      #grid-host {
+        width: 1200px;
+        height: 760px;
+      }
+    </style>
+  </head>
+  <body>
+    <output id="bench-status" data-status="loading">loading</output>
+    <button id="bench-run" type="button" disabled>Run</button>
+    <div id="grid-host"></div>
+    <script type="module" src="./analytics-page.ts"></script>
+  </body>
+</html>

@@ -37,7 +37,12 @@ async function ribbonMounted(host: HTMLElement): Promise<void> {
   if (!host.querySelector(".sheetwrite-ribbon")) throw new Error("the ribbon did not mount");
 }
 
-async function setup(readOnly = false, icons?: IconOverrides, ribbon: GridConfig["ribbon"] = true) {
+async function setup(
+  readOnly = false,
+  icons?: IconOverrides,
+  ribbon: GridConfig["ribbon"] = true,
+  extra: Omit<GridConfig, "ribbon" | "icons"> = {},
+) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -59,7 +64,7 @@ async function setup(readOnly = false, icons?: IconOverrides, ribbon: GridConfig
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
-  const config: GridConfig = { ribbon, ...(icons === undefined ? {} : { icons }) };
+  const config: GridConfig = { ...extra, ribbon, ...(icons === undefined ? {} : { icons }) };
   const grid = new GridImpl(host, { workbook, readOnly, config }, store);
   grids.push(grid);
   await ribbonMounted(host);
@@ -528,6 +533,40 @@ it("fills from a palette pick and clears with No Fill", async () => {
 
   pick("No Fill");
   expect(cell(0, 0).style.backgroundColor).toBeUndefined();
+});
+
+it("ties a one-letter word to its neighbour, so a large label breaks only between phrases", async () => {
+  const { control, openTab } = await setup();
+  openTab("Data");
+  const ascending = control("Sort A to Z");
+  const label = ascending.querySelector(".sheetwrite-ribbon-label");
+  // "Sort" / "A to Z" on two lines; the name and tooltip keep plain spaces.
+  expect(label?.textContent).toBe("Sort A\u00a0to\u00a0Z");
+  expect(ascending.title).toBe("Sort A to Z");
+  const descending = control("Sort Z to A").querySelector(".sheetwrite-ribbon-label");
+  expect(descending?.textContent).toBe("Sort Z\u00a0to\u00a0A");
+  expect(control("Custom Sort").querySelector(".sheetwrite-ribbon-label")?.textContent).toBe(
+    "Custom Sort",
+  );
+});
+
+it("opens on Home when the File tab shows, as Excel does", async () => {
+  const { host } = await setup(false, undefined, true, { keyboardSettings: true });
+  const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
+  const file = tabs.find((tab) => tab.textContent === "File");
+  const home = tabs.find((tab) => tab.textContent === "Home");
+  if (file === undefined || home === undefined) throw new Error("no File or Home tab");
+  expect(file.hidden).toBe(false);
+  // Identity checks: a failing toBe on DOM nodes prints whole elements, which is slow.
+  expect(tabs[0] === file).toBe(true);
+
+  const selected = host.querySelector('.sheetwrite-ribbon [role="tab"][aria-selected="true"]');
+  expect(selected?.textContent).toBe("Home");
+  expect(selected === home).toBe(true);
+  const panel = host.querySelector(".sheetwrite-ribbon-panel:not([hidden])");
+  expect(panel?.getAttribute("aria-labelledby")).toBe(home.id);
+  expect(home.tabIndex).toBe(0);
+  expect(file.tabIndex).toBe(-1);
 });
 
 it("gives the grid the panel's height back when minimized", async () => {
