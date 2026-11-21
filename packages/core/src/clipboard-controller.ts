@@ -63,6 +63,13 @@ export interface ClipboardControllerDeps {
   readOnly: () => boolean;
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
+  /** The view row of a data row; null for a row the view hides. */
+  toViewRow: (dataRow: number) => number | null;
+  /**
+   * The data rows view rows `first` to `last` span with the rows hidden by
+   * hand between them; null under a sort or a filter between them.
+   */
+  rowSpan: (first: number, last: number) => { first: number; last: number } | null;
   commit: (patches: DocumentOp[], reason: CommitReason) => void;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
@@ -747,8 +754,11 @@ export class ClipboardController {
       this.endCut();
       // A read-only grid copies: nothing can move.
       if (this.deps.readOnly()) return "done";
-      // The snapshot holds the selected rows, which are the ones shown.
-      const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
+      // The rows the move takes that the view does not show.
+      let hidden = 0;
+      for (let row = source.start.row; row <= source.end.row; row++) {
+        if (this.deps.toViewRow(row) === null) hidden++;
+      }
       this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
       if (hidden > 0) {
@@ -1701,11 +1711,25 @@ export class ClipboardController {
       { length: rect.c1 - rect.c0 + 1 },
       (_, index) => rect.c0 + index,
     );
+    // Rows hidden by hand between the selected rows are copied, as in Excel;
+    // rows a filter hides are not, and neither are rows past a view sort's order.
+    const span = this.deps.rowSpan(rect.r0, rect.r1);
+    const handHidden = span && span.last - span.first !== rect.r1 - rect.r0 ? span : null;
+    const rowCount = handHidden ? handHidden.last - handHidden.first + 1 : rect.r1 - rect.r0 + 1;
     const bulk = this.deps.store.getClipboardWindow?.(
       activeSheet,
-      { start: rect.r0, end: rect.r1 + 1 },
+      handHidden
+        ? { start: handHidden.first, end: handHidden.last + 1 }
+        : { start: rect.r0, end: rect.r1 + 1 },
       selectedColumns,
+      handHidden ? { dataRows: true } : undefined,
     );
+    /** The view row of the `index`th copied row; null for a row hidden by hand. */
+    const viewRowAt = (index: number): number | null =>
+      handHidden ? this.deps.toViewRow(handHidden.first + index) : rect.r0 + index;
+    const dataRowAt = (index: number): number =>
+      bulk?.dataRows[index] ??
+      (handHidden ? handHidden.first + index : this.deps.toDataRow(rect.r0 + index));
     // A projected child has no source to move. Reject the whole cut before
     // replacing the clipboard when its owning formula is outside the selection.
     if (cut && bulk?.spillDerived.some((derived) => derived === 1)) {
@@ -1734,19 +1758,20 @@ export class ClipboardController {
       : null;
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
-    const firstDataRow = this.deps.toDataRow(rect.r0);
-    // A filter or hidden rows leave gaps between the selected data rows; a
-    // view sort puts them out of order.
+    const firstDataRow = dataRowAt(0);
+    // A filter leaves gaps between the selected data rows; a view sort puts
+    // them out of order.
     let contiguous = true;
     let ascending = true;
     let lastDataRow = firstDataRow;
     let merged = false;
-    for (let row = rect.r0; row <= rect.r1; row++) {
-      const dataRow = this.deps.toDataRow(row);
-      contiguous &&= dataRow === firstDataRow + row - rect.r0;
-      ascending &&= row === rect.r0 || dataRow > lastDataRow;
+    for (let index = 0; index < rowCount; index++) {
+      const dataRow = dataRowAt(index);
+      contiguous &&= dataRow === firstDataRow + index;
+      ascending &&= index === 0 || dataRow > lastDataRow;
       lastDataRow = dataRow;
-      for (let col = rect.c0; col <= rect.c1 && !merged; col++) {
+      const row = viewRowAt(index);
+      for (let col = rect.c0; col <= rect.c1 && !merged && row !== null; col++) {
         merged = this.deps.mergeAnchorAt(row, col) !== null;
       }
     }
@@ -1769,7 +1794,7 @@ export class ClipboardController {
               return (
                 hyperlink.range.sheet === activeSheet &&
                 r0 >= firstDataRow &&
-                r1 <= firstDataRow + rect.r1 - rect.r0 &&
+                r1 <= firstDataRow + rowCount - 1 &&
                 c0 >= rect.c0 &&
                 c1 <= rect.c1
               );
@@ -1777,26 +1802,21 @@ export class ClipboardController {
             .map(cloneCellHyperlink)
         : [];
 
-    for (let r = rect.r0; r <= rect.r1; r++) {
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+      const r = viewRowAt(rowIndex);
       const cellLine: ClipboardCell[] = [];
       const valueLine: CellScalar[] = [];
       for (let c = rect.c0; c <= rect.c1; c++) {
-        const merge = this.deps.mergeAnchorAt(r, c);
+        const merge = r === null ? null : this.deps.mergeAnchorAt(r, c);
         if (merge && (merge.r0 !== r || merge.c0 !== c)) {
           cellLine.push({ value: { kind: "literal", value: null }, resolved: null, style: {} });
           valueLine.push(null);
           continue;
         }
 
-        const rowIndex = r - rect.r0;
         const colIndex = c - rect.c0;
         const offset = rowIndex * selectedColumns.length + colIndex;
-        const addr = {
-          sheet: activeSheet,
-          row: bulk?.dataRows[rowIndex] ?? this.deps.toDataRow(r),
-          col: c,
-        };
-
+        const addr = { sheet: activeSheet, row: dataRowAt(rowIndex), col: c };
         const bulkResolved = bulk?.values[offset];
         const cell =
           bulk === undefined
@@ -1828,7 +1848,7 @@ export class ClipboardController {
       values.push(valueLine);
     }
 
-    const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
+    const anchor = { row: firstDataRow, col: rect.c0 };
     const sheet = this.deps.sheet();
     return {
       anchor,
