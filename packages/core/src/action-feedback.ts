@@ -40,11 +40,14 @@ export function errorDetail(cause: unknown): string {
  */
 class ActionFeedback {
   private readonly el: HTMLElement;
+  /** The grid's element, which gets the keyboard back after a notice's button runs. */
+  private readonly host: HTMLElement;
   private readonly lifetime: Scope;
   private readonly running = new Set<string>();
   private timer: number | undefined;
 
   constructor(host: HTMLElement, lifetime: Scope) {
+    this.host = host;
     this.el = document.createElement("div");
     this.el.className = "sheetwrite-action-status";
     this.el.setAttribute("role", "alert");
@@ -112,6 +115,8 @@ class ActionFeedback {
       button.addEventListener("click", () => {
         this.clear();
         action.run();
+        // The button hides with the notice: the grid keeps the keys, so Ctrl+Z undoes the action.
+        this.host.focus({ preventScroll: true });
       });
       this.el.append(" ", button);
     }
