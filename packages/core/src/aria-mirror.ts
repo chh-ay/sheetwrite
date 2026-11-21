@@ -4,16 +4,31 @@ import type { VisibleWindowView } from "./types/store.js";
 
 let ariaSeq = 0;
 
-/** Page loads can refresh the same window repeatedly without changing its labels. */
-function updateAttribute(element: HTMLElement, name: string, value: string | null): void {
-  if (element.getAttribute(name) === value) return;
-
-  if (value === null) element.removeAttribute(name);
-  else element.setAttribute(name, value);
+function writeSelected(element: HTMLElement, selected: boolean): void {
+  if (selected) element.setAttribute("aria-selected", "true");
+  else element.removeAttribute("aria-selected");
 }
 
-function updateText(element: HTMLElement, text: string): void {
-  if (element.textContent !== text) element.textContent = text;
+/** Make `target` hold the values of `source`, reusing its storage. */
+function copyInto<T>(target: T[], source: readonly T[]): void {
+  target.length = source.length;
+  for (const [index, value] of source.entries()) target[index] = value;
+}
+
+/**
+ * The window content the mirror nodes hold: what the last flush wrote. A
+ * patch compares against it instead of reading attributes back from the DOM.
+ */
+class WrittenWindow {
+  rowStart = 0;
+  focusRow = -1;
+  focusCol = -1;
+  selectedRow: number | null = null;
+  selectedColumn: number | null = null;
+  readonly cols: number[] = [];
+  readonly headerTexts: string[] = [];
+  readonly cellTexts: string[] = [];
+  readonly cellDescriptions: (string | null)[] = [];
 }
 
 export interface AriaMirrorDeps {
@@ -79,6 +94,8 @@ export class AriaMirror {
   private headerCells: HTMLDivElement[] = [];
   private rowEls: HTMLDivElement[] = [];
   private cellEls: HTMLDivElement[] = [];
+  /** What those nodes hold, so a patch writes only what changed. */
+  private readonly written = new WrittenWindow();
 
   constructor(deps: AriaMirrorDeps) {
     this.host = deps.host;
@@ -186,6 +203,7 @@ export class AriaMirror {
       this.lastNRows = this.rowCount;
       this.lastNCols = nCols;
     }
+    this.recordWritten();
     this.writeActiveDescendant(this.focusId);
   }
 
@@ -252,34 +270,72 @@ export class AriaMirror {
   /**
    * Same shape, shifted window: rewrite absolute header/cell column indices,
    * labels, per-row `aria-rowindex`, ids, text, and selection state on the
-   * retained nodes.
+   * retained nodes. Each value is compared with what the last flush wrote,
+   * not read back from the DOM, and only a changed value is written.
    */
   private patchInPlace(nCols: number): void {
+    this.patchHeaders();
+    for (const [rowIndex, rowElement] of this.rowEls.entries()) {
+      this.patchRow(rowElement, rowIndex, nCols);
+    }
+  }
+
+  private patchHeaders(): void {
+    const was = this.written;
     for (const [columnIndex, header] of this.headerCells.entries()) {
       const col = this.cols[columnIndex] ?? -1;
-      updateAttribute(header, "aria-selected", this.selectedColumn === col ? "true" : null);
-      updateText(header, this.headerTexts[columnIndex] ?? "");
-      updateAttribute(header, "aria-colindex", String(col + 1));
+      const wasCol = was.cols[columnIndex] ?? -1;
+      const selected = this.selectedColumn === col;
+      if (selected !== (was.selectedColumn === wasCol)) writeSelected(header, selected);
+      const text = this.headerTexts[columnIndex] ?? "";
+      if (text !== was.headerTexts[columnIndex]) header.textContent = text;
+      if (col !== wasCol) header.setAttribute("aria-colindex", String(col + 1));
     }
+  }
 
-    for (const [rowIndex, rowElement] of this.rowEls.entries()) {
-      const row = this.rowStart + rowIndex;
-      updateAttribute(rowElement, "aria-selected", this.selectedRow === row ? "true" : null);
-      updateAttribute(rowElement, "aria-rowindex", String(row + 2));
+  private patchRow(rowElement: HTMLDivElement, rowIndex: number, nCols: number): void {
+    const was = this.written;
+    const row = this.rowStart + rowIndex;
+    const wasRow = was.rowStart + rowIndex;
+    const selected = this.selectedRow === row;
+    if (selected !== (was.selectedRow === wasRow)) writeSelected(rowElement, selected);
+    if (row !== wasRow) rowElement.setAttribute("aria-rowindex", String(row + 2));
 
-      for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
-        const col = this.cols[columnIndex] ?? -1;
-        const index = rowIndex * nCols + columnIndex;
-        const cell = this.cellEls[index];
-        if (cell === undefined) throw new Error("ARIA cell has no visible coordinate");
+    for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
+      const col = this.cols[columnIndex] ?? -1;
+      const wasCol = was.cols[columnIndex] ?? -1;
+      const index = rowIndex * nCols + columnIndex;
+      const cell = this.cellEls[index];
+      if (cell === undefined) throw new Error("ARIA cell has no visible coordinate");
 
-        updateAttribute(cell, "id", `${this.aria.id}-${row}-${col}`);
-        updateAttribute(cell, "aria-colindex", String(col + 1));
-        updateText(cell, this.cellTexts[index] ?? "");
-        updateAttribute(cell, "aria-description", this.cellDescriptions[index] ?? null);
-        updateAttribute(cell, "aria-selected", this.isFocused(row, col) ? "true" : null);
+      if (row !== wasRow || col !== wasCol) cell.id = `${this.aria.id}-${row}-${col}`;
+      if (col !== wasCol) cell.setAttribute("aria-colindex", String(col + 1));
+      const text = this.cellTexts[index] ?? "";
+      if (text !== was.cellTexts[index]) cell.textContent = text;
+      const description = this.cellDescriptions[index] ?? null;
+      if (description !== (was.cellDescriptions[index] ?? null)) {
+        if (description === null) cell.removeAttribute("aria-description");
+        else cell.setAttribute("aria-description", description);
+      }
+      const focused = this.isFocused(row, col);
+      if (focused !== (was.focusRow === wasRow && was.focusCol === wasCol)) {
+        writeSelected(cell, focused);
       }
     }
+  }
+
+  /** Record the captured content as what the mirror nodes now hold. */
+  private recordWritten(): void {
+    const was = this.written;
+    was.rowStart = this.rowStart;
+    was.focusRow = this.focusRow;
+    was.focusCol = this.focusCol;
+    was.selectedRow = this.selectedRow;
+    was.selectedColumn = this.selectedColumn;
+    copyInto(was.cols, this.cols);
+    copyInto(was.headerTexts, this.headerTexts);
+    copyInto(was.cellTexts, this.cellTexts);
+    copyInto(was.cellDescriptions, this.cellDescriptions);
   }
 
   destroy(): void {

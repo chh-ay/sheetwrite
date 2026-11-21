@@ -136,6 +136,12 @@ export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
   private readonly redoStack: UndoEntry[] = [];
   /**
+   * Snapshot payload bytes of the undo stack, kept as entries come and go so
+   * an edit does not sum the whole stack again. Every change to `undoStack`
+   * goes through `pushUndo`, `popUndo`, `evictOldest`, `rebaseAxis` or `clear`.
+   */
+  private undoSnapshotBytes = 0;
+  /**
    * Recorded pivots whose deleted anchor fell back, keyed by the rebased
    * definition. Undoing the delete inserts the same span, which would push the
    * fallback anchor `count` cells past its old place. Any later rewrite replaces
@@ -149,24 +155,34 @@ export class UndoManager {
   push(undo: HistoryAction, redo: DocumentOp[], name: string): void {
     if (undo.length === 0) return;
 
-    this.undoStack.push({ undo, redo, name });
+    this.pushUndo({ undo, redo, name });
     for (const entry of this.redoStack) disposeEntry(entry);
     this.redoStack.length = 0;
     this.evictOldest();
   }
 
   private evictOldest(): void {
-    let bytes = 0;
-    for (const entry of this.undoStack) bytes += entrySnapshotBytes(entry);
     while (
       this.undoStack.length > 1 &&
-      (this.undoStack.length > this.limit || bytes > DEFAULT_HISTORY_SNAPSHOT_BYTES)
+      (this.undoStack.length > this.limit ||
+        this.undoSnapshotBytes > DEFAULT_HISTORY_SNAPSHOT_BYTES)
     ) {
       const oldest = this.undoStack.shift();
       if (!oldest) break;
-      bytes -= entrySnapshotBytes(oldest);
+      this.undoSnapshotBytes -= entrySnapshotBytes(oldest);
       disposeEntry(oldest);
     }
+  }
+
+  private pushUndo(entry: UndoEntry): void {
+    this.undoStack.push(entry);
+    this.undoSnapshotBytes += entrySnapshotBytes(entry);
+  }
+
+  private popUndo(): UndoEntry | undefined {
+    const entry = this.undoStack.pop();
+    if (entry) this.undoSnapshotBytes -= entrySnapshotBytes(entry);
+    return entry;
   }
 
   /**
@@ -203,10 +219,13 @@ export class UndoManager {
     const mapAddr = (addr: CellAddress): CellAddress | null => rebaseAddr(addr, sheet, axis, remap);
     rebaseEntries(this.undoStack, mapAddr, mapPivot);
     rebaseEntries(this.redoStack, mapAddr, mapPivot);
+    // Rebasing drops snapshots that left the sheet, and the entries left empty.
+    this.undoSnapshotBytes = 0;
+    for (const entry of this.undoStack) this.undoSnapshotBytes += entrySnapshotBytes(entry);
   }
 
   undo(): HistoryStep | null {
-    const entry = this.undoStack.pop();
+    const entry = this.popUndo();
     if (!entry) return null;
 
     this.redoStack.push(entry);
@@ -216,7 +235,7 @@ export class UndoManager {
   /** Restore the most recently moved undo entry after its transaction was rejected. */
   restoreUndo(): void {
     const entry = this.redoStack.pop();
-    if (entry) this.undoStack.push(entry);
+    if (entry) this.pushUndo(entry);
   }
 
   /**
@@ -232,13 +251,13 @@ export class UndoManager {
     const entry = this.redoStack.pop();
     if (!entry) return null;
 
-    this.undoStack.push(entry);
+    this.pushUndo(entry);
     return { action: [{ kind: "patches", patches: entry.redo }], name: entry.name };
   }
 
   /** Restore the most recently moved redo entry after its transaction was rejected. */
   restoreRedo(): void {
-    const entry = this.undoStack.pop();
+    const entry = this.popUndo();
     if (entry) this.redoStack.push(entry);
   }
 
@@ -246,6 +265,7 @@ export class UndoManager {
     for (const entry of this.undoStack) disposeEntry(entry);
     for (const entry of this.redoStack) disposeEntry(entry);
     this.undoStack.length = 0;
+    this.undoSnapshotBytes = 0;
     this.redoStack.length = 0;
   }
 
