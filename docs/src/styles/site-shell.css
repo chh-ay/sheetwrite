@@ -497,6 +497,22 @@ details[open] > summary > .sw-disclosure-icon {
   border-left-color: var(--sw-accent);
   color: var(--sw-accent-strong);
 }
+/* A long outline scrolls in its column; lib/shell.ts marks an end that hides
+   entries, and that edge fades, because overlay scroll bars show nothing. */
+.sw-toc[data-more="end"] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sw-space-12)), transparent);
+}
+.sw-toc[data-more="start"] {
+  mask-image: linear-gradient(to top, #000 calc(100% - var(--sw-space-12)), transparent);
+}
+.sw-toc[data-more="start end"] {
+  mask-image: linear-gradient(
+    transparent,
+    #000 var(--sw-space-12),
+    #000 calc(100% - var(--sw-space-12)),
+    transparent
+  );
+}
 .sw-toc li[data-depth="1"],
 .sw-toc-inline li[data-depth="1"] {
   padding-left: var(--sw-space-3);

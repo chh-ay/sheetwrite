@@ -226,7 +226,7 @@ function Landing() {
   const highlighted = releaseFacts.highlighted;
   return (
     <div class="sw-landing">
-      <canvas class="sw-landing__glow" />
+      <canvas aria-hidden="true" class="sw-landing__glow" />
       <SiteTopbar pathname="/" />
 
       <main id="main-content">

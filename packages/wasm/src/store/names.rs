@@ -32,9 +32,9 @@ pub(crate) mod shapes;
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
     bind_defined_names, for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse,
-    relative_reach, rename_sheet_refs, resolve_structured_refs, shift_cols, shift_rows,
-    translate_name_refs, ArrayLiteral, Ast, NameId, NamedRangeRef, RefFlags, WrittenNames,
-    SHEET_COLS, SHEET_ROWS,
+    relative_reach, rename_sheet_refs, resolve_structured_refs, shift_cols, shift_range,
+    shift_rows, translate_name_refs, ArrayLiteral, Ast, NameId, NamedRangeRef, RefFlags,
+    WrittenNames, SHEET_COLS, SHEET_ROWS,
 };
 use crate::cell_move::{move_cell_refs, CellMove};
 use crate::eval::{current_formula_origin, read_shifted, shifted_cell, shifted_range};
@@ -1629,5 +1629,138 @@ fn is_positional(ast: &Ast) -> bool {
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => is_positional(&definition.body),
         _ => false,
+    }
+}
+
+#[wasm_bindgen]
+impl CellStore {
+    /// Define `name` in `scope` (a sheet handle, or -1 for the workbook) as
+    /// the cells `row_start..=row_end`, `col_start..=col_end` of `sheet`.
+    /// It replaces a range or formula of the same name and scope, and the
+    /// formulas that use the name are bound again. Rejects a name that is
+    /// not formula-safe or that a table has, a removed sheet, and a range
+    /// outside the sheet.
+    #[wasm_bindgen(js_name = setNamedRange)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
+    pub fn set_named_range(
+        &mut self,
+        name: &str,
+        scope: i32,
+        sheet: usize,
+        row_start: usize,
+        col_start: usize,
+        row_end: usize,
+        col_end: usize,
+    ) -> bool {
+        let Some(name_scope) = self.defined_name_scope(name, scope) else {
+            return false;
+        };
+        if self.sheet_alive.get(sheet) != Some(&true)
+            || row_start > row_end
+            || col_start > col_end
+            || row_end >= self.sheets[sheet].cells.row_count()
+            || col_end >= self.sheets[sheet].cells.n_cols()
+        {
+            return false;
+        }
+        let key = workbook_name_key(name);
+        let definition = NamedRangeRef {
+            name: name.to_owned(),
+            scope: name_scope,
+            sheet: sheet as u32,
+            row_start: row_start as u32,
+            col_start: col_start as u32,
+            row_end: row_end as u32,
+            col_end: col_end as u32,
+        };
+        let changed = vec![key.clone()];
+        self.bindings
+            .names
+            .insert(name_scope, key, name, DefinedName::Range(definition));
+        self.rebind_name_users(changed);
+        self.recompute_all_sheets();
+        true
+    }
+
+    /// Remove the defined name `name` in `scope` (-1 for the workbook),
+    /// whether it refers to a range or holds a formula.
+    #[wasm_bindgen(js_name = removeNamedRange)]
+    pub fn remove_named_range(&mut self, name: &str, scope: i32) -> bool {
+        let key = workbook_name_key(name);
+        if !self
+            .bindings
+            .names
+            .settled()
+            .remove(u32::try_from(scope).ok(), &key)
+        {
+            return false;
+        }
+        self.rebind_name_users(vec![key]);
+        self.recompute_all_sheets();
+        true
+    }
+}
+
+impl CellStore {
+    /// The scope of a new defined name `name`: `None` for the workbook (a
+    /// negative `scope`), else the live sheet handle. `None` overall when
+    /// the name is not formula-safe, a table has it, or the sheet is gone.
+    fn defined_name_scope(&self, name: &str, scope: i32) -> Option<Option<u32>> {
+        if name.is_empty()
+            || !matches!(parse(name), Ok(Ast::Name(_)))
+            || self.bindings.tables.named(name).is_some()
+        {
+            return None;
+        }
+        let Ok(sheet_scope) = u32::try_from(scope) else {
+            return Some(None);
+        };
+        self.sheet_alive
+            .get(sheet_scope as usize)
+            .copied()
+            .unwrap_or_default()
+            .then_some(Some(sheet_scope))
+    }
+
+    /// Follow a row (or, with `columns`, column) insertion or deletion of
+    /// `delta` at `at` on `edited_sheet` in every named range, adding the
+    /// names it moved or removed to `changed`. A range the edit deletes
+    /// whole is removed.
+    pub(super) fn rebase_named_ranges(
+        &mut self,
+        edited_sheet: u32,
+        (at, delta): (u32, i64),
+        columns: bool,
+        changed: &mut Vec<String>,
+    ) {
+        self.bindings
+            .names
+            .settled()
+            .retain(&mut |_, spelling, definition| {
+                let DefinedName::Range(range) = definition else {
+                    return true;
+                };
+                if range.sheet != edited_sheet {
+                    return true;
+                }
+                let (start, end) = if columns {
+                    (&mut range.col_start, &mut range.col_end)
+                } else {
+                    (&mut range.row_start, &mut range.row_end)
+                };
+                let shifted = shift_range(*start, *end, at, delta);
+                if shifted == Some((*start, *end)) {
+                    return true;
+                }
+                changed.push(workbook_name_key(spelling));
+                let Some(span) = shifted else {
+                    return false;
+                };
+                (*start, *end) = span;
+                true
+            });
     }
 }

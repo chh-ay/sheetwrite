@@ -348,9 +348,17 @@ declare global {
 // listener holds events back. Interaction islands hold and replay their own.
 globalThis._$HY ??= { events: [], completed: new WeakSet(), r: {} };
 
-/** An old URL redirects here with its old #fragment; send that heading on. */
+/**
+ * An old URL redirects here with its old #fragment; send that heading on. A
+ * heading renamed on this page only changes the fragment, which reloads
+ * nothing, so the page swaps the fragment and starts as usual.
+ */
 const forwarded = forwardedHeading(window.location.pathname, window.location.hash);
-if (forwarded === undefined) {
+const forwardsInPage = forwarded?.startsWith(`${window.location.pathname}#`) === true;
+if (forwarded !== undefined && forwardsInPage) {
+  window.history.replaceState(window.history.state, "", forwarded);
+}
+if (forwarded === undefined || forwardsInPage) {
   initializeCodeEnhancements();
   installExpressiveCodeScripts();
   installAnchorReveal();

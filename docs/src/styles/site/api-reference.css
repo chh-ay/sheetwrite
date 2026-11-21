@@ -389,15 +389,6 @@
   color: var(--sw-fg-muted);
 }
 
-.sw-prose .api-sig__type a {
-  color: var(--sw-accent-strong);
-  text-decoration: none;
-}
-
-.sw-prose .api-sig__type a:hover {
-  text-decoration: underline;
-}
-
 .sw-prose .api-card__doc,
 .sw-prose .api-card > :not(.api-card__head) {
   max-width: none;

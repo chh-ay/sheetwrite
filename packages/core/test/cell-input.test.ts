@@ -196,8 +196,26 @@ describe("typing into a general column", () => {
   it("opens a time on the clock of the column's number locale", () => {
     expect(cellEditText(21.5 / 24, "general", "h:mm", "de-DE")).toBe("21:30:00");
     expect(cellEditText(21.5 / 24, "general", "h:mm AM/PM", "en-GB")).toBe("21:30:00");
-    expect(cellEditText(46_037.5, "general", "m/d/yyyy h:mm", "de-DE")).toBe("1/15/2026 12:00:00");
+    expect(cellEditText(46_037.5, "general", "m/d/yyyy h:mm", "de-DE")).toBe("15.01.2026 12:00:00");
     expect(cellEditText(21.5 / 24, "general", "h:mm", "en-US")).toBe("9:30:00 PM");
     expect(formulaBarText(21.5 / 24, "h:mm", "en-GB")).toBe("21:30:00");
+  });
+
+  // The formula bar shows a date in the region's short date, with a
+  // four-digit year, and typing reads dates in the same order.
+  it("opens a date in the short date of the column's number locale, and reads it back", () => {
+    expect(cellEditText(46_037, "general", "m/d/yyyy", "de-DE")).toBe("15.01.2026");
+    expect(cellEditText(46_037, "general", "m/d/yyyy", "en-GB")).toBe("15/01/2026");
+    expect(cellEditText(46_037, "general", "m/d/yyyy", "en-US")).toBe("1/15/2026");
+    expect(cellEditText(46_037, "general", "m/d/yyyy")).toBe("1/15/2026");
+    expect(entry("15.01.2026", "de-DE")).toEqual([46_037, "dd.mm.yyyy"]);
+    expect(entry("15/01/2026", "en-GB")).toEqual([46_037, "dd/mm/yyyy"]);
+    expect(entry("15/01/2026 12:00:00", "en-GB")).toEqual([46_037.5, "dd/mm/yyyy h:mm:ss"]);
+    expect(entry("1/15/2026", "en-GB")).toEqual(["1/15/2026", null]);
+    expect(entry("2026-01-15", "nl-NL")).toEqual([46_037, "dd-mm-yyyy"]);
+    const [january15] = entry(`15.01.${new Date().getFullYear()}`, "de-DE");
+    expect(entry("15.01", "de-DE")).toEqual([january15, "d-mmm"]);
+    // Text that the locale reads as a date opens with an apostrophe.
+    expect(cellEditText("15.01.2026", "general", undefined, "de-DE")).toBe("'15.01.2026");
   });
 });

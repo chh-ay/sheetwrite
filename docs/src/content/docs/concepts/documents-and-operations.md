@@ -69,7 +69,7 @@ so retry sends the same ID. A conflict remains `conflicted` with its local
 operations intact and exposes server operations or a snapshot; Sheetwrite does
 not silently merge ambiguous structural edits. See
 [Collaboration and offline work](/docs/features/collaboration/) for durable storage, recovery,
-presence, comments, revisions, and the conservative rebase gate.
+presence, comments, version history, and the conservative rebase gate.
 
 Remote operations must arrive at exactly `serverVersion + 1`. Older versions and
 known mutation echoes are idempotently ignored; a gap emits `reload-required`

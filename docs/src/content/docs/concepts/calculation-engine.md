@@ -1,7 +1,7 @@
 ---
 title: Calculation engine
 description: Understand engine builds, incremental recalculation, spills, paged data, formula errors, volatility, and iteration.
-updated: "0.6.0"
+updated: "0.7.0"
 ---
 
 Sheetwrite calculates formulas in a Rust engine compiled to WebAssembly. The
@@ -70,7 +70,7 @@ that returns one cell waits only for that cell, not for the rest of its area. Se
 ## Errors are values
 
 A formula error is a result, not an exception: `#DIV/0!`, `#N/A`, `#NAME?`,
-`#REF!`, `#VALUE!`, `#NUM!`, `#SPILL!`, `#CALC!`, `#CYCLE!`, and `#LOADING!`.
+`#NULL!`, `#REF!`, `#VALUE!`, `#NUM!`, `#SPILL!`, `#CALC!`, `#CYCLE!`, and `#LOADING!`.
 Errors flow to dependent formulas, and `IFERROR` can replace them. An unknown
 function returns `#NAME?`, and its source stays in the document, so a later
 engine build can calculate it. See [Scalars, coercion, and errors](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
@@ -88,16 +88,18 @@ it returns an error, usually `#NUM!`, and never a partial result:
 The [compatibility limits](/docs/reference/compatibility-limits/#formula-evaluation)
 list every limit, its unit, and its behavior.
 
-## No network, no custom code
+## No network, no code from the document
 
 Formula calculation makes no network request and runs no JavaScript from the
-document. Functions that need external data, such as `WEBSERVICE` or
+document. It runs only the JavaScript functions that the host installs with
+`functionsAddon`; see [Custom functions](/docs/features/formulas/custom-functions/).
+Functions that need external data, such as `WEBSERVICE` or
 `GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` read the clock once per
 recalculation, so every formula in one recalculation sees the same time.
 
 ## Volatile functions
 
-`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile.
+`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY`, `NOW`, `SHEET`, `SHEETS` and `INFO` are volatile.
 Each transaction that changes cell inputs recalculates them and their dependents,
 as in Excel. A transaction without cell changes recalculates nothing. Other
 formulas recalculate only when a cell they read changes. Workbooks without

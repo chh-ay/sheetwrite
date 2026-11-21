@@ -102,6 +102,7 @@ Persisted literals and evaluated formula results use `string | number | boolean 
 | `#DIV/0!` | Division/modulo by zero or an empty criteria average. |
 | `#NAME?` | Unknown function or unresolved named range. |
 | `#N/A` | Lookup did not find a compatible value. |
+| `#NULL!` | An intersection (the space operator) of ranges that do not overlap, such as `=SUM(A1:A2 C1:C2)`. |
 | `#NUM!` | Non-finite numeric result, excessive recursion, or an oversized range. |
 | `#SPILL!` | A dynamic result intersects content, another spill, a merge, validation/protection metadata, or a sheet boundary. |
 | `#CALC!` | A supported array calculation has no result, such as `FILTER` without matches or an empty fallback. |
@@ -253,7 +254,7 @@ Cells inside a spilled range and host-linked reference cells hold no formula. A 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. `RANDARRAY`, network functions, external/live-data providers, values from external workbooks, and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
+Formula evaluation performs no network request. It runs no JavaScript from the document, only the functions that the host installs with [`functionsAddon`](/docs/features/formulas/custom-functions/). `RANDARRAY`, network functions, external/live-data providers and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. A reference to another workbook shows the values saved for its link, as described above; it never opens that workbook. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. [Unsupported functions](/docs/reference/formula-functions/#unsupported-functions) lists each group, why it is unsupported, and what its cells show.
 

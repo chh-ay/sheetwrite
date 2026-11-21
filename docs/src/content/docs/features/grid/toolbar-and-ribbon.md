@@ -86,10 +86,12 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 
 | Tab | Groups and controls |
 | --- | --- |
+| File | **Import**: Import XLSX, when the XLSX add-on is installed. **Options**: Keyboard Shortcuts, with `config.keyboardSettings`. |
 | Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert (Insert Cells…, rows and columns), Delete (Delete Cells…, rows and columns), Format (AutoFit, hide and unhide, Format Cells…). **Editing**: AutoSum, Clear, Sort & Filter, Find. |
 | Insert | **Rows & Columns**: Insert (Insert Cells…, rows above or below, columns left or right), Delete (Delete Cells…, rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
-| Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. **Formula Auditing**: Explain Formula. |
-| Data | **Sort & Filter**: Sort A to Z and Sort Z to A (sort the cells in place, as Excel does), Custom Sort (the Sort panel), Sort View A to Z and Sort View Z to A (sort the view only), Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
+| Formulas | **Function Library**: Insert Function. It shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. **Defined Names**: Name Manager, Define Name. **Formula Auditing**: Explain Formula. |
+| Data | **Get & Transform Data**: Get Data. **Queries & Connections**: Refresh All, Queries & Connections, Edit Links. **Sort & Filter**: Sort A to Z and Sort Z to A (sort the cells in place, as Excel does), Custom Sort (the Sort panel), Sort View A to Z and Sort View Z to A (sort the view only), Filter, Clear, Reapply. **Data Tools**: Data Model, Relationships, Measures. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
+| Review | **Version History**: Version History, Save Version, with the history add-on. |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
@@ -104,11 +106,11 @@ Every control reads the same `getCommandState` contract as host chrome. It disab
 
 **Version History** and **Save Version** (Review › Version History) appear in a grid that the history add-on applies to; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 
-### Layout for the 0.7 features
+### Where the 0.7.0 commands are
 
-The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships, New Dashboard, KPI Card, PivotChart, Slicer and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+0.7.0 adds the commands below to the full ribbon, the compact ribbon and the toolbar. Their glyphs are on the icon sheet, so `IconOverrides` and replacement sheets can use their names.
 
-Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
+Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. When the ribbon is too narrow, groups fold in the order of the last column of the second table below, first group first.
 
 | Tab | Group | Command | Glyph | Feature |
 | --- | --- | --- | --- | --- |
@@ -185,7 +187,7 @@ const grid = createGrid(host, {
 });
 ```
 
-`compactWidth` must be a positive finite number; other values throw a `RangeError` when the grid is created or reconfigured.
+`compactWidth` must be a positive finite number. Other values throw a `SheetwriteError` with code `invalid-argument` when the grid is created or reconfigured.
 
 ### Keyboard
 

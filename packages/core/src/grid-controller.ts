@@ -97,7 +97,7 @@ export interface GridController {
  * `initSheetwrite()` MUST already have been awaited; {@link createGrid} throws
  * otherwise.
  *
- * ### Live handlers
+ * ## Live handlers
  * `handlers` is held **by reference**, not copied. Every event reads the
  * object's *current* fields (`handlers.onGridChange?.(…)`), so a host may swap
  * callbacks without rebuilding the grid. Framework adapters must mutate the
