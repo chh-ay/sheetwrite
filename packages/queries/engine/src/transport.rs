@@ -454,3 +454,6 @@ impl QueryRunner {
             .map_err(error)
     }
 }
+
+#[cfg(test)]
+mod tests;

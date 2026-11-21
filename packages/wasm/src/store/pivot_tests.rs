@@ -971,6 +971,12 @@ fn pivot_multi_level_layout_matches_pivotby_through_group_edits() {
             level.store.recompute_changed();
             assert_level_parity(&mut level, &case, step);
         }
+        // Source row 1 is the label row of column key 1; it moves to key 2.
+        level
+            .store
+            .set_number(level.source, 1, LEVEL_QUARTER, 2.0, 0);
+        level.store.recompute_changed();
+        assert_level_parity(&mut level, &case, "column label row moves");
         for (step, row, flag) in filter_edits {
             level
                 .store
