@@ -1177,6 +1177,32 @@ into `results/render-baseline-raw.json`, then the promotion of that raw artifact
 over the committed baseline. Commit both in the release change; the promotion
 diff is baseline-only and reviewable on its own.
 
+### Charts, pivots and dashboards in Chromium
+
+`bench:analytics` (`src/analytics-bench.ts`) times what a user waits for after
+an action on a chart, a pivot or a dashboard, in Chromium with the full engine
+and the charts add-on. Each scenario runs in a fresh browser per run
+(`--runs`, default 3). A sample is the action plus the callbacks of the frames
+after it, each up to a forced layout; idle time between frames is not
+counted. The page reports to the driver through a Playwright binding, so no
+locator polls run in the timed frames. `--profile <dir>` writes a V8 CPU
+profile per run, and `--readable` serves the page unminified so profiles keep
+their function names; time only minified pages.
+
+| Scenario | Action |
+|---|---|
+| `chart-edit-line`, `chart-edit-column` | Edit one source cell of a line chart (4 series) or a column chart (3 series) over 20,000 rows. |
+| `chart-filter-line` | Filter the chart's source column, then clear the filter. The chart must keep its drawing (`redrawn` 0). |
+| `scroll-charts` | Scroll a sheet with 10 charts by 120 px. No chart may draw again; `--param charts=0` is the control. |
+| `dashboard-showcase-first` | Start the dashboards showcase as its page does. |
+| `dashboard-model-first` | Create the grid of 100,000 orders and open its dashboard: 3 KPI cards (a sum, a ratio, a share of all regions), a slicer, a PivotChart and a data-model pivot. `ordersOnlyMedianMs` is the orders sheet alone. |
+| `dashboard-model-edit` | Edit one order while the dashboard shows. |
+| `dashboard-model-slicer` | Click a region on the slicer. |
+
+For an A/B comparison, run each side from its own checkout with built
+packages, in fresh processes on one `bench-run --slot`, in ABBA and BAAB
+rounds, and report the A/A spread of the two A runs of each round.
+
 ### Fail-closed gate policy
 
 Ordinary CI runs the deterministic gate, not a timing comparison:
