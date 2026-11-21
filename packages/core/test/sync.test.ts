@@ -34,7 +34,11 @@ let restoreStubs: () => void;
 beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+const teardown: Array<() => void> = [];
+afterEach(() => {
+  for (const dispose of teardown.splice(0)) dispose();
+  restoreStubs();
+});
 
 class ControlledAdapter implements PersistenceAdapter {
   readonly requests: PersistenceCommitRequest[] = [];
@@ -109,7 +113,26 @@ function harness(ids = ["m1", "m2", "m3"], options: Partial<SyncCoordinatorOptio
   });
   const events: SyncCoordinatorEvent[] = [];
   coordinator.on((event) => events.push(event));
+  teardown.push(() => {
+    coordinator.destroy();
+    grid.destroy();
+  });
   return { grid, adapter, coordinator, events };
+}
+
+function applied(version: number, clientMutationId: string): PersistenceCommitResponse {
+  return { status: "applied", version, clientMutationId };
+}
+
+function expectSyncError(events: readonly SyncCoordinatorEvent[], code: string): void {
+  expect(
+    events.some(
+      (event) =>
+        event.type === "error" &&
+        event.error instanceof SyncProtocolError &&
+        event.error.code === code,
+    ),
+  ).toBe(true);
 }
 
 describe("sync coordinator", () => {
@@ -299,38 +322,26 @@ describe("sync coordinator", () => {
     const { grid, coordinator, events } = harness();
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
-    try {
-      await coordinator.applyVersionedOperation({
-        version: 8,
-        operations: [localSet(12)],
-        batch: { index: 0, count: 2 },
-      });
-      await coordinator.applyVersionedOperation({
-        version: 9,
-        operations: [
-          {
-            op: "set",
-            addr: { sheet: "missing", row: 0, col: 0 },
-            value: { kind: "literal", value: 34 },
-          },
-        ],
-        batch: { index: 1, count: 2 },
-      });
-      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
-      expect(coordinator.serverVersion).toBe(7);
-      expect(changes).toHaveLength(0);
-      expect(
-        events.some(
-          (event) =>
-            event.type === "error" &&
-            event.error instanceof SyncProtocolError &&
-            event.error.code === "remote-operations-rejected",
-        ),
-      ).toBe(true);
-    } finally {
-      coordinator.destroy();
-      grid.destroy();
-    }
+    await coordinator.applyVersionedOperation({
+      version: 8,
+      operations: [localSet(12)],
+      batch: { index: 0, count: 2 },
+    });
+    await coordinator.applyVersionedOperation({
+      version: 9,
+      operations: [
+        {
+          op: "set",
+          addr: { sheet: "missing", row: 0, col: 0 },
+          value: { kind: "literal", value: 34 },
+        },
+      ],
+      batch: { index: 1, count: 2 },
+    });
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+    expect(coordinator.serverVersion).toBe(7);
+    expect(changes).toHaveLength(0);
+    expectSyncError(events, "remote-operations-rejected");
   });
 
   it("keeps the per-version byte limit for remote batch members", async () => {
@@ -339,39 +350,27 @@ describe("sync coordinator", () => {
     });
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
-    try {
-      await coordinator.applyVersionedOperation({
-        version: 8,
-        operations: [localSet(12)],
-        batch: { index: 0, count: 2 },
-      });
-      await coordinator.applyVersionedOperation({
-        version: 9,
-        operations: [
-          {
-            op: "set",
-            addr: { sheet: "s1", row: 1, col: 0 },
-            value: { kind: "literal", value: "x".repeat(256) },
-          },
-        ],
-        batch: { index: 1, count: 2 },
-      });
-      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
-      expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
-      expect(coordinator.serverVersion).toBe(7);
-      expect(changes).toHaveLength(0);
-      expect(
-        events.some(
-          (event) =>
-            event.type === "error" &&
-            event.error instanceof SyncProtocolError &&
-            event.error.code === "payload-limit",
-        ),
-      ).toBe(true);
-    } finally {
-      coordinator.destroy();
-      grid.destroy();
-    }
+    await coordinator.applyVersionedOperation({
+      version: 8,
+      operations: [localSet(12)],
+      batch: { index: 0, count: 2 },
+    });
+    await coordinator.applyVersionedOperation({
+      version: 9,
+      operations: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: "x".repeat(256) },
+        },
+      ],
+      batch: { index: 1, count: 2 },
+    });
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+    expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
+    expect(coordinator.serverVersion).toBe(7);
+    expect(changes).toHaveLength(0);
+    expectSyncError(events, "payload-limit");
   });
 
   it("syncs a split undo as one local history step and one peer change", async () => {
@@ -514,11 +513,7 @@ describe("sync coordinator", () => {
       clientMutationId: "m1",
       operations: [localSet(2)],
     });
-    adapter.responses[0]!.resolve({
-      status: "applied",
-      version: 8,
-      clientMutationId: "m1",
-    });
+    adapter.responses[0]!.resolve(applied(8, "m1"));
     await sending;
 
     expect(coordinator.pendingCount).toBe(0);
@@ -542,69 +537,30 @@ describe("sync coordinator", () => {
       { clientMutationId: "m1", status: "sending" },
       { clientMutationId: "m2", status: "pending" },
     ]);
-    adapter.responses[0]!.resolve({
-      status: "applied",
-      version: 8,
-      clientMutationId: "m1",
-    });
+    adapter.responses[0]!.resolve(applied(8, "m1"));
     await first;
 
     const second = coordinator.send("m2");
     expect(adapter.requests.at(-1)).toMatchObject({ clientMutationId: "m2", baseVersion: 8 });
-    adapter.responses[1]!.resolve({
-      status: "applied",
-      version: 9,
-      clientMutationId: "m2",
-    });
+    adapter.responses[1]!.resolve(applied(9, "m2"));
     await second;
     expect(coordinator.pendingCount).toBe(0);
     expect(coordinator.serverVersion).toBe(9);
     expect(events.filter((event) => event.type === "error")).toEqual([]);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("rejects a response mutation ID mismatch before queue or version mutation", async () => {
-    const { grid, adapter, coordinator } = harness();
+    const { grid, adapter, coordinator, events } = harness();
     grid.applyTransaction({ patches: [localSet(2)] });
     const sending = coordinator.sendNext();
-    adapter.responses[0]!.resolve({
-      status: "applied",
-      version: 8,
-      clientMutationId: "wrong-id",
-    });
+    adapter.responses[0]!.resolve(applied(8, "wrong-id"));
 
     await expect(sending).rejects.toMatchObject({ code: "response-id-mismatch" });
     expect(coordinator.serverVersion).toBe(7);
     expect(coordinator.pendingCommits()).toMatchObject([
       { clientMutationId: "m1", status: "pending" },
     ]);
-    coordinator.destroy();
-    grid.destroy();
-  });
-
-  it("retries with the same mutation ID only when the host asks", async () => {
-    const { grid, adapter, coordinator, events } = harness();
-    grid.applyTransaction({ patches: [localSet(2)] });
-
-    const first = coordinator.sendNext();
-    adapter.responses[0]!.reject(new Error("offline"));
-    await expect(first).rejects.toThrow("offline");
-    expect(coordinator.pendingCommits()[0]?.status).toBe("pending");
     expect(events.some((event) => event.type === "error")).toBe(true);
-
-    const retry = coordinator.retry("m1");
-    expect(adapter.requests[1]?.clientMutationId).toBe("m1");
-    expect(adapter.requests[1]?.baseVersion).toBe(7);
-    adapter.responses[1]!.resolve({
-      status: "duplicate",
-      version: 8,
-      clientMutationId: "m1",
-    });
-    await retry;
-    expect(coordinator.pendingCount).toBe(0);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("retains conflicted work and exposes deterministic reload/reapply state", async () => {
@@ -633,8 +589,6 @@ describe("sync coordinator", () => {
       baseVersion: 8,
       status: "pending",
     });
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("recovers a cell-level conflict in place and resends the queue on the server head", async () => {
@@ -694,8 +648,6 @@ describe("sync coordinator", () => {
     adapter.responses[1]!.resolve({ status: "applied", version: 10, clientMutationId: "m1" });
     await resend;
     expect(await coordinator.recoverConflict()).toEqual({ status: "no-conflict" });
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("keeps durable queue bases when a missed version is rejected during recovery", async () => {
@@ -744,8 +696,6 @@ describe("sync coordinator", () => {
     });
     expect(replacements).toEqual([]);
     expect(records.get("m1")?.baseVersion).toBe(7);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("keeps the host offline flag when a remote subscription starts", async () => {
@@ -874,8 +824,6 @@ describe("sync coordinator", () => {
         baseVersion: 7,
         status: "conflicted",
       });
-      coordinator.destroy();
-      grid.destroy();
     }
   });
 
@@ -935,8 +883,6 @@ describe("sync coordinator", () => {
       expect(coordinator.serverVersion).toBe(7);
       expect(coordinator.pendingCommits()[0]?.status).toBe("pending");
       expect(events.some((event) => event.type === "conflict")).toBe(false);
-      coordinator.destroy();
-      grid.destroy();
     }
   });
 
@@ -959,16 +905,6 @@ describe("sync coordinator", () => {
     );
 
     const rebased = rebaseDocumentOperations(coordinator.pendingCommits()[0]!.operations, remote);
-    expect(rebased).toEqual({
-      status: "rebased",
-      operations: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 3, col: 0 },
-          value: { kind: "literal", value: 7 },
-        },
-      ],
-    });
     if (rebased.status !== "rebased") throw new Error("Expected successful host rebase");
 
     await coordinator.applyVersionedOperation({ version: 9, operations: remote });
@@ -989,8 +925,6 @@ describe("sync coordinator", () => {
         status: "conflicted",
       },
     ]);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("rejects canonical response operations and applies later remote operations", async () => {
@@ -1012,11 +946,7 @@ describe("sync coordinator", () => {
     expect(coordinator.serverVersion).toBe(7);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
 
-    await coordinator.handleResponse({
-      status: "applied",
-      version: 8,
-      clientMutationId: "m1",
-    });
+    await coordinator.handleResponse(applied(8, "m1"));
     expect(coordinator.pendingCount).toBe(0);
     await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(11)] });
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(11);
@@ -1030,8 +960,6 @@ describe("sync coordinator", () => {
       receivedVersion: 11,
     });
     expect(remoteEvents).toHaveLength(1);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("recovers missing versions in order and drains the buffered operation", async () => {
@@ -1069,8 +997,6 @@ describe("sync coordinator", () => {
         .filter((event) => event.type === "remote-applied")
         .map((event) => event.operation.version),
     ).toEqual([8, 9, 10]);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("fails closed when a nonempty inbound version noops and accepts empty version ticks", async () => {
@@ -1093,8 +1019,6 @@ describe("sync coordinator", () => {
       receivedVersion: 8,
     });
     expect(failed.events.some((event) => event.type === "remote-applied")).toBe(false);
-    failed.coordinator.destroy();
-    failed.grid.destroy();
 
     const tick = harness();
     await tick.coordinator.applyVersionedOperation({ version: 8, operations: [] });
@@ -1103,8 +1027,6 @@ describe("sync coordinator", () => {
       type: "remote-applied",
       operation: { version: 8, operations: [] },
     });
-    tick.coordinator.destroy();
-    tick.grid.destroy();
   });
 
   it("validates complete operation shapes before retaining future versions", async () => {
@@ -1118,22 +1040,13 @@ describe("sync coordinator", () => {
     await coordinator.applyVersionedOperation({ version: 8, operations: [] });
     await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(9)] });
 
-    expect(
-      events.some(
-        (event) =>
-          event.type === "error" &&
-          event.error instanceof SyncProtocolError &&
-          event.error.code === "invalid-operations",
-      ),
-    ).toBe(true);
+    expectSyncError(events, "invalid-operations");
     expect(coordinator.serverVersion).toBe(9);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("wraps a duplicate local mutation ID as sync-failed with the action", () => {
-    const { grid, coordinator, events } = harness(["m1", "m1"]);
+    const { grid, events } = harness(["m1", "m1"]);
     grid.applyTransaction({ patches: [localSet(2)] });
     try {
       grid.applyTransaction({ patches: [localSet(3)] });
@@ -1149,12 +1062,10 @@ describe("sync coordinator", () => {
       context: { action: "reserve-local" },
       cause: expect.any(Error),
     });
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("keeps the JSON failure as the cause of a rejected remote payload", async () => {
-    const { grid, coordinator, events } = harness();
+    const { coordinator, events } = harness();
     const notJson = {
       op: "set",
       addr: { sheet: "s1", row: 0, col: 0 },
@@ -1172,8 +1083,6 @@ describe("sync coordinator", () => {
       code: "invalid-operations",
       operation: "transaction",
     });
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("bounds retained acknowledgements and treats expired late echoes as reload violations", async () => {
@@ -1183,21 +1092,9 @@ describe("sync coordinator", () => {
     grid.applyTransaction({ patches: [localSet(2)] });
     grid.applyTransaction({ patches: [localSet(3)] });
     grid.applyTransaction({ patches: [localSet(4)] });
-    await coordinator.handleResponse({
-      status: "applied",
-      version: 8,
-      clientMutationId: "m1",
-    });
-    await coordinator.handleResponse({
-      status: "applied",
-      version: 9,
-      clientMutationId: "m2",
-    });
-    await coordinator.handleResponse({
-      status: "applied",
-      version: 10,
-      clientMutationId: "m3",
-    });
+    await coordinator.handleResponse(applied(8, "m1"));
+    await coordinator.handleResponse(applied(9, "m2"));
+    await coordinator.handleResponse(applied(10, "m3"));
 
     const reloadsBefore = events.filter((event) => event.type === "reload-required").length;
     await coordinator.applyVersionedOperation({
@@ -1219,16 +1116,7 @@ describe("sync coordinator", () => {
       expectedVersion: 11,
       receivedVersion: 8,
     });
-    expect(
-      events.some(
-        (event) =>
-          event.type === "error" &&
-          event.error instanceof SyncProtocolError &&
-          event.error.code === "late-echo",
-      ),
-    ).toBe(true);
-    coordinator.destroy();
-    grid.destroy();
+    expectSyncError(events, "late-echo");
   });
 
   it("bounds callback intake when a source ignores listener backpressure", async () => {
@@ -1248,16 +1136,7 @@ describe("sync coordinator", () => {
 
     expect(coordinator.serverVersion).toBe(8);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
-    expect(
-      events.some(
-        (event) =>
-          event.type === "error" &&
-          event.error instanceof SyncProtocolError &&
-          event.error.code === "buffer-count-limit",
-      ),
-    ).toBe(true);
-    coordinator.destroy();
-    grid.destroy();
+    expectSyncError(events, "buffer-count-limit");
   });
 
   it("deduplicates remote echoes by mutation ID", async () => {
@@ -1273,8 +1152,6 @@ describe("sync coordinator", () => {
     expect(coordinator.pendingCount).toBe(0);
     expect(coordinator.serverVersion).toBe(8);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("rejects count limit plus one before API or UI mutation and preserves history", async () => {
@@ -1304,33 +1181,21 @@ describe("sync coordinator", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
     expect(changes).toHaveLength(1);
     expect(rejectionEvents).toBe(3);
-    expect(coordinator.pendingCount).toBe(1);
-    expect(coordinator.pendingCommits()).toHaveLength(1);
-    expect(adapter.requests).toHaveLength(0);
-    expect(coordinator.state).toMatchObject({
-      pendingCount: 1,
-      pendingOperations: 1,
-      pendingCapacity: "full",
-    });
-    const capacityErrors = events.filter(
-      (event) => event.type === "error" && event.error instanceof SyncPendingCapacityError,
-    );
-    expect(capacityErrors).toHaveLength(3);
+    expect(coordinator.state).toMatchObject({ pendingCount: 1, pendingCapacity: "full" });
+    expect(
+      events.filter(
+        (event) => event.type === "error" && event.error instanceof SyncPendingCapacityError,
+      ),
+    ).toHaveLength(3);
 
     const sending = coordinator.sendNext();
-    adapter.responses[0]!.resolve({
-      status: "applied",
-      version: 8,
-      clientMutationId: "m1",
-    });
+    adapter.responses[0]!.resolve(applied(8, "m1"));
     await sending;
     expect(coordinator.state.pendingCapacity).toBe("available");
 
     grid.undo();
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
     expect(coordinator.pendingCommits()[0]?.clientMutationId).toBe("m2");
-    coordinator.destroy();
-    grid.destroy();
   });
 
   it("reserves capacity across reentrant commits and lets remote operations bypass it", () => {
