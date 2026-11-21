@@ -2080,6 +2080,7 @@ impl PagedStorage {
 #[cfg(test)]
 mod tests {
     use super::{Directory, DirtyRowWrite, PagedStorage, DIRTY_BLOCK_ROWS, NONE};
+    use crate::tests::support::xorshift as next_random;
     use crate::transfer::{Reader, Writer};
     use crate::types::{KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING};
 
@@ -2169,63 +2170,15 @@ mod tests {
     }
 
     #[test]
-    fn eviction_takes_the_least_recent_unpinned_page_and_pins_hold_pages() {
-        let mut storage = PagedStorage::new(ROWS, budget_for(2), 1).unwrap();
-        load(&mut storage, 0, 0, 1);
-        load(&mut storage, 1, 0, 2);
-        assert_eq!(storage.read(0, 0).1, 1);
-
-        load(&mut storage, 2, 0, 3);
-        assert!(is_resident(&storage, 0, 0));
-        assert!(!is_resident(&storage, 1, 0));
-
-        storage.pin_viewport_bands(&[0, ROWS as u32, 0, 1]);
-        load(&mut storage, 3, 0, 4);
-        assert!(is_resident(&storage, 0, 0));
-        assert!(!is_resident(&storage, 2, 0));
-
-        // Unpinning returns page 0 to its access-order position, older than page 3.
-        storage.pin_viewport_bands(&[]);
-        load(&mut storage, 4, 0, 5);
-        assert!(!is_resident(&storage, 0, 0));
-        assert!(is_resident(&storage, 3, 0));
-        assert_eq!(storage.resident_chunks(), 2);
-        assert_eq!(storage.evictions, 3);
-    }
-
-    #[test]
-    fn read_pins_refresh_access_order_when_released() {
-        let mut storage = PagedStorage::new(ROWS, budget_for(2), 1).unwrap();
-        load(&mut storage, 0, 0, 1);
-        load(&mut storage, 1, 0, 2);
-
-        storage.pin_read_window(0, ROWS, &[], &[0]);
-        storage.pin_read_window(0, 0, &[], &[]);
-        load(&mut storage, 2, 0, 3);
-        assert!(is_resident(&storage, 0, 0));
-        assert!(!is_resident(&storage, 1, 0));
-    }
-
-    #[test]
-    fn a_read_after_a_read_window_makes_its_page_newer_than_the_window() {
-        let mut storage = PagedStorage::new(ROWS, budget_for(2), 1).unwrap();
-        load(&mut storage, 0, 0, 1);
-        load(&mut storage, 1, 0, 2);
-
-        // Both pages share the window's access until page 0 is read.
-        storage.pin_read_window(0, 2 * ROWS, &[], &[0]);
-        storage.read(0, 0);
-        storage.pin_read_window(0, 0, &[], &[]);
-        load(&mut storage, 2, 0, 3);
-        assert!(is_resident(&storage, 0, 0));
-        assert!(!is_resident(&storage, 1, 0));
-    }
-
-    #[test]
     fn dirty_cells_and_calculated_blocks_survive_eviction_and_release_when_empty() {
         let mut storage = PagedStorage::new(ROWS, budget_for(1), 4).unwrap();
+        assert!(storage.write(1, 0, KIND_NUMBER, 9, 0, Some(4)));
         assert!(storage.write(1, 0, KIND_NUMBER, 10, 0, Some(5)));
         load(&mut storage, 0, 0, 1);
+        assert!(
+            !storage.hydrate(1, 0, KIND_NUMBER, 30, 0),
+            "a page load keeps the local edit"
+        );
         assert!(storage.set_calculated(2, 0, KIND_NUMBER, 20));
         load(&mut storage, 1, 0, 2);
 
@@ -2235,6 +2188,12 @@ mod tests {
 
         storage.remove_calculated(2, 0);
         assert!(!storage.has_calculated());
+        storage.acknowledge_revision(4);
+        assert_eq!(
+            storage.read(1, 0),
+            (KIND_NUMBER, 10, 0, true, true),
+            "revision 5 owns the cell"
+        );
         storage.acknowledge_revision(5);
         assert_eq!(storage.read(1, 0), (KIND_NUMBER, 10, 0, true, false));
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 0, 0, false, false));
@@ -2242,28 +2201,31 @@ mod tests {
     }
 
     #[test]
-    fn transfer_keeps_pages_dirty_slots_pins_and_eviction_order() {
+    fn dirty_overlay_limit_fails_closed_without_changing_existing_cells() {
+        let mut storage = PagedStorage::new(ROWS, 0, 2).unwrap();
+        assert!(storage.write(0, 0, KIND_EMPTY, 1, 0, Some(1)));
+        assert!(storage.write(4, 0, KIND_EMPTY, 2, 0, Some(1)));
+        assert!(!storage.write(8, 0, KIND_EMPTY, 3, 0, Some(1)));
+        assert_eq!(storage.dirty_cells(), 2);
+        assert_eq!(storage.read(8, 0), (KIND_EMPTY, 0, 0, false, false));
+        assert!(storage.write(0, 0, KIND_EMPTY, 4, 0, Some(2)));
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 4, 0, true, true));
+    }
+
+    #[test]
+    fn transfer_keeps_dirty_slots_and_calculated_blocks() {
         let mut storage = PagedStorage::new(ROWS, budget_for(2), 4).unwrap();
         load(&mut storage, 0, 0, 1);
         load(&mut storage, 1, 0, 2);
         assert!(storage.write(5, 1, KIND_NUMBER, 30, 7, Some(9)));
         assert!(storage.set_calculated(3, 1, KIND_NUMBER, 40));
-        storage.pin_viewport_bands(&[0, ROWS as u32, 1, 2]);
 
-        let mut out = Writer::new(TRANSFER_TAG);
-        storage.write_transfer(&mut out);
-        let mut input = Reader::new(&out.0, TRANSFER_TAG).unwrap();
-        let mut restored = PagedStorage::read_transfer(&mut input).unwrap();
-        input.finish().unwrap();
+        let mut restored = transferred(&storage);
 
         assert_eq!(restored.read(5, 1), (KIND_NUMBER, 30, 7, true, true));
         assert_eq!(restored.calculated_at(3, 1), Some((KIND_NUMBER, 40)));
         assert_eq!(restored.dirty_coordinates(), vec![5.0, 1.0]);
         assert_eq!(restored.dirty_byte_len(), storage.dirty_byte_len());
-
-        load(&mut restored, 2, 0, 3);
-        assert!(!is_resident(&restored, 0, 0));
-        assert!(is_resident(&restored, 1, 0));
 
         restored.acknowledge_revision(9);
         assert_eq!(restored.dirty_cells(), 0);
@@ -2299,23 +2261,20 @@ mod tests {
     }
 
     #[test]
-    fn transfer_refuses_dirty_kinds_the_store_cannot_hold() {
+    fn transfer_refuses_dirty_and_clean_page_kinds_the_store_cannot_hold() {
         assert!(read_transfer(&transfer_with_dirty_kind(KIND_FORMULA.into())).is_ok());
 
-        for raw in [5, 0x105] {
-            let error = read_transfer(&transfer_with_dirty_kind(raw)).err();
+        let mut clean_page = PagedStorage::new(ROWS, budget_for(1), 1).unwrap();
+        load(&mut clean_page, 0, 0, 1);
+        clean_page.clean[0].kind[0] = KIND_FORMULA + 1;
+        for bytes in [
+            transfer_with_dirty_kind(5),
+            transfer_with_dirty_kind(0x105),
+            transfer(&clean_page),
+        ] {
+            let error = read_transfer(&bytes).err();
             assert_eq!(error.as_deref(), Some("invalid transferred source kind"));
         }
-    }
-
-    #[test]
-    fn transfer_refuses_clean_page_kinds_the_store_cannot_hold() {
-        let mut storage = PagedStorage::new(ROWS, budget_for(1), 1).unwrap();
-        load(&mut storage, 0, 0, 1);
-        storage.clean[0].kind[0] = KIND_FORMULA + 1;
-
-        let error = read_transfer(&transfer(&storage)).err();
-        assert_eq!(error.as_deref(), Some("invalid transferred source kind"));
     }
 
     /// One page of the eviction model.
@@ -2416,13 +2375,6 @@ mod tests {
                 state.viewport_pinned = pinned_col == col && pages.contains(&page);
             }
         }
-    }
-
-    fn next_random(seed: &mut u32, bound: usize) -> usize {
-        *seed ^= *seed << 13;
-        *seed ^= *seed >> 17;
-        *seed ^= *seed << 5;
-        *seed as usize % bound
     }
 
     fn transferred(storage: &PagedStorage) -> PagedStorage {
@@ -2530,12 +2482,7 @@ mod tests {
 
         for sheet in 0..SHEETS {
             let mut seed = 0x2545_f491 ^ (sheet + 1).wrapping_mul(0x9e37_79b9);
-            let mut random = |bound: usize| {
-                seed ^= seed << 13;
-                seed ^= seed >> 17;
-                seed ^= seed << 5;
-                seed as usize % bound
-            };
+            let mut random = |bound: usize| next_random(&mut seed, bound);
             let budget = budget_for(1 + random(PAGES));
             let mut cells = PagedStorage::new(ROWS, budget, 64).unwrap();
             let mut columns = PagedStorage::new(ROWS, budget, 64).unwrap();

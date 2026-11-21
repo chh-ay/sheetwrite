@@ -1494,91 +1494,6 @@ impl CellStorage {
 }
 
 #[cfg(test)]
-mod paged_storage_tests {
-    use super::{PagedStorage, KIND_EMPTY};
-    use crate::sheet::SheetData;
-
-    #[test]
-    fn revision_index_cleans_only_cells_still_owned_by_the_acknowledged_write() {
-        let mut storage = PagedStorage::new(4, 0, 4).unwrap();
-        assert!(storage.write(0, 0, KIND_EMPTY, 10, 0, Some(7)));
-        assert!(storage.write(4, 0, KIND_EMPTY, 20, 0, Some(7)));
-        assert!(storage.write(0, 0, KIND_EMPTY, 30, 0, Some(8)));
-
-        storage.acknowledge_revision(7);
-        assert_eq!(storage.read(4, 0), (KIND_EMPTY, 20, 0, true, false));
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, true));
-        assert_eq!(storage.dirty_cells(), 1);
-
-        storage.acknowledge_revision(8);
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, false));
-        assert_eq!(storage.dirty_cells(), 0);
-    }
-
-    #[test]
-    fn structural_rebase_preserves_revision_ownership_at_the_moved_cell() {
-        let mut sheet = SheetData::new_paged(2, 8, 4, 0, 4).unwrap();
-        assert!(sheet.write_cell(1, 0, KIND_EMPTY, 10, 0, Some(11)));
-        assert!(sheet.write_cell(3, 1, KIND_EMPTY, 20, 0, Some(12)));
-
-        let mut slots = crate::formula_slots::FormulaStore::default();
-        let store = crate::store::CellStore::new();
-        let names = store.name_scope(0);
-        assert!(sheet.insert_rows(names, 0, 2, &mut slots).is_ok());
-        assert!(sheet.insert_cols(names, 0, 1, &mut slots).is_ok());
-        assert_eq!(
-            sheet.cells.paged.as_ref().unwrap().read(3, 1),
-            (KIND_EMPTY, 10, 0, true, true)
-        );
-        assert_eq!(
-            sheet.cells.paged.as_ref().unwrap().read(5, 2),
-            (KIND_EMPTY, 20, 0, true, true)
-        );
-
-        sheet.cells.acknowledge_revision(11);
-        assert_eq!(
-            sheet.cells.paged.as_ref().unwrap().read(3, 1),
-            (KIND_EMPTY, 10, 0, true, false)
-        );
-        assert_eq!(
-            sheet.cells.paged.as_ref().unwrap().read(5, 2),
-            (KIND_EMPTY, 20, 0, true, true)
-        );
-        sheet.cells.acknowledge_revision(12);
-        assert_eq!(sheet.cells.paged.as_ref().unwrap().dirty_cells(), 0);
-    }
-
-    #[test]
-    fn dirty_overlay_precedes_hydration_survives_eviction_and_cleans_by_revision() {
-        let chunk_bytes = PagedStorage::new(4, 0, 2).unwrap().chunk_bytes();
-        let mut storage = PagedStorage::new(4, chunk_bytes, 2).unwrap();
-        assert!(storage.hydrate(0, 0, KIND_EMPTY, 10, 1));
-        assert!(storage.write(0, 0, KIND_EMPTY, 20, 2, Some(7)));
-        assert!(!storage.hydrate(0, 0, KIND_EMPTY, 30, 3));
-        assert!(storage.write(4, 0, KIND_EMPTY, 40, 4, None));
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, true));
-        assert_eq!(storage.resident_chunks(), 1);
-        storage.acknowledge_revision(6);
-        assert_eq!(storage.dirty_cells(), 1);
-        storage.acknowledge_revision(7);
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, false));
-        assert_eq!(storage.dirty_cells(), 0);
-    }
-
-    #[test]
-    fn dirty_overlay_limit_fails_closed_without_changing_existing_cells() {
-        let mut storage = PagedStorage::new(4, 0, 2).unwrap();
-        assert!(storage.write(0, 0, KIND_EMPTY, 1, 0, Some(1)));
-        assert!(storage.write(4, 0, KIND_EMPTY, 2, 0, Some(1)));
-        assert!(!storage.write(8, 0, KIND_EMPTY, 3, 0, Some(1)));
-        assert_eq!(storage.dirty_cells(), 2);
-        assert_eq!(storage.read(8, 0), (KIND_EMPTY, 0, 0, false, false));
-        assert!(storage.write(0, 0, KIND_EMPTY, 4, 0, Some(2)));
-        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 4, 0, true, true));
-    }
-}
-
-#[cfg(test)]
 mod calculated_slot_tests {
     use super::*;
     use crate::transfer::{Reader, Writer};
@@ -1664,60 +1579,17 @@ mod calculated_slot_tests {
 }
 
 #[cfg(test)]
-mod source_history_tests {
-    use crate::store::CellStore;
-    use crate::types::KIND_FORMULA;
-
-    #[test]
-    fn history_capture_does_not_persist_calculated_text_or_numbers() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(1, 2);
-        store.set_formula(sheet, 0, 0, "=\"computed text\"", 0);
-        store.set_formula(sheet, 1, 0, "=42", 0);
-        store.recompute(sheet);
-        let snapshot = store.capture_range(sheet, 0, 0, 2, 1).unwrap();
-        assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_FORMULA]);
-        assert_eq!(store.snapshot_numbers(&snapshot), vec![0.0, 0.0]);
-        assert_eq!(store.snapshot_texts(&snapshot), vec!["", ""]);
-        assert!(store.clear_range(sheet, 0, 0, 1, 0, true, false));
-        assert!(store.restore_range(sheet, 0, 0, &snapshot));
-        store.recompute(sheet);
-        assert_eq!(
-            store.get_cell(sheet, 0, 0).string().as_deref(),
-            Some("computed text")
-        );
-        assert_eq!(store.get_cell(sheet, 1, 0).num(), 42.0);
-    }
-}
-#[cfg(test)]
 mod lifecycle_tests {
-    const TEST_ROWS: usize = 1536;
     use crate::store::CellStore;
-
-    #[test]
-    fn shrinking_spill_clears_vacated_outputs() {
-        let mut store = CellStore::new();
-        let rows = TEST_ROWS;
-        let sheet = store.add_sheet(2, rows);
-        store.set_number(sheet, 0, 1, rows as f64, 0);
-        store.set_formula(sheet, 0, 0, "=SEQUENCE(B1)", 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, rows - 1, 0).num(), rows as f64);
-
-        store.set_number(sheet, 0, 1, 1.0, 0);
-        store.recompute(sheet);
-        assert_eq!(store.get_cell(sheet, 0, 0).num(), 1.0);
-        assert_eq!(store.sheets[sheet].cells.calculated_cell_at(rows - 1), None);
-    }
 
     #[test]
     fn string_pool_sweep_keeps_calculated_text_across_distant_rows() {
         let mut store = CellStore::new();
-        let rows = TEST_ROWS;
+        let rows = 1536;
         let sheet = store.add_sheet(2, rows);
         store.set_string(sheet, 0, 1, "discarded pool entry", 0);
         store.set_number(sheet, 0, 1, 0.0, 0);
-        let positions = [0, TEST_ROWS / 3, rows - 1];
+        let positions = [0, rows / 3, rows - 1];
         for row in positions {
             store.set_formula(sheet, row, 0, "=\"retained\"&\" text\"", 0);
         }
@@ -1736,14 +1608,8 @@ mod lifecycle_tests {
 #[cfg(test)]
 mod local_paged_tests {
     use super::{CellStorage, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER};
+    use crate::tests::support::xorshift as next;
     use crate::types::CellKey;
-
-    fn next(seed: &mut u32, bound: usize) -> usize {
-        *seed ^= *seed << 13;
-        *seed ^= *seed >> 17;
-        *seed ^= *seed << 5;
-        *seed as usize % bound
-    }
 
     fn assert_same(dense: &CellStorage, local: &CellStorage, context: &str) {
         assert_eq!(

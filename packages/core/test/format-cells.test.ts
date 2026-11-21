@@ -8,6 +8,7 @@ import type { CellStyle, Renderer } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
+  expectSameNode,
   makeColumnarData,
   makeWorkbook,
   mountHost,
@@ -88,18 +89,18 @@ describe("Format Cells", () => {
       "Border",
       "Fill",
     ]);
-    expect(document.activeElement).toBe(tabs[0]!);
+    expectSameNode(document.activeElement, tabs[0]!);
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expect(document.activeElement).toBe(tabs[1]!);
+    expectSameNode(document.activeElement, tabs[1]!);
     expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
     const panels = [...dialog.querySelectorAll<HTMLElement>("[role=tabpanel]")];
     expect(panels.map((panel) => panel.hidden)).toEqual([true, false, true, true, true]);
     tabs[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(document.activeElement).toBe(tabs[4]!);
+    expectSameNode(document.activeElement, tabs[4]!);
 
     await answerDialog(host, "Cancel");
-    expect(document.activeElement).toBe(host);
+    expectSameNode(document.activeElement, host);
     expect(cell(0, 1).style).toEqual({});
   });
 
@@ -135,34 +136,27 @@ describe("Format Cells", () => {
     expect(cell(1, 1).style).toEqual({});
   });
 
-  it("keeps OK from closing while a custom code is empty", async () => {
+  it("shows a custom code's sample in its section's color, and keeps OK from closing while the code is empty", async () => {
     const dialog = await openFormatCells();
     setValue(control(dialog, "Category", HTMLSelectElement), "Custom");
     const code = [...dialog.querySelectorAll<HTMLInputElement>("input[type=text]")][0]!;
-    code.value = "";
-    code.dispatchEvent(new Event("input", { bubbles: true }));
+    const type = (text: string) => {
+      code.value = text;
+      code.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const sample = control(dialog, "Sample", HTMLOutputElement);
+    // Excel's Sample shows the number in its format section's color.
+    type("[Red]0.0");
+    expect([sample.textContent, sample.style.color]).toEqual(["0.5", "#ff0000"]);
+    type("0.0");
+    expect([sample.textContent, sample.style.color]).toEqual(["0.5", ""]);
+    type("");
     dialog.querySelector<HTMLButtonElement>(".sheetwrite-dialog-default")!.click();
     expect(dialog.isConnected).toBe(true);
-    expect(document.activeElement).toBe(code);
-    code.value = '0.0 "kg"';
-    code.dispatchEvent(new Event("input", { bubbles: true }));
+    expectSameNode(document.activeElement, code);
+    type('0.0 "kg"');
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');
-  });
-
-  // Excel's Sample shows the number in its format section's color.
-  it("shows the sample in the color of its format section", async () => {
-    const dialog = await openFormatCells();
-    setValue(control(dialog, "Category", HTMLSelectElement), "Custom");
-    const code = [...dialog.querySelectorAll<HTMLInputElement>("input[type=text]")][0]!;
-    const sample = control(dialog, "Sample", HTMLOutputElement);
-    code.value = "[Red]0.0";
-    code.dispatchEvent(new Event("input", { bubbles: true }));
-    expect([sample.textContent, sample.style.color]).toEqual(["0.5", "#ff0000"]);
-    code.value = "0.0";
-    code.dispatchEvent(new Event("input", { bubbles: true }));
-    expect([sample.textContent, sample.style.color]).toEqual(["0.5", ""]);
-    await answerDialog(host, "Cancel");
   });
 
   it("offers Excel's Fraction types and the Text category", async () => {
@@ -242,27 +236,17 @@ describe("Number tab categories", () => {
   });
 
   it("name the Number Format box for the number-format keys and the % and comma buttons, as Excel does", () => {
-    const labels = [
-      "$#,##0.00_);($#,##0.00)",
-      "0%",
-      "#,##0.00",
-      "d-mmm-yy",
-      "h:mm AM/PM",
-      "0.00E+00",
-      "General",
-      "m/d/yyyy",
-      '0.0 "kg"',
-    ].map(numberFormatLabel);
-    expect(labels).toEqual([
-      "Currency",
-      "Percentage",
-      "Number",
-      "Date",
-      "Time",
-      "Scientific",
-      "General",
-      "Short Date",
-      "Custom",
-    ]);
+    const cases: [string, string][] = [
+      ["$#,##0.00_);($#,##0.00)", "Currency"],
+      ["0%", "Percentage"],
+      ["#,##0.00", "Number"],
+      ["d-mmm-yy", "Date"],
+      ["h:mm AM/PM", "Time"],
+      ["0.00E+00", "Scientific"],
+      ["General", "General"],
+      ["m/d/yyyy", "Short Date"],
+      ['0.0 "kg"', "Custom"],
+    ];
+    for (const [code, label] of cases) expect(numberFormatLabel(code), code).toBe(label);
   });
 });

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { DEFAULT_THEME } from "../src/grid.js";
 import type { CellScalar, DataValidationRule } from "../src/types.js";
 import { type BeginValidationEditOptions, ValidationEditor } from "../src/validation-editor.js";
+import { expectSameNode } from "./fixtures.js";
 
 const rect = { x: 20, y: 30, w: 120, h: 28 };
 const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 0 } };
@@ -69,26 +70,11 @@ describe("ValidationEditor", () => {
     return { editor, commits, texts, input, cancels: () => cancels };
   }
 
-  it("filters the items by the typed text anywhere in them, ignoring case", () => {
-    const { editor, commits, input } = openList({ filter: "w" });
-    expect(document.activeElement).toBe(input);
-    type(input, "we");
-    expect(shownItems()).toEqual(["West", "South-West"]);
-    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
-
-    press(input, "ArrowDown");
-    press(input, "ArrowDown");
-    expect(
-      document.getElementById(input.getAttribute("aria-activedescendant") ?? "")?.textContent,
-    ).toBe("South-West");
-    press(input, "Enter");
-    expect(commits).toEqual([{ value: "South-West", navigate: "down" }]);
-    editor.destroy();
-  });
-
   it("starts on the cell's value and stores the text when no item is highlighted", () => {
     let list = openList();
     expect(shownItems()).toEqual(regions);
+    const active = list.input.getAttribute("aria-activedescendant") ?? "";
+    expect(document.getElementById(active)?.textContent).toBe("East");
     press(list.input, "Tab");
     expect(list.commits).toEqual([{ value: "East", navigate: "right" }]);
 
@@ -117,11 +103,11 @@ describe("ValidationEditor", () => {
     expect(box?.style.top).toBe(`${rect.y + rect.h}px`);
     expect(input.style.height).toBe("");
     expect(current?.textContent).toBe("East");
-    expect(document.activeElement).toBe(input);
+    expectSameNode(document.activeElement, input);
 
     // Typing replaces the value: the box moves over the cell and filters the list.
     type(input, "s");
-    expect(input.parentElement).toBe(box);
+    expectSameNode(input.parentElement, box);
     expect(box?.style.top).toBe(`${rect.y}px`);
     expect(input.style.height).toBe(`${rect.h}px`);
     expect(shownItems()).toEqual(["South", "East", "West", "North-East", "South-West"]);

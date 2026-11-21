@@ -1,6 +1,7 @@
 //! A coordinate model checks rows independently of page layout and directories.
 
 use super::super::{PagedStorage, NONE};
+use crate::tests::support::xorshift as next;
 use crate::types::KIND_NUMBER;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -13,13 +14,6 @@ struct ModelCell {
 type ModelColumns = [Vec<Option<ModelCell>>];
 /// The model's columns, which column edits insert and remove.
 type ModelGrid = Vec<Vec<Option<ModelCell>>>;
-
-fn next(seed: &mut u32, bound: usize) -> usize {
-    *seed ^= *seed << 13;
-    *seed ^= *seed >> 17;
-    *seed ^= *seed << 5;
-    *seed as usize % bound
-}
 
 fn check(storage: &PagedStorage, columns: &ModelColumns) {
     for (col, cells) in columns.iter().enumerate() {

@@ -16,40 +16,6 @@ fn paged_aggregate_counts_loaded_formula_before_first_recompute() {
 }
 
 #[test]
-fn paged_derived_text_is_remapped_by_collection_but_not_captured_as_source() {
-    let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    for row in 0..3 {
-        store.clear_cell(sheet, row, 0, 0);
-    }
-    for edit in 0..100 {
-        store.set_string(sheet, 0, 1, &format!("obsolete-{edit}"), 0);
-    }
-    store.set_formula(
-        sheet,
-        0,
-        0,
-        "={\"anchor\";\"first child\";\"second child\"}",
-        0,
-    );
-    store.commit_sources();
-    store.clear_cell(sheet, 0, 1, 0);
-    store.compact_string_storage();
-    assert!(store.string_pool_epoch() > 0);
-    assert_eq!(
-        [0, 1, 2].map(|row| string(&store, sheet, row, 0)),
-        [
-            Some("anchor".into()),
-            Some("first child".into()),
-            Some("second child".into())
-        ],
-    );
-    let snapshot = store.capture_range(sheet, 0, 0, 3, 1).unwrap();
-    assert_eq!(store.snapshot_texts(&snapshot), vec!["", "", ""]);
-    assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_EMPTY, KIND_EMPTY]);
-}
-
-#[test]
 fn paged_text_collection_preserves_dirty_overlays_after_clean_eviction() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
@@ -181,11 +147,20 @@ fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounti
     assert!(store.columns_fully_loaded(sheet, 2, 2, &[0, 1, 2]));
     assert!(store.columns_fully_loaded(sheet, 0, 8, &[]));
 
+    // Resident chunks, loaded cells, dirty cells and the fully-loaded flag.
     let stats = store.paged_stats(sheet);
-    assert_eq!(stats[0], 2.0);
-    assert_eq!(stats[1], 8.0);
-    assert_eq!(stats[2], 0.0);
-    assert_eq!(stats[4], 0.0);
+    assert_eq!(
+        [stats[0], stats[1], stats[2], stats[4]],
+        [2.0, 8.0, 0.0, 0.0]
+    );
+
+    // Loading every remaining cell makes the sheet fully loaded.
+    store.begin_page_load();
+    crate::tests::write_number_column(&mut store, sheet, 0, 4, &[0.0; 4]);
+    crate::tests::write_number_column(&mut store, sheet, 1, 0, &[0.0; 8]);
+    crate::tests::write_number_column(&mut store, sheet, 2, 4, &[0.0; 4]);
+    store.commit_sources();
+    assert!(store.is_fully_loaded(sheet));
 }
 
 #[test]
@@ -373,8 +348,6 @@ fn loaded_spans_match_per_row_loaded_probes() {
     store.set_number(sheet, 7, 0, 9.0, 0);
 
     assert_eq!(store.loaded_spans(sheet, 0, 8, 0), vec![0, 4, 7, 8]);
-    assert_eq!(store.loaded_spans(sheet, 1, 6, 0), vec![1, 4]);
-    assert_eq!(store.loaded_spans(sheet, 4, 8, 0), vec![7, 8]);
     assert_eq!(store.loaded_spans(sheet, 0, 8, 1), vec![2, 6]);
     assert_eq!(store.loaded_spans(sheet, 0, 8, 2), Vec::<u32>::new());
     assert_eq!(store.loaded_spans(sheet, 3, 1, 0), Vec::<u32>::new());

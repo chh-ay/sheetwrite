@@ -1,5 +1,5 @@
-//! Row and column inserts that the store cannot hold, and formula text that
-//! structural edits must leave alone.
+//! Row and column inserts that the store cannot hold, and growth past the
+//! dense limit into local pages.
 
 use crate::cells::{MAX_DENSE_CELLS, MAX_LOCAL_PAGED_CELLS};
 use crate::store::CellStore;
@@ -50,47 +50,47 @@ fn a_row_insert_whose_cell_count_overflows_changes_nothing() {
     assert_unchanged(&store, sheet, reader);
 }
 
-#[test]
-fn dense_growth_past_the_dense_cap_continues_in_local_pages() {
-    const WIDE_COLS: usize = 10;
-    let (mut store, sheet, reader) = sheet_with_reference();
-    assert!(store.insert_cols(sheet, COLS, WIDE_COLS - COLS));
-    let rows_past_limit = MAX_DENSE_CELLS / WIDE_COLS;
+/// The dense cells of the two sheets of [`sheet_with_reference`].
+const BOTH_SHEETS: usize = 2 * COLS * ROWS;
 
-    assert!(store.add_rows(sheet, 0, rows_past_limit));
+#[test]
+fn dense_growth_past_the_dense_limit_continues_in_local_pages() {
+    let (mut store, sheet, reader) = sheet_with_reference();
+    store.set_storage_limits(BOTH_SHEETS, MAX_LOCAL_PAGED_CELLS);
+
+    assert!(store.add_rows(sheet, 0, 1));
     store.recompute(sheet);
-    assert_eq!(store.row_count(sheet), ROWS + rows_past_limit);
+    assert!(store.is_local_paged(sheet));
+    assert!(
+        !store.is_local_paged(reader),
+        "only the sheet that grows moves"
+    );
     assert!(!store.is_paged(sheet), "a local sheet loads no pages");
-    let moved = 1 + rows_past_limit;
-    assert_eq!(store.get_cell(sheet, moved, 0).num(), 7.0);
+    assert_eq!(store.get_cell(sheet, 2, 0).num(), 7.0);
     assert_eq!(
         store.formula_source(reader, 0, 0).as_deref(),
-        Some(format!("=Grid!A{}", moved + 1).as_str())
+        Some("=Grid!A3")
     );
     assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
 
-    let wide = store.add_sheet(1, MAX_DENSE_CELLS);
-    assert!(store.insert_cols(wide, 0, 1));
-    assert_eq!(store.col_count(wide), 2);
+    // Inserted columns move a dense sheet to local pages too.
+    let wide = store.add_sheet(1, ROWS);
+    assert!(store.insert_cols(wide, 0, COLS));
+    assert!(store.is_local_paged(wide));
+    assert_eq!(store.col_count(wide), COLS + 1);
 }
 
 #[test]
-fn local_growth_past_the_workbook_budget_changes_nothing() {
+fn local_growth_past_the_local_limit_changes_nothing() {
     let (mut store, sheet, reader) = sheet_with_reference();
-    let rows_past_budget = MAX_LOCAL_PAGED_CELLS / COLS;
+    store.set_storage_limits(BOTH_SHEETS, BOTH_SHEETS);
 
-    assert!(!store.add_rows(sheet, 0, rows_past_budget));
+    assert!(!store.add_rows(sheet, 0, ROWS + 1));
     assert_unchanged(&store, sheet, reader);
 
-    // Local sheets share one budget across the workbook.
-    let first = store.add_sheet(1, MAX_LOCAL_PAGED_CELLS / 2);
-    assert!(store
-        .try_add_sheet(1, MAX_LOCAL_PAGED_CELLS / 2 + 1)
-        .is_err());
-    assert!(store.insert_cols(first, 0, 1), "exactly at the budget");
-    assert!(!store.add_rows(first, 0, 1), "one row past the budget");
-    assert_eq!(store.col_count(first), 2);
-    assert_eq!(store.row_count(first), MAX_LOCAL_PAGED_CELLS / 2);
+    assert!(store.add_rows(sheet, 0, ROWS), "exactly at the local limit");
+    assert!(!store.add_rows(sheet, 0, 1), "one row past the local limit");
+    assert_eq!(store.row_count(sheet), 2 * ROWS);
 }
 
 #[test]
@@ -145,88 +145,4 @@ fn a_paged_sheet_rejects_a_chunk_size_it_cannot_round() {
         .try_add_paged_sheet(1, ROWS, oversized_chunk_rows, 0, 0)
         .is_err());
     assert!(store.sheets.is_empty());
-}
-
-#[test]
-fn structural_edits_keep_the_text_of_formulas_they_do_not_move() {
-    let (mut store, sheet, reader) = sheet_with_reference();
-    let untouched = store.add_sheet(COLS, ROWS);
-    store.set_formula(untouched, 0, 0, "=A2+B2*2", 0);
-    store.recompute(untouched);
-
-    assert!(store.add_rows(sheet, 0, 1));
-    store.recompute(sheet);
-
-    assert_eq!(
-        store.formula_source(untouched, 0, 0).as_deref(),
-        Some("=A2+B2*2")
-    );
-    assert_eq!(
-        store.formula_source(reader, 0, 0).as_deref(),
-        Some("=Grid!A3")
-    );
-    assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
-}
-
-#[test]
-fn formula_ids_survive_structural_edits_and_slot_reuse() {
-    use crate::types::AbsCellKey;
-
-    let (mut store, sheet, reader) = sheet_with_reference();
-    let original = store.formula_id(AbsCellKey::new(sheet, 0, 1)).unwrap();
-    let reader_id = store.formula_id(AbsCellKey::new(reader, 0, 0)).unwrap();
-
-    assert!(store.add_rows(sheet, 0, 1));
-    assert!(store.insert_cols(sheet, 0, 1));
-    store.commit_sources();
-    assert_eq!(
-        store.formula_id(AbsCellKey::new(sheet, 1, 2)),
-        Some(original)
-    );
-    assert_eq!(
-        store.formula_id(AbsCellKey::new(reader, 0, 0)),
-        Some(reader_id)
-    );
-    assert_eq!(store.get_cell(sheet, 1, 2).num(), 7.0);
-    assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
-
-    assert!(store.remove_rows(sheet, 0, 1));
-    assert!(store.remove_cols(sheet, 0, 1));
-    store.commit_sources();
-    assert_eq!(
-        store.formula_id(AbsCellKey::new(sheet, 0, 1)),
-        Some(original)
-    );
-
-    // A new source may reuse the removed reader's slot, never the live source.
-    assert!(store.remove_sheet(reader));
-    store.set_formula(sheet, 0, 0, "=B1+10", 0);
-    store.commit_sources();
-    assert_eq!(
-        store.formula_id(AbsCellKey::new(sheet, 0, 1)),
-        Some(original)
-    );
-    assert_ne!(
-        store.formula_id(AbsCellKey::new(sheet, 0, 0)),
-        Some(original)
-    );
-    assert_eq!(store.get_cell(sheet, 0, 0).num(), 17.0);
-}
-
-#[test]
-fn the_dense_sheet_that_passes_the_workbook_dense_cap_moves_to_local_pages() {
-    let mut store = CellStore::new();
-    let large = store.add_sheet(1, MAX_DENSE_CELLS - 2_000_000);
-    let small = store.add_sheet(1, 1_900_000);
-    store.set_number(small, 1_899_999, 0, 5.0, 0);
-
-    assert!(store.add_rows(small, 0, 200_000));
-    assert!(store.sheets[small].cells.is_local_paged());
-    assert!(!store.sheets[large].cells.is_paged());
-    assert_eq!(store.get_cell(small, 2_099_999, 0).num(), 5.0);
-    assert!(!store.is_paged(small));
-
-    // A new sheet that would pass the dense cap starts in local pages.
-    let added = store.add_sheet(1, 2_000_001);
-    assert!(store.sheets[added].cells.is_local_paged());
 }

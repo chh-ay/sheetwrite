@@ -448,7 +448,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(delivered).toEqual(["current generation"]);
     });
 
-    it("aborts and destroys a custom editor when the framework unmounts", async () => {
+    it("forwards semantic headers, and aborts and destroys a custom editor when the framework unmounts", async () => {
       const workbook = makeConformanceWorkbook();
       present(workbook.sheets[0]?.columns[0], "column").editor = "framework";
       const lifecycle: string[] = [];
@@ -469,9 +469,11 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       };
       const { mounted, grid } = await mountRecorded(mount, {
         workbook,
+        presentation: "data-grid",
         editors: { framework: editor },
       });
 
+      expect(mounted.host.querySelector('[role="columnheader"]')?.textContent).toBe("Name");
       grid.beginEdit(0, 0);
       expect([lifecycle, signal?.aborted]).toEqual([["mount"], false]);
 

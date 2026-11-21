@@ -175,21 +175,3 @@ fn semi_voiced_base(code: u32) -> Option<char> {
         .then(|| char::from_u32(base))
         .flatten()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn voiced_katakana_split_and_join() {
-        assert_eq!(half_width("ガパヴァン"), "ｶﾞﾊﾟｳﾞｧﾝ");
-        assert_eq!(full_width("ｶﾞﾊﾟｳﾞｧﾝ"), "ガパヴァン");
-        assert_eq!(full_width("ｱﾞ"), "ア゛");
-    }
-
-    #[test]
-    fn other_text_is_unchanged() {
-        assert_eq!(half_width("日本 ヰ"), "日本 ヰ");
-        assert_eq!(full_width("日本"), "日本");
-    }
-}

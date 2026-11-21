@@ -518,6 +518,8 @@ mod tests {
             original.set_number(0, row, 0, value, 0);
         }
         original.set_formula(0, 0, 1, "=SUBTOTAL(109,A1:A3)", 0);
+        // Code 9 skips only the filtered row, so the two kinds stay apart.
+        original.set_formula(0, 1, 1, "=SUBTOTAL(9,A1:A3)", 0);
         original.recompute_changed();
         assert!(original.set_hidden_rows(0, &[0, 0], &[2, 2]));
 
@@ -526,6 +528,7 @@ mod tests {
         replacement.set_number(0, 1, 0, 8.0, 0);
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 8.0);
+        assert_eq!(replacement.get_cell(0, 1, 1).num(), 9.0);
 
         assert!(replacement.set_hidden_rows(0, &[], &[]));
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 13.0);

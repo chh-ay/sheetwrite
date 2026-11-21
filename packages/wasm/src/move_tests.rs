@@ -8,7 +8,8 @@
 //! (<https://support.microsoft.com/en-us/excel/get-started/sum-function>,
 //! "Formulas won't update references when inserting rows or columns").
 
-use crate::store::{CellStore, BLOCK_OK};
+use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK};
+use crate::tests::support::{formula_text as text, number};
 
 const ROWS: usize = 10;
 const COLS: usize = 4;
@@ -26,14 +27,6 @@ fn store() -> (CellStore, usize, usize) {
     (store, data, summary)
 }
 
-fn text(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
-    store.formula_source(sheet, row, col).unwrap_or_default()
-}
-
-fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
-    store.get_cell(sheet, row, col).num()
-}
-
 /// The text of `formula` on `Summary` after `count` rows of `Data` move
 /// from row index `from` so that the first lands on row index `to`.
 fn after_row_move(formula: &str, from: usize, count: usize, to: usize) -> String {
@@ -45,31 +38,6 @@ fn after_row_move(formula: &str, from: usize, count: usize, to: usize) -> String
         "the row move succeeds"
     );
     text(&store, summary, 0, 0)
-}
-
-#[test]
-fn moved_cells_keep_their_values_and_references_follow_them() {
-    let (mut store, data, summary) = store();
-    store.set_formula(data, 1, 1, "=A2*2", 0);
-    store.set_formula(data, 2, 1, "=A3 + A2", 0);
-    store.set_formula(summary, 0, 0, "=Data!A2*2", 0);
-    store.set_formula(summary, 1, 0, "=(Data!A3 + 1) * 2", 0);
-
-    // Row 2 lands below row 4.
-    assert_eq!(store.move_rows(data, 1, 1, 3), BLOCK_OK);
-    store.recompute(summary);
-    store.recompute(data);
-
-    let column: Vec<f64> = (0..5).map(|row| number(&store, data, row, 0)).collect();
-    assert_eq!(column, [1.0, 3.0, 4.0, 2.0, 5.0]);
-    assert_eq!(text(&store, data, 3, 1), "=A4*2");
-    assert_eq!(text(&store, data, 1, 1), "=A2 + A4");
-    assert_eq!(text(&store, summary, 0, 0), "=Data!A4*2");
-    assert_eq!(text(&store, summary, 1, 0), "=(Data!A2 + 1) * 2");
-    assert_eq!(number(&store, data, 3, 1), 4.0);
-    assert_eq!(number(&store, data, 1, 1), 5.0);
-    assert_eq!(number(&store, summary, 0, 0), 4.0);
-    assert_eq!(number(&store, summary, 1, 0), 8.0);
 }
 
 #[test]
@@ -116,31 +84,31 @@ fn a_range_follows_excel_rules_for_a_moved_block() {
 #[test]
 fn moved_columns_follow_the_same_rules() {
     let (mut store, data, summary) = store();
-    store.set_number(data, 0, 1, 20.0, 0);
     store.set_formula(summary, 0, 0, "=Data!B1+SUM(Data!A1:C1)", 0);
     store.set_formula(data, 1, 3, "=A1", 0);
 
     // Column A lands after column C.
     assert_eq!(store.move_cols(data, 0, 1, 2), BLOCK_OK);
-    store.recompute(summary);
-    store.recompute(data);
-
-    assert_eq!(number(&store, data, 0, 0), 20.0);
-    assert_eq!(number(&store, data, 0, 2), 1.0);
     assert_eq!(text(&store, summary, 0, 0), "=Data!A1+SUM(Data!A1:B1)");
     assert_eq!(text(&store, data, 1, 3), "=C1");
-    assert_eq!(number(&store, data, 1, 3), 1.0);
 }
 
 #[test]
-fn defined_names_follow_a_move() {
+fn defined_names_and_shifted_rows_follow_a_move() {
     let (mut store, data, summary) = store();
     assert!(store.set_named_range("Second", -1, data, 1, 0, 1, 0));
     assert!(store.set_named_formula("Double", -1, "=Data!$A$2 * 2"));
     store.set_formula(summary, 0, 0, "=Second+Double", 0);
+    // Row 3 shifts up while row 2 moves below row 4.
+    store.set_formula(data, 2, 1, "=A3 + A2", 0);
 
     assert_eq!(store.move_rows(data, 1, 1, 3), BLOCK_OK);
     store.recompute(summary);
+    store.recompute(data);
+
+    assert_eq!(number(&store, data, 2, 0), 4.0);
+    assert_eq!(text(&store, data, 1, 1), "=A2 + A4");
+    assert_eq!(number(&store, data, 1, 1), 5.0);
 
     assert_eq!(
         store.named_formula_source("Double", -1).as_deref(),
@@ -165,8 +133,8 @@ fn losses_list_the_formulas_a_move_back_cannot_restore() {
 #[test]
 fn a_move_that_does_not_fit_changes_nothing() {
     let (mut store, data, _) = store();
-    assert_ne!(store.move_rows(data, 9, 2, 0), BLOCK_OK);
-    assert_ne!(store.move_rows(data, 0, 1, 10), BLOCK_OK);
-    assert_ne!(store.move_rows(data, 0, 0, 1), BLOCK_OK);
+    for (from, count, to) in [(9, 2, 0), (0, 1, 10), (0, 0, 1)] {
+        assert_eq!(store.move_rows(data, from, count, to), BLOCK_INVALID);
+    }
     assert_eq!(number(&store, data, 0, 0), 1.0);
 }

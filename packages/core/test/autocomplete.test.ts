@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, GridConfig, Workbook } from "../src/types.js";
-import { elementAdded, mountHost } from "./fixtures.js";
+import { elementAdded, expectSameNode, mountHost } from "./fixtures.js";
 
 // Excel's AutoComplete: typing a text entry completes it from the entries
 // above and below in the column.
@@ -102,28 +102,33 @@ function at(row: number): void {
 }
 
 const value = (row: number) => store.getCell({ sheet: "s1", row, col: 0 }).resolved;
+const listed = () =>
+  [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
+    (option) => option.textContent,
+  );
 const shown = () => {
   const field = editor();
   return [field.value, field.value.slice(field.selectionStart, field.selectionEnd)];
 };
 
 describe("AutoComplete", () => {
-  it("completes from the entries above, with the added text selected, and Enter stores it", async () => {
+  it.each([
+    [
+      "from the entries above, with the added text selected",
+      "Ap",
+      ["Apple", "ple"],
+      "Enter",
+      "Apple",
+    ],
+    // Tab and Enter store the entry in its own letter case, as Excel does.
+    ["from the first letter", "b", ["banana", "anana"], "Tab", "Banana"],
+  ] as const)("completes %s", async (_, typed, completion, accept, stored) => {
     mount(["Apple", "Banana"]);
     at(2);
-    await type("Ap");
-    expect(shown()).toEqual(["Apple", "ple"]);
-    key("Enter");
-    expect(value(2)).toBe("Apple");
-  });
-
-  it("completes from the first letter, and Tab accepts in the entry's letter case", async () => {
-    mount(["Apple", "Banana"]);
-    at(2);
-    await type("b");
-    expect(shown()).toEqual(["banana", "anana"]);
-    key("Tab");
-    expect(value(2)).toBe("Banana");
+    await type(typed);
+    expect(shown()).toEqual([...completion]);
+    key(accept);
+    expect(value(2)).toBe(stored);
   });
 
   it("uses the entries below too, but not past an empty cell", async () => {
@@ -272,10 +277,6 @@ describe("AutoComplete's list", () => {
   });
 
   it("reads the column at the first typed key: text pasted before it lists nothing", async () => {
-    const listed = () =>
-      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map(
-        (option) => option.textContent,
-      );
     mount(["North", "Northeast"]);
     at(2);
     key("F2");
@@ -301,7 +302,7 @@ describe("Pick From Drop-down List", () => {
     const list = await elementAdded(host, ".sheetwrite-entry-list", HTMLDivElement);
     const options = [...list.querySelectorAll("[role=option]")].map((option) => option.textContent);
     expect(options).toEqual(["East", "North", "south", "West"]);
-    expect(document.activeElement).toBe(list);
+    expectSameNode(document.activeElement, list);
 
     for (const name of ["ArrowDown", "Enter"]) {
       list.dispatchEvent(
