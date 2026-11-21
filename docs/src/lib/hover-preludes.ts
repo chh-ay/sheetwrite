@@ -33,8 +33,7 @@ const FRAMEWORK_PRELUDE = [
   "declare const columns: readonly SimpleColumn<Record<string, CellScalar>>[];",
   "declare const rows: readonly Record<string, CellScalar>[];",
   "declare const datasource: DataSource;",
-  "declare const gridRef: Grid | null;",
-  "declare const persist: (transaction: Transaction) => void;",
+  "declare const persist: (event: ChangeEvent) => void;",
   "declare const observe: (grid: Grid, generation: number, reason: string) => void;",
   "declare const connect: (grid: Grid) => void;",
   'declare const operationQueue: { push(...patches: Transaction["patches"]): void };',
@@ -52,9 +51,12 @@ const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
   ["framework", FRAMEWORK_PRELUDE],
   [
     "react",
-    [FRAMEWORK_PRELUDE, 'import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";'].join(
-      "\n",
-    ),
+    [
+      FRAMEWORK_PRELUDE,
+      'import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";',
+      'import type { RefObject } from "react";',
+      "declare const gridRef: RefObject<Grid | null>;",
+    ].join("\n"),
   ],
   [
     "vue",
@@ -70,6 +72,7 @@ const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
     "collaboration",
     [
       CORE_PRELUDE,
+      'import type { PendingCommitStorage, VersionedOperation } from "@sheetwrite/core";',
       "declare const adapter: PersistenceAdapter;",
       "declare const persistenceAdapter: PersistenceAdapter;",
       "declare const sync: SyncCoordinator;",
@@ -78,10 +81,10 @@ const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
       "declare const documentId: string;",
       "declare const signal: AbortSignal;",
       "declare const saveButton: HTMLButtonElement;",
-      "declare const remoteOperationSource: AsyncIterable<DocumentOp>;",
+      "declare const remoteOperationSource: AsyncIterable<VersionedOperation>;",
       "declare const showConflict: (conflict: unknown) => void;",
       "declare const requestFreshSnapshot: () => Promise<void>;",
-      "declare const pendingStorage: { remove(documentId: string): Promise<void> };",
+      "declare const pendingStorage: PendingCommitStorage;",
     ].join("\n"),
   ],
   [

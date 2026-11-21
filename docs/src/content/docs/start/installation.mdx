@@ -33,7 +33,7 @@ npm install @sheetwrite/react
 import { Sheetwrite } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 
-export function Workbook() {
+export function WorkbookView() {
   return <Sheetwrite columns={columns} defaultRows={rows} height={520} />;
 }
 ```
@@ -95,7 +95,7 @@ The adapter host, its `Grid`, and WASM initialization are client-owned. Server r
 
 ## Runtime initialization
 
-Zero-argument `initSheetwrite()` is canonical for the imperative package. It is re-entrant: concurrent calls share one initialization, retries work after failure, and repeats after success are no-ops. Framework adapters call the same initializer on mount.
+With `@sheetwrite/core`, call `initSheetwrite()` with no arguments. You can call it more than once: calls at the same time share one start, a failed start can be tried again, and calls after a successful start do nothing. Framework adapters call the same initializer on mount.
 
 Pass a source only for unsupported bundlers, public-asset policies, or controlled delivery:
 
