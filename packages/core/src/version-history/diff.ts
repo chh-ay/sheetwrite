@@ -688,7 +688,7 @@ export function cellIn(
 }
 
 /** The sheets of a rebuilt version, as the diff kernel sees them. */
-export function shapesOf(workbook: Workbook): SheetShape[] {
+function shapesOf(workbook: Workbook): SheetShape[] {
   return workbook.sheets.map((sheet) => ({
     id: sheet.id,
     rowCount: sheet.rowCount,
