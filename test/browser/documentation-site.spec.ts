@@ -214,8 +214,10 @@ test("a page's eyebrow carries its section's sidebar icon, and no icon stands al
   const eyebrow = page.locator(".sw-document__eyebrow");
   await expect(eyebrow).toHaveText("Getting started");
   // The same glyph as the section's row in the sidebar.
+  // The sidebar's markup is in the page twice (the phone menu holds a copy).
   const sidebarGlyph = await page
     .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
+    .first()
     .getAttribute("href");
   await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
   // Beside its label: centred on the label's line.
