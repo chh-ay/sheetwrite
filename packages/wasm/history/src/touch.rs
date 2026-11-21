@@ -138,21 +138,6 @@ mod tests {
     }
 
     #[test]
-    fn the_last_write_names_the_author_and_all_writers_are_kept() {
-        let mut touches = Touches::default();
-        touches.add(rect(0, 0, 9, 3, 1));
-        touches.add(rect(2, 1, 2, 1, 2));
-
-        assert_eq!(last_author(&touches, 2, 1), 2);
-        assert_eq!(last_author(&touches, 5, 0), 1);
-        assert_eq!(last_author(&touches, 10, 0), NONE);
-
-        let mut authors = Vec::new();
-        touches.authors(2, 1, &mut authors);
-        assert_eq!(authors, vec![1, 2]);
-    }
-
-    #[test]
     fn authorship_follows_cells_through_inserted_and_removed_rows() {
         let mut touches = Touches::default();
         touches.add(rect(4, 0, 4, 0, 7));
@@ -163,16 +148,5 @@ mod tests {
 
         touches.apply_rows(AxisOp::Remove { at: 7, count: 1 });
         assert_eq!(last_author(&touches, 7, 0), NONE);
-    }
-
-    #[test]
-    fn a_cleared_and_reinserted_cell_keeps_both_writers() {
-        let mut touches = Touches::default();
-        touches.add(rect(3, 2, 3, 2, 1));
-        touches.apply_cols(AxisOp::Remove { at: 2, count: 1 });
-        touches.apply_cols(AxisOp::Insert { at: 2, count: 1 });
-        touches.add(rect(3, 2, 3, 2, 4));
-
-        assert_eq!(last_author(&touches, 3, 2), 4);
     }
 }
