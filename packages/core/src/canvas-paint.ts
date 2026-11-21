@@ -5,6 +5,7 @@ import { formatNumber, numberFormatColor } from "./number-format.js";
 import type {
   CellAlign,
   CellBorder,
+  CellFormat,
   CellScalar,
   CellStyle,
   CellVerticalAlign,
@@ -12,7 +13,82 @@ import type {
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
+/** Space between a cell's text and its left and right gridlines, in CSS pixels at zoom 1. */
 const CELL_PAD = 6;
+
+/**
+ * Space between a cell's text and its gridlines at `zoom`. Like the text, it
+ * scales with the sheet's zoom, as in Excel.
+ */
+export function cellPadding(zoom: number): number {
+  return CELL_PAD * zoom;
+}
+
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
+const FILTER_BUTTON_SIZE = 16;
+
+/**
+ * Room between an AutoFilter header cell's filter button and the cell's
+ * right gridline: the text's left padding, so the header has the same room on
+ * both sides. In CSS pixels at zoom 1.
+ */
+const FILTER_BUTTON_INSET = CELL_PAD;
+
+/** Room between the end of a header cell's text and its filter button: the text's left padding again. */
+const FILTER_TEXT_GAP = CELL_PAD;
+
+/** Room above and below the filter button in a row too short for its full size, at zoom 1. */
+const FILTER_BUTTON_MARGIN = 2;
+
+/** The least width of the area a pointer opens the filter dropdown in, in screen pixels, for touch. */
+const FILTER_BUTTON_HIT_WIDTH = 24;
+
+type CellBox = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+
+/**
+ * Where an AutoFilter header cell's filter button sits at `zoom`: a square
+ * `FILTER_BUTTON_INSET` from the cell's right gridline, centred in the row, as
+ * in Excel. Its size, inset and gap scale with the zoom, as the text does.
+ * `cell` and the result share a coordinate space.
+ */
+export function filterButtonRect(cell: CellBox, zoom: number): CellBox {
+  const inset = FILTER_BUTTON_INSET * zoom;
+  const size = Math.max(
+    0,
+    Math.min(
+      FILTER_BUTTON_SIZE * zoom,
+      cell.h - 2 * FILTER_BUTTON_MARGIN * zoom,
+      cell.w - 2 * inset,
+    ),
+  );
+  return { x: cell.x + cell.w - inset - size, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
+
+/**
+ * Where a pointer opens the filter dropdown: the button and the inset to the
+ * gridline, and at any zoom at least `FILTER_BUTTON_HIT_WIDTH` wide and as
+ * tall, within the cell.
+ */
+export function filterButtonHitRect(cell: CellBox, zoom: number): CellBox {
+  const button = filterButtonRect(cell, zoom);
+  const right = cell.x + cell.w;
+  const left = Math.max(cell.x, Math.min(button.x, right - FILTER_BUTTON_HIT_WIDTH));
+  const middle = button.y + button.h / 2;
+  const half = Math.max(FILTER_BUTTON_HIT_WIDTH, button.h) / 2;
+  const top = Math.max(cell.y, middle - half);
+  const bottom = Math.min(cell.y + cell.h, middle + half);
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/**
+ * Where an AutoFilter header cell's text box ends at `zoom`:
+ * `FILTER_TEXT_GAP` before the filter button, as Excel keeps header text clear
+ * of the button. Text of every alignment lays out and clips in the box from
+ * the cell's left edge to here, and the cell editor ends here too.
+ */
+export function filterTextRight(cell: CellBox, zoom: number): number {
+  return filterButtonRect(cell, zoom).x - FILTER_TEXT_GAP * zoom;
+}
 
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
@@ -121,6 +197,25 @@ function withFontFamily(font: string, family: string): string {
   const themeFamilies = fromSize.slice(sizeToken.length).trim();
   const families = themeFamilies ? `"${family}", ${themeFamilies}` : `"${family}"`;
   return `${font.slice(0, sizeMatch.index)}${sizeToken} ${families}`;
+}
+
+/**
+ * Where a cell's text sits: its own alignment, else Excel's General rule,
+ * which centres logical values and right-aligns numbers (and every value of
+ * a number or currency column).
+ */
+export function cellAlign(
+  style: Pick<CellStyle, "align">,
+  value: CellScalar,
+  type: CellFormat | undefined,
+): CellAlign {
+  if (style.align !== undefined) return style.align;
+  if (typeof value === "boolean") return "center";
+  return type === "number" ||
+    type === "currency" ||
+    (type === "general" && typeof value === "number")
+    ? "right"
+    : "left";
 }
 
 /** Resolve the canvas font from the theme and cell style. */
@@ -378,16 +473,17 @@ function fillAlignedText(
   x: number,
   w: number,
   cy: number,
+  pad: number,
 ): void {
   if (align === "right") {
     ctx.textAlign = "right";
-    ctx.fillText(text, x + w - CELL_PAD, cy);
+    ctx.fillText(text, x + w - pad, cy);
   } else if (align === "center") {
     ctx.textAlign = "center";
     ctx.fillText(text, x + w / 2, cy);
   } else {
     ctx.textAlign = "left";
-    ctx.fillText(text, x + CELL_PAD, cy);
+    ctx.fillText(text, x + pad, cy);
   }
 }
 
@@ -406,14 +502,15 @@ function paintTextDecoration(
   w: number,
   cy: number,
   fontPx: number,
+  pad: number,
 ): void {
   const runWidth = ctx.measureText(text).width;
   if (runWidth <= 0) return;
 
   let left: number;
-  if (align === "right") left = x + w - CELL_PAD - runWidth;
+  if (align === "right") left = x + w - pad - runWidth;
   else if (align === "center") left = x + w / 2 - runWidth / 2;
-  else left = x + CELL_PAD;
+  else left = x + pad;
 
   const effectiveFontPx = fontPx || 12;
 
@@ -683,8 +780,17 @@ export function paintFrame(
   damage?: PaintDamage,
   pane?: PaintDamage,
 ): void {
-  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights, rowNumbers, filteredRows } =
-    viewport;
+  const {
+    width,
+    height,
+    scrollTop,
+    scrollLeft,
+    rowTops,
+    rowHeights,
+    rowNumbers,
+    filteredRows,
+    filterHeader,
+  } = viewport;
   const { rowHeight, headerHeight } = theme;
   const colX = columnEdges(layout);
   const g = theme.rowHeaderWidth;
@@ -782,14 +888,24 @@ export function paintFrame(
       const styleId = view.styleIds[i]!;
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
+      // An AutoFilter header cell lays out its text in a box that ends a gap
+      // before its filter button, for every alignment, as in Excel.
+      const textRight =
+        filterHeader !== undefined &&
+        row === filterHeader.row &&
+        col >= filterHeader.start &&
+        col <= filterHeader.end
+          ? filterTextRight({ x, y, w: cw, h: ch }, layout.zoom ?? 1)
+          : undefined;
 
       // Sheets lets text spill through adjacent empty cells, but never through
       // occupied cells. Compute the contiguous empty run around this cell; the
       // painter chooses the relevant side after resolving alignment. Numbers
-      // and custom renderers deliberately keep their own cell bounds.
+      // and custom renderers deliberately keep their own cell bounds, and a
+      // filter header cell keeps its text in its box.
       let spillX = x;
       let spillRight = x + cw;
-      if (!merge && typeof value === "string" && value !== "") {
+      if (!merge && textRight === undefined && typeof value === "string" && value !== "") {
         for (let k = cj - 1; k >= 0; k--) {
           const adjacent = view.cols[k]! + 1 === view.cols[k + 1]!;
           const neighbour = view.values[ri * nCols + k];
@@ -819,6 +935,7 @@ export function paintFrame(
         y,
         cw,
         ch,
+        textRight,
         spillX,
         spillRight - spillX,
         renderers,
@@ -1026,6 +1143,8 @@ function paintCell(
   y: number,
   w: number,
   h: number,
+  /** Where a filter header's text box ends, before its button; undefined for other cells. */
+  textRight: number | undefined,
   spillX: number,
   spillW: number,
   renderers: ReadonlyMap<string, CellRenderer>,
@@ -1095,17 +1214,12 @@ function paintCell(
         : theme.fg),
   );
 
-  const align =
-    effective.align ??
-    (typeof value === "boolean"
-      ? "center"
-      : column?.type === "number" ||
-          column?.type === "currency" ||
-          (column?.type === "general" && typeof value === "number")
-        ? "right"
-        : "left");
+  const align = cellAlign(effective, value, column?.type);
   let text = cellDisplayText(value, numberFormat, column?.numberLocale);
-  const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
+  // A filter header's text pads on the left as usual and ends at its text box.
+  const pad = cellPadding(layout.zoom ?? 1);
+  const textW = textRight === undefined ? w : textRight + pad - x;
+  const availableTextWidth = Math.max(0, textW - pad * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
       state.measuredFont = state.lastFont;
@@ -1134,7 +1248,7 @@ function paintCell(
 
   ctx.save();
   if (effective.wrap && !numeric) {
-    clipCell(ctx, x, y, w, h);
+    clipCell(ctx, x, y, (textRight ?? x + w) - x, h);
 
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
@@ -1148,21 +1262,21 @@ function paintCell(
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
       const lineText = lines[line]!;
-      fillAlignedText(ctx, lineText, align, x, w, cy);
+      fillAlignedText(ctx, lineText, align, x, textW, cy, pad);
       if (effective.underline || effective.strikethrough) {
-        paintTextDecoration(ctx, effective, lineText, align, x, w, cy, fontPx);
+        paintTextDecoration(ctx, effective, lineText, align, x, textW, cy, fontPx, pad);
       }
     }
   } else {
     // Left-aligned strings spill right, right-aligned strings spill left, and
     // centered strings can use both sides. Numeric output never spills.
     let textClipX = x;
-    let textClipW = w;
+    let textClipW = textW;
     if (!numeric) {
       if (align === "left") textClipW = spillX + spillW - x;
       else if (align === "right") {
         textClipX = spillX;
-        textClipW = x + w - spillX;
+        textClipW = x + textW - spillX;
       } else {
         textClipX = spillX;
         textClipW = spillW;
@@ -1174,10 +1288,12 @@ function paintCell(
       effective.verticalAlign === undefined || effective.verticalAlign === "middle"
         ? y + h / 2
         : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
+    // A filter header's text clips at its text box, the gap before the button.
+    if (textRight !== undefined) textClipW = Math.min(textClipW, textRight - textClipX);
     clipCell(ctx, textClipX, y, textClipW, h);
-    fillAlignedText(ctx, text, align, x, w, cy);
+    fillAlignedText(ctx, text, align, x, textW, cy, pad);
     if (effective.underline || effective.strikethrough) {
-      paintTextDecoration(ctx, effective, text, align, x, w, cy, fontPx);
+      paintTextDecoration(ctx, effective, text, align, x, textW, cy, fontPx, pad);
     }
   }
 
@@ -1286,7 +1402,7 @@ function paintHeader(
     const align = headerStyle?.align ?? "center";
     ctx.save();
     clipCell(ctx, x, 0, w, h);
-    fillAlignedText(ctx, column.header, align, x, w, cy);
+    fillAlignedText(ctx, column.header, align, x, w, cy, cellPadding(layout.zoom ?? 1));
     ctx.restore();
   }
 

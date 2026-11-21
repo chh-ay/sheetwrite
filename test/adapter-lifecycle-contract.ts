@@ -18,6 +18,7 @@ import type {
 import type * as Core from "../packages/core/src/index.js";
 import type * as Testing from "../packages/core/src/testing.js";
 import type * as XlsxSlots from "../packages/core/src/xlsx-slots.js";
+import { expectDifferent, expectSame } from "./expect-same.js";
 
 // The adapters load core's built entry, and the built package keeps no declarations for these
 // internal paths, so the test loads their runtime from dist with the source modules' types.
@@ -270,10 +271,10 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         });
         const second = present(mounted.getPublishedGrid(), "replacement grid");
 
-        expect(second).not.toBe(grid);
+        expectDifferent(second, grid);
         expect(ready).toHaveLength(2);
         expect(ready[1]).toMatchObject({ grid: second, generation: 2, reason });
-        expect(mounted.publishedAtReady.at(-1)).toBe(second);
+        expectSame(mounted.publishedAtReady.at(-1), second);
         expect(destroyCalls.get(grid)).toBe(1);
         expect(mounted.host.querySelectorAll('[role="grid"]')).toHaveLength(1);
 
@@ -331,7 +332,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         overscan: 9,
         minColumns: 12,
       });
-      expect(mounted.getPublishedGrid()).toBe(grid);
+      expectSame(mounted.getPublishedGrid(), grid);
       expect(ready).toHaveLength(1);
       expect(grid.getEffectiveTheme().bg).toBe("#102030");
       expect(mounted.host.querySelector('[role="grid"]')?.getAttribute("aria-colcount")).toBe("12");
@@ -430,7 +431,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         delivered.push(event.error.message);
       await mounted.render({ ...props, datasource: current.datasource, onDatasourceError });
       await waitFor(() => current.state.requests > 0);
-      expect(mounted.getPublishedGrid()).not.toBe(grid);
+      expectDifferent(mounted.getPublishedGrid(), grid);
 
       stale.fail("stale generation");
       await Bun.sleep(0);
@@ -448,7 +449,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(delivered).toEqual(["current generation"]);
     });
 
-    it("aborts and destroys a custom editor when the framework unmounts", async () => {
+    it("forwards semantic headers, and aborts and destroys a custom editor when the framework unmounts", async () => {
       const workbook = makeConformanceWorkbook();
       present(workbook.sheets[0]?.columns[0], "column").editor = "framework";
       const lifecycle: string[] = [];
@@ -469,9 +470,11 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       };
       const { mounted, grid } = await mountRecorded(mount, {
         workbook,
+        presentation: "data-grid",
         editors: { framework: editor },
       });
 
+      expect(mounted.host.querySelector('[role="columnheader"]')?.textContent).toBe("Name");
       grid.beginEdit(0, 0);
       expect([lifecycle, signal?.aborted]).toEqual([["mount"], false]);
 

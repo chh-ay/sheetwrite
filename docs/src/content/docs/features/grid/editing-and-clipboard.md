@@ -70,6 +70,8 @@ grid.beginEdit(0, 0, "42");
 
 Editing happens in a single real `<textarea>` on top of the active cell. The grid never recycles it across cells, so **IME composition and focus survive scrolling**. Composing CJK text or other input methods is safe. Begin editing by double-clicking, pressing F2, or just typing. F2 and double-click put the caret at the end of the text; Backspace clears the active cell and opens it.
 
+The editor keeps the cell's look, as Excel's in-cell editor does: its font (family, size, bold, italic), colour, underline or strikethrough, and its horizontal alignment, so right-aligned or centred text stays where it is while you edit. Without an alignment of its own, the cell follows Excel's General rule for the text being edited: a value opened with F2 or a double-click sits where it is shown (numbers and every value of a number or currency column at the right, TRUE and FALSE centred, text at the left), while a formula and a newly typed entry start at the left unless the column is a number or currency column. A [host-supplied editor](/docs/features/grid/custom-editors/) keeps its own look.
+
 As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
 In a `general` column, the editor opens a date or a time as Excel's formula bar shows it. A time uses the clock of the column's `numberLocale`, whatever the cell's format: `9:30:00 PM` in `en-US` (the default) and `21:30:00` in `de-DE` or `en-GB`. A date uses the short date of the same locale, with a four-digit year: `1/15/2026` in `en-US`, `15.01.2026` in `de-DE` and `15/01/2026` in `en-GB`. Typing that text back reads the same date.

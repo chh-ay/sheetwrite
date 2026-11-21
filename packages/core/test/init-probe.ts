@@ -1,11 +1,9 @@
-// Init-semantics probe, run by init.test.ts in a FRESH bun process (loader
-// state is module-global, so pre-init and failure-path assertions cannot run
-// inside the shared `bun test` process where sibling suites already
-// initialized WASM). Prints a JSON result object; the test asserts on it.
-//
-// Modes:
-//   lifecycle — pre-init guards, concurrent init semantics, post-success calls
-//   retry     — a failing first source rejects, then a corrected init succeeds
+// Init-semantics probe, run by init.test.ts in a fresh bun process: loader state is
+// module-global, and sibling suites of the shared `bun test` process already
+// initialized WASM. Modes: lifecycle (pre-init guard, concurrent init, calls after
+// success) and retry (a failing source rejects, then a corrected init succeeds).
+import assert from "node:assert/strict";
+
 import {
   initSheetwrite,
   isSheetwriteReady,
@@ -26,70 +24,40 @@ const workbook: Workbook = {
   ],
 };
 
-function rejectedInitialization(error: unknown): Record<string, unknown> {
-  if (!(error instanceof Error)) throw new TypeError("Initialization must reject with an Error");
-  return {
-    status: "rejected",
-    name: error.name,
-    ...(error instanceof SheetwriteError ? { code: error.code, operation: error.operation } : {}),
-  };
+async function assertFailure(run: () => unknown, code: string, operation: string): Promise<void> {
+  await assert.rejects(
+    async () => run(),
+    (error) => {
+      assert.ok(error instanceof SheetwriteError);
+      assert.equal(error.code, code);
+      assert.equal(error.operation, operation);
+      return true;
+    },
+  );
 }
 
-async function lifecycle(): Promise<Record<string, unknown>> {
-  const result: Record<string, unknown> = {};
-
-  result.readyBefore = isSheetwriteReady();
-  try {
-    new SheetwriteStore(workbook);
-    result.preInitStore = "constructed";
-  } catch (error) {
-    result.preInitStore = rejectedInitialization(error);
-  }
-
-  // Fire everything before awaiting: while the first call's initialization is
-  // in flight, a same-source call shares it (both fulfill) and a
-  // different-source call rejects.
-  const first = initSheetwrite();
-  const sameSourceWhileInFlight = initSheetwrite();
-  const second = initSheetwrite({ source: "https://example.invalid/x.wasm" }).then(
-    () => "fulfilled",
-    (error: unknown) => rejectedInitialization(error),
-  );
-  await Promise.all([first, sameSourceWhileInFlight]);
-  result.concurrentSameSource = "fulfilled";
-  result.concurrentDifferentSource = await second;
-
-  result.readyAfter = isSheetwriteReady();
-
-  // Repeat calls after success stay no-op fulfillments.
-  await Promise.all([initSheetwrite(), initSheetwrite()]);
-  result.repeatFulfilled = true;
-
-  // Different source AFTER success warns and keeps the first module.
-  await initSheetwrite({ source: "https://example.invalid/late.wasm" });
-  result.postSuccessDifferentSource = "fulfilled";
-
-  result.storeAfter = new SheetwriteStore(workbook) instanceof SheetwriteStore;
-  return result;
-}
-
-async function retry(): Promise<Record<string, unknown>> {
-  const result: Record<string, unknown> = {};
-
-  result.firstFailure = await initSheetwrite({
-    source: "https://example.invalid/broken.wasm",
-  }).then(
-    () => "fulfilled",
-    (error: unknown) => rejectedInitialization(error),
-  );
-  result.readyAfterFailure = isSheetwriteReady();
-
+if (process.argv[2] === "retry") {
+  const broken = { source: "https://example.invalid/broken.wasm" };
+  await assertFailure(() => initSheetwrite(broken), "initialization-failed", "initialize");
+  assert.equal(isSheetwriteReady(), false);
   // The rejected init cleared the in-flight cache: a corrected call succeeds.
   await initSheetwrite();
-  result.readyAfterRetry = isSheetwriteReady();
-  return result;
+  assert.equal(isSheetwriteReady(), true);
+} else {
+  assert.equal(isSheetwriteReady(), false);
+  await assertFailure(() => new SheetwriteStore(workbook), "initialization-required", "store");
+  // While the first call is in flight, a same-source call shares it and a different source rejects.
+  const first = initSheetwrite();
+  const sameSource = initSheetwrite();
+  const otherSource = assertFailure(
+    () => initSheetwrite({ source: "https://example.invalid/x.wasm" }),
+    "initialization-failed",
+    "initialize",
+  );
+  await Promise.all([first, sameSource, otherSource]);
+  assert.equal(isSheetwriteReady(), true);
+  // After success, repeats and a different source (which only warns) fulfill.
+  await Promise.all([initSheetwrite(), initSheetwrite()]);
+  await initSheetwrite({ source: "https://example.invalid/late.wasm" });
+  assert.ok(new SheetwriteStore(workbook) instanceof SheetwriteStore);
 }
-
-const mode = process.argv[2];
-const result = mode === "retry" ? await retry() : await lifecycle();
-console.log(JSON.stringify(result));

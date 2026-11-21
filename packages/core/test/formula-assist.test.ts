@@ -12,6 +12,10 @@ const LOAD_TIMEOUT_MS = 2_000;
 const POLL_MS = 5;
 
 let store: SheetwriteStore;
+const SALES_UNITS = {
+  name: "SalesUnits",
+  range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
+};
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -159,12 +163,7 @@ describe("function list", () => {
     const sheet = workbook.sheets[0]!;
     const named = new SheetwriteStore({
       ...workbook,
-      namedRanges: [
-        {
-          name: "SalesUnits",
-          range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
-        },
-      ],
+      namedRanges: [SALES_UNITS],
       sheets: [
         {
           ...sheet,
@@ -222,7 +221,8 @@ describe("reference colours", () => {
 
     const mirrored = [...document.querySelectorAll<HTMLElement>(".sheetwrite-formula-mirror span")];
     const a1b2 = mirrored.find((span) => span.textContent === "A1:B2");
-    expect(first?.color?.startsWith(a1b2?.style.color ?? "missing")).toBe(true);
+    expect(a1b2?.style.color).toBeTruthy();
+    expect(first?.color?.startsWith(a1b2!.style.color)).toBe(true);
 
     editor.commit("down");
     expect(state.committed).toBe("=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
@@ -269,15 +269,7 @@ describe("result preview", () => {
 
 describe("fixes for live errors", () => {
   it("offers the fix under the error and applies it with Tab or a click", async () => {
-    const named = new SheetwriteStore({
-      ...makeWorkbook(2),
-      namedRanges: [
-        {
-          name: "SalesUnits",
-          range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
-        },
-      ],
-    });
+    const named = new SheetwriteStore({ ...makeWorkbook(2), namedRanges: [SALES_UNITS] });
     const { textarea } = beginEdit(named);
     const fix = () => document.querySelector<HTMLButtonElement>(".sheetwrite-formula-fix");
     await typeUntilListed(textarea, "=SU", "SUM");

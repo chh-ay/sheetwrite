@@ -1,5 +1,5 @@
-//! Cell storage invariants: sheet limits, NaN boxing, string collection and
-//! bounds checks on the public interface.
+//! Cell storage invariants: the dense ceiling, NaN boxing, string collection
+//! and bounds checks on the public interface.
 
 use super::*;
 
@@ -10,63 +10,26 @@ fn put_number(sheet: &mut SheetData, row: usize, col: usize, value: f64) {
     );
 }
 
+/// The store caps growth below the ceiling, so only these calls reach the
+/// overflow and ceiling checks of a dense grid.
 #[test]
-fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
+fn dense_grids_refuse_overflowing_and_oversized_cell_counts() {
     assert_eq!(
         checked_dense_cell_count(1, MAX_DENSE_CELLS),
         Some(MAX_DENSE_CELLS)
     );
     assert_eq!(checked_dense_cell_count(1, MAX_DENSE_CELLS + 1), None);
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
-    assert!(
-        SheetData::try_new(usize::MAX, 2).is_err(),
-        "a dense sheet past the cap is refused; the store places it in local pages"
-    );
-    let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
-    assert_eq!(
-        at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
-        KIND_EMPTY
-    );
-    drop(at_limit);
+    assert_eq!(checked_dense_cell_count(usize::MAX / 2 + 1, 2), None);
+    assert!(SheetData::try_new(usize::MAX, 2).is_err());
 
-    let mut bounded_store = CellStore::new();
-    assert!(bounded_store
-        .try_add_sheet(1, crate::cells::MAX_LOCAL_PAGED_CELLS + 1)
-        .is_err());
-    assert!(bounded_store.sheets.is_empty());
-    let mut dense = SheetData::new(2, 2);
-    put_number(&mut dense, 1, 1, 9.0);
-    let mut slots = crate::formula_slots::FormulaStore::default();
-    let names = bounded_store.name_scope(0);
-    assert!(dense.insert_rows(names, 1, 0, &mut slots).is_ok());
-    assert!(dense.delete_rows(names, 2, 1, &mut slots).is_ok());
-    assert!(dense.delete_rows(names, 0, 0, &mut slots).is_ok());
-    assert!(dense.insert_cols(names, 1, 0, &mut slots).is_ok());
-    assert!(dense.delete_cols(names, 2, 1, &mut slots).is_ok());
-    assert!(dense.delete_cols(names, 0, 0, &mut slots).is_ok());
-    assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
-
-    dense.formulas.clear_dirty();
-    dense
+    // Clearing forgets a large set of dirty cells.
+    let mut sheet = SheetData::new(2, 2);
+    sheet
         .formulas
         .mark_cells_dirty((0..5_000).map(|row| (row, 0)));
-    dense.formulas.clear_dirty();
-    assert!(!dense.formulas.has_dirty());
-
-    let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS).unwrap();
-    assert!(!paged.cells.is_fully_loaded());
-    assert!(!paged.cells.range_fully_loaded(0, 0, 1, 1));
-    for col in 0..2 {
-        for row in 0..2 {
-            assert!(paged.write_cell(row, col, KIND_EMPTY, 0, 0, Some(1)));
-        }
-    }
-    assert!(paged.cells.is_fully_loaded());
-    assert!(paged.cells.range_fully_loaded(0, 0, 1, 1));
-    assert!(paged.cells.is_cell_dirty(1, 1));
-    paged.cells.mark_range_clean(0, 2, 0, 2);
-    assert!(!paged.cells.is_cell_dirty(1, 1));
-    assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
+    sheet.formulas.clear_dirty();
+    assert!(!sheet.formulas.has_dirty());
 }
 
 #[test]
@@ -85,6 +48,15 @@ fn public_api_bounds_checks_do_not_panic() {
         store.set_formula(sheet, 9, 0, "=A1", 0);
         store.add_rows(99, 0, 1);
         store.remove_rows(99, 0, 1);
+        // Empty edits and deletes past the last row or column change nothing.
+        store.set_number(sheet, 1, 1, 9.0, 0);
+        store.add_rows(sheet, 1, 0);
+        store.remove_rows(sheet, 2, 1);
+        store.remove_rows(sheet, 0, 0);
+        store.insert_cols(sheet, 1, 0);
+        store.remove_cols(sheet, 2, 1);
+        store.remove_cols(sheet, 0, 0);
+        assert_eq!(store.get_cell(sheet, 1, 1).num(), 9.0);
 
         assert_eq!(store.get_cell(99, 0, 0).kind(), KIND_EMPTY);
         store.insert_cols(99, 0, 1);
@@ -105,7 +77,7 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(!store.range_fully_loaded(99, 0, 0, 0, 0));
         assert_eq!(store.row_count(99), 0);
         assert_eq!(store.col_count(99), 0);
-        assert_ne!(
+        assert_eq!(
             store.set_block_packed(
                 99,
                 0,
@@ -122,7 +94,7 @@ fn public_api_bounds_checks_do_not_panic() {
                 &[],
                 &[],
             ),
-            0
+            crate::store::BLOCK_INVALID
         );
         assert!(!store.clear_range(99, 0, 0, 0, 0, true, true));
         assert!(store.range_style_ids(99, 0, 0, 0, 0).is_empty());

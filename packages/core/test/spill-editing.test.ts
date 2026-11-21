@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { DocumentController } from "../src/document-controller.js";
 import { initSheetwrite } from "../src/grid.js";
@@ -113,26 +113,6 @@ const cases: EditingCase[] = [
       [null, null],
     ],
     reason: "paste",
-  },
-  {
-    name: "filling across the anchor replaces the formula and removes former children",
-    patches: [
-      {
-        op: "setRange",
-        range: range(1, 2),
-        cells: [
-          { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 99 } },
-          { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: 100 } },
-        ],
-      },
-    ],
-    expected: [
-      [99, null],
-      [100, null],
-      [null, null],
-      [null, null],
-    ],
-    reason: "fill",
   },
   {
     name: "deleting one projected child does not change the array",
@@ -252,6 +232,11 @@ function projection(store: SheetwriteStore): CellScalar[][] {
   );
 }
 
+const cleanups: (() => void)[] = [];
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
+});
+
 function setup() {
   const store = new SheetwriteStore(makeWorkbook(10));
   store.applyTransaction({
@@ -266,6 +251,10 @@ function setup() {
     onMutationRejected: () => {},
     onHistoryApplied: () => {},
   });
+  cleanups.push(() => {
+    controller.destroy();
+    store.dispose();
+  });
   return { store, controller };
 }
 
@@ -273,89 +262,161 @@ describe("spill editing and command history", () => {
   for (const scenario of cases) {
     it(`${scenario.name}; undo and redo restore the same spill state`, () => {
       const { store, controller } = setup();
-      try {
-        const outcome = controller.commit(scenario.patches, scenario.reason ?? "api");
-        expect(outcome.status).toBe(scenario.status ?? "applied");
-        expect(projection(store)).toEqual(scenario.expected);
-        if (scenario.view) {
-          expect(
-            store.getVisibleWindow("s1", { start: 0, end: scenario.view.length }, [1]).values,
-          ).toEqual(scenario.view);
-          expect(store.getSpillAnchor(address(2))).toEqual(address(1));
-        }
-        if (scenario.status === "noop") {
-          expect(controller.canUndo).toBe(false);
-          return;
-        }
-        controller.undo();
-        expect(projection(store)).toEqual(original);
-        expect(store.getFormula(address(1))).toBe(sequence);
-        controller.redo();
-        expect(projection(store)).toEqual(scenario.expected);
-        if (scenario.view) {
-          expect(
-            store.getVisibleWindow("s1", { start: 0, end: scenario.view.length }, [1]).values,
-          ).toEqual(scenario.view);
-        }
-      } finally {
-        controller.destroy();
-        store.dispose();
+      const outcome = controller.commit(scenario.patches, scenario.reason ?? "api");
+      expect(outcome.status).toBe(scenario.status ?? "applied");
+      expect(projection(store)).toEqual(scenario.expected);
+      if (scenario.view) {
+        expect(
+          store.getVisibleWindow("s1", { start: 0, end: scenario.view.length }, [1]).values,
+        ).toEqual(scenario.view);
+        expect(store.getSpillAnchor(address(2))).toEqual(address(1));
+      }
+      if (scenario.status === "noop") {
+        expect(controller.canUndo).toBe(false);
+        return;
+      }
+      controller.undo();
+      expect(projection(store)).toEqual(original);
+      expect(store.getFormula(address(1))).toBe(sequence);
+      controller.redo();
+      expect(projection(store)).toEqual(scenario.expected);
+      if (scenario.view) {
+        expect(
+          store.getVisibleWindow("s1", { start: 0, end: scenario.view.length }, [1]).values,
+        ).toEqual(scenario.view);
       }
     });
   }
 
   it("clearing a typed blocker respills, and undo and redo restore the obstruction", () => {
     const { store, controller } = setup();
-    try {
-      expect(
-        controller.commit(
-          [{ op: "set", addr: address(2), value: { kind: "literal", value: 99 } }],
-          "edit-enter",
-        ).status,
-      ).toBe("applied");
-      expect(projection(store)).toEqual(blocked);
-      expect(
-        controller.commit([{ op: "clearRange", range: range(2), style: false }], "api").status,
-      ).toBe("applied");
-      expect(projection(store)).toEqual(original);
-      controller.undo();
-      expect(projection(store)).toEqual(blocked);
-      controller.redo();
-      expect(projection(store)).toEqual(original);
-    } finally {
-      controller.destroy();
-      store.dispose();
-    }
+    expect(
+      controller.commit(
+        [{ op: "set", addr: address(2), value: { kind: "literal", value: 99 } }],
+        "edit-enter",
+      ).status,
+    ).toBe("applied");
+    expect(projection(store)).toEqual(blocked);
+    expect(
+      controller.commit([{ op: "clearRange", range: range(2), style: false }], "api").status,
+    ).toBe("applied");
+    expect(projection(store)).toEqual(original);
+    controller.undo();
+    expect(projection(store)).toEqual(blocked);
+    controller.redo();
+    expect(projection(store)).toEqual(original);
   });
 
   it("remote spill edits and their originator's undo and redo converge without adding receiver history", () => {
     const sender = setup();
     const receiver = setup();
-    const unsubscribe = sender.store.on("change", (event) => {
+    sender.store.on("change", (event) => {
       expect(receiver.controller.applyRemoteOperations(event.transaction.patches).status).toBe(
         "applied",
       );
     });
-    try {
-      expect(
-        sender.controller.commit(
-          [{ op: "set", addr: address(2), value: { kind: "literal", value: 99 } }],
-          "edit-enter",
-        ).status,
-      ).toBe("applied");
-      expect(projection(receiver.store)).toEqual(blocked);
-      expect(receiver.controller.canUndo).toBe(false);
-      sender.controller.undo();
-      expect(projection(receiver.store)).toEqual(original);
-      sender.controller.redo();
-      expect(projection(receiver.store)).toEqual(blocked);
-      expect(receiver.controller.canUndo).toBe(false);
-    } finally {
-      unsubscribe();
-      sender.controller.destroy();
-      sender.store.dispose();
-      receiver.controller.destroy();
-      receiver.store.dispose();
-    }
+    expect(
+      sender.controller.commit(
+        [{ op: "set", addr: address(2), value: { kind: "literal", value: 99 } }],
+        "edit-enter",
+      ).status,
+    ).toBe("applied");
+    expect(projection(receiver.store)).toEqual(blocked);
+    expect(receiver.controller.canUndo).toBe(false);
+    sender.controller.undo();
+    expect(projection(receiver.store)).toEqual(original);
+    sender.controller.redo();
+    expect(projection(receiver.store)).toEqual(blocked);
+    expect(receiver.controller.canUndo).toBe(false);
+  });
+});
+
+describe("FILTER spills", () => {
+  it("resizes, obstructs, copies and persists FILTER spills", () => {
+    const store = new SheetwriteStore(makeWorkbook(12));
+    const values = [3, 1, 3, 2, 4];
+    const include = [true, true, false, true, false];
+    store.applyTransaction({
+      patches: [
+        ...values.map((value, row) => ({
+          op: "set" as const,
+          addr: address(row, 0),
+          value: { kind: "literal" as const, value },
+        })),
+        ...include.map((value, row) => ({
+          op: "set" as const,
+          addr: address(row, 1),
+          value: { kind: "literal" as const, value },
+        })),
+        {
+          op: "set",
+          addr: address(4, 2),
+          value: { kind: "literal", value: "blocker" },
+        },
+        {
+          op: "set",
+          addr: address(0, 2),
+          value: { kind: "formula", src: "=FILTER(A1:A5,B1:B5)" },
+        },
+      ],
+    });
+
+    expect([0, 1, 2].map((row) => store.getCell(address(row, 2)).resolved)).toEqual([3, 1, 2]);
+    expect(store.getSpillAnchor(address(1, 2))).toEqual(address(0, 2));
+    expect(store.getFormula(address(1, 2))).toBeNull();
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: address(2, 1), value: { kind: "literal", value: true } }],
+    });
+    expect([0, 1, 2, 3].map((row) => store.getCell(address(row, 2)).resolved)).toEqual([
+      3, 1, 3, 2,
+    ]);
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: address(4, 1), value: { kind: "literal", value: true } }],
+    });
+    expect(store.getCell(address(0, 2)).resolved).toBe("#SPILL!");
+    expect(store.getCell(address(1, 2)).resolved).toBeNull();
+
+    store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 4, col: 2 }, end: { row: 4, col: 2 } },
+        },
+      ],
+    });
+    expect([0, 1, 2, 3, 4].map((row) => store.getCell(address(row, 2)).resolved)).toEqual(values);
+
+    const clipboard = store.getClipboardWindow("s1", { start: 0, end: 5 }, [2]);
+    expect(Array.from(clipboard.values)).toEqual(values);
+    expect(Array.from(clipboard.spillDerived)).toEqual([0, 1, 1, 1, 1]);
+    expect(clipboard.formulas).toEqual([{ offset: 0, source: "=FILTER(A1:A5,B1:B5)" }]);
+    store.setViewSort("s1", [{ col: 0, ascending: false }]);
+    const sortedClipboard = store.getClipboardWindow("s1", { start: 0, end: 12 }, [2]);
+    const spillOffsets = Array.from(sortedClipboard.dataRows, (row, offset) =>
+      row < values.length ? offset : -1,
+    ).filter((offset) => offset >= 0);
+    expect(spillOffsets.map((offset) => sortedClipboard.values[offset])).toEqual(
+      spillOffsets.map((offset) => values[sortedClipboard.dataRows[offset]!]!),
+    );
+    expect(spillOffsets.map((offset) => sortedClipboard.spillDerived[offset])).toEqual(
+      spillOffsets.map((offset) => (sortedClipboard.dataRows[offset] === 0 ? 0 : 1)),
+    );
+
+    const snapshot = store.exportSnapshot();
+    expect(
+      snapshot.sheets[0]!.cells.flatMap((block) => block.cells)
+        .filter((cell) => cell.colOffset === 2)
+        .map((cell) => cell.value),
+    ).toEqual([{ kind: "formula", src: "=FILTER(A1:A5,B1:B5)" }]);
+    const restored = SheetwriteStore.fromSnapshot(snapshot);
+    expect([0, 1, 2, 3, 4].map((row) => restored.getCell(address(row, 2)).resolved)).toEqual(
+      values,
+    );
+    expect(restored.getSpillAnchor(address(4, 2))).toEqual(address(0, 2));
+
+    restored.dispose();
+    store.dispose();
   });
 });

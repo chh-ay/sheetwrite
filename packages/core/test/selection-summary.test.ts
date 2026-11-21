@@ -24,8 +24,9 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-// Column A mixes numbers, text and a blank; column B is all numbers.
-function setup() {
+// Column A mixes numbers, text and a blank; column B is all numbers, in
+// `numberFormat` when given.
+function setup(numberFormat?: string) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -35,7 +36,13 @@ function setup() {
         rowCount: 4,
         columns: [
           { key: "a", header: "A", type: "text", width: 100 },
-          { key: "b", header: "B", type: "number", width: 100 },
+          {
+            key: "b",
+            header: "B",
+            type: "number",
+            width: 100,
+            ...(numberFormat === undefined ? {} : { numberFormat }),
+          },
         ],
       },
     ],
@@ -79,6 +86,28 @@ it("shows Excel's Average, Count and Sum in the shell status line", async () => 
   expect(status()).toContain("Sum: 22");
   // The status line shows numbers in Excel's General display, as Excel's does.
   expect(status()).toContain("Average: 3.666666667");
+});
+
+// Excel shows Sum and Average in the number format of the active cell, and
+// Count as a plain count.
+// https://learn.microsoft.com/en-us/answers/questions/5176712/set-display-format-of-sum-of-selected-cells-excel
+it("shows Sum and Average in the active cell's number format", async () => {
+  const { grid, status } = setup("$#,##0.00");
+  // A1:B4 with the active cell B1, in the currency column.
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 0 } },
+  });
+  await grid.summarizeSelection();
+  expect(status()).toContain("Average: $3.67 · Count: 7 · Sum: $22.00");
+
+  // With the active cell A1, in General, the same totals show in General.
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+  });
+  await grid.summarizeSelection();
+  expect(status()).toContain("Average: 3.666666667 · Count: 7 · Sum: 22");
 });
 
 it("names a selected row by its sheet row under a filter", () => {

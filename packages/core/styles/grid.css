@@ -83,7 +83,9 @@
   font: var(--sheetwrite-font);
   color: var(--sheetwrite-fg);
   background: var(--sheetwrite-bg);
-  padding: 0 4px;
+  /* The text sits as far from the gridlines as the cell paints it: the
+     cell padding, which scales with the zoom, less this border. */
+  padding: 0 calc(var(--sheetwrite-cell-pad, 6px) - 2px);
   box-sizing: border-box;
   z-index: 3;
   overflow: auto;
@@ -110,6 +112,15 @@
   background: var(--sheetwrite-bg);
   font: var(--sheetwrite-font);
   outline: none;
+}
+
+/* A list opened without typing keeps its focused box out of sight, so the
+   cell keeps showing its value; the first typed text shows the box. */
+.sheetwrite-validation-input-idle {
+  height: 0;
+  padding: 0;
+  border-width: 0;
+  opacity: 0;
 }
 
 .sheetwrite-validation-list {

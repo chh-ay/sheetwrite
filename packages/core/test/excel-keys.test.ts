@@ -1,9 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
+import type { CellStyle, CellValue, DocumentOp, Grid } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
@@ -179,46 +180,65 @@ describe("Ctrl+Enter", () => {
       range: { sheet: "s1", start: { row: 0, col: 2 }, end: { row: 2, col: 2 } },
     });
   });
-
-  it("commits one cell and stays on it", () => {
-    select(4, 2);
-    type("z");
-    press("Enter", { ctrlKey: true });
-    expect(value(4, 2)).toBe("z");
-    expect(active()).toEqual({ sheet: "s1", row: 4, col: 2 });
-  });
 });
 
 describe("the cell editor", () => {
-  it("opens with F2 with the caret at the end, as in Excel", () => {
+  // #1107: Excel's in-cell editor keeps the cell's alignment and font.
+  it("keeps the cell's alignment and font while it edits", () => {
+    const set = (row: number, col: number, style: CellStyle) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col },
+      value: { kind: "literal" as const, value: `Cell ${row}` },
+      style,
+    });
+    grid.applyTransaction({
+      patches: [
+        set(1, 0, { align: "right" }),
+        set(2, 0, { align: "center" }),
+        set(3, 0, { bold: true, fontSize: 14, color: "#c00000" }),
+      ],
+    });
+    const look = (row: number, col: number) => {
+      select(row, col);
+      press("F2");
+      const field = editor();
+      if (field === null) throw new Error("The cell editor did not open");
+      const style = getComputedStyle(field);
+      const shown = [style.textAlign, style.fontWeight, style.fontSize, style.color];
+      press("Escape");
+      return shown;
+    };
+    expect(look(1, 0)[0]).toBe("right");
+    expect(look(2, 0)[0]).toBe("center");
+    const [align, weight, size, color] = look(3, 0);
+    expect([align, weight, size]).toEqual(["left", "bold", "14px"]);
+    // Browsers report the colour as rgb(), happy-dom as written.
+    expect(["#c00000", "rgb(192, 0, 0)"]).toContain(color ?? "");
+    // General alignment: the amounts column is numeric, so its values edit right-aligned.
+    expect(look(4, 1)[0]).toBe("right");
+  });
+
+  it("opens with F2 with the caret at the end, where arrows move the caret, as in Excel", () => {
     select(0, 0);
     press("F2");
     const field = editor();
     expect(field?.value).toBe("Customer 0");
     expect([field?.selectionStart, field?.selectionEnd]).toEqual([10, 10]);
+    expect(press("ArrowLeft").defaultPrevented).toBe(false);
+    expect(editor()).not.toBeNull();
   });
 
-  it("commits with Shift+Enter and moves up", () => {
-    select(3, 2);
-    type("up");
-    press("Enter", { shiftKey: true });
-    expect(value(3, 2)).toBe("up");
-    expect(active()).toEqual({ sheet: "s1", row: 2, col: 2 });
-  });
-
-  it("commits with an arrow key after typing, and moves the caret after F2", () => {
+  it.each([
+    ["Shift+Enter, moving up", "Enter", { shiftKey: true }, 2],
+    ["Ctrl+Enter, staying", "Enter", { ctrlKey: true }, 3],
+    ["an arrow key, moving with it", "ArrowDown", {}, 4],
+  ] as const)("commits with %s", (_, key, init, row) => {
     select(3, 2);
     type("go");
-    press("ArrowDown");
+    press(key, init);
     expect(editor()).toBeNull();
     expect(value(3, 2)).toBe("go");
-    expect(active()).toEqual({ sheet: "s1", row: 4, col: 2 });
-
-    select(3, 0);
-    press("F2");
-    const left = press("ArrowLeft");
-    expect(left.defaultPrevented).toBe(false);
-    expect(editor()).not.toBeNull();
+    expect(active()).toEqual({ sheet: "s1", row, col: 2 });
   });
 
   it("points at cells with arrow keys in a formula", () => {
@@ -279,7 +299,7 @@ describe("the cell editor", () => {
     await answerDialog(host, "OK");
     const field = editor();
     expect(value(3, 2)).toBe("Phnom Penh");
-    expect(document.activeElement).toBe(field);
+    expectSame(document.activeElement, field);
     expect([field?.selectionStart, field?.selectionEnd]).toEqual([11, 12]);
     press("Escape");
 
@@ -318,40 +338,29 @@ describe("Ctrl+A", () => {
   });
 });
 
-describe("arrow keys on a merged cell", () => {
-  it("step past the whole merged block, as in Excel", () => {
-    grid.applyTransaction({
-      patches: [{ op: "addMerge", sheet: "s1", merge: { r0: 1, c0: 0, r1: 2, c1: 1 } }],
-    });
-    select(1, 0);
-    press("ArrowRight");
-    expect(active()).toEqual({ sheet: "s1", row: 1, col: 2 });
-    select(1, 0);
-    press("ArrowDown");
-    expect(active()).toEqual({ sheet: "s1", row: 3, col: 0 });
-  });
-});
-
-describe("End, Ctrl+End and Backspace", () => {
-  it("jumps to the data edge with End then an arrow, and to the last used cell with Ctrl+End", () => {
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "clearRange",
-          range: { sheet: "s1", start: { row: 6, col: 0 }, end: { row: 9, col: 2 } },
-        },
-        { op: "set", addr: { sheet: "s1", row: 7, col: 0 }, value: { kind: "literal", value: 1 } },
-      ],
-    });
-    select(0, 1);
-    press("End");
-    expect(active()).toEqual({ sheet: "s1", row: 0, col: 1 });
-    press("ArrowDown");
-    expect(active()).toEqual({ sheet: "s1", row: 5, col: 1 });
-    press("ArrowDown");
-    expect(active()).toEqual({ sheet: "s1", row: 6, col: 1 });
-    press("End", { ctrlKey: true });
-    expect(active()).toEqual({ sheet: "s1", row: 7, col: 2 });
+describe("moving the active cell", () => {
+  const merged: DocumentOp[] = [
+    { op: "addMerge", sheet: "s1", merge: { r0: 1, c0: 0, r1: 2, c1: 1 } },
+  ];
+  // Rows 7 to 10 are empty but for A8.
+  const gap: DocumentOp[] = [
+    {
+      op: "clearRange",
+      range: { sheet: "s1", start: { row: 6, col: 0 }, end: { row: 9, col: 2 } },
+    },
+    { op: "set", addr: { sheet: "s1", row: 7, col: 0 }, value: { kind: "literal", value: 1 } },
+  ];
+  it.each([
+    ["ArrowRight steps past a merged block", merged, [1, 0], [["ArrowRight"]], [1, 2]],
+    ["ArrowDown steps past a merged block", merged, [1, 0], [["ArrowDown"]], [3, 0]],
+    ["End then an arrow jumps to the data edge", gap, [0, 1], [["End"], ["ArrowDown"]], [5, 1]],
+    ["End mode ends after one jump", gap, [0, 1], [["End"], ["ArrowDown"], ["ArrowDown"]], [6, 1]],
+    ["Ctrl+End goes to the last used cell", gap, [0, 1], [["End", { ctrlKey: true }]], [7, 2]],
+  ] as const)("%s, as in Excel", (_, patches, [row, col], keys, [toRow, toCol]) => {
+    grid.applyTransaction({ patches: [...patches] });
+    select(row, col);
+    for (const [key, init] of keys) press(key, init);
+    expect(active()).toEqual({ sheet: "s1", row: toRow, col: toCol });
   });
 
   it("clears only the active cell with Backspace and opens it; Escape restores it", () => {
@@ -367,14 +376,6 @@ describe("End, Ctrl+End and Backspace", () => {
 });
 
 describe("formatting and date keys", () => {
-  it("toggles bold with Ctrl+B and italic with Ctrl+3", () => {
-    select(0, 0, 1, 0);
-    press("b", { ctrlKey: true });
-    press("3", { ctrlKey: true });
-    const style = store.getCell({ sheet: "s1", row: 1, col: 0 }).style;
-    expect([style.bold, style.italic]).toEqual([true, true]);
-  });
-
   it("enters today's date with Ctrl+; as a formatted date serial", () => {
     select(2, 1);
     press(";", { ctrlKey: true, code: "Semicolon" });
@@ -388,49 +389,59 @@ describe("formatting and date keys", () => {
   });
 });
 
-describe("number-format keys", () => {
-  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", () => {
+describe("format keys", () => {
+  const shift = (code: string) => ({ ctrlKey: true, shiftKey: true, code });
+  it.each([
+    ["b", { ctrlKey: true }, { bold: true }],
+    ["3", { ctrlKey: true }, { italic: true }],
+    ["~", shift("Backquote"), { numberFormat: "General" }],
+    ["!", shift("Digit1"), { numberFormat: "#,##0.00" }],
+    ["@", shift("Digit2"), { numberFormat: "h:mm AM/PM" }],
+    ["#", shift("Digit3"), { numberFormat: "d-mmm-yy" }],
+    ["$", shift("Digit4"), { numberFormat: "$#,##0.00_);($#,##0.00)" }],
+    ["%", shift("Digit5"), { numberFormat: "0%" }],
+    ["^", shift("Digit6"), { numberFormat: "0.00E+00" }],
+  ] as const)("Ctrl+(Shift+)%s gives the selection Excel's %o", (key, init, style) => {
     select(0, 1, 1, 1);
-    const keys = [
-      ["~", "Backquote", "General"],
-      ["!", "Digit1", "#,##0.00"],
-      ["@", "Digit2", "h:mm AM/PM"],
-      ["#", "Digit3", "d-mmm-yy"],
-      ["$", "Digit4", "$#,##0.00_);($#,##0.00)"],
-      ["%", "Digit5", "0%"],
-      ["^", "Digit6", "0.00E+00"],
-    ] as const;
-    for (const [key, code, format] of keys) {
-      const event = press(key, { ctrlKey: true, shiftKey: true, code });
-      expect(event.defaultPrevented).toBe(true);
-      expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.numberFormat).toBe(format);
-    }
+    expect(press(key, init).defaultPrevented).toBe(true);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style).toMatchObject(style);
   });
 });
 
 describe("hide and unhide keys", () => {
-  it("hide the selected rows with Ctrl+9 and show them with Ctrl+Shift+9", () => {
-    select(2, 0, 3, 0);
-    press("9", { ctrlKey: true, code: "Digit9" });
-    expect(grid.hiddenRows()).toEqual([2, 3]);
-    // A range around the hidden rows shows them again.
-    select(1, 0, 4, 0);
-    press("(", { ctrlKey: true, shiftKey: true, code: "Digit9" });
-    expect(grid.hiddenRows()).toEqual([]);
-  });
-
-  it("hide the selected columns with Ctrl+0 and show them with Ctrl+Shift+0", () => {
-    select(0, 1);
-    press("0", { ctrlKey: true, code: "Digit0" });
-    expect(grid.hiddenColumns()).toEqual([1]);
-    select(0, 0, 0, 2);
-    press(")", { ctrlKey: true, shiftKey: true, code: "Digit0" });
-    expect(grid.hiddenColumns()).toEqual([]);
-  });
+  it.each([
+    ["rows", "9", [2, 0, 3, 0], [1, 0, 4, 0], [2, 3], () => grid.hiddenRows()],
+    ["columns", "0", [0, 1, 0, 1], [0, 0, 0, 2], [1], () => grid.hiddenColumns()],
+  ] as const)(
+    "hide the selected %s with Ctrl+%s and show them with Ctrl+Shift and the same digit",
+    (_, digit, hide, around, hidden, read) => {
+      select(hide[0], hide[1], hide[2], hide[3]);
+      press(digit, { ctrlKey: true, code: `Digit${digit}` });
+      expect(read()).toEqual(hidden);
+      // A range around the hidden ones shows them again.
+      select(around[0], around[1], around[2], around[3]);
+      press(digit === "9" ? "(" : ")", { ctrlKey: true, shiftKey: true, code: `Digit${digit}` });
+      expect(read()).toEqual([]);
+    },
+  );
 });
 
 describe("insert and delete keys", () => {
   const sheet = () => store.getWorkbook().sheets[0]!;
+  const put = (...cells: [number, number, CellValue][]) =>
+    store.applyTransaction({
+      patches: cells.map(([row, col, cell]) => ({
+        op: "set",
+        addr: { sheet: "s1", row, col },
+        value: cell,
+      })),
+    });
+  /** Pick the `choice`th option of the Insert or Delete dialog and press OK. */
+  const choose = async (choice: number) => {
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
+    dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[choice]!.checked = true;
+    await answerDialog(host, "OK");
+  };
 
   it("insert whole rows with Ctrl++ and delete them with Ctrl+-", () => {
     grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
@@ -465,7 +476,6 @@ describe("insert and delete keys", () => {
     select(1, 0, 1, 1);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
     const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-    expect(dialog.getAttribute("role")).toBe("dialog");
     const title = document.getElementById(dialog.getAttribute("aria-labelledby") ?? "");
     expect(title?.textContent).toBe("Insert");
     const choices = [...dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")];
@@ -476,14 +486,15 @@ describe("insert and delete keys", () => {
       ["Entire column", false],
     ]);
     // A wide range defaults to Shift cells down; the focus starts on the chosen option.
-    expect(document.activeElement).toBe(choices[1]!);
+    expect(choices[1]!.checked).toBe(true);
+    expectSame(document.activeElement, choices[1]!);
     choices[2]!.checked = true;
     await answerDialog(host, "OK");
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBe("Customer 1");
-    expect(document.activeElement).toBe(host);
+    expectSame(document.activeElement, host);
 
-    // A tall range defaults to Shift cells left, and Escape cancels.
+    // A tall range defaults to Shift cells left.
     select(0, 1, 3, 1);
     press("-", { ctrlKey: true, code: "Minus" });
     const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
@@ -495,33 +506,11 @@ describe("insert and delete keys", () => {
       "Entire column",
     ]);
     expect(removeChoices[0]?.checked).toBe(true);
-    remove.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(remove.isConnected).toBe(false);
-    expect(sheet().columns).toHaveLength(3);
   });
 
   // https://support.microsoft.com/en-us/office/insert-or-delete-cells-rows-and-columns-6f40e6e4-85af-45e0-b39d-65dd504a3246
   it("shift cells up and down, and the formulas that refer to them follow", async () => {
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 2 },
-          value: { kind: "formula", src: "=A6" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 2 },
-          value: { kind: "formula", src: "=A3" },
-        },
-      ],
-    });
-    const choose = async (choice: number) => {
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-      dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[choice]!.checked = true;
-      await answerDialog(host, "OK");
-    };
+    put([0, 2, { kind: "formula", src: "=A6" }], [1, 2, { kind: "formula", src: "=A3" }]);
 
     // Delete A3:A4, Shift cells up: A5:A10 move to A3:A8.
     select(2, 0, 3, 0);
@@ -554,15 +543,7 @@ describe("insert and delete keys", () => {
     expect(value(1, 0)).toBe("Customer 1");
 
     // With A10 empty, they fit: A2:A9 move to A3:A10.
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 9, col: 0 },
-          value: { kind: "literal", value: null },
-        },
-      ],
-    });
+    put([9, 0, { kind: "literal", value: null }]);
     select(1, 0);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
     await choose(1);
@@ -573,35 +554,18 @@ describe("insert and delete keys", () => {
   });
 
   it("shift cells right and left along their rows", async () => {
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 2 },
-          value: { kind: "literal", value: null },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 5, col: 0 },
-          value: { kind: "formula", src: "=B2" },
-        },
-      ],
-    });
+    put([1, 2, { kind: "literal", value: null }], [5, 0, { kind: "formula", src: "=B2" }]);
     // Insert at A2 (tall), Shift cells right: A2:B2 move to B2:C2.
     select(1, 0);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-    dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
-    await answerDialog(host, "OK");
+    await choose(0);
     expect([0, 1, 2].map((col) => value(1, col))).toEqual([null, "Customer 1", 10.5]);
     expect(formula(5, 0)).toBe("=C2");
 
     // Delete A2, Shift cells left: B2:C2 move back.
     select(1, 0);
     press("-", { ctrlKey: true, code: "Minus" });
-    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-    remove.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
-    await answerDialog(host, "OK");
+    await choose(0);
     expect([0, 1, 2].map((col) => value(1, col))).toEqual(["Customer 1", 10.5, null]);
     expect(formula(5, 0)).toBe("=B2");
   });

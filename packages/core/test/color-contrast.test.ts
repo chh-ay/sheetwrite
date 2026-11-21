@@ -16,8 +16,7 @@ describe("parseRgbColor", () => {
 });
 
 describe("resolveCssColor", () => {
-  // A stand-in for a canvas context: it normalizes the names it knows and keeps
-  // its previous value for anything else, as a canvas does.
+  // A canvas context stand-in: it keeps its last value for a name it does not know.
   const NAMES: Record<string, string> = { white: "#ffffff", navy: "#000080" };
   const resolver = {
     value: "#000000",
@@ -42,20 +41,20 @@ describe("resolveCssColor", () => {
 });
 
 describe("automaticTextColor", () => {
-  it("keeps the foreground when it contrasts more and inverts it otherwise", () => {
-    expect(automaticTextColor("#ffffff", "#1f2328", "#ffffff")).toBe("#1f2328");
-    expect(automaticTextColor("#000000", "#1f2328", "#ffffff")).toBe("#e0dcd7");
-    expect(automaticTextColor("#e6f2ec", "#e6edf3", "#0d1117")).toBe("#19120c");
-    expect(automaticTextColor("#0b3d2e", "#e6edf3", "#0d1117")).toBe("#e6edf3");
-  });
-
-  it("judges a translucent fill as painted over the background", () => {
-    // 10% black over white is light; over a near-black page it is dark.
-    expect(automaticTextColor("rgba(0, 0, 0, 0.1)", "#e6edf3", "#ffffff")).toBe("#19120c");
-    expect(automaticTextColor("rgba(0, 0, 0, 0.1)", "#e6edf3", "#0d1117")).toBe("#e6edf3");
-  });
-
-  it("keeps the foreground for a fill it cannot read", () => {
-    expect(automaticTextColor("bogus", "#e6edf3", "#0d1117")).toBe("#e6edf3");
-  });
+  // The foreground or its inverse, whichever contrasts more with the fill
+  // painted over the background; a fill it cannot read keeps the foreground.
+  it.each([
+    ["#ffffff", "#1f2328", "#ffffff", "#1f2328"],
+    ["#000000", "#1f2328", "#ffffff", "#e0dcd7"],
+    ["#e6f2ec", "#e6edf3", "#0d1117", "#19120c"],
+    ["#0b3d2e", "#e6edf3", "#0d1117", "#e6edf3"],
+    ["rgba(0, 0, 0, 0.1)", "#e6edf3", "#ffffff", "#19120c"],
+    ["rgba(0, 0, 0, 0.1)", "#e6edf3", "#0d1117", "#e6edf3"],
+    ["bogus", "#e6edf3", "#0d1117", "#e6edf3"],
+  ])(
+    "paints %s with foreground %s on background %s in %s",
+    (fill, foreground, background, text) => {
+      expect(automaticTextColor(fill, foreground, background)).toBe(text);
+    },
+  );
 });

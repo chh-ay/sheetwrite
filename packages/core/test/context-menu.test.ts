@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { expectSame } from "../../../test/expect-same.js";
 import { ContextMenu } from "../src/context-menu.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -215,7 +216,7 @@ describe("ContextMenu", () => {
     key(document.activeElement, "Enter");
     expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(4);
     expect(openMenus(host)).toHaveLength(0);
-    expect(document.activeElement).toBe(before);
+    expectSame(document.activeElement, before);
   });
 
   it("closes on the user's scroll, not on the page's own", () => {

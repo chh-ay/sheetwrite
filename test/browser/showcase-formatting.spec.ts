@@ -1,7 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import type { Grid } from "../../packages/core/src/types.js";
-import { siteUrl } from "./playwright.config.js";
+import { expect, fitsViewport, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -14,12 +12,7 @@ const REVENUE = { sheet: "budget", row: 2, col: 1 };
 test("formatting controls change the live budget and XLSX preserves the edited styles", async ({
   page,
 }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto(siteUrl("/showcases/formatting/"));
+  await page.goto("/showcases/formatting/");
   await expect(page.getByTestId("formatting-status")).toContainText("Ready");
   await expect(page.locator(".sw-formatting-grid canvas")).toBeAttached();
 
@@ -66,8 +59,5 @@ test("formatting controls change the live budget and XLSX preserves the edited s
     ).not.toBe("rgba(0, 0, 0, 0)");
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-  expect(errors).toEqual([]);
+  expect(await fitsViewport(page)).toBe(true);
 });

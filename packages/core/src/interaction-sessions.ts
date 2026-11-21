@@ -1,4 +1,11 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
+import {
+  cellAlign,
+  cellPadding,
+  filterButtonHitRect,
+  filterTextRight,
+  fontFor,
+} from "./canvas-paint.js";
 import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellEntry } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
@@ -7,12 +14,18 @@ import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
 import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
-import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
+import {
+  type EditCompletion,
+  EditController,
+  type EditNavigate,
+  type EditorLook,
+  type EditRect,
+} from "./editor.js";
 import { type AutoFillChoice, FillController, type FillTip } from "./fill-controller.js";
 import { focusOutside } from "./focus-exit.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
-import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
+import { listButtonRect } from "./overlay-painter.js";
 import type { PickList } from "./pick-list.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
@@ -392,7 +405,7 @@ export class InteractionSessions {
     if (editor instanceof CustomEditorController) {
       editor.position({ x: rect.x, y: rect.y, width: rect.w, height: rect.h });
     } else {
-      editor?.position(rect);
+      editor?.position(editor === this.editor ? this.textBox(row, address.col, rect) : rect);
     }
   }
 
@@ -513,6 +526,16 @@ export class InteractionSessions {
   ): CellEditorRect {
     const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+  }
+
+  /**
+   * Where the cell editor sits: the cell, or in an AutoFilter header cell
+   * its text box, which ends a gap before the filter button, as in Excel.
+   */
+  private textBox(row: number, col: number, rect: EditRect): EditRect {
+    return this.isAutoFilterHeader(row, col)
+      ? { ...rect, w: filterTextRight(rect, this.deps.zoom()) - rect.x }
+      : rect;
   }
 
   /**
@@ -909,14 +932,20 @@ export class InteractionSessions {
       // F2 and double-click put the caret at the end, as in Excel.
       selectAll: focus && selectAll,
       entering: initial !== undefined,
-      rect: this.deps.screenRect(
+      rect: this.textBox(
         editCell.row,
         editCell.col,
-        contentTop,
-        this.deps.scroller.scrollLeft,
+        this.deps.screenRect(editCell.row, editCell.col, contentTop, this.deps.scroller.scrollLeft),
       ),
       label: this.editorLabel(editCell.row, editCell.col),
       theme: this.deps.theme(),
+      look: this.editorLook(
+        column,
+        this.deps.store.getCell(dataAddr).style,
+        // A formula edits left-aligned under General alignment, as in Excel;
+        // a typed entry is not a value yet, so only a column type aligns it.
+        initial !== undefined || formula !== null ? null : current,
+      ),
       focus,
       onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
       onCancel: () => this.endEditor(),
@@ -929,6 +958,26 @@ export class InteractionSessions {
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
     this.deps.editDraft.text(this.editor.value);
+  }
+
+  /**
+   * How the cell editor shows the cell, as Excel's in-cell editor does: the
+   * cell's font, colour and alignment over its column's. Under General
+   * alignment the text being edited aligns by Excel's rule for it: `shown`
+   * is the value the editor opened on, or null for a typed entry or a
+   * formula, which edit left-aligned unless the column type is numeric.
+   */
+  private editorLook(column: Column, own: CellStyle, shown: CellScalar): EditorLook {
+    const style = column.cellStyle === undefined ? own : { ...column.cellStyle, ...own };
+    const theme = this.deps.theme();
+    const lines = [style.underline ? "underline" : "", style.strikethrough ? "line-through" : ""];
+    return {
+      align: cellAlign(style, shown, column.type),
+      font: fontFor(theme, style, this.deps.zoom()),
+      color: style.color ?? theme.fg,
+      decoration: lines.filter(Boolean).join(" ") || "none",
+      pad: cellPadding(this.deps.zoom()),
+    };
   }
 
   /** Excel's message for a formula that does not parse, with what is wrong with it. */
@@ -1285,21 +1334,18 @@ export class InteractionSessions {
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
     if (this.isAutoFilterHeader(cell.row, cell.col)) {
-      const button = filterButtonRect(
+      // The area is at least 24 px wide, for touch, and may cover the inset.
+      const hit = filterButtonHitRect(
         this.deps.screenRect(
           cell.row,
           cell.col,
           this.deps.contentTop(),
           this.deps.scroller.scrollLeft,
         ),
+        this.deps.zoom(),
       );
       const x = e.clientX - viewportRect.left;
-      if (
-        x >= button.x &&
-        x <= button.x + button.w &&
-        py >= button.y &&
-        py <= button.y + button.h
-      ) {
+      if (x >= hit.x && x <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
         e.preventDefault();
         const selection = this.deps.selection();
         selection.selectCell(cell.row, cell.col);
@@ -2161,6 +2207,7 @@ export class InteractionSessions {
         this.deps.contentTop(),
         this.deps.scroller.scrollLeft,
       ),
+      this.deps.zoom(),
     );
     const inside =
       x >= button.x && x <= button.x + button.w && y >= button.y && y <= button.y + button.h;
