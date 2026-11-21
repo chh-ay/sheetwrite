@@ -1,0 +1,80 @@
+PASS [spreadsheet-chromium-1440] open ready in 876 ms 
+PASS [spreadsheet-chromium-1440] add sheet tabs 3 -> 4 
+PASS [spreadsheet-chromium-1440] type values A1 '1234.5' -> {"resolved":1234.5,"value":null,"fmt":null}; A2 '3/15/2026' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A3 '12%' -> {"resolved":0.12,"value":null,"fmt":"0%"}; A4 '$1,234.50' -> {"resolved":1234.5,"value":null,"fmt":"$#,##0.00"}; A5 '00123' -> {"resolved":123,"value":null,"fmt":null}; A6 'hello world' -> {"resolved":"hello world","value":null,"fmt":null}; A7 '2026-03-15' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A8 '-7.25' -> {"resolved":-7.25,"value":null,"fmt":null}; A9 '1e3' -> {"resolved":1000,"value":null,"fmt":"0.00E+00"} 
+PASS [spreadsheet-chromium-1440] formula with sum {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-1440] autocomplete tab accept options: AVERAGE,AVERAGEA,AVERAGEIF,AVERAGEIFS; after Tab editor='=AVERAGE('; {"resolved":613.625,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-1440] fill handle drag C1:C8=[1,2,3,4,5,6,7,null] 
+PASS [spreadsheet-chromium-1440] copy paste [{"resolved":1234.5,"value":null,"fmt":null},{"resolved":46096,"value":null,"fmt":"m/d/yyyy"},{"resolved":0.12,"value":null,"fmt":"0%"}] 
+PASS [spreadsheet-chromium-1440] cut paste moves {"C1":{"resolved":null,"value":null,"fmt":null},"E1":{"resolved":1,"value":null,"fmt":null},"E2":{"resolved":2,"value":null,"fmt":null}} 
+PASS [spreadsheet-chromium-1440] paste special values {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-1440] find and replace {"resolved":"bye world","value":null,"fmt":null}; find bar open after Esc=false 
+PASS [spreadsheet-chromium-1440] undo redo undo=hello world redo=bye world 
+PASS [spreadsheet-chromium-1440] format cells dialog tabs=Number,Alignment,Font,Border,Fill; dialog 495,252 440x396 in 1440x900; {"resolved":1234.5,"value":null,"fmt":"0.00%"} 
+PASS [spreadsheet-chromium-1440] insert and delete row after insert A2=null A3=46096; after delete A2=46096 
+PASS [spreadsheet-chromium-1440] data validation rejects alert=true; G1={"resolved":null,"value":null,"fmt":null} G2={"resolved":7,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-1440] sheet tabs keyboard Sheet4 sheet -> PgDn Summary sheet -> PgUp Sheet4 sheet; clicked: Sales sheet 
+PASS [spreadsheet-chromium-1440] rename sheet by double-click tabs=Sales,Scratch,Summary,Targets 
+PASS [spreadsheet-chromium-1440] autofilter on Region values=(Select All),East 12,North 12,South 12,West 12; status=Ready36 of 48 records found; row heights 2..12=28,28,28,28,28,28,28,28,28,28,28 
+PASS [spreadsheet-chromium-1440] sort descending from filter stored first rows=North:2 South:24 West:23 East:23 North:7 West:22 East:21 South:21 North:12 West:20 
+PASS [spreadsheet-chromium-1440] ribbon at narrow and More tabs more visible=false; visible ribbon tabs=Home,Insert,Formulas,Data,View 
+PASS [spreadsheet-chromium-1440] keyboard shortcuts panel available Keyboard Shortcuts buttons on page=0 
+PASS [spreadsheet-chromium-390] open ready in 865 ms 
+PASS [spreadsheet-chromium-390] add sheet tabs 3 -> 4 
+PASS [spreadsheet-chromium-390] type values A1 '1234.5' -> {"resolved":1234.5,"value":null,"fmt":null}; A2 '3/15/2026' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A3 '12%' -> {"resolved":0.12,"value":null,"fmt":"0%"}; A4 '$1,234.50' -> {"resolved":1234.5,"value":null,"fmt":"$#,##0.00"}; A5 '00123' -> {"resolved":123,"value":null,"fmt":null}; A6 'hello world' -> {"resolved":"hello world","value":null,"fmt":null}; A7 '2026-03-15' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A8 '-7.25' -> {"resolved":-7.25,"value":null,"fmt":null}; A9 '1e3' -> {"resolved":1000,"value":null,"fmt":"0.00E+00"} 
+PASS [spreadsheet-chromium-390] formula with sum {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-390] autocomplete tab accept options: AVERAGE,AVERAGEA,AVERAGEIF,AVERAGEIFS; after Tab editor='=AVERAGE('; {"resolved":613.625,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-390] fill handle drag C1:C8=[1,2,3,4,5,6,7,null] 
+PASS [spreadsheet-chromium-390] copy paste [{"resolved":1234.5,"value":null,"fmt":null},{"resolved":46096,"value":null,"fmt":"m/d/yyyy"},{"resolved":0.12,"value":null,"fmt":"0%"}] 
+PASS [spreadsheet-chromium-390] cut paste moves {"C1":{"resolved":null,"value":null,"fmt":null},"E1":{"resolved":1,"value":null,"fmt":null},"E2":{"resolved":2,"value":null,"fmt":null}} 
+PASS [spreadsheet-chromium-390] paste special values {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-chromium-390] find and replace {"resolved":"bye world","value":null,"fmt":null}; find bar open after Esc=false 
+PASS [spreadsheet-chromium-390] undo redo undo=hello world redo=bye world 
+PASS [spreadsheet-chromium-390] format cells dialog tabs=Number,Alignment,Font,Border,Fill; dialog 16,224 358x396 in 390x844; {"resolved":1234.5,"value":null,"fmt":"0.00%"} 
+PASS [spreadsheet-chromium-390] insert and delete row after insert A2=null A3=46096; after delete A2=46096 
+FAIL [spreadsheet-chromium-390] data validation rejects Data via More tabs locator.click: Timeout 30000ms exceeded. | Call log: |   - waiting for getByRole('button', { name: 'Data Validation' }).first() | 
+FAIL [spreadsheet-chromium-390] sheet tabs keyboard Sheet4 sheet -> PgDn Sheet4 sheet -> PgUp Sheet4 sheet; clicked: Sales sheet keyboard sheet switching failed
+PASS [spreadsheet-chromium-390] rename sheet by double-click tabs=Sales,Scratch,Summary,Targets 
+PASS [spreadsheet-chromium-390] autofilter on Region values=(Select All),East 12,North 12,South 12,West 12; status=Ready36 of 48 records found; row heights 2..12=28,28,28,28,28,28,28,28,28,28,28 
+PASS [spreadsheet-chromium-390] sort descending from filter stored first rows=North:2 South:24 West:23 East:23 North:7 West:22 East:21 South:21 North:12 West:20 
+PASS [spreadsheet-chromium-390] ribbon at narrow and More tabs more visible=true; visible ribbon tabs=Home,Insert,Data; menu=Formulas View 
+PASS [spreadsheet-chromium-390] keyboard shortcuts panel available Keyboard Shortcuts buttons on page=0 
+PASS [spreadsheet-firefox-1440] open ready in 1055 ms 
+PASS [spreadsheet-firefox-1440] add sheet tabs 3 -> 4 
+PASS [spreadsheet-firefox-1440] type values A1 '1234.5' -> {"resolved":1234.5,"value":null,"fmt":null}; A2 '3/15/2026' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A3 '12%' -> {"resolved":0.12,"value":null,"fmt":"0%"}; A4 '$1,234.50' -> {"resolved":1234.5,"value":null,"fmt":"$#,##0.00"}; A5 '00123' -> {"resolved":123,"value":null,"fmt":null}; A6 'hello world' -> {"resolved":"hello world","value":null,"fmt":null}; A7 '2026-03-15' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A8 '-7.25' -> {"resolved":-7.25,"value":null,"fmt":null}; A9 '1e3' -> {"resolved":1000,"value":null,"fmt":"0.00E+00"} 
+PASS [spreadsheet-firefox-1440] formula with sum {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-1440] autocomplete tab accept options: AVERAGE,AVERAGEA,AVERAGEIF,AVERAGEIFS; after Tab editor='=AVERAGE('; {"resolved":613.625,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-1440] fill handle drag C1:C8=[1,2,3,4,5,6,7,null] 
+PASS [spreadsheet-firefox-1440] copy paste [{"resolved":1234.5,"value":null,"fmt":null},{"resolved":46096,"value":null,"fmt":"m/d/yyyy"},{"resolved":0.12,"value":null,"fmt":"0%"}] 
+PASS [spreadsheet-firefox-1440] cut paste moves {"C1":{"resolved":null,"value":null,"fmt":null},"E1":{"resolved":1,"value":null,"fmt":null},"E2":{"resolved":2,"value":null,"fmt":null}} 
+PASS [spreadsheet-firefox-1440] paste special values {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-1440] find and replace {"resolved":"bye world","value":null,"fmt":null}; find bar open after Esc=false 
+PASS [spreadsheet-firefox-1440] undo redo undo=hello world redo=bye world 
+PASS [spreadsheet-firefox-1440] format cells dialog tabs=Number,Alignment,Font,Border,Fill; dialog 500,252 440x396 in 1440x900; {"resolved":1234.5,"value":null,"fmt":"0.00%"} 
+PASS [spreadsheet-firefox-1440] insert and delete row after insert A2=null A3=46096; after delete A2=46096 
+PASS [spreadsheet-firefox-1440] data validation rejects alert=true; G1={"resolved":null,"value":null,"fmt":null} G2={"resolved":7,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-1440] sheet tabs keyboard Sheet4 sheet -> PgDn Summary sheet -> PgUp Sheet4 sheet; clicked: Sales sheet 
+PASS [spreadsheet-firefox-1440] rename sheet by double-click tabs=Sales,Scratch,Summary,Targets 
+PASS [spreadsheet-firefox-1440] autofilter on Region values=(Select All),East 12,North 12,South 12,West 12; status=Ready36 of 48 records found; row heights 2..12=28,28,28,28,28,28,28,28,28,28,28 
+PASS [spreadsheet-firefox-1440] sort descending from filter stored first rows=North:2 South:24 West:23 East:23 North:7 West:22 East:21 South:21 North:12 West:20 
+PASS [spreadsheet-firefox-1440] ribbon at narrow and More tabs more visible=false; visible ribbon tabs=Home,Insert,Formulas,Data,View 
+PASS [spreadsheet-firefox-1440] keyboard shortcuts panel available Keyboard Shortcuts buttons on page=0 
+PASS [spreadsheet-firefox-390] open ready in 1148 ms 
+PASS [spreadsheet-firefox-390] add sheet tabs 3 -> 4 
+PASS [spreadsheet-firefox-390] type values A1 '1234.5' -> {"resolved":1234.5,"value":null,"fmt":null}; A2 '3/15/2026' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A3 '12%' -> {"resolved":0.12,"value":null,"fmt":"0%"}; A4 '$1,234.50' -> {"resolved":1234.5,"value":null,"fmt":"$#,##0.00"}; A5 '00123' -> {"resolved":123,"value":null,"fmt":null}; A6 'hello world' -> {"resolved":"hello world","value":null,"fmt":null}; A7 '2026-03-15' -> {"resolved":46096,"value":null,"fmt":"m/d/yyyy"}; A8 '-7.25' -> {"resolved":-7.25,"value":null,"fmt":null}; A9 '1e3' -> {"resolved":1000,"value":null,"fmt":"0.00E+00"} 
+PASS [spreadsheet-firefox-390] formula with sum {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-390] autocomplete tab accept options: AVERAGE,AVERAGEA,AVERAGEIF,AVERAGEIFS; after Tab editor='=AVERAGE('; {"resolved":613.625,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-390] fill handle drag C1:C8=[1,2,3,4,5,6,7,null] 
+PASS [spreadsheet-firefox-390] copy paste [{"resolved":1234.5,"value":null,"fmt":null},{"resolved":46096,"value":null,"fmt":"m/d/yyyy"},{"resolved":0.12,"value":null,"fmt":"0%"}] 
+PASS [spreadsheet-firefox-390] cut paste moves {"C1":{"resolved":null,"value":null,"fmt":null},"E1":{"resolved":1,"value":null,"fmt":null},"E2":{"resolved":2,"value":null,"fmt":null}} 
+PASS [spreadsheet-firefox-390] paste special values {"resolved":2469.12,"value":null,"fmt":null} 
+PASS [spreadsheet-firefox-390] find and replace {"resolved":"bye world","value":null,"fmt":null}; find bar open after Esc=false 
+PASS [spreadsheet-firefox-390] undo redo undo=hello world redo=bye world 
+PASS [spreadsheet-firefox-390] format cells dialog tabs=Number,Alignment,Font,Border,Fill; dialog 16,224 358x396 in 390x844; {"resolved":1234.5,"value":null,"fmt":"0.00%"} 
+PASS [spreadsheet-firefox-390] insert and delete row after insert A2=null A3=46096; after delete A2=46096 
+FAIL [spreadsheet-firefox-390] data validation rejects Data via More tabs locator.click: Timeout 30000ms exceeded. | Call log: |   - waiting for getByRole('button', { name: 'Data Validation' }).first() | 
+PASS [spreadsheet-firefox-390] sheet tabs keyboard Sheet4 sheet -> PgDn Summary sheet -> PgUp Sheet4 sheet; clicked: Sales sheet 
+PASS [spreadsheet-firefox-390] rename sheet by double-click tabs=Sales,Scratch,Summary,Targets 
+PASS [spreadsheet-firefox-390] autofilter on Region values=(Select All),East 12,North 12,South 12,West 12; status=Ready36 of 48 records found; row heights 2..12=28,28,28,28,28,28,28,28,28,28,28 
+PASS [spreadsheet-firefox-390] sort descending from filter stored first rows=North:2 South:24 West:23 East:23 North:7 West:22 East:21 South:21 North:12 West:20 
+PASS [spreadsheet-firefox-390] ribbon at narrow and More tabs more visible=true; visible ribbon tabs=Home,Insert,Data; menu=Formulas View 
+PASS [spreadsheet-firefox-390] keyboard shortcuts panel available Keyboard Shortcuts buttons on page=0 
