@@ -1122,32 +1122,22 @@ struct DistinctLimit {
 
 /// The distinct resolved values of `col` over `rows`, in first-seen order. A
 /// `counted` scan also gives the style of each one's first cell and how many
-/// of the rows read hold it.
+/// of the rows read hold it, and keeps each pool id's slot to count it. A
+/// scan that only lists stops at `limit` values and marks pool ids with one
+/// bit, so it never zero-fills four bytes per id of the string pool. Both are
+/// one function, so the dropdown's counted scan runs the code that listing
+/// calls (AutoComplete, the pivot field list) keep optimized.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,
     col: usize,
     rows: impl Iterator<Item = usize> + Clone,
-    limit: DistinctLimit,
+    reach: DistinctLimit,
 ) -> DistinctColumn {
-    if limit.counted {
-        distinct_scan::<true>(store, data, col, rows, limit.values)
-    } else {
-        distinct_scan::<false>(store, data, col, rows, limit.values)
-    }
-}
-
-/// [`distinct_over`] for one kind of caller. A `COUNTED` scan reads every row
-/// and keeps each pool id's slot in its output, to count it. A scan that only
-/// lists stops at `limit` values and marks pool ids with one bit, so it never
-/// zero-fills four bytes per id of the workbook's string pool.
-fn distinct_scan<const COUNTED: bool>(
-    store: &CellStore,
-    data: &SheetData,
-    col: usize,
-    rows: impl Iterator<Item = usize> + Clone,
-    limit: usize,
-) -> DistinctColumn {
+    let DistinctLimit {
+        values: limit,
+        counted,
+    } = reach;
     let mut out;
     let text_at = |index: usize| {
         resolved_text(data, &store.strings, index, &store.formula_slots).unwrap_or_default()
@@ -1168,7 +1158,7 @@ fn distinct_scan<const COUNTED: bool>(
         for row in rows.clone() {
             let next = out.kinds.len();
             let full = limit != 0 && next >= limit;
-            if full && !COUNTED {
+            if full && !counted {
                 break;
             }
             let index = col * data.cells.row_count() + row;
@@ -1193,7 +1183,7 @@ fn distinct_scan<const COUNTED: bool>(
                 _ => Met::Key(DistinctKey::Blank),
             };
             let found = match met {
-                Met::Id(id) if COUNTED => id_slots.slot(id, next, full),
+                Met::Id(id) if counted => id_slots.slot(id, next, full),
                 Met::Id(id) => id_stamps.insert(id).then_some(next),
                 Met::Key(key) if full => key_slots.get(&key).copied(),
                 Met::Key(key) => Some(*key_slots.entry(key).or_insert(next)),
@@ -1205,7 +1195,13 @@ fn distinct_scan<const COUNTED: bool>(
                         *count = count.saturating_add(1);
                     }
                 }
-                Some(_) => push_entry::<COUNTED>(&mut out, store, data, index, kind),
+                Some(_) => {
+                    if counted {
+                        out.styles.push(data.cells.style_at(index));
+                        out.counts.push(1);
+                    }
+                    push_entry(&mut out, store, data, index, kind);
+                }
                 None => {}
             }
         }
@@ -1222,9 +1218,8 @@ fn distinct_scan<const COUNTED: bool>(
     out
 }
 
-/// Lists the value of the cell at `index`, of resolved `kind`, as a new entry;
-/// a `COUNTED` entry also gets its cell's style and a count of one row.
-fn push_entry<const COUNTED: bool>(
+/// Lists the value of the cell at `index`, of resolved `kind`, as a new entry.
+fn push_entry(
     out: &mut DistinctColumn,
     store: &CellStore,
     data: &SheetData,
@@ -1232,10 +1227,6 @@ fn push_entry<const COUNTED: bool>(
     kind: u8,
 ) {
     out.kinds.push(kind);
-    if COUNTED {
-        out.styles.push(data.cells.style_at(index));
-        out.counts.push(1);
-    }
     match kind {
         1 => out
             .numbers
