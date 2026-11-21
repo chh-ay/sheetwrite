@@ -1001,10 +1001,17 @@ export class SheetTabs {
     // Only reveal the tab horizontally; the workbook may sit below the page fold.
     const stripRect = this.host.getBoundingClientRect();
     const tabRect = element.getBoundingClientRect();
+    // The Add sheet button sticks to the strip's right edge when the tabs
+    // overflow, so a tab is in view only left of it.
+    const add = this.host.querySelector<HTMLElement>(".sheetwrite-tab-add");
+    const right =
+      add === null || add === element
+        ? stripRect.right
+        : Math.min(stripRect.right, add.getBoundingClientRect().left);
     if (tabRect.left < stripRect.left) {
       this.host.scrollLeft += tabRect.left - stripRect.left;
-    } else if (tabRect.right > stripRect.right) {
-      this.host.scrollLeft += tabRect.right - stripRect.right;
+    } else if (tabRect.right > right) {
+      this.host.scrollLeft += tabRect.right - right;
     }
   }
 
