@@ -36,7 +36,7 @@ export const HISTORY_DIFF_NONE = 0xffff_ffff;
 export const MAX_HISTORY_DIFF_ENTRIES = 1_000;
 
 /** Cells read from each version per window. */
-const WINDOW_CELLS = 65_536;
+export const WINDOW_CELLS = 65_536;
 
 /** Where the next page of a diff starts. Pass it back unchanged. */
 export interface HistoryDiffCursor {
@@ -334,7 +334,10 @@ function plain(value: unknown): string {
  * Content IDs for the style IDs of both stores: two stores intern styles
  * independently, so equal styles are matched by content.
  */
-function styleTables(before: StoreDataEngine, after: StoreDataEngine): [Uint32Array, Uint32Array] {
+export function styleTables(
+  before: StoreDataEngine,
+  after: StoreDataEngine,
+): [Uint32Array, Uint32Array] {
   const ids = new Map<string, number>();
   const table = (engine: StoreDataEngine) => {
     const styles = engine.styleTable();
@@ -509,7 +512,7 @@ function pieces(
   return out;
 }
 
-function transferOf(
+export function transferOf(
   engine: StoreDataEngine,
   sheet: SheetId,
   row: number,

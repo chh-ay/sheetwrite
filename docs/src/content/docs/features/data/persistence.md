@@ -172,14 +172,19 @@ the caller's `signal.reason`. It never publishes a partial marker.
 
 ### Restore a version
 
-`archive.restoreVersion(grid, versionId, scope, { sync, signal })` brings back part or
+`archive.restoreVersion(grid, versionId, scope, { sync, signal, kernel })` brings back part or
 all of a version on a live grid as **one undoable change**: one undo step, one `change`
 event with `commitReason: "restore"`, and, with `sync`, one synchronized transaction.
 The version is rebuilt in a separate engine instance, or taken from the archive when
 `readVersion` or a restore just rebuilt it. Sheet and workbook settings are
-compared and only the changed ones are written; the cells of the scope are cleared and
-written again from the version. All of it uses ordinary document operations, so the
-undo step and the synchronized transaction grow with the size of the scope.
+compared and only the changed ones are written. The cells of the scope are compared
+with the version's by position, and only the rows whose sources or styles differ are
+cleared and written again. When a sheet changes size or columns, or the restore adds,
+removes or renames sheets or changes tables, pivots or the data model, every cell of
+the scope is cleared and written again from the version. All of it uses ordinary
+document operations, so the undo step and the synchronized transaction grow with the
+rows that are written. The comparison runs on the history kernel; `kernel` sets where
+its WASM comes from, as in `diffVersions`.
 
 | Scope | Restores | Keeps current |
 | --- | --- | --- |

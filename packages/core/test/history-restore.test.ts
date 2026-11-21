@@ -308,6 +308,119 @@ describe("restore the workbook", () => {
     ]);
     expect(value(alice.grid, "data", 2, 0)).toBe(33);
   });
+
+  it("rewrites only the rows whose cells differ from the version", async () => {
+    const { archive, alice } = await session();
+    await edit(alice, [
+      { op: "addRows", sheet: "data", at: 8, count: 120 },
+      set("data", 64, 1, 640),
+    ]);
+    const version = await archive.saveVersion("Long", "alice", 0);
+    await edit(alice, [set("data", 2, 0, 33), set("data", 110, 1, 1100)]);
+
+    const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
+    expect(outcome.status).toBe("applied");
+
+    // Row 64 holds the version's cells already, so no operation of the restore writes it.
+    const patches = outcome.status === "applied" ? outcome.transaction.patches : [];
+    const writesRow64 = patches.some(
+      (patch) =>
+        "range" in patch &&
+        patch.range?.sheet === "data" &&
+        Math.min(patch.range.start.row, patch.range.end.row) <= 64 &&
+        Math.max(patch.range.start.row, patch.range.end.row) >= 64,
+    );
+    expect(writesRow64).toBe(false);
+    expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 110, 1)]).toEqual([3, null]);
+    expect(value(alice.grid, "data", 64, 1)).toBe(640);
+  });
+
+  it("restores the version exactly in every scope when only some rows differ, and undo returns the live cells", async () => {
+    /** Cells and notes of each sheet, cell by cell, inside `rect` when given. */
+    const contents = (book: WorkbookSnapshot, rect?: { r0: number; r1: number }) =>
+      book.sheets.map((sheet) => {
+        const inside = (row: number) => !rect || (row >= rect.r0 && row <= rect.r1);
+        const cells = sheet.cells
+          .flatMap((block) =>
+            block.cells.map((cell) => ({
+              row: block.startRow + cell.rowOffset,
+              col: block.startCol + cell.colOffset,
+              value: cell.value,
+              style: cell.style ?? {},
+            })),
+          )
+          .filter((cell) => inside(cell.row))
+          .sort((a, b) => a.row - b.row || a.col - b.col);
+        const notes = (sheet.notes ?? [])
+          .filter((note) => inside(note.addr.row))
+          .sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
+        return { id: sheet.id, cells, notes };
+      });
+
+    /** Random edits on Data!A1:B200: values, formulas, clears, styles and notes. */
+    const edits = (random: () => number, count: number): DocumentOp[] =>
+      Array.from({ length: count }, (): DocumentOp => {
+        const row = Math.floor(random() * 200);
+        const col = Math.floor(random() * 2);
+        const addr = { sheet: "data", row, col };
+        const range = { sheet: "data", start: { row, col }, end: { row, col } };
+        switch (Math.floor(random() * 6)) {
+          case 0:
+            return set("data", row, col, Math.floor(random() * 5));
+          case 1:
+            return set("data", row, col, String(Math.floor(random() * 5)));
+          case 2:
+            return { op: "set", addr, value: { kind: "formula", src: `=A${1 + (row % 8)}+1` } };
+          case 3:
+            return { op: "clearRange", range, contents: true, style: random() < 0.5 };
+          case 4:
+            return { op: "setRangeStyle", range, style: { bold: random() < 0.5 } };
+          default:
+            return { op: "setNote", addr, text: random() < 0.3 ? null : `n${row % 3}` };
+        }
+      });
+
+    const scopes: Parameters<HistoryArchive["restoreVersion"]>[2][] = [
+      { kind: "workbook" },
+      { kind: "sheet", sheet: "data" },
+      {
+        kind: "range",
+        range: { sheet: "data", start: { row: 30, col: 0 }, end: { row: 170, col: 1 } },
+      },
+    ];
+
+    for (const [index, scope] of scopes.entries()) {
+      let seed = 7 + index;
+      const random = () => {
+        seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+        return seed / 2_147_483_648;
+      };
+
+      const { archive, alice } = await session();
+      await edit(alice, [
+        { op: "addRows", sheet: "data", at: 8, count: 192 },
+        ...edits(random, 120),
+      ]);
+      const version = await archive.saveVersion("Random", "alice", 0);
+      for (let round = 0; round < 6; round++) {
+        await edit(alice, edits(random, 1 + Math.floor(random() * 12)));
+      }
+
+      const live = contents(alice.grid.exportSnapshot());
+      const rect = scope.kind === "range" ? { r0: 30, r1: 170 } : undefined;
+      const outcome = await restore(archive, alice, version.id, scope);
+      expect(outcome.status).toBe("applied");
+
+      const historical = await archive.readVersion(version.id);
+      const restored = contents(alice.grid.exportSnapshot(), rect);
+      expect(restored.find((sheet) => sheet.id === "data")).toEqual(
+        contents(historical, rect).find((sheet) => sheet.id === "data"),
+      );
+
+      alice.grid.undo();
+      expect(contents(alice.grid.exportSnapshot())).toEqual(live);
+    }
+  });
 });
 
 describe("restore external links", () => {

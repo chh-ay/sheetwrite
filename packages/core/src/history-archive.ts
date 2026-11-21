@@ -54,6 +54,7 @@ import {
   type HistoryRestoreScope,
   planRestore,
 } from "./version-history/restore.js";
+import { loadRowComparer } from "./version-history/row-compare.js";
 import type {
   HistoryArchiveOptions,
   HistoryHead,
@@ -830,6 +831,7 @@ export class HistoryArchive {
     });
 
     try {
+      const compareRows = await loadRowComparer(options.kernel);
       return await this.withPinnedVersion(id, options.signal, (version, read) =>
         this.withRebuiltVersion(version, read, options.signal, true, ({ store, revision }) => {
           if (revision !== version.revision) {
@@ -842,7 +844,7 @@ export class HistoryArchive {
 
           assertIdle(options.sync);
 
-          const plan = planRestore(grid.store, store, scope);
+          const plan = planRestore(grid.store, store, scope, compareRows);
 
           const outcome = commitRestore(grid, plan.operations, plan.guards, {
             versionId: id,
