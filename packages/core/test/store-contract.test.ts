@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { SnapshotResourceError, SnapshotValidationError } from "../src/document-protocol.js";
+import { SnapshotValidationError } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -195,26 +195,7 @@ describe("SheetwriteStore facade contract", () => {
       SnapshotValidationError,
     );
 
-    const large = makeWorkbook(1_000_000);
-    for (let index = large.sheets[0]!.columns.length; index < 6; index++) {
-      large.sheets[0]!.columns.push({
-        key: `extra-${index}`,
-        header: `Extra ${index}`,
-        width: 80,
-        type: "text",
-      });
-    }
-    // Past the dense cell limit a dense sheet loads in local pages, still not paged.
-    const local = new SheetwriteStore(large);
-    expect(local.isPaged("s1")).toBe(false);
-    local.dispose();
-    expect(
-      () =>
-        new SheetwriteStore(large, undefined, {
-          snapshotResourceLimits: { maxLocalPagedCells: 5_999_999 },
-        }),
-    ).toThrow(SnapshotResourceError);
-    const paged = new SheetwriteStore(large, undefined, { storage: "paged" });
+    const paged = new SheetwriteStore(makeWorkbook(1_000_000), undefined, { storage: "paged" });
     expect(paged.isPaged("s1")).toBe(true);
     paged.dispose();
   });

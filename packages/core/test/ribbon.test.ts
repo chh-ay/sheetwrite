@@ -370,13 +370,20 @@ it("keeps a form open when it moves focus to show an error or wrap Tab", async (
     expect(document.activeElement).toBe(ok);
     key(ok, "Tab");
     expect(document.activeElement).toBe(field);
+    field.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(ok);
     expect(host.querySelector(".sheetwrite-ribbon-popup")).toBe(form);
   } finally {
     restore();
   }
 });
 
-it("keeps a menu open for a scroll that leaves its trigger in place", async () => {
+it.each([
+  ["scroll", document],
+  ["resize", window],
+] as const)("keeps a menu open for a %s that leaves its trigger in place", async (type, target) => {
   const { host, control, key } = await setup();
   const options = control("Borders options");
   let triggerTop = 500;
@@ -389,35 +396,15 @@ it("keeps a menu open for a scroll that leaves its trigger in place", async () =
   const menu = () => host.querySelector('.sheetwrite-ribbon-popup[aria-label="Borders"]');
   expect(menu()).not.toBeNull();
 
-  // WebKit can deliver the event of a page scroll that happened before the menu opened.
-  document.dispatchEvent(new Event("scroll"));
+  // WebKit can deliver the event of a scroll or resize that happened before the menu opened.
+  target.dispatchEvent(new Event(type));
   expect(menu()).not.toBeNull();
   expect(document.activeElement?.textContent).toBe("Bottom Border");
 
-  // The page scrolls and the trigger moves: the placed menu would be wrong, so it closes.
+  // The trigger moves: the placed menu would be wrong, so it closes.
   triggerTop = 300;
-  document.dispatchEvent(new Event("scroll"));
+  target.dispatchEvent(new Event(type));
   expect(menu()).toBeNull();
-});
-
-it("keeps a menu open for a resize event delivered after it was placed", async () => {
-  const { host, control, key } = await setup();
-  const options = control("Borders options");
-  let triggerTop = 500;
-  Object.defineProperty(options, "getBoundingClientRect", {
-    configurable: true,
-    value: () => new DOMRect(40, triggerTop, 28, 24),
-  });
-  key(options, "ArrowDown");
-  const menuSelector = '.sheetwrite-ribbon-popup[aria-label="Borders"]';
-
-  window.dispatchEvent(new Event("resize"));
-  expect(host.querySelector(menuSelector)).not.toBeNull();
-  expect(document.activeElement?.textContent).toBe("Bottom Border");
-
-  triggerTop = 300;
-  window.dispatchEvent(new Event("resize"));
-  expect(host.querySelector(menuSelector)).toBeNull();
 });
 
 it("disables editing controls while read-only but keeps view controls", async () => {
@@ -730,26 +717,6 @@ it("offers Excel's cell dialogs in the Cells menus, each with its own glyph", as
     ["Delete Cells…", "deleteCells"],
     ["Format Cells…", "formatCells"],
   ]);
-});
-
-it("keeps Tab inside a form popup, wrapping at both ends", async () => {
-  const { host, control, openTab, select, key, press } = await setup();
-  openTab("Insert");
-  select(0, 0);
-  press(control("Link"));
-  const field = host.querySelector<HTMLInputElement>(".sheetwrite-ribbon-popup input");
-  const ok = host.querySelector<HTMLButtonElement>(".sheetwrite-ribbon-form-button");
-  if (field === null || ok === null) throw new Error("the link form did not open");
-  expect(document.activeElement).toBe(field);
-
-  ok.focus();
-  key(ok, "Tab");
-  expect(document.activeElement).toBe(field);
-  field.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
-  );
-  expect(document.activeElement).toBe(ok);
-  expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
 });
 
 it("shows a failed placement command in its form instead of rejecting", async () => {
