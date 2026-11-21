@@ -797,6 +797,27 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await expect(arrow).toBeVisible();
   const arrowBox = await arrow.boundingBox();
   if (!arrowBox) throw new Error("expected the dropdown arrow");
+  // Probe: log focus moves and the list's life, to see why it closes.
+  await page.evaluate(() => {
+    const name = (node: EventTarget | null) =>
+      node instanceof Element ? `${node.tagName}.${node.className}` : String(node);
+    for (const type of ["focusin", "focusout", "pointerdown", "pointerup", "mousedown", "click"]) {
+      document.addEventListener(
+        type,
+        (event) => {
+          const related = "relatedTarget" in event ? (event as FocusEvent).relatedTarget : null;
+          console.log(`probe ${type} ${name(event.target)} -> ${name(related)} active=${name(document.activeElement)} t=${performance.now().toFixed(1)}`);
+        },
+        true,
+      );
+    }
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) console.log(`probe added ${name(node)}`);
+        for (const node of record.removedNodes) console.log(`probe removed ${name(node)}`);
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await page.mouse.click(arrowBox.x + arrowBox.width / 2, arrowBox.y + arrowBox.height / 2);
   const choices = page.getByRole("listbox");
   await expect(choices.getByRole("option")).toHaveCount(6);

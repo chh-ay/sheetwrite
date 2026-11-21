@@ -797,7 +797,7 @@ jobs:
       - name: Exercise production site
         env:
           DOCS_OUTPUT_DIR: .vercel/output/static
-        run: bun run test:browser --workers=2 --shard=${{ matrix.shard }}/3
+        run: bun run test:browser --project=webkit test/browser/showcase-spreadsheet.spec.ts -g "validation alerts" --repeat-each=30 --trace=retain-on-failure --workers=2
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
