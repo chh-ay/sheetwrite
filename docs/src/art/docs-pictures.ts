@@ -201,8 +201,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "status-bar",
         size: "panel",
-        alt: "A selected column of revenue values on the Orders sheet and the status bar below it showing their Average, Count and Sum.",
-        caption: "The status bar shows the Average, Count and Sum of the selected numbers.",
+        alt: "A selected column of revenue values on the Orders sheet and the status bar below it showing Ready, their Average and their Sum in dollars.",
+        caption: "The status bar shows the Average and Sum of the selected numbers in the active cell's format; at this width it leaves out Count.",
       },
     },
   ],
