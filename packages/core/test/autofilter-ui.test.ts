@@ -497,6 +497,32 @@ describe("AutoFilter in the grid", () => {
     expect(grid.hiddenRows()).toEqual([2]);
   });
 
+  it("shows the rows of the sheet that was cut, after a switch to another sheet", async () => {
+    stubClipboard();
+    const { grid } = mount();
+    grid.hideRows([2]);
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+
+    // Another sheet with its own hidden row 3 is active when Show them is clicked.
+    grid.addSheet({
+      id: "s2",
+      name: "Other",
+      rowCount: 5,
+      columns: [{ key: "a", header: "A", width: 100, type: "text" }],
+    });
+    grid.setActiveSheet("s2");
+    grid.hideRows([2]);
+    document.querySelector<HTMLElement>(".sheetwrite-action-status button")?.click();
+
+    expect(grid.hiddenRows()).toEqual([2]);
+    grid.setActiveSheet("s1");
+    expect(grid.hiddenRows()).toEqual([]);
+  });
+
   it("copies and cuts the active cell of a hidden row, as Excel does", async () => {
     const clipboardText = stubClipboard();
     const { grid, store } = mount();

@@ -1010,6 +1010,9 @@ export class GridImpl implements Grid {
       // and shows the step's hidden rows, as one undo step.
       onHiddenRowsMoved: (count, step, spans) => {
         const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
+        // The rows are the sheet's that is active now; Show them acts on it
+        // even after a switch to another sheet.
+        const sheetId = this.activeSheet;
         this.actionFeedback.show(
           step === "cut"
             ? `This cut includes ${rows}.`
@@ -1019,7 +1022,8 @@ export class GridImpl implements Grid {
           {
             label: "Show them",
             run: () => {
-              const sheet = this.sheet();
+              const sheet = this.sheetById(sheetId);
+              if (!sheet) return;
               const shown = [...(sheet.hiddenRows ?? [])].filter((row) =>
                 spans.some(({ start, end }) => row >= start && row <= end),
               );
