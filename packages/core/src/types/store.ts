@@ -194,12 +194,15 @@ export interface Store {
   ): VisibleWindowView;
   /**
    * Optional packed clipboard read. Custom stores may omit it; the controller
-   * preserves the per-cell Store fallback contract.
+   * preserves the per-cell Store fallback contract. With `dataRows`, `viewRows`
+   * are data rows, read in sheet order with the rows the view hides, as a copy
+   * over rows hidden by hand takes them.
    */
   getClipboardWindow?(
     sheet: SheetId,
     viewRows: { start: number; end: number },
     cols: readonly number[],
+    options?: { readonly dataRows?: boolean },
   ): ClipboardWindowView;
   /**
    * Ensure a sheet can address at least `columns.length` columns without
