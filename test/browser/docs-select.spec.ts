@@ -1,15 +1,12 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { waitForHydration } from "./fixtures.js";
 import { siteUrl } from "./playwright.config.js";
 
 // The docs site's select (docs/src/components/Select.tsx), the WAI-ARIA
 // select-only combobox, through the formula reference's engine filter.
 
 const FORMULA_PAGE = siteUrl("/docs/reference/formula-functions/math/");
-
-async function waitForHydration(page: Page): Promise<void> {
-  await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
-}
 
 interface EngineFilter {
   readonly field: Locator;
@@ -229,9 +226,18 @@ test.describe("on a phone", () => {
 });
 
 // The filter's code loads on first use (or ahead, at low priority, when the
-// page is idle); a press or click made before it arrives must act once.
-for (const activation of ["Enter", "Space", "ArrowDown", "click"] as const) {
-  test(`the engine filter opens once on ${activation} made before its code arrives @portability`, async ({
+// page is idle); a press or click made before it arrives must act once. Every
+// key that opens the list is held and replayed alike (islands/client.tsx), so
+// ArrowDown and a click carry the per-engine check. Enter and Space stay as
+// Chromium rows: only they reach the check that leaves a native element's
+// activation keys to the browser, which the combobox must not match.
+for (const [activation, portabilityTag] of [
+  ["Enter", ""],
+  ["Space", ""],
+  ["ArrowDown", " @portability"],
+  ["click", " @portability"],
+] as const) {
+  test(`the engine filter opens once on ${activation} made before its code arrives${portabilityTag}`, async ({
     page,
   }) => {
     await openFormulaPage(page);

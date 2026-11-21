@@ -76,10 +76,13 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
   });
   await page.locator(".sw-demo-grid .sheetwrite").press("Alt+ArrowDown");
 
+  // #726: Alt+Down opens a list rule's list, as in Excel. Typing filters the
+  // open list; Enter stores the item the text names and closes it.
   const list = page.getByRole("listbox", { name: "Choices" });
   await expect(list).toBeVisible();
   await page.keyboard.type("2");
   await page.keyboard.press("Enter");
+  await expect(list).toBeHidden();
   await expect
     .poll(() =>
       page.evaluate(
@@ -115,44 +118,4 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
       ),
     )
     .toBe(true);
-});
-
-// #726: Alt+Down opens a list rule's list, as in Excel.
-test("Alt+Down opens a list rule's list", async ({ page }) => {
-  await page.goto("/vue/");
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-  await expect
-    .poll(() => page.evaluate(() => Boolean(window.__sheetwriteVueWorkbench?.grid)))
-    .toBe(true);
-
-  await page.evaluate(() => {
-    const grid = window.__sheetwriteVueWorkbench?.grid;
-    if (!grid) throw new Error("Vue grid is unavailable");
-    grid.setValidationRule({
-      id: "browser-alt-down",
-      range: { sheet: "orders", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
-      condition: { kind: "list", values: [1, 2, 3] },
-      policy: "reject",
-      helpText: "Choose an order ID",
-    });
-    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
-  });
-  const grid = page.locator(".sw-demo-grid .sheetwrite");
-  const list = page.getByRole("listbox", { name: "Choices" });
-
-  await grid.press("Alt+ArrowDown");
-  await expect(list).toBeVisible();
-  // Typing filters the open list; Enter stores the item the text names.
-  await page.keyboard.type("2");
-  await page.keyboard.press("Enter");
-  await expect(list).toBeHidden();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 1, col: 0 })
-            .resolved,
-      ),
-    )
-    .toBe(2);
 });

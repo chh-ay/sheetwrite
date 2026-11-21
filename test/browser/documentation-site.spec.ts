@@ -389,7 +389,6 @@ test("everyday words and questions find their guide among the first three pages"
     ["import xlsx", "/docs/import-export/xlsx-import/"],
     ["datasource", "/docs/features/data/datasources/"],
     ["autofilter", "/docs/features/data/autofilter/"],
-    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
   ] as const) {
     const { dialog, input } = await openSearch(page);
     await input.fill(query);

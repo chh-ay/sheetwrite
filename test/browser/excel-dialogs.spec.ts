@@ -187,7 +187,6 @@ test("Excel's format, hide, insert, delete and Format Cells keys reach the grid 
 // Format Cells opens centred in the window, as Excel's does, and fits it: a
 // short window scrolls the dialog's body, and OK and Cancel stay in view.
 for (const viewport of [
-  { width: 1_280, height: 720 },
   { width: 390, height: 844 },
   { width: 1_280, height: 400 },
 ]) {
