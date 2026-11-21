@@ -216,6 +216,46 @@ it("writes the mirror and aria-activedescendant of a synchronous paint in the sa
   expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
 });
 
+it("reads each cell as the canvas shows it, in the cell's number format", () => {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
+  Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
+  document.body.appendChild(host);
+  const grid = createGrid(host, {
+    workbook: {
+      activeSheet: "s1",
+      sheets: [
+        {
+          id: "s1",
+          name: "One",
+          rowCount: 1,
+          columns: [
+            { key: "due", header: "Due", type: "number", width: 100, numberFormat: "yyyy-mm-dd" },
+            {
+              key: "rate",
+              header: "Rate",
+              type: "number",
+              width: 80,
+              cellStyle: { numberFormat: "0.0%" },
+            },
+            { key: "share", header: "Share", type: "general", width: 120 },
+          ],
+        },
+      ],
+    },
+    data: { rowCount: 1, columns: { due: [45351], rate: [0.125], share: [1 / 3] } },
+    config: { toolbar: false, find: false, contextMenu: false },
+  });
+  mounted = { grid, host };
+  flushFrames();
+
+  expect([0, 1, 2].map((col) => gridCell(host, 0, col)?.textContent)).toEqual([
+    "2024-02-29",
+    "12.5%",
+    "0.333333333",
+  ]);
+});
+
 it("leaves the host clean when a listener destroys the grid during a paint", () => {
   const { grid, host } = mount();
   grid.on("scroll", () => grid.destroy());

@@ -1,6 +1,8 @@
 /* The recorded demo on the formula assist showcase (DemoVideo.tsx). The frame
    takes the shape of the take for the screen width before anything loads, so
-   the poster, and later the video, never move the page (CLS 0). */
+   the poster, and later the video, never move the page (CLS 0). One poster
+   shows: the screen's shape in the site's theme. The site is dark unless the
+   page says light, as the theme toggle reads it. */
 
 .sw-demo-video {
   margin: 0;
@@ -24,7 +26,16 @@
   object-fit: contain;
 }
 
-.sw-demo-video__poster--narrow {
+.sw-demo-video__poster {
+  display: none;
+}
+
+.sw-demo-video__poster--wide.sw-demo-video__poster--dark,
+:root[data-theme="light"] .sw-demo-video__poster--wide.sw-demo-video__poster--light {
+  display: block;
+}
+
+:root[data-theme="light"] .sw-demo-video__poster--wide.sw-demo-video__poster--dark {
   display: none;
 }
 
@@ -55,11 +66,14 @@
     aspect-ratio: 390 / 700;
   }
 
-  .sw-demo-video__poster--wide {
+  .sw-demo-video__poster--wide.sw-demo-video__poster--dark,
+  :root[data-theme="light"] .sw-demo-video__poster--wide.sw-demo-video__poster--light,
+  :root[data-theme="light"] .sw-demo-video__poster--narrow.sw-demo-video__poster--dark {
     display: none;
   }
 
-  .sw-demo-video__poster--narrow {
+  .sw-demo-video__poster--narrow.sw-demo-video__poster--dark,
+  :root[data-theme="light"] .sw-demo-video__poster--narrow.sw-demo-video__poster--light {
     display: block;
   }
 }
