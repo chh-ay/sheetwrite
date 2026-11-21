@@ -1,4 +1,5 @@
 import { parseDateInput } from "./date-serial.js";
+import { numberFormatDateKind, parseGeneralNumber } from "./general-entry.js";
 import { formatNumber } from "./number-format.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
@@ -34,8 +35,13 @@ const DATE_EDIT_CODES = ["yyyy-mm-dd", "yyyy-mm-dd hh:mm", "yyyy-mm-dd hh:mm:ss"
  * `yyyy-mm-dd hh:mm:ss` text that {@link parseDateInput} reads back as exactly
  * that serial, so committing the editor unchanged keeps the value. Any other value,
  * or a serial no such text reproduces, opens as {@link cellScalarToText}.
+ *
+ * In a `general` column, a number in a date, time or percent format opens as
+ * Excel opens it (`1/15/2026`, `9:30:00`, `12%`), and text that would read
+ * back as a number opens with Excel's leading apostrophe (`'007`).
  */
-export function cellEditText(value: CellScalar, type: CellFormat): string {
+export function cellEditText(value: CellScalar, type: CellFormat, numberFormat?: string): string {
+  if (type === "general") return generalEditText(value, numberFormat);
   if (type !== "date" || typeof value !== "number") return cellScalarToText(value);
 
   for (const code of DATE_EDIT_CODES) {
@@ -46,6 +52,27 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
   return cellScalarToText(value);
 }
 
+/** {@link cellEditText} in a `general` column: text that reads back as the same value. */
+function generalEditText(value: CellScalar, numberFormat: string | undefined): string {
+  if (typeof value === "string") {
+    const reread = parseCellEntry(value, "general").value;
+    return reread.kind === "literal" && reread.value === value ? value : `'${value}`;
+  }
+  if (typeof value !== "number") return cellScalarToText(value);
+  const kind = numberFormatDateKind(numberFormat);
+  const text =
+    kind === "date" || (kind === "time" && value >= 1)
+      ? formatNumber(value, Number.isInteger(value) ? "m/d/yyyy" : "m/d/yyyy h:mm:ss")
+      : kind === "time"
+        ? formatNumber(value, "h:mm:ss")
+        : numberFormat?.endsWith("%")
+          ? `${Number((value * 100).toPrecision(15))}%`
+          : null;
+  if (text === null) return cellScalarToText(value);
+  const reread = parseCellEntry(text, "general").value;
+  return reread.kind === "literal" && reread.value === value ? text : cellScalarToText(value);
+}
+
 /**
  * Coerce raw text input into a {@link CellValue}, following spreadsheet
  * input-bar conventions:
@@ -53,6 +80,8 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
  * - blank (after trimming) clears the cell to a `null` literal;
  * - in a cell formatted as Text (`@`), anything else stays text exactly as
  *   typed, as in Excel: numbers, dates, `TRUE` and formulas alike;
+ * - in a `general` column, the entry reads as Excel's General format reads it:
+ *   numbers, percentages, amounts, dates and times, and `'` keeps text;
  * - text longer than one character beginning with `=` becomes a formula;
  * - in a `number`, `currency` or `date` column a finite numeric string becomes a
  *   number literal (in a `date` column, that number is the date serial);
@@ -69,8 +98,16 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
  * @param type - The column's format, which decides how dates and currency are read.
  * @param numberFormat - The cell's effective number format (cell style, then
  *   column); the Text format `@` keeps the input as text.
+ * @param locale - The column's number locale, whose separators a `general`
+ *   column reads.
  */
-export function parseCellInput(raw: string, type: CellFormat, numberFormat?: string): CellValue {
+export function parseCellInput(
+  raw: string,
+  type: CellFormat,
+  numberFormat?: string,
+  locale?: string,
+): CellValue {
+  if (type === "general") return parseCellEntry(raw, type, numberFormat, locale).value;
   const trimmed = raw.trim();
 
   if (trimmed === "") {
@@ -111,6 +148,47 @@ export function parseCellInput(raw: string, type: CellFormat, numberFormat?: str
   }
 
   return { kind: "literal", value: raw };
+}
+
+/** A typed entry: what the cell stores, and the number format Excel's General gives it. */
+export interface ParsedEntry {
+  readonly value: CellValue;
+  /** The format that shows the entry as typed (`0%` for `12%`); absent when none. */
+  readonly numberFormat?: string;
+}
+
+/**
+ * Read a typed entry as {@link parseCellInput} does, and in a `general`
+ * column also the number format Excel's General format gives the cell, as in
+ * Excel: `12%` is 0.12 in `0%`, `$4.50` is 4.5 in `$#,##0.00`, `1/15/2026`
+ * is its date serial in `m/d/yyyy`, `9:30 PM` a time in `h:mm AM/PM`, `1,234`
+ * is 1234 in `#,##0`, `1e5` is 100000 in `0.00E+00` and `1 1/2` is 1.5 in
+ * `# ?/?`. `007` is 7. A leading apostrophe keeps the rest as text. `locale`
+ * gives the grouping and decimal separators; dates read in US order.
+ */
+export function parseCellEntry(
+  raw: string,
+  type: CellFormat,
+  numberFormat?: string,
+  locale?: string,
+): ParsedEntry {
+  if (type !== "general") return { value: parseCellInput(raw, type, numberFormat) };
+  const trimmed = raw.trim();
+  if (trimmed === "") return { value: { kind: "literal", value: null } };
+  if (numberFormat === "@") return { value: { kind: "literal", value: raw } };
+  if (trimmed.startsWith("'")) return { value: { kind: "literal", value: trimmed.slice(1) } };
+  if (trimmed.length > 1 && trimmed.startsWith("=")) {
+    return { value: { kind: "formula", src: trimmed } };
+  }
+  if (BOOLEAN_TEXT.test(trimmed)) {
+    return { value: { kind: "literal", value: trimmed.toUpperCase() === "TRUE" } };
+  }
+  const number = parseGeneralNumber(trimmed, locale);
+  if (number === null) return { value: { kind: "literal", value: raw } };
+  const value: CellValue = { kind: "literal", value: number.value };
+  return number.numberFormat === undefined
+    ? { value }
+    : { value, numberFormat: number.numberFormat };
 }
 
 /** Spreadsheet booleans; ASCII-only, matching the interactive input rule. */

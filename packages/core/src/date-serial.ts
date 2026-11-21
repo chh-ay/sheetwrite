@@ -72,7 +72,7 @@ export function serialToWeekdayDate(serial: number): Date {
  * through `Date.UTC` and checking they survive normalization; this also rejects
  * two-digit years, since `Date.UTC` would remap 0–99 into 1900–1999.
  */
-function componentsToSerial(
+export function componentsToSerial(
   year: number,
   month: number,
   day: number,

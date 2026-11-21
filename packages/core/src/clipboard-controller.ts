@@ -1,5 +1,5 @@
 import { cellA1, shiftA1Refs } from "./a1.js";
-import { parseCellInput } from "./cell-input.js";
+import { parseCellEntry } from "./cell-input.js";
 import { isCellFontFamily, isCellVerticalAlign, sanitizeCellStyle } from "./cell-style-fields.js";
 import {
   type ClipboardCell,
@@ -135,10 +135,15 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellValue {
-  const parsed = parseCellInput(source, type);
-
-  return parsed.kind === "formula" ? { kind: "literal", value: `'${parsed.src}` } : parsed;
+/**
+ * Text from elsewhere read as typed input for the target column: a formula
+ * lands as inert text, and in a `general` column a number gets the format
+ * Excel's General gives it (`12%` in `0%`).
+ */
+function parseExternalInput(source: string, type: Sheet["columns"][number]["type"]): CellWrite {
+  const { value, numberFormat } = parseCellEntry(source, type);
+  if (value.kind === "formula") return { value: { kind: "literal", value: `'${value.src}` } };
+  return numberFormat === undefined ? { value } : { value, style: { numberFormat } };
 }
 
 /**
@@ -158,7 +163,12 @@ function externalCellWrite(cell: CellWrite, type: Sheet["columns"][number]["type
     return { value, style: cell.style };
   }
 
-  return { value: parseExternalInput(source, type), style: cell.style };
+  const parsed = parseExternalInput(source, type);
+  const style =
+    parsed.style && cell.style?.numberFormat === undefined
+      ? { ...cell.style, ...parsed.style }
+      : cell.style;
+  return { value: parsed.value, style };
 }
 
 function clipboardHtml(snapshot: ClipboardSnapshot): string {
@@ -1200,9 +1210,8 @@ export class ClipboardController {
       focus,
       grid.length,
       (r) => grid[r]!.length,
-      (r, c, targetCol): CellWrite => ({
-        value: parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
-      }),
+      (r, c, targetCol): CellWrite =>
+        parseExternalInput(grid[r]?.[c] ?? "", sheet.columns[targetCol]?.type ?? "text"),
     );
   }
 

@@ -24,7 +24,7 @@ import {
   insertOrDelete,
   runCellCommand,
 } from "./cell-commands.js";
-import { cellDisplayText, cellScalarToText } from "./cell-input.js";
+import { cellDisplayText, cellEditText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { isDashboard } from "./dashboard.js";
@@ -2916,8 +2916,15 @@ export class GridImpl implements Grid {
       col: cell.col,
     };
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
-    const resolved = this.store.getCell(address).resolved;
-    const text = formula ?? cellScalarToText(resolved);
+    const stored = this.store.getCell(address);
+    // The text the cell editor opens with, so the formula bar reads it back the same.
+    const text =
+      formula ??
+      cellEditText(
+        stored.resolved,
+        column.type,
+        stored.style.numberFormat ?? column.cellStyle?.numberFormat ?? column.numberFormat,
+      );
 
     return { address, text, format: column.type };
   }
@@ -3651,7 +3658,7 @@ export class GridImpl implements Grid {
     let suffix = 2;
     while (used.has(id)) id = `${input.id?.trim() || "sheet"}-${suffix++}`;
     const columns = input.columns?.map((column) => ({ ...column })) ?? [
-      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
+      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "general" as const },
     ];
     const name = validateSheetName(
       input.name,
@@ -3977,7 +3984,7 @@ export class GridImpl implements Grid {
       let suffix = 1;
       while (used.has(key)) key = `${base}_${suffix++}`;
       used.add(key);
-      columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+      columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "general" });
     }
     return columns;
   }
@@ -4045,7 +4052,7 @@ export class GridImpl implements Grid {
         let suffix = 1;
         while (used.has(key)) key = `${base}_${suffix++}`;
         used.add(key);
-        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "general" });
       }
       additions.push({ op: "addColumns", sheet: sheetId, at: stored.columns.length, columns });
     }
@@ -4970,7 +4977,7 @@ function changedCells(patch: DocumentOp): Range | null {
 
 function appendPadColumns(columns: Column[], target: number): void {
   for (let c = columns.length; c < target; c++) {
-    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
+    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "general" });
   }
 }
 

@@ -476,3 +476,21 @@ describe("local deterministic and adversarial XLSX gates", () => {
     expect(failure.actual).toBeGreaterThan(limit);
   });
 });
+
+describe("column types of an imported sheet", () => {
+  it("makes unformatted columns General and keeps each cell's stored type (#911)", async () => {
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>North</t></is></c><c r="B1"><v>5</v></c></row>' +
+          '<row r="2"><c r="A2" t="inlineStr"><is><t>007</t></is></c><c r="B2" t="inlineStr"><is><t>x</t></is></c></row></sheetData>',
+      ),
+    );
+    expect(sheetAt(imported).columns.map((column) => column.type)).toEqual(["general", "general"]);
+    expect(valuesOf(imported)).toEqual([
+      literal("North"),
+      literal(5),
+      literal("007"),
+      literal("x"),
+    ]);
+  });
+});

@@ -45,6 +45,7 @@ import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-quer
 import { DYNAMIC_DATE_FILTERS, validFilterCondition } from "./store/autofilter.js";
 import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
+import type { CellFormat } from "./types/cell.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   CalculationSettings,
@@ -65,6 +66,15 @@ import {
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
+
+/** Every column type a snapshot or patch may name. */
+const COLUMN_TYPES: readonly string[] = [
+  "general",
+  "text",
+  "number",
+  "date",
+  "currency",
+] satisfies readonly CellFormat[];
 
 /** Excel's iteration count for a new workbook. */
 export const DEFAULT_MAX_ITERATIONS = 100;
@@ -1249,7 +1259,7 @@ function validateColumnShape(
     invalid(errors, `${path}.width`, "Column width must be finite and non-negative");
   }
   const type = ownValue(column, "type");
-  if (!["text", "number", "date", "currency"].includes(String(type))) {
+  if (!COLUMN_TYPES.includes(String(type))) {
     invalid(errors, `${path}.type`, "Column type is invalid");
   }
   for (const key of ["numberFormat", "numberLocale", "renderer"]) {
@@ -2435,7 +2445,7 @@ export function validateDocumentOperationShape(
       }
 
       const type = ownValue(patch, "type");
-      if (type !== undefined && !["text", "number", "date", "currency"].includes(String(type))) {
+      if (type !== undefined && !COLUMN_TYPES.includes(String(type))) {
         invalid(errors, `${patchPath}.type`, "Column type is invalid");
       }
 

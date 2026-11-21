@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { cellDisplayText, cellScalarToText, parseCellInput } from "../src/cell-input.js";
+import {
+  cellDisplayText,
+  cellEditText,
+  cellScalarToText,
+  parseCellEntry,
+  parseCellInput,
+  parseCellLiteralInput,
+} from "../src/cell-input.js";
 
 describe("parseCellInput", () => {
   it("keeps cross-sheet links as formulas", () => {
@@ -55,5 +62,95 @@ describe("parseCellInput", () => {
       kind: "literal",
       value: 60,
     });
+  });
+});
+
+// A `general` column reads typed text as Excel's General format does, and
+// gives the cell the number format Excel gives it (#911).
+// https://support.microsoft.com/en-us/office/available-number-formats-in-excel-0afe8f52-97db-41f1-b972-4b46e9f1e8d2
+describe("typing into a general column", () => {
+  const entry = (raw: string, locale?: string): [unknown, string | null] => {
+    const { value, numberFormat } = parseCellEntry(raw, "general", undefined, locale);
+    return [value.kind === "literal" ? value.value : value, numberFormat ?? null];
+  };
+
+  it("reads numbers, leading zeros, grouping, signs and scientific notation", () => {
+    expect(entry("5")).toEqual([5, null]);
+    expect(entry(" 007 ")).toEqual([7, null]);
+    expect(entry("-3.5")).toEqual([-3.5, null]);
+    expect(entry("+.5")).toEqual([0.5, null]);
+    expect(entry("(42)")).toEqual([-42, null]);
+    expect(entry("1,234")).toEqual([1234, "#,##0"]);
+    expect(entry("1,234.5")).toEqual([1234.5, "#,##0.00"]);
+    expect(entry("12,34")).toEqual(["12,34", null]);
+    expect(entry("1e5")).toEqual([100_000, "0.00E+00"]);
+    expect(entry("1.5E-3")).toEqual([0.0015, "0.00E+00"]);
+  });
+
+  it("reads percentages and amounts with their formats", () => {
+    expect(entry("12%")).toEqual([0.12, "0%"]);
+    expect(entry("12.5%")).toEqual([0.125, "0.00%"]);
+    expect(entry("$4.50")).toEqual([4.5, "$#,##0.00"]);
+    expect(entry("$1,200")).toEqual([1200, "$#,##0"]);
+    expect(entry("-$4.50")).toEqual([-4.5, "$#,##0.00"]);
+    expect(entry("€7")).toEqual([7, "€#,##0"]);
+  });
+
+  it("reads dates, times and fractions with their formats", () => {
+    expect(entry("1/15/2026")).toEqual([46_037, "m/d/yyyy"]);
+    expect(entry("1/15/26")).toEqual([46_037, "m/d/yyyy"]);
+    expect(entry("2026-01-15")).toEqual([46_037, "m/d/yyyy"]);
+    expect(entry("15-Jan-2026")).toEqual([46_037, "d-mmm-yy"]);
+    expect(entry("Jan 15, 2026")).toEqual([46_037, "d-mmm-yy"]);
+    expect(entry("Jan-2026")).toEqual([46_023, "mmm-yy"]);
+    const [thisYear] = entry(`1/15/${new Date().getFullYear()}`);
+    expect(entry("1/15")).toEqual([thisYear, "d-mmm"]);
+
+    const [time, timeFormat] = entry("9:30");
+    expect(time).toBeCloseTo(9.5 / 24, 12);
+    expect(timeFormat).toBe("h:mm");
+    const [evening, eveningFormat] = entry("9:30 PM");
+    expect(evening).toBeCloseTo(21.5 / 24, 12);
+    expect(eveningFormat).toBe("h:mm AM/PM");
+    expect(entry("9:30:15")[1]).toBe("h:mm:ss");
+    const [stamp, stampFormat] = entry("1/15/2026 9:30");
+    expect(stamp).toBeCloseTo(46_037 + 9.5 / 24, 9);
+    expect(stampFormat).toBe("m/d/yyyy h:mm");
+
+    expect(entry("1 1/2")).toEqual([1.5, "# ?/?"]);
+    expect(entry("0 3/16")).toEqual([0.1875, "# ??/??"]);
+  });
+
+  it("keeps text, and a leading apostrophe forces text", () => {
+    expect(entry("North")).toEqual(["North", null]);
+    expect(entry("'007")).toEqual(["007", null]);
+    expect(entry("'=A1")).toEqual(["=A1", null]);
+    expect(entry("1/2/3/4")).toEqual(["1/2/3/4", null]);
+    expect(entry("TRUE")).toEqual([true, null]);
+    expect(parseCellEntry("=A1*2", "general").value).toEqual({ kind: "formula", src: "=A1*2" });
+    // The Text format still keeps what is typed.
+    expect(parseCellEntry("007", "general", "@").value).toEqual({ kind: "literal", value: "007" });
+  });
+
+  it("reads the separators of the column's number locale", () => {
+    expect(entry("1.234,5", "de-DE")).toEqual([1234.5, "#,##0.00"]);
+    expect(entry("4,5", "de-DE")).toEqual([4.5, null]);
+  });
+
+  it("leaves text columns as before, and imported text keeps its type", () => {
+    expect(parseCellInput("5", "text")).toEqual({ kind: "literal", value: "5" });
+    expect(parseCellInput("5", "general")).toEqual({ kind: "literal", value: 5 });
+    expect(parseCellLiteralInput("5", "general")).toBe("5");
+  });
+
+  it("opens a cell in the editor with text that reads back the same", () => {
+    expect(cellEditText("007", "general")).toBe("'007");
+    expect(cellEditText("North", "general")).toBe("North");
+    expect(cellEditText(46_037, "general", "m/d/yyyy")).toBe("1/15/2026");
+    expect(cellEditText(0.12, "general", "0%")).toBe("12%");
+    expect(cellEditText(0.07, "general", "0%")).toBe("7%");
+    expect(cellEditText(1234.5, "general", "#,##0.00")).toBe("1234.5");
+    // Other columns keep the scalar text, so a number column reads it back.
+    expect(cellEditText(0.12, "number", "0%")).toBe("0.12");
   });
 });
