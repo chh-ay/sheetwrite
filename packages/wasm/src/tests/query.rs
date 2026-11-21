@@ -444,6 +444,29 @@ fn distinct_values_in_rows_reads_only_the_listed_rows_in_the_range() {
     assert!(none.take_kinds().is_empty());
 }
 
+#[test]
+fn match_cache_handles_repeats_eviction_and_collisions() {
+    let mut store = CellStore::new();
+    // More distinct values than MATCH_CACHE_SLOTS (1024) so str_ids collide
+    // mod slot count and evict each other mid-scan.
+    let rows = 3000usize;
+    let sheet = store.add_sheet(2, rows);
+    for r in 0..rows {
+        store.set_string(sheet, r, 0, &format!("item{r}"), 0);
+        store.set_string(sheet, r, 1, if r % 3 == 0 { "Tokyo" } else { "Berlin" }, 0);
+    }
+
+    // Unique column: a colliding/evicting cache must still equal a brute scan.
+    let expected: Vec<u32> = (0..rows)
+        .filter(|r| format!("item{r}").contains('7'))
+        .map(|r| r as u32)
+        .collect();
+    assert_eq!(store.filter_rows(sheet, 0, "7"), expected);
+
+    let tokyo: Vec<u32> = (0..rows).step_by(3).map(|r| r as u32).collect();
+    assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
+}
+
 /// "Values" filter coverage: the per-column lookup must answer exactly what the
 /// linear scan answered, including NaN, `-0.0`, blanks, booleans and text.
 mod value_set_filter {
