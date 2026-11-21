@@ -132,7 +132,6 @@ import type {
   CellHyperlink,
   CellScalar,
   CellStyle,
-  CellValue,
   Column,
   ConditionalFormatRule,
 } from "./types/cell.js";
@@ -2312,6 +2311,11 @@ export class GridImpl implements Grid {
     this.interactions.beginEdit(row, col, initial, selectAll);
   }
 
+  /**
+   * Delete and Clear Contents: the selected cells' values and formulas go,
+   * and their formats stay, as Excel's Delete does. In a merge, its first
+   * cell is cleared.
+   */
   private clearSelection(): void {
     // Delete on a hidden active cell clears it, as in Excel.
     const hidden = this.hiddenActive;
@@ -2319,7 +2323,13 @@ export class GridImpl implements Grid {
       if (this.readOnly) return;
       const cell = { row: hidden.row, col: hidden.col };
       this.document.commit(
-        [{ op: "clearRange", range: { sheet: hidden.sheet, start: cell, end: cell } }],
+        [
+          {
+            op: "clearRange",
+            range: { sheet: hidden.sheet, start: cell, end: cell },
+            style: false,
+          },
+        ],
         "clear",
       );
       return;
@@ -2356,6 +2366,7 @@ export class GridImpl implements Grid {
               start: { row: runStart, col: rect.c0 },
               end: { row: previous, col: rect.c1 },
             },
+            style: false,
           });
 
           runStart = dataRow;
@@ -2364,7 +2375,6 @@ export class GridImpl implements Grid {
       }
     } else {
       const seen = new Set<number>();
-      const nullValue: CellValue = { kind: "literal", value: null };
       for (const rect of rects) {
         for (let r = rect.r0; r <= rect.r1; r++) {
           for (let c = rect.c0; c <= rect.c1; c++) {
@@ -2372,10 +2382,11 @@ export class GridImpl implements Grid {
             const key = cell.row * sheet.columns.length + cell.col;
             if (seen.has(key)) continue;
             seen.add(key);
+            const addr = { row: this.toDataRow(cell.row), col: cell.col };
             patches.push({
-              op: "set",
-              addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
-              value: nullValue,
+              op: "clearRange",
+              range: { sheet: this.activeSheet, start: addr, end: addr },
+              style: false,
             });
           }
         }
