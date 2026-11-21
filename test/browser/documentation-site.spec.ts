@@ -261,6 +261,30 @@ test("a search with no match says so", async ({ page }) => {
   await expect(dialog.getByRole("option")).toHaveCount(0);
 });
 
+test("everyday words and questions find their guide among the first three pages", async ({
+  page,
+}) => {
+  for (const [query, guide] of [
+    ["charts", "/docs/features/analysis/charts/"],
+    ["import xlsx", "/docs/import-export/xlsx-import/"],
+    ["datasource", "/docs/features/data/datasources/"],
+    ["autofilter", "/docs/features/data/autofilter/"],
+    ["how do I use sheetwrite with react", "/docs/frameworks/react/"],
+  ] as const) {
+    const { dialog, input } = await openSearch(page);
+    await input.fill(query);
+    const results = dialog.getByRole("option");
+    await expect(results.first()).toBeVisible({ timeout: 15_000 });
+    const pages = new Set<string>();
+    for (const href of await results.evaluateAll((options) =>
+      options.map((option) => option.getAttribute("href") ?? ""),
+    )) {
+      pages.add(href.split("#")[0] ?? href);
+    }
+    expect([...pages].slice(0, 3), query).toContain(guide);
+  }
+});
+
 test.describe(() => {
   // A missing page or index logs its failed request to the console.
   test.use({ allowErrors: true });
