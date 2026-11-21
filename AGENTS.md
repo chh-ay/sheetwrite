@@ -27,6 +27,10 @@ Do not add a unit test the change does not need.
 - Add a unit test only when it fails before your change and passes after it.
 - When you add that test, write it first and watch it fail. Then change the code until it passes.
 - Do not add a test that already passes on the old code.
+- Before you add a test, name the behavior or contract it protects.
+- Find the test that already owns that behavior and extend it, for example with a new row in its table. Do not add a near-duplicate next to it.
+- Test one scenario at one layer: the strongest boundary that reaches it. Do not repeat it in the model, the controller and the grid.
+- Do not add a test that pins wording, counts, file lists or internal call shapes.
 - Do not add a test that mocks the function you changed and then asserts on that mock.
 - Do not add a snapshot or a large fixture for a one-line fix.
 - A change that no unit test can reach (canvas paint, real keyboard or clipboard input, browser layout) needs steps in the PR body under "Test plan". Do not add a test file that cannot run the changed code.
