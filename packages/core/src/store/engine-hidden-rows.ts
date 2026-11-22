@@ -3,32 +3,35 @@ import type { RowGroup, Workbook } from "../types/document.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 const EMPTY_RUNS = new Uint32Array(0);
-const NOTHING_HIDDEN: SentRuns = { manual: EMPTY_RUNS, filtered: EMPTY_RUNS };
+const NOTHING_HIDDEN: SentRows = { manual: EMPTY_RUNS, kept: null };
 
-interface SentRuns {
+interface SentRows {
+  /** Rows hidden by hand or by a collapsed group, as packed runs. */
   readonly manual: Uint32Array;
-  readonly filtered: Uint32Array;
+  /** The rows the filters keep, or `null` when no filter is on. */
+  readonly kept: Uint32Array | null;
 }
 
 /**
  * Sends the hidden rows of each sheet to the engine, where SUBTOTAL and
  * AGGREGATE skip them. The engine keeps two kinds apart, as Excel does: rows
- * hidden by hand or by a collapsed row group, and rows that a filter hides.
- * Both travel as packed inclusive `[first, last]` runs. A view change only
- * queues its sheet; {@link flush} sends each queued sheet once per
- * transaction, and only when its runs changed, so hiding many rows costs one
- * engine call, not one per row.
+ * hidden by hand or by a collapsed row group, which travel as packed
+ * inclusive `[first, last]` runs, and rows that a filter hides, which travel
+ * as the rows the filter keeps: the view has them already, and the engine
+ * lists the others. A view change only queues its sheet; {@link flush} sends
+ * each queued sheet once per transaction, and only when its rows may have
+ * changed, so hiding many rows costs one engine call, not one per row.
  */
 export class EngineHiddenRows {
-  private readonly filtered_by_sheet = new Map<SheetId, Uint32Array>();
-  private readonly sent_by_sheet = new Map<SheetId, SentRuns>();
+  private readonly kept_by_sheet = new Map<SheetId, Uint32Array>();
+  private readonly sent_by_sheet = new Map<SheetId, SentRows>();
   private readonly pending = new Set<SheetId>();
 
   constructor(
     private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
-  ) {}
+  ) { }
 
   replaceEngine(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
@@ -46,17 +49,20 @@ export class EngineHiddenRows {
   /**
    * Queue a sheet after its view was computed again. `filterSurvivors` holds
    * the ascending data rows that the active filters keep, or `null` when no
-   * filter is active.
+   * filter is active; it is kept, not copied, so it must not change later.
    */
-  viewChanged(sheet: SheetId, filterSurvivors: Uint32Array | null, rowCount: number): void {
-    if (filterSurvivors)
-      this.filtered_by_sheet.set(sheet, missing_row_runs(filterSurvivors, rowCount));
-    else this.filtered_by_sheet.delete(sheet);
+  viewChanged(sheet: SheetId, filterSurvivors: Uint32Array | null): void {
+    if (filterSurvivors) this.kept_by_sheet.set(sheet, filterSurvivors);
+    else this.kept_by_sheet.delete(sheet);
 
     this.pending.add(sheet);
   }
 
-  /** Send the queued sheets whose runs differ from what the engine holds. */
+  /**
+   * Send the queued sheets whose rows may differ from what the engine holds.
+   * Kept rows compare by identity: a view computed again sends its new rows,
+   * and the engine recalculates only when the hidden rows changed.
+   */
   flush(): void {
     if (this.pending.size === 0) return;
 
@@ -65,17 +71,17 @@ export class EngineHiddenRows {
       const handle = this.handles.get(sheet);
       if (!meta || handle === undefined) continue;
 
-      const next: SentRuns = {
+      const next: SentRows = {
         manual: manual_row_runs(meta.hiddenRows, meta.rowGroups),
-        filtered: this.filtered_by_sheet.get(sheet) ?? EMPTY_RUNS,
+        kept: this.kept_by_sheet.get(sheet) ?? null,
       };
       const sent = this.sent_by_sheet.get(sheet) ?? NOTHING_HIDDEN;
-      if (same_runs(sent.manual, next.manual) && same_runs(sent.filtered, next.filtered)) continue;
+      if (same_runs(sent.manual, next.manual) && sent.kept === next.kept) continue;
 
-      if (!this.wasm.setHiddenRows(handle, next.manual, next.filtered)) {
+      if (!this.wasm.setRowVisibility(handle, next.manual, next.kept ?? undefined)) {
         throw new RangeError(`invalid hidden rows for sheet: ${sheet}`);
       }
-      if (next.manual.length === 0 && next.filtered.length === 0) this.sent_by_sheet.delete(sheet);
+      if (next.manual.length === 0 && next.kept === null) this.sent_by_sheet.delete(sheet);
       else this.sent_by_sheet.set(sheet, next);
     }
 
@@ -83,13 +89,13 @@ export class EngineHiddenRows {
   }
 
   removeSheet(sheet: SheetId): void {
-    this.filtered_by_sheet.delete(sheet);
+    this.kept_by_sheet.delete(sheet);
     this.sent_by_sheet.delete(sheet);
     this.pending.delete(sheet);
   }
 
   dispose(): void {
-    this.filtered_by_sheet.clear();
+    this.kept_by_sheet.clear();
     this.sent_by_sheet.clear();
     this.pending.clear();
   }
@@ -126,35 +132,6 @@ function manual_row_runs(
   runs.push(start, end);
 
   return Uint32Array.from(runs);
-}
-
-/**
- * Runs of the rows in `[0, row_count)` that the ascending `present` rows leave
- * out. A filter can keep hundreds of thousands of rows, so the runs go
- * straight into a typed array sized for the most runs there can be (one
- * more than the kept rows, and never more than the hidden rows), and only
- * the written part is kept.
- */
-function missing_row_runs(present: Uint32Array, row_count: number): Uint32Array {
-  const most_runs = Math.min(present.length + 1, Math.max(0, row_count - present.length));
-  const runs = new Uint32Array(most_runs * 2);
-  let at = 0;
-  let next = 0;
-  for (let i = 0; i < present.length; i++) {
-    const row = present[i] ?? next;
-    if (row > next) {
-      runs[at] = next;
-      runs[at + 1] = row - 1;
-      at += 2;
-    }
-    next = row + 1;
-  }
-  if (next < row_count) {
-    runs[at] = next;
-    runs[at + 1] = row_count - 1;
-    at += 2;
-  }
-  return at === 0 ? EMPTY_RUNS : runs.slice(0, at);
 }
 
 function same_runs(left: Uint32Array, right: Uint32Array): boolean {

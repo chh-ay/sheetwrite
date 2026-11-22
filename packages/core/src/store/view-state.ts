@@ -372,7 +372,7 @@ export class StoreViewState {
       state === undefined ||
       (state.sortKeys.length === 0 && state.filters.size === 0 && !hidden)
     ) {
-      this.engine_hidden_rows.viewChanged(sheet, null, row_count);
+      this.engine_hidden_rows.viewChanged(sheet, null);
       this.drop_order(sheet);
       return;
     }
@@ -383,7 +383,7 @@ export class StoreViewState {
       state.filters.size > 0
         ? keepOutsideAutoFilter(this.run_filters(handle, state.filters), meta.autoFilter, row_count)
         : null;
-    this.engine_hidden_rows.viewChanged(sheet, survivors, row_count);
+    this.engine_hidden_rows.viewChanged(sheet, survivors);
 
     if (hidden) {
       if (survivors) {
