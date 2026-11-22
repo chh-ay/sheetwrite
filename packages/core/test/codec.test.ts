@@ -99,3 +99,15 @@ it("refuses a cell field behind a getter in the exact check", () => {
   });
   expect(validateWorkbookSnapshot(book([cell])).ok).toBe(false);
 });
+
+it("reads no cell field from a polluted Object.prototype in the built check", () => {
+  // A cell without its own row offset; the prototype lends it one.
+  const cell = { colOffset: 0, value: { kind: "literal", value: 1 } };
+  Reflect.set(Object.prototype, "rowOffset", 0);
+  try {
+    expect(validateBuiltWorkbookSnapshot(book([cell])).ok).toBe(false);
+    expect(validateWorkbookSnapshot(book([cell])).ok).toBe(false);
+  } finally {
+    Reflect.deleteProperty(Object.prototype, "rowOffset");
+  }
+});

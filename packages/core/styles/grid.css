@@ -82,13 +82,21 @@
   resize: none;
   font: var(--sheetwrite-font);
   color: var(--sheetwrite-fg);
+  /* The cell's own alignment and font go on inline (src/editor.ts) only when
+     they differ from these. */
+  text-align: left;
   background: var(--sheetwrite-bg);
   /* The text sits as far from the gridlines as the cell paints it: the
      cell padding, which scales with the zoom, less this border. */
   padding: 0 calc(var(--sheetwrite-cell-pad, 6px) - 2px);
   box-sizing: border-box;
   z-index: 3;
-  overflow: auto;
+  /* A long line scrolls with the caret, as Excel's in-cell editor does,
+     without a scrollbar: a classic one would cover the line, and making room
+     for it means reading the editor's layout on every open (editor.ts). More
+     than eight lines scroll vertically. */
+  overflow-x: hidden;
+  overflow-y: auto;
   white-space: pre;
 }
 

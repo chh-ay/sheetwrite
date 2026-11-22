@@ -10,6 +10,7 @@ import {
   elementAdded,
   makeColumnarData,
   makeWorkbook,
+  installCoreStyles,
   mountHost,
 } from "./fixtures.js";
 
@@ -185,6 +186,7 @@ describe("Ctrl+Enter", () => {
 describe("the cell editor", () => {
   // #1107: Excel's in-cell editor keeps the cell's alignment and font.
   it("keeps the cell's alignment and font while it edits", () => {
+    const remove_styles = installCoreStyles();
     const set = (row: number, col: number, style: CellStyle) => ({
       op: "set" as const,
       addr: { sheet: "s1", row, col },
@@ -208,14 +210,54 @@ describe("the cell editor", () => {
       press("Escape");
       return shown;
     };
-    expect(look(1, 0)[0]).toBe("right");
-    expect(look(2, 0)[0]).toBe("center");
-    const [align, weight, size, color] = look(3, 0);
-    expect([align, weight, size]).toEqual(["left", "bold", "14px"]);
-    // Browsers report the colour as rgb(), happy-dom as written.
-    expect(["#c00000", "rgb(192, 0, 0)"]).toContain(color ?? "");
-    // General alignment: the amounts column is numeric, so its values edit right-aligned.
-    expect(look(4, 1)[0]).toBe("right");
+    try {
+      expect(look(1, 0)[0]).toBe("right");
+      expect(look(2, 0)[0]).toBe("center");
+      const [align, weight, size, color] = look(3, 0);
+      expect([align, weight, size]).toEqual(["left", "bold", "14px"]);
+      // Browsers report the colour as rgb(), happy-dom as written.
+      expect(["#c00000", "rgb(192, 0, 0)"]).toContain(color ?? "");
+      // General alignment: the amounts column is numeric, so its values edit right-aligned.
+      expect(look(4, 1)[0]).toBe("right");
+    } finally {
+      remove_styles();
+    }
+  });
+
+  // The stylesheet already gives an unformatted cell's look; inline
+  // declarations would only slow the style recalculation that focus forces.
+  it("puts on inline only the look that differs from its stylesheet", () => {
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: "Bold" },
+          style: { bold: true },
+        },
+      ],
+    });
+    const inline_look = (row: number, col: number) => {
+      select(row, col);
+      press("F2");
+      const field = editor();
+      if (field === null) throw new Error("The cell editor did not open");
+      const { style } = field;
+      const written = {
+        font: style.font !== "",
+        color: style.color !== "",
+        align: style.textAlign !== "",
+        decoration: style.textDecoration !== "",
+        pad: style.getPropertyValue("--sheetwrite-cell-pad") !== "",
+      };
+      press("Escape");
+      return written;
+    };
+    const none = { font: false, color: false, align: false, decoration: false, pad: false };
+    expect(inline_look(2, 0)).toEqual(none);
+    expect(inline_look(1, 0)).toEqual({ ...none, font: true });
+    // General alignment right-aligns the numeric amounts column.
+    expect(inline_look(4, 1)).toEqual({ ...none, align: true });
   });
 
   it("opens with F2 with the caret at the end, where arrows move the caret, as in Excel", () => {

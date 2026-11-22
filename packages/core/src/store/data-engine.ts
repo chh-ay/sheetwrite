@@ -821,20 +821,21 @@ export class StoreDataEngine {
       throw store_failure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
 
-    assertWorkbookTables(
-      workbook.sheets,
-      DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-      (workbook.namedRanges ?? []).map((range) => range.name),
-    );
-
+    // The store checked the tables already, in `assertWorkbookAllocationLimits`.
     assertWorkbookCharts(workbook.sheets);
 
     this.workbook = workbook;
     this.sheets = new SheetRegistry(workbook);
     this.storage_options = options;
     this.wasm = new (getEngine().CellStore)();
-    this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
-    this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    // A new engine starts with the default limits, the engine's ceilings.
+    if (
+      storageLimits.maxDenseCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ||
+      storageLimits.maxLocalPagedCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells
+    ) {
+      this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
+      this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    }
     this.view = new StoreViewState(this.wasm, this.sheets);
     this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
     this.snapshot_codec = new StoreSnapshotCodec(
@@ -872,8 +873,14 @@ export class StoreDataEngine {
 
       this.sheets.handles.set(sheet.id, handle);
       this.sheet_ids_by_handle[handle] = sheet.id;
-      this.sync_spill_blockers(sheet);
-      this.view.queueHiddenRows(sheet.id);
+      if (
+        (sheet.merges?.length ?? 0) > 0 ||
+        (sheet.protectedRanges?.length ?? 0) > 0 ||
+        (sheet.validationRules?.length ?? 0) > 0
+      )
+        this.sync_spill_blockers(sheet);
+      if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
+        this.view.queueHiddenRows(sheet.id);
     }
 
     // Before any formula is loaded, so formulas find the links they read.
@@ -904,7 +911,12 @@ export class StoreDataEngine {
       }
     }
 
-    if (!this.sync_relationships(workbook.dataModel)) {
+    // A new engine holds no relationships or measures.
+    const model = workbook.dataModel;
+    if (
+      ((model?.relationships?.length ?? 0) > 0 || (model?.measures?.length ?? 0) > 0) &&
+      !this.sync_relationships(model)
+    ) {
       this.wasm.free();
       throw store_failure("invalid-snapshot", "invalid data model");
     }
@@ -5443,9 +5455,20 @@ export class StoreDataEngine {
       const column = columns[col]!;
       const source = data.columns[column.key];
       const base = col * row_count;
+      if (source instanceof Float64Array) {
+        write_number_column(kinds, numbers, base, source, row_count);
+        continue;
+      }
       for (let row = 0; row < row_count; row++) {
-        const parsed = columnar_scalar(source?.[row], column.type);
+        const value = source?.[row];
         const offset = base + row;
+        // A number, the most common cell, needs no parsing.
+        if (typeof value === "number") {
+          kinds[offset] = KIND_NUMBER;
+          numbers[offset] = value;
+          continue;
+        }
+        const parsed = columnar_scalar(value, column.type);
         if (parsed && typeof parsed === "object") {
           if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
           else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
@@ -5498,6 +5521,22 @@ export class StoreDataEngine {
     this.note_range_mutation_ffi();
     this.wasm.compactStringStorage();
   }
+}
+
+/**
+ * Write a `Float64Array` column at `base`: every entry is a number cell, so
+ * the column is copied in one call. Rows past the end of `source` stay empty.
+ */
+function write_number_column(
+  kinds: Uint8Array,
+  numbers: Float64Array,
+  base: number,
+  source: Float64Array,
+  row_count: number,
+): void {
+  const length = Math.min(source.length, row_count);
+  numbers.set(source.subarray(0, length), base);
+  kinds.fill(KIND_NUMBER, base, base + length);
 }
 
 /**
