@@ -1,10 +1,13 @@
-# Dependencies
-node_modules/
+# Dependencies. No trailing slash, so the node_modules symlinks that
+# test/bundler-fixtures/first-paint/run.mjs creates are ignored too.
+node_modules
 
 # Build outputs
 dist/
 # The webpack bundler fixture's stylesheet build (webpack.styles.config.js).
 test/bundler-fixtures/webpack/dist-styles/
+# Written by `next build` in the Next.js bundler fixtures.
+test/bundler-fixtures/**/next-env.d.ts
 *.tsbuildinfo
 .astro/
 .tanstack/
