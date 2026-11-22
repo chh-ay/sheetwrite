@@ -872,8 +872,14 @@ export class StoreDataEngine {
 
       this.sheets.handles.set(sheet.id, handle);
       this.sheet_ids_by_handle[handle] = sheet.id;
-      this.sync_spill_blockers(sheet);
-      this.view.queueHiddenRows(sheet.id);
+      if (
+        (sheet.merges?.length ?? 0) > 0 ||
+        (sheet.protectedRanges?.length ?? 0) > 0 ||
+        (sheet.validationRules?.length ?? 0) > 0
+      )
+        this.sync_spill_blockers(sheet);
+      if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
+        this.view.queueHiddenRows(sheet.id);
     }
 
     // Before any formula is loaded, so formulas find the links they read.

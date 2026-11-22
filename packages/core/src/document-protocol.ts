@@ -668,15 +668,15 @@ function resolve_snapshot_validation_options(
     }
     overrides[resource] = override;
   }
-  return { storage, limits: resolveSnapshotResourceLimits(overrides) };
+  return { storage, limits: resolve_snapshot_resource_limits(overrides) };
 }
 
 /**
  * `DEFAULT_SNAPSHOT_RESOURCE_LIMITS` with validated `overrides` over it, and
  * `maxDenseCells` and `maxLocalPagedCells` capped at the engine's ceilings,
- * which the store also gives the engine.
+ * which `assertWorkbookAllocationLimits` returns to the store.
  */
-export function resolveSnapshotResourceLimits(
+function resolve_snapshot_resource_limits(
   overrides: Partial<SnapshotResourceLimits> = {},
 ): SnapshotResourceLimits {
   const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
@@ -857,11 +857,14 @@ function preflight_snapshot_resources(
   return undefined;
 }
 
-/** Reject workbook dimensions before a direct store or grid allocates JS/WASM buffers. */
+/**
+ * Reject workbook dimensions before a direct store or grid allocates JS/WASM
+ * buffers, and return the resolved limits the workbook met.
+ */
 export function assertWorkbookAllocationLimits(
   workbook: Workbook,
   options: SnapshotValidationOptions = {},
-): void {
+): SnapshotResourceLimits {
   const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) {
     throw new SheetwriteError(
@@ -982,6 +985,7 @@ export function assertWorkbookAllocationLimits(
       );
     }
   }
+  return limits;
 }
 
 function invalid(

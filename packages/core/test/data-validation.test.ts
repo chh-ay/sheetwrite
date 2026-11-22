@@ -363,7 +363,7 @@ describe("the work a data validation check does", () => {
       },
       50,
     );
-    const policy = new StoreMutationPolicy(workbook, undefined, reads);
+    const policy = new StoreMutationPolicy(workbook, undefined, () => reads);
     const fill = (count: number): DocumentOp[] =>
       Array.from({ length: count }, (_, row) => ({
         op: "set",

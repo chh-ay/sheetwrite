@@ -12,7 +12,6 @@ import {
 import {
   assertWorkbookAllocationLimits,
   isEngineBuiltTransaction,
-  resolveSnapshotResourceLimits,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -230,12 +229,11 @@ export class SheetwriteStore implements Store {
       options.transactionResourceLimits,
     );
     const storage = options.storage ?? "dense";
-    assertWorkbookAllocationLimits(workbook, {
+    // Validates every override, and gives the limits it checked.
+    this.snapshot_resource_limits = assertWorkbookAllocationLimits(workbook, {
       storage,
       resourceLimits: options.snapshotResourceLimits,
     });
-    // The assertion above has validated every override.
-    this.snapshot_resource_limits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
 
     try {
       this.data_engine = new StoreDataEngine(
@@ -261,7 +259,7 @@ export class SheetwriteStore implements Store {
     this.policy = new StoreMutationPolicy(
       workbook,
       (sheet) => this.engine.pivotOutputs(sheet),
-      this.engine.validationReads,
+      () => this.engine.validationReads,
     );
     this.protection_resolver = options.protectionResolver;
     this.mutation_policy = options.mutationPolicy ?? "atomic";
@@ -336,7 +334,7 @@ export class SheetwriteStore implements Store {
     this.policy = new StoreMutationPolicy(
       this.workbook,
       (sheet) => this.engine.pivotOutputs(sheet),
-      this.engine.validationReads,
+      () => this.engine.validationReads,
     );
     replaceStoreXlsxSource(this, replacement);
 
