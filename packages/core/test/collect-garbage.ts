@@ -17,6 +17,15 @@ function collect_in_fresh_stack(delay_ms = 0): Promise<void> {
 }
 
 /**
+ * Collect a few times, each from a fresh stack, without waiting for referents:
+ * for checks that a call frees what it allocated promptly, not dozens of
+ * collections later.
+ */
+export async function collectFromFreshStacks(): Promise<void> {
+  for (let turn = 0; turn < GC_TURNS; turn++) await collect_in_fresh_stack();
+}
+
+/**
  * JavaScriptCore marks the objects that a compilation in its concurrent JIT
  * worklist profiled, and the code blocks of that compilation, as GC roots until
  * the compilation finishes. On a loaded machine a compilation can stay in
@@ -25,7 +34,7 @@ function collect_in_fresh_stack(delay_ms = 0): Promise<void> {
  * deadline.
  */
 export async function collectUntilFreed(refs: readonly WeakRef<object>[]): Promise<void> {
-  for (let turn = 0; turn < GC_TURNS; turn++) await collect_in_fresh_stack();
+  await collectFromFreshStacks();
 
   const deadline = performance.now() + SETTLE_DEADLINE_MS;
   while (refs.some((ref) => ref.deref() !== undefined) && performance.now() < deadline) {
