@@ -265,8 +265,7 @@ fn trimmed_mean(mut numbers: Vec<f64>, percent: f64) -> NumberResult {
     }
     // Excel drops floor(n * percent / 2) points from each end.
     let drop = (numbers.len() as f64 * percent / 2.0).floor() as usize;
-    // This plain-number sort shares the default engine's f64 instantiation.
-    numbers.sort_unstable_by(f64::total_cmp);
+    crate::sorting::sort_f64(&mut numbers);
     let kept = &numbers[drop..numbers.len() - drop];
     Ok(kept.iter().sum::<f64>() / kept.len() as f64)
 }

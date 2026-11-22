@@ -241,7 +241,7 @@ fn mode_sngl(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     if numbers.len() < 2 {
         return Err(FormulaError::Na);
     }
-    numbers.sort_unstable_by(f64::total_cmp);
+    crate::sorting::sort_f64(numbers);
     let mut best_value = numbers[0];
     let mut best_count = 1usize;
     let mut run_count = 1usize;
