@@ -731,6 +731,11 @@ jobs:
       - name: Build production docs
         # This build only feeds Browser Smoke (docs-deploy.yml builds the
         # published site), so it includes the test fixture pages.
+        # The heap cap is a memory budget: Node's default heap on a 16 GB
+        # machine is about 2 GB, and runners give it more, so without the cap
+        # a build that no longer fits contributors' machines still passes here.
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
         run: bun run --filter '@sheetwrite/docs' build:test
       - name: Example XLSX isolation
         run: bun scripts/verify-example-xlsx-isolation.ts
