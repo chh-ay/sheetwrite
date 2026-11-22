@@ -1128,7 +1128,7 @@ impl CellStore {
         let mut vacated_spill = VacatedSpill::default();
 
         loop {
-            let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
+            let mut pending: Vec<(AbsCellKey, bool)> = affected
                 .keys(&self.formula_slots)
                 .filter(|key| !processed_arrays.contains(key))
                 .filter_map(|key| {
@@ -1149,7 +1149,7 @@ impl CellStore {
                     };
                     self.dynamic_array_bound(ast, key.sheet as usize, &mut pass)
                         .is_some()
-                        .then(|| (key, ast.clone(), entry.has_spill_refs()))
+                        .then(|| (key, entry.has_spill_refs()))
                 })
                 .collect();
 
@@ -1162,8 +1162,17 @@ impl CellStore {
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
-            for (key, stored_ast, has_spill_refs) in pending {
+            for (key, has_spill_refs) in pending {
                 let Some(id) = self.formula_id(key) else {
+                    continue;
+                };
+                // The entry is read in place: evaluating anchors changes
+                // values and spills, never formulas.
+                let Some(stored_ast) = self
+                    .formula_slots
+                    .get(id)
+                    .and_then(|entry| entry.ast.as_ref())
+                else {
                     continue;
                 };
                 processed_arrays.insert(key);
@@ -1190,13 +1199,15 @@ impl CellStore {
                 #[cfg(test)]
                 FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
                 let enclosing_reads = has_spill_refs.then(start_runtime_reads);
+                let resolved;
                 let ast = if has_spill_refs {
-                    self.resolve_spill_refs(&stored_ast, output_sheet, &mut pass, 0)
+                    resolved = self.resolve_spill_refs(stored_ast, output_sheet, &mut pass, 0);
+                    &resolved
                 } else {
                     stored_ast
                 };
 
-                let evaluated = match self.dynamic_array_bound(&ast, output_sheet, &mut pass) {
+                let evaluated = match self.dynamic_array_bound(ast, output_sheet, &mut pass) {
                     _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
                     Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
                         Some(total) => {
@@ -1205,10 +1216,10 @@ impl CellStore {
                             // A LET that resolves to one cell leaves no array
                             // expression; its scalar value is the result.
                             let evaluated =
-                                match self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0) {
+                                match self.eval_dynamic_array(ast, output_sheet, &mut pass, 0) {
                                     Some(result) => result,
                                     None if has_spill_refs => {
-                                        match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                                        match self.eval_ast(ast, output_sheet, &mut pass, 0) {
                                             Value::Error(error) => Err(error),
                                             value @ (Value::Number(_)
                                             | Value::Text(_)
@@ -1244,7 +1255,7 @@ impl CellStore {
                     Some(Err(error)) => Err(error),
                     // Resolving a missing spill removes its array marker.
                     // Keep the scalar expression's error instead of replacing it.
-                    None => match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                    None => match self.eval_ast(ast, output_sheet, &mut pass, 0) {
                         Value::Error(error) => Err(error),
                         // A runtime reference that resolved to one cell can
                         // leave a scalar expression; its value is the result.
