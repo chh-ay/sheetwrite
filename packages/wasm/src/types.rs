@@ -296,10 +296,10 @@ impl ReadSet {
             // AREAS reads the shape of its reference, never its cells, so a
             // dependency on them would only invent cycles and wasted work.
             // A runtime reference inside it is volatile and refreshes anyway.
-            Ast::Func(Func::Areas, _) => {}
+            Ast::Func(Func::Areas, ..) => {}
             // SUMIF and AVERAGEIF read as many sum cells as the criteria
             // range has, whatever size the sum range is written with.
-            Ast::Func(Func::SumIf | Func::AverageIf, args) if args.len() == 3 => {
+            Ast::Func(Func::SumIf | Func::AverageIf, args, _) if args.len() == 3 => {
                 for arg in args {
                     collect(self, arg);
                 }
@@ -316,7 +316,7 @@ impl ReadSet {
             }
             // Static operands read only the shared cells; an empty
             // intersection is a constant #NULL! and reads nothing.
-            Ast::Func(Func::Intersect, operands) => match intersection_range(operands, names) {
+            Ast::Func(Func::Intersect, operands, _) => match intersection_range(operands, names) {
                 Ok(range) => self.push_range(range),
                 Err(FormulaError::Null) => {}
                 Err(_) => {
@@ -325,7 +325,7 @@ impl ReadSet {
                     }
                 }
             },
-            Ast::Func(_, args) => {
+            Ast::Func(_, args, _) => {
                 for arg in args {
                     collect(self, arg);
                 }
@@ -335,11 +335,13 @@ impl ReadSet {
                     collect(self, arg);
                 }
             }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
                 collect(self, left);
                 collect(self, right);
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => collect(self, inner),
+            Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
+                collect(self, inner)
+            }
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
             | Ast::InvalidRef
@@ -415,10 +417,10 @@ fn ast_is_plain(ast: &Ast) -> bool {
         | Ast::SheetCell(..)
         | Ast::AbsCell(..)
         | Ast::InvalidRef => true,
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             ast_is_plain(left) && ast_is_plain(right)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_plain(inner),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => ast_is_plain(inner),
         _ => false,
     }
 }
@@ -450,7 +452,7 @@ const fn calls_volatile(ast: &Ast) -> bool {
                 | Func::Sheet
                 | Func::Sheets
                 | Func::Info,
-            _,
+            ..
         )
     )
 }
@@ -491,7 +493,7 @@ fn any_with_names(
 #[inline]
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::Let, _) => true,
+        Ast::Func(Func::Let, ..) => true,
         _ => ast.any_child(&mut ast_contains_let),
     }
 }
@@ -510,7 +512,7 @@ fn ast_contains_spill_ref(ast: &Ast) -> bool {
 const fn calls_spill_ref(ast: &Ast) -> bool {
     matches!(
         ast,
-        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _)
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, ..)
     )
 }
 

@@ -195,7 +195,7 @@ struct LiftedCall<'a> {
 }
 
 /// Rows, columns and cells of an array.
-type ArrayShape = (usize, usize, usize);
+pub(super) type ArrayShape = (usize, usize, usize);
 
 impl CellStore {
     /// An IF, IFERROR, IFNA, IFS, SWITCH or CHOOSE `call` as an array, or
@@ -211,7 +211,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
-        if !matches!(call, Ast::Func(Func::Choose, _))
+        if !matches!(call, Ast::Func(Func::Choose, ..))
             && !ast_produces_array(call, pass.shapes(self.name_scope(sheet)))
         {
             return None;
@@ -229,7 +229,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let Ast::Func(func, args) = call else {
+        let Ast::Func(func, args, _) = call else {
             return Err(FormulaError::Value);
         };
         let kind = Branching::of(*func).ok_or(FormulaError::Value)?;
@@ -271,7 +271,7 @@ impl CellStore {
         formula_sheet: usize,
         pass: &mut EvalPass<'_>,
     ) -> Result<ArrayShape, FormulaError> {
-        let Ast::Func(func, args) = call else {
+        let Ast::Func(func, args, _) = call else {
             return Err(FormulaError::Value);
         };
         let kind = Branching::of(*func)
@@ -298,7 +298,7 @@ impl CellStore {
     }
 
     /// The shape of one argument before evaluation; a value is one cell.
-    fn argument_shape(
+    pub(super) fn argument_shape(
         &self,
         arg: &Ast,
         formula_sheet: usize,

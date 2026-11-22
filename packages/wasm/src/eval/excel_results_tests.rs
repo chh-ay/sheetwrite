@@ -2609,6 +2609,97 @@ fn branch_functions_take_array_arguments_element_by_element() {
     assert_spills(BRANCH_FUNCTION_RESULTS);
 }
 
+/// A function that takes one value, given an array or a range, runs once
+/// for each element and returns an array of that shape. Every argument
+/// that takes one value broadcasts as in the branch functions: a single row
+/// repeats down, a single column across, a 1×1 array is one value, and a
+/// cell outside a smaller argument is #N/A. An error stays in its element.
+/// Arguments that take a range (SUM's, COUNTIF's range, the lookup tables)
+/// are never lifted.
+///
+/// Microsoft Support, "Guidelines and examples of array formulas", shows
+/// `SUM(LEN(C9:C13))`, `SQRT({1,2,3,4;5,6,7,8;9,10,11,12}^2)`,
+/// `SMALL(B9:B18,{1;2;3})`, `TEXT(DATE(YEAR(TODAY()),SEQUENCE(1,12),1),"mmm")`
+/// and `SUM(IF(ISERROR(Data),"",Data))`; the rows marked "documented" follow
+/// those examples. The TEXT row uses `yyyy-mm-dd`, as the engine has no
+/// month names. Every other row applies the same rule to a function the
+/// page doesn't show, and is on the Excel checks list (#219).
+const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
+    // Documented.
+    ("=SQRT({1,4;9,16})", 2, &["1", "2", "3", "4"]),
+    ("=LEN(Data!D1:D3)", 1, &["1", "1", "0"]),
+    ("=SMALL(Data!B1:B3,{1;2})", 1, &["10", "20"]),
+    (
+        "=TEXT(DATE(2024,SEQUENCE(1,3),1),\"yyyy-mm-dd\")",
+        3,
+        &["2024-01-01", "2024-02-01", "2024-03-01"],
+    ),
+    (
+        "=ISERROR(Data!A1:A3/(Data!A1:A3-2))",
+        1,
+        &["FALSE", "TRUE", "FALSE"],
+    ),
+    ("=LEN(IF({TRUE,FALSE},\"ab\",\"c\"))", 2, &["2", "1"]),
+    // Unverified: the rule above, for functions the page doesn't show.
+    ("=ABS({-1,2})", 2, &["1", "2"]),
+    ("=ABS(Data!A1:A3-2)", 1, &["1", "0", "1"]),
+    ("=ROUND({1.25,2.25},1)", 2, &["1.3", "2.3"]),
+    ("=ROUND(2.71828,{0,1,2})", 3, &["3", "2.7", "2.72"]),
+    ("=ROUND({1.25,2.25},{1,0})", 2, &["1.3", "2"]),
+    ("=UPPER(Data!D1:D2)", 1, &["5", "X"]),
+    ("=LEFT({\"abc\",\"def\"},{1,2})", 2, &["a", "de"]),
+    ("=LEFT({\"abc\";\"xyz\"},{1,2})", 2, &["a", "ab", "x", "xy"]),
+    ("=DATE({2024,2025},{1,2},{15,28})", 2, &["45306", "45716"]),
+    ("=TEXT({1.5,2},\"0.00\")", 2, &["1.50", "2.00"]),
+    ("=TEXT(0.5,{\"0%\",\"0.0\"})", 2, &["50%", "0.5"]),
+    ("=MOD({5,-5},3)", 2, &["2", "1"]),
+    ("=MOD(Data!B1:B3,{3,7})", 2, &["1", "3", "2", "6", "0", "2"]),
+    ("=POWER({2,3},{3;2})", 2, &["8", "27", "4", "9"]),
+    ("=NOT({TRUE,FALSE,0})", 3, &["FALSE", "TRUE", "TRUE"]),
+    ("=ISNUMBER(Data!D1:D3)", 1, &["TRUE", "FALSE", "FALSE"]),
+    ("=ISBLANK(Data!D1:D3)", 1, &["FALSE", "FALSE", "TRUE"]),
+    ("=MOD({5,6,7},{2,4})", 3, &["1", "2", "#N/A"]),
+    ("=ABS({-1,#DIV/0!,3})", 3, &["1", "#DIV/0!", "3"]),
+    ("=ISNA({1,#N/A})", 2, &["FALSE", "TRUE"]),
+    ("=ABS({-4})", 1, &["4", ""]),
+    ("=ROUND({1.25,2.25},{1})", 2, &["1.3", "2.3"]),
+    ("=SUM(Data!A1:A3)", 1, &["6", ""]),
+    ("=COUNTIF(Data!A1:A3,\">1\")", 1, &["2", ""]),
+    ("=SUM(ABS({-1,2}))", 1, &["3", ""]),
+    (
+        "=ROUND(IF(Data!A1:A3>1,Data!A1:A3,0),0)",
+        1,
+        &["0", "2", "3"],
+    ),
+    ("=COUNTIF(Data!A1:A3,{1,3,4})", 3, &["1", "1", "0"]),
+    ("=LARGE(Data!B1:B3,{1,2})", 2, &["30", "20"]),
+    ("=MATCH({3,1},Data!A1:A3,0)", 2, &["3", "1"]),
+    ("=VLOOKUP({2;3},Data!A1:B3,2,FALSE)", 1, &["20", "30"]),
+    ("=LOOKUP({2,3},Data!A1:A3,Data!B1:B3)", 2, &["20", "30"]),
+    ("=RANDBETWEEN(Data!A1:A2,Data!A1:A2)", 1, &["1", "2"]),
+    ("=LET(x,Data!A1:A3,ABS(x-2))", 1, &["1", "0", "1"]),
+];
+
+#[test]
+fn functions_that_take_one_value_run_once_for_each_element() {
+    assert_spills(LIFTED_FUNCTION_RESULTS);
+}
+
+/// A call decides whether it can lift when the formula is entered. A name
+/// that the formula reads before it is defined can still become a range,
+/// so the call lifts once the name is defined.
+#[test]
+fn a_name_defined_after_the_formula_still_lifts_the_call() {
+    let (mut store, report) = data_workbook(2, 4);
+    store.set_formula(report, 0, 0, "=ABS(Vals-2)", 0);
+    store.commit_sources();
+    let data = report + 1;
+    assert!(store.set_named_range("Vals", -1, data, 0, 0, 2, 0));
+    store.commit_sources();
+    let shown_cells: Vec<String> = (0..3).map(|row| shown(&store, report, row, 0)).collect();
+    assert_eq!(shown_cells, ["1", "0", "1"]);
+}
+
 /// A scalar condition evaluates only the branch it takes: the SEQUENCE in
 /// the untaken branch builds no array. The second formula takes that branch
 /// and shows that the count sees it.

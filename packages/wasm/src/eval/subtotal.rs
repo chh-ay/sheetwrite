@@ -25,18 +25,18 @@ use crate::sheet::SheetData;
 pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
     let calls = move |child: &Ast| ast_calls_subtotal(child, names);
     match ast {
-        Ast::Func(Func::Subtotal, _) => true,
+        Ast::Func(Func::Subtotal, ..) => true,
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), _) => true,
-        Ast::Func(_, args) => args.iter().any(calls),
+        Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), ..) => true,
+        Ast::Func(_, args, _) => args.iter().any(calls),
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => calls(&definition.body),
         Ast::UnknownFunc(call) => {
             let args = &call.args;
             args.iter().any(calls)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => calls(left) || calls(right),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => calls(inner),
         Ast::LetSlot { expression, .. } => calls(expression),
         Ast::DefinedName(id, _) => names.facts(*id).has(NameFacts::CALLS_SUBTOTAL),
         _ => false,
@@ -202,7 +202,7 @@ impl SubtotalReader<'_> {
         if let Some(range) = reference {
             return self.range(range, index > 0, pass, depth + 1);
         }
-        if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+        if matches!(arg, Ast::Func(Func::Union, ..) | Ast::SheetSpan(_)) {
             return self.areas(arg, pass, depth + 1);
         }
         self.value(arg, pass, depth)

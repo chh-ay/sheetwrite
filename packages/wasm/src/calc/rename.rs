@@ -42,9 +42,9 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => {

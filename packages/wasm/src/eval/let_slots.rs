@@ -40,7 +40,7 @@ pub(crate) fn resolve_let_names(ast: &mut Ast, names: NameScope<'_>) {
 
     // A LET resolves its own nested LETs, or none of them when it is not
     // resolvable.
-    if let Ast::Func(Func::Let, args) = ast {
+    if let Ast::Func(Func::Let, args, _) = ast {
         if let_resolvable(args, names) {
             let mut bindings = Vec::new();
             let mut next = 0;
@@ -91,17 +91,17 @@ fn lets_have_scalar_bindings(args: &[Ast], names: NameScope<'_>) -> bool {
 fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
     let nested = |child: &Ast| nested_lets_scalar(child, names);
     match ast {
-        Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args, names),
+        Ast::Func(Func::Let, args, _) => lets_have_scalar_bindings(args, names),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
-        Ast::Func(_, args) => args.iter().all(nested),
+        Ast::Func(Func::Analysis(_), ..) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
+        Ast::Func(_, args, _) => args.iter().all(nested),
         #[cfg(not(feature = "analysis"))]
         Ast::UnknownFunc(call) => {
             let args = &call.args;
             args.iter().all(nested)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => nested(left) && nested(right),
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => nested(inner),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => nested(left) && nested(right),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => nested(inner),
         _ => true,
     }
 }
@@ -113,7 +113,7 @@ fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
 pub(crate) fn scalar_binding(expression: &Ast, names: NameScope<'_>) -> bool {
     match expression {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Name(_) => true,
-        Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_) => {
+        Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..) => {
             scalar_operand(expression, names)
         }
         Ast::Func(..) => call_has_scalar_result(expression, names),
@@ -147,10 +147,12 @@ fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
         | Ast::Cell(..)
         | Ast::AbsCell(..)
         | Ast::SheetCell(..) => true,
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             scalar_operand(left, names) && scalar_operand(right, names)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner, names),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
+            scalar_operand(inner, names)
+        }
         Ast::Func(..) => call_has_scalar_result(ast, names),
         Ast::Missing
         | Ast::DefinedName(..)
@@ -181,7 +183,7 @@ fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
 ///   shape;
 /// - calls whose arguments hold a LET that cannot resolve.
 fn call_has_scalar_result(call: &Ast, names: NameScope<'_>) -> bool {
-    let Ast::Func(func, args) = call else {
+    let Ast::Func(func, args, _) = call else {
         return false;
     };
     #[cfg(feature = "analysis")]
@@ -251,7 +253,7 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
         }
         return;
     }
-    if let Ast::Func(Func::Let, args) = ast {
+    if let Ast::Func(Func::Let, args, _) = ast {
         resolve_scope(args, bindings, next);
         return;
     }
@@ -495,7 +497,7 @@ mod tests {
 
     fn let_args(source: &str) -> Vec<Ast> {
         match parse(source) {
-            Ok(Ast::Func(Func::Let, args)) => args.into_vec(),
+            Ok(Ast::Func(Func::Let, args, _)) => args.into_vec(),
             other => panic!("{source} is not a LET: {other:?}"),
         }
     }

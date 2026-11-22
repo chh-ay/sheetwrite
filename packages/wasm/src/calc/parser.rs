@@ -155,8 +155,8 @@ impl<'a> Parser<'a, '_> {
             let right = Box::new(self.binary_at(level + 1, depth)?);
             let left_operand = Box::new(left);
             left = match operator {
-                BinaryOperator::Cmp(op) => Ast::Cmp(op, left_operand, right),
-                BinaryOperator::Op(op) => Ast::Bin(op, left_operand, right),
+                BinaryOperator::Cmp(op) => Ast::cmp(op, left_operand, right),
+                BinaryOperator::Op(op) => Ast::bin(op, left_operand, right),
             };
 
             if level == COMPARISON {
@@ -195,7 +195,7 @@ impl<'a> Parser<'a, '_> {
         }
         while matches!(self.peek(), Some(Tok::Op('%'))) {
             let _ = self.next();
-            value = Ast::Percent(Box::new(value));
+            value = Ast::percent(Box::new(value));
         }
         Ok(value)
     }
@@ -208,9 +208,9 @@ impl<'a> Parser<'a, '_> {
             let _ = self.next();
             let inner = Box::new(self.unary_at(depth + 1)?);
             return Ok(if sign == '-' {
-                Ast::Neg(inner)
+                Ast::neg(inner)
             } else {
-                Ast::Pos(inner)
+                Ast::pos(inner)
             });
         }
         // Intersection binds tighter than every operator except `:`.
@@ -231,7 +231,7 @@ impl<'a> Parser<'a, '_> {
             let _ = self.next();
             operands.push(self.primary_at(depth)?);
         }
-        Ok(Ast::Func(Func::Intersect, operands.into()))
+        Ok(Ast::call(Func::Intersect, operands.into()))
     }
 
     /// A number, or the first row of a whole-row range such as `1:3`.
@@ -260,7 +260,7 @@ impl<'a> Parser<'a, '_> {
                         let _ = self.next();
                         areas.push(self.expr_at(depth + 1)?);
                     }
-                    Ast::Func(Func::Union, areas.into())
+                    Ast::call(Func::Union, areas.into())
                 } else {
                     first
                 };
@@ -469,7 +469,7 @@ impl<'a> Parser<'a, '_> {
         self.close_paren()?;
         let args: Box<[Ast]> = self.args.drain(first..).collect();
         Ok(if let Some(known) = func {
-            Ast::Func(known, args)
+            Ast::call(known, args)
         } else {
             self.features.names = true;
             Ast::UnknownFunc(Box::new(UnknownCall {
@@ -609,7 +609,7 @@ impl<'a> Parser<'a, '_> {
     fn spill_suffix(&mut self, anchor: Ast) -> Ast {
         if matches!(self.peek(), Some(Tok::Hash)) {
             let _ = self.next();
-            Ast::Func(Func::AnchorArray, (vec![anchor]).into())
+            Ast::call(Func::AnchorArray, (vec![anchor]).into())
         } else {
             anchor
         }

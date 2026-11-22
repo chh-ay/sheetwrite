@@ -378,7 +378,7 @@ impl Reader<'_> {
             self.values.start_arg();
             let first = if let Some(area) = argument_range(arg, self.store.name_scope(self.sheet)) {
                 self.range(area, pass, depth + 1)?
-            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+            } else if matches!(arg, Ast::Func(Func::Union, ..) | Ast::SheetSpan(_)) {
                 self.areas(arg, pass, depth + 1)?
             } else {
                 self.value(arg, pass, depth)?

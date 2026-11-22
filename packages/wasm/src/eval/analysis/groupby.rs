@@ -362,7 +362,7 @@ impl Aggregator {
             } else {
                 1
             };
-            let Ast::Func(function, _) =
+            let Ast::Func(function, ..) =
                 parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?
             else {
                 return Err(FormulaError::Value);
@@ -378,7 +378,7 @@ impl Aggregator {
                 .collect();
             return Ok(Self {
                 arity,
-                function: Ast::Func(function, arguments),
+                function: Ast::call(function, arguments),
                 label,
             });
         }
@@ -442,7 +442,7 @@ impl Aggregator {
             super::lambda::Context::new(context.store, context.sheet, context.pass, context.depth);
         if let Ast::Lambda(_) = &self.function {
             super::lambda::call_with_slots(call, &self.function, slots)
-        } else if let Ast::Func(_, _) = &self.function {
+        } else if let Ast::Func(..) = &self.function {
             super::lambda::evaluate_with_slots(call, &self.function, slots)
         } else {
             Err(FormulaError::Value)
@@ -528,7 +528,7 @@ pub(crate) fn evaluate_ast(
     }
     let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
         store.eval_ast(
-            &Ast::Func(Func::Sum, (vec![expression.clone()]).into()),
+            &Ast::call(Func::Sum, (vec![expression.clone()]).into()),
             sheet,
             pass,
             depth + 1,

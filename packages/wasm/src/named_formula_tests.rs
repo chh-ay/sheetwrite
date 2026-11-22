@@ -444,7 +444,7 @@ fn first_operand_address(
     let entry = store.sheets[sheet]
         .formulas
         .get((row, col), &store.formula_slots)?;
-    let crate::calc::Ast::Bin(_, left, _) = entry.ast.as_ref()? else {
+    let crate::calc::Ast::Bin(_, left, _, _) = entry.ast.as_ref()? else {
         return None;
     };
     Some(std::ptr::from_ref(&**left))

@@ -57,7 +57,7 @@ fn a_space_before_any_reference_form_intersects() {
     }
     assert!(matches!(
         parse("=A1:B2 'Other Sheet'!B1"),
-        Ok(Ast::Func(Func::Intersect, operands)) if operands.len() == 2
+        Ok(Ast::Func(Func::Intersect, operands, _)) if operands.len() == 2
     ));
 }
 
@@ -154,7 +154,7 @@ fn heap_memory_stats_accounts_owning_ast_shapes() {
         ),
         (
             "function arguments",
-            Ast::Func(Func::Rept, (vec![Ast::Num(1.0)]).into()),
+            Ast::call(Func::Rept, (vec![Ast::Num(1.0)]).into()),
             boxed,
         ),
         (
@@ -167,17 +167,17 @@ fn heap_memory_stats_accounts_owning_ast_shapes() {
         ),
         (
             "binary",
-            Ast::Bin(Op::Add, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
+            Ast::bin(Op::Add, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
             boxed * 2,
         ),
         (
             "comparison",
-            Ast::Cmp(CmpOp::Eq, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
+            Ast::cmp(CmpOp::Eq, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
             boxed * 2,
         ),
-        ("negation", Ast::Neg(Box::new(Ast::Num(1.0))), boxed),
-        ("unary plus", Ast::Pos(Box::new(Ast::Num(1.0))), boxed),
-        ("percent", Ast::Percent(Box::new(Ast::Num(1.0))), boxed),
+        ("negation", Ast::neg(Box::new(Ast::Num(1.0))), boxed),
+        ("unary plus", Ast::pos(Box::new(Ast::Num(1.0))), boxed),
+        ("percent", Ast::percent(Box::new(Ast::Num(1.0))), boxed),
         ("inline leaf", Ast::Cell(2, 3, RefFlags::default()), 0),
         ("invalid reference", Ast::InvalidRef, 0),
     ];

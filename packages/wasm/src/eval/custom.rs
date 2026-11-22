@@ -295,12 +295,12 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions, names: NameScop
                 .is_some_and(|function| function.volatile)
                 || any(arguments)
         }
-        Ast::Func(_, arguments) => any(arguments),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Func(_, arguments, _) => any(arguments),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             calls_volatile_custom(left, functions, names)
                 || calls_volatile_custom(right, functions, names)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
             calls_volatile_custom(inner, functions, names)
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions, names),

@@ -246,14 +246,14 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             out.push('}');
         }
         Ast::LetSlot { expression, .. } => write_ast_with_names(expression, out, names),
-        Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
+        Ast::Func(Func::AnchorArray, args, _) if args.len() == 1 => {
             write_ast_with_names(&args[0], out, names);
             // A deleted anchor writes as #REF!, which has no spill suffix.
             if !matches!(args[0], Ast::InvalidRef) {
                 out.push('#');
             }
         }
-        Ast::Func(Func::Union, areas) => {
+        Ast::Func(Func::Union, areas, _) => {
             out.push('(');
             for (index, area) in areas.iter().enumerate() {
                 if index > 0 {
@@ -263,14 +263,14 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             }
             out.push(')');
         }
-        Ast::Func(Func::Intersect, operands) => {
+        Ast::Func(Func::Intersect, operands, _) => {
             for (index, operand) in operands.iter().enumerate() {
                 if index > 0 {
                     out.push(' ');
                 }
                 // A signed operand needs its own parentheses, or the sign
                 // would apply to the whole intersection when parsed again.
-                let signed = matches!(operand, Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_));
+                let signed = matches!(operand, Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..));
                 if signed {
                     out.push('(');
                 }
@@ -280,7 +280,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
                 }
             }
         }
-        Ast::Func(func, args) => {
+        Ast::Func(func, args, _) => {
             out.push_str(func_name(*func));
             out.push('(');
             for (index, arg) in args.iter().enumerate() {
@@ -320,7 +320,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             }
             out.push(')');
         }
-        Ast::Bin(op, left, right) => {
+        Ast::Bin(op, left, right, _) => {
             out.push('(');
             write_ast_with_names(left, out, names);
             out.push(match op {
@@ -334,7 +334,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             write_ast_with_names(right, out, names);
             out.push(')');
         }
-        Ast::Cmp(op, left, right) => {
+        Ast::Cmp(op, left, right, _) => {
             out.push('(');
             write_ast_with_names(left, out, names);
             out.push_str(match op {
@@ -348,17 +348,17 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             write_ast_with_names(right, out, names);
             out.push(')');
         }
-        Ast::Neg(inner) => {
+        Ast::Neg(inner, _) => {
             out.push_str("-(");
             write_ast_with_names(inner, out, names);
             out.push(')');
         }
-        Ast::Pos(inner) => {
+        Ast::Pos(inner, _) => {
             out.push_str("+(");
             write_ast_with_names(inner, out, names);
             out.push(')');
         }
-        Ast::Percent(inner) => {
+        Ast::Percent(inner, _) => {
             out.push('(');
             write_ast_with_names(inner, out, names);
             out.push_str(")%");

@@ -567,18 +567,18 @@ impl CellStore {
                 *expression = self.inlined_measure(measure, stack)?;
                 Ok(())
             }
-            Ast::Func(_, arguments) => arguments
+            Ast::Func(_, arguments, _) => arguments
                 .iter_mut()
                 .try_for_each(|argument| self.inline_references(argument, stack)),
             Ast::UnknownFunc(call) => call
                 .args
                 .iter_mut()
                 .try_for_each(|argument| self.inline_references(argument, stack)),
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
                 self.inline_references(left, stack)?;
                 self.inline_references(right, stack)
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
                 self.inline_references(inner, stack)
             }
             Ast::Num(_)
@@ -860,7 +860,7 @@ impl CellStore {
                 | Func::Column
                 | Func::Cell
                 | Func::AnchorArray,
-                _,
+                ..,
             )
             | Ast::Parameter { .. }
             | Ast::Lambda(_)
@@ -879,17 +879,17 @@ impl CellStore {
             | Ast::InvalidRef
             | Ast::LetSlot { .. }
             | Ast::LetName { .. } => Err(FormulaError::Value),
-            Ast::Func(_, arguments) => arguments.iter_mut().try_for_each(|argument| {
+            Ast::Func(_, arguments, _) => arguments.iter_mut().try_for_each(|argument| {
                 self.name_columns(argument, columns, context, contexts, calculations)
             }),
             Ast::UnknownFunc(call) => call.args.iter_mut().try_for_each(|argument| {
                 self.name_columns(argument, columns, context, contexts, calculations)
             }),
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
                 self.name_columns(left, columns, context, contexts, calculations)?;
                 self.name_columns(right, columns, context, contexts, calculations)
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
                 self.name_columns(inner, columns, context, contexts, calculations)
             }
             Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array(_) => Ok(()),
@@ -915,7 +915,7 @@ impl CellStore {
                         _ => return Err(FormulaError::Value),
                     }
                 }
-                Ast::Cmp(op, left, right) => match (&**left, &**right) {
+                Ast::Cmp(op, left, right, _) => match (&**left, &**right) {
                     (Ast::Structured(column), value) => (column, *op, value),
                     (value, Ast::Structured(column)) => (column, swapped(*op), value),
                     _ => return Err(FormulaError::Value),
@@ -942,9 +942,9 @@ impl CellStore {
                 | Ast::Func(..)
                 | Ast::UnknownFunc(..)
                 | Ast::Bin(..)
-                | Ast::Neg(_)
-                | Ast::Pos(_)
-                | Ast::Percent(_)
+                | Ast::Neg(..)
+                | Ast::Pos(..)
+                | Ast::Percent(..)
                 | Ast::LetSlot { .. }
                 | Ast::LetName { .. }
                 | Ast::Array { .. } => return Err(FormulaError::Value),
