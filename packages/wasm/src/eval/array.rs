@@ -84,9 +84,12 @@ impl<'a> Shapes<'a> {
 }
 
 /// Whether `ast` evaluates to an array. A LAMBDA parameter's shape comes
-/// from `shapes`: [`Shapes::top`] outside every call. A value, a cell or a
-/// written range, what most arguments are, is decided inline; every other
-/// node takes [`node_produces_array`].
+/// from `shapes`: [`Shapes::top`] outside every call. A value, a cell, a
+/// written range or a call without arguments (`ROW()`, `TODAY()`, `PI()`), what
+/// most arguments are, is decided inline; every other node takes
+/// [`node_produces_array`]. The conditional-format rules ask this of every
+/// nested call in every visible cell, so the inline cases keep a call such
+/// as `MOD(ROW(),2)` from walking into `ROW()`.
 #[inline]
 #[allow(
     clippy::wildcard_enum_match_arm,
@@ -96,8 +99,25 @@ pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
     match ast {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Cell(..) | Ast::AbsCell(..) => false,
         Ast::Range(..) | Ast::AbsRange(..) => true,
+        Ast::Func(func, args) if args.is_empty() && !returns_array_without_arguments(*func) => {
+            false
+        }
         _ => node_produces_array(ast, shapes),
     }
+}
+
+/// The functions whose call without arguments can still be an array: the
+/// reference functions, and in the full engine a family with array hooks.
+/// Every other call without arguments is one value.
+const fn returns_array_without_arguments(func: Func) -> bool {
+    #[cfg(feature = "analysis")]
+    if matches!(func, Func::Analysis(_)) {
+        return true;
+    }
+    matches!(
+        func,
+        Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect
+    )
 }
 
 /// [`ast_produces_array`] of any node.
