@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use std::rc::Rc;
 
-use crate::calc::{Ast, Func, RangeFlags, SheetRef};
+use crate::calc::{Ast, Func, RangeFlags, Shape, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
@@ -32,8 +32,8 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
         {
             Some(value.trunc() as i64)
         }
-        Ast::Neg(inner) => static_integer(Some(inner)).and_then(i64::checked_neg),
-        Ast::Pos(inner) => static_integer(Some(inner)),
+        Ast::Neg(inner, _) => static_integer(Some(inner)).and_then(i64::checked_neg),
+        Ast::Pos(inner, _) => static_integer(Some(inner)),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -54,7 +54,7 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Percent(_)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
@@ -100,9 +100,21 @@ pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
     }
 }
 
-/// [`ast_produces_array`] of any node.
+/// [`ast_produces_array`] of any other node. A call or operator whose
+/// [`Shape`] was decided when it was built answers without a walk; the
+/// rest are decided here.
 fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
     match ast {
+        Ast::Func(_, _, shape)
+        | Ast::Bin(_, _, _, shape)
+        | Ast::Cmp(_, _, _, shape)
+        | Ast::Neg(_, shape)
+        | Ast::Pos(_, shape)
+        | Ast::Percent(_, shape)
+            if shape.get() != Shape::Dynamic =>
+        {
+            shape.get() == Shape::Array
+        }
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, ..) => true,
         #[cfg(feature = "analysis")]
         Ast::Parameter { depth, index, .. } => _shapes.parameter_is_array(*depth, *index),
@@ -119,10 +131,10 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
         Ast::Structured(reference) => reference.row_start != reference.row_end,
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression, _shapes),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             ast_produces_array(left, _shapes) || ast_produces_array(right, _shapes)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
             ast_produces_array(inner, _shapes)
         }
         #[cfg(feature = "analysis")]
@@ -152,13 +164,90 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
             args,
             _,
         ) => args.iter().any(|arg| ast_produces_array(arg, _shapes)),
-        // A function that takes one value, given an array there. The call's
-        // shape, decided when it was built, rules out most calls without
-        // looking at their arguments.
-        Ast::Func(func, args, shape) if shape.may_lift() => {
-            super::lift::lifts(*func, args, _shapes)
-        }
+        // A function that takes one value, given an array there.
+        Ast::Func(func, args, _) => super::lift::lifts(*func, args, _shapes),
         _ => false,
+    }
+}
+
+/// The [`Shape`] of `ast` as far as the tree decides it: the shape a call or
+/// operator was built with, and for any other node the one its kind gives.
+/// A node that binding or a rewrite can still turn into an array (a name, a
+/// structured or detached reference, a LET name, a LAMBDA parameter, an
+/// unknown call) is [`Shape::Dynamic`].
+pub(crate) fn node_shape(ast: &Ast) -> Shape {
+    match ast {
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Cell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetCell(_)
+        | Ast::InvalidRef => Shape::Scalar,
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => Shape::Array,
+        Ast::Func(_, _, shape)
+        | Ast::Bin(_, _, _, shape)
+        | Ast::Cmp(_, _, _, shape)
+        | Ast::Neg(_, shape)
+        | Ast::Pos(_, shape)
+        | Ast::Percent(_, shape) => shape.get(),
+        Ast::LetSlot { expression, .. } => node_shape(expression),
+        Ast::Name(_)
+        | Ast::DefinedName(..)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::SheetRange(_)
+        | Ast::SheetSpan(_)
+        | Ast::UnknownFunc(_)
+        | Ast::LetName { .. } => Shape::Dynamic,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } => Shape::Dynamic,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(_) | Ast::RegexPattern(_) => Shape::Scalar,
+    }
+}
+
+/// The [`Shape`] of a call of `func` with `args`, decided once when the call
+/// is built ([`Ast::call`]). It follows [`node_produces_array`] arm by arm:
+/// OFFSET, INDIRECT, `A1#` and a family with array hooks are decided when
+/// asked, the array functions are arrays, LET and the branch functions are
+/// arrays when an argument is, INDEX when it selects a whole row or column,
+/// and every other function when an argument that takes one value is.
+pub(crate) fn call_shape(func: Func, args: &[Ast]) -> Shape {
+    match func {
+        Func::AnchorArray | Func::Offset | Func::Indirect => Shape::Dynamic,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) if super::analysis::family(id).array.is_some() => Shape::Dynamic,
+        Func::Intersect
+        | Func::Filter
+        | Func::Sort
+        | Func::Unique
+        | Func::Transpose
+        | Func::Sequence
+        | Func::Take
+        | Func::Drop
+        | Func::ChooseCols
+        | Func::ChooseRows
+        | Func::TrimRange => Shape::Array,
+        Func::Let
+        | Func::If
+        | Func::IfError
+        | Func::IfNa
+        | Func::Ifs
+        | Func::Switch
+        | Func::Choose => Shape::any(args.iter().map(node_shape)),
+        Func::Index if index_selects_whole_axis(args) => Shape::Array,
+        Func::Index => Shape::Scalar,
+        _ => {
+            let value_args = super::lift::value_args(func);
+            Shape::any(
+                args.iter()
+                    .enumerate()
+                    .filter(|&(index, _)| value_args.takes(index))
+                    .map(|(_, arg)| node_shape(arg)),
+            )
+        }
     }
 }
 
@@ -240,7 +329,7 @@ impl CellStore {
             // The shape is known only after evaluation, so the pending loop
             // charges the spill budget with the evaluated size instead.
             Ast::Func(Func::Offset | Func::Indirect, ..) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
-            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+            Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..)
                 if ast_produces_array(ast, pass.shapes(self.name_scope(formula_sheet))) =>
             {
                 Some(
@@ -465,7 +554,7 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<T, FormulaError>> {
         let result = match ast {
-            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+            Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..)
                 if ast_produces_array(ast, pass.shapes(self.name_scope(sheet))) =>
             {
                 self.eval_operator_array(ast, sheet, pass, depth + 1)
@@ -670,7 +759,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
                 let names = self.name_scope(formula_sheet);
                 let (left_rows, left_cols, _) = if ast_produces_array(left, pass.shapes(names)) {
                     self.matrix_shape(left, formula_sheet, pass)?
@@ -686,7 +775,7 @@ impl CellStore {
                 let cols = left_cols.max(right_cols);
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
                 return self.matrix_shape(inner, formula_sheet, pass);
             }
             Ast::Func(Func::AnchorArray, args, _) => {
@@ -850,9 +939,9 @@ impl CellStore {
             | Ast::UnknownFunc(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array { .. } => {

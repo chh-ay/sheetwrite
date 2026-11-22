@@ -153,9 +153,9 @@ impl CellStore {
             | Ast::UnknownFunc(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array { .. }) => range_from_ast(other, self.name_scope(sheet))
@@ -268,9 +268,9 @@ impl CellStore {
             | Ast::UnknownFunc(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array { .. } => vec![Err(FormulaError::Value)],
@@ -350,9 +350,9 @@ impl CellStore {
             | Ast::UnknownFunc(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array { .. } => Err(FormulaError::Ref),

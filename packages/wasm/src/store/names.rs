@@ -632,9 +632,9 @@ impl<'a> NameScope<'a> {
                 | Ast::UnknownFunc(..)
                 | Ast::Bin(..)
                 | Ast::Cmp(..)
-                | Ast::Neg(_)
-                | Ast::Pos(_)
-                | Ast::Percent(_)
+                | Ast::Neg(..)
+                | Ast::Pos(..)
+                | Ast::Percent(..)
                 | Ast::LetName { .. }
                 | Ast::Array { .. } => return expression,
             };
@@ -1623,11 +1623,13 @@ fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
                 used_names(arg, names);
             }
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             used_names(left, names);
             used_names(right, names);
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => used_names(inner, names),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
+            used_names(inner, names)
+        }
         Ast::LetSlot { expression, .. } => used_names(expression, names),
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => used_names(&definition.body, names),
@@ -1660,10 +1662,10 @@ fn is_positional(ast: &Ast) -> bool {
         Ast::UnresolvedStructured(_) | Ast::Structured(_) => true,
         Ast::Func(_, args, _) => args.iter().any(is_positional),
         Ast::UnknownFunc(call) => call.args.iter().any(is_positional),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             is_positional(left) || is_positional(right)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => is_positional(inner),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => is_positional(inner),
         Ast::LetSlot { expression, .. } => is_positional(expression),
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => is_positional(&definition.body),

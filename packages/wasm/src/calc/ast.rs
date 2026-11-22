@@ -302,16 +302,17 @@ pub(crate) enum Ast {
     /// otherwise grow every node of every formula.
     SheetSpan(Box<SheetSpanRef>),
     InvalidRef,
-    /// A call of a built-in function. The [`CallShape`] is decided once
-    /// from the arguments when the call is built ([`Ast::call`]), so shape
-    /// checks need not walk into the arguments of a call that can't lift.
-    Func(Func, Box<[Self]>, CallShape),
+    /// A call of a built-in function. Its [`NodeShape`] is decided once
+    /// from the arguments when the call is built ([`Ast::call`]).
+    Func(Func, Box<[Self]>, NodeShape),
     UnknownFunc(Box<UnknownCall>),
-    Bin(Op, Box<Self>, Box<Self>),
-    Cmp(CmpOp, Box<Self>, Box<Self>),
-    Neg(Box<Self>),
-    Pos(Box<Self>),
-    Percent(Box<Self>),
+    /// Operators carry a [`NodeShape`] like calls ([`Ast::bin`] and the
+    /// other operator builders).
+    Bin(Op, Box<Self>, Box<Self>, NodeShape),
+    Cmp(CmpOp, Box<Self>, Box<Self>, NodeShape),
+    Neg(Box<Self>, NodeShape),
+    Pos(Box<Self>, NodeShape),
+    Percent(Box<Self>, NodeShape),
     /// One use of a LET binding in an expanded tree. `slot` identifies the
     /// binding for the evaluation in progress, so its expression is evaluated
     /// at most once however many uses the expansion has; `expression` stays
@@ -341,38 +342,137 @@ const _: () = assert!(
     std::mem::size_of::<Ast>() == 24,
     "Ast changed size: measure, then update this number"
 );
-// The call shape lives in the padding of `Ast::Func`.
+// The node shape lives in the padding of the call and operator variants.
 const _: () = assert!(
-    std::mem::size_of::<CallShape>() == 1,
-    "CallShape must fit in the padding of Ast::Func"
+    std::mem::size_of::<NodeShape>() == 1,
+    "NodeShape must fit in the padding of Ast::Func and the operators"
 );
 
-/// What a call's arguments can be, decided once when the call is built.
-/// Only [`Ast::call`] makes one, from the function and its arguments, so
-/// no builder can leave it out or set it by hand.
+/// Whether a node evaluates to an array, as far as the tree alone decides.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CallShape(bool);
+pub(crate) enum Shape {
+    /// One value, wherever and whenever it is evaluated.
+    Scalar,
+    /// An array, wherever and whenever it is evaluated.
+    Array,
+    /// Decided by the shape check when it is asked: the node reads a LAMBDA
+    /// parameter, a defined name, a structured or detached reference, a LET
+    /// name, a call whose result has no shape of its own (OFFSET, INDIRECT,
+    /// `A1#`, a LAMBDA call), or a node that binding can still change.
+    Dynamic,
+}
 
-impl CallShape {
-    /// The shape of a call of `func` with `args`: whether an argument that
-    /// takes one value can be an array, so the call can lift (#1127).
-    fn of(func: Func, args: &[Ast]) -> Self {
-        Self(crate::eval::call_may_lift(func, args))
+impl Shape {
+    /// The shape of a node that is an array when any of `parts` is.
+    pub(crate) fn any(parts: impl IntoIterator<Item = Self>) -> Self {
+        let mut shape = Self::Scalar;
+        for part in parts {
+            match part {
+                Self::Array => return Self::Array,
+                Self::Dynamic => shape = Self::Dynamic,
+                Self::Scalar => {}
+            }
+        }
+        shape
     }
+}
 
-    /// Whether the call can lift: an argument that takes one value can be
-    /// an array. `false` means it never does, whatever the arguments
-    /// evaluate to; `true` leaves it to the shape check.
-    pub(crate) const fn may_lift(self) -> bool {
+/// The [`Shape`] of a call or operator node, decided once when the node is
+/// built, so the shape check ([`crate::eval::ast_produces_array`]) answers
+/// a static node without walking it. Only the builders in this module make
+/// one ([`Ast::call`], [`Ast::bin`], [`Ast::cmp`], [`Ast::neg`],
+/// [`Ast::pos`], [`Ast::percent`]), so no builder can leave it out or set
+/// it by hand.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NodeShape(Shape);
+
+impl NodeShape {
+    /// The shape this node was built with.
+    pub(crate) const fn get(self) -> Shape {
         self.0
     }
 }
 
 impl Ast {
-    /// A call of `func` with `args`, with its [`CallShape`].
+    /// A call of `func` with `args`, with its [`NodeShape`].
     pub(crate) fn call(func: Func, args: Box<[Self]>) -> Self {
-        let shape = CallShape::of(func, &args);
+        let shape = NodeShape(crate::eval::call_shape(func, &args));
         Self::Func(func, args, shape)
+    }
+
+    /// `left op right`, an array when either operand is.
+    pub(crate) fn bin(op: Op, left: Box<Self>, right: Box<Self>) -> Self {
+        let shape = NodeShape(Shape::any([left.shape(), right.shape()]));
+        Self::Bin(op, left, right, shape)
+    }
+
+    /// `left op right` for a comparison, an array when either operand is.
+    pub(crate) fn cmp(op: CmpOp, left: Box<Self>, right: Box<Self>) -> Self {
+        let shape = NodeShape(Shape::any([left.shape(), right.shape()]));
+        Self::Cmp(op, left, right, shape)
+    }
+
+    /// `-inner`, an array when `inner` is.
+    pub(crate) fn neg(inner: Box<Self>) -> Self {
+        let shape = NodeShape(inner.shape());
+        Self::Neg(inner, shape)
+    }
+
+    /// `+inner`, an array when `inner` is.
+    pub(crate) fn pos(inner: Box<Self>) -> Self {
+        let shape = NodeShape(inner.shape());
+        Self::Pos(inner, shape)
+    }
+
+    /// `inner%`, an array when `inner` is.
+    pub(crate) fn percent(inner: Box<Self>) -> Self {
+        let shape = NodeShape(inner.shape());
+        Self::Percent(inner, shape)
+    }
+
+    /// This node's [`Shape`]: the one a call or operator was built with,
+    /// and for any other node the one its kind gives.
+    pub(crate) fn shape(&self) -> Shape {
+        crate::eval::node_shape(self)
+    }
+
+    /// This call or operator node with its [`NodeShape`] decided again from
+    /// its children, after a rewrite changed them in place; any other node
+    /// is left as it is.
+    fn refresh_shape(&mut self) {
+        match self {
+            Self::Func(func, args, shape) => {
+                *shape = NodeShape(crate::eval::call_shape(*func, args))
+            }
+            Self::Bin(_, left, right, shape) | Self::Cmp(_, left, right, shape) => {
+                *shape = NodeShape(Shape::any([left.shape(), right.shape()]));
+            }
+            Self::Neg(inner, shape) | Self::Pos(inner, shape) | Self::Percent(inner, shape) => {
+                *shape = NodeShape(inner.shape());
+            }
+            Self::Num(_)
+            | Self::Str(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Name(_)
+            | Self::DefinedName(..)
+            | Self::UnresolvedStructured(_)
+            | Self::Structured(_)
+            | Self::Cell(..)
+            | Self::SheetCell(_)
+            | Self::AbsCell(..)
+            | Self::Range(..)
+            | Self::SheetRange(_)
+            | Self::AbsRange(..)
+            | Self::SheetSpan(_)
+            | Self::InvalidRef
+            | Self::UnknownFunc(_)
+            | Self::LetSlot { .. }
+            | Self::LetName { .. }
+            | Self::Array(_) => {}
+            #[cfg(feature = "analysis")]
+            Self::Parameter { .. } | Self::Lambda(_) | Self::RegexPattern(_) => {}
+        }
     }
 }
 
@@ -390,8 +490,10 @@ impl Ast {
                 let args = &call.args;
                 args.iter().any(test)
             }
-            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => test(left) || test(right),
-            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => test(inner),
+            Self::Bin(_, left, right, _) | Self::Cmp(_, left, right, _) => {
+                test(left) || test(right)
+            }
+            Self::Neg(inner, _) | Self::Pos(inner, _) | Self::Percent(inner, _) => test(inner),
             Self::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
             Self::Parameter { .. } => false,
@@ -422,27 +524,24 @@ impl Ast {
 
     /// Run `visit` on every direct child expression, as [`Ast::any_child`]
     /// finds them, and return whether any visit reported a change. Every
-    /// child is visited, so one rewrite does not stop the others. A call
-    /// whose arguments changed decides its [`CallShape`] again. Every node
-    /// kind is listed, so a new kind must say whether it has children.
+    /// child is visited, so one rewrite does not stop the others. A call or
+    /// operator whose children changed decides its [`NodeShape`] again.
+    /// Every node kind is listed, so a new kind must say whether it has
+    /// children.
     pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Self) -> bool) -> bool {
-        match self {
-            Self::Func(func, args, shape) => {
-                let changed = args
-                    .iter_mut()
-                    .fold(false, |changed, arg| visit(arg) | changed);
-                if changed {
-                    *shape = CallShape::of(*func, args);
-                }
-                changed
-            }
+        let changed = match self {
+            Self::Func(_, args, _) => args
+                .iter_mut()
+                .fold(false, |changed, arg| visit(arg) | changed),
             Self::UnknownFunc(call) => {
                 let args = &mut call.args;
                 args.iter_mut()
                     .fold(false, |changed, arg| visit(arg) | changed)
             }
-            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => visit(left) | visit(right),
-            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => visit(inner),
+            Self::Bin(_, left, right, _) | Self::Cmp(_, left, right, _) => {
+                visit(left) | visit(right)
+            }
+            Self::Neg(inner, _) | Self::Pos(inner, _) | Self::Percent(inner, _) => visit(inner),
             Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
             Self::Parameter { .. } => false,
@@ -470,7 +569,11 @@ impl Ast {
             | Self::SheetSpan(_)
             | Self::InvalidRef
             | Self::Array(_) => false,
+        };
+        if changed {
+            self.refresh_shape();
         }
+        changed
     }
 
     /// Heap payload owned below an inline AST root. The root itself is already
@@ -540,11 +643,11 @@ impl Ast {
                 add_string_memory(name, out);
                 add_ast_slice_memory(args, out);
             }
-            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => {
+            Self::Bin(_, left, right, _) | Self::Cmp(_, left, right, _) => {
                 add_boxed_ast_memory(left, out);
                 add_boxed_ast_memory(right, out);
             }
-            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => {
+            Self::Neg(inner, _) | Self::Pos(inner, _) | Self::Percent(inner, _) => {
                 add_boxed_ast_memory(inner, out);
             }
             Self::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),

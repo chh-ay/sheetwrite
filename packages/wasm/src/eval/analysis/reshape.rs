@@ -89,8 +89,8 @@ fn literal_number(ast: &Ast) -> Option<f64> {
     match ast {
         Ast::Num(value) if value.is_finite() => Some(*value),
         Ast::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
-        Ast::Neg(inner) => literal_number(inner).map(|value| -value),
-        Ast::Pos(inner) => literal_number(inner),
+        Ast::Neg(inner, _) => literal_number(inner).map(|value| -value),
+        Ast::Pos(inner, _) => literal_number(inner),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Missing
@@ -113,7 +113,7 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Percent(_)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,

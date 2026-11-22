@@ -35,8 +35,8 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
             let args = &call.args;
             args.iter().any(calls)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => calls(left) || calls(right),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => calls(inner),
         Ast::LetSlot { expression, .. } => calls(expression),
         Ast::DefinedName(id, _) => names.facts(*id).has(NameFacts::CALLS_SUBTOTAL),
         _ => false,

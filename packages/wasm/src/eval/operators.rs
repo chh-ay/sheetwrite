@@ -221,9 +221,9 @@ enum BinaryOperator {
 /// The operator and operand of a unary operator node, `None` for any other node.
 fn unary_parts(ast: &Ast) -> Option<(UnaryOp, &Ast)> {
     match ast {
-        Ast::Neg(inner) => Some((UnaryOp::Neg, inner.as_ref())),
-        Ast::Pos(inner) => Some((UnaryOp::Pos, inner.as_ref())),
-        Ast::Percent(inner) => Some((UnaryOp::Percent, inner.as_ref())),
+        Ast::Neg(inner, _) => Some((UnaryOp::Neg, inner.as_ref())),
+        Ast::Pos(inner, _) => Some((UnaryOp::Pos, inner.as_ref())),
+        Ast::Percent(inner, _) => Some((UnaryOp::Percent, inner.as_ref())),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -258,12 +258,12 @@ type BinaryParts<'a> = (BinaryOperator, &'a Ast, &'a Ast);
 /// The operator and operands of a binary operator node, `None` for any other node.
 fn binary_parts(ast: &Ast) -> Option<BinaryParts<'_>> {
     match ast {
-        Ast::Bin(op, left, right) => Some((
+        Ast::Bin(op, left, right, _) => Some((
             BinaryOperator::Arithmetic(*op),
             left.as_ref(),
             right.as_ref(),
         )),
-        Ast::Cmp(op, left, right) => Some((
+        Ast::Cmp(op, left, right, _) => Some((
             BinaryOperator::Comparison(*op),
             left.as_ref(),
             right.as_ref(),
@@ -286,9 +286,9 @@ fn binary_parts(ast: &Ast) -> Option<BinaryParts<'_>> {
         | Ast::InvalidRef
         | Ast::Func(..)
         | Ast::UnknownFunc(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,

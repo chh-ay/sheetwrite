@@ -203,8 +203,8 @@ pub(crate) fn evaluate_matrix(
 fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
     let number = match ast {
         Ast::Num(number) => *number,
-        Ast::Pos(inner) => number_literal(inner)?,
-        Ast::Neg(inner) => -number_literal(inner)?,
+        Ast::Pos(inner, _) => number_literal(inner)?,
+        Ast::Neg(inner, _) => -number_literal(inner)?,
         Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
@@ -227,7 +227,7 @@ fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Percent(_)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => return None,
@@ -261,9 +261,9 @@ const fn number_literal(ast: &Ast) -> Option<f64> {
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,

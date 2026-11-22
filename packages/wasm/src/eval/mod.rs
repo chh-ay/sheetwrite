@@ -74,7 +74,7 @@ use crate::types::{
 };
 
 use array::dynamic_recompute_within_limit;
-pub(crate) use array::{ast_produces_array, Shapes};
+pub(crate) use array::{ast_produces_array, call_shape, node_shape, Shapes};
 pub(crate) use criteria::{sum_range_extent, Criterion};
 pub(crate) use date::excel_date_parts;
 use date::host_clock_serial;
@@ -87,7 +87,6 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
 pub(crate) use let_slots::{resolve_let_names, LetFrame};
-pub(crate) use lift::call_may_lift;
 use lookup::option_code;
 pub(crate) use lookup::LookupStates;
 pub(crate) use matrix::range_from_ast as static_range;
@@ -480,9 +479,9 @@ fn expand_let_node<'a>(
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
@@ -568,19 +567,21 @@ fn expand_let_node<'a>(
                 .collect::<Result<Vec<_>, _>>()?
                 .into(),
         })),
-        Ast::Bin(op, left, right) => Ast::Bin(
+        Ast::Bin(op, left, right, _) => Ast::bin(
             *op,
             Box::new(expand(left, bindings, nodes, next_slot)?),
             Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Cmp(op, left, right) => Ast::Cmp(
+        Ast::Cmp(op, left, right, _) => Ast::cmp(
             *op,
             Box::new(expand(left, bindings, nodes, next_slot)?),
             Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(expand(inner, bindings, nodes, next_slot)?)),
-        Ast::Pos(inner) => Ast::Pos(Box::new(expand(inner, bindings, nodes, next_slot)?)),
-        Ast::Percent(inner) => Ast::Percent(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Neg(inner, _) => Ast::neg(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Pos(inner, _) => Ast::pos(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Percent(inner, _) => {
+            Ast::percent(Box::new(expand(inner, bindings, nodes, next_slot)?))
+        }
         other => other.clone(),
     })
 }
@@ -617,9 +618,9 @@ fn shift_parameters(ast: &mut Ast, by: u16) {
             | Ast::UnknownFunc(_)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array(_) => {
@@ -2016,10 +2017,10 @@ impl CellStore {
             Ast::Structured(_) | Ast::Range(..) | Ast::AbsRange(..) | Ast::SheetSpan(_) => {
                 Value::Error(FormulaError::Value)
             }
-            Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
+            Ast::Neg(expr, _) | Ast::Pos(expr, _) | Ast::Percent(expr, _) => {
                 let op = match ast {
-                    Ast::Neg(_) => operators::UnaryOp::Neg,
-                    Ast::Pos(_) => operators::UnaryOp::Pos,
+                    Ast::Neg(..) => operators::UnaryOp::Neg,
+                    Ast::Pos(..) => operators::UnaryOp::Pos,
                     Ast::Num(_)
                     | Ast::Str(_)
                     | Ast::Bool(_)
@@ -2040,7 +2041,7 @@ impl CellStore {
                     | Ast::UnknownFunc(..)
                     | Ast::Bin(..)
                     | Ast::Cmp(..)
-                    | Ast::Percent(_)
+                    | Ast::Percent(..)
                     | Ast::LetSlot { .. }
                     | Ast::LetName { .. }
                     | Ast::Array { .. } => operators::UnaryOp::Percent,
@@ -2051,13 +2052,13 @@ impl CellStore {
                 };
                 operators::unary(op, &self.eval_ast(expr, sheet, pass, depth + 1))
             }
-            Ast::Bin(op, left, right) => {
+            Ast::Bin(op, left, right, _) => {
                 let left_value = self.eval_ast(left, sheet, pass, depth + 1);
                 operators::binary(*op, &left_value, || {
                     self.eval_ast(right, sheet, pass, depth + 1)
                 })
             }
-            Ast::Cmp(op, left, right) => {
+            Ast::Cmp(op, left, right, _) => {
                 let left_value = self.eval_ast(left, sheet, pass, depth + 1);
                 let right_value = self.eval_ast(right, sheet, pass, depth + 1);
                 operators::comparison(*op, &left_value, &right_value)

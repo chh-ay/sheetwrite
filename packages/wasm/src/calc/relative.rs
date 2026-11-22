@@ -64,9 +64,9 @@ fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
         | Ast::LetSlot { .. }
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -263,9 +263,9 @@ fn translate_relative_refs_inner(
         | Ast::UnknownFunc(_)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_) => {
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..) => {
             ast.fold_children_mut(&mut translate_child);
             true
         }
