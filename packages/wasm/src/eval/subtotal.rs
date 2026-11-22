@@ -25,10 +25,10 @@ use crate::sheet::SheetData;
 pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
     let calls = move |child: &Ast| ast_calls_subtotal(child, names);
     match ast {
-        Ast::Func(Func::Subtotal, _) => true,
+        Ast::Func(Func::Subtotal, ..) => true,
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), _) => true,
-        Ast::Func(_, args) => args.iter().any(calls),
+        Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), ..) => true,
+        Ast::Func(_, args, _) => args.iter().any(calls),
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => calls(&definition.body),
         Ast::UnknownFunc(call) => {
@@ -202,7 +202,7 @@ impl SubtotalReader<'_> {
         if let Some(range) = reference {
             return self.range(range, index > 0, pass, depth + 1);
         }
-        if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+        if matches!(arg, Ast::Func(Func::Union, ..) | Ast::SheetSpan(_)) {
             return self.areas(arg, pass, depth + 1);
         }
         self.value(arg, pass, depth)

@@ -2677,11 +2677,27 @@ const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=VLOOKUP({2;3},Data!A1:B3,2,FALSE)", 1, &["20", "30"]),
     ("=LOOKUP({2,3},Data!A1:A3,Data!B1:B3)", 2, &["20", "30"]),
     ("=RANDBETWEEN(Data!A1:A2,Data!A1:A2)", 1, &["1", "2"]),
+    ("=LET(x,Data!A1:A3,ABS(x-2))", 1, &["1", "0", "1"]),
 ];
 
 #[test]
 fn functions_that_take_one_value_run_once_for_each_element() {
     assert_spills(LIFTED_FUNCTION_RESULTS);
+}
+
+/// A call decides whether it can lift when the formula is entered. A name
+/// that the formula reads before it is defined can still become a range,
+/// so the call lifts once the name is defined.
+#[test]
+fn a_name_defined_after_the_formula_still_lifts_the_call() {
+    let (mut store, report) = data_workbook(2, 4);
+    store.set_formula(report, 0, 0, "=ABS(Vals-2)", 0);
+    store.commit_sources();
+    let data = report + 1;
+    assert!(store.set_named_range("Vals", -1, data, 0, 0, 2, 0));
+    store.commit_sources();
+    let shown_cells: Vec<String> = (0..3).map(|row| shown(&store, report, row, 0)).collect();
+    assert_eq!(shown_cells, ["1", "0", "1"]);
 }
 
 /// A scalar condition evaluates only the branch it takes: the SEQUENCE in

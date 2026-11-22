@@ -320,7 +320,7 @@ fn sum_scalar_or_range(arg: &Ast, names: NameScope<'_>, shapes: Shapes<'_>) -> O
         Ast::Cell(..) | Ast::AbsCell(..) => Some(SumArg::Scalar {
             reference: treats_cell_as_reference(Func::Sum),
         }),
-        Ast::Missing | Ast::Func(Func::Union | Func::Intersect, _) | Ast::SheetSpan(_) => None,
+        Ast::Missing | Ast::Func(Func::Union | Func::Intersect, ..) | Ast::SheetSpan(_) => None,
         _ if ast_produces_array(arg, shapes) => None,
         Ast::Num(_)
         | Ast::Str(_)

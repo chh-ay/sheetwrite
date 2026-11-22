@@ -1538,7 +1538,7 @@ fn name_use(
                 || matches!(call.args.first(), Some(Ast::DefinedName(id, _))
                     if ids.contains(id) && !callable(*id));
         }
-        Ast::Func(crate::calc::Func::Let, _) => has_let = true,
+        Ast::Func(crate::calc::Func::Let, ..) => has_let = true,
         _ => {}
     };
     walk(ast, &mut visit);
@@ -1618,7 +1618,7 @@ fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
                 used_names(arg, names);
             }
         }
-        Ast::Func(_, args) => {
+        Ast::Func(_, args, _) => {
             for arg in args {
                 used_names(arg, names);
             }
@@ -1658,7 +1658,7 @@ fn is_positional(ast: &Ast) -> bool {
             .iter()
             .any(|corner| !corner.row_abs() || !corner.col_abs()),
         Ast::UnresolvedStructured(_) | Ast::Structured(_) => true,
-        Ast::Func(_, args) => args.iter().any(is_positional),
+        Ast::Func(_, args, _) => args.iter().any(is_positional),
         Ast::UnknownFunc(call) => call.args.iter().any(is_positional),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             is_positional(left) || is_positional(right)

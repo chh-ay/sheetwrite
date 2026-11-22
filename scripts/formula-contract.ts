@@ -263,7 +263,7 @@ export function extractParserSpellings(source: string): string[] {
  */
 export function extractVolatileFunctions(typesSource: string, calcSource: string): string[] {
   const arm = typesSource.match(
-    /fn calls_volatile\(ast: &Ast\) -> bool \{\s*matches!\(\s*ast,\s*Ast::Func\(\s*([^)]*?),\s*_,?\s*\)/,
+    /fn calls_volatile\(ast: &Ast\) -> bool \{\s*matches!\(\s*ast,\s*Ast::Func\(\s*([^)]*?),\s*\.\.,?\s*\)/,
   );
   const variants = arm?.[1]?.split("|").map((entry) => entry.trim().replace(/^Func::/, ""));
   if (!variants || variants.some((variant) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(variant))) {

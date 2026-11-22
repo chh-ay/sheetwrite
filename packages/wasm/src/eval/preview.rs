@@ -390,7 +390,7 @@ impl SafetyWalk<'_> {
             return self.refuse(FormulaPreviewStatus::CostLimit);
         }
 
-        if matches!(ast, Ast::Func(Func::Rand | Func::RandBetween, _)) {
+        if matches!(ast, Ast::Func(Func::Rand | Func::RandBetween, ..)) {
             return self.refuse(FormulaPreviewStatus::UnsafeFunction);
         }
         if let Ast::DefinedName(id, _) = ast {

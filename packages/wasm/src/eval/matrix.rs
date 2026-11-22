@@ -244,7 +244,7 @@ pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRang
             reference.row_end,
             reference.col,
         )),
-        Ast::Func(Func::Intersect, operands) => intersection_range(operands, names).ok(),
+        Ast::Func(Func::Intersect, operands, _) => intersection_range(operands, names).ok(),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -344,7 +344,7 @@ fn node_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
             reference.row_end,
             reference.col,
         )),
-        Ast::Func(Func::Intersect, operands) => intersection_range(operands, names).ok(),
+        Ast::Func(Func::Intersect, operands, _) => intersection_range(operands, names).ok(),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)

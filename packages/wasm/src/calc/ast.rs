@@ -302,7 +302,10 @@ pub(crate) enum Ast {
     /// otherwise grow every node of every formula.
     SheetSpan(Box<SheetSpanRef>),
     InvalidRef,
-    Func(Func, Box<[Self]>),
+    /// A call of a built-in function. The [`CallShape`] is decided once
+    /// from the arguments when the call is built ([`Ast::call`]), so shape
+    /// checks need not walk into the arguments of a call that can't lift.
+    Func(Func, Box<[Self]>, CallShape),
     UnknownFunc(Box<UnknownCall>),
     Bin(Op, Box<Self>, Box<Self>),
     Cmp(CmpOp, Box<Self>, Box<Self>),
@@ -338,6 +341,40 @@ const _: () = assert!(
     std::mem::size_of::<Ast>() == 24,
     "Ast changed size: measure, then update this number"
 );
+// The call shape lives in the padding of `Ast::Func`.
+const _: () = assert!(
+    std::mem::size_of::<CallShape>() == 1,
+    "CallShape must fit in the padding of Ast::Func"
+);
+
+/// What a call's arguments can be, decided once when the call is built.
+/// Only [`Ast::call`] makes one, from the function and its arguments, so
+/// no builder can leave it out or set it by hand.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CallShape(bool);
+
+impl CallShape {
+    /// The shape of a call of `func` with `args`: whether an argument that
+    /// takes one value can be an array, so the call can lift (#1127).
+    fn of(func: Func, args: &[Ast]) -> Self {
+        Self(crate::eval::call_may_lift(func, args))
+    }
+
+    /// Whether the call can lift: an argument that takes one value can be
+    /// an array. `false` means it never does, whatever the arguments
+    /// evaluate to; `true` leaves it to the shape check.
+    pub(crate) const fn may_lift(self) -> bool {
+        self.0
+    }
+}
+
+impl Ast {
+    /// A call of `func` with `args`, with its [`CallShape`].
+    pub(crate) fn call(func: Func, args: Box<[Self]>) -> Self {
+        let shape = CallShape::of(func, &args);
+        Self::Func(func, args, shape)
+    }
+}
 
 impl Ast {
     /// Whether `test` holds for a direct child expression: a function
@@ -348,7 +385,7 @@ impl Ast {
     /// must say whether it has children.
     pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Self) -> bool) -> bool {
         match self {
-            Self::Func(_, args) => args.iter().any(test),
+            Self::Func(_, args, _) => args.iter().any(test),
             Self::UnknownFunc(call) => {
                 let args = &call.args;
                 args.iter().any(test)
@@ -385,13 +422,20 @@ impl Ast {
 
     /// Run `visit` on every direct child expression, as [`Ast::any_child`]
     /// finds them, and return whether any visit reported a change. Every
-    /// child is visited, so one rewrite does not stop the others. Every node
+    /// child is visited, so one rewrite does not stop the others. A call
+    /// whose arguments changed decides its [`CallShape`] again. Every node
     /// kind is listed, so a new kind must say whether it has children.
     pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Self) -> bool) -> bool {
         match self {
-            Self::Func(_, args) => args
-                .iter_mut()
-                .fold(false, |changed, arg| visit(arg) | changed),
+            Self::Func(func, args, shape) => {
+                let changed = args
+                    .iter_mut()
+                    .fold(false, |changed, arg| visit(arg) | changed);
+                if changed {
+                    *shape = CallShape::of(*func, args);
+                }
+                changed
+            }
             Self::UnknownFunc(call) => {
                 let args = &mut call.args;
                 args.iter_mut()
@@ -487,7 +531,7 @@ impl Ast {
                 }
                 out.add_vec::<u32>(span.sheets.len(), span.sheets.capacity());
             }
-            Self::Func(_, args) => add_ast_slice_memory(args, out),
+            Self::Func(_, args, _) => add_ast_slice_memory(args, out),
             Self::UnknownFunc(call) => {
                 let UnknownCall { name, args } = &**call;
 

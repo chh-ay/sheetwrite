@@ -285,7 +285,7 @@ impl Reference {
 
     /// Whether the text ends with the spill suffix `#`.
     const fn spills(&self) -> bool {
-        matches!(self.ast, Some(Ast::Func(Func::AnchorArray, _)))
+        matches!(self.ast, Some(Ast::Func(Func::AnchorArray, ..)))
     }
 }
 
@@ -407,7 +407,7 @@ fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
 fn is_deleted(reference: &Ast) -> bool {
     match reference {
         Ast::InvalidRef => true,
-        Ast::Func(Func::AnchorArray, anchor) => matches!(anchor.as_ref(), [Ast::InvalidRef]),
+        Ast::Func(Func::AnchorArray, anchor, _) => matches!(anchor.as_ref(), [Ast::InvalidRef]),
         _ => false,
     }
 }
@@ -545,7 +545,7 @@ fn reference_at(lexemes: &[Lexeme<'_>], index: usize) -> Option<(Ast, usize)> {
     };
     let cell = Ast::Cell(row, col, flags);
     if tok(index + 1) == Some(&Tok::Hash) {
-        return Some((Ast::Func(Func::AnchorArray, (vec![cell]).into()), index + 2));
+        return Some((Ast::call(Func::AnchorArray, (vec![cell]).into()), index + 2));
     }
     Some((cell, index + 1))
 }

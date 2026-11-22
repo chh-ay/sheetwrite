@@ -119,18 +119,18 @@ impl CellStore {
         }
 
         match reference {
-            Ast::Func(Func::Union, areas) => {
+            Ast::Func(Func::Union, areas, _) => {
                 let mut count = 0;
                 for area in areas {
                     count += self.area_count(area, sheet, pass, depth + 1)?;
                 }
                 Ok(count)
             }
-            Ast::Func(Func::Intersect, operands) => {
+            Ast::Func(Func::Intersect, operands, _) => {
                 intersection_range(operands, self.name_scope(sheet)).map(|_| 1)
             }
             // Inside LET and LAMBDA these calls are still unresolved here.
-            Ast::Func(func @ (Func::Offset | Func::Indirect), args) => self
+            Ast::Func(func @ (Func::Offset | Func::Indirect), args, _) => self
                 .runtime_range(*func, args, sheet, pass, depth + 1)
                 .map(|_| 1),
             Ast::InvalidRef => Err(FormulaError::Ref),
@@ -226,7 +226,7 @@ impl CellStore {
         }
 
         match reference {
-            Ast::Func(Func::Union, areas) if accepts_union(func) => {
+            Ast::Func(Func::Union, areas, _) if accepts_union(func) => {
                 let mut ranges = Vec::new();
                 for area in areas {
                     if let Some(range) = range_from_ast(area, self.name_scope(sheet)) {
@@ -243,7 +243,7 @@ impl CellStore {
             }
             Ast::SheetSpan(span) if accepts_sheet_span(func) => self.sheet_span_ranges(span, depth),
             // A resolvable intersection never reaches here: it is one range.
-            Ast::Func(Func::Intersect, operands) => {
+            Ast::Func(Func::Intersect, operands, _) => {
                 vec![Err(intersection_range(operands, self.name_scope(sheet))
                     .err()
                     .unwrap_or(FormulaError::Value))]
@@ -328,7 +328,7 @@ impl CellStore {
             Some(area_ast) => positive_index(&self.eval_ast(area_ast, sheet, pass, depth + 1))?,
         };
         match reference {
-            Ast::Func(Func::Union, areas) => areas.get(index).ok_or(FormulaError::Ref),
+            Ast::Func(Func::Union, areas, _) => areas.get(index).ok_or(FormulaError::Ref),
             _ if index == 0 => Ok(reference),
             Ast::Num(_)
             | Ast::Str(_)

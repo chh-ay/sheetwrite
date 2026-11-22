@@ -91,8 +91,8 @@ impl RewriteScope {
 pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool {
     let contains = move |child: &Ast| ast_contains_runtime_ref(child, names);
     match ast {
-        Ast::Func(Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) => args.iter().any(contains),
+        Ast::Func(Func::Offset | Func::Indirect, ..) => true,
+        Ast::Func(_, args, _) => args.iter().any(contains),
         Ast::UnknownFunc(call) => {
             let args = &call.args;
             args.iter().any(contains)
@@ -326,8 +326,8 @@ impl CellStore {
 
         let child = scope.child();
         match ast {
-            Ast::Func(Func::AnchorArray, args) => *ast = self.spill_reference(args, sheet),
-            Ast::Func(func @ (Func::Offset | Func::Indirect), args) => {
+            Ast::Func(Func::AnchorArray, args, _) => *ast = self.spill_reference(args, sheet),
+            Ast::Func(func @ (Func::Offset | Func::Indirect), args, _) => {
                 for arg in args.iter_mut() {
                     self.rewrite_references(arg, sheet, pass, depth + 1, child);
                 }
@@ -341,10 +341,12 @@ impl CellStore {
                     *ast = node;
                 }
             }
-            Ast::Func(Func::Let, args) => self.rewrite_deferred(args, sheet, pass, depth),
+            Ast::Func(Func::Let, args, _) => self.rewrite_deferred(args, sheet, pass, depth),
             Ast::UnknownFunc(call) => self.rewrite_deferred(&mut call.args, sheet, pass, depth),
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(_), args) => self.rewrite_deferred(args, sheet, pass, depth),
+            Ast::Func(Func::Analysis(_), args, _) => {
+                self.rewrite_deferred(args, sheet, pass, depth)
+            }
             #[cfg(feature = "analysis")]
             Ast::Lambda(definition) => {
                 let body = &mut std::rc::Rc::make_mut(definition).body;
@@ -680,7 +682,7 @@ impl CellStore {
             let coordinate = if let Some(reference) = args.first() {
                 let range = match (range_from_ast(reference, self.name_scope(sheet)), reference) {
                     (Some(range), _) => range,
-                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
+                    (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args, _)) => {
                         match self.runtime_range(*func, args, sheet, pass, depth + 1) {
                             Ok(range) => range,
                             Err(error) => return Value::Error(error),

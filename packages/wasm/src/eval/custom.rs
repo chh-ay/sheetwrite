@@ -295,7 +295,7 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions, names: NameScop
                 .is_some_and(|function| function.volatile)
                 || any(arguments)
         }
-        Ast::Func(_, arguments) => any(arguments),
+        Ast::Func(_, arguments, _) => any(arguments),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             calls_volatile_custom(left, functions, names)
                 || calls_volatile_custom(right, functions, names)

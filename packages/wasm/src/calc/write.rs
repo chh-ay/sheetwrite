@@ -246,14 +246,14 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             out.push('}');
         }
         Ast::LetSlot { expression, .. } => write_ast_with_names(expression, out, names),
-        Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
+        Ast::Func(Func::AnchorArray, args, _) if args.len() == 1 => {
             write_ast_with_names(&args[0], out, names);
             // A deleted anchor writes as #REF!, which has no spill suffix.
             if !matches!(args[0], Ast::InvalidRef) {
                 out.push('#');
             }
         }
-        Ast::Func(Func::Union, areas) => {
+        Ast::Func(Func::Union, areas, _) => {
             out.push('(');
             for (index, area) in areas.iter().enumerate() {
                 if index > 0 {
@@ -263,7 +263,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             }
             out.push(')');
         }
-        Ast::Func(Func::Intersect, operands) => {
+        Ast::Func(Func::Intersect, operands, _) => {
             for (index, operand) in operands.iter().enumerate() {
                 if index > 0 {
                     out.push(' ');
@@ -280,7 +280,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
                 }
             }
         }
-        Ast::Func(func, args) => {
+        Ast::Func(func, args, _) => {
             out.push_str(func_name(*func));
             out.push('(');
             for (index, arg) in args.iter().enumerate() {

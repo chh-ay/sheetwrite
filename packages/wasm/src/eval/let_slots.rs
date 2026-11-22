@@ -40,7 +40,7 @@ pub(crate) fn resolve_let_names(ast: &mut Ast, names: NameScope<'_>) {
 
     // A LET resolves its own nested LETs, or none of them when it is not
     // resolvable.
-    if let Ast::Func(Func::Let, args) = ast {
+    if let Ast::Func(Func::Let, args, _) = ast {
         if let_resolvable(args, names) {
             let mut bindings = Vec::new();
             let mut next = 0;
@@ -91,10 +91,10 @@ fn lets_have_scalar_bindings(args: &[Ast], names: NameScope<'_>) -> bool {
 fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
     let nested = |child: &Ast| nested_lets_scalar(child, names);
     match ast {
-        Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args, names),
+        Ast::Func(Func::Let, args, _) => lets_have_scalar_bindings(args, names),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
-        Ast::Func(_, args) => args.iter().all(nested),
+        Ast::Func(Func::Analysis(_), ..) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
+        Ast::Func(_, args, _) => args.iter().all(nested),
         #[cfg(not(feature = "analysis"))]
         Ast::UnknownFunc(call) => {
             let args = &call.args;
@@ -181,7 +181,7 @@ fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
 ///   shape;
 /// - calls whose arguments hold a LET that cannot resolve.
 fn call_has_scalar_result(call: &Ast, names: NameScope<'_>) -> bool {
-    let Ast::Func(func, args) = call else {
+    let Ast::Func(func, args, _) = call else {
         return false;
     };
     #[cfg(feature = "analysis")]
@@ -251,7 +251,7 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
         }
         return;
     }
-    if let Ast::Func(Func::Let, args) = ast {
+    if let Ast::Func(Func::Let, args, _) = ast {
         resolve_scope(args, bindings, next);
         return;
     }
@@ -495,7 +495,7 @@ mod tests {
 
     fn let_args(source: &str) -> Vec<Ast> {
         match parse(source) {
-            Ok(Ast::Func(Func::Let, args)) => args.into_vec(),
+            Ok(Ast::Func(Func::Let, args, _)) => args.into_vec(),
             other => panic!("{source} is not a LET: {other:?}"),
         }
     }

@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 use crate::calc::{ArrayLiteral, Ast, Func};
 use crate::store::CellStore;
-use crate::types::{FormulaError, Value};
+use crate::types::{FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
 use super::array::{ast_produces_array, Shapes};
 use super::branches::ArrayShape;
@@ -255,6 +255,110 @@ fn array_at_value_arg(func: Func, args: &[Ast], first: usize, shapes: Shapes<'_>
                 .any(|(index, arg)| value_args.takes(index) && ast_produces_array(arg, shapes)))
 }
 
+/// Whether a call of `func` with `args` can lift, decided once when the
+/// call is built (`calc::CallShape`): an argument that takes one value is
+/// not surely one value. The shape check walks into the arguments only of
+/// a call for which this holds.
+pub(crate) fn call_may_lift(func: Func, args: &[Ast]) -> bool {
+    let value_args = value_args(func);
+    !value_args.is_none()
+        && args
+            .iter()
+            .enumerate()
+            .any(|(index, arg)| value_args.takes(index) && !surely_one_value(arg, 0))
+}
+
+/// Whether `ast` is one value whatever its cells hold. It must never hold
+/// where [`ast_produces_array`] can answer `true`, so it is conservative: a
+/// node that binding or a rewrite can turn into an array later (a name, a
+/// structured or detached reference, a LET use, a LAMBDA parameter), a
+/// function that returns arrays of its own ([`returns_arrays`]), and a call
+/// that can lift are not. Past the evaluator's depth limit it answers
+/// `false`.
+fn surely_one_value(ast: &Ast, depth: usize) -> bool {
+    if depth > FORMULA_RECURSION_LIMIT {
+        return false;
+    }
+    match ast {
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Cell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetCell(_)
+        | Ast::InvalidRef => true,
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            surely_one_value(left, depth + 1) && surely_one_value(right, depth + 1)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            surely_one_value(inner, depth + 1)
+        }
+        Ast::Func(func, _, shape) => !shape.may_lift() && !returns_arrays(*func),
+        Ast::Name(_)
+        | Ast::DefinedName(..)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Range(..)
+        | Ast::SheetRange(_)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::UnknownFunc(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::RegexPattern(_) => true,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) => false,
+    }
+}
+
+/// The functions whose call can be an array without lifting: the reference
+/// functions, the array functions, LET, INDEX, the branch functions, and in
+/// the full engine a family with array hooks. Every function that
+/// [`super::array::ast_produces_array`] answers for by its own rule is here.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "every other built-in function returns one value unless it lifts"
+)]
+#[cfg_attr(
+    not(feature = "analysis"),
+    allow(
+        clippy::missing_const_for_fn,
+        reason = "the full engine's arm reads a family's array hooks, which a const fn cannot"
+    )
+)]
+fn returns_arrays(func: Func) -> bool {
+    match func {
+        Func::AnchorArray
+        | Func::Offset
+        | Func::Indirect
+        | Func::Intersect
+        | Func::Filter
+        | Func::Sort
+        | Func::Unique
+        | Func::Transpose
+        | Func::Sequence
+        | Func::Take
+        | Func::Drop
+        | Func::ChooseCols
+        | Func::ChooseRows
+        | Func::TrimRange
+        | Func::Let
+        | Func::Index
+        | Func::If
+        | Func::IfError
+        | Func::IfNa
+        | Func::Ifs
+        | Func::Switch
+        | Func::Choose => true,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => super::analysis::family(id).array.is_some(),
+        _ => false,
+    }
+}
+
 /// The argument that gives the scalar path `value`. Blank and errors have no
 /// literal of their own: a one-cell array holds them, and the scalar path
 /// reads its one value.
@@ -311,7 +415,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
-        let Ast::Func(func, args) = call else {
+        let Ast::Func(func, args, _) = call else {
             return None;
         };
         if !lifts(*func, args, pass.shapes(self.name_scope(sheet))) {
@@ -402,7 +506,7 @@ impl CellStore {
             for col in 0..cols {
                 let value = match element_args(args, &operands, row, col) {
                     Some(element) => {
-                        self.eval_ast(&Ast::Func(func, element), sheet, pass, depth + 1)
+                        self.eval_ast(&Ast::call(func, element), sheet, pass, depth + 1)
                     }
                     // Outside a smaller argument, as the operators give.
                     None => Value::Error(FormulaError::Na),
