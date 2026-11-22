@@ -1040,7 +1040,10 @@ function require_string(
   return undefined;
 }
 
-/** Reads one field of a record under validation: `ownValue`, or `walked_field` after the JSON-safety walk. */
+/**
+ * Reads one field of a record under validation: `ownValue`, or `walked_field`
+ * or `built_field` after the JSON-safety walk.
+ */
 type FieldReader = (record: PlainRecord, key: string) => unknown;
 
 function optional_string(
@@ -1813,14 +1816,15 @@ function validate_workbook_table_shape(
 }
 
 /**
- * `walked` says the JSON-safety walk accepted `value` in this validation, with
- * no code run since, so its cells may be accepted by `is_valid_walked_cell`.
+ * `walked` is given when the JSON-safety walk accepted `value` in this
+ * validation, with no code run since: its cells may then be accepted by
+ * `is_valid_walked_cell`, reading their fields with `walked`.
  */
 function validate_sheet_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
-  walked = false,
+  walked?: FieldReader,
 ): void {
   const sheet = record_at(value, path, errors);
   if (!sheet) return;
@@ -2017,7 +2021,7 @@ function validate_sheet_shape(
     }
     const cells = array_at(ownValue(block, "cells"), `${block_path}.cells`, errors);
     cells?.forEach((cell_entry, cell_index) => {
-      if (walked && is_valid_walked_cell(cell_entry, valid_styles)) return;
+      if (walked && is_valid_walked_cell(cell_entry, valid_styles, walked)) return;
       // Paths are read only by recorded errors, and almost every cell is valid,
       // so a cell's three path strings are built only to report the errors a
       // path-free pass already found.
@@ -2064,33 +2068,74 @@ function walked_field(record: PlainRecord, key: string): unknown {
 }
 
 /**
+ * `record[key]`, for a snapshot its caller built in this call from plain data
+ * (`builtByCaller`), whose own fields are all enumerable data properties. A
+ * direct read then gives the value `walked_field` gives, as long as
+ * `Object.prototype` has only its standard properties, none of them a
+ * snapshot field. It skips the property check that took a fifth of
+ * validating an imported workbook.
+ */
+function built_field(record: PlainRecord, key: string): unknown {
+  return record[key];
+}
+
+/** The own properties of an `Object.prototype` no code has added to. */
+const STANDARD_OBJECT_PROTOTYPE_KEYS: ReadonlySet<string> = new Set([
+  "constructor",
+  "toString",
+  "toLocaleString",
+  "valueOf",
+  "hasOwnProperty",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
+  "__defineGetter__",
+  "__defineSetter__",
+  "__lookupGetter__",
+  "__lookupSetter__",
+  "__proto__",
+]);
+
+/** The reader for cells the JSON-safety walk accepted: `built_field` when it is exact. */
+function walked_cell_reader(built_by_caller: boolean): FieldReader {
+  if (!built_by_caller) return walked_field;
+  const prototype_is_standard = Object.getOwnPropertyNames(Object.prototype).every((key) =>
+    STANDARD_OBJECT_PROTOTYPE_KEYS.has(key),
+  );
+  return prototype_is_standard ? built_field : walked_field;
+}
+
+/**
  * Whether `validate_cell_shape` accepts `entry`, decided with direct reads and
  * without building paths. Only for a cell the JSON-safety walk accepted in
  * this validation. False means "check fully", not "invalid": a reference
  * cell or a style that fails takes the full check, which reports the errors.
  * `valid_styles` holds the style objects already accepted in this validation.
  */
-function is_valid_walked_cell(entry: unknown, valid_styles: Set<unknown>): boolean {
+function is_valid_walked_cell(
+  entry: unknown,
+  valid_styles: Set<unknown>,
+  read: FieldReader,
+): boolean {
   if (!isPlainRecord(entry)) return false;
   if (
-    !non_negative_integer(walked_field(entry, "rowOffset")) ||
-    !non_negative_integer(walked_field(entry, "colOffset"))
+    !non_negative_integer(read(entry, "rowOffset")) ||
+    !non_negative_integer(read(entry, "colOffset"))
   ) {
     return false;
   }
-  const value = walked_field(entry, "value");
+  const value = read(entry, "value");
   if (!isPlainRecord(value)) return false;
-  const kind = walked_field(value, "kind");
+  const kind = read(value, "kind");
   const valid =
     kind === "literal"
-      ? scalar(walked_field(value, "value"))
-      : kind === "formula" && typeof walked_field(value, "src") === "string";
+      ? scalar(read(value, "value"))
+      : kind === "formula" && typeof read(value, "src") === "string";
   if (!valid) return false;
 
-  const style = walked_field(entry, "style");
+  const style = read(entry, "style");
   if (style === undefined || valid_styles.has(style)) return true;
   const style_errors: DocumentValidationError[] = [];
-  validate_cell_style(style, "", style_errors, walked_field);
+  validate_cell_style(style, "", style_errors, read);
   if (style_errors.length > 0) return false;
   valid_styles.add(style);
   return true;
@@ -3387,7 +3432,10 @@ function validate_snapshot_pivots(
   }
 }
 
-function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
+function validate_json_safe_snapshot(
+  input: unknown,
+  built_by_caller: boolean,
+): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   const candidate = record_at(input, "$", errors);
   if (!candidate) return { ok: false, errors };
@@ -3447,9 +3495,10 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
     invalid(errors, "sheets", "At least one sheet is required");
   }
 
+  // `validate_snapshot` runs the JSON-safety walk over `input` first.
+  const cell_reader = walked_cell_reader(built_by_caller);
   sheets?.forEach((sheet, index) => {
-    // `validateWorkbookSnapshot` runs the JSON-safety walk over `input` first.
-    validate_sheet_shape(sheet, `sheets[${index}]`, errors, true);
+    validate_sheet_shape(sheet, `sheets[${index}]`, errors, cell_reader);
   });
 
   if (errors.length > 0) return { ok: false, errors };
@@ -4002,7 +4051,7 @@ function validate_snapshot(
     );
     if (issue) return { ok: false, errors: [issue] };
 
-    return validate_json_safe_snapshot(input);
+    return validate_json_safe_snapshot(input, built_by_caller);
   } catch (error) {
     const resource_failure = error instanceof RangeError;
     return {
