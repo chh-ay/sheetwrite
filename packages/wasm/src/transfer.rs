@@ -164,6 +164,10 @@ pub(crate) struct Reader<'a> {
     _native_borrow: std::marker::PhantomData<&'a [u8]>,
     #[cfg(target_arch = "wasm32")]
     source: js_sys::Uint8Array,
+    /// The source's length, read once: each read checks it, and asking the
+    /// array is a call into JavaScript.
+    #[cfg(target_arch = "wasm32")]
+    length: usize,
     #[cfg(target_arch = "wasm32")]
     buffer: Vec<u8>,
     #[cfg(target_arch = "wasm32")]
@@ -187,6 +191,7 @@ impl<'a> Reader<'a> {
     pub(crate) fn new(source: js_sys::Uint8Array, tag: u32) -> TransferResult<Self> {
         let mut input = Self {
             _native_borrow: std::marker::PhantomData,
+            length: source.length() as usize,
             source,
             buffer: Vec::new(),
             offset: 0,
@@ -202,7 +207,7 @@ impl<'a> Reader<'a> {
     fn remaining(&self) -> usize {
         #[cfg(target_arch = "wasm32")]
         {
-            self.source.length() as usize - self.offset
+            self.length - self.offset
         }
 
         #[cfg(not(target_arch = "wasm32"))]
