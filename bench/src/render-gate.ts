@@ -9,6 +9,7 @@ import {
   RENDER_ORDER_SEED,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  RENDER_WARMUP_SAMPLES,
   type RenderBenchmarkArtifact,
   type RenderRunConfig,
   renderMatrixKey,
@@ -51,7 +52,7 @@ export const RENDER_GATE_POLICIES: Readonly<Record<BenchmarkMode, RenderGatePoli
     config: RENDER_FULL_CONFIG,
     rounds: 2,
     measuredSamples: 3,
-    warmupSamples: 1,
+    warmupSamples: RENDER_WARMUP_SAMPLES,
     minimumSampleDurationMs: RENDER_MINIMUM_SAMPLE_MS,
   },
   smoke: {
@@ -59,7 +60,7 @@ export const RENDER_GATE_POLICIES: Readonly<Record<BenchmarkMode, RenderGatePoli
     config: RENDER_SMOKE_CONFIG,
     rounds: 1,
     measuredSamples: 1,
-    warmupSamples: 1,
+    warmupSamples: RENDER_WARMUP_SAMPLES,
     minimumSampleDurationMs: RENDER_MINIMUM_SAMPLE_MS,
   },
 };
