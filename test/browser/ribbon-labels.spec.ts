@@ -197,6 +197,10 @@ test("running a command from a collapsed group's dropdown closes it", async ({ p
   const showHide = page.locator(
     '.sheetwrite-ribbon-group[aria-label="Show/Hide"] .sheetwrite-ribbon-group-button',
   );
+  // At 834 px Show/Hide is folded into More, so its button is not shown. The
+  // ribbon re-fits on the frame after the resize; until then there is nothing
+  // to focus. Act once the re-fit shows Show/Hide as its own button again.
+  await expect(showHide).toBeVisible();
   await showHide.focus();
   await page.keyboard.press("Enter");
   await expect(showHide).toHaveAttribute("aria-expanded", "true");
