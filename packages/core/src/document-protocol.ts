@@ -668,15 +668,15 @@ function resolve_snapshot_validation_options(
     }
     overrides[resource] = override;
   }
-  return { storage, limits: resolveSnapshotResourceLimits(overrides) };
+  return { storage, limits: resolve_snapshot_resource_limits(overrides) };
 }
 
 /**
  * `DEFAULT_SNAPSHOT_RESOURCE_LIMITS` with validated `overrides` over it, and
  * `maxDenseCells` and `maxLocalPagedCells` capped at the engine's ceilings,
- * which the store also gives the engine.
+ * which `assertWorkbookAllocationLimits` returns to the store.
  */
-export function resolveSnapshotResourceLimits(
+function resolve_snapshot_resource_limits(
   overrides: Partial<SnapshotResourceLimits> = {},
 ): SnapshotResourceLimits {
   const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
