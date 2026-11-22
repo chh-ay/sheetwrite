@@ -301,17 +301,24 @@ macro_rules! define_function_registry {
 
 #[cfg(feature = "analysis")]
 pub(crate) fn function_names() -> Vec<String> {
-    let mut names: Vec<String> = FUNCTION_NAMES
+    let names: Vec<&str> = FUNCTION_NAMES
         .iter()
         .chain(FUNCTION_ALIASES.iter())
-        .map(|(name, _)| (*name).to_owned())
-        .chain(crate::eval::analysis::names().map(str::to_owned))
+        .map(|(name, _)| *name)
+        .chain(crate::eval::analysis::names())
         .collect();
+    // The shared index sort: a sort of `String`s would compile its own copy.
+    let mut order: Vec<u32> = (0..names.len() as u32).collect();
+    crate::sorting::sort_indices_by(&mut order, &mut |left, right| {
+        names[left as usize].cmp(names[right as usize])
+    });
+    let mut sorted: Vec<String> = order
+        .iter()
+        .map(|&index| names[index as usize].to_owned())
+        .collect();
+    sorted.dedup();
 
-    names.sort_unstable();
-    names.dedup();
-
-    names
+    sorted
 }
 
 define_function_registry! {

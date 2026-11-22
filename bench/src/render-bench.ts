@@ -50,6 +50,7 @@ import {
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  RENDER_WARMUP_SAMPLES,
   type RenderResourceMetrics,
   type ScenarioId,
   type ScenarioResult,
@@ -217,6 +218,16 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   /** Canvas frames the renderer has drawn; `repaint()` fails when one call draws none. */
   private canvas_frames = 0;
   private read_windows!: { invalidateData(): void };
+  /** The renderer's canvas, which `present_frame()` rasterizes. */
+  private frame_canvas: HTMLCanvasElement | null = null;
+  /**
+   * A one-pixel canvas that `present_frame()` copies the renderer's canvas
+   * into and reads back. Reading it runs the copy at once, so it keeps no
+   * snapshot of the renderer's canvas that the next draw would have to copy.
+   */
+  private readonly frame_sink = document
+    .createElement("canvas")
+    .getContext("2d", { willReadFrequently: true });
   constructor(
     dataset: ColumnarDataset,
     private readonly windowTransferDiagnostic: boolean,
@@ -246,9 +257,9 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   /**
-   * Resolve the internals `repaint()` drives and count every canvas frame. An
-   * internal that was renamed or removed fails the mount instead of turning a
-   * timed repaint into a no-op.
+   * Resolve the internals `repaint()` and `present_frame()` drive and count
+   * every canvas frame. An internal that was renamed or removed fails the
+   * mount instead of turning a timed repaint into a no-op.
    */
   private install_frame_counter(): void {
     const read_windows: unknown = Reflect.get(this.grid, "read_windows");
@@ -269,6 +280,11 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     if (!renderer || typeof renderer.paint !== "function") {
       throw new Error("repaint requires a canvas renderer");
     }
+    const canvas: unknown = Reflect.get(renderer, "canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("presenting a frame requires the canvas renderer's canvas");
+    }
+    this.frame_canvas = canvas;
     const paint = renderer.paint.bind(renderer);
     renderer.paint = (view) => {
       this.canvas_frames++;
@@ -373,6 +389,24 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
     element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
     this.grid.refresh();
+    this.present_frame();
+  }
+
+  /**
+   * Rasterize the frame just painted, as the browser does when it presents a
+   * frame between two scroll events, so a timed step starts from a drawn
+   * frame. Chromium records canvas drawing and rasterizes it at the next frame
+   * or when something reads the canvas. A scroll blit reads it, so without this
+   * the timed step would also pay for rasterizing the untimed setup frame.
+   * The renderer's canvas is read through a copy into another canvas, not with
+   * `getImageData`, which can make Chromium move it off the GPU.
+   */
+  private present_frame(): void {
+    if (this.frame_canvas === null || this.frame_sink === null) {
+      throw new Error("presenting a frame requires the mounted renderer's canvas");
+    }
+    this.frame_sink.drawImage(this.frame_canvas, 0, 0, 1, 1, 0, 0, 1, 1);
+    this.frame_sink.getImageData(0, 0, 1, 1);
   }
 
   scrollBy(axis: "top" | "left", pixels: number): void {
@@ -975,6 +1009,9 @@ class HandsontableAdapter implements RenderBenchAdapter {
     element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
     element.dispatchEvent(new Event("scroll"));
     this.hot.render();
+    // Lay the setup frame out, as presenting it would, so the timed step does
+    // not pay for it; the Sheetwrite adapter rasterizes its canvas likewise.
+    element.getBoundingClientRect();
   }
 
   scrollBy(axis: "top" | "left", pixels: number): void {
@@ -1351,7 +1388,7 @@ function read_configuration(params: URLSearchParams): PageConfiguration {
     scenarios: requested_scenarios as ScenarioId[],
     rows: positive_integer(params.get("rows"), 100_000),
     measuredSamples: positive_integer(params.get("samples"), 3),
-    warmupSamples: non_negative_integer(params.get("warmups"), 1),
+    warmupSamples: non_negative_integer(params.get("warmups"), RENDER_WARMUP_SAMPLES),
     minimumSampleDurationMs: Math.max(
       RENDER_MINIMUM_SAMPLE_MS,
       positive_integer(params.get("minimumSampleMs"), RENDER_MINIMUM_SAMPLE_MS),

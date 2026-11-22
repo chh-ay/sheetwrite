@@ -391,9 +391,9 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
         }
         holidays.push(serial as i64);
     }
-    holidays.sort_unstable();
-    holidays.dedup();
-    Ok(holidays)
+    let mut sorted = crate::sorting::sort_i64(holidays);
+    sorted.dedup();
+    Ok(sorted)
 }
 
 fn workday(values: &FuncAccumulator) -> Result<f64, FormulaError> {

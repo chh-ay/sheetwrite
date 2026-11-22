@@ -157,13 +157,30 @@ fn push_zeros(text: &mut String, count: usize) {
     text.extend(std::iter::repeat_n('0', count));
 }
 
+/// Powers of ten that a double holds exactly.
+const EXACT_POWERS_OF_TEN: [f64; 23] = [
+    1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16,
+    1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+];
+/// Integers below this are exact doubles.
+const EXACT_INTEGER_LIMIT: u64 = 1 << f64::MANTISSA_DIGITS;
+
 /// `number` rounded at a decimal place the way ROUND, ROUNDUP and ROUNDDOWN
 /// do. `places` may be negative.
 pub(super) fn round_decimal(number: f64, places: i32, rounding: Rounding) -> f64 {
     if !number.is_finite() {
         return number;
     }
-    Decimal::of(number).round(places, rounding).to_f64()
+    // Excel has no negative zero; the decimal path gives +0 as well.
+    if number == 0.0 {
+        return 0.0;
+    }
+    let (digits, last_place) = digit_integer(number.abs());
+    let (mantissa, exponent) = round_digit_integer(digits, last_place, places, rounding);
+    exact_value(mantissa, exponent).map_or_else(
+        || Decimal::of(number).round(places, rounding).to_f64(),
+        |magnitude| with_sign(magnitude, number),
+    )
 }
 
 /// `number` with at most 15 significant digits, the value Excel shows.
@@ -171,7 +188,79 @@ pub(super) fn significant(number: f64) -> f64 {
     if !number.is_finite() {
         return number;
     }
-    Decimal::of(number).to_f64()
+    if number == 0.0 {
+        return 0.0;
+    }
+    let (digits, last_place) = digit_integer(number.abs());
+    exact_value(digits, last_place).map_or_else(
+        || Decimal::of(number).to_f64(),
+        |magnitude| with_sign(magnitude, number),
+    )
+}
+
+/// The 15 significant digits of `magnitude` (positive, finite) as
+/// `digits × 10^last_place`, the integer form of [`Decimal::of`].
+fn digit_integer(magnitude: f64) -> (u64, i32) {
+    let rounded = rounded_digits(magnitude, SIGNIFICANT_DIGITS);
+    let count = rounded.digits.ilog10() as i32 + 1;
+    (rounded.digits, rounded.exponent + 1 - count)
+}
+
+/// `digits × 10^last_place` rounded at `places` decimals as [`Decimal::round`]
+/// does, as `mantissa × 10^exponent`.
+fn round_digit_integer(
+    digits: u64,
+    last_place: i32,
+    places: i32,
+    rounding: Rounding,
+) -> (u64, i32) {
+    let kept_place = places.saturating_neg();
+    let dropped = kept_place.saturating_sub(last_place);
+    if dropped <= 0 {
+        return (digits, last_place);
+    }
+    // `digits` has at most 15 digits: a unit above ten times them (or past
+    // 64 bits) leaves every digit below the kept place, and only a round-up
+    // keeps a unit there.
+    let dropped_unit = u32::try_from(dropped)
+        .ok()
+        .and_then(|count| 10u64.checked_pow(count));
+    let Some(unit) = dropped_unit.filter(|&unit| unit <= digits.saturating_mul(10)) else {
+        return (u64::from(rounding == Rounding::Away), kept_place);
+    };
+    let kept = digits / unit;
+    let rest = digits % unit;
+    let round_up = match rounding {
+        Rounding::Nearest => rest >= unit / 2,
+        Rounding::Away => rest != 0,
+        Rounding::Toward => false,
+    };
+    (kept + u64::from(round_up), kept_place)
+}
+
+/// `mantissa × 10^exponent` when both factors are exact doubles: one
+/// multiplication or division then rounds once, to the same double that
+/// parsing the decimal text gives.
+fn exact_value(mantissa: u64, exponent: i32) -> Option<f64> {
+    if mantissa >= EXACT_INTEGER_LIMIT {
+        return None;
+    }
+    let power = *EXACT_POWERS_OF_TEN.get(exponent.unsigned_abs() as usize)?;
+    let integer = mantissa as f64;
+    Some(if exponent < 0 {
+        integer / power
+    } else {
+        integer * power
+    })
+}
+
+/// `magnitude` with the sign of `number`; a zero result stays positive.
+const fn with_sign(magnitude: f64, number: f64) -> f64 {
+    if number < 0.0 && magnitude != 0.0 {
+        -magnitude
+    } else {
+        magnitude
+    }
 }
 
 /// The General text form that `&`, CONCAT and other text functions give a
@@ -920,5 +1009,160 @@ fn closest_fraction(value: f64, max_denominator: u32) -> (f64, f64) {
             return (p1, q1);
         }
         rest = 1.0 / fraction;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{round_decimal, significant, Decimal, Rounding};
+
+    const SEED: u64 = 0x9e37_79b9_7f4a_7c15;
+    /// Random numbers of each kind. With the edge numbers, every place and
+    /// every rounding, the test checks about 30,000 cases, about a second in
+    /// a debug build.
+    const RANDOM_NUMBERS_PER_KIND: usize = 40;
+    /// From far left to far right of the 15 significant digits.
+    const PLACES: std::ops::RangeInclusive<i32> = -25..=25;
+    /// The limits ROUND accepts, and places beyond every digit of a double.
+    const EXTREME_PLACES: [i32; 4] = [-308, 308, -400, 400];
+    const ROUNDINGS: [(&str, Rounding); 3] = [
+        ("nearest", Rounding::Nearest),
+        ("away", Rounding::Away),
+        ("toward", Rounding::Toward),
+    ];
+    /// Decimal scales of everyday numbers, and of every finite magnitude
+    /// from subnormal to near `f64::MAX`.
+    const NARROW_SCALES: std::ops::RangeInclusive<i32> = -20..=8;
+    const WIDE_SCALES: std::ops::RangeInclusive<i32> = -340..=290;
+    const MAX_DIGITS: u32 = 17;
+
+    /// The decimal text path that the integer path stands in for, from the
+    /// number's digits (`None` when it is not finite).
+    fn text_path_round(
+        decimal: Option<&Decimal>,
+        number: f64,
+        places: i32,
+        rounding: Rounding,
+    ) -> f64 {
+        decimal.map_or(number, |digits| {
+            digits.clone().round(places, rounding).to_f64()
+        })
+    }
+
+    /// Halfway decimals, carries, the limits of exact doubles and of exact
+    /// powers of ten, huge, tiny and subnormal magnitudes, zeros and
+    /// numbers that are not finite.
+    fn edge_numbers() -> Vec<f64> {
+        let exact_integer_limit = 2f64.powi(53);
+        let positive = [
+            0.5,
+            1.5,
+            2.5,
+            0.125,
+            0.015,
+            1.005,
+            2.675,
+            9.995,
+            999.995,
+            0.1 + 0.2,
+            1.0 / 3.0,
+            99_999_999_999_999.5,
+            999_999_999_999_999.0,
+            exact_integer_limit - 1.0,
+            exact_integer_limit,
+            exact_integer_limit + 2.0,
+            1e22,
+            1e22 * 10.0,
+            1.234_567_890_123_45 * 1e22,
+            1e-22,
+            1e-23,
+            1e300,
+            f64::MAX,
+            1e-300,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE / 3.0,
+            f64::from_bits(1),
+        ];
+        let mut numbers: Vec<f64> = positive
+            .iter()
+            .flat_map(|&number| [number, -number])
+            .collect();
+        numbers.extend([0.0, -0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]);
+        numbers
+    }
+
+    /// A deterministic xorshift generator, so a failure reproduces.
+    struct Random(u64);
+
+    impl Random {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+
+        /// Any finite double: random sign, exponent and mantissa bits.
+        fn finite_bits(&mut self) -> f64 {
+            loop {
+                let number = f64::from_bits(self.next());
+                if number.is_finite() {
+                    return number;
+                }
+            }
+        }
+
+        /// Up to 17 random digits at a random scale and sign, sometimes
+        /// ending in a 5 to land on a halfway case.
+        fn decimal(&mut self, scales: std::ops::RangeInclusive<i32>) -> f64 {
+            let digit_count = 1 + (self.next() % u64::from(MAX_DIGITS)) as u32;
+            let mut digits = self.next() % 10u64.pow(digit_count);
+            if self.next().is_multiple_of(3) {
+                digits = digits / 10 * 10 + 5;
+            }
+            let scale_count = scales.end().abs_diff(*scales.start()) + 1;
+            let scale = scales.start() + (self.next() % u64::from(scale_count)) as i32;
+            // Two steps, so a tiny scale does not underflow before the digits apply.
+            let magnitude = digits as f64 * 10f64.powi(scale / 2) * 10f64.powi(scale - scale / 2);
+            if self.next().is_multiple_of(2) {
+                -magnitude
+            } else {
+                magnitude
+            }
+        }
+    }
+
+    fn numbers() -> Vec<f64> {
+        let mut random = Random(SEED);
+        let mut numbers = edge_numbers();
+        for _ in 0..RANDOM_NUMBERS_PER_KIND {
+            numbers.push(random.finite_bits());
+            numbers.push(random.decimal(NARROW_SCALES));
+            numbers.push(random.decimal(WIDE_SCALES));
+        }
+        numbers
+    }
+
+    #[test]
+    fn integer_rounding_gives_the_bits_of_the_decimal_text_path() {
+        let places: Vec<i32> = PLACES.chain(EXTREME_PLACES).collect();
+        for number in numbers() {
+            let decimal = number.is_finite().then(|| Decimal::of(number));
+            let shown = decimal.as_ref().map_or(number, Decimal::to_f64);
+            assert_eq!(
+                significant(number).to_bits(),
+                shown.to_bits(),
+                "significant({number:e})"
+            );
+            for &place in &places {
+                for (name, rounding) in ROUNDINGS {
+                    assert_eq!(
+                        round_decimal(number, place, rounding).to_bits(),
+                        text_path_round(decimal.as_ref(), number, place, rounding).to_bits(),
+                        "round {name} ({number:e}, {place})"
+                    );
+                }
+            }
+        }
     }
 }
