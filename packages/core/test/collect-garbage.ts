@@ -22,12 +22,16 @@ function collect_in_fresh_stack(delay_ms = 0): Promise<void> {
  * the compilation finishes. On a loaded machine a compilation can stay in
  * flight across several collections, so collect again until every referent is
  * free or the deadline passes. A real owner keeps its referent alive past the
- * deadline.
+ * deadline. A check that a call frees what it allocated promptly, not dozens
+ * of collections later, passes a `settle_ms` of 0.
  */
-export async function collectUntilFreed(refs: readonly WeakRef<object>[]): Promise<void> {
+export async function collectUntilFreed(
+  refs: readonly WeakRef<object>[],
+  settle_ms = SETTLE_DEADLINE_MS,
+): Promise<void> {
   for (let turn = 0; turn < GC_TURNS; turn++) await collect_in_fresh_stack();
 
-  const deadline = performance.now() + SETTLE_DEADLINE_MS;
+  const deadline = performance.now() + settle_ms;
   while (refs.some((ref) => ref.deref() !== undefined) && performance.now() < deadline) {
     await collect_in_fresh_stack(SETTLE_DELAY_MS);
   }

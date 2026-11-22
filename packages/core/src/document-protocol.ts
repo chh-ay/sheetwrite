@@ -3228,6 +3228,85 @@ function cell_block_in_sheet(block: SheetSnapshot["cells"][number], sheet: Sheet
   );
 }
 
+// The checks that visit every cell live in small functions of their own, out of
+// `validate_json_safe_snapshot`. JavaScriptCore optimizes a long loop in a
+// background compilation, and until that compilation is used or dropped it keeps
+// every value the function's variables held when it started. The large function
+// runs once per snapshot, so its loops ended before their compilation was ready,
+// and the compilation kept the whole imported workbook alive for dozens of
+// collections (35 MB after importing the XLSX benchmark corpus). A small
+// function compiles in time to be used, and its variables reach one block.
+
+/** What the cell checks of one block need from its sheet. */
+interface BlockCellScope {
+  /** Path of the block, such as `sheets[0].cells[2]`. */
+  readonly path: string;
+  readonly inBounds: boolean;
+  /** Addresses seen so far in the sheet; only a sheet with a duplicate address has one. */
+  readonly occupied: Set<number> | undefined;
+  readonly sheetWidth: number;
+  readonly errors: DocumentValidationError[];
+}
+
+/**
+ * Report each cell of `block` that lies outside the block and, when the sheet
+ * has a duplicate address, each cell whose address an earlier cell holds.
+ */
+function validate_block_cells(block: SheetSnapshot["cells"][number], scope: BlockCellScope): void {
+  const { path, inBounds: in_bounds, occupied, sheetWidth: sheet_width, errors } = scope;
+  for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+    const cell = block.cells[cell_index];
+    // The shape checks reject holes; this only narrows the type.
+    if (cell === undefined) continue;
+    if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
+      invalid(
+        errors,
+        `${path}.cells[${cell_index}]`,
+        "Cell offset lies outside its block",
+        "out-of-bounds",
+      );
+      continue;
+    }
+
+    if (!in_bounds || !occupied) continue;
+    const key = (block.startRow + cell.rowOffset) * sheet_width + block.startCol + cell.colOffset;
+    if (occupied.has(key)) {
+      invalid(
+        errors,
+        `${path}.cells[${cell_index}]`,
+        "A snapshot cell may appear only once",
+        "duplicate-id",
+      );
+    }
+
+    occupied.add(key);
+  }
+}
+
+/** Report each reference cell of `block`, at `path`, whose target is not in an existing sheet. */
+function validate_block_references(
+  block: SheetSnapshot["cells"][number],
+  path: string,
+  sheet_by_id: ReadonlyMap<string, SheetSnapshot>,
+  errors: DocumentValidationError[],
+): void {
+  for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+    const cell = block.cells[cell_index];
+    // The shape checks reject holes; this only narrows the type.
+    if (cell === undefined || cell.value.kind !== "ref") continue;
+    const target_sheet = sheet_by_id.get(cell.value.target.sheet);
+    const target_path = `${path}.cells[${cell_index}].value.target`;
+    if (!target_sheet) {
+      invalid(errors, target_path, "Cell reference sheet must exist", "missing-reference");
+    } else if (
+      cell.value.target.row >= target_sheet.rowCount ||
+      cell.value.target.col >= target_sheet.columns.length
+    ) {
+      invalid(errors, target_path, "Cell reference target lies outside the sheet", "out-of-bounds");
+    }
+  }
+}
+
 /**
  * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
  * replaces a Set entry per cell, which cost about 100 bytes each and made
@@ -3441,32 +3520,13 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
         invalid(errors, block_path, "Cell block lies outside the sheet", "out-of-bounds");
       }
 
-      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
-        const cell = block.cells[cell_index]!;
-        if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
-          invalid(
-            errors,
-            `${block_path}.cells[${cell_index}]`,
-            "Cell offset lies outside its block",
-            "out-of-bounds",
-          );
-          continue;
-        }
-
-        if (!block_in_bounds || !occupied) continue;
-        const key =
-          (block.startRow + cell.rowOffset) * sheet_width + block.startCol + cell.colOffset;
-        if (occupied.has(key)) {
-          invalid(
-            errors,
-            `${block_path}.cells[${cell_index}]`,
-            "A snapshot cell may appear only once",
-            "duplicate-id",
-          );
-        }
-
-        occupied.add(key);
-      }
+      validate_block_cells(block, {
+        path: block_path,
+        inBounds: block_in_bounds,
+        occupied,
+        sheetWidth: sheet_width,
+        errors,
+      });
     }
 
     const metadata_rows = new Set<number>();
@@ -3751,27 +3811,13 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
   const sheet_by_id = new Map(validated.sheets.map((sheet) => [sheet.id, sheet]));
   for (let sheet_index = 0; sheet_index < validated.sheets.length; sheet_index++) {
     const sheet = validated.sheets[sheet_index]!;
-    for (let block_index = 0; block_index < sheet.cells.length; block_index++) {
-      const block = sheet.cells[block_index]!;
-      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
-        const cell = block.cells[cell_index]!;
-        if (cell.value.kind !== "ref") continue;
-        const target_sheet = sheet_by_id.get(cell.value.target.sheet);
-        const target_path = `sheets[${sheet_index}].cells[${block_index}].cells[${cell_index}].value.target`;
-        if (!target_sheet) {
-          invalid(errors, target_path, "Cell reference sheet must exist", "missing-reference");
-        } else if (
-          cell.value.target.row >= target_sheet.rowCount ||
-          cell.value.target.col >= target_sheet.columns.length
-        ) {
-          invalid(
-            errors,
-            target_path,
-            "Cell reference target lies outside the sheet",
-            "out-of-bounds",
-          );
-        }
-      }
+    for (const [block_index, block] of sheet.cells.entries()) {
+      validate_block_references(
+        block,
+        `sheets[${sheet_index}].cells[${block_index}]`,
+        sheet_by_id,
+        errors,
+      );
     }
 
     for (const [link_index, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
