@@ -80,7 +80,7 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "../pivot.js";
-import { cloneJsonValue } from "../plain-data.js";
+import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -4018,7 +4018,7 @@ export class StoreDataEngine {
           if (patch.patch.filters !== undefined) {
             sheet.filters = patch.patch.filters.map(([col, filter]) => [
               col,
-              cloneJsonValue(filter),
+              cloneColumnFilter(filter),
             ]);
           }
 

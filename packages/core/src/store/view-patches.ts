@@ -3,7 +3,8 @@
  * expose, so the two apply the same rules: sort keys and filters are copied,
  * and a request that changes nothing builds no patch.
  */
-import { cloneJsonValue } from "../plain-data.js";
+import { markOwnedArray } from "../json-bytes.js";
+import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, DocumentOp, Sheet, SortKey } from "../types/document.js";
 
@@ -29,10 +30,20 @@ export function columnFilterPatch(
   if (filter === null) {
     if (!filters.delete(col)) return null;
   } else {
-    filters.set(col, cloneJsonValue(filter));
+    filters.set(col, owned_filter_copy(filter));
   }
 
   return { op: "setSheetMeta", sheet: meta.id, patch: { filters: [...filters] } };
+}
+
+/**
+ * A copy of `filter` whose picks the transaction then measures in one pass:
+ * the copy is fresh plain data that only Sheetwrite reaches.
+ */
+function owned_filter_copy(filter: ColumnFilter): ColumnFilter {
+  const copy = cloneColumnFilter(filter);
+  if (copy.kind === "values" && Array.isArray(copy.values)) markOwnedArray(copy.values);
+  return copy;
 }
 
 /**
