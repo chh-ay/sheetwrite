@@ -418,15 +418,56 @@ export class GeometryLayoutController {
     this.columnIndex = new ColumnIndex(this.visibleColumnIndices, widths);
   }
 
-  layoutSize(viewportHeight: number): { width: number; height: number } {
+  /** Content offset of the first row that starts at or below `contentY`. */
+  rowStartFrom(contentY: number): number {
+    const row = this.rowIndex.rowAtOffset(contentY).row;
+    const top = this.rowIndex.offsetOf(row);
+    return top >= contentY ? top : this.rowIndex.offsetOf(row + 1);
+  }
+
+  /**
+   * Content offset of the first visible column that starts at or right of
+   * `contentX`; the last visible column's left when none does.
+   */
+  columnStartFrom(contentX: number): number {
+    const column = this.columnIndex.columnAtX(contentX);
+    const left = this.columnIndex.leftOf(column);
+    if (left >= contentX) return left;
+    const next = this.nextVisibleColumn(column, 1);
+    return next === column ? left : this.columnIndex.leftOf(next);
+  }
+
+  /**
+   * The scroller's content size, for a viewport `viewportHeight` tall whose
+   * scroller shows `clientWidth` × `clientHeight`. A scroll into view stops
+   * on a column and row boundary, so past the last column and row the extent
+   * keeps the room that takes: less than one column and one row.
+   */
+  layoutSize(
+    viewportHeight: number,
+    clientWidth: number,
+    clientHeight: number,
+  ): { width: number; height: number } {
     const theme = this.options.theme();
+    const totalWidth = this.columnIndex.totalWidth;
+    const totalHeight = this.rowIndex.totalHeight;
+    const frozenWidth = this.frozenWidth();
+    const frozenHeight = this.frozenHeight();
+    // Where the scrolling body starts when the last column or row ends at the
+    // scroller's edge, and the boundary at or past it a scroll into view uses.
+    const lastLeft = totalWidth - Math.max(0, clientWidth - theme.rowHeaderWidth - frozenWidth);
+    const lastTop = totalHeight - Math.max(0, clientHeight - theme.headerHeight - frozenHeight);
+    const widthRoom =
+      lastLeft > frozenWidth ? Math.max(0, this.columnStartFrom(lastLeft) - lastLeft) : 0;
+    const heightRoom =
+      lastTop > frozenHeight ? Math.max(0, this.rowStartFrom(lastTop) - lastTop) : 0;
     this.scrollScale.update(
-      this.rowIndex.totalHeight + theme.headerHeight,
+      totalHeight + theme.headerHeight + heightRoom,
       viewportHeight,
       this.options.maxElementHeight(),
     );
     return {
-      width: this.columnIndex.totalWidth + theme.rowHeaderWidth,
+      width: totalWidth + theme.rowHeaderWidth + widthRoom,
       height: this.scrollScale.sizerHeight,
     };
   }
