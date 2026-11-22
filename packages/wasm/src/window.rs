@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::formula_slots::{FormulaResults, FormulaStore};
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{relative_reach, translate_relative_refs, Ast, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{relative_reach, translate_relative_refs, Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{payload_num, payload_str_id};
 use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
@@ -40,6 +40,50 @@ enum CondPred {
 struct FormulaRule {
     ast: Ast,
     reach: (u32, u32),
+}
+
+/// Whether `ast` has one value at every cell of a row: no reference moves
+/// with the column, and nothing reads the column of the cell it is read for
+/// or draws a random number for each cell. Defined names, table
+/// references, and custom and LAMBDA calls count as varying, since their
+/// content is not read here.
+fn same_across_row(ast: &Ast) -> bool {
+    match ast {
+        Ast::Cell(.., flags) | Ast::AbsCell(.., flags) => flags.col_abs(),
+        Ast::SheetCell(reference) => reference.flags.col_abs(),
+        Ast::Range(.., flags) | Ast::AbsRange(.., flags) => {
+            flags.start.col_abs() && flags.end.col_abs()
+        }
+        Ast::SheetRange(reference) => {
+            reference.flags.start.col_abs() && reference.flags.end.col_abs()
+        }
+        Ast::SheetSpan(span) => span.flags.start.col_abs() && span.flags.end.col_abs(),
+        Ast::Func(
+            Func::Column | Func::Cell | Func::Indirect | Func::Rand | Func::RandBetween,
+            ..,
+        ) => false,
+        Ast::Func(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
+        | Ast::LetSlot { .. } => !ast.any_child(&mut |child| !same_across_row(child)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array(_) => true,
+        Ast::Name(_)
+        | Ast::DefinedName(..)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::UnknownFunc(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(_) | Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+    }
 }
 
 /// A cell a rule covers, and its distance in rows and columns from the rule
@@ -102,6 +146,10 @@ struct CondRule {
     c1: u32,
     pred: CondPred,
     stop_if_true: bool,
+    /// A formula rule that holds alike at every cell of a row
+    /// ([`same_across_row`]), so a window reads it once per row. It sits in
+    /// the rule's padding, so a rule takes no more memory for it.
+    same_across_row: bool,
 }
 
 /// Parsed conditional-format rules per sheet handle, synced from the host and
@@ -221,6 +269,11 @@ impl CellStore {
                 _ => continue,
             };
 
+            let row_invariant = if let CondPred::Formula(formula) = &pred {
+                same_across_row(&formula.ast)
+            } else {
+                false
+            };
             rules.push(CondRule {
                 r0,
                 c0,
@@ -228,6 +281,7 @@ impl CellStore {
                 c1,
                 pred,
                 stop_if_true: flag & 2 != 0,
+                same_across_row: row_invariant,
             });
         }
 
@@ -491,6 +545,8 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
     let mut results = FormulaResults::default();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
+        // The row's result of each rule that holds alike across it.
+        let mut row_holds = [None; 32];
         for (cj, &col) in cols.iter().enumerate() {
             let dst = ri * n_cols + cj;
             for (bit, rule) in rules.iter().take(32).enumerate() {
@@ -505,7 +561,13 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                             target: (data_row, col),
                             shift: (data_row - rule.r0, col - rule.c0),
                         };
-                        formula.holds(store, sheet_index, cell, &mut results)
+                        if rule.same_across_row {
+                            *row_holds[bit].get_or_insert_with(|| {
+                                formula.holds(store, sheet_index, cell, &mut results)
+                            })
+                        } else {
+                            formula.holds(store, sheet_index, cell, &mut results)
+                        }
                     }
                     predicate @ (CondPred::GtNum(_)
                     | CondPred::LtNum(_)

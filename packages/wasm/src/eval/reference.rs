@@ -127,6 +127,19 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
     }
 }
 
+/// Whether the formula-cell rewrite replaces a node in `ast`: an `A1#`, an
+/// OFFSET or INDIRECT call, or a defined name.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; the rewrite replaces no other node"
+)]
+fn rewrite_replaces(ast: &Ast) -> bool {
+    matches!(
+        ast,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, ..) | Ast::DefinedName(..)
+    ) || ast.any_child(&mut rewrite_replaces)
+}
+
 const fn sheet_ref(handle: u32) -> SheetRef {
     SheetRef { handle }
 }
@@ -287,6 +300,16 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Ast {
+        // A formula that is one call over arguments the rewrite keeps becomes
+        // the node its range resolves to, so the arguments are not copied.
+        if let Ast::Func(func @ (Func::Offset | Func::Indirect), args, _) = ast {
+            if !args.iter().any(rewrite_replaces) {
+                let range = self.runtime_range(*func, args, sheet, pass, depth + 1);
+                return RewriteScope::Root
+                    .resolved_node(range)
+                    .unwrap_or_else(|| ast.clone());
+            }
+        }
         let mut resolved = ast.clone();
         self.rewrite_references(&mut resolved, sheet, pass, depth, RewriteScope::Root);
         resolved
