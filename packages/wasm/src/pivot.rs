@@ -742,6 +742,10 @@ fn inline_partials(partials: &[f64]) -> [f64; INLINE_PARTIALS] {
 }
 
 impl ExactSum {
+    // Inline at both callers: a row update and a build's merge. With two
+    // callers wasm-opt keeps it out of line, and each edit then pays a call
+    // per aggregate.
+    #[inline(always)]
     fn add(&mut self, number: f64) {
         // Sums of whole numbers keep one partial and add without a rounding
         // error, so they skip the general path.
@@ -780,6 +784,30 @@ impl ExactSum {
                 partials: partials[..count].to_vec(),
                 carry,
             }));
+        }
+    }
+
+    /// Adds the exact sum `other` holds, so the result equals adding its
+    /// numbers one by one.
+    fn merge(&mut self, other: &Self) {
+        let partials = match &other.spilled {
+            Some(spilled) => spilled.partials.as_slice(),
+            None => &other.inline[..other.inline_count()],
+        };
+        for &partial in partials {
+            self.add(partial);
+        }
+        let carry = other.spilled.as_ref().map_or(0, |spilled| spilled.carry);
+        if carry != 0 {
+            let inline = &self.inline;
+            let target = self.spilled.get_or_insert_with(|| {
+                let count = inline.iter().take_while(|&&partial| partial != 0.0).count();
+                Box::new(SpilledSum {
+                    partials: inline[..count].to_vec(),
+                    carry: 0,
+                })
+            });
+            target.carry += carry;
         }
     }
 
@@ -1032,6 +1060,24 @@ impl Partial {
                         self.multiset = None;
                     }
                 }
+            }
+        }
+    }
+
+    /// Adds the rows `other` aggregates, as if each had been added here.
+    fn merge(&mut self, other: &Self) {
+        self.sum.merge(&other.sum);
+        self.numbers += other.numbers;
+        self.nonblank += other.nonblank;
+        if let Some(errors) = &other.errors {
+            self.errors
+                .get_or_insert_default()
+                .extend(errors.iter().map(|(&row, &error)| (row, error)));
+        }
+        if let Some(multiset) = &other.multiset {
+            let target = self.multiset.get_or_insert_default();
+            for (&key, &count) in multiset.iter() {
+                *target.entry(key).or_insert(0) += count;
             }
         }
     }
@@ -1377,6 +1423,19 @@ fn pair_key(row_group: u32, col_group: u32) -> u64 {
     (u64::from(row_group) << 32) | u64::from(col_group)
 }
 
+/// The row and column group of a [`pair_key`].
+const fn pair_groups(key: u64) -> (u32, u32) {
+    ((key >> 32) as u32, key as u32)
+}
+
+/// A pair of groups and the slot of its aggregates, while a build rolls
+/// them up.
+struct SlotPair {
+    row_group: u32,
+    col_group: u32,
+    slot: u32,
+}
+
 impl PivotCache {
     /// Value definitions in output order.
     pub(crate) fn values(&self) -> &[PivotValue] {
@@ -1666,12 +1725,91 @@ impl PivotCache {
         };
 
         for row in 0..rows {
-            cache.add_row(row, source);
+            if cache.enter_row(row, source) {
+                cache.apply_row(row, true, false);
+            }
             if cache.group_count() > MAX_PIVOT_GROUPS {
                 return Err(FormulaError::Num);
             }
         }
+        cache.roll_up();
         Ok(cache)
+    }
+
+    /// Adds the aggregates of every leaf pair, which the build filled, to
+    /// the pairs of all their ancestor groups: first up the row axis for each
+    /// leaf column group, then up the column axis for every row group. Each
+    /// pair merges into its parent pair once, where adding each row to every
+    /// pair on its paths updates `levels × levels` pairs per row.
+    fn roll_up(&mut self) {
+        let mut row_level: Vec<SlotPair> = self
+            .pairs
+            .iter()
+            .map(|(&key, &slot)| {
+                let (row_group, col_group) = pair_groups(key);
+                SlotPair {
+                    row_group,
+                    col_group,
+                    slot,
+                }
+            })
+            .collect();
+        let mut leaf_columns = Vec::with_capacity(row_level.len());
+        while row_level.first().is_some_and(|pair| pair.row_group != ROOT) {
+            let parents = self.merge_level(&row_level, true);
+            leaf_columns.append(&mut row_level);
+            row_level = parents;
+        }
+        leaf_columns.append(&mut row_level);
+
+        let mut col_level = leaf_columns;
+        while col_level.first().is_some_and(|pair| pair.col_group != ROOT) {
+            col_level = self.merge_level(&col_level, false);
+        }
+    }
+
+    /// Merges each pair of `level`, whose groups on the rolled axis share
+    /// one depth, into the pair with the parent group on that axis. Returns
+    /// the pairs this created.
+    fn merge_level(&mut self, level: &[SlotPair], on_rows: bool) -> Vec<SlotPair> {
+        let values = self.definition.values.len();
+        let mut created = Vec::new();
+        for pair in level {
+            let (row_parent, col_parent) = if on_rows {
+                (
+                    self.row_axis.groups[pair.row_group as usize].parent,
+                    pair.col_group,
+                )
+            } else {
+                (
+                    pair.row_group,
+                    self.col_axis.groups[pair.col_group as usize].parent,
+                )
+            };
+            let rows = self.pair_rows[pair.slot as usize];
+            let target = match self.pairs.get(&pair_key(row_parent, col_parent)) {
+                Some(&target) => {
+                    self.pair_rows[target as usize] += rows;
+                    target
+                }
+                None => {
+                    let target = self.new_pair(row_parent, col_parent, rows);
+                    created.push(SlotPair {
+                        row_group: row_parent,
+                        col_group: col_parent,
+                        slot: target,
+                    });
+                    target
+                }
+            };
+            let (from, to) = (pair.slot as usize * values, target as usize * values);
+            for index in 0..values {
+                let partial = std::mem::take(&mut self.partials[from + index]);
+                self.partials[to + index].merge(&partial);
+                self.partials[from + index] = partial;
+            }
+        }
+        created
     }
 
     fn group_count(&self) -> usize {
@@ -1740,13 +1878,22 @@ impl PivotCache {
     }
 
     fn add_row(&mut self, row: usize, source: &impl PivotSource) {
+        if self.enter_row(row, source) {
+            self.apply_row(row, true, true);
+        }
+    }
+
+    /// Groups `row` on both axes and records its contributions, without
+    /// adding them to any pair. Returns whether the row passed the filters
+    /// and its keys hold no error.
+    fn enter_row(&mut self, row: usize, source: &impl PivotSource) -> bool {
         if !self
             .definition
             .filters
             .iter()
             .all(|filter| filter.keeps(&source.value(row, filter.field), &mut self.folded))
         {
-            return;
+            return false;
         }
 
         // Read and check every key first, so a key error leaves both axes as
@@ -1765,7 +1912,7 @@ impl PivotCache {
         if let Some(error) = key_error {
             self.keys = keys;
             self.key_errors.insert(row as u32, error);
-            return;
+            return false;
         }
 
         let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
@@ -1801,7 +1948,7 @@ impl PivotCache {
             self.contribution_payloads[row * values + index] = payload;
         }
 
-        self.apply_row(row, true);
+        true
     }
 
     fn remove_row(&mut self, row: usize) {
@@ -1811,7 +1958,7 @@ impl PivotCache {
         if self.row_leaf[row] == NO_GROUP {
             return;
         }
-        self.apply_row(row, false);
+        self.apply_row(row, false, true);
 
         let values = self.definition.values.len();
         for (index, value) in self.definition.values.iter().enumerate() {
@@ -1831,12 +1978,23 @@ impl PivotCache {
     }
 
     /// Adds or removes `row`'s contribution in every pair of its row and
-    /// column groups, at every level.
-    fn apply_row(&mut self, row: usize, adding: bool) {
+    /// column groups, at every level, or with `every_level` false in its
+    /// leaf pair only, which a build rolls up later. The build shares this
+    /// loop rather than calling a helper of its own: with one caller, the
+    /// pair lookup and the aggregate update stay inline here, where each
+    /// edit runs them.
+    fn apply_row(&mut self, row: usize, adding: bool, every_level: bool) {
         let mut row_path = std::mem::take(&mut self.row_path);
         let mut col_path = std::mem::take(&mut self.col_path);
-        self.row_axis.path(self.row_leaf[row], &mut row_path);
-        self.col_axis.path(self.col_leaf[row], &mut col_path);
+        if every_level {
+            self.row_axis.path(self.row_leaf[row], &mut row_path);
+            self.col_axis.path(self.col_leaf[row], &mut col_path);
+        } else {
+            row_path.clear();
+            row_path.push(self.row_leaf[row]);
+            col_path.clear();
+            col_path.push(self.col_leaf[row]);
+        }
 
         let values = self.definition.values.len();
         for &row_group in &row_path {
@@ -1874,28 +2032,30 @@ impl PivotCache {
     }
 
     fn pair_slot(&mut self, row_group: u32, col_group: u32, adding: bool) -> u32 {
-        let key = pair_key(row_group, col_group);
-        if let Some(&slot) = self.pairs.get(&key) {
+        if let Some(&slot) = self.pairs.get(&pair_key(row_group, col_group)) {
             if adding {
                 self.pair_rows[slot as usize] += 1;
             }
             return slot;
         }
         debug_assert!(adding, "a removed row's pairs exist");
-        let values = self.definition.values.len();
-        let slot = match self.free_pairs.pop() {
-            Some(slot) => {
-                self.pair_rows[slot as usize] = 1;
-                slot
-            }
-            None => {
-                self.pair_rows.push(1);
-                self.partials
-                    .resize_with(self.partials.len() + values, Partial::default);
-                (self.pair_rows.len() - 1) as u32
-            }
+        self.new_pair(row_group, col_group, 1)
+    }
+
+    /// Gives the pair of `row_group` and `col_group` a slot of empty
+    /// aggregates, counting `rows` rows.
+    fn new_pair(&mut self, row_group: u32, col_group: u32, rows: u32) -> u32 {
+        let slot = if let Some(slot) = self.free_pairs.pop() {
+            self.pair_rows[slot as usize] = rows;
+            slot
+        } else {
+            self.pair_rows.push(rows);
+            let values = self.definition.values.len();
+            self.partials
+                .resize_with(self.partials.len() + values, Partial::default);
+            (self.pair_rows.len() - 1) as u32
         };
-        self.pairs.insert(key, slot);
+        self.pairs.insert(pair_key(row_group, col_group), slot);
         slot
     }
 
