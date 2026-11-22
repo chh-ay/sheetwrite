@@ -14,6 +14,14 @@ const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([
   // The release's measured size report; the docs build renders the landing data from it.
   "scripts/size-report.json",
 ]);
+/**
+ * Paths inside a published package that never reach a user: tests, test
+ * fixtures, benchmarks, Rust test modules (`tests.rs`, `*_tests.rs`) and
+ * Markdown. Each package's tarball ships a README, but a README change ships
+ * with the next release whatever it bumps.
+ */
+const UNPUBLISHED_PACKAGE_PATH =
+  /(?:^|\/)(?:test|tests|bench|fixtures)\/|\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:[^/]+_)?tests\.rs$|\.md$/;
 
 export interface ChangesetComparison {
   readonly baseRef: string;
@@ -55,11 +63,33 @@ export function isGeneratedPackageSizeHistoryChange(paths: readonly string[]): b
   );
 }
 
-async function changed_files_since(comparison: ChangesetComparison): Promise<string[]> {
-  const stdout = await captureProcess(["git", "diff", "--name-only", comparison.diffRange], {
-    cwd: REPOSITORY_ROOT,
-    failure: ({ stderr }) => `Unable to inspect package size history diff: ${stderr}`,
+/**
+ * Whether a pull request changing `paths` needs a changeset: only when it
+ * changes the shipped source of a published package. Changes to tests, test
+ * fixtures, benchmarks, scripts, docs or CI need none, so they leave no empty
+ * changeset behind.
+ */
+export function changesetRequired(
+  paths: readonly string[],
+  publishable: readonly string[] = PUBLISHABLE_PACKAGE_ORDER,
+): boolean {
+  const package_roots = publishable.map((name) => `packages/${name.slice("@sheetwrite/".length)}/`);
+  return paths.some((path) => {
+    const root = package_roots.find((candidate) => path.startsWith(candidate));
+    return root !== undefined && !UNPUBLISHED_PACKAGE_PATH.test(path.slice(root.length));
   });
+}
+
+async function changed_files_since(comparison: ChangesetComparison): Promise<string[]> {
+  // Without renames, a file moved out of a package's source lists its old path too.
+  const stdout = await captureProcess(
+    ["git", "diff", "--name-only", "--no-renames", comparison.diffRange],
+    {
+      cwd: REPOSITORY_ROOT,
+      failure: ({ stderr }) =>
+        `Unable to list the files changed since ${comparison.baseRef}: ${stderr}`,
+    },
+  );
   return stdout
     .split("\n")
     .map((path) => path.trim())
@@ -123,18 +153,25 @@ async function main(): Promise<void> {
   }
   assert_changesets_name_published_packages();
   const comparison = changesetComparisonFromBaseRef(process.env.GITHUB_BASE_REF);
+  const changed_files = await changed_files_since(comparison);
   const package_size_history_version = packageSizeHistoryVersionFromHeadRef(
     process.env.GITHUB_HEAD_REF,
   );
   if (package_size_history_version !== undefined) {
     validateReleasePackageVersions(package_size_history_version);
-    if (isGeneratedPackageSizeHistoryChange(await changed_files_since(comparison))) {
+    if (isGeneratedPackageSizeHistoryChange(changed_files)) {
       console.log(`Package size history versions match branch ${package_size_history_version}`);
       return;
     }
     console.log(
       "Package size history branch contains non-generated changes; requiring a changeset",
     );
+  }
+  if (!changesetRequired(changed_files)) {
+    console.log(
+      `No published package source changed since ${comparison.baseRef}; no changeset needed`,
+    );
+    return;
   }
   const child = Bun.spawn(["bun", "run", "changeset:status", "--", comparison.sinceArgument], {
     cwd: REPOSITORY_ROOT,

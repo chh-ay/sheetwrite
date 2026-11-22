@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "dependencies": {
-    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.7.0.tgz",
-    "@sheetwrite/queries": "file:artifacts/sheetwrite-queries-0.7.0.tgz",
-    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.7.0.tgz"
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core.tgz",
+    "@sheetwrite/queries": "file:artifacts/sheetwrite-queries.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm.tgz"
   }
 }

@@ -6,7 +6,7 @@ Run from the repository root:
 bun run verify:bundlers
 ```
 
-The orchestrator stages and packs publishable package contents, rewrites workspace dependency ranges, removes stale fixture installations, installs the fresh tarballs, and runs each real production build. Fixture manifests pin Vite 7.2.2, webpack 5.102.1, and Next.js 15.5.9.
+The orchestrator stages and packs publishable package contents, rewrites workspace dependency ranges, removes stale fixture installations, installs the fresh tarballs, and runs each real production build. Fixture manifests pin Vite 7.2.2, webpack 5.102.1, and Next.js 15.5.9. They name each Sheetwrite package as a version-free tarball in `.packed`, such as `sheetwrite-core.tgz`, and their locks hold only a placeholder for it. The orchestrator copies the tarballs to those names and fills the placeholders for the build, then restores the lock.
 
 Verified contracts:
 
@@ -23,4 +23,4 @@ Verified contracts:
 
 The package export boundary selects `loader-browser.mjs` for browser-aware bundlers and `loader-node.mjs` for Node. `@sheetwrite/wasm/wasm` remains available for explicit asset-control fixtures, but it is not the ordinary startup path.
 
-Fixture installs are deliberately fresh. Reusing `node_modules` with an unchanged local tarball filename can make npm retain stale package contents and produce a false browser-graph failure.
+Fixture installs are deliberately fresh. The local tarball file names never change, so reusing `node_modules` can make npm retain stale package contents and produce a false browser-graph failure.

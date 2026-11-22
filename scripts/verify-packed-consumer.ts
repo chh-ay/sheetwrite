@@ -16,7 +16,7 @@ import {
   REQUIRED_PACKAGE_FILES,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
-import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
+import { installCanonicalTarballs } from "./release-lock-integrity.mjs";
 import { captureProcess, readJson } from "./script-io.js";
 
 interface PackageManifest {
@@ -272,16 +272,13 @@ async function verify_no_optional_package_closure(
 ): Promise<void> {
   const root = join(temporary_root, `without-optional-${name}`);
   await cp(join(repository_root, "test/release-locks", name), root, { recursive: true });
-  const artifact_root = join(root, "artifacts");
-  await mkdir(artifact_root, { recursive: true });
   const local_tarballs = new Map<string, string>();
   for (const local_package of new Set([package_name, "@sheetwrite/core", "@sheetwrite/wasm"])) {
     const tarball = tarballs.get(local_package);
     if (tarball === undefined) throw new Error(`Missing tarball for ${local_package}`);
     local_tarballs.set(local_package, tarball);
-    await cp(tarball, join(artifact_root, basename(tarball)));
   }
-  await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), local_tarballs);
+  await installCanonicalTarballs(join(root, "package-lock.json"), local_tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
   // Core and the adapters must install and run without the optional packages.
@@ -551,12 +548,7 @@ try {
   ]);
 
   await cp(fixture_root, consumer_root, { recursive: true });
-  const consumer_artifacts = join(consumer_root, "artifacts");
-  await mkdir(consumer_artifacts, { recursive: true });
-  for (const tarball of tarballs.values()) {
-    await cp(tarball, join(consumer_artifacts, basename(tarball)));
-  }
-  await bindCanonicalTarballIntegrities(join(consumer_root, "package-lock.json"), tarballs);
+  await installCanonicalTarballs(join(consumer_root, "package-lock.json"), tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumer_root);
   await run(
     [

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { brotliCompressSync, gzipSync, constants as zlibConstants } from "node:zlib";
 
 import { optionValue, requiredOption } from "../bench/src/cli-options.js";
+import { machineLabel } from "../bench/src/machine-label.js";
 import {
   assertCleanMatrixCapture,
   decideWasmProfile,
@@ -215,7 +216,7 @@ function capture_build(args: readonly string[]): void {
         commit,
         dirty: false,
         timestamp: new Date().toISOString(),
-        host: hostname(),
+        host: machineLabel(),
         rustc: successful_output(["rustc", "--version"]),
         cargo: successful_output(["cargo", "--version"]),
         wasmPack: successful_output(["wasm-pack", "--version"]),

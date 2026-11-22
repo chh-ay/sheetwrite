@@ -1,118 +1,95 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
+const SHEETWRITE_ENTRY = "node_modules/@sheetwrite/";
+/** Manifest fields npm copies from a package into its lockfile entry. */
+const LOCKED_MANIFEST_FIELDS = [
+  "license",
+  "dependencies",
+  "optionalDependencies",
+  "peerDependencies",
+  "peerDependenciesMeta",
+  "bin",
+  "engines",
+  "os",
+  "cpu",
+];
 
 /**
- * Rebind local canonical tarball entries in a copied npm manifest and lockfile.
- * Registry entries and the rest of the resolved graph remain byte-for-byte equivalent.
+ * The file name a release consumer fixture installs a package from, such as
+ * `sheetwrite-core.tgz`. It has no version, so the fixtures never change
+ * between releases.
+ *
+ * @param {string} packageName
+ */
+export function versionFreeTarballName(packageName) {
+  return `${packageName.replace(/^@/, "").replaceAll("/", "-")}.tgz`;
+}
+
+/**
+ * Installs canonical tarballs into a copied release consumer fixture.
+ *
+ * A committed fixture lock pins only third-party packages. Each Sheetwrite
+ * package has a placeholder entry with only `resolved`, a version-free
+ * `file:` path. For every placeholder, this copies the canonical tarball to
+ * that path and fills the entry from the tarball: version, integrity, and the
+ * manifest fields npm locks (dependencies and peer ranges included).
  *
  * @param {string} lockPath
  * @param {ReadonlyMap<string, string>} tarballs package name to canonical tarball path
+ * @returns {Promise<string[]>} the installed package names
  */
-export async function bindCanonicalTarballIntegrities(lockPath, tarballs) {
-  const manifestPath = join(dirname(lockPath), "package.json");
-  const [lockSource, manifestSource] = await Promise.all([
-    readFile(lockPath, "utf8"),
-    readFile(manifestPath, "utf8"),
-  ]);
-  const lock = JSON.parse(lockSource);
-  const manifest = JSON.parse(manifestSource);
-  if (
-    lock === null ||
-    typeof lock !== "object" ||
-    lock.packages === null ||
-    typeof lock.packages !== "object"
-  ) {
+export async function installCanonicalTarballs(lockPath, tarballs) {
+  const fixtureRoot = dirname(lockPath);
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  if (lock === null || typeof lock !== "object" || typeof lock.packages !== "object") {
     throw new Error(`${lockPath} has no npm package graph`);
   }
-  if (manifest === null || typeof manifest !== "object") {
-    throw new Error(`${manifestPath} has no npm package manifest`);
-  }
-
-  const canonicalPackages = new Map();
-  for (const [packageName, tarballPath] of tarballs) {
-    const filename = basename(tarballPath);
-    const prefix = `${packageName.replace(/^@/, "").replaceAll("/", "-")}-`;
-    const version =
-      filename.startsWith(prefix) && filename.endsWith(".tgz")
-        ? filename.slice(prefix.length, -".tgz".length)
-        : "";
-    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
-      throw new Error(`${tarballPath} has no canonical stable package version`);
+  const installed = [];
+  for (const [packagePath, placeholder] of Object.entries(lock.packages)) {
+    if (!packagePath.startsWith(SHEETWRITE_ENTRY)) continue;
+    const packageName = packagePath.slice("node_modules/".length);
+    const tarballPath = tarballs.get(packageName);
+    if (tarballPath === undefined) {
+      throw new Error(`${lockPath} installs ${packageName}, which has no canonical tarball`);
     }
-    const bytes = await readFile(tarballPath);
-    canonicalPackages.set(packageName, {
-      filename,
-      version,
+    const resolved = placeholder?.resolved;
+    if (
+      Object.keys(placeholder).join() !== "resolved" ||
+      typeof resolved !== "string" ||
+      !resolved.startsWith("file:") ||
+      !resolved.endsWith(`/${versionFreeTarballName(packageName)}`)
+    ) {
+      throw new Error(
+        `${lockPath} ${packagePath} must be a placeholder with only a version-free resolved path`,
+      );
+    }
+    const target = join(fixtureRoot, resolved.slice("file:".length));
+    await mkdir(dirname(target), { recursive: true });
+    await copyFile(tarballPath, target);
+    const [bytes, { stdout }] = await Promise.all([
+      readFile(tarballPath),
+      run("tar", ["-xOzf", tarballPath, "package/package.json"], { maxBuffer: 1 << 20 }),
+    ]);
+    const manifest = JSON.parse(stdout);
+    if (manifest.name !== packageName) {
+      throw new Error(`${tarballPath} holds ${manifest.name}, expected ${packageName}`);
+    }
+    const entry = {
+      version: manifest.version,
+      resolved,
       integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
-    });
+    };
+    for (const field of LOCKED_MANIFEST_FIELDS) {
+      if (manifest[field] !== undefined) entry[field] = manifest[field];
+    }
+    lock.packages[packagePath] = entry;
+    installed.push(packageName);
   }
-
-  const rebindFileReference = (value, filename, label) => {
-    if (typeof value !== "string" || !value.startsWith("file:")) {
-      throw new Error(`${label} is not a local tarball reference`);
-    }
-    const separator = value.lastIndexOf("/");
-    return `${separator < 0 ? "file:" : value.slice(0, separator + 1)}${filename}`;
-  };
-
-  for (const [packageName, canonical] of canonicalPackages) {
-    const packagePath = `node_modules/${packageName}`;
-    const locked = lock.packages[packagePath];
-    if (locked === null || typeof locked !== "object" || typeof locked.resolved !== "string") {
-      throw new Error(`${lockPath} does not bind canonical tarball ${packageName}`);
-    }
-    locked.version = canonical.version;
-    locked.resolved = rebindFileReference(
-      locked.resolved,
-      canonical.filename,
-      `${packagePath} resolved`,
-    );
-    locked.integrity = canonical.integrity;
-
-    for (const field of ["dependencies", "devDependencies"]) {
-      const manifestDependencies = manifest[field];
-      if (
-        manifestDependencies !== null &&
-        typeof manifestDependencies === "object" &&
-        packageName in manifestDependencies
-      ) {
-        manifestDependencies[packageName] = rebindFileReference(
-          manifestDependencies[packageName],
-          canonical.filename,
-          `${manifestPath} ${field}.${packageName}`,
-        );
-      }
-      const rootDependencies = lock.packages[""]?.[field];
-      if (
-        rootDependencies !== null &&
-        typeof rootDependencies === "object" &&
-        packageName in rootDependencies
-      ) {
-        rootDependencies[packageName] = rebindFileReference(
-          rootDependencies[packageName],
-          canonical.filename,
-          `${lockPath} ${field}.${packageName}`,
-        );
-      }
-    }
-  }
-
-  for (const [packagePath, locked] of Object.entries(lock.packages)) {
-    if (packagePath === "" || locked === null || typeof locked !== "object") continue;
-    // A peer range on a canonical package is its exact version too, and npm ci
-    // rejects a lock whose peer range no longer matches the installed version.
-    for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
-      const dependencies = locked[field];
-      if (dependencies === null || typeof dependencies !== "object") continue;
-      for (const [packageName, canonical] of canonicalPackages) {
-        if (packageName in dependencies) dependencies[packageName] = canonical.version;
-      }
-    }
-  }
-
-  await Promise.all([
-    writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`),
-    writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`),
-  ]);
+  await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  return installed;
 }
