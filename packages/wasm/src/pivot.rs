@@ -37,6 +37,10 @@ pub(crate) const MAX_PIVOT_GROUPS: usize = 100_000;
 
 /// A row outside the pivot: filtered out, or with an error in a key field.
 const NO_GROUP: u32 = u32::MAX;
+/// Value fields whose new contributions an in-place row update keeps on the
+/// stack. A pivot with more updates its rows by leaving and entering their
+/// groups.
+const IN_PLACE_VALUES: usize = 8;
 /// Between the aggregation and the field in a value field's caption.
 const CAPTION_JOIN: &str = " of ";
 /// Group 0 of each axis is the grand total.
@@ -1288,11 +1292,9 @@ pub(crate) struct PivotCache {
     /// A group appeared or disappeared, a group label changed, or a header
     /// changed: the output needs a new layout.
     relayout: bool,
-    /// Scratch buffers for one row's keys, new contributions, group paths
-    /// and text case fold, kept between rows so a row update does not
-    /// allocate.
+    /// Scratch buffers for one row's keys, group paths and text case fold,
+    /// kept between rows so a row update does not allocate.
     keys: Vec<Value>,
-    contributions: Vec<(u8, u64)>,
     row_path: Vec<u32>,
     col_path: Vec<u32>,
     folded: String,
@@ -1469,8 +1471,9 @@ enum RowUpdate {
     /// A key moved the row; its keys, free of errors, are in `keys`, read
     /// after the filters passed.
     KeysRead,
-    /// The row was not grouped, a filter now drops it, or a key holds an
-    /// error; the caller reads the row again.
+    /// The row was not grouped, a filter now drops it, a key holds an error,
+    /// or the pivot has more than [`IN_PLACE_VALUES`] value fields; the
+    /// caller reads the row again.
     Skipped,
 }
 
@@ -1782,7 +1785,6 @@ impl PivotCache {
             relayout: true,
             keys: Vec::with_capacity(definition.rows.len().max(definition.columns.len())),
             row_path: Vec::new(),
-            contributions: Vec::new(),
             col_path: Vec::new(),
             folded: String::new(),
             outputs,
@@ -1794,7 +1796,7 @@ impl PivotCache {
         };
 
         for row in 0..rows {
-            if cache.enter_row(row, source) {
+            if cache.enter_row(row, source, false) {
                 cache.apply_row(row, true, false);
             }
             if cache.group_count() > MAX_PIVOT_GROUPS {
@@ -1913,8 +1915,9 @@ impl PivotCache {
                 // The check passed the filters and left the row's keys,
                 // free of errors, in `self.keys`: enter them without a
                 // second read.
-                self.enter_keys(index, source);
-                self.apply_row(index, true, true);
+                if self.enter_row(index, source, true) {
+                    self.apply_row(index, true, true);
+                }
             } else {
                 self.add_row(index, source);
             }
@@ -1960,25 +1963,47 @@ impl PivotCache {
     }
 
     fn add_row(&mut self, row: usize, source: &impl PivotSource) {
-        if self.enter_row(row, source) {
+        if self.enter_row(row, source, false) {
             self.apply_row(row, true, true);
         }
     }
 
     /// Groups `row` on both axes and records its contributions, without
     /// adding them to any pair. Returns whether the row passed the filters
-    /// and its keys hold no error.
-    fn enter_row(&mut self, row: usize, source: &impl PivotSource) -> bool {
-        if !self.passes_filters(row, source) {
-            return false;
+    /// and its keys hold no error. With `keys_ready`, the caller has checked
+    /// both and left the keys in `self.keys`.
+    fn enter_row(&mut self, row: usize, source: &impl PivotSource, keys_ready: bool) -> bool {
+        if !keys_ready {
+            if !self.passes_filters(row, source) {
+                return false;
+            }
+            // Read and check every key first, so a key error leaves both
+            // axes as they were.
+            if let Err(error) = self.read_keys(row, source) {
+                self.key_errors.insert(row as u32, error);
+                return false;
+            }
         }
-        // Read and check every key first, so a key error leaves both axes as
-        // they were.
-        if let Err(error) = self.read_keys(row, source) {
-            self.key_errors.insert(row as u32, error);
-            return false;
+        let keys = std::mem::take(&mut self.keys);
+        let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
+        let (row_leaf, row_changed) = self.row_axis.enter(row_keys, row as u32);
+        let (col_leaf, col_changed) = self.col_axis.enter(col_keys, row as u32);
+        self.keys = keys;
+        self.relayout |= row_changed || col_changed;
+        self.row_leaf[row] = row_leaf;
+        self.col_leaf[row] = col_leaf;
+
+        let values = self.definition.values.len();
+        for (index, value) in self.definition.values.iter().enumerate() {
+            let (kind, payload) = contribution(
+                value.aggregation,
+                source.value(row, value.field),
+                &mut self.folded,
+                &mut self.texts,
+            );
+            self.contribution_kinds[row * values + index] = kind;
+            self.contribution_payloads[row * values + index] = payload;
         }
-        self.enter_keys(row, source);
         true
     }
 
@@ -2000,31 +2025,6 @@ impl PivotCache {
         result
     }
 
-    /// [`Self::enter_row`] for a row that passed the filters and whose keys,
-    /// free of errors, are in `self.keys`.
-    fn enter_keys(&mut self, row: usize, source: &impl PivotSource) {
-        let keys = std::mem::take(&mut self.keys);
-        let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
-        let (row_leaf, row_changed) = self.row_axis.enter(row_keys, row as u32);
-        let (col_leaf, col_changed) = self.col_axis.enter(col_keys, row as u32);
-        self.keys = keys;
-        self.relayout |= row_changed || col_changed;
-        self.row_leaf[row] = row_leaf;
-        self.col_leaf[row] = col_leaf;
-
-        let values = self.definition.values.len();
-        for (index, value) in self.definition.values.iter().enumerate() {
-            let (kind, payload) = contribution(
-                value.aggregation,
-                source.value(row, value.field),
-                &mut self.folded,
-                &mut self.texts,
-            );
-            self.contribution_kinds[row * values + index] = kind;
-            self.contribution_payloads[row * values + index] = payload;
-        }
-    }
-
     fn passes_filters(&mut self, row: usize, source: &impl PivotSource) -> bool {
         self.definition
             .filters
@@ -2039,7 +2039,8 @@ impl PivotCache {
     /// see [`RowUpdate`] for what it leaves behind.
     fn update_values(&mut self, row: usize, source: &impl PivotSource) -> RowUpdate {
         let (row_leaf, col_leaf) = (self.row_leaf[row], self.col_leaf[row]);
-        if row_leaf == NO_GROUP || !self.passes_filters(row, source) {
+        let values = self.definition.values.len();
+        if values > IN_PLACE_VALUES || row_leaf == NO_GROUP || !self.passes_filters(row, source) {
             return RowUpdate::Skipped;
         }
         if self.read_keys(row, source).is_err() {
@@ -2053,18 +2054,16 @@ impl PivotCache {
             return RowUpdate::KeysRead;
         }
 
-        let mut contributions = std::mem::take(&mut self.contributions);
-        contributions.clear();
-        for value in &self.definition.values {
-            contributions.push(contribution(
+        let mut contributions = [(CONTRIBUTION_BLANK, 0); IN_PLACE_VALUES];
+        for (slot, value) in contributions.iter_mut().zip(&self.definition.values) {
+            *slot = contribution(
                 value.aggregation,
                 source.value(row, value.field),
                 &mut self.folded,
                 &mut self.texts,
-            ));
+            );
         }
-        self.replace_contributions(row, &contributions);
-        self.contributions = contributions;
+        self.replace_contributions(row, &contributions[..values]);
         RowUpdate::InPlace
     }
 
@@ -2585,7 +2584,6 @@ impl PivotCache {
             + value_bytes(&self.outputs)
             + self.keys.capacity() * size_of::<Value>()
             + (self.row_path.capacity() + self.col_path.capacity()) * size_of::<u32>()
-            + self.contributions.capacity() * size_of::<(u8, u64)>()
             + self.folded.capacity()
     }
 }
