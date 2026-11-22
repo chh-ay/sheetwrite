@@ -56,7 +56,7 @@ const KIND_TEXT = 2;
 const KIND_BOOLEAN = 3;
 const KIND_ERROR = 4;
 
-function previewValue(preview: EnginePreview): FormulaPreviewValue {
+function preview_value(preview: EnginePreview): FormulaPreviewValue {
   switch (preview.kind) {
     case KIND_NUMBER:
       return preview.number;
@@ -75,8 +75,9 @@ function previewValue(preview: EnginePreview): FormulaPreviewValue {
 export function decodePreview(fields: Float64Array, text: string | undefined): FormulaPreview {
   const [status = -1, kind = 0, number = 0, rows = 0, cols = 0] = fields;
   const preview: EnginePreview = { status, kind, number, text };
-  if (status === STATUS_VALUE) return { status: "value", value: previewValue(preview) };
-  if (status === STATUS_ARRAY) return { status: "array", rows, cols, first: previewValue(preview) };
+  if (status === STATUS_VALUE) return { status: "value", value: preview_value(preview) };
+  if (status === STATUS_ARRAY)
+    return { status: "array", rows, cols, first: preview_value(preview) };
 
   const reason = UNAVAILABLE[status];
   if (reason === undefined) throw new Error(`Sheetwrite: unknown formula preview status ${status}`);

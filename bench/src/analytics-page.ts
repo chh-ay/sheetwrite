@@ -26,19 +26,19 @@ import {
 // query string, clicks the run button and reads the result from the status
 // element. Each sample times the work the browser does for one action: the
 // action itself, then the callbacks of the frames after it up to a forced
-// layout (see `timeAction`). Idle time between frames is not counted.
+// layout (see `time_action`). Idle time between frames is not counted.
 
-const status = requiredElement("#bench-status", HTMLOutputElement);
-const runButton = requiredElement("#bench-run", HTMLButtonElement);
-const host = requiredElement("#grid-host", HTMLDivElement);
+const status = required_element("#bench-status", HTMLOutputElement);
+const run_button = required_element("#bench-run", HTMLButtonElement);
+const host = required_element("#grid-host", HTMLDivElement);
 const params = new URLSearchParams(location.search);
 const scenario = params.get("scenario") ?? "";
-const samples = positiveInteger("samples", 30);
-const warmups = positiveInteger("warmups", 10);
+const samples = positive_integer("samples", 30);
+const warmups = positive_integer("warmups", 10);
 /** Charts on the scroll sheet; `charts=0` is the control. */
-const scrollChartCount = Number(params.get("charts") ?? "10");
+const scroll_chart_count = Number(params.get("charts") ?? "10");
 /** Orders of the model workbook. */
-const modelRowCount = Number(params.get("rows") ?? MODEL_ROWS);
+const model_row_count = Number(params.get("rows") ?? MODEL_ROWS);
 /** Most frames an action may take before its sample fails. */
 const MAX_FRAMES = 120;
 /** Pixels one scroll step moves. */
@@ -48,31 +48,31 @@ const ROW_HEIGHT_PX = 20;
 const SHOWCASE_KPIS = 2;
 const MODEL_KPIS = 3;
 
-function requiredElement<T extends Element>(selector: string, type: new () => T): T {
+function required_element<T extends Element>(selector: string, type: new () => T): T {
   const element = document.querySelector(selector);
   if (!(element instanceof type)) throw new Error(`The benchmark page has no ${selector}.`);
   return element;
 }
 
-function positiveInteger(name: string, fallback: number): number {
+function positive_integer(name: string, fallback: number): number {
   const value = Number(params.get(name) ?? fallback);
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`Invalid ${name}: ${value}`);
   return value;
 }
 
-function setStatus(next: string): void {
+function set_status(next: string): void {
   status.dataset.status = next;
   status.textContent = next;
 }
 
-function nextFrame(): Promise<number> {
+function next_frame(): Promise<number> {
   const { promise, resolve } = Promise.withResolvers<number>();
   requestAnimationFrame(resolve);
   return promise;
 }
 
 /** Style and layout of the whole page, as the next paint needs them. */
-function forceLayout(): void {
+function force_layout(): void {
   void document.body.offsetHeight;
 }
 
@@ -84,25 +84,25 @@ interface ActionSample {
 
 /**
  * Time `action`, started in a frame callback, plus the callbacks of the
- * frames after it until `isDone` holds, each up to a forced layout. A
+ * frames after it until `is_done` holds, each up to a forced layout. A
  * callback registered before the action runs first in the next frame and
  * marks where that frame's work starts; one registered after the action runs
  * after the work the action scheduled.
  */
-async function timeAction(action: () => void, isDone: () => boolean): Promise<ActionSample> {
-  await nextFrame();
+async function time_action(action: () => void, is_done: () => boolean): Promise<ActionSample> {
+  await next_frame();
   const { promise, resolve, reject } = Promise.withResolvers<ActionSample>();
   let busy = 0;
-  let frameStart = 0;
+  let frame_start = 0;
   let frames = 0;
-  const markFrameStart = (): void => {
-    frameStart = performance.now();
+  const mark_frame_start = (): void => {
+    frame_start = performance.now();
   };
-  const onFrame = (): void => {
-    forceLayout();
-    busy += performance.now() - frameStart;
+  const on_frame = (): void => {
+    force_layout();
+    busy += performance.now() - frame_start;
     frames += 1;
-    if (isDone()) {
+    if (is_done()) {
       resolve({ ms: busy, frames });
       return;
     }
@@ -110,11 +110,11 @@ async function timeAction(action: () => void, isDone: () => boolean): Promise<Ac
       reject(new Error(`${scenario}: the action did not finish in ${MAX_FRAMES} frames`));
       return;
     }
-    requestAnimationFrame(markFrameStart);
-    requestAnimationFrame(onFrame);
+    requestAnimationFrame(mark_frame_start);
+    requestAnimationFrame(on_frame);
   };
   requestAnimationFrame(() => {
-    requestAnimationFrame(markFrameStart);
+    requestAnimationFrame(mark_frame_start);
     const start = performance.now();
     try {
       action();
@@ -123,7 +123,7 @@ async function timeAction(action: () => void, isDone: () => boolean): Promise<Ac
       return;
     }
     busy += performance.now() - start;
-    requestAnimationFrame(onFrame);
+    requestAnimationFrame(on_frame);
   });
   return promise;
 }
@@ -149,33 +149,33 @@ async function collect(sample: (index: number) => Promise<ActionSample>): Promis
   return { samples: times, frames };
 }
 
-function svgOf(chartHost: Element | null): SVGSVGElement | null {
-  const svg = chartHost?.querySelector("svg");
+function svg_of(chart_host: Element | null): SVGSVGElement | null {
+  const svg = chart_host?.querySelector("svg");
   return svg instanceof SVGSVGElement ? svg : null;
 }
 
-function worksheetChart(id: string): HTMLElement {
+function worksheet_chart(id: string): HTMLElement {
   const frame = host.querySelector<HTMLElement>(`.sheetwrite-object[data-chart-id="${id}"]`);
   if (frame === null) throw new Error(`Chart ${id} has no frame on the sheet`);
   return frame;
 }
 
-function requireApplied(result: { status: string }): void {
+function require_applied(result: { status: string }): void {
   if (result.status !== "applied") throw new Error(`An operation was refused: ${result.status}`);
 }
 
 /** Edit one source cell of a chart; the chart draws a new SVG with the value. */
-async function chartEdit(kind: "line" | "column", seriesCount: number): Promise<ScenarioResult> {
-  const { workbook, data } = chartWorkbook(kind, seriesCount);
+async function chart_edit(kind: "line" | "column", series_count: number): Promise<ScenarioResult> {
+  const { workbook, data } = chartWorkbook(kind, series_count);
   const grid = createGrid(host, { workbook, data });
   try {
-    const chart = worksheetChart("chart");
-    await waitFor(() => svgOf(chart) !== null);
+    const chart = worksheet_chart("chart");
+    await wait_for(() => svg_of(chart) !== null);
     return await collect((index) => {
-      const before = svgOf(chart);
-      return timeAction(
+      const before = svg_of(chart);
+      return time_action(
         () =>
-          requireApplied(
+          require_applied(
             grid.applyTransaction({
               patches: [
                 {
@@ -186,7 +186,7 @@ async function chartEdit(kind: "line" | "column", seriesCount: number): Promise<
               ],
             }),
           ),
-        () => svgOf(chart) !== before,
+        () => svg_of(chart) !== before,
       );
     });
   } finally {
@@ -198,15 +198,18 @@ async function chartEdit(kind: "line" | "column", seriesCount: number): Promise<
  * Filter the chart's source column and clear the filter again. A chart
  * reads data rows, so its drawing must stay the same node.
  */
-async function chartFilter(kind: "line" | "column", seriesCount: number): Promise<ScenarioResult> {
-  const { workbook, data } = chartWorkbook(kind, seriesCount);
+async function chart_filter(
+  kind: "line" | "column",
+  series_count: number,
+): Promise<ScenarioResult> {
+  const { workbook, data } = chartWorkbook(kind, series_count);
   const grid = createGrid(host, { workbook, data });
   try {
-    const chart = worksheetChart("chart");
-    await waitFor(() => svgOf(chart) !== null);
-    const drawn = svgOf(chart);
+    const chart = worksheet_chart("chart");
+    await wait_for(() => svg_of(chart) !== null);
+    const drawn = svg_of(chart);
     const result = await collect((index) =>
-      timeAction(
+      time_action(
         () =>
           grid.setColumnFilter(
             CHART_EDIT.col,
@@ -215,7 +218,7 @@ async function chartFilter(kind: "line" | "column", seriesCount: number): Promis
         () => true,
       ),
     );
-    return { ...result, extra: { redrawn: svgOf(chart) === drawn ? 0 : 1 } };
+    return { ...result, extra: { redrawn: svg_of(chart) === drawn ? 0 : 1 } };
   } finally {
     grid.destroy();
   }
@@ -226,13 +229,13 @@ async function chartFilter(kind: "line" | "column", seriesCount: number): Promis
  * grid's frame callbacks. This listener is added after the grid's, so its
  * frame callback runs after the grid's paint.
  */
-function timeScroll(scroller: HTMLElement, top: number): Promise<ActionSample> {
+function time_scroll(scroller: HTMLElement, top: number): Promise<ActionSample> {
   const { promise, resolve } = Promise.withResolvers<ActionSample>();
   scroller.addEventListener(
     "scroll",
     (event) => {
       requestAnimationFrame(() => {
-        forceLayout();
+        force_layout();
         resolve({ ms: performance.now() - event.timeStamp, frames: 1 });
       });
     },
@@ -243,37 +246,37 @@ function timeScroll(scroller: HTMLElement, top: number): Promise<ActionSample> {
 }
 
 /** Scroll down a sheet with charts; no chart may draw again. */
-async function scrollCharts(): Promise<ScenarioResult> {
-  const { workbook, data } = scrollWorkbook(scrollChartCount);
+async function scroll_charts(): Promise<ScenarioResult> {
+  const { workbook, data } = scrollWorkbook(scroll_chart_count);
   const grid = createGrid(host, { workbook, data });
   try {
     const charts = [...host.querySelectorAll<HTMLElement>(".sheetwrite-object")];
-    await waitFor(() => charts.every((chart) => svgOf(chart) !== null));
-    const drawings = charts.map((chart) => svgOf(chart));
+    await wait_for(() => charts.every((chart) => svg_of(chart) !== null));
+    const drawings = charts.map((chart) => svg_of(chart));
     const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
     if (scroller === null) throw new Error("The grid has no scroller");
     // Down through the charts, then back to the top.
-    const lastTop = (SCROLL_ROWS / 2) * ROW_HEIGHT_PX;
+    const last_top = (SCROLL_ROWS / 2) * ROW_HEIGHT_PX;
     const result = await collect(() => {
       const below = scroller.scrollTop + SCROLL_STEP_PX;
-      return timeScroll(scroller, below > lastTop ? 0 : below);
+      return time_scroll(scroller, below > last_top ? 0 : below);
     });
-    const redrawn = charts.filter((chart, index) => svgOf(chart) !== drawings[index]).length;
+    const redrawn = charts.filter((chart, index) => svg_of(chart) !== drawings[index]).length;
     return { ...result, extra: { charts: charts.length, redrawn } };
   } finally {
     grid.destroy();
   }
 }
 
-function dashboardRoot(): HTMLElement | null {
+function dashboard_root(): HTMLElement | null {
   return host.querySelector<HTMLElement>(".sheetwrite-dashboard");
 }
 
 /** Every item of the dashboard shows its content: KPI values, chart bars, pivot cells, slicer buttons. */
-function isDashboardDrawn(kpis: number): boolean {
-  const root = dashboardRoot();
+function is_dashboard_drawn(kpis: number): boolean {
+  const root = dashboard_root();
   if (root === null || root.hidden) return false;
-  const chart = svgOf(root.querySelector("[data-chart-id]"));
+  const chart = svg_of(root.querySelector("[data-chart-id]"));
   return (
     root.querySelectorAll(".sheetwrite-dashboard-kpi").length === kpis &&
     chart?.querySelector(".sheetwrite-chart-bar") != null &&
@@ -286,26 +289,26 @@ function isDashboardDrawn(kpis: number): boolean {
  * Time creating a grid in `create`, and destroy every grid it created
  * after the sample.
  */
-async function timeCreate(create: () => Grid, isDone: () => boolean): Promise<ActionSample> {
+async function time_create(create: () => Grid, is_done: () => boolean): Promise<ActionSample> {
   const created: Grid[] = [];
   try {
-    return await timeAction(() => created.push(create()), isDone);
+    return await time_action(() => created.push(create()), is_done);
   } finally {
     for (const grid of created) grid.destroy();
   }
 }
 
 /** Start the showcase as its page does: the grid, then the orders and pivots as operations. */
-function showcaseFirst(): Promise<ScenarioResult> {
+function showcase_first(): Promise<ScenarioResult> {
   return collect(() =>
-    timeCreate(
+    time_create(
       () => {
         const grid = createGrid(host, { workbook: showcaseWorkbook() });
-        requireApplied(grid.applyRemoteOperations(orderOperations(SHOWCASE_ROWS)));
-        requireApplied(grid.applyRemoteOperations(showcaseOperations()));
+        require_applied(grid.applyRemoteOperations(orderOperations(SHOWCASE_ROWS)));
+        require_applied(grid.applyRemoteOperations(showcaseOperations()));
         return grid;
       },
-      () => isDashboardDrawn(SHOWCASE_KPIS),
+      () => is_dashboard_drawn(SHOWCASE_KPIS),
     ),
   );
 }
@@ -315,54 +318,54 @@ function showcaseFirst(): Promise<ScenarioResult> {
  * dashboard, as one action. The control row creates the grid of the orders
  * sheet alone, without the dashboard or the measures.
  */
-async function modelFirst(): Promise<ScenarioResult> {
+async function model_first(): Promise<ScenarioResult> {
   const controls: number[] = [];
   const result = await collect(async (index) => {
-    const control = modelWorkbook(modelRowCount);
+    const control = modelWorkbook(model_row_count);
     control.workbook.sheets = control.workbook.sheets.filter((sheet) => sheet.id === ORDERS_SHEET);
     delete control.workbook.dataModel;
-    const loaded = await timeCreate(
+    const loaded = await time_create(
       () => createGrid(host, control),
       () => true,
     );
     if (index >= 0) controls.push(loaded.ms);
 
-    const { workbook, data } = modelWorkbook(modelRowCount);
-    return timeCreate(
+    const { workbook, data } = modelWorkbook(model_row_count);
+    return time_create(
       () => {
         const grid = createGrid(host, { workbook, data });
         grid.setActiveSheet(DASHBOARD_SHEET);
         return grid;
       },
-      () => isDashboardDrawn(MODEL_KPIS),
+      () => is_dashboard_drawn(MODEL_KPIS),
     );
   });
   return { ...result, extra: { ordersOnlyMedianMs: median(controls) } };
 }
 
-function kpiTexts(): string {
-  const values = dashboardRoot()?.querySelectorAll(".sheetwrite-dashboard-kpi") ?? [];
+function kpi_texts(): string {
+  const values = dashboard_root()?.querySelectorAll(".sheetwrite-dashboard-kpi") ?? [];
   return [...values].map((element) => element.textContent).join("|");
 }
 
 /** The model dashboard, open and drawn. */
-async function openModelDashboard(): Promise<Grid> {
-  const { workbook, data } = modelWorkbook(modelRowCount);
+async function open_model_dashboard(): Promise<Grid> {
+  const { workbook, data } = modelWorkbook(model_row_count);
   const grid = createGrid(host, { workbook, data });
   grid.setActiveSheet(DASHBOARD_SHEET);
-  await waitFor(() => isDashboardDrawn(MODEL_KPIS));
+  await wait_for(() => is_dashboard_drawn(MODEL_KPIS));
   return grid;
 }
 
 /** Edit one order's revenue on the orders sheet; the KPI cards, chart and pivot update. */
-async function modelEdit(): Promise<ScenarioResult> {
-  const grid = await openModelDashboard();
+async function model_edit(): Promise<ScenarioResult> {
+  const grid = await open_model_dashboard();
   try {
     return await collect((index) => {
-      const before = kpiTexts();
-      return timeAction(
+      const before = kpi_texts();
+      return time_action(
         () =>
-          requireApplied(
+          require_applied(
             grid.applyTransaction({
               patches: [
                 {
@@ -373,7 +376,7 @@ async function modelEdit(): Promise<ScenarioResult> {
               ],
             }),
           ),
-        () => isDashboardDrawn(MODEL_KPIS) && kpiTexts() !== before,
+        () => is_dashboard_drawn(MODEL_KPIS) && kpi_texts() !== before,
       );
     });
   } finally {
@@ -381,9 +384,9 @@ async function modelEdit(): Promise<ScenarioResult> {
   }
 }
 
-function slicerButton(label: string): HTMLButtonElement {
+function slicer_button(label: string): HTMLButtonElement {
   const buttons =
-    dashboardRoot()?.querySelectorAll<HTMLButtonElement>(".sheetwrite-dashboard-slicer-value") ??
+    dashboard_root()?.querySelectorAll<HTMLButtonElement>(".sheetwrite-dashboard-slicer-value") ??
     [];
   const button = [...buttons].find((candidate) => candidate.textContent === label);
   if (button === undefined) throw new Error(`The slicer has no ${label} button`);
@@ -391,18 +394,18 @@ function slicerButton(label: string): HTMLButtonElement {
 }
 
 /** Click a region on the slicer, a different one each sample; every item updates. */
-async function modelSlicer(): Promise<ScenarioResult> {
-  const grid = await openModelDashboard();
+async function model_slicer(): Promise<ScenarioResult> {
+  const grid = await open_model_dashboard();
   try {
     return await collect((index) => {
       const region = REGIONS[(index + warmups) % REGIONS.length] ?? REGIONS[0];
-      const before = kpiTexts();
-      return timeAction(
-        () => slicerButton(region).click(),
+      const before = kpi_texts();
+      return time_action(
+        () => slicer_button(region).click(),
         () =>
-          isDashboardDrawn(MODEL_KPIS) &&
-          kpiTexts() !== before &&
-          slicerButton(region).getAttribute("aria-pressed") === "true",
+          is_dashboard_drawn(MODEL_KPIS) &&
+          kpi_texts() !== before &&
+          slicer_button(region).getAttribute("aria-pressed") === "true",
       );
     });
   } finally {
@@ -410,10 +413,10 @@ async function modelSlicer(): Promise<ScenarioResult> {
   }
 }
 
-async function waitFor(condition: () => boolean): Promise<void> {
+async function wait_for(condition: () => boolean): Promise<void> {
   for (let frame = 0; frame < MAX_FRAMES; frame++) {
     if (condition()) return;
-    await nextFrame();
+    await next_frame();
   }
   throw new Error(`${scenario}: the page did not reach its start state`);
 }
@@ -426,14 +429,14 @@ function median(values: readonly number[]): number {
 }
 
 const SCENARIOS: Readonly<Record<string, () => Promise<ScenarioResult>>> = {
-  "chart-edit-line": () => chartEdit("line", 4),
-  "chart-edit-column": () => chartEdit("column", 3),
-  "chart-filter-line": () => chartFilter("line", 4),
-  "scroll-charts": scrollCharts,
-  "dashboard-showcase-first": showcaseFirst,
-  "dashboard-model-first": modelFirst,
-  "dashboard-model-edit": modelEdit,
-  "dashboard-model-slicer": modelSlicer,
+  "chart-edit-line": () => chart_edit("line", 4),
+  "chart-edit-column": () => chart_edit("column", 3),
+  "chart-filter-line": () => chart_filter("line", 4),
+  "scroll-charts": scroll_charts,
+  "dashboard-showcase-first": showcase_first,
+  "dashboard-model-first": model_first,
+  "dashboard-model-edit": model_edit,
+  "dashboard-model-slicer": model_slicer,
 };
 
 /**
@@ -442,7 +445,7 @@ const SCENARIOS: Readonly<Record<string, () => Promise<ScenarioResult>>> = {
  * work and frame callbacks to the timed frames.
  */
 function report(next: string, result = ""): void {
-  setStatus(next);
+  set_status(next);
   const binding: unknown = Reflect.get(globalThis, "analyticsReport");
   if (typeof binding === "function") binding(next, result);
 }
@@ -451,9 +454,9 @@ async function start(): Promise<void> {
   const run = SCENARIOS[scenario];
   if (run === undefined) throw new Error(`Unknown scenario: ${scenario}`);
   await initSheetwrite({ engine: formulas, source: "/formulas.wasm", addons: [chartsAddon()] });
-  runButton.addEventListener("click", () => {
-    runButton.disabled = true;
-    setStatus("running");
+  run_button.addEventListener("click", () => {
+    run_button.disabled = true;
+    set_status("running");
     run().then(
       (result) => report("done", JSON.stringify(result)),
       (error: unknown) => {
@@ -462,7 +465,7 @@ async function start(): Promise<void> {
       },
     );
   });
-  runButton.disabled = false;
+  run_button.disabled = false;
   report("idle");
 }
 

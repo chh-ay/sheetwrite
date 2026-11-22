@@ -43,7 +43,7 @@ export function parsePackageReleaseIdentities(
     throw new Error(`${label} must be ${allowEmpty ? "an array" : "a non-empty array"}`);
   }
   const seen = new Set<string>();
-  let previousIndex = -1;
+  let previous_index = -1;
   return parsed.map((entry, index) => {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`${label}[${index}] must be an object`);
@@ -53,15 +53,15 @@ export function parsePackageReleaseIdentities(
       throw new Error(`${label}[${index}] must contain only name and version`);
     }
     const { name, version } = entry as Record<string, unknown>;
-    const packageIndex = publishableIndex(name);
-    if (packageIndex === -1) throw new Error(`Unknown publishable package ${String(name)}`);
-    if (packageIndex <= previousIndex) throw new Error(`${label} must preserve dependency order`);
+    const package_index = publishableIndex(name);
+    if (package_index === -1) throw new Error(`Unknown publishable package ${String(name)}`);
+    if (package_index <= previous_index) throw new Error(`${label} must preserve dependency order`);
     if (typeof version !== "string" || !STABLE_VERSION.test(version)) {
       throw new Error(`${String(name)} has no stable version`);
     }
     if (seen.has(name as string)) throw new Error(`Duplicate package ${String(name)}`);
     seen.add(name as string);
-    previousIndex = packageIndex;
+    previous_index = package_index;
     return { name: name as string, version };
   });
 }
@@ -109,45 +109,46 @@ export function provenanceCommitFromAttestations(value: unknown): string {
   throw new Error("npm provenance has no source commit");
 }
 
-async function queryPackageProvenance(identity: PackageReleaseIdentity): Promise<string> {
-  const metadataUrl = `https://registry.npmjs.org/${encodeURIComponent(identity.name)}/${identity.version}`;
-  let lastError: unknown;
+async function query_package_provenance(identity: PackageReleaseIdentity): Promise<string> {
+  const metadata_url = `https://registry.npmjs.org/${encodeURIComponent(identity.name)}/${identity.version}`;
+  let last_error: unknown;
   for (let attempt = 1; attempt <= 12; attempt += 1) {
     try {
-      const metadataResponse = await fetch(metadataUrl);
-      if (!metadataResponse.ok) throw new Error(`npm metadata returned ${metadataResponse.status}`);
-      const metadata = (await metadataResponse.json()) as {
+      const metadata_response = await fetch(metadata_url);
+      if (!metadata_response.ok)
+        throw new Error(`npm metadata returned ${metadata_response.status}`);
+      const metadata = (await metadata_response.json()) as {
         readonly dist?: { readonly attestations?: { readonly url?: unknown } };
       };
-      const attestationsUrl = metadata.dist?.attestations?.url;
-      if (typeof attestationsUrl !== "string")
+      const attestations_url = metadata.dist?.attestations?.url;
+      if (typeof attestations_url !== "string")
         throw new Error("npm metadata has no attestations URL");
-      const attestationsResponse = await fetch(attestationsUrl);
-      if (!attestationsResponse.ok) {
-        throw new Error(`npm attestations returned ${attestationsResponse.status}`);
+      const attestations_response = await fetch(attestations_url);
+      if (!attestations_response.ok) {
+        throw new Error(`npm attestations returned ${attestations_response.status}`);
       }
-      return provenanceCommitFromAttestations(await attestationsResponse.json());
+      return provenanceCommitFromAttestations(await attestations_response.json());
     } catch (error) {
-      lastError = error;
+      last_error = error;
       if (attempt < 12) await Bun.sleep(5_000);
     }
   }
   throw new Error(`${packageReleaseTag(identity)} provenance did not propagate`, {
-    cause: lastError,
+    cause: last_error,
   });
 }
 
 export async function runCommand(command: readonly [string, ...string[]]): Promise<CommandResult> {
   const child = Bun.spawn([...command], { env: process.env, stderr: "pipe", stdout: "pipe" });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
+  return { exitCode: exit_code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 
-async function requireSuccess(
+async function require_success(
   runner: CommandRunner,
   command: readonly [string, ...string[]],
 ): Promise<string> {
@@ -168,24 +169,24 @@ export interface ReleaseServices {
   readonly readChangelog: ChangelogReader;
 }
 
-const repositoryRoot = resolve(import.meta.dir, "..");
+const repository_root = resolve(import.meta.dir, "..");
 
 export async function readPackageChangelog(packageName: string): Promise<string> {
-  const directories = await readdir(join(repositoryRoot, "packages"), { withFileTypes: true });
+  const directories = await readdir(join(repository_root, "packages"), { withFileTypes: true });
   for (const directory of directories) {
     if (!directory.isDirectory()) continue;
-    const packageRoot = join(repositoryRoot, "packages", directory.name);
-    const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
+    const package_root = join(repository_root, "packages", directory.name);
+    const manifest = JSON.parse(await readFile(join(package_root, "package.json"), "utf8")) as {
       readonly name?: unknown;
     };
-    if (manifest.name === packageName) return readFile(join(packageRoot, "CHANGELOG.md"), "utf8");
+    if (manifest.name === packageName) return readFile(join(package_root, "CHANGELOG.md"), "utf8");
   }
   throw new Error(`No workspace package is named ${packageName}`);
 }
 
 const DEFAULT_SERVICES: ReleaseServices = {
   runner: runCommand,
-  provenance: queryPackageProvenance,
+  provenance: query_package_provenance,
   readChangelog: readPackageChangelog,
 };
 
@@ -193,21 +194,21 @@ export function versionReleaseTag(version: string): string {
   return `v${version}`;
 }
 
-async function tagCommit(runner: CommandRunner, tag: string): Promise<string | undefined> {
+async function tag_commit(runner: CommandRunner, tag: string): Promise<string | undefined> {
   const result = await runner(["git", "rev-parse", "--verify", `refs/tags/${tag}^{commit}`]);
   return result.exitCode === 0 ? result.stdout.trim() : undefined;
 }
 
 /** Creates the tag at `commit`, or fails when an existing tag points elsewhere. */
-async function ensureTag(runner: CommandRunner, tag: string, commit: string): Promise<void> {
-  const existing = await tagCommit(runner, tag);
+async function ensure_tag(runner: CommandRunner, tag: string, commit: string): Promise<void> {
+  const existing = await tag_commit(runner, tag);
   if (existing !== undefined) {
     if (existing !== commit) throw new Error(`${tag} targets ${existing}, expected ${commit}`);
     return;
   }
 
-  await requireSuccess(runner, ["git", "tag", tag, commit]);
-  await requireSuccess(runner, ["git", "push", "origin", `refs/tags/${tag}`]);
+  await require_success(runner, ["git", "tag", tag, commit]);
+  await require_success(runner, ["git", "push", "origin", `refs/tags/${tag}`]);
 }
 
 /** Each package's CHANGELOG section for `version`, in release notes order. */
@@ -240,25 +241,25 @@ export async function releaseNotesLinks(
 ): Promise<ReleaseNotesLinks> {
   const docs = docsReleaseUrl(version);
   const [lead] = changelogs;
-  const previousVersion = lead?.section.previousVersion;
-  if (lead === undefined || previousVersion === undefined)
+  const previous_version = lead?.section.previousVersion;
+  if (lead === undefined || previous_version === undefined)
     return docs === undefined ? {} : { docs };
 
-  const previousVersionTag = versionReleaseTag(previousVersion);
-  const baseTag =
-    (await tagCommit(runner, previousVersionTag)) === undefined
-      ? packageReleaseTag({ name: lead.name, version: previousVersion })
-      : previousVersionTag;
+  const previous_version_tag = versionReleaseTag(previous_version);
+  const base_tag =
+    (await tag_commit(runner, previous_version_tag)) === undefined
+      ? packageReleaseTag({ name: lead.name, version: previous_version })
+      : previous_version_tag;
   return {
     ...(docs === undefined ? {} : { docs }),
     previous: {
-      version: previousVersion,
-      compareUrl: compareUrl(baseTag, versionReleaseTag(version)),
+      version: previous_version,
+      compareUrl: compareUrl(base_tag, versionReleaseTag(version)),
     },
   };
 }
 
-function compareStableVersions(left: readonly number[], right: readonly number[]): number {
+function compare_stable_versions(left: readonly number[], right: readonly number[]): number {
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
     const difference = (left[index] ?? 0) - (right[index] ?? 0);
     if (difference !== 0) return difference;
@@ -271,30 +272,30 @@ function compareStableVersions(left: readonly number[], right: readonly number[]
  * `--latest=false`, GitHub can pick Latest by date, so a rerun for an older
  * version would take Latest from a newer release.
  */
-async function latestFlag(runner: CommandRunner, version: string): Promise<string> {
+async function latest_flag(runner: CommandRunner, version: string): Promise<string> {
   const parts = (value: string) => value.split(".").map(Number);
-  const versionTags = await requireSuccess(runner, ["git", "tag", "--list", "v*"]);
-  const isHighest = versionTags
+  const version_tags = await require_success(runner, ["git", "tag", "--list", "v*"]);
+  const is_highest = version_tags
     .split("\n")
     .map((tag) => STABLE_VERSION.exec(tag.trim().slice(1))?.[0])
     .every(
-      (other) => other === undefined || compareStableVersions(parts(other), parts(version)) <= 0,
+      (other) => other === undefined || compare_stable_versions(parts(other), parts(version)) <= 0,
     );
-  return isHighest ? "--latest" : "--latest=false";
+  return is_highest ? "--latest" : "--latest=false";
 }
 
-async function ensureVersionGithubRelease(
+async function ensure_version_github_release(
   runner: CommandRunner,
   version: string,
   commit: string,
   notes: string,
 ): Promise<void> {
   const tag = versionReleaseTag(version);
-  await ensureTag(runner, tag, commit);
+  await ensure_tag(runner, tag, commit);
 
   const title = `Sheetwrite ${version}`;
-  const latest = await latestFlag(runner, version);
-  const releaseResult = await runner([
+  const latest = await latest_flag(runner, version);
+  const release_result = await runner([
     "gh",
     "release",
     "view",
@@ -302,8 +303,8 @@ async function ensureVersionGithubRelease(
     "--json",
     "tagName,isDraft,isPrerelease",
   ]);
-  if (releaseResult.exitCode !== 0) {
-    await requireSuccess(runner, [
+  if (release_result.exitCode !== 0) {
+    await require_success(runner, [
       "gh",
       "release",
       "create",
@@ -320,7 +321,7 @@ async function ensureVersionGithubRelease(
     return;
   }
 
-  const release = JSON.parse(releaseResult.stdout) as {
+  const release = JSON.parse(release_result.stdout) as {
     readonly tagName?: unknown;
     readonly isDraft?: unknown;
     readonly isPrerelease?: unknown;
@@ -330,7 +331,7 @@ async function ensureVersionGithubRelease(
   }
 
   // A rerun refreshes the notes, for example after a CHANGELOG correction.
-  await requireSuccess(runner, [
+  await require_success(runner, [
     "gh",
     "release",
     "edit",
@@ -355,7 +356,11 @@ export async function ensureVersionRelease(
   expectedCommit: string,
   services: Partial<ReleaseServices> = {},
 ): Promise<string | undefined> {
-  const { runner, provenance, readChangelog } = { ...DEFAULT_SERVICES, ...services };
+  const {
+    runner,
+    provenance,
+    readChangelog: read_changelog,
+  } = { ...DEFAULT_SERVICES, ...services };
   if (!/^[0-9a-f]{40}$/.test(expectedCommit)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
@@ -368,53 +373,57 @@ export async function ensureVersionRelease(
   }
 
   // npm provenance and consumers address packages by these per-package tags.
-  const releasedFromCommit: PackageReleaseIdentity[] = [];
+  const released_from_commit: PackageReleaseIdentity[] = [];
   for (const identity of packages) {
     const tag = packageReleaseTag(identity);
-    const attestedCommit = await provenance(identity);
-    if (!/^[0-9a-f]{40}$/.test(attestedCommit)) {
-      throw new Error(`${tag} provenance has invalid source commit ${attestedCommit}`);
+    const attested_commit = await provenance(identity);
+    if (!/^[0-9a-f]{40}$/.test(attested_commit)) {
+      throw new Error(`${tag} provenance has invalid source commit ${attested_commit}`);
     }
-    if (published.has(tag) && attestedCommit !== expectedCommit) {
-      throw new Error(`${tag} provenance targets ${attestedCommit}, expected ${expectedCommit}`);
+    if (published.has(tag) && attested_commit !== expectedCommit) {
+      throw new Error(`${tag} provenance targets ${attested_commit}, expected ${expectedCommit}`);
     }
 
-    await ensureTag(runner, tag, attestedCommit);
-    if (attestedCommit === expectedCommit) releasedFromCommit.push(identity);
+    await ensure_tag(runner, tag, attested_commit);
+    if (attested_commit === expectedCommit) released_from_commit.push(identity);
   }
 
-  if (releasedFromCommit.length === 0) return undefined;
+  if (released_from_commit.length === 0) return undefined;
 
   // The changeset fixed group keeps every package on one version.
-  const versions = [...new Set(releasedFromCommit.map((identity) => identity.version))];
+  const versions = [...new Set(released_from_commit.map((identity) => identity.version))];
   const [version] = versions;
   if (version === undefined || versions.length !== 1) {
     throw new Error(
-      `Packages published from ${expectedCommit} have different versions: ${releasedFromCommit.map(packageReleaseTag).join(", ")}`,
+      `Packages published from ${expectedCommit} have different versions: ${released_from_commit.map(packageReleaseTag).join(", ")}`,
     );
   }
 
-  const changelogs = await readReleaseChangelogs(releasedFromCommit, version, readChangelog);
+  const changelogs = await readReleaseChangelogs(released_from_commit, version, read_changelog);
   const links = await releaseNotesLinks(changelogs, version, runner);
   const notes = renderReleaseNotes(changelogs, links);
-  await ensureVersionGithubRelease(runner, version, expectedCommit, notes);
+  await ensure_version_github_release(runner, version, expectedCommit, notes);
   return versionReleaseTag(version);
 }
 
 async function main(): Promise<void> {
-  const rawPackages = process.env.VERIFIED_PACKAGES;
-  if (!rawPackages) throw new Error("VERIFIED_PACKAGES is required");
-  const rawPublished = process.env.PUBLISHED_PACKAGES;
-  if (rawPublished === undefined) throw new Error("PUBLISHED_PACKAGES is required");
-  const expectedCommit = process.env.EXPECTED_SHA;
-  if (!expectedCommit) throw new Error("EXPECTED_SHA is required");
-  const packages = parsePackageReleaseIdentities(rawPackages);
-  const publishedPackages = parsePackageReleaseIdentities(rawPublished, "PUBLISHED_PACKAGES", true);
-  const releaseTag = await ensureVersionRelease(packages, publishedPackages, expectedCommit);
+  const raw_packages = process.env.VERIFIED_PACKAGES;
+  if (!raw_packages) throw new Error("VERIFIED_PACKAGES is required");
+  const raw_published = process.env.PUBLISHED_PACKAGES;
+  if (raw_published === undefined) throw new Error("PUBLISHED_PACKAGES is required");
+  const expected_commit = process.env.EXPECTED_SHA;
+  if (!expected_commit) throw new Error("EXPECTED_SHA is required");
+  const packages = parsePackageReleaseIdentities(raw_packages);
+  const published_packages = parsePackageReleaseIdentities(
+    raw_published,
+    "PUBLISHED_PACKAGES",
+    true,
+  );
+  const release_tag = await ensureVersionRelease(packages, published_packages, expected_commit);
   console.log(
-    releaseTag === undefined
-      ? `Verified ${packages.length} package tags; no package was published from ${expectedCommit}`
-      : `Verified ${packages.length} package tags and the ${releaseTag} GitHub release`,
+    release_tag === undefined
+      ? `Verified ${packages.length} package tags; no package was published from ${expected_commit}`
+      : `Verified ${packages.length} package tags and the ${release_tag} GitHub release`,
   );
 }
 

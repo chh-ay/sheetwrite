@@ -41,15 +41,15 @@ const snapshot = () =>
     ),
   );
 
-/** A real signal that aborts with `reason` when the codec reads `aborted` for the `abortAt`-th time. */
-function signalAbortingAt(abortAt: number, reason: Error) {
+/** A real signal that aborts with `reason` when the codec reads `aborted` for the `abort_at`-th time. */
+function signal_aborting_at(abort_at: number, reason: Error) {
   const controller = new AbortController();
   let checks = 0;
   let aborted = false;
   Object.defineProperty(controller.signal, "aborted", {
     get() {
       checks += 1;
-      if (checks === abortAt) {
+      if (checks === abort_at) {
         controller.abort(reason);
         aborted = true;
       }
@@ -63,13 +63,13 @@ function signalAbortingAt(abortAt: number, reason: Error) {
  * Run `operation` once with a signal that never fires to count its checks, then
  * once more aborting at each check. Every aborted run must reject with the reason.
  */
-async function expectAbortAtEveryCheck(operation: (signal: AbortSignal) => Promise<unknown>) {
-  const counting = signalAbortingAt(Number.POSITIVE_INFINITY, new Error("never"));
+async function expect_abort_at_every_check(operation: (signal: AbortSignal) => Promise<unknown>) {
+  const counting = signal_aborting_at(Number.POSITIVE_INFINITY, new Error("never"));
   await operation(counting.signal);
   const total = counting.checks();
-  for (let abortAt = 1; abortAt <= total; abortAt++) {
-    const reason = new Error(`abort at check ${abortAt}`);
-    await expect(operation(signalAbortingAt(abortAt, reason).signal)).rejects.toBe(reason);
+  for (let abort_at = 1; abort_at <= total; abort_at++) {
+    const reason = new Error(`abort at check ${abort_at}`);
+    await expect(operation(signal_aborting_at(abort_at, reason).signal)).rejects.toBe(reason);
   }
   return total;
 }
@@ -77,28 +77,30 @@ async function expectAbortAtEveryCheck(operation: (signal: AbortSignal) => Promi
 describe("XLSX abort", () => {
   it("rejects workbook and table imports with the reason at every check, never per cell", async () => {
     const bytes = await toXlsxWorkbook(snapshot());
-    const workbookChecks = await expectAbortAtEveryCheck((signal) =>
+    const workbook_checks = await expect_abort_at_every_check((signal) =>
       fromXlsxWorkbook(bytes, { signal }),
     );
-    const tableChecks = await expectAbortAtEveryCheck((signal) => fromXlsxTable(bytes, { signal }));
+    const table_checks = await expect_abort_at_every_check((signal) =>
+      fromXlsxTable(bytes, { signal }),
+    );
 
-    expect(workbookChecks).toBeGreaterThanOrEqual(SHEET_COUNT);
-    expect(workbookChecks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
-    expect(tableChecks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
+    expect(workbook_checks).toBeGreaterThanOrEqual(SHEET_COUNT);
+    expect(workbook_checks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
+    expect(table_checks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
   });
 
   it("rejects workbook and table exports with the reason at every check and leaves the store unchanged", async () => {
     const store = SheetwriteStore.fromSnapshot(snapshot());
     const before = JSON.stringify(store.exportSnapshot());
-    const workbookChecks = await expectAbortAtEveryCheck((signal) =>
+    const workbook_checks = await expect_abort_at_every_check((signal) =>
       toXlsxWorkbook(store, { signal }),
     );
-    const tableChecks = await expectAbortAtEveryCheck((signal) =>
+    const table_checks = await expect_abort_at_every_check((signal) =>
       toXlsxTable(store.getWorkbook(), store, { signal }),
     );
 
-    expect(workbookChecks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
-    expect(tableChecks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
+    expect(workbook_checks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
+    expect(table_checks).toBeLessThan(CELL_COUNT / MIN_CELLS_PER_ABORT_CHECK);
     expect(JSON.stringify(store.exportSnapshot())).toBe(before);
     store.dispose();
   });
@@ -123,10 +125,10 @@ describe("XLSX failure size", () => {
     expect(new TextEncoder().encode(failure.message).byteLength).toBeLessThanOrEqual(
       MAX_ERROR_MESSAGE_BYTES,
     );
-    const codecFailure = failure.cause;
-    if (!(codecFailure instanceof TypeError)) throw new Error("expected the codec TypeError");
-    expect(codecFailure.message).toBe(failure.message);
-    expect(codecFailure.cause).toBeInstanceOf(URIError);
+    const codec_failure = failure.cause;
+    if (!(codec_failure instanceof TypeError)) throw new Error("expected the codec TypeError");
+    expect(codec_failure.message).toBe(failure.message);
+    expect(codec_failure.cause).toBeInstanceOf(URIError);
   });
 
   it("reports at most 64 warnings for one import", async () => {
@@ -135,10 +137,10 @@ describe("XLSX failure size", () => {
       (_, index) =>
         `<Relationship Id="rExt${index}" Type="${TRANSITIONAL_REL}/oleObject" Target="https://example.invalid/${index}" TargetMode="External"/>`,
     ).join("");
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     await fromXlsxWorkbook(
       rawXlsx({ sheets: [{ xml: worksheet("<sheetData/>") }], rootRelationships: relationships }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(warnings).toHaveLength(MAX_WARNINGS);
   });

@@ -36,18 +36,18 @@ function captioned(
 }
 
 /** General for every cell of `cells`. */
-function generalFormats(cells: DashboardItemExport["cells"]): (string | null)[][] {
+function general_formats(cells: DashboardItemExport["cells"]): (string | null)[][] {
   return cells.map((row) => row.map(() => null));
 }
 
 /** The pivot result under its name, with each value field's number format. */
-function pivotExport(store: Store, sheet: SheetId, item: DashboardItem & { kind: "pivot" }) {
+function pivot_export(store: Store, sheet: SheetId, item: DashboardItem & { kind: "pivot" }) {
   const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
   const index = owner?.pivots?.findIndex((pivot) => pivot.id === item.pivot) ?? -1;
   const formats = owner?.pivots?.[index]?.values.map((value) => value.numberFormat ?? null) ?? [];
   const output = pivotOutputOf(store, sheet, index);
   const content =
-    output === null ? { cells: [], numberFormats: [] } : pivotOutputContent(output, formats);
+    output === null ? { cells: [], numberFormats: [] } : pivot_output_content(output, formats);
   const caption = dashboardItemTitle(store, sheet, item);
   return {
     cells: captioned(caption, content.cells),
@@ -56,9 +56,9 @@ function pivotExport(store: Store, sheet: SheetId, item: DashboardItem & { kind:
 }
 
 /** The static content of one item. */
-function itemExport(store: Store, sheet: SheetId, item: DashboardItem): DashboardItemExport {
+function item_export(store: Store, sheet: SheetId, item: DashboardItem): DashboardItemExport {
   const caption = dashboardItemTitle(store, sheet, item);
-  if (item.kind === "pivot") return { id: item.id, ...pivotExport(store, sheet, item) };
+  if (item.kind === "pivot") return { id: item.id, ...pivot_export(store, sheet, item) };
   if (item.kind === "chart") {
     const chart = resolveChartView(store, sheet, item.chart) ?? undefined;
     return { id: item.id, cells: [], numberFormats: [], ...(chart ? { chart } : {}) };
@@ -78,7 +78,7 @@ function itemExport(store: Store, sheet: SheetId, item: DashboardItem): Dashboar
     caption,
     kept.map((value) => [value]),
   );
-  return { id: item.id, cells, numberFormats: generalFormats(cells) };
+  return { id: item.id, cells, numberFormats: general_formats(cells) };
 }
 
 /** What an XLSX export writes from the pivot views of a store. */
@@ -100,17 +100,17 @@ export function pivotViewExports(store: Store): PivotViewExports {
   applyPivotViews(store, dashboards);
   setPivotChartViews(store, pivotChartViewOf);
 
-  const pivotCharts = new Map<SheetId, Map<string, ChartView>>();
+  const pivot_charts = new Map<SheetId, Map<string, ChartView>>();
   for (const sheet of store.getWorkbook().sheets) {
     if (isDashboard(sheet)) continue;
     for (const chart of sheet.charts ?? []) {
       if (chart.pivot === undefined) continue;
       const view = resolveChartView(store, sheet.id, chart.id);
       if (view === null) continue;
-      let views = pivotCharts.get(sheet.id);
+      let views = pivot_charts.get(sheet.id);
       if (views === undefined) {
         views = new Map();
-        pivotCharts.set(sheet.id, views);
+        pivot_charts.set(sheet.id, views);
       }
       views.set(chart.id, view);
     }
@@ -120,9 +120,9 @@ export function pivotViewExports(store: Store): PivotViewExports {
     dashboards: dashboards.map((sheet) => {
       const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
       const items = owner?.dashboard?.items ?? [];
-      return { sheet, items: items.map((item) => itemExport(store, sheet, item)) };
+      return { sheet, items: items.map((item) => item_export(store, sheet, item)) };
     }),
-    pivotCharts,
+    pivotCharts: pivot_charts,
   };
 }
 
@@ -140,22 +140,22 @@ interface PivotOutputCells {
  * their value field's format (data columns cycle through the value fields),
  * labels and headers use General.
  */
-function pivotOutputContent(
+function pivot_output_content(
   output: PivotOutputCells,
   formats: readonly (string | null)[],
 ): Pick<DashboardItemExport, "cells" | "numberFormats"> {
   const cells: CellScalar[][] = [];
-  const numberFormats: (string | null)[][] = [];
+  const number_formats: (string | null)[][] = [];
   for (let row = 0; row < output.rows; row++) {
     cells.push(output.cells.slice(row * output.cols, (row + 1) * output.cols));
-    numberFormats.push(
+    number_formats.push(
       Array.from({ length: output.cols }, (_, col) => {
         const value = row >= output.headerRows && col >= output.labelCols;
         return value ? (formats[(col - output.labelCols) % formats.length] ?? null) : null;
       }),
     );
   }
-  return { cells, numberFormats };
+  return { cells, numberFormats: number_formats };
 }
 
 /**
@@ -172,7 +172,7 @@ export function worksheetPivotExports(store: SheetwriteStore): DashboardExport[]
       const result = store.getPivotResult(sheet.id, pivot.id);
       if (result?.status !== "ok" || result.cells.length === 0) continue;
       const formats = pivot.values.map((value) => value.numberFormat ?? null);
-      items.push({ id: pivot.id, ...pivotOutputContent(result, formats) });
+      items.push({ id: pivot.id, ...pivot_output_content(result, formats) });
     }
     if (items.length > 0) exports.push({ sheet: sheet.id, items });
   }

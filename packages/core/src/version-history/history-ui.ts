@@ -36,18 +36,18 @@ export function historyAddon(
 ): SheetwriteAddon<Partial<HistoryAddonOptions>> {
   return {
     name: "history",
-    grid({ grid, settings, historyCommand }) {
+    grid({ grid, settings, historyCommand: history_command }) {
       const merged = { ...options, ...settings };
-      const { archive, authorId } = merged;
-      if (archive === undefined || authorId === undefined) return;
+      const { archive, authorId: author_id } = merged;
+      if (archive === undefined || author_id === undefined) return;
 
-      const gridOptions: HistoryAddonOptions = { ...merged, archive, authorId };
-      historyCommand((action) => {
+      const grid_options: HistoryAddonOptions = { ...merged, archive, authorId: author_id };
+      history_command((action) => {
         requestPanel(grid, (controller) =>
           controller.openHistoryPanel(grid, async () => {
-            const { historyPanel } = await import("../panels/history-panel.js");
+            const { historyPanel: history_panel } = await import("../panels/history-panel.js");
 
-            return (target) => historyPanel(target, gridOptions, action === "save");
+            return (target) => history_panel(target, grid_options, action === "save");
           }),
         );
       });

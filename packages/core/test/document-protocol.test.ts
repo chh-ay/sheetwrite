@@ -32,7 +32,7 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-function richSnapshot(): WorkbookSnapshot {
+function rich_snapshot(): WorkbookSnapshot {
   return {
     schemaVersion: WORKBOOK_SCHEMA_VERSION,
     documentId: "doc-1",
@@ -123,10 +123,10 @@ function richSnapshot(): WorkbookSnapshot {
   };
 }
 
-function mergeSnapshot(
+function merge_snapshot(
   merges: NonNullable<WorkbookSnapshot["sheets"][number]["merges"]>,
-  rowCount: number,
-  columnCount: number,
+  row_count: number,
+  column_count: number,
 ): WorkbookSnapshot {
   return {
     schemaVersion: WORKBOOK_SCHEMA_VERSION,
@@ -137,8 +137,8 @@ function mergeSnapshot(
         id: "s",
         name: "Merges",
         order: 0,
-        rowCount,
-        columns: Array.from({ length: columnCount }, (_, index) => ({
+        rowCount: row_count,
+        columns: Array.from({ length: column_count }, (_, index) => ({
           key: `c${index}`,
           header: `C${index}`,
           width: 80,
@@ -151,21 +151,21 @@ function mergeSnapshot(
   };
 }
 
-function withWorkbook(patch: Record<string, unknown>): unknown {
-  const snapshot = richSnapshot();
+function with_workbook(patch: Record<string, unknown>): unknown {
+  const snapshot = rich_snapshot();
   return { ...snapshot, workbook: { ...snapshot.workbook, ...patch } };
 }
 
-function withFirstSheet(patch: Record<string, unknown>): unknown {
-  const snapshot = richSnapshot();
+function with_first_sheet(patch: Record<string, unknown>): unknown {
+  const snapshot = rich_snapshot();
   return {
     ...snapshot,
     sheets: [{ ...snapshot.sheets[0]!, ...patch }, ...snapshot.sheets.slice(1)],
   };
 }
 
-function withFirstBlock(patch: Record<string, unknown>): unknown {
-  const snapshot = richSnapshot();
+function with_first_block(patch: Record<string, unknown>): unknown {
+  const snapshot = rich_snapshot();
   const sheet = snapshot.sheets[0]!;
   return {
     ...snapshot,
@@ -179,8 +179,8 @@ function withFirstBlock(patch: Record<string, unknown>): unknown {
   };
 }
 
-function withFirstCell(patch: Record<string, unknown>): unknown {
-  const snapshot = richSnapshot();
+function with_first_cell(patch: Record<string, unknown>): unknown {
+  const snapshot = rich_snapshot();
   const sheet = snapshot.sheets[0]!;
   const block = sheet.cells[0]!;
   return {
@@ -201,7 +201,7 @@ function withFirstCell(patch: Record<string, unknown>): unknown {
   };
 }
 
-function expectInvalid(
+function expect_invalid(
   value: unknown,
   expected: Pick<DocumentValidationError, "path" | "code">,
 ): DocumentValidationResult {
@@ -216,7 +216,7 @@ function expectInvalid(
 
 describe("workbook document protocol", () => {
   it("round-trips every authoritative field through JSON", () => {
-    const parsed: unknown = JSON.parse(JSON.stringify(richSnapshot()));
+    const parsed: unknown = JSON.parse(JSON.stringify(rich_snapshot()));
     const result = validateWorkbookSnapshot(parsed);
 
     expect(result.ok).toBe(true);
@@ -247,9 +247,9 @@ describe("workbook document protocol", () => {
     cyclic.self = cyclic;
     const inherited = Object.create({ inherited: true }) as Record<string, unknown>;
     inherited.schemaVersion = WORKBOOK_SCHEMA_VERSION;
-    const nullPrototype = Object.create(null) as Record<string, unknown>;
-    nullPrototype.schemaVersion = WORKBOOK_SCHEMA_VERSION;
-    const hostileProxy = new Proxy(
+    const null_prototype = Object.create(null) as Record<string, unknown>;
+    null_prototype.schemaVersion = WORKBOOK_SCHEMA_VERSION;
+    const hostile_proxy = new Proxy(
       {},
       {
         ownKeys(): never {
@@ -277,113 +277,113 @@ describe("workbook document protocol", () => {
       { name: "typed array", value: new Uint8Array(), path: "$", code: "non-serializable" },
       { name: "cycle", value: cyclic, path: "self", code: "non-serializable" },
       { name: "inherited prototype", value: inherited, path: "$", code: "non-serializable" },
-      { name: "null prototype", value: nullPrototype, path: "$", code: "non-serializable" },
-      { name: "hostile proxy", value: hostileProxy, path: "$", code: "invalid-value" },
+      { name: "null prototype", value: null_prototype, path: "$", code: "non-serializable" },
+      { name: "hostile proxy", value: hostile_proxy, path: "$", code: "invalid-value" },
     ];
 
-    for (const testCase of cases) {
-      expectInvalid(testCase.value, { path: testCase.path, code: testCase.code });
+    for (const test_case of cases) {
+      expect_invalid(test_case.value, { path: test_case.path, code: test_case.code });
     }
   });
 
   it("rejects malformed blocks, cells, ranges, values, and styles at exact paths", () => {
-    const sheet = richSnapshot().sheets[0]!;
+    const sheet = rich_snapshot().sheets[0]!;
     const block = sheet.cells[0]!;
     const cell = block.cells[0]!;
-    const conditionalFormat = {
+    const conditional_format = {
       range: { sheet: "sheet-b", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
       when: { kind: "greaterThan", value: 0 },
       style: { bold: true },
     };
-    const cellPath = "sheets[0].cells[0].cells[0]";
-    const outsideRange = (sheet: string, endRow: number) => ({
+    const cell_path = "sheets[0].cells[0].cells[0]";
+    const outside_range = (sheet: string, end_row: number) => ({
       sheet,
       start: { row: 0, col: 0 },
-      end: { row: endRow, col: 0 },
+      end: { row: end_row, col: 0 },
     });
     const cases: Array<{ value: unknown; path: string; code?: DocumentValidationError["code"] }> = [
-      { value: withFirstBlock({ startRow: 0.5 }), path: "sheets[0].cells[0].startRow" },
-      { value: withFirstBlock({ rowCount: 0 }), path: "sheets[0].cells[0].rowCount" },
-      { value: withFirstCell({ rowOffset: "0" }), path: `${cellPath}.rowOffset` },
-      { value: withFirstCell({ value: { kind: "unknown" } }), path: `${cellPath}.value.kind` },
+      { value: with_first_block({ startRow: 0.5 }), path: "sheets[0].cells[0].startRow" },
+      { value: with_first_block({ rowCount: 0 }), path: "sheets[0].cells[0].rowCount" },
+      { value: with_first_cell({ rowOffset: "0" }), path: `${cell_path}.rowOffset` },
+      { value: with_first_cell({ value: { kind: "unknown" } }), path: `${cell_path}.value.kind` },
       {
-        value: withFirstCell({ value: { kind: "formula", src: 1 } }),
-        path: `${cellPath}.value.src`,
+        value: with_first_cell({ value: { kind: "formula", src: 1 } }),
+        path: `${cell_path}.value.src`,
       },
       {
-        value: withFirstCell({ value: { kind: "ref", target: null } }),
-        path: `${cellPath}.value.target`,
+        value: with_first_cell({ value: { kind: "ref", target: null } }),
+        path: `${cell_path}.value.target`,
       },
-      { value: withFirstCell({ style: null }), path: `${cellPath}.style` },
-      { value: withFirstCell({ style: { bold: "yes" } }), path: `${cellPath}.style.bold` },
+      { value: with_first_cell({ style: null }), path: `${cell_path}.style` },
+      { value: with_first_cell({ style: { bold: "yes" } }), path: `${cell_path}.style.bold` },
       {
         // Families land inside a canvas font string; quotes and separators would inject.
-        value: withFirstCell({ style: { fontFamily: 'Arial"; color: red' } }),
-        path: `${cellPath}.style.fontFamily`,
+        value: with_first_cell({ style: { fontFamily: 'Arial"; color: red' } }),
+        path: `${cell_path}.style.fontFamily`,
       },
       {
-        value: withFirstCell({ style: { fontFamily: "Arial, serif" } }),
-        path: `${cellPath}.style.fontFamily`,
+        value: with_first_cell({ style: { fontFamily: "Arial, serif" } }),
+        path: `${cell_path}.style.fontFamily`,
       },
       {
-        value: withFirstCell({ style: { verticalAlign: "center" } }),
-        path: `${cellPath}.style.verticalAlign`,
+        value: with_first_cell({ style: { verticalAlign: "center" } }),
+        path: `${cell_path}.style.verticalAlign`,
       },
       {
-        value: withFirstCell({ style: { numberFormat: "0".repeat(256) } }),
-        path: `${cellPath}.style.numberFormat`,
+        value: with_first_cell({ style: { numberFormat: "0".repeat(256) } }),
+        path: `${cell_path}.style.numberFormat`,
       },
       {
-        value: withFirstSheet({ conditionalFormats: [{ ...conditionalFormat, range: null }] }),
+        value: with_first_sheet({ conditionalFormats: [{ ...conditional_format, range: null }] }),
         path: "sheets[0].conditionalFormats[0].range",
       },
       {
-        value: withFirstSheet({
+        value: with_first_sheet({
           conditionalFormats: [
             {
-              ...conditionalFormat,
-              range: { ...conditionalFormat.range, start: { row: 0.25, col: 0 } },
+              ...conditional_format,
+              range: { ...conditional_format.range, start: { row: 0.25, col: 0 } },
             },
           ],
         }),
         path: "sheets[0].conditionalFormats[0].range.start.row",
       },
       {
-        value: withFirstCell({
+        value: with_first_cell({
           ...cell,
           value: { kind: "ref", target: { sheet: "missing", row: 0, col: 0 } },
         }),
-        path: `${cellPath}.value.target`,
+        path: `${cell_path}.value.target`,
         code: "missing-reference",
       },
       {
-        value: withFirstCell({
+        value: with_first_cell({
           ...cell,
           value: { kind: "ref", target: { sheet: "sheet-b", row: 99, col: 0 } },
         }),
-        path: `${cellPath}.value.target`,
+        path: `${cell_path}.value.target`,
         code: "out-of-bounds",
       },
       {
-        value: withWorkbook({
-          namedRanges: [{ name: "Missing", range: outsideRange("missing", 0) }],
+        value: with_workbook({
+          namedRanges: [{ name: "Missing", range: outside_range("missing", 0) }],
         }),
         path: "workbook.namedRanges[0].range",
         code: "missing-reference",
       },
       {
-        value: withWorkbook({
-          namedRanges: [{ name: "Outside", range: outsideRange("sheet-b", 9) }],
+        value: with_workbook({
+          namedRanges: [{ name: "Outside", range: outside_range("sheet-b", 9) }],
         }),
         path: "workbook.namedRanges[0].range",
         code: "out-of-bounds",
       },
     ];
 
-    for (const testCase of cases) {
-      expectInvalid(testCase.value, {
-        path: testCase.path,
-        code: testCase.code ?? "invalid-value",
+    for (const test_case of cases) {
+      expect_invalid(test_case.value, {
+        path: test_case.path,
+        code: test_case.code ?? "invalid-value",
       });
     }
   });
@@ -398,40 +398,40 @@ describe("workbook document protocol", () => {
     });
     const sparse: unknown[] = [];
     sparse.length = 1;
-    const nestedPrototype = Object.create({ inherited: true }) as Record<string, unknown>;
-    nestedPrototype.value = "unsafe";
+    const nested_prototype = Object.create({ inherited: true }) as Record<string, unknown>;
+    nested_prototype.value = "unsafe";
 
-    const valuePath = "sheets[0].cells[0].cells[0].value.value";
+    const value_path = "sheets[0].cells[0].cells[0].value.value";
     const values: Array<{ value: unknown; path: string }> = [
-      { value: Number.NaN, path: `${valuePath}` },
-      { value: Number.POSITIVE_INFINITY, path: `${valuePath}` },
-      { value: Number.NEGATIVE_INFINITY, path: `${valuePath}` },
-      { value: undefined, path: `${valuePath}` },
-      { value: new Date(0), path: `${valuePath}` },
-      { value: Symbol("unsafe"), path: `${valuePath}` },
-      { value: 1n, path: `${valuePath}` },
-      { value: accessor, path: `${valuePath}.value` },
-      { value: nestedPrototype, path: `${valuePath}` },
-      { value: sparse, path: `${valuePath}[0]` },
+      { value: Number.NaN, path: `${value_path}` },
+      { value: Number.POSITIVE_INFINITY, path: `${value_path}` },
+      { value: Number.NEGATIVE_INFINITY, path: `${value_path}` },
+      { value: undefined, path: `${value_path}` },
+      { value: new Date(0), path: `${value_path}` },
+      { value: Symbol("unsafe"), path: `${value_path}` },
+      { value: 1n, path: `${value_path}` },
+      { value: accessor, path: `${value_path}.value` },
+      { value: nested_prototype, path: `${value_path}` },
+      { value: sparse, path: `${value_path}[0]` },
     ];
 
-    for (const testCase of values) {
-      expectInvalid(withFirstCell({ value: { kind: "literal", value: testCase.value } }), {
-        path: testCase.path,
+    for (const test_case of values) {
+      expect_invalid(with_first_cell({ value: { kind: "literal", value: test_case.value } }), {
+        path: test_case.path,
         code: "non-serializable",
       });
     }
 
-    const metadataValues: Array<{ value: unknown; path: string }> = [
+    const metadata_values: Array<{ value: unknown; path: string }> = [
       {
-        value: withFirstSheet({ rowMeta: [[0, { height: Number.NaN }]] }),
+        value: with_first_sheet({ rowMeta: [[0, { height: Number.NaN }]] }),
         path: "sheets[0].rowMeta[0][1].height",
       },
       {
-        value: withFirstSheet({
+        value: with_first_sheet({
           columns: [
             {
-              ...richSnapshot().sheets[0]!.columns[0]!,
+              ...rich_snapshot().sheets[0]!.columns[0]!,
               headerStyle: { color: new Date(0) },
             },
           ],
@@ -439,19 +439,19 @@ describe("workbook document protocol", () => {
         path: "sheets[0].columns[0].headerStyle.color",
       },
     ];
-    for (const testCase of metadataValues) {
-      expectInvalid(testCase.value, { path: testCase.path, code: "non-serializable" });
+    for (const test_case of metadata_values) {
+      expect_invalid(test_case.value, { path: test_case.path, code: "non-serializable" });
     }
   });
 
   it("returns structured errors for invalid identities, bounds, merges, and schemas", () => {
-    const future = { ...richSnapshot(), schemaVersion: 2 };
-    const futureResult = validateWorkbookSnapshot(future);
-    expect(futureResult.ok).toBe(false);
-    if (futureResult.ok) throw new Error("future schema unexpectedly accepted");
-    expect(futureResult.errors.map((error) => error.code)).toContain("unsupported-schema");
+    const future = { ...rich_snapshot(), schemaVersion: 2 };
+    const future_result = validateWorkbookSnapshot(future);
+    expect(future_result.ok).toBe(false);
+    if (future_result.ok) throw new Error("future schema unexpectedly accepted");
+    expect(future_result.errors.map((error) => error.code)).toContain("unsupported-schema");
 
-    const invalid = richSnapshot();
+    const invalid = rich_snapshot();
     invalid.sheets[1]!.id = "sheet-a";
     invalid.sheets[0]!.columns.push({
       ...invalid.sheets[0]!.columns[0]!,
@@ -485,7 +485,7 @@ describe("workbook document protocol", () => {
         c1: index % columns,
       })).reverse();
       const result = validateWorkbookSnapshot(
-        mergeSnapshot(merges, Math.ceil(count / columns), columns),
+        merge_snapshot(merges, Math.ceil(count / columns), columns),
       );
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("disjoint merges unexpectedly rejected");
@@ -503,15 +503,15 @@ describe("workbook document protocol", () => {
   it("admits large disjoint merge sets on added sheets and rejects a distant overlap", () => {
     const count = 4_000;
     const columns = 128;
-    const mergesPerRow = columns / 2;
+    const merges_per_row = columns / 2;
     // Admission requires each merge to cover more than one cell.
     const merges = Array.from({ length: count }, (_, index) => ({
-      r0: Math.floor(index / mergesPerRow),
-      c0: (index % mergesPerRow) * 2,
-      r1: Math.floor(index / mergesPerRow),
-      c1: (index % mergesPerRow) * 2 + 1,
+      r0: Math.floor(index / merges_per_row),
+      c0: (index % merges_per_row) * 2,
+      r1: Math.floor(index / merges_per_row),
+      c1: (index % merges_per_row) * 2 + 1,
     }));
-    const [source] = mergeSnapshot(merges, Math.ceil(count / mergesPerRow), columns).sheets;
+    const [source] = merge_snapshot(merges, Math.ceil(count / merges_per_row), columns).sheets;
     if (!source) throw new Error("merge sheet missing");
     const store = new SheetwriteStore(makeWorkbook(1));
 
@@ -533,7 +533,7 @@ describe("workbook document protocol", () => {
   });
 
   it("rejects zero row heights like row metadata operations", () => {
-    const snapshot = richSnapshot();
+    const snapshot = rich_snapshot();
     const input = {
       ...snapshot,
       sheets: snapshot.sheets.map((sheet) =>
@@ -548,7 +548,7 @@ describe("workbook document protocol", () => {
   });
 
   it("orders canonical identifiers independently of the runtime locale", () => {
-    const snapshot = richSnapshot();
+    const snapshot = rich_snapshot();
     const range = { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
     const input = {
       ...snapshot,
@@ -569,11 +569,14 @@ describe("workbook document protocol", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("snapshot unexpectedly rejected");
     const sheet = result.value.sheets.find((candidate) => candidate.id === "sheet-a");
-    expect(sheet?.protectedRanges?.map((protectedRange) => protectedRange.id)).toEqual(["B", "a"]);
+    expect(sheet?.protectedRanges?.map((protected_range) => protected_range.id)).toEqual([
+      "B",
+      "a",
+    ]);
   });
 
   it("reports table column overflow as a table limit", () => {
-    const snapshot = richSnapshot();
+    const snapshot = rich_snapshot();
     const columns = Array.from({ length: 16_385 }, (_, index) => ({ name: `C${index}` }));
     const input = {
       ...snapshot,
@@ -592,7 +595,7 @@ describe("workbook document protocol", () => {
   });
 
   it("validates named range scope, identity, and formula-safe names", () => {
-    const scoped = richSnapshot();
+    const scoped = rich_snapshot();
     scoped.workbook.namedRanges!.push({
       name: "Totals",
       scope: "sheet-a",
@@ -610,7 +613,7 @@ describe("workbook document protocol", () => {
     if (duplicate.ok) throw new Error("duplicate named range unexpectedly accepted");
     expect(duplicate.errors.map((error) => error.code)).toContain("duplicate-id");
 
-    const invalid = richSnapshot();
+    const invalid = rich_snapshot();
     invalid.workbook.namedRanges = [
       {
         name: "A1",
@@ -618,19 +621,19 @@ describe("workbook document protocol", () => {
         range: { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
       },
     ];
-    const invalidResult = validateWorkbookSnapshot(invalid);
-    expect(invalidResult.ok).toBe(false);
-    if (invalidResult.ok) throw new Error("invalid named range unexpectedly accepted");
-    expect(new Set(invalidResult.errors.map((error) => error.code))).toEqual(
+    const invalid_result = validateWorkbookSnapshot(invalid);
+    expect(invalid_result.ok).toBe(false);
+    if (invalid_result.ok) throw new Error("invalid named range unexpectedly accepted");
+    expect(new Set(invalid_result.errors.map((error) => error.code))).toEqual(
       new Set(["invalid-value"]),
     );
 
-    const missingScope = richSnapshot();
-    missingScope.workbook.namedRanges![0]!.scope = "missing";
-    const missingScopeResult = validateWorkbookSnapshot(missingScope);
-    expect(missingScopeResult.ok).toBe(false);
-    if (missingScopeResult.ok) throw new Error("missing scope unexpectedly accepted");
-    expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
+    const missing_scope = rich_snapshot();
+    missing_scope.workbook.namedRanges![0]!.scope = "missing";
+    const missing_scope_result = validateWorkbookSnapshot(missing_scope);
+    expect(missing_scope_result.ok).toBe(false);
+    if (missing_scope_result.ok) throw new Error("missing scope unexpectedly accepted");
+    expect(missing_scope_result.errors.map((error) => error.code)).toContain("missing-reference");
   });
 
   it("accepts Excel's iteration limits and rejects anything the engine would refuse", () => {
@@ -639,7 +642,7 @@ describe("workbook document protocol", () => {
       { iterate: false, maxIterations: 32_767, maxChange: 1e300 },
     ];
     for (const calculation of boundaries) {
-      expect(validateWorkbookSnapshot(withWorkbook({ calculation })).ok).toBe(true);
+      expect(validateWorkbookSnapshot(with_workbook({ calculation })).ok).toBe(true);
       expect(validateDocumentOperationShape({ op: "setCalculation", calculation })).toEqual([]);
     }
 
@@ -657,7 +660,7 @@ describe("workbook document protocol", () => {
     ];
     for (const [field, value] of invalid) {
       const calculation = { ...valid, [field]: value };
-      const snapshot = validateWorkbookSnapshot(withWorkbook({ calculation }));
+      const snapshot = validateWorkbookSnapshot(with_workbook({ calculation }));
       expect(snapshot.ok).toBe(false);
       if (snapshot.ok) throw new Error(`calculation.${field} = ${String(value)} accepted`);
       expect(snapshot.errors.map((error) => error.path)).toEqual([`workbook.calculation.${field}`]);
@@ -670,25 +673,25 @@ describe("workbook document protocol", () => {
   });
 
   it("enforces every snapshot resource boundary before normalization", () => {
-    const snapshot = richSnapshot();
+    const snapshot = rich_snapshot();
     snapshot.documentId = '雪\u0000"\n\ud800';
-    const serializedBytes = new TextEncoder().encode(JSON.stringify(snapshot)).byteLength;
-    const acceptedLimits = [
+    const serialized_bytes = new TextEncoder().encode(JSON.stringify(snapshot)).byteLength;
+    const accepted_limits = [
       { maxSheets: 2 },
       { maxRowsPerSheet: 4 },
       { maxColumnsPerSheet: 2 },
       { maxMetadataEntries: 8 },
-      { maxSerializedBytes: serializedBytes },
+      { maxSerializedBytes: serialized_bytes },
       { maxLogicalCellsPerSheet: 8 },
       { maxDenseCells: 10, maxLocalPagedCells: 0 },
       // Past the dense cells, a sheet loads in local pages up to their own limit.
       { maxLocalPagedCells: 10, maxDenseCells: 0 },
     ] as const;
-    for (const resourceLimits of acceptedLimits) {
-      expect(validateWorkbookSnapshot(snapshot, { resourceLimits }).ok).toBe(true);
-      const [resource, limit] = Object.entries(resourceLimits)[0]!;
+    for (const resource_limits of accepted_limits) {
+      expect(validateWorkbookSnapshot(snapshot, { resourceLimits: resource_limits }).ok).toBe(true);
+      const [resource, limit] = Object.entries(resource_limits)[0]!;
       const rejected = validateWorkbookSnapshot(snapshot, {
-        resourceLimits: { ...resourceLimits, [resource]: limit - 1 },
+        resourceLimits: { ...resource_limits, [resource]: limit - 1 },
       });
       expect(rejected.ok).toBe(false);
       if (rejected.ok) throw new Error(`${resource} limit unexpectedly accepted`);
@@ -701,7 +704,7 @@ describe("workbook document protocol", () => {
       width: 80,
       type: "text" as const,
     }));
-    const millionRowSnapshot: WorkbookSnapshot = {
+    const million_row_snapshot: WorkbookSnapshot = {
       schemaVersion: WORKBOOK_SCHEMA_VERSION,
       workbook: { activeSheet: "paged" },
       sheets: [
@@ -715,48 +718,51 @@ describe("workbook document protocol", () => {
         },
       ],
     };
-    const paged = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });
+    const paged = validateWorkbookSnapshot(million_row_snapshot, { storage: "paged" });
     expect(paged.ok).toBe(true);
     // Six million cells pass the dense cell limit and load in local pages.
-    expect(validateWorkbookSnapshot(millionRowSnapshot, { storage: "dense" }).ok).toBe(true);
-    const local = validateWorkbookSnapshot(millionRowSnapshot, {
+    expect(validateWorkbookSnapshot(million_row_snapshot, { storage: "dense" }).ok).toBe(true);
+    const local = validateWorkbookSnapshot(million_row_snapshot, {
       resourceLimits: { maxLocalPagedCells: 5_999_999 },
     });
     expect(local.ok).toBe(false);
     if (local.ok) throw new Error("oversized local capacity unexpectedly accepted");
     expect(local.errors[0]).toMatchObject({ code: "resource-limit" });
 
-    millionRowSnapshot.sheets[0]!.rowCount += 1;
-    const excessiveRows = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });
-    expect(excessiveRows.ok).toBe(false);
-    if (excessiveRows.ok) throw new Error("excessive paged rows unexpectedly accepted");
-    expect(excessiveRows.errors[0]).toMatchObject({
+    million_row_snapshot.sheets[0]!.rowCount += 1;
+    const excessive_rows = validateWorkbookSnapshot(million_row_snapshot, { storage: "paged" });
+    expect(excessive_rows.ok).toBe(false);
+    if (excessive_rows.ok) throw new Error("excessive paged rows unexpectedly accepted");
+    expect(excessive_rows.errors[0]).toMatchObject({
       path: "sheets[0].rowCount",
       code: "resource-limit",
     });
   });
 
   it("rechecks a checked snapshot against every limit as a second validation would", () => {
-    const accepted = validateWorkbookSnapshot(richSnapshot());
+    const accepted = validateWorkbookSnapshot(rich_snapshot());
     if (!accepted.ok) throw new Error("the rich snapshot is invalid");
-    const serializedBytes = new TextEncoder().encode(JSON.stringify(accepted.value)).byteLength;
-    const checked = new CheckedSnapshot(accepted.value, serializedBytes);
+    const serialized_bytes = new TextEncoder().encode(JSON.stringify(accepted.value)).byteLength;
+    const checked = new CheckedSnapshot(accepted.value, serialized_bytes);
     const limits = [
       { maxSheets: 2 },
       { maxRowsPerSheet: 4 },
       { maxColumnsPerSheet: 2 },
       { maxMetadataEntries: 8 },
-      { maxSerializedBytes: serializedBytes },
+      { maxSerializedBytes: serialized_bytes },
       { maxLogicalCellsPerSheet: 8 },
       { maxDenseCells: 10, maxLocalPagedCells: 0 },
       { maxLocalPagedCells: 10, maxDenseCells: 0 },
     ] as const;
-    for (const resourceLimits of limits) {
-      const [resource, limit] = Object.entries(resourceLimits)[0]!;
+    for (const resource_limits of limits) {
+      const [resource, limit] = Object.entries(resource_limits)[0]!;
       for (const options of [
-        { resourceLimits },
-        { resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
-        { storage: "paged" as const, resourceLimits: { ...resourceLimits, [resource]: limit - 1 } },
+        { resourceLimits: resource_limits },
+        { resourceLimits: { ...resource_limits, [resource]: limit - 1 } },
+        {
+          storage: "paged" as const,
+          resourceLimits: { ...resource_limits, [resource]: limit - 1 },
+        },
       ]) {
         const expected = validateWorkbookSnapshot(accepted.value, options);
         const rechecked = recheckSnapshotResources(checked, options);
@@ -780,7 +786,7 @@ describe("workbook document protocol", () => {
       { kind: "textLength", comparison: { operator: "lessThan", value: 8 } },
       { kind: "number", min: 0, max: 10 },
     ];
-    const accepted = richSnapshot();
+    const accepted = rich_snapshot();
     accepted.sheets[1]!.validationRules = comparisons.map((condition, index) => ({
       id: `comparison-${index}`,
       range: {
@@ -793,7 +799,7 @@ describe("workbook document protocol", () => {
     }));
     expect(validateWorkbookSnapshot(accepted)).toMatchObject({ ok: true });
 
-    const invalidConditions: unknown[] = [
+    const invalid_conditions: unknown[] = [
       {
         kind: "number",
         min: 0,
@@ -806,8 +812,8 @@ describe("workbook document protocol", () => {
       { kind: "textLength", comparison: { operator: "equal", value: 1.5 } },
       { kind: "textLength", comparison: { operator: "between", min: -1, max: 4 } },
     ];
-    for (const [index, condition] of invalidConditions.entries()) {
-      const rejected = richSnapshot();
+    for (const [index, condition] of invalid_conditions.entries()) {
+      const rejected = rich_snapshot();
       rejected.sheets[1]!.validationRules = [
         {
           id: `invalid-comparison-${index}`,
@@ -825,7 +831,7 @@ describe("workbook document protocol", () => {
   });
 
   it("rejects every dimension-bearing metadata shape outside its sheet", () => {
-    const snapshot = richSnapshot();
+    const snapshot = rich_snapshot();
     const sheet = snapshot.sheets[1]!;
     sheet.frozenRows = sheet.rowCount + 1;
     sheet.frozenCols = sheet.columns.length + 1;
@@ -928,12 +934,12 @@ describe("workbook document protocol", () => {
 });
 
 describe("transaction resource protocol", () => {
-  const setOperation = (text: string): DocumentOp => ({
+  const set_operation = (text: string): DocumentOp => ({
     op: "set",
     addr: { sheet: "s1", row: 0, col: 0 },
     value: { kind: "literal", value: text },
   });
-  const jsonBytes = (operations: readonly DocumentOp[]): number =>
+  const json_bytes = (operations: readonly DocumentOp[]): number =>
     new TextEncoder().encode(JSON.stringify(operations)).byteLength;
 
   it("publishes validated inclusive defaults and rejects invalid overrides", () => {
@@ -946,21 +952,21 @@ describe("transaction resource protocol", () => {
       maxEncodedBytes: 8 * 1024 * 1024,
     });
     for (const invalid of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const invalidLimit = expect.objectContaining({
+      const invalid_limit = expect.objectContaining({
         code: "invalid-limits",
         operation: "transaction",
       });
       expect(() => resolveTransactionResourceLimits({ maxOperations: invalid })).toThrow(
-        invalidLimit,
+        invalid_limit,
       );
       expect(() => resolveTransactionResourceLimits({ maxEncodedBytes: invalid })).toThrow(
-        invalidLimit,
+        invalid_limit,
       );
     }
   });
 
   it("accepts the default operation-count limit and rejects limit plus one", () => {
-    const operation = setOperation("x");
+    const operation = set_operation("x");
     const accepted = Array.from(
       { length: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations },
       () => operation,
@@ -984,11 +990,11 @@ describe("transaction resource protocol", () => {
   });
 
   it("accepts an exactly 8 MiB long-string payload and rejects one extra byte", () => {
-    const empty = [setOperation("")];
-    const overhead = jsonBytes(empty);
-    const exactText = "x".repeat(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes - overhead);
-    const exact = [setOperation(exactText)];
-    expect(jsonBytes(exact)).toBe(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes);
+    const empty = [set_operation("")];
+    const overhead = json_bytes(empty);
+    const exact_text = "x".repeat(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes - overhead);
+    const exact = [set_operation(exact_text)];
+    expect(json_bytes(exact)).toBe(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes);
 
     const accepted = validateTransactionResources(exact);
     expect(accepted).toEqual({
@@ -997,7 +1003,7 @@ describe("transaction resource protocol", () => {
       encodedBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
     });
 
-    const rejected = validateTransactionResources([setOperation(`${exactText}x`)]);
+    const rejected = validateTransactionResources([set_operation(`${exact_text}x`)]);
     expect(rejected.ok).toBe(false);
     if (rejected.ok) throw new Error("limit-plus-one string unexpectedly accepted");
     expect(rejected.issue).toMatchObject({
@@ -1017,32 +1023,32 @@ describe("transaction resource protocol", () => {
       },
       block: { rowCount: 1, colCount: 1, values: [text] },
     });
-    const acceptedOperations = [packed("packed".repeat(100))];
-    const maxEncodedBytes = jsonBytes(acceptedOperations);
+    const accepted_operations = [packed("packed".repeat(100))];
+    const max_encoded_bytes = json_bytes(accepted_operations);
     expect(
-      validateTransactionResources(acceptedOperations, {
+      validateTransactionResources(accepted_operations, {
         maxOperations: 1,
-        maxEncodedBytes,
+        maxEncodedBytes: max_encoded_bytes,
       }),
-    ).toEqual({ ok: true, operationCount: 1, encodedBytes: maxEncodedBytes });
+    ).toEqual({ ok: true, operationCount: 1, encodedBytes: max_encoded_bytes });
 
     const rejected = validateTransactionResources([packed(`${"packed".repeat(100)}x`)], {
       maxOperations: 1,
-      maxEncodedBytes,
+      maxEncodedBytes: max_encoded_bytes,
     });
     expect(rejected.ok).toBe(false);
     if (rejected.ok) throw new Error("oversized packed block unexpectedly accepted");
     expect(rejected.issue).toMatchObject({
       resource: "encoded-bytes",
-      actual: maxEncodedBytes + 1,
-      max: maxEncodedBytes,
+      actual: max_encoded_bytes + 1,
+      max: max_encoded_bytes,
     });
   });
 });
 
 describe("compressed restore operation admission", () => {
-  const restoreRange = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
-  const restoredBlock = {
+  const restore_range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+  const restored_block = {
     rowCount: 2,
     colCount: 2,
     values: ["résumé", null, 42, true],
@@ -1055,26 +1061,26 @@ describe("compressed restore operation admission", () => {
     styleIds: [0, 0, 0, 0],
   };
 
-  function rawRestore(
+  function raw_restore(
     bytes: Uint8Array,
-    decodedBytes = bytes.length,
+    decoded_bytes = bytes.length,
   ): Extract<DocumentOp, { op: "restoreBlock" }> {
     const compressed = deflateSync(bytes);
     let binary = "";
     for (const byte of compressed) binary += String.fromCharCode(byte);
     return {
       op: "restoreBlock",
-      range: restoreRange,
+      range: restore_range,
       encoding: "deflate-json-v1",
-      decodedBytes,
+      decodedBytes: decoded_bytes,
       data: btoa(binary),
     };
   }
 
   it("admits one compact operation and preserves every packed cell field", () => {
-    const operation = encodeRestoreBlock(restoreRange, restoredBlock);
+    const operation = encodeRestoreBlock(restore_range, restored_block);
     expect(validateDocumentOperationShape(operation)).toEqual([]);
-    expect(decodeRestoreBlock(JSON.parse(JSON.stringify(operation)))).toEqual(restoredBlock);
+    expect(decodeRestoreBlock(JSON.parse(JSON.stringify(operation)))).toEqual(restored_block);
     expect(documentOpTarget(operation)).toBe("s1");
     expect(validateTransactionResources([operation])).toMatchObject({
       ok: true,
@@ -1083,8 +1089,8 @@ describe("compressed restore operation admission", () => {
   });
 
   it("rejects malformed encoding, byte claims, UTF-8 and decoded block fields", () => {
-    const valid = encodeRestoreBlock(restoreRange, restoredBlock);
-    const invalidOperations = [
+    const valid = encodeRestoreBlock(restore_range, restored_block);
+    const invalid_operations = [
       { ...valid, encoding: "unknown" },
       { ...valid, decodedBytes: valid.decodedBytes - 1 },
       { ...valid, decodedBytes: valid.decodedBytes + 1 },
@@ -1093,17 +1099,17 @@ describe("compressed restore operation admission", () => {
       { ...valid, data: "AA==" },
       { ...valid, data: btoa(atob(valid.data).slice(0, -1)) },
       { ...valid, data: btoa(`${atob(valid.data)}\\0`) },
-      rawRestore(new Uint8Array([255])),
-      rawRestore(new TextEncoder().encode(JSON.stringify({ ...restoredBlock, values: [1] }))),
-      rawRestore(
+      raw_restore(new Uint8Array([255])),
+      raw_restore(new TextEncoder().encode(JSON.stringify({ ...restored_block, values: [1] }))),
+      raw_restore(
         new TextEncoder().encode(
-          JSON.stringify({ ...restoredBlock, refs: [[4, { sheet: "s1", row: 0, col: 0 }]] }),
+          JSON.stringify({ ...restored_block, refs: [[4, { sheet: "s1", row: 0, col: 0 }]] }),
         ),
       ),
-      rawRestore(
+      raw_restore(
         new TextEncoder().encode(
           JSON.stringify({
-            ...restoredBlock,
+            ...restored_block,
             formulas: [
               [1, "=A1"],
               [1, "=A2"],
@@ -1111,10 +1117,10 @@ describe("compressed restore operation admission", () => {
           }),
         ),
       ),
-      rawRestore(
+      raw_restore(
         new TextEncoder().encode(
           JSON.stringify({
-            ...restoredBlock,
+            ...restored_block,
             refs: [
               [2, { sheet: "s1", row: 0, col: 0 }],
               [2, { sheet: "s1", row: 1, col: 0 }],
@@ -1122,22 +1128,22 @@ describe("compressed restore operation admission", () => {
           }),
         ),
       ),
-      rawRestore(
+      raw_restore(
         new TextEncoder().encode(
-          JSON.stringify({ ...restoredBlock, refs: [[1, { sheet: "s1", row: 0, col: 0 }]] }),
+          JSON.stringify({ ...restored_block, refs: [[1, { sheet: "s1", row: 0, col: 0 }]] }),
         ),
       ),
-      rawRestore(
+      raw_restore(
         new TextEncoder().encode(JSON.stringify({ rowCount: 4_000_001, colCount: 1, values: [] })),
       ),
     ];
-    for (const operation of invalidOperations) {
+    for (const operation of invalid_operations) {
       expect(validateDocumentOperationShape(operation).length).toBeGreaterThan(0);
     }
   });
 
   it("rejects restore envelope accessors without executing untrusted code", () => {
-    const valid = encodeRestoreBlock(restoreRange, restoredBlock);
+    const valid = encodeRestoreBlock(restore_range, restored_block);
     for (const field of ["encoding", "decodedBytes", "data"] as const) {
       let reads = 0;
       const operation = Object.defineProperty({ ...valid }, field, {
@@ -1153,31 +1159,31 @@ describe("compressed restore operation admission", () => {
   });
 
   it("rejects actual expansion over the decoded boundary even when the byte claim is allowed", () => {
-    const bomb = rawRestore(
+    const bomb = raw_restore(
       new Uint8Array(MAX_RESTORE_BLOCK_DECODED_BYTES + 1),
       MAX_RESTORE_BLOCK_DECODED_BYTES,
     );
     expect(validateDocumentOperationShape(bomb).length).toBeGreaterThan(0);
-    const tinyClaim = rawRestore(new Uint8Array(1024 * 1024), 1);
-    expect(validateDocumentOperationShape(tinyClaim).length).toBeGreaterThan(0);
+    const tiny_claim = raw_restore(new Uint8Array(1024 * 1024), 1);
+    expect(validateDocumentOperationShape(tiny_claim).length).toBeGreaterThan(0);
   });
 
   /** Runs `body` as a runtime without native base64 would. */
-  function withoutNativeBase64(body: () => void): void {
-    const toBase64 = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "toBase64");
-    const fromBase64 = Object.getOwnPropertyDescriptor(Uint8Array, "fromBase64");
+  function without_native_base64(body: () => void): void {
+    const to_base64 = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "toBase64");
+    const from_base64 = Object.getOwnPropertyDescriptor(Uint8Array, "fromBase64");
     Reflect.deleteProperty(Uint8Array.prototype, "toBase64");
     Reflect.deleteProperty(Uint8Array, "fromBase64");
     try {
       body();
     } finally {
-      if (toBase64) Object.defineProperty(Uint8Array.prototype, "toBase64", toBase64);
-      if (fromBase64) Object.defineProperty(Uint8Array, "fromBase64", fromBase64);
+      if (to_base64) Object.defineProperty(Uint8Array.prototype, "toBase64", to_base64);
+      if (from_base64) Object.defineProperty(Uint8Array, "fromBase64", from_base64);
     }
   }
 
   /** A valid restore whose base64 ends in padding, so it has unused bits to set. */
-  function paddedRestore(): Extract<DocumentOp, { op: "restoreBlock" }> {
+  function padded_restore(): Extract<DocumentOp, { op: "restoreBlock" }> {
     for (let length = 1; ; length++) {
       const operation = encodeRestoreBlock(
         { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
@@ -1189,27 +1195,27 @@ describe("compressed restore operation admission", () => {
 
   it("rejects a non-canonical base64 spelling of a valid stream with and without native base64", () => {
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const valid = paddedRestore();
+    const valid = padded_restore();
     const last = valid.data.length - (valid.data.endsWith("==") ? 3 : 2);
-    const lastChar = valid.data[last] ?? "";
+    const last_char = valid.data[last] ?? "";
     // The low bits of the last data character are padding; canonical base64 leaves them zero.
-    const spelled = `${valid.data.slice(0, last)}${alphabet[alphabet.indexOf(lastChar) | 1]}${valid.data.slice(last + 1)}`;
+    const spelled = `${valid.data.slice(0, last)}${alphabet[alphabet.indexOf(last_char) | 1]}${valid.data.slice(last + 1)}`;
     expect(atob(spelled)).toBe(atob(valid.data));
 
     expect(validateDocumentOperationShape(valid)).toEqual([]);
     expect(validateDocumentOperationShape({ ...valid, data: spelled }).length).toBeGreaterThan(0);
-    withoutNativeBase64(() => {
+    without_native_base64(() => {
       expect(validateDocumentOperationShape({ ...valid })).toEqual([]);
       expect(validateDocumentOperationShape({ ...valid, data: spelled }).length).toBeGreaterThan(0);
     });
   });
 
   it("encodes the same restore with and without native base64", () => {
-    const native = encodeRestoreBlock(restoreRange, restoredBlock);
-    withoutNativeBase64(() => {
-      expect(encodeRestoreBlock(restoreRange, restoredBlock)).toEqual(native);
+    const native = encodeRestoreBlock(restore_range, restored_block);
+    without_native_base64(() => {
+      expect(encodeRestoreBlock(restore_range, restored_block)).toEqual(native);
     });
-    expect(decodeRestoreBlock(native)).toEqual(restoredBlock);
+    expect(decodeRestoreBlock(native)).toEqual(restored_block);
   });
 });
 

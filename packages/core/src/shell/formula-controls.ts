@@ -83,25 +83,25 @@ export function createNameBox(
     }
 
     // A single cell is a range whose corners are the same cell.
-    const [, startCol, startRow, endCol = startCol, endRow = startRow] = match;
+    const [, start_col, start_row, end_col = start_col, end_row = start_row] = match;
     const corner = (col: string | undefined, row: string | undefined) => ({
       row: Number(row) - 1,
       col: labelToCol((col ?? "").toUpperCase()),
     });
-    const start = corner(startCol, startRow);
-    const end = corner(endCol, endRow);
+    const start = corner(start_col, start_row);
+    const end = corner(end_col, end_row);
     const left = Math.min(start.col, end.col);
     const right = Math.max(start.col, end.col);
-    const sheetId = grid.getActiveSheet();
-    const rowCount =
-      grid.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId)?.rowCount ?? 0;
+    const sheet_id = grid.getActiveSheet();
+    const row_count =
+      grid.store.getWorkbook().sheets.find((sheet) => sheet.id === sheet_id)?.rowCount ?? 0;
 
     // One cell becomes the active cell, also on a row a filter or Hide Rows
     // hides, as in Excel.
     if (start.row === end.row && start.col === end.col) {
       // Not dirty, so the selection event shows the cell's reference.
       dirty = false;
-      if (!grid.goToCell({ sheet: sheetId, row: start.row, col: start.col })) {
+      if (!grid.goToCell({ sheet: sheet_id, row: start.row, col: start.col })) {
         dirty = true;
         input.setAttribute("aria-invalid", "true");
         return;
@@ -112,10 +112,10 @@ export function createNameBox(
     // The typed sheet rows that show, as view rows; a filter, hidden rows or a
     // view sort can leave gaps or change their order.
     const shown: number[] = [];
-    if (start.row >= 0 && end.row >= 0 && Math.max(start.row, end.row) < rowCount) {
+    if (start.row >= 0 && end.row >= 0 && Math.max(start.row, end.row) < row_count) {
       for (let row = Math.min(start.row, end.row); row <= Math.max(start.row, end.row); row++) {
-        const viewRow = grid.viewRowOf(row);
-        if (viewRow !== null) shown.push(viewRow);
+        const view_row = grid.viewRowOf(row);
+        if (view_row !== null) shown.push(view_row);
       }
     }
     shown.sort((a, b) => a - b);
@@ -134,19 +134,19 @@ export function createNameBox(
 
     // Consecutive view rows make one range each.
     const ranges: Range[] = [];
-    let runStart = first;
+    let run_start = first;
     for (let index = 1; index <= shown.length; index++) {
       const previous = shown[index - 1]!;
       if (shown[index] === previous + 1) continue;
       ranges.push({
-        sheet: sheetId,
-        start: { row: runStart, col: left },
+        sheet: sheet_id,
+        start: { row: run_start, col: left },
         end: { row: previous, col: right },
       });
-      runStart = shown[index] ?? 0;
+      run_start = shown[index] ?? 0;
     }
 
-    const addr = { sheet: sheetId, row: first, col: left };
+    const addr = { sheet: sheet_id, row: first, col: left };
     const [only] = ranges;
     if (ranges.length > 1) grid.setSelection({ kind: "multi", ranges });
     else if (only && (only.start.row !== only.end.row || left !== right)) {
@@ -158,7 +158,7 @@ export function createNameBox(
     options.focusGrid?.();
   };
 
-  const onKeydown = (event: KeyboardEvent): void => {
+  const on_keydown = (event: KeyboardEvent): void => {
     if (event.key === "Enter") {
       event.preventDefault();
       event.stopPropagation();
@@ -177,7 +177,7 @@ export function createNameBox(
   };
 
   const lifetime = new Scope();
-  input.addEventListener("keydown", onKeydown, { signal: lifetime.signal });
+  input.addEventListener("keydown", on_keydown, { signal: lifetime.signal });
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
   refresh();
@@ -249,18 +249,18 @@ export function createFormulaBar(
   let snapshot: CellInputSnapshot | null = null;
   let committed = "";
   let dirty = false;
-  let readOnly = false;
+  let read_only = false;
   let composing = false;
   /** The built-in grid's draft channel; another `Grid` implementation has none. */
   const draft = editDraftFor(grid);
   /** A cell edit is open and the bar shows its draft. */
   let editing = false;
   /** Lines the bar was last sized for. */
-  let sizedLines = -1;
+  let sized_lines = -1;
 
   const size = (): void => {
     sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
-    sizedLines = editorLineCount(input.value);
+    sized_lines = editorLineCount(input.value);
   };
 
   const refresh = (): void => {
@@ -286,7 +286,7 @@ export function createFormulaBar(
   };
 
   const commit = (): void => {
-    if (readOnly || !snapshot) return;
+    if (read_only || !snapshot) return;
     if (editing) {
       // A formula that does not parse stays in the bar to be fixed, as in Excel.
       if (draft?.commit() === false) return;
@@ -295,7 +295,7 @@ export function createFormulaBar(
     options.focusGrid?.();
   };
 
-  const onKeydown = (event: KeyboardEvent): void => {
+  const on_keydown = (event: KeyboardEvent): void => {
     if (composing || event.isComposing) {
       event.stopPropagation();
       return;
@@ -317,36 +317,36 @@ export function createFormulaBar(
   };
 
   // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
-  const onInput = (): void => {
+  const on_input = (): void => {
     dirty = true;
     size();
     assist.update();
-    if (readOnly) return;
+    if (read_only) return;
     editing = draft?.setText(input.value, input.selectionStart, input.selectionEnd) ?? false;
   };
-  const onFocus = (): void => {
+  const on_focus = (): void => {
     size();
     // The grid's theme, as the cell editor's help gets: the bar sits outside
     // the grid, so the guide cannot inherit the grid's colours.
     assist.attach(input, grid.getTheme());
   };
-  const onBlur = (): void => assist.detach();
+  const on_blur = (): void => assist.detach();
 
   /** The cell editor's draft: shown here unless the user is typing in the bar. */
-  const onEditInput = (text: string): void => {
+  const on_edit_input = (text: string): void => {
     editing = true;
     if (document.activeElement === input || input.value === text) return;
     input.value = text;
     dirty = true;
     // Typing within a line keeps the bar's height, so it is laid out only at a line break.
-    if (editorLineCount(text) !== sizedLines) size();
+    if (editorLineCount(text) !== sized_lines) size();
   };
   /**
    * Edit an active cell the view hides, which has no cell editor: the bar
    * takes the focus and starts from the typed key, or the cell's text (F2).
    */
-  const onEditRequest = (initial: string | null): boolean => {
-    if (readOnly || !snapshot) return false;
+  const on_edit_request = (initial: string | null): boolean => {
+    if (read_only || !snapshot) return false;
     input.focus();
     if (initial !== null) input.value = initial;
     input.setSelectionRange(input.value.length, input.value.length);
@@ -355,7 +355,7 @@ export function createFormulaBar(
     assist.update();
     return true;
   };
-  const onEditEnd = (): void => {
+  const on_edit_end = (): void => {
     editing = false;
     dirty = false;
     refresh();
@@ -377,15 +377,15 @@ export function createFormulaBar(
     },
     { signal },
   );
-  input.addEventListener("keydown", onKeydown, { signal });
-  input.addEventListener("input", onInput, { signal });
-  input.addEventListener("focus", onFocus, { signal });
-  input.addEventListener("blur", onBlur, { signal });
+  input.addEventListener("keydown", on_keydown, { signal });
+  input.addEventListener("input", on_input, { signal });
+  input.addEventListener("focus", on_focus, { signal });
+  input.addEventListener("blur", on_blur, { signal });
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
   if (draft) {
-    lifetime.add(draft.subscribe({ text: onEditInput, end: onEditEnd, edit: onEditRequest }));
+    lifetime.add(draft.subscribe({ text: on_edit_input, end: on_edit_end, edit: on_edit_request }));
   }
   host.appendChild(input);
   refresh();
@@ -395,7 +395,7 @@ export function createFormulaBar(
   return {
     element: input,
     setReadOnly(value: boolean) {
-      readOnly = value;
+      read_only = value;
       input.readOnly = value;
       // A pending draft cannot commit anymore; restore the stable text.
       if (value) restore();

@@ -135,8 +135,12 @@ const DASHBOARDS: DashboardExport[] = [
 ];
 
 it("writes a dashboard as a worksheet of its values and a chart, and opens it as the same dashboard", async () => {
-  const { warnings, onWarning } = collectWarnings();
-  const bytes = await backend.toXlsxWorkbook(snapshot(), { onWarning }, { dashboards: DASHBOARDS });
+  const { warnings, onWarning: on_warning } = collectWarnings();
+  const bytes = await backend.toXlsxWorkbook(
+    snapshot(),
+    { onWarning: on_warning },
+    { dashboards: DASHBOARDS },
+  );
 
   const xml = partText(bytes, "xl/worksheets/sheet2.xml");
   // Each item starts at its box: the pivot at A1, the slicer at E1, the KPI card at G1.
@@ -155,8 +159,8 @@ it("writes a dashboard as a worksheet of its values and a chart, and opens it as
   expect(xml).toMatch(/<c r="G2"[^>]*><v>2<\/v><\/c>/u);
   // No native pivot: the dashboard's pivot stays in metadata, so the chart is not a PivotChart.
   expect(partNames(bytes).filter((name) => name.startsWith("xl/pivotTables/"))).toEqual([]);
-  const chartPart = partNames(bytes).find((name) => name.startsWith("xl/charts/")) ?? "";
-  const chart = partText(bytes, chartPart);
+  const chart_part = partNames(bytes).find((name) => name.startsWith("xl/charts/")) ?? "";
+  const chart = partText(bytes, chart_part);
   // The chart reads West and 2 where the pivot item wrote them, with the values as its cache.
   expect(chart).toContain(
     '<c:cat><c:strRef><c:f>&apos;Dash&apos;!$A$3:$A$3</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>West</c:v></c:pt></c:strCache></c:strRef></c:cat>',
@@ -169,8 +173,8 @@ it("writes a dashboard as a worksheet of its values and a chart, and opens it as
     "Dashboard sheets were written as worksheets of their current values and charts; they are interactive only in Sheetwrite",
   ]);
 
-  const reopenWarnings = collectWarnings();
-  const reopened = await backend.fromXlsxWorkbook(bytes, { onWarning: reopenWarnings.onWarning });
+  const reopen_warnings = collectWarnings();
+  const reopened = await backend.fromXlsxWorkbook(bytes, { onWarning: reopen_warnings.onWarning });
   const authored = sheetNamed(snapshot(), "Dash");
   expect(sheetNamed(reopened, "Dash")).toMatchObject({
     kind: "dashboard",
@@ -181,7 +185,7 @@ it("writes a dashboard as a worksheet of its values and a chart, and opens it as
     pivots: authored.pivots,
     charts: authored.charts,
   });
-  expect(reopenWarnings.warnings).toEqual([]);
+  expect(reopen_warnings.warnings).toEqual([]);
 });
 
 it("writes an empty worksheet for a dashboard exported without computed values", async () => {

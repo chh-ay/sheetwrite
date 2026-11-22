@@ -10,12 +10,12 @@
  */
 
 /** Apple platforms name the Command key; others use Ctrl. */
-function isApplePlatform(): boolean {
+function is_apple_platform(): boolean {
   return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 }
 
 /** Opens the search dialog of the island that holds `opener`, with its field focused. */
-function openSearch(opener: Element): void {
+function open_search(opener: Element): void {
   const dialog = opener.closest("[data-island]")?.querySelector("dialog");
   if (dialog == null) return;
   if (!dialog.open) dialog.showModal();
@@ -23,9 +23,9 @@ function openSearch(opener: Element): void {
 }
 
 /** Installs the opener for the page's first search `button` and every other one. */
-function installSearch(button: HTMLElement): void {
-  const keyCap = button.querySelector("kbd");
-  if (keyCap !== null && !isApplePlatform()) keyCap.textContent = "Ctrl K";
+function install_search(button: HTMLElement): void {
+  const key_cap = button.querySelector("kbd");
+  if (key_cap !== null && !is_apple_platform()) key_cap.textContent = "Ctrl K";
   // On the window, in the capture phase: the islands client holds a click on
   // the island's markup until the island hydrates.
   window.addEventListener(
@@ -33,23 +33,23 @@ function installSearch(button: HTMLElement): void {
     (event) => {
       const opener =
         event.target instanceof Element ? event.target.closest("[data-search-open]") : null;
-      if (opener !== null) openSearch(opener);
+      if (opener !== null) open_search(opener);
     },
     true,
   );
   window.addEventListener("keydown", (event) => {
-    const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
+    const command_k = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
     const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
-    if (!commandK && !slash) return;
+    if (!command_k && !slash) return;
     const target = event.target;
     // "/" keeps typing semantics inside fields; Ctrl+K may not.
     if (slash && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
     event.preventDefault();
-    openSearch(button);
+    open_search(button);
   });
 }
 
-const firstButton = document.querySelector<HTMLElement>("[data-search-open]");
-if (firstButton !== null) installSearch(firstButton);
+const first_button = document.querySelector<HTMLElement>("[data-search-open]");
+if (first_button !== null) install_search(first_button);

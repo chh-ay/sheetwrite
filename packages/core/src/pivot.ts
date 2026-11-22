@@ -56,7 +56,7 @@ export interface PivotIssueSink {
   push(...issues: PivotIssue[]): number;
 }
 
-function isIndex(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number {
+function is_index(value: unknown, max = Number.MAX_SAFE_INTEGER): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= max;
 }
 
@@ -79,7 +79,7 @@ function issue(
   issues.push({ path, code, message });
 }
 
-function boundedArray(
+function bounded_array(
   record: PlainRecord,
   key: string,
   path: string,
@@ -104,16 +104,16 @@ function boundedArray(
   return value;
 }
 
-function validateFieldList(
+function validate_field_list(
   record: PlainRecord,
   key: "rows" | "columns",
   path: string,
   issues: PivotIssueSink,
 ): number[] {
-  const fields = boundedArray(record, key, path, issues, true) ?? [];
+  const fields = bounded_array(record, key, path, issues, true) ?? [];
   const seen = new Set<number>();
   fields.forEach((field, index) => {
-    if (!isIndex(field, MAX_PIVOT_FIELD_INDEX)) {
+    if (!is_index(field, MAX_PIVOT_FIELD_INDEX)) {
       issue(issues, `${path}.${key}[${index}]`, "Pivot field must be a source column index");
     } else if (seen.has(field)) {
       issue(issues, `${path}.${key}[${index}]`, "Pivot field appears twice on one axis");
@@ -121,10 +121,10 @@ function validateFieldList(
       seen.add(field);
     }
   });
-  return fields.filter((field): field is number => isIndex(field, MAX_PIVOT_FIELD_INDEX));
+  return fields.filter((field): field is number => is_index(field, MAX_PIVOT_FIELD_INDEX));
 }
 
-function validateSourceShape(value: unknown, path: string, issues: PivotIssueSink): void {
+function validate_source_shape(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
     issue(issues, path, "Pivot source must be an object");
     return;
@@ -179,15 +179,15 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
     return;
   }
 
-  const rangePath = `${path}.range`;
+  const range_path = `${path}.range`;
   if (!isPlainRecord(range)) {
-    issue(issues, rangePath, "range must be an object");
+    issue(issues, range_path, "range must be an object");
     return;
   }
 
   const sheet = ownValue(range, "sheet");
   if (typeof sheet !== "string" || sheet.length === 0) {
-    issue(issues, `${rangePath}.sheet`, "sheet must be a non-empty string");
+    issue(issues, `${range_path}.sheet`, "sheet must be a non-empty string");
   }
 
   const corners: { row: number; col: number }[] = [];
@@ -195,8 +195,8 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
     const corner = ownValue(range, end);
     const row = isPlainRecord(corner) ? ownValue(corner, "row") : undefined;
     const col = isPlainRecord(corner) ? ownValue(corner, "col") : undefined;
-    if (!isIndex(row) || !isIndex(col)) {
-      issue(issues, `${rangePath}.${end}`, `${end} must hold non-negative integer row and col`);
+    if (!is_index(row) || !is_index(col)) {
+      issue(issues, `${range_path}.${end}`, `${end} must hold non-negative integer row and col`);
       return;
     }
 
@@ -206,11 +206,11 @@ function validateSourceShape(value: unknown, path: string, issues: PivotIssueSin
   const [start, finish] = corners;
   // The first range row is the header row, so the rectangle must be canonical.
   if (start && finish && (start.row > finish.row || start.col > finish.col)) {
-    issue(issues, rangePath, "Pivot source range must run from top-left to bottom-right");
+    issue(issues, range_path, "Pivot source range must run from top-left to bottom-right");
   }
 }
 
-function validateValueShape(value: unknown, path: string, issues: PivotIssueSink): void {
+function validate_value_shape(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
     issue(issues, path, "Pivot value field must be an object");
     return;
@@ -219,9 +219,10 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
   if (measure !== undefined) {
     const mixed =
       ownValue(value, "field") !== undefined || ownValue(value, "aggregation") !== undefined;
-    if (!isBoundedName(measure) || mixed) issue(issues, `${path}.measure`, "Invalid measure value");
+    if (!is_bounded_name(measure) || mixed)
+      issue(issues, `${path}.measure`, "Invalid measure value");
   } else {
-    if (!isIndex(ownValue(value, "field"), MAX_PIVOT_FIELD_INDEX)) {
+    if (!is_index(ownValue(value, "field"), MAX_PIVOT_FIELD_INDEX)) {
       issue(issues, `${path}.field`, "field must be a source column index");
     }
     const aggregation = ownValue(value, "aggregation");
@@ -234,8 +235,8 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
     issue(issues, `${path}.name`, `name must be a string of at most ${MAX_PIVOT_NAME_LENGTH}`);
   }
   // The same bound as a cell's number format.
-  const numberFormat = ownValue(value, "numberFormat");
-  if (numberFormat !== undefined && !isBoundedName(numberFormat)) {
+  const number_format = ownValue(value, "numberFormat");
+  if (number_format !== undefined && !is_bounded_name(number_format)) {
     issue(
       issues,
       `${path}.numberFormat`,
@@ -245,75 +246,79 @@ function validateValueShape(value: unknown, path: string, issues: PivotIssueSink
 }
 
 /** A non-empty string no longer than a pivot name. */
-function isBoundedName(value: unknown): value is string {
+function is_bounded_name(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_PIVOT_NAME_LENGTH;
 }
 
 /** Each field takes at most one filter, and all filters share one value budget. */
-function validateFiltersShape(pivot: PlainRecord, path: string, issues: PivotIssueSink): void {
-  let filterValues = 0;
-  const filteredFields = new Set<unknown>();
-  boundedArray(pivot, "filters", path, issues, false)?.forEach((entry, index) => {
-    const filterPath = `${path}.filters[${index}]`;
+function validate_filters_shape(pivot: PlainRecord, path: string, issues: PivotIssueSink): void {
+  let filter_values = 0;
+  const filtered_fields = new Set<unknown>();
+  bounded_array(pivot, "filters", path, issues, false)?.forEach((entry, index) => {
+    const filter_path = `${path}.filters[${index}]`;
     if (!isPlainRecord(entry)) {
-      issue(issues, filterPath, "Pivot filter must be an object");
+      issue(issues, filter_path, "Pivot filter must be an object");
       return;
     }
 
     const field = ownValue(entry, "field");
-    if (!isIndex(field, MAX_PIVOT_FIELD_INDEX)) {
-      issue(issues, `${filterPath}.field`, "field must be a source column index");
-    } else if (filteredFields.has(field)) {
-      issue(issues, `${filterPath}.field`, "A field may have only one filter");
+    if (!is_index(field, MAX_PIVOT_FIELD_INDEX)) {
+      issue(issues, `${filter_path}.field`, "field must be a source column index");
+    } else if (filtered_fields.has(field)) {
+      issue(issues, `${filter_path}.field`, "A field may have only one filter");
     }
-    filteredFields.add(field);
+    filtered_fields.add(field);
 
     const values = ownValue(entry, "values");
     if (!Array.isArray(values)) {
-      issue(issues, `${filterPath}.values`, "values must be an array");
+      issue(issues, `${filter_path}.values`, "values must be an array");
       return;
     }
-    filterValues += values.length;
-    if (filterValues > MAX_PIVOT_FILTER_VALUES) {
+    filter_values += values.length;
+    if (filter_values > MAX_PIVOT_FILTER_VALUES) {
       issue(
         issues,
-        `${filterPath}.values`,
+        `${filter_path}.values`,
         `Pivot filter value limit ${MAX_PIVOT_FILTER_VALUES} exceeded`,
         "resource-limit",
       );
       return;
     }
-    values.forEach((filterValue, valueIndex) => {
-      if (!isPivotScalar(filterValue)) {
-        issue(issues, `${filterPath}.values[${valueIndex}]`, "Filter value must be a cell scalar");
+    values.forEach((filter_value, value_index) => {
+      if (!isPivotScalar(filter_value)) {
+        issue(
+          issues,
+          `${filter_path}.values[${value_index}]`,
+          "Filter value must be a cell scalar",
+        );
       }
     });
   });
 }
 
 /** A sort key must name a field that groups its axis. */
-function validateSortShape(
+function validate_sort_shape(
   pivot: PlainRecord,
   path: string,
   grouped: { rows: readonly unknown[]; columns: readonly unknown[] },
   issues: PivotIssueSink,
 ): void {
-  boundedArray(pivot, "sort", path, issues, false)?.forEach((entry, index) => {
-    const sortPath = `${path}.sort[${index}]`;
+  bounded_array(pivot, "sort", path, issues, false)?.forEach((entry, index) => {
+    const sort_path = `${path}.sort[${index}]`;
     if (!isPlainRecord(entry)) {
-      issue(issues, sortPath, "Pivot sort must be an object");
+      issue(issues, sort_path, "Pivot sort must be an object");
       return;
     }
 
     const axis = ownValue(entry, "axis");
     const field = ownValue(entry, "field");
     if (axis !== "rows" && axis !== "columns") {
-      issue(issues, `${sortPath}.axis`, "axis must be rows or columns");
-    } else if (!isIndex(field) || !grouped[axis].includes(field)) {
-      issue(issues, `${sortPath}.field`, "A sort field must group the sorted axis");
+      issue(issues, `${sort_path}.axis`, "axis must be rows or columns");
+    } else if (!is_index(field) || !grouped[axis].includes(field)) {
+      issue(issues, `${sort_path}.field`, "A sort field must group the sorted axis");
     }
     if (typeof ownValue(entry, "descending") !== "boolean") {
-      issue(issues, `${sortPath}.descending`, "descending must be a boolean");
+      issue(issues, `${sort_path}.descending`, "descending must be a boolean");
     }
   });
 }
@@ -334,32 +339,32 @@ export function validatePivotShape(value: unknown, path: string, issues: PivotIs
     issue(issues, `${path}.name`, `name must be a string of at most ${MAX_PIVOT_NAME_LENGTH}`);
   }
 
-  validateSourceShape(ownValue(value, "source"), `${path}.source`, issues);
+  validate_source_shape(ownValue(value, "source"), `${path}.source`, issues);
 
   const anchor = ownValue(value, "anchor");
   if (
     !isPlainRecord(anchor) ||
-    !isIndex(ownValue(anchor, "row")) ||
-    !isIndex(ownValue(anchor, "col"))
+    !is_index(ownValue(anchor, "row")) ||
+    !is_index(ownValue(anchor, "col"))
   ) {
     issue(issues, `${path}.anchor`, "anchor must hold non-negative integer row and col");
   }
 
-  const rows = validateFieldList(value, "rows", path, issues);
-  const columns = validateFieldList(value, "columns", path, issues);
-  const rowFields = new Set(rows);
+  const rows = validate_field_list(value, "rows", path, issues);
+  const columns = validate_field_list(value, "columns", path, issues);
+  const row_fields = new Set(rows);
   columns.forEach((field, index) => {
-    if (rowFields.has(field)) {
+    if (row_fields.has(field)) {
       issue(issues, `${path}.columns[${index}]`, "A field may group rows or columns, not both");
     }
   });
 
-  boundedArray(value, "values", path, issues, true)?.forEach((entry, index) => {
-    validateValueShape(entry, `${path}.values[${index}]`, issues);
+  bounded_array(value, "values", path, issues, true)?.forEach((entry, index) => {
+    validate_value_shape(entry, `${path}.values[${index}]`, issues);
   });
 
-  validateFiltersShape(value, path, issues);
-  validateSortShape(value, path, { rows, columns }, issues);
+  validate_filters_shape(value, path, issues);
+  validate_sort_shape(value, path, { rows, columns }, issues);
 
   for (const key of ["rowTotals", "columnTotals", "subtotals"]) {
     const flag = ownValue(value, key);
@@ -371,18 +376,19 @@ export function validatePivotShape(value: unknown, path: string, issues: PivotIs
   if (layout !== undefined && layout !== "compact" && layout !== "tabular") {
     issue(issues, `${path}.layout`, "layout must be compact or tabular");
   }
-  const savedOutput = ownValue(value, "savedOutput");
-  if (savedOutput !== undefined) validateSavedOutput(savedOutput, `${path}.savedOutput`, issues);
+  const saved_output = ownValue(value, "savedOutput");
+  if (saved_output !== undefined)
+    validate_saved_output(saved_output, `${path}.savedOutput`, issues);
 }
 
-function validateSavedOutput(value: unknown, path: string, issues: PivotIssueSink): void {
+function validate_saved_output(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
     issue(issues, path, "savedOutput must be an object");
     return;
   }
   const rows = ownValue(value, "rows");
   const cols = ownValue(value, "cols");
-  if (!isIndex(rows) || !isIndex(cols) || rows === 0 || cols === 0) {
+  if (!is_index(rows) || !is_index(cols) || rows === 0 || cols === 0) {
     issue(issues, path, "savedOutput must hold positive integer rows and cols");
     return;
   }
@@ -400,9 +406,9 @@ function validateSavedOutput(value: unknown, path: string, issues: PivotIssueSin
     issue(issues, `${path}.cells`, "cells must be an array of rows * cols values");
     return;
   }
-  const invalidCell = cells.findIndex((cell) => !isPivotScalar(cell));
-  if (invalidCell >= 0) {
-    issue(issues, `${path}.cells[${invalidCell}]`, "Saved output cell must be a cell scalar");
+  const invalid_cell = cells.findIndex((cell) => !isPivotScalar(cell));
+  if (invalid_cell >= 0) {
+    issue(issues, `${path}.cells[${invalid_cell}]`, "Saved output cell must be a cell scalar");
   }
 }
 
@@ -414,7 +420,7 @@ export interface PivotReferenceScope {
 }
 
 /** Highest field index any part of the definition references, or -1. */
-function highestField(pivot: PivotDefinition): number {
+function highest_field(pivot: PivotDefinition): number {
   let highest = -1;
   for (const field of pivot.rows) highest = Math.max(highest, field);
   for (const field of pivot.columns) highest = Math.max(highest, field);
@@ -484,10 +490,10 @@ export function validatePivotReferences(
 
     width = range.end.col - range.start.col + 1;
   } else {
-    const tableWidth = scope.tableWidth(
+    const table_width = scope.tableWidth(
       "model" in pivot.source ? pivot.source.model.table : pivot.source.table,
     );
-    if (tableWidth === undefined) {
+    if (table_width === undefined) {
       issue(
         issues,
         `${path}.source.table`,
@@ -497,10 +503,10 @@ export function validatePivotReferences(
       return;
     }
 
-    width = "model" in pivot.source ? pivot.source.model.fields.length : tableWidth;
+    width = "model" in pivot.source ? pivot.source.model.fields.length : table_width;
   }
 
-  if (highestField(pivot) >= width) {
+  if (highest_field(pivot) >= width) {
     issue(issues, path, "Pivot field index lies outside its source", "out-of-bounds");
   }
 }
@@ -522,7 +528,7 @@ export function sheetPivotScope(sheets: readonly Sheet[]): PivotReferenceScope {
   };
 }
 
-function cloneSource(source: PivotSource): PivotSource {
+function clone_source(source: PivotSource): PivotSource {
   const clone: PivotSource =
     "range" in source
       ? {
@@ -549,7 +555,7 @@ export function clonePivot(pivot: PivotDefinition): PivotDefinition {
   const clone: PivotDefinition = {
     id: pivot.id,
     name: pivot.name,
-    source: cloneSource(pivot.source),
+    source: clone_source(pivot.source),
     anchor: { row: pivot.anchor.row, col: pivot.anchor.col },
     rows: pivot.rows.slice(),
     columns: pivot.columns.slice(),
@@ -619,36 +625,36 @@ export interface PivotRewrite {
 const NO_TABLES: ReadonlySet<string> = new Set();
 const NO_TABLE_COLUMNS: ReadonlyMap<string, { start: number; end: number }> = new Map();
 
-function hasPivots(sheets: readonly Sheet[]): boolean {
+function has_pivots(sheets: readonly Sheet[]): boolean {
   return sheets.some((sheet) => (sheet.pivots?.length ?? 0) > 0);
 }
 
-function axisPlan(
+function axis_plan(
   sheet: Sheet,
   axis: "row" | "col",
   remap: (index: number) => number | null,
-  anchorFallback: number,
+  anchor_fallback: number,
   span?: PivotAxisEdit["span"],
 ): PivotEditPlan {
-  const removedTables = new Set<string>();
-  const tableColumns = new Map<string, { start: number; end: number }>();
+  const removed_tables = new Set<string>();
+  const table_columns = new Map<string, { start: number; end: number }>();
   for (const table of sheet.tables ?? []) {
     const start = axis === "row" ? table.range.start.row : table.range.start.col;
     const end = axis === "row" ? table.range.end.row : table.range.end.col;
-    if (!(span ? span(start, end) : remapSpan(start, end, remap))) removedTables.add(table.id);
+    if (!(span ? span(start, end) : remapSpan(start, end, remap))) removed_tables.add(table.id);
     if (axis === "col") {
-      tableColumns.set(table.id, { start: Math.min(start, end), end: Math.max(start, end) });
+      table_columns.set(table.id, { start: Math.min(start, end), end: Math.max(start, end) });
     }
   }
   return {
-    axisEdit: { sheet: sheet.id, axis, remap, anchorFallback, span },
-    removedTables,
-    tableColumns,
+    axisEdit: { sheet: sheet.id, axis, remap, anchorFallback: anchor_fallback, span },
+    removedTables: removed_tables,
+    tableColumns: table_columns,
   };
 }
 
 /** A move has three monotone segments; inspect their ends, not every source row. */
-function movedSpan(from: number, count: number, to: number): NonNullable<PivotAxisEdit["span"]> {
+function moved_span(from: number, count: number, to: number): NonNullable<PivotAxisEdit["span"]> {
   const cuts = [from, from + count, to < from ? to : to + count];
   return (start, end) => {
     let low = Math.min(moveIndex(start, from, count, to), moveIndex(end, from, count, to));
@@ -685,7 +691,7 @@ export function planPivotEdit(
     case "addColumns":
     case "removeColumns":
     case "moveColumns":
-      if (!hasPivots(sheets)) return null;
+      if (!has_pivots(sheets)) return null;
       break;
 
     default:
@@ -711,7 +717,7 @@ export function planPivotEdit(
   if (!sheet) return null;
   switch (operation.op) {
     case "addRows":
-      return axisPlan(
+      return axis_plan(
         sheet,
         "row",
         (row) => (row >= operation.at ? row + operation.count : row),
@@ -720,7 +726,7 @@ export function planPivotEdit(
 
     case "removeRows": {
       const { at, count } = operation;
-      return axisPlan(
+      return axis_plan(
         sheet,
         "row",
         (row) => (row < at ? row : row < at + count ? null : row - count),
@@ -729,22 +735,22 @@ export function planPivotEdit(
     }
 
     case "moveRows":
-      return axisPlan(
+      return axis_plan(
         sheet,
         "row",
         (row) => moveIndex(row, operation.from, operation.count, operation.to),
         0,
-        movedSpan(operation.from, operation.count, operation.to),
+        moved_span(operation.from, operation.count, operation.to),
       );
 
     case "addColumns": {
       const count = operation.columns.length;
-      return axisPlan(sheet, "col", (col) => (col >= operation.at ? col + count : col), 0);
+      return axis_plan(sheet, "col", (col) => (col >= operation.at ? col + count : col), 0);
     }
 
     case "removeColumns": {
       const { at, count } = operation;
-      return axisPlan(
+      return axis_plan(
         sheet,
         "col",
         (col) => (col < at ? col : col < at + count ? null : col - count),
@@ -753,12 +759,12 @@ export function planPivotEdit(
     }
 
     default:
-      return axisPlan(
+      return axis_plan(
         sheet,
         "col",
         (col) => moveIndex(col, operation.from, operation.count, operation.to),
         0,
-        movedSpan(operation.from, operation.count, operation.to),
+        moved_span(operation.from, operation.count, operation.to),
       );
   }
 }
@@ -768,39 +774,39 @@ export function pivotAxisPlan(edit: PivotAxisEdit): PivotEditPlan {
   return { axisEdit: edit, removedTables: NO_TABLES, tableColumns: NO_TABLE_COLUMNS };
 }
 
-function remapFields(
+function remap_fields(
   pivot: PivotDefinition,
-  mapField: (field: number) => number | null,
+  map_field: (field: number) => number | null,
 ): PivotDefinition {
   const changed =
-    pivot.rows.some((field) => mapField(field) !== field) ||
-    pivot.columns.some((field) => mapField(field) !== field) ||
-    pivot.values.some((value) => "field" in value && mapField(value.field) !== value.field) ||
-    (pivot.filters?.some((filter) => mapField(filter.field) !== filter.field) ?? false);
+    pivot.rows.some((field) => map_field(field) !== field) ||
+    pivot.columns.some((field) => map_field(field) !== field) ||
+    pivot.values.some((value) => "field" in value && map_field(value.field) !== value.field) ||
+    (pivot.filters?.some((filter) => map_field(filter.field) !== filter.field) ?? false);
   if (!changed) return pivot;
 
   // A deleted source column leaves the pivot, as Excel drops a deleted field.
-  const mapList = (fields: readonly number[]): number[] =>
-    fields.map(mapField).filter((field): field is number => field !== null);
+  const map_list = (fields: readonly number[]): number[] =>
+    fields.map(map_field).filter((field): field is number => field !== null);
   const next: PivotDefinition = {
     ...pivot,
-    rows: mapList(pivot.rows),
-    columns: mapList(pivot.columns),
+    rows: map_list(pivot.rows),
+    columns: map_list(pivot.columns),
     values: pivot.values.flatMap((value): PivotValueField[] => {
       if ("measure" in value) return [value];
-      const field = mapField(value.field);
+      const field = map_field(value.field);
       return field === null ? [] : [{ ...value, field }];
     }),
   };
   if (pivot.filters) {
     next.filters = pivot.filters.flatMap((filter): PivotFilter[] => {
-      const field = mapField(filter.field);
+      const field = map_field(filter.field);
       return field === null ? [] : [{ ...filter, field }];
     });
   }
   if (pivot.sort) {
     next.sort = pivot.sort.flatMap((sort): PivotSort[] => {
-      const field = mapField(sort.field);
+      const field = map_field(sort.field);
       return field === null ? [] : [{ ...sort, field }];
     });
   }
@@ -815,7 +821,7 @@ function invalidated(source: PivotSource): PivotSource {
  * Whether `edit` keeps the `count` indices from `start` together: in order,
  * without a gap or a deletion. Saved output survives only such an edit.
  */
-function keepsSpanIntact(edit: PivotAxisEdit, start: number, count: number): boolean {
+function keeps_span_intact(edit: PivotAxisEdit, start: number, count: number): boolean {
   const first = edit.remap(start);
   if (first === null) return false;
   // Inserts and deletes are monotone, so the ends prove the whole span.
@@ -832,7 +838,7 @@ function keepsSpanIntact(edit: PivotAxisEdit, start: number, count: number): boo
  * The anchor of a pivot on the edited sheet after `edit`, and whether its
  * saved output survives the edit.
  */
-function moveAnchor(
+function move_anchor(
   pivot: PivotDefinition,
   edit: PivotAxisEdit,
 ): { anchor: PivotDefinition["anchor"]; keepsSavedOutput: boolean } {
@@ -848,19 +854,19 @@ function moveAnchor(
         : { ...pivot.anchor, col: moved };
 
   const saved = pivot.savedOutput;
-  const keepsSavedOutput =
-    !saved || keepsSpanIntact(edit, old, edit.axis === "row" ? saved.rows : saved.cols);
-  return { anchor, keepsSavedOutput };
+  const keeps_saved_output =
+    !saved || keeps_span_intact(edit, old, edit.axis === "row" ? saved.rows : saved.cols);
+  return { anchor, keepsSavedOutput: keeps_saved_output };
 }
 
 /**
  * A live source after `edit`, and the source-column remap a column edit
  * implies for its fields; null when the field indices stay put.
  */
-function moveSource(
+function move_source(
   source: PivotSource,
   edit: PivotAxisEdit,
-  tableColumns: PivotEditPlan["tableColumns"],
+  table_columns: PivotEditPlan["tableColumns"],
 ): { source: PivotSource; mapField: ((field: number) => number | null) | null } {
   if (!source.invalid && "range" in source && source.range.sheet === edit.sheet) {
     const range = source.range;
@@ -869,9 +875,9 @@ function moveSource(
     const span = edit.span ? edit.span(start, end) : remapSpan(start, end, edit.remap);
     if (!span) return { source: invalidated(source), mapField: null };
 
-    const [newStart, newEnd] = span;
+    const [new_start, new_end] = span;
     const moved =
-      newStart === start && newEnd === end
+      new_start === start && new_end === end
         ? source
         : {
             ...source,
@@ -879,39 +885,39 @@ function moveSource(
               edit.axis === "row"
                 ? {
                     ...range,
-                    start: { ...range.start, row: newStart },
-                    end: { ...range.end, row: newEnd },
+                    start: { ...range.start, row: new_start },
+                    end: { ...range.end, row: new_end },
                   }
                 : {
                     ...range,
-                    start: { ...range.start, col: newStart },
-                    end: { ...range.end, col: newEnd },
+                    start: { ...range.start, col: new_start },
+                    end: { ...range.end, col: new_end },
                   },
           };
-    const mapField =
+    const map_field =
       edit.axis === "col"
         ? (field: number) => {
             const mapped = edit.remap(start + field);
-            return mapped === null ? null : mapped - newStart;
+            return mapped === null ? null : mapped - new_start;
           }
         : null;
-    return { source: moved, mapField };
+    return { source: moved, mapField: map_field };
   }
 
   if (!source.invalid && "table" in source && edit.axis === "col") {
-    const columns = tableColumns.get(source.table);
+    const columns = table_columns.get(source.table);
     const span = columns
       ? edit.span
         ? edit.span(columns.start, columns.end)
         : remapSpan(columns.start, columns.end, edit.remap)
       : null;
     if (columns && span) {
-      const newStart = span[0];
-      const mapField = (field: number) => {
+      const new_start = span[0];
+      const map_field = (field: number) => {
         const mapped = edit.remap(columns.start + field);
-        return mapped === null ? null : mapped - newStart;
+        return mapped === null ? null : mapped - new_start;
       };
-      return { source, mapField };
+      return { source, mapField: map_field };
     }
   }
   return { source, mapField: null };
@@ -928,15 +934,15 @@ export function rebasePivot(
   plan: PivotEditPlan,
 ): PivotDefinition {
   const edit = plan.axisEdit;
-  const { anchor, keepsSavedOutput } =
+  const { anchor, keepsSavedOutput: keeps_saved_output } =
     edit && owner === edit.sheet
-      ? moveAnchor(pivot, edit)
+      ? move_anchor(pivot, edit)
       : { anchor: pivot.anchor, keepsSavedOutput: true };
-  const { source: movedSource, mapField } = edit
-    ? moveSource(pivot.source, edit, plan.tableColumns)
+  const { source: moved_source, mapField: map_field } = edit
+    ? move_source(pivot.source, edit, plan.tableColumns)
     : { source: pivot.source, mapField: null };
 
-  let source = movedSource;
+  let source = moved_source;
   if (
     !source.invalid &&
     (("range" in source && source.range.sheet === plan.removedSheet) ||
@@ -949,8 +955,8 @@ export function rebasePivot(
   let moved =
     anchor === pivot.anchor && source === pivot.source ? pivot : { ...pivot, anchor, source };
   // The saved values no longer match an output rectangle the edit cut.
-  if (!keepsSavedOutput) moved = withoutSavedOutput(moved);
-  return mapField && !source.invalid ? remapFields(moved, mapField) : moved;
+  if (!keeps_saved_output) moved = withoutSavedOutput(moved);
+  return map_field && !source.invalid ? remap_fields(moved, map_field) : moved;
 }
 
 /** Every pivot `plan` rewrites, in sheet order. */
@@ -1072,13 +1078,13 @@ export function encodePivotPayload(
 ): PivotPayload {
   const numbers: number[] = [];
   const strings: string[] = [];
-  const stringIndex = new Map<string, number>();
+  const string_index = new Map<string, number>();
   const text = (value: string): number => {
-    let index = stringIndex.get(value);
+    let index = string_index.get(value);
     if (index === undefined) {
       index = strings.length;
       strings.push(value);
-      stringIndex.set(value, index);
+      string_index.set(value, index);
     }
     return index;
   };
@@ -1181,16 +1187,16 @@ export interface SavedPivotPayload {
  */
 export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): SavedPivotPayload {
   const saved = pivots.filter((pivot) => pivot.savedOutput !== undefined);
-  const cellCount = saved.reduce(
+  const cell_count = saved.reduce(
     (total, pivot) => total + (pivot.savedOutput?.cells.length ?? 0),
     0,
   );
 
   const layout = new Uint32Array(saved.length * SAVED_LAYOUT_STRIDE);
-  const kinds = new Uint8Array(cellCount);
-  const numbers = new Float64Array(cellCount);
+  const kinds = new Uint8Array(cell_count);
+  const numbers = new Float64Array(cell_count);
   const texts: string[] = [];
-  const textLengths: number[] = [];
+  const text_lengths: number[] = [];
 
   let cell = 0;
   saved.forEach((pivot, index) => {
@@ -1209,7 +1215,7 @@ export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): Sav
       } else if (typeof value === "string") {
         kinds[cell] = SAVED_TEXT;
         texts.push(value);
-        textLengths.push(value.length);
+        text_lengths.push(value.length);
       } else {
         kinds[cell] = SAVED_BOOLEAN;
         numbers[cell] = value ? 1 : 0;
@@ -1224,6 +1230,6 @@ export function encodeSavedPivotPayload(pivots: readonly PivotDefinition[]): Sav
     kinds,
     numbers,
     text: texts.join(""),
-    textLengths: Uint32Array.from(textLengths),
+    textLengths: Uint32Array.from(text_lengths),
   };
 }

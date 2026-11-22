@@ -112,7 +112,7 @@ export function searchTerms(query: string): string {
  * A query that names code (`createGrid`, `XLOOKUP`, `grid.sort`), as opposed
  * to plain words. Plain words look for a guide before the API reference.
  */
-function namesCode(query: string): boolean {
+function names_code(query: string): boolean {
   return /[a-z][A-Z]|[.()]|^[A-Z0-9.]{2,}$/u.test(query.trim());
 }
 
@@ -122,7 +122,7 @@ function singular(word: string): string {
 }
 
 /** The text holds the word, give or take its ending. */
-function holdsWord(text: string, word: string): boolean {
+function holds_word(text: string, word: string): boolean {
   return text.includes(word.length > ENDING_LENGTH + 2 ? word.slice(0, -ENDING_LENGTH) : word);
 }
 
@@ -131,14 +131,14 @@ function holdsWord(text: string, word: string): boolean {
  * text, or the row of the formula function with that name
  * (scripts/formula-docs.ts gives each row the id `fn-<name>`).
  */
-function exactSection(data: PagefindResultData, query: string): SearchEntry | undefined {
-  const functionId = `fn-${query.replaceAll(/[^a-z0-9]+/gu, "-").replaceAll(/(^-|-$)/gu, "")}`;
+function exact_section(data: PagefindResultData, query: string): SearchEntry | undefined {
+  const function_id = `fn-${query.replaceAll(/[^a-z0-9]+/gu, "-").replaceAll(/(^-|-$)/gu, "")}`;
   for (const anchor of data.anchors ?? []) {
-    const isHeading = /^h\d$/iu.test(anchor.element) && normalized(anchor.text ?? "") === query;
-    if (!isHeading && anchor.id !== functionId) continue;
+    const is_heading = /^h\d$/iu.test(anchor.element) && normalized(anchor.text ?? "") === query;
+    if (!is_heading && anchor.id !== function_id) continue;
     return {
       url: `${data.url}#${anchor.id}`,
-      title: isHeading ? (anchor.text ?? "").trim() : query.toUpperCase(),
+      title: is_heading ? (anchor.text ?? "").trim() : query.toUpperCase(),
       excerpt: data.meta.title ?? "",
     };
   }
@@ -150,16 +150,16 @@ function exactSection(data: PagefindResultData, query: string): SearchEntry | un
  * also returns pages for a query that matches no word at all, which are
  * not results.
  */
-function containsQuery(data: PagefindResultData, words: readonly string[]): boolean {
+function contains_query(data: PagefindResultData, words: readonly string[]): boolean {
   const text = `${data.meta.title ?? ""} ${data.content}`.toLowerCase();
-  return words.every((word) => holdsWord(text, word));
+  return words.every((word) => holds_word(text, word));
 }
 
 /**
  * For a query of several words, the first heading that holds them as one
  * phrase: "find all" names "Options and Find All in the find bar".
  */
-function phraseSection(data: PagefindResultData, query: string): SearchEntry | undefined {
+function phrase_section(data: PagefindResultData, query: string): SearchEntry | undefined {
   for (const anchor of data.anchors ?? []) {
     const text = anchor.text ?? "";
     if (!/^h\d$/iu.test(anchor.element) || !normalized(text).includes(query)) continue;
@@ -168,7 +168,7 @@ function phraseSection(data: PagefindResultData, query: string): SearchEntry | u
   return undefined;
 }
 
-function entriesFor(data: PagefindResultData, exact: SearchEntry | undefined): SearchEntry[] {
+function entries_for(data: PagefindResultData, exact: SearchEntry | undefined): SearchEntry[] {
   const page: SearchEntry = {
     url: data.url,
     title: data.meta.title ?? data.url,
@@ -201,7 +201,7 @@ const TIER_OTHER = 4;
 const SHARED_STEM_LENGTH = 6;
 
 /** Two words name the same thing: equal but for a plural "s", or long words with one stem. */
-function sameWord(left: string, right: string): boolean {
+function same_word(left: string, right: string): boolean {
   if (singular(left) === singular(right)) return true;
   return (
     left.length >= SHARED_STEM_LENGTH &&
@@ -210,42 +210,42 @@ function sameWord(left: string, right: string): boolean {
   );
 }
 
-function rankPage(
+function rank_page(
   page: PagefindResultData,
   order: number,
   query: string,
   words: readonly string[],
 ): Ranked {
   const title = normalized(page.meta.title ?? "");
-  const isApiReference = page.url.startsWith(API_REFERENCE_PREFIX);
+  const is_api_reference = page.url.startsWith(API_REFERENCE_PREFIX);
   const ranked = (tier: number, exact?: SearchEntry): Ranked => ({
     page,
     exact,
     order,
     tier,
-    isApiReference,
+    isApiReference: is_api_reference,
   });
   if (title === query || singular(title) === singular(query)) return ranked(TIER_TITLE);
-  const exact = exactSection(page, query);
+  const exact = exact_section(page, query);
   if (exact !== undefined) return ranked(TIER_SECTION, exact);
   if (words.length < 2) return ranked(TIER_OTHER);
   // A question names a guide by its title: "use sheetwrite with react" names
   // React, "add a chart" names Charts. API pages are left out: their one-word
   // titles (Grid, Range, Theme) are words of many questions.
-  const titleWords = title
+  const title_words = title
     .split(/[^\p{L}\p{N}]+/u)
     .filter((word) => word.length > 0 && !QUESTION_WORDS.has(word));
   if (
-    !isApiReference &&
-    titleWords.length > 0 &&
-    titleWords.every((titleWord) => words.some((word) => sameWord(word, titleWord)))
+    !is_api_reference &&
+    title_words.length > 0 &&
+    title_words.every((title_word) => words.some((word) => same_word(word, title_word)))
   ) {
     return ranked(TIER_GUIDE_NAMED);
   }
-  if (title.includes(query) || words.every((word) => holdsWord(title, word))) {
+  if (title.includes(query) || words.every((word) => holds_word(title, word))) {
     return ranked(TIER_TITLE_WORDS_OR_PHRASE);
   }
-  const phrase = phraseSection(page, query);
+  const phrase = phrase_section(page, query);
   return phrase === undefined ? ranked(TIER_OTHER) : ranked(TIER_TITLE_WORDS_OR_PHRASE, phrase);
 }
 
@@ -265,21 +265,21 @@ export function rankEntries(pages: readonly PagefindResultData[], rawQuery: stri
   const terms = searchTerms(rawQuery);
   const query = normalized(terms);
   const words = query.split(/\s+/u).filter(Boolean);
-  const guidesFirst = !namesCode(terms);
+  const guides_first = !names_code(terms);
   const ranked = pages
-    .filter((page) => containsQuery(page, words))
-    .map((page, order) => rankPage(page, order, query, words))
+    .filter((page) => contains_query(page, words))
+    .map((page, order) => rank_page(page, order, query, words))
     .sort(
       (left, right) =>
         left.tier - right.tier ||
-        (guidesFirst ? Number(left.isApiReference) - Number(right.isApiReference) : 0) ||
+        (guides_first ? Number(left.isApiReference) - Number(right.isApiReference) : 0) ||
         left.order - right.order,
     )
     .slice(0, SHOWN_PAGES);
   const seen = new Set<string>();
   const entries: SearchEntry[] = [];
   for (const { page, exact } of ranked) {
-    for (const entry of entriesFor(page, exact)) {
+    for (const entry of entries_for(page, exact)) {
       if (seen.has(entry.url)) continue;
       seen.add(entry.url);
       entries.push(entry);

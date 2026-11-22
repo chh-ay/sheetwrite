@@ -299,7 +299,7 @@ const RELATIONSHIP_STATUS = {
 } as const;
 
 /** Decodes one engine `relationshipStatus` record. */
-function relationshipStatusOf(record: Uint32Array): RelationshipStatus {
+function relationship_status_of(record: Uint32Array): RelationshipStatus {
   const [code, first = 0, second = 0, unmatched = 0] = record;
   switch (code) {
     case RELATIONSHIP_STATUS.ok:
@@ -377,34 +377,34 @@ export interface SheetwriteStoreOptions {
   mutationPolicy?: MutationPolicyMode;
 }
 
-function rebaseHyperlinkAxis(
+function rebase_hyperlink_axis(
   hyperlink: CellHyperlink,
-  editedSheet: SheetId,
+  edited_sheet: SheetId,
   axis: SheetAxis,
   remap: (index: number) => number | null,
 ): CellHyperlink | null {
-  const rebaseRange = (range: Range): Range | null =>
-    range.sheet === editedSheet ? rebaseRangeSpan(range, axis, remap) : range;
+  const rebase_range = (range: Range): Range | null =>
+    range.sheet === edited_sheet ? rebaseRangeSpan(range, axis, remap) : range;
 
-  const range = rebaseRange(hyperlink.range);
+  const range = rebase_range(hyperlink.range);
   if (!range) return null;
   if (hyperlink.target.kind === "external") {
     return range === hyperlink.range ? hyperlink : { ...hyperlink, range };
   }
 
-  const targetRange = rebaseRange(hyperlink.target.range);
-  if (!targetRange) return null;
+  const target_range = rebase_range(hyperlink.target.range);
+  if (!target_range) return null;
   return {
     ...hyperlink,
     range,
     target:
-      targetRange === hyperlink.target.range
+      target_range === hyperlink.target.range
         ? hyperlink.target
-        : { kind: "internal", range: targetRange },
+        : { kind: "internal", range: target_range },
   };
 }
 /** A copy of `items` with `item` at `index`, or appended when `index` is negative. */
-function withEntry<T>(items: readonly T[], index: number, item: T): T[] {
+function with_entry<T>(items: readonly T[], index: number, item: T): T[] {
   if (index < 0) return [...items, item];
 
   const next = [...items];
@@ -417,11 +417,11 @@ function withEntry<T>(items: readonly T[], index: number, item: T): T[] {
  * `item` appended. The list is copied, never mutated, so a list captured for
  * undo stays exact.
  */
-function upsertWhere<T>(items: readonly T[], item: T, matches: (existing: T) => boolean): T[] {
-  return withEntry(items, items.findIndex(matches), item);
+function upsert_where<T>(items: readonly T[], item: T, matches: (existing: T) => boolean): T[] {
+  return with_entry(items, items.findIndex(matches), item);
 }
 
-/** `upsertWhere` keyed by `id`; null when an append would pass `maxEntries`. */
+/** `upsert_where` keyed by `id`; null when an append would pass `maxEntries`. */
 function upsertById<T extends { readonly id: string }>(items: readonly T[], item: T): T[];
 function upsertById<T extends { readonly id: string }>(
   items: readonly T[],
@@ -431,12 +431,12 @@ function upsertById<T extends { readonly id: string }>(
 function upsertById<T extends { readonly id: string }>(
   items: readonly T[],
   item: T,
-  maxEntries = Number.POSITIVE_INFINITY,
+  max_entries = Number.POSITIVE_INFINITY,
 ): T[] | null {
   const index = items.findIndex((existing) => existing.id === item.id);
-  if (index < 0 && items.length >= maxEntries) return null;
+  if (index < 0 && items.length >= max_entries) return null;
 
-  return withEntry(items, index, item);
+  return with_entry(items, index, item);
 }
 
 /** Copies of the range-keyed items that a row or column move carries. */
@@ -455,7 +455,7 @@ interface MovedItems {
  * The rows or columns a move changes: the moved block and the indexes it
  * passes over, across the whole sheet.
  */
-function movedSpanRange(
+function moved_span_range(
   sheet: Sheet,
   patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
   axis: SheetAxis,
@@ -476,7 +476,7 @@ function movedSpanRange(
 }
 
 /** Row heights, hidden rows and row groups after a row insert or delete. */
-function rebaseRowMeta(meta: Sheet, remap: (row: number) => number | null): void {
+function rebase_row_meta(meta: Sheet, remap: (row: number) => number | null): void {
   if (meta.rowHeights) {
     const next = new Map<number, number>();
     for (const [row, height] of meta.rowHeights) {
@@ -505,7 +505,7 @@ function rebaseRowMeta(meta: Sheet, remap: (row: number) => number | null): void
     .filter((group): group is RowGroup => group !== null);
 }
 
-function rebaseMergeAxis(
+function rebase_merge_axis(
   merge: MergeRange,
   axis: SheetAxis,
   remap: (index: number) => number | null,
@@ -520,13 +520,13 @@ function rebaseMergeAxis(
 }
 
 /** Frozen rows or columns after an axis edit: up to the last frozen index that survives. */
-function frozenCountAfter(count: number, remap: (index: number) => number | null): number {
+function frozen_count_after(count: number, remap: (index: number) => number | null): number {
   const boundary = remapSpan(0, count - 1, remap);
   return boundary ? boundary[1] + 1 : 0;
 }
 
 /** Notes on `sheet` moved along `axis`; a note whose cell is removed is dropped. */
-function rebaseNotes(
+function rebase_notes(
   notes: NonNullable<Sheet["notes"]>,
   sheet: SheetId,
   axis: SheetAxis,
@@ -546,33 +546,33 @@ function rebaseNotes(
   return rebased;
 }
 
-/** Hyperlinks rebased with `rebaseHyperlinkAxis`, dropping the removed ones. */
-function rebaseHyperlinks(
+/** Hyperlinks rebased with `rebase_hyperlink_axis`, dropping the removed ones. */
+function rebase_hyperlinks(
   hyperlinks: readonly CellHyperlink[],
   sheet: SheetId,
   axis: SheetAxis,
   remap: (index: number) => number | null,
 ): CellHyperlink[] {
   return hyperlinks
-    .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, sheet, axis, remap))
+    .map((hyperlink) => rebase_hyperlink_axis(hyperlink, sheet, axis, remap))
     .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
 }
 
 /**
- * Carry the conditional formats of `editedSheet` through a row or column
+ * Carry the conditional formats of `edited_sheet` through a row or column
  * edit: each range moves with `remap` and each formula rule's references
- * follow `formulaEdit`. A rule whose range is removed is dropped.
+ * follow `formula_edit`. A rule whose range is removed is dropped.
  */
-function rebaseConditionalFormats(
+function rebase_conditional_formats(
   rules: readonly ConditionalFormatRule[],
-  editedSheet: SheetId,
+  edited_sheet: SheetId,
   axis: SheetAxis,
   remap: (index: number) => number | null,
-  formulaEdit: FormulaAxisEdit,
+  formula_edit: FormulaAxisEdit,
 ): ConditionalFormatRule[] {
   const rebased: ConditionalFormatRule[] = [];
   for (const rule of rules) {
-    if (rule.range.sheet !== editedSheet) {
+    if (rule.range.sheet !== edited_sheet) {
       rebased.push(rule);
       continue;
     }
@@ -582,7 +582,7 @@ function rebaseConditionalFormats(
 
     const when =
       rule.when.kind === "formula"
-        ? { ...rule.when, source: remapFormulaA1Refs(rule.when.source, axis, formulaEdit) }
+        ? { ...rule.when, source: remapFormulaA1Refs(rule.when.source, axis, formula_edit) }
         : rule.when;
     rebased.push({ ...rule, range, when });
   }
@@ -590,22 +590,22 @@ function rebaseConditionalFormats(
 }
 
 /**
- * Validation rules after a row or column edit on `editedSheet`: their ranges
+ * Validation rules after a row or column edit on `edited_sheet`: their ranges
  * follow it, and so do the references of their formulas.
  */
-function rebaseValidationRules(
+function rebase_validation_rules(
   rules: readonly DataValidationRule[],
-  editedSheet: SheetId,
+  edited_sheet: SheetId,
   axis: SheetAxis,
   remap: (index: number) => number | null,
-  formulaEdit: FormulaAxisEdit,
+  formula_edit: FormulaAxisEdit,
 ): DataValidationRule[] {
-  return rebaseRangeItems(rules, editedSheet, axis, remap).map((rule) =>
-    rule.range.sheet === editedSheet
+  return rebaseRangeItems(rules, edited_sheet, axis, remap).map((rule) =>
+    rule.range.sheet === edited_sheet
       ? {
           ...rule,
           condition: mapValidationFormulas(rule.condition, (formula) =>
-            remapFormulaA1Refs(formula, axis, formulaEdit),
+            remapFormulaA1Refs(formula, axis, formula_edit),
           ),
         }
       : rule,
@@ -613,7 +613,7 @@ function rebaseValidationRules(
 }
 
 /** A store failure caused by the workbook, options or call the host gave. */
-function storeFailure(
+function store_failure(
   code: SheetwriteErrorCode,
   message: string,
   context?: SheetwriteErrorContext,
@@ -649,7 +649,7 @@ export interface StoreDataEngineEffects {
   readonly storageRevision: bigint;
 }
 
-function literalOf(value: CellScalar): CellValue {
+function literal_of(value: CellScalar): CellValue {
   return { kind: "literal", value };
 }
 
@@ -671,7 +671,7 @@ const NON_ASCII = /[^\0-\x7f]/;
  * re-encodes. `texts` must be in the flat input order of their cells:
  * row-major for document blocks and column-major for columnar imports.
  */
-function packTexts(texts: readonly string[]): { bytes: Uint8Array; offsets: Uint32Array } {
+function pack_texts(texts: readonly string[]): { bytes: Uint8Array; offsets: Uint32Array } {
   // Start of each string, plus the packed length as the final entry.
   const offsets = new Uint32Array(texts.length + 1);
   let bytes = new Uint8Array(0);
@@ -726,55 +726,55 @@ export interface HostFunctionHooks {
 export class StoreDataEngine {
   private wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
-  private readonly storageOptions: SheetwriteStoreOptions;
+  private readonly storage_options: SheetwriteStoreOptions;
   /** Sheets and engine handles, shared with the store parts and the public store. */
   readonly sheets: SheetRegistry;
   private readonly styles = new StyleDictionary();
-  private readonly sheetIdsByHandle: SheetId[] = [];
+  private readonly sheet_ids_by_handle: SheetId[] = [];
   private readonly view: StoreViewState;
-  private readonly windowReader: StoreWindowReader;
-  private readonly snapshotCodec: StoreSnapshotCodec;
-  private readonly pagedDirtyPreflight: PagedDirtyPreflight | null;
-  private readonly boundaryAccounting = new BoundaryResourceAccounting();
-  private resourceOperation: RuntimeResourceOperation | null = "startup";
+  private readonly window_reader: StoreWindowReader;
+  private readonly snapshot_codec: StoreSnapshotCodec;
+  private readonly paged_dirty_preflight: PagedDirtyPreflight | null;
+  private readonly boundary_accounting = new BoundaryResourceAccounting();
+  private resource_operation: RuntimeResourceOperation | null = "startup";
   private disposed = false;
-  private committedBytesAfterDispose: number | null = null;
-  private readonly spillBlockersDirty = new Set<SheetId>();
+  private committed_bytes_after_dispose: number | null = null;
+  private readonly spill_blockers_dirty = new Set<SheetId>();
   /** Sheets whose pivots must be sent to the engine before the mutation commits. */
-  private readonly pivotSheetsDirty = new Set<SheetId>();
+  private readonly pivot_sheets_dirty = new Set<SheetId>();
   /**
    * The definitions the engine computes for a sheet's pivots, when they
    * differ from the saved ones. The dashboard chunk sets it to add slicer
    * filters, so first paint carries only this slot.
    */
-  private pivotView: ((sheet: Sheet) => PivotDefinition[] | undefined) | null = null;
+  private pivot_view: ((sheet: Sheet) => PivotDefinition[] | undefined) | null = null;
 
-  private readonly rangeHistory = new Map<
+  private readonly range_history = new Map<
     CompactRangeHistory,
     { sheetHandle: number; replace(resource: RangeSnapshot): void }
   >();
 
-  private pendingPageRequests = 0;
+  private pending_page_requests = 0;
 
-  private pageIdleWaiters: Array<() => void> | undefined;
+  private page_idle_waiters: Array<() => void> | undefined;
 
-  private readonly memoryReleaseListeners = new Set<() => void>();
-  private chartRecalculationTracked = false;
+  private readonly memory_release_listeners = new Set<() => void>();
+  private chart_recalculation_tracked = false;
   /** Rectangles the last engine commit reported; -1 asks for a conservative refresh. */
-  private recalculatedRectCount = -1;
-  /** Epoch of the commit whose report {@link chartRecalculation} holds. */
-  private chartRecalculationEpoch: number | undefined;
+  private recalculated_rect_count = -1;
+  /** Epoch of the commit whose report {@link chart_recalculation} holds. */
+  private chart_recalculation_epoch: number | undefined;
   /** That commit's rectangles; null when it must refresh conservatively. */
-  private chartRecalculation: Uint32Array | null = null;
+  private chart_recalculation: Uint32Array | null = null;
 
   /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
   hostFunctions: HostFunctionHooks | undefined;
 
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
-  private readonly authoritativeSnapshotSheets = new Set<SheetId>();
-  private snapshotAuthoritative = false;
+  private readonly authoritative_snapshot_sheets = new Set<SheetId>();
+  private snapshot_authoritative = false;
 
-  private readonly rangeMutationStats = {
+  private readonly range_mutation_stats = {
     documentOperations: 0,
     jsPatchObjects: 0,
     ffiCalls: 0,
@@ -800,7 +800,7 @@ export class StoreDataEngine {
     storageLimits: Readonly<StorageLimits> = DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   ) {
     if (!isLoaded()) {
-      throw storeFailure(
+      throw store_failure(
         "initialization-required",
         `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
       );
@@ -811,14 +811,14 @@ export class StoreDataEngine {
       (!Number.isSafeInteger(options.referenceSimulationLimit) ||
         options.referenceSimulationLimit <= 0)
     ) {
-      throw storeFailure(
+      throw store_failure(
         "invalid-argument",
         "Sheetwrite: referenceSimulationLimit must be a positive safe integer",
       );
     }
 
     if (data && options.storage === "paged") {
-      throw storeFailure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
+      throw store_failure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
 
     assertWorkbookTables(
@@ -831,118 +831,122 @@ export class StoreDataEngine {
 
     this.workbook = workbook;
     this.sheets = new SheetRegistry(workbook);
-    this.storageOptions = options;
+    this.storage_options = options;
     this.wasm = new (getEngine().CellStore)();
     this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
-    this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
+    this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, this.sheets);
-    this.windowReader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
-    this.snapshotCodec = new StoreSnapshotCodec(workbook, this.windowReader, this.sheetIdsByHandle);
-    this.pagedDirtyPreflight =
+    this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
+    this.snapshot_codec = new StoreSnapshotCodec(
+      workbook,
+      this.window_reader,
+      this.sheet_ids_by_handle,
+    );
+    this.paged_dirty_preflight =
       options.storage === "paged"
         ? new PagedDirtyPreflight(
             this.wasm,
             this.sheets,
-            this.sheetIdsByHandle,
-            this.rangeMutationStats,
-            this.boundaryAccounting,
+            this.sheet_ids_by_handle,
+            this.range_mutation_stats,
+            this.boundary_accounting,
             options.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
             options.referenceSimulationLimit ?? MAX_PAGED_REFERENCE_SIMULATION_ENTRIES,
           )
         : null;
 
     for (const sheet of workbook.sheets) {
-      const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "startup",
+      const handle = this.allocate_sheet(sheet.columns.length, sheet.rowCount);
+      this.boundary_accounting.record(
+        this.resource_operation ?? "startup",
         "js-to-wasm",
         (sheet.id.length + sheet.name.length) * 2,
         "scalar",
       );
       if (!this.wasm.setSheetName(handle, sheet.id, sheet.name)) {
         this.wasm.free();
-        throw storeFailure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
+        throw store_failure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
           sheet: sheet.id,
         });
       }
 
       this.sheets.handles.set(sheet.id, handle);
-      this.sheetIdsByHandle[handle] = sheet.id;
-      this.syncSpillBlockers(sheet);
+      this.sheet_ids_by_handle[handle] = sheet.id;
+      this.sync_spill_blockers(sheet);
       this.view.queueHiddenRows(sheet.id);
     }
 
     // Before any formula is loaded, so formulas find the links they read.
     if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
       this.wasm.free();
-      throw storeFailure("invalid-snapshot", "invalid external link values");
+      throw store_failure("invalid-snapshot", "invalid external link values");
     }
 
     // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
     this.view.flushHiddenRows();
     for (const sheet of workbook.sheets) {
       for (const table of sheet.tables ?? []) {
-        if (!this.syncTable(table)) {
+        if (!this.sync_table(table)) {
           this.wasm.free();
-          throw storeFailure("invalid-snapshot", `invalid workbook table: ${table.id}`, {
+          throw store_failure("invalid-snapshot", `invalid workbook table: ${table.id}`, {
             table: table.id,
           });
         }
       }
     }
 
-    for (const namedRange of workbook.namedRanges ?? []) {
-      if (!this.syncNamedRange(namedRange)) {
+    for (const named_range of workbook.namedRanges ?? []) {
+      if (!this.sync_named_range(named_range)) {
         this.wasm.free();
-        throw storeFailure("invalid-snapshot", `invalid named range: ${namedRange.name}`, {
-          name: namedRange.name,
+        throw store_failure("invalid-snapshot", `invalid named range: ${named_range.name}`, {
+          name: named_range.name,
         });
       }
     }
 
-    if (!this.syncRelationships(workbook.dataModel)) {
+    if (!this.sync_relationships(workbook.dataModel)) {
       this.wasm.free();
-      throw storeFailure("invalid-snapshot", "invalid data model");
+      throw store_failure("invalid-snapshot", "invalid data model");
     }
 
-    this.loadPivots();
+    this.load_pivots();
 
     // Before any cell is loaded, so formulas compute once under the stored limits.
     // Defaults need no engine call and are dropped to keep snapshots unchanged.
     const calculation = storedCalculationSettings(workbook.calculation);
     if (calculation === undefined) delete workbook.calculation;
-    else if (this.syncCalculation(calculation)) workbook.calculation = calculation;
+    else if (this.sync_calculation(calculation)) workbook.calculation = calculation;
     else {
       this.wasm.free();
-      throw storeFailure("invalid-snapshot", "invalid calculation settings");
+      throw store_failure("invalid-snapshot", "invalid calculation settings");
     }
 
     if (data) {
-      this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
+      this.withResourceOperation("ingest", () => this.load_columnar(workbook.activeSheet, data));
     } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
-      this.commitEngineSources();
+      this.commit_engine_sources();
     }
 
     // After the cells, because filters and sort keys read cell values.
     for (const sheet of workbook.sheets) this.view.sheetLoaded(sheet.id);
-    if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
+    if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
 
-    this.resourceOperation = null;
+    this.resource_operation = null;
   }
 
   /** Internal allocation counters for deterministic range-mutation gates. */
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
     return {
-      ...this.rangeMutationStats,
+      ...this.range_mutation_stats,
       styleDictionaryEntries: this.styles.table.length,
     };
   }
 
   resetRangeMutationAllocationStats(): void {
-    for (const key of Object.keys(this.rangeMutationStats) as Array<
-      keyof typeof this.rangeMutationStats
+    for (const key of Object.keys(this.range_mutation_stats) as Array<
+      keyof typeof this.range_mutation_stats
     >) {
-      this.rangeMutationStats[key] = 0;
+      this.range_mutation_stats[key] = 0;
     }
   }
 
@@ -953,7 +957,7 @@ export class StoreDataEngine {
   ): RuntimeResourceSnapshot {
     let wasm: StoreMemoryBreakdown;
     if (this.disposed) {
-      wasm = emptyStoreMemoryStats(this.committedBytesAfterDispose);
+      wasm = emptyStoreMemoryStats(this.committed_bytes_after_dispose);
     } else {
       const committed = this.wasm.wasmCommittedBytes();
       wasm = decodeStoreMemoryStats(this.wasm.memoryStats(), committed > 0 ? committed : null);
@@ -962,14 +966,14 @@ export class StoreDataEngine {
       operation,
       phase,
       wasm,
-      jsOwners: this.disposed ? [] : this.resourceOwners(),
-      boundary: this.boundaryAccounting.snapshot(),
+      jsOwners: this.disposed ? [] : this.resource_owners(),
+      boundary: this.boundary_accounting.snapshot(),
       runtime,
     });
   }
 
   resetRuntimeResourceAccounting(): void {
-    this.boundaryAccounting.reset();
+    this.boundary_accounting.reset();
   }
 
   getFormulaMatrixResourcePeak(): TransientResourcePeak {
@@ -993,16 +997,16 @@ export class StoreDataEngine {
   }
 
   withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
-    const previous = this.resourceOperation;
-    this.resourceOperation = operation;
+    const previous = this.resource_operation;
+    this.resource_operation = operation;
     try {
       return run();
     } finally {
-      this.resourceOperation = previous;
+      this.resource_operation = previous;
     }
   }
 
-  private resourceOwners(): ResourceOwnerBytes[] {
+  private resource_owners(): ResourceOwnerBytes[] {
     return [
       {
         owner: "js.store.sheet-handles",
@@ -1013,18 +1017,18 @@ export class StoreDataEngine {
       },
       ...this.styles.resourceOwners(),
       ...this.view.resourceOwners(),
-      ...this.windowReader.resourceOwners(),
+      ...this.window_reader.resourceOwners(),
     ];
   }
 
-  private recordWindowBoundary(
+  private record_window_boundary(
     window: VisibleWindowView,
-    fallbackOperation: RuntimeResourceOperation,
+    fallback_operation: RuntimeResourceOperation,
   ): void {
-    const operation = this.resourceOperation ?? fallbackOperation;
+    const operation = this.resource_operation ?? fallback_operation;
     const calls = window.ffiBoundaryCalls ?? window.ffiCalls ?? 0;
     const largest = window.ffiLargestTransferBytes ?? 0;
-    this.boundaryAccounting.record(
+    this.boundary_accounting.record(
       operation,
       "js-to-wasm",
       window.ffiInputBytes ?? 0,
@@ -1032,7 +1036,7 @@ export class StoreDataEngine {
       calls,
       largest,
     );
-    this.boundaryAccounting.record(
+    this.boundary_accounting.record(
       operation,
       "wasm-to-js",
       window.ffiOutputBytes ?? 0,
@@ -1042,36 +1046,36 @@ export class StoreDataEngine {
     );
   }
 
-  private noteRangeMutationFfi(transferredArrayLength = 0, transferredBytes?: number): void {
-    this.rangeMutationStats.ffiCalls += 1;
-    this.rangeMutationStats.maxTransferredArrayLength = Math.max(
-      this.rangeMutationStats.maxTransferredArrayLength,
-      transferredArrayLength,
+  private note_range_mutation_ffi(transferred_array_length = 0, transferred_bytes?: number): void {
+    this.range_mutation_stats.ffiCalls += 1;
+    this.range_mutation_stats.maxTransferredArrayLength = Math.max(
+      this.range_mutation_stats.maxTransferredArrayLength,
+      transferred_array_length,
     );
-    const bytes = transferredBytes ?? transferredArrayLength * Uint32Array.BYTES_PER_ELEMENT;
-    this.boundaryAccounting.record(
-      this.resourceOperation ?? "edit",
+    const bytes = transferred_bytes ?? transferred_array_length * Uint32Array.BYTES_PER_ELEMENT;
+    this.boundary_accounting.record(
+      this.resource_operation ?? "edit",
       "js-to-wasm",
       bytes,
-      transferredArrayLength > 0 ? "bulk" : "scalar",
+      transferred_array_length > 0 ? "bulk" : "scalar",
     );
   }
 
-  private syncSpillBlockers(sheet: Sheet): void {
+  private sync_spill_blockers(sheet: Sheet): void {
     const bounds: number[] = [];
     for (const merge of sheet.merges ?? []) {
       bounds.push(merge.r0, merge.c0, merge.r1, merge.c1);
     }
-    for (const protectedRange of sheet.protectedRanges ?? []) {
-      const range = normalizedRange(protectedRange.range);
+    for (const protected_range of sheet.protectedRanges ?? []) {
+      const range = normalizedRange(protected_range.range);
       bounds.push(range.start.row, range.start.col, range.end.row, range.end.col);
     }
-    for (const validationRule of sheet.validationRules ?? []) {
-      const range = normalizedRange(validationRule.range);
+    for (const validation_rule of sheet.validationRules ?? []) {
+      const range = normalizedRange(validation_rule.range);
       bounds.push(range.start.row, range.start.col, range.end.row, range.end.col);
     }
     if (!this.wasm.setSpillBlockers(this.sheets.handleOf(sheet.id), Uint32Array.from(bounds))) {
-      throw storeFailure(
+      throw store_failure(
         "resource-limit",
         `spill blocker resource limit exceeded for sheet: ${sheet.id}`,
         { sheet: sheet.id },
@@ -1079,24 +1083,24 @@ export class StoreDataEngine {
     }
   }
 
-  private flushSpillBlockers(): void {
-    for (const sheetId of this.spillBlockersDirty) {
-      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
-      if (sheet) this.syncSpillBlockers(sheet);
+  private flush_spill_blockers(): void {
+    for (const sheet_id of this.spill_blockers_dirty) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheet_id);
+      if (sheet) this.sync_spill_blockers(sheet);
     }
-    this.spillBlockersDirty.clear();
+    this.spill_blockers_dirty.clear();
   }
 
   /** Validate every loaded pivot against the whole workbook, then install them. */
-  private loadPivots(): void {
+  private load_pivots(): void {
     const ids = new Set<string>();
     for (const sheet of this.workbook.sheets) {
       for (const [index, pivot] of (sheet.pivots ?? []).entries()) {
-        const issues = this.pivotIssues(pivot, sheet, this.workbook.sheets);
+        const issues = this.pivot_issues(pivot, sheet, this.workbook.sheets);
         if (ids.has(pivot.id) || ids.size >= MAX_PIVOTS_PER_WORKBOOK || issues.length > 0) {
           this.wasm.free();
           const reason = issues[0]?.message ?? "Pivot IDs must be unique within the limit";
-          throw storeFailure(
+          throw store_failure(
             "invalid-snapshot",
             `invalid pivot ${sheet.id}.pivots[${index}]: ${reason}`,
             {
@@ -1107,11 +1111,11 @@ export class StoreDataEngine {
         }
         ids.add(pivot.id);
       }
-      if (sheet.pivots?.length) this.syncPivots(sheet);
+      if (sheet.pivots?.length) this.sync_pivots(sheet);
     }
   }
 
-  private pivotIssues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
+  private pivot_issues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
     const issues: PivotIssue[] = [];
     validatePivotShape(pivot, "pivot", issues);
     if (issues.length > 0) return issues;
@@ -1128,7 +1132,7 @@ export class StoreDataEngine {
   }
 
   /** The full engine gets every definition; the default engine only saved output. */
-  private syncPivots(sheet: Sheet, wasm: RecomputingCellStore = this.wasm): void {
+  private sync_pivots(sheet: Sheet, wasm: RecomputingCellStore = this.wasm): void {
     const pivots = sheet.pivots ?? [];
     if (!wasm.setPivots) {
       if (!wasm.setSavedPivots) {
@@ -1140,8 +1144,8 @@ export class StoreDataEngine {
       }
 
       const saved = encodeSavedPivotPayload(pivots);
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "edit",
+      this.boundary_accounting.record(
+        this.resource_operation ?? "edit",
         "js-to-wasm",
         saved.layout.byteLength +
           saved.kinds.byteLength +
@@ -1150,9 +1154,9 @@ export class StoreDataEngine {
         "bulk",
       );
       const handle = this.sheets.handleOf(sheet.id);
-      const { layout, kinds, numbers, text, textLengths } = saved;
-      if (!wasm.setSavedPivots(handle, layout, kinds, numbers, text, textLengths)) {
-        throw storeFailure(
+      const { layout, kinds, numbers, text, textLengths: text_lengths } = saved;
+      if (!wasm.setSavedPivots(handle, layout, kinds, numbers, text, text_lengths)) {
+        throw store_failure(
           "resource-limit",
           `saved pivot payload rejected for sheet: ${sheet.id}`,
           {
@@ -1164,17 +1168,17 @@ export class StoreDataEngine {
       return;
     }
 
-    const payload = encodePivotPayload(this.pivotView?.(sheet) ?? pivots, (id) =>
+    const payload = encodePivotPayload(this.pivot_view?.(sheet) ?? pivots, (id) =>
       this.sheets.handles.get(id),
     );
-    this.boundaryAccounting.record(
-      this.resourceOperation ?? "edit",
+    this.boundary_accounting.record(
+      this.resource_operation ?? "edit",
       "js-to-wasm",
       payload.numbers.byteLength,
       "bulk",
     );
     if (!wasm.setPivots(this.sheets.handleOf(sheet.id), payload.numbers, payload.strings)) {
-      throw storeFailure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
+      throw store_failure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
         sheet: sheet.id,
       });
     }
@@ -1194,26 +1198,26 @@ export class StoreDataEngine {
     view: (sheet: Sheet) => PivotDefinition[] | undefined,
     sheets: readonly SheetId[],
   ): void {
-    this.pivotView = view;
+    this.pivot_view = view;
     this.wasm.beginMutation();
     try {
-      for (const id of sheets) this.pivotSheetsDirty.add(id);
-      this.flushPivots();
+      for (const id of sheets) this.pivot_sheets_dirty.add(id);
+      this.flush_pivots();
     } finally {
-      this.commitEngineSources();
+      this.commit_engine_sources();
     }
   }
 
   /** Runs inside the mutation, so the engine renders pivots at the commit barrier. */
-  private flushPivots(): void {
-    for (const sheetId of this.pivotSheetsDirty) {
-      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
-      if (sheet) this.syncPivots(sheet);
+  private flush_pivots(): void {
+    for (const sheet_id of this.pivot_sheets_dirty) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheet_id);
+      if (sheet) this.sync_pivots(sheet);
     }
-    this.pivotSheetsDirty.clear();
+    this.pivot_sheets_dirty.clear();
   }
 
-  private admitsSourceRange(range: Range): boolean {
+  private admits_source_range(range: Range): boolean {
     const bounds = normalizedRange(range);
     return this.wasm.admitSourceRange(
       this.sheets.handleOf(bounds.sheet),
@@ -1224,25 +1228,25 @@ export class StoreDataEngine {
     );
   }
 
-  private captureSourceProjection(
+  private capture_source_projection(
     sheet: SheetId,
-    rowStart: number,
-    colStart: number,
+    row_start: number,
+    col_start: number,
     rows: number,
     cols: number,
   ): RangeSourceProjection | null {
-    this.noteRangeMutationFfi();
+    this.note_range_mutation_ffi();
     const snapshot = this.wasm.captureSources(
       this.sheets.handleOf(sheet),
-      rowStart,
-      colStart,
+      row_start,
+      col_start,
       rows,
       cols,
     );
-    return snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
+    return snapshot ? consumeSourceSnapshot(snapshot, this.sheet_ids_by_handle) : null;
   }
 
-  private namedRangeScope(scope: SheetId | undefined): number {
+  private named_range_scope(scope: SheetId | undefined): number {
     return scope === undefined ? -1 : this.sheets.handleOf(scope);
   }
 
@@ -1253,7 +1257,7 @@ export class StoreDataEngine {
    * false when the engine refuses them; an engine without the call keeps
    * them only in the workbook.
    */
-  private syncRelationships(
+  private sync_relationships(
     model: DataModel | undefined,
     wasm: RecomputingCellStore = this.wasm,
   ): boolean {
@@ -1277,7 +1281,7 @@ export class StoreDataEngine {
    * column or measure; see `renameStructuredReference`. A rename to the same
    * name is skipped. Returns `model` itself when no formula changes.
    */
-  private withRenames(
+  private with_renames(
     model: DataModel | undefined,
     renames: [table: string, column: string, to: string][],
   ): DataModel | undefined {
@@ -1294,17 +1298,17 @@ export class StoreDataEngine {
     return changed ? { relationships: cloneRelationships(model), measures } : model;
   }
 
-  private syncTable(table: WorkbookTable): boolean {
+  private sync_table(table: WorkbookTable): boolean {
     const range = normalizedRange(table.range);
-    const textBytes =
+    const text_bytes =
       (table.id.length +
         table.name.length +
         table.columns.reduce((total, column) => total + column.id.length + column.name.length, 0)) *
       2;
-    this.boundaryAccounting.record(
-      this.resourceOperation ?? "edit",
+    this.boundary_accounting.record(
+      this.resource_operation ?? "edit",
       "js-to-wasm",
-      textBytes,
+      text_bytes,
       "scalar",
     );
     return this.wasm.setTable(
@@ -1322,7 +1326,7 @@ export class StoreDataEngine {
     );
   }
 
-  private insertedTableColumns(
+  private inserted_table_columns(
     table: WorkbookTable,
     columns: readonly Column[],
   ): WorkbookTableColumn[] {
@@ -1330,28 +1334,28 @@ export class StoreDataEngine {
     const names = new Set(table.columns.map((column) => workbookTableNameKey(column.name)));
     return columns.map((column, index) => {
       const fallback = `Column${table.columns.length + index + 1}`;
-      const rawId = (column.key || fallback).normalize("NFC");
-      let id = rawId.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength);
+      const raw_id = (column.key || fallback).normalize("NFC");
+      let id = raw_id.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength);
       for (let suffix = 2; ids.has(workbookTableNameKey(id)); suffix++) {
         const marker = `_${suffix}`;
-        id = `${rawId.slice(
+        id = `${raw_id.slice(
           0,
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength - marker.length,
         )}${marker}`;
       }
 
       ids.add(workbookTableNameKey(id));
-      const normalizedHeader = (column.header || fallback).normalize("NFC");
-      const rawName =
-        /[[\],]/u.test(normalizedHeader) ||
-        normalizedHeader.startsWith("@") ||
-        normalizedHeader.startsWith("#")
+      const normalized_header = (column.header || fallback).normalize("NFC");
+      const raw_name =
+        /[[\],]/u.test(normalized_header) ||
+        normalized_header.startsWith("@") ||
+        normalized_header.startsWith("#")
           ? fallback
-          : normalizedHeader;
-      let name = rawName.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength);
+          : normalized_header;
+      let name = raw_name.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength);
       for (let suffix = 2; names.has(workbookTableNameKey(name)); suffix++) {
         const marker = `_${suffix}`;
-        name = `${rawName.slice(
+        name = `${raw_name.slice(
           0,
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength - marker.length,
         )}${marker}`;
@@ -1366,7 +1370,7 @@ export class StoreDataEngine {
    * Hand settings to the engine. Checked here first because the binding
    * truncates a fractional or out-of-range count to u32 instead of refusing it.
    */
-  private syncCalculation(calculation: CalculationSettings): boolean {
+  private sync_calculation(calculation: CalculationSettings): boolean {
     if (!isValidCalculationSettings(calculation)) return false;
 
     return this.wasm.setIterativeCalculation(
@@ -1376,27 +1380,27 @@ export class StoreDataEngine {
     );
   }
 
-  private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
-    const scope = this.namedRangeScope(namedRange.scope);
-    if (namedRange.range === undefined) {
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "edit",
+  private sync_named_range(named_range: NamedRangeSnapshot): boolean {
+    const scope = this.named_range_scope(named_range.scope);
+    if (named_range.range === undefined) {
+      this.boundary_accounting.record(
+        this.resource_operation ?? "edit",
         "js-to-wasm",
-        (namedRange.name.length + namedRange.formula.length) * 2,
+        (named_range.name.length + named_range.formula.length) * 2,
         "scalar",
       );
-      return this.wasm.setNamedFormula(namedRange.name, scope, namedRange.formula);
+      return this.wasm.setNamedFormula(named_range.name, scope, named_range.formula);
     }
 
-    const range = normalizedRange(namedRange.range);
-    this.boundaryAccounting.record(
-      this.resourceOperation ?? "edit",
+    const range = normalizedRange(named_range.range);
+    this.boundary_accounting.record(
+      this.resource_operation ?? "edit",
       "js-to-wasm",
-      namedRange.name.length * 2,
+      named_range.name.length * 2,
       "scalar",
     );
     return this.wasm.setNamedRange(
-      namedRange.name,
+      named_range.name,
       scope,
       this.sheets.handleOf(range.sheet),
       range.start.row,
@@ -1411,19 +1415,19 @@ export class StoreDataEngine {
    * rewrites them when a sheet is renamed or removed and when rows or
    * columns are added or removed.
    */
-  private refreshNamedFormulas(): void {
-    const namedRanges = this.workbook.namedRanges;
-    if (!namedRanges?.some((namedRange) => namedRange.formula !== undefined)) return;
+  private refresh_named_formulas(): void {
+    const named_ranges = this.workbook.namedRanges;
+    if (!named_ranges?.some((named_range) => named_range.formula !== undefined)) return;
 
-    this.workbook.namedRanges = namedRanges.map((namedRange) => {
-      if (namedRange.formula === undefined) return namedRange;
+    this.workbook.namedRanges = named_ranges.map((named_range) => {
+      if (named_range.formula === undefined) return named_range;
       const formula = this.wasm.namedFormulaSource(
-        namedRange.name,
-        this.namedRangeScope(namedRange.scope),
+        named_range.name,
+        this.named_range_scope(named_range.scope),
       );
-      return formula === undefined || formula === namedRange.formula
-        ? namedRange
-        : { ...namedRange, formula };
+      return formula === undefined || formula === named_range.formula
+        ? named_range
+        : { ...named_range, formula };
     });
   }
 
@@ -1446,7 +1450,7 @@ export class StoreDataEngine {
     const result = this.wasm.previewFormulaWith(
       target,
       text,
-      trialKind(trial),
+      trial_kind(trial),
       typeof trial === "number" ? trial : trial === true ? 1 : 0,
       typeof trial === "string" ? trial : "",
       fields,
@@ -1454,41 +1458,41 @@ export class StoreDataEngine {
     return decodePreview(fields, result);
   }
 
-  private validationReadsCache: StoreValidationReads | undefined;
+  private validation_reads_cache: StoreValidationReads | undefined;
 
   /** What data validation rules read from this store: formula results and list sources. */
   get validationReads(): ValidationReads {
-    this.validationReadsCache ??= storeValidationReads({
+    this.validation_reads_cache ??= storeValidationReads({
       workbook: () => this.workbook,
       // One window read of a list's source, kept out of the scroll counts.
       values: (sheet, rows, cols) =>
-        this.windowReader.read(sheet, rows, cols, undefined, false).values,
+        this.window_reader.read(sheet, rows, cols, undefined, false).values,
       previewFormula: (cell, text) => this.previewFormula(cell, text),
       previewFormulaWith: (cell, text, trial) => this.previewFormulaWith(cell, text, trial),
     });
-    return this.validationReadsCache;
+    return this.validation_reads_cache;
   }
 
-  private sameNamedRange(
-    namedRange: NamedRangeSnapshot,
+  private same_named_range(
+    named_range: NamedRangeSnapshot,
     name: string,
     scope: SheetId | undefined,
   ): boolean {
-    return formulaNameKey(namedRange.name) === formulaNameKey(name) && namedRange.scope === scope;
+    return formulaNameKey(named_range.name) === formulaNameKey(name) && named_range.scope === scope;
   }
 
-  private allocateSheet(columns: number, rows: number): number {
+  private allocate_sheet(columns: number, rows: number): number {
     const handle =
-      this.storageOptions.storage === "paged"
+      this.storage_options.storage === "paged"
         ? this.wasm.addPagedSheet(
             columns,
             rows,
-            this.storageOptions.chunkRows ?? DEFAULT_PAGED_CHUNK_ROWS,
-            this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
-            this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
+            this.storage_options.chunkRows ?? DEFAULT_PAGED_CHUNK_ROWS,
+            this.storage_options.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
+            this.storage_options.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
           )
         : this.wasm.addSheet(columns, rows);
-    this.boundaryAccounting.record(this.resourceOperation ?? "edit", "js-to-wasm", 0, "scalar");
+    this.boundary_accounting.record(this.resource_operation ?? "edit", "js-to-wasm", 0, "scalar");
     return handle;
   }
 
@@ -1516,7 +1520,11 @@ export class StoreDataEngine {
   queryCapability(sheet: SheetId): QueryCapability {
     const meta = this.sheets.sheetMeta(sheet);
     const stats = this.getPagedStats(sheet);
-    if (!this.isPaged(sheet) || stats.fullyLoaded || this.authoritativeSnapshotSheets.has(sheet)) {
+    if (
+      !this.isPaged(sheet) ||
+      stats.fullyLoaded ||
+      this.authoritative_snapshot_sheets.has(sheet)
+    ) {
       return { status: "complete" };
     }
     return {
@@ -1572,7 +1580,7 @@ export class StoreDataEngine {
 
   /** Clean-chunk cache budget of each paged sheet, in bytes. */
   pagedCacheBytes(): number {
-    return this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES;
+    return this.storage_options.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES;
   }
 
   /**
@@ -1606,7 +1614,7 @@ export class StoreDataEngine {
 
   canApplyLocally(patch: DocumentOp): boolean {
     if (patch.op === "moveCells") {
-      return movedCellBounds(patch).every((range) => this.blockLoaded(range));
+      return movedCellBounds(patch).every((range) => this.block_loaded(range));
     }
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -1633,7 +1641,7 @@ export class StoreDataEngine {
   }
 
   pagedDirtyCapacityIssue(patches: readonly DocumentOp[]): MutationIssue | null {
-    return this.pagedDirtyPreflight?.issue(patches, this.resourceOperation) ?? null;
+    return this.paged_dirty_preflight?.issue(patches, this.resource_operation) ?? null;
   }
 
   /** Throw `IncompleteDataError` while a paged sheet has unloaded cells a query would need. */
@@ -1642,7 +1650,7 @@ export class StoreDataEngine {
     if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
   }
 
-  private isCellInBounds(addr: CellAddress): boolean {
+  private is_cell_in_bounds(addr: CellAddress): boolean {
     const meta = this.workbook.sheets.find((s) => s.id === addr.sheet);
     return (
       meta !== undefined &&
@@ -1673,45 +1681,45 @@ export class StoreDataEngine {
 
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
-    this.noteRangeMutationFfi();
-    const capturedResource = this.wasm.captureRange(
+    this.note_range_mutation_ffi();
+    const captured_resource = this.wasm.captureRange(
       this.sheets.handleOf(range.sheet),
       range.start.row,
       range.start.col,
       rows,
       cols,
     );
-    if (!capturedResource) return null;
+    if (!captured_resource) return null;
 
-    let resource: RangeSnapshot = capturedResource;
-    this.rangeMutationStats.historySnapshots += 1;
-    this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
+    let resource: RangeSnapshot = captured_resource;
+    this.range_mutation_stats.historySnapshots += 1;
+    this.range_mutation_stats.historySnapshotBytes += resource.byteLength();
 
-    const formulaCoordinates = resource.formulaOffsets();
-    const formulaSources = resource.formulaSources();
-    const formulas: Array<[number, string]> = new Array(formulaSources.length);
-    for (let index = 0; index < formulaSources.length; index++) {
+    const formula_coordinates = resource.formulaOffsets();
+    const formula_sources = resource.formulaSources();
+    const formulas: Array<[number, string]> = new Array(formula_sources.length);
+    for (let index = 0; index < formula_sources.length; index++) {
       const coordinate = index * 2;
       formulas[index] = [
-        formulaCoordinates[coordinate]! * cols + formulaCoordinates[coordinate + 1]!,
-        formulaSources[index]!,
+        formula_coordinates[coordinate]! * cols + formula_coordinates[coordinate + 1]!,
+        formula_sources[index]!,
       ];
     }
 
-    const referenceCoordinates = resource.referenceOffsets();
-    const referenceTargets = resource.referenceTargets();
-    const refs: Array<[number, CellAddress]> = new Array(referenceCoordinates.length / 2);
+    const reference_coordinates = resource.referenceOffsets();
+    const reference_targets = resource.referenceTargets();
+    const refs: Array<[number, CellAddress]> = new Array(reference_coordinates.length / 2);
     for (let index = 0; index < refs.length; index++) {
       const coordinate = index * 2;
-      const packedTarget = referenceTargets.subarray(index * 3, index * 3 + 3);
-      const target = referenceTargetFromPacked(packedTarget, this.sheetIdsByHandle);
+      const packed_target = reference_targets.subarray(index * 3, index * 3 + 3);
+      const target = referenceTargetFromPacked(packed_target, this.sheet_ids_by_handle);
       if (!target) {
         resource.free();
         throw new Error("history snapshot contains an unknown reference target");
       }
 
       refs[index] = [
-        referenceCoordinates[coordinate]! * cols + referenceCoordinates[coordinate + 1]!,
+        reference_coordinates[coordinate]! * cols + reference_coordinates[coordinate + 1]!,
         target,
       ];
     }
@@ -1728,27 +1736,27 @@ export class StoreDataEngine {
       refs,
       toDocumentOp: (target, preparation) => {
         if (disposed) throw new Error("history range snapshot already disposed");
-        this.rangeMutationStats.historyMaterializations += 1;
+        this.range_mutation_stats.historyMaterializations += 1;
 
-        const kindsColumnMajor = resource.kinds();
-        const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
-        const textsColumnMajor = kindsColumnMajor.includes(KIND_STRING)
+        const kinds_column_major = resource.kinds();
+        const numbers_column_major = this.wasm.snapshotNumbers(resource);
+        const texts_column_major = kinds_column_major.includes(KIND_STRING)
           ? this.wasm.snapshotTexts(resource)
           : undefined;
-        const stylesColumnMajor = resource.styleIds();
+        const styles_column_major = resource.styleIds();
 
         const values: CellScalar[] = new Array(rows * cols);
-        const styleIds: number[] = new Array(rows * cols);
-        const styleTable: CellStyle[] = [];
-        const styleLookup = new Map<number, number>();
+        const style_ids: number[] = new Array(rows * cols);
+        const style_table: CellStyle[] = [];
+        const style_lookup = new Map<number, number>();
 
         for (let col = 0; col < cols; col++) {
           for (let row = 0; row < rows; row++) {
             const source = col * rows + row;
             const offset = row * cols + col;
-            const kind = kindsColumnMajor[source]!;
-            const number = numbersColumnMajor[source]!;
-            const text = textsColumnMajor?.[source] ?? "";
+            const kind = kinds_column_major[source]!;
+            const number = numbers_column_major[source]!;
+            const text = texts_column_major?.[source] ?? "";
             values[offset] =
               kind === KIND_NUMBER
                 ? number
@@ -1757,15 +1765,15 @@ export class StoreDataEngine {
                   : kind === KIND_STRING
                     ? text
                     : null;
-            const storeStyleId = stylesColumnMajor[source]!;
-            let tableId = styleLookup.get(storeStyleId);
-            if (tableId === undefined) {
-              tableId = styleTable.length;
-              styleLookup.set(storeStyleId, tableId);
-              styleTable.push({ ...this.styles.get(storeStyleId) });
+            const store_style_id = styles_column_major[source]!;
+            let table_id = style_lookup.get(store_style_id);
+            if (table_id === undefined) {
+              table_id = style_table.length;
+              style_lookup.set(store_style_id, table_id);
+              style_table.push({ ...this.styles.get(store_style_id) });
             }
 
-            styleIds[offset] = tableId;
+            style_ids[offset] = table_id;
           }
         }
 
@@ -1775,8 +1783,8 @@ export class StoreDataEngine {
           values,
           formulas: formulas.length > 0 ? formulas : undefined,
           refs: refs.length > 0 ? refs.map(([offset, ref]) => [offset, { ...ref }]) : undefined,
-          styleTable,
-          styleIds,
+          styleTable: style_table,
+          styleIds: style_ids,
         };
 
         const operation: Extract<DocumentOp, { op: "setBlock" }> = {
@@ -1792,7 +1800,7 @@ export class StoreDataEngine {
             bounds.end.col - bounds.start.col + 1 !== cols
           )
             return false;
-          this.noteRangeMutationFfi();
+          this.note_range_mutation_ffi();
           return this.wasm.restoreRange(
             this.sheets.handleOf(bounds.sheet),
             bounds.start.row,
@@ -1807,12 +1815,12 @@ export class StoreDataEngine {
         if (disposed) return;
         disposed = true;
         resource.free();
-        this.rangeHistory.delete(history);
-        this.rangeMutationStats.historyDisposals += 1;
+        this.range_history.delete(history);
+        this.range_mutation_stats.historyDisposals += 1;
       },
     };
 
-    this.rangeHistory.set(history, {
+    this.range_history.set(history, {
       sheetHandle: this.sheets.handleOf(range.sheet),
       replace: (replacement) => {
         const previous = resource;
@@ -1869,14 +1877,14 @@ export class StoreDataEngine {
     return this.workbook;
   }
 
-  private pivotCount(): number {
+  private pivot_count(): number {
     let count = 0;
     for (const sheet of this.workbook.sheets) count += sheet.pivots?.length ?? 0;
     return count;
   }
 
   /** Status record of the pivot at `index` on `sheet`, or null without engine support. */
-  private pivotStatusRecord(sheet: SheetId, index: number): PivotStatusRecord | null {
+  private pivot_status_record(sheet: SheetId, index: number): PivotStatusRecord | null {
     if (!this.wasm.pivotStatus) return null;
     return pivotStatusAt(this.wasm.pivotStatus(this.sheets.handleOf(sheet)), index);
   }
@@ -1890,7 +1898,7 @@ export class StoreDataEngine {
   pivotOutputs(sheet: SheetId): Array<{ id: string; range: Range }> {
     const pivots = this.workbook.sheets.find((candidate) => candidate.id === sheet)?.pivots;
     if (!pivots?.length) return [];
-    if (!this.wasm.pivotStatus) return this.savedPivotOutputs(sheet, pivots);
+    if (!this.wasm.pivotStatus) return this.saved_pivot_outputs(sheet, pivots);
 
     const status = this.wasm.pivotStatus(this.sheets.handleOf(sheet));
     const outputs: Array<{ id: string; range: Range }> = [];
@@ -1909,7 +1917,7 @@ export class StoreDataEngine {
     return outputs;
   }
 
-  private savedPivotOutputs(
+  private saved_pivot_outputs(
     sheet: SheetId,
     pivots: readonly PivotDefinition[],
   ): Array<{ id: string; range: Range }> {
@@ -1930,7 +1938,7 @@ export class StoreDataEngine {
   getRelationshipStatus(id: string): RelationshipStatus {
     const record = this.wasm.relationshipStatus?.(id);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
-    return relationshipStatusOf(record);
+    return relationship_status_of(record);
   }
 
   /**
@@ -1943,7 +1951,7 @@ export class StoreDataEngine {
     const pivot = pivots[index];
     if (!pivot) return null;
 
-    const record = this.pivotStatusRecord(sheet, index);
+    const record = this.pivot_status_record(sheet, index);
     if (!record) {
       const result = uncomputedPivotResult(sheet, pivot);
       if (!pivot.savedOutput) return result;
@@ -1968,7 +1976,7 @@ export class StoreDataEngine {
 
     const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
     // A dashboard has no cells: its view reads the output with `pivotOutputCells`.
-    const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
+    const cells = isDashboard(owner) ? [] : this.pivot_window_cells(sheet, record);
     return {
       status: "ok",
       anchor: { sheet, row: record.row, col: record.col },
@@ -1981,7 +1989,7 @@ export class StoreDataEngine {
   }
 
   /** Output cells that a worksheet pivot placed, read from the sheet. */
-  private pivotWindowCells(sheet: SheetId, record: PivotStatusRecord): CellScalar[] {
+  private pivot_window_cells(sheet: SheetId, record: PivotStatusRecord): CellScalar[] {
     const cols = Array.from({ length: record.cols }, (_, offset) => record.col + offset);
     const window = this.getDataWindow(
       sheet,
@@ -2035,7 +2043,7 @@ export class StoreDataEngine {
 
   getCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.sheets.handleOf(addr.sheet), addr.row, addr.col);
-    const resolved = resolvedScalar(cell.kind, cell.num, cell.string ?? null);
+    const resolved = resolved_scalar(cell.kind, cell.num, cell.string ?? null);
     const style = this.styles.get(cell.style);
     cell.free();
     return { resolved, style };
@@ -2065,20 +2073,20 @@ export class StoreDataEngine {
   getRefTarget(addr: CellAddress): CellAddress | null {
     return referenceTargetFromPacked(
       this.wasm.referenceTarget(this.sheets.handleOf(addr.sheet), addr.row, addr.col),
-      this.sheetIdsByHandle,
+      this.sheet_ids_by_handle,
     );
   }
 
   recomputeVolatile(now: Date): void {
     const milliseconds = now.getTime();
     if (!Number.isFinite(milliseconds)) {
-      throw storeFailure("invalid-argument", "invalid volatile recalculation date");
+      throw store_failure("invalid-argument", "invalid volatile recalculation date");
     }
     // A list source may hold a volatile formula.
-    this.validationReadsCache?.invalidate();
+    this.validation_reads_cache?.invalidate();
     this.wasm.recomputeVolatile(dateToSerial(now));
-    if (this.chartRecalculationTracked)
-      this.recalculatedRectCount = this.wasm.recalculatedRectCount();
+    if (this.chart_recalculation_tracked)
+      this.recalculated_rect_count = this.wasm.recalculatedRectCount();
   }
 
   /**
@@ -2106,8 +2114,8 @@ export class StoreDataEngine {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
-    const window = this.windowReader.read(sheet, rows, cols, this.view.order(sheet), true);
-    this.recordWindowBoundary(window, "scroll");
+    const window = this.window_reader.read(sheet, rows, cols, this.view.order(sheet), true);
+    this.record_window_boundary(window, "scroll");
     return window;
   }
 
@@ -2116,8 +2124,8 @@ export class StoreDataEngine {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
-    const window = this.windowReader.read(sheet, rows, cols, undefined, false);
-    this.recordWindowBoundary(window, "scroll");
+    const window = this.window_reader.read(sheet, rows, cols, undefined, false);
+    this.record_window_boundary(window, "scroll");
     return window;
   }
 
@@ -2129,29 +2137,29 @@ export class StoreDataEngine {
   ): ClipboardWindowView {
     // Data rows read in sheet order, past the rows the view hides.
     const order = options?.dataRows ? undefined : this.view.order(sheet);
-    const clippedEnd = order ? Math.min(viewRows.end, order.length) : viewRows.end;
-    const rowCount = Math.max(0, clippedEnd - viewRows.start);
-    const dataRows = new Uint32Array(rowCount);
+    const clipped_end = order ? Math.min(viewRows.end, order.length) : viewRows.end;
+    const row_count = Math.max(0, clipped_end - viewRows.start);
+    const data_rows = new Uint32Array(row_count);
     if (order) {
-      dataRows.set(order.subarray(viewRows.start, clippedEnd));
+      data_rows.set(order.subarray(viewRows.start, clipped_end));
     } else {
-      for (let index = 0; index < rowCount; index++) dataRows[index] = viewRows.start + index;
+      for (let index = 0; index < row_count; index++) data_rows[index] = viewRows.start + index;
     }
 
-    const window = this.windowReader.read(
+    const window = this.window_reader.read(
       sheet,
-      { start: viewRows.start, end: clippedEnd },
+      { start: viewRows.start, end: clipped_end },
       cols,
       order,
       false,
     );
-    this.recordWindowBoundary(window, "export");
+    this.record_window_boundary(window, "export");
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
-    const sourceSnapshot = this.windowReader.captureSourcesForRows(sheet, dataRows, cols);
-    const spillDerived = sourceSnapshot?.spillDerived() ?? new Uint8Array();
-    if (sourceSnapshot) {
-      const sources = consumeSourceSnapshot(sourceSnapshot, this.sheetIdsByHandle);
+    const source_snapshot = this.window_reader.captureSourcesForRows(sheet, data_rows, cols);
+    const spill_derived = source_snapshot?.spillDerived() ?? new Uint8Array();
+    if (source_snapshot) {
+      const sources = consumeSourceSnapshot(source_snapshot, this.sheet_ids_by_handle);
       for (let index = 0; index < sources.formulaOffsets.length; index++) {
         formulas.push({
           offset: sources.formulaOffsets[index]!,
@@ -2168,24 +2176,24 @@ export class StoreDataEngine {
 
     return {
       sheet,
-      viewRows: { start: viewRows.start, end: clippedEnd },
-      dataRows,
+      viewRows: { start: viewRows.start, end: clipped_end },
+      dataRows: data_rows,
       cols,
       values: window.values,
       styleIds: window.styleIds,
       styles: window.styles,
-      spillDerived,
+      spillDerived: spill_derived,
       formulas,
       refs,
-      ffiCalls: (window.ffiCalls ?? 0) + (sourceSnapshot ? 2 : 1),
+      ffiCalls: (window.ffiCalls ?? 0) + (source_snapshot ? 2 : 1),
       transferredElements:
         window.values.length +
         window.styleIds.length +
-        dataRows.length +
+        data_rows.length +
         window.styles.length +
         formulas.length * 2 +
         refs.length * 4 +
-        spillDerived.length,
+        spill_derived.length,
     };
   }
 
@@ -2193,15 +2201,15 @@ export class StoreDataEngine {
    * Close the engine mutation. The engine returns the size of its chart
    * recalculation report with it, so a commit costs no extra boundary call.
    */
-  private commitEngineSources(): void {
-    this.recalculatedRectCount = this.wasm.commitSources();
+  private commit_engine_sources(): void {
+    this.recalculated_rect_count = this.wasm.commitSources();
   }
 
   /** Keep one bounded engine report per commit only while charts are observed. */
   trackChartRecalculation(enabled: boolean): void {
-    this.chartRecalculationTracked = enabled;
-    this.chartRecalculationEpoch = undefined;
-    this.chartRecalculation = null;
+    this.chart_recalculation_tracked = enabled;
+    this.chart_recalculation_epoch = undefined;
+    this.chart_recalculation = null;
     this.wasm.setRecalculationTracking(enabled);
   }
 
@@ -2210,11 +2218,11 @@ export class StoreDataEngine {
    * listener that commits again replaces it with its own commit's report.
    */
   captureChartRecalculation(epoch: number | undefined): void {
-    if (!this.chartRecalculationTracked) return;
-    const count = this.recalculatedRectCount;
-    this.chartRecalculationEpoch = epoch;
+    if (!this.chart_recalculation_tracked) return;
+    const count = this.recalculated_rect_count;
+    this.chart_recalculation_epoch = epoch;
     // An event without an epoch cannot be matched to its report later.
-    this.chartRecalculation =
+    this.chart_recalculation =
       epoch === undefined || count < 0
         ? null
         : count === 0
@@ -2230,12 +2238,12 @@ export class StoreDataEngine {
    * {@link sheetIdOfHandle}.
    */
   recalculatedRects(epoch: number | undefined): Uint32Array | null {
-    return epoch === this.chartRecalculationEpoch ? this.chartRecalculation : null;
+    return epoch === this.chart_recalculation_epoch ? this.chart_recalculation : null;
   }
 
   /** The sheet an engine handle names, or undefined for a removed sheet. */
   sheetIdOfHandle(handle: number): SheetId | undefined {
-    return this.sheetIdsByHandle[handle];
+    return this.sheet_ids_by_handle[handle];
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
@@ -2382,14 +2390,14 @@ export class StoreDataEngine {
 
     const additions = columns.slice(meta.columns.length);
     if (!this.wasm.insertCols(this.sheets.handleOf(sheet), meta.columns.length, additions.length)) {
-      throw storeFailure("resource-limit", "the engine cannot hold the added columns");
+      throw store_failure("resource-limit", "the engine cannot hold the added columns");
     }
     meta.columns.push(...additions);
   }
 
   /** Persisted cells only: empty space and unstyled spill children need no history payload. */
   captureSheetCells(sheet: SheetId): SnapshotCell[] {
-    const captured = this.windowReader.capturePersistedCells(sheet);
+    const captured = this.window_reader.capturePersistedCells(sheet);
     const formulas = new Map<number, string>();
     const references = new Map<number, CellAddress>();
     for (const [index, offset] of captured.formulaOffsets.entries()) {
@@ -2401,7 +2409,7 @@ export class StoreDataEngine {
     for (const [index, offset] of captured.referenceOffsets.entries()) {
       const target = referenceTargetFromPacked(
         captured.referenceTargets.subarray(index * 3, index * 3 + 3),
-        this.sheetIdsByHandle,
+        this.sheet_ids_by_handle,
       );
       if (!target) throw new Error("Missing persisted reference target");
 
@@ -2448,7 +2456,7 @@ export class StoreDataEngine {
     const metadata = this.sheets.sheetMeta(sheet);
     if (metadata.rowCount === 0 || metadata.columns.length === 0) return null;
 
-    return this.captureSourceProjection(sheet, 0, 0, metadata.rowCount, metadata.columns.length);
+    return this.capture_source_projection(sheet, 0, 0, metadata.rowCount, metadata.columns.length);
   }
 
   /** Whether a rectangular write would include a derived spill child. */
@@ -2459,13 +2467,13 @@ export class StoreDataEngine {
       (_, index) => bounds.start.col + index,
     );
 
-    return this.windowReader
+    return this.window_reader
       .spillDerivedMask(bounds.sheet, { start: bounds.start.row, end: bounds.end.row + 1 }, columns)
       .some((derived) => derived !== 0);
   }
 
   /**
-   * Cells, at their address before the move, whose formula a `permuteRows`
+   * Cells, at their address before the move, whose formula a `permute_rows`
    * operation adjusts in a way that its inverse cannot undo. History captures
    * them before the operation applies.
    */
@@ -2508,7 +2516,7 @@ export class StoreDataEngine {
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
-      const sheet = this.sheetIdsByHandle[triples[index] ?? -1];
+      const sheet = this.sheet_ids_by_handle[triples[index] ?? -1];
       const row = triples[index + 1];
       const col = triples[index + 2];
       if (sheet !== undefined && row !== undefined && col !== undefined) {
@@ -2527,8 +2535,8 @@ export class StoreDataEngine {
     const move = cellBlockMove(patch);
     const { from, to } = move;
     const handle = this.sheets.handles.get(from.sheet);
-    const toHandle = this.sheets.handles.get(to.sheet);
-    if (handle === undefined || toHandle === undefined) return [];
+    const to_handle = this.sheets.handles.get(to.sheet);
+    if (handle === undefined || to_handle === undefined) return [];
 
     const triples = this.wasm.moveCellsLosses(
       handle,
@@ -2536,14 +2544,14 @@ export class StoreDataEngine {
       from.start.col,
       from.end.row - from.start.row + 1,
       from.end.col - from.start.col + 1,
-      toHandle,
+      to_handle,
       to.start.row,
       to.start.col,
       move.shift,
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
-      const sheet = this.sheetIdsByHandle[triples[index] ?? -1];
+      const sheet = this.sheet_ids_by_handle[triples[index] ?? -1];
       const row = triples[index + 1];
       const col = triples[index + 2];
       if (sheet !== undefined && row !== undefined && col !== undefined) {
@@ -2582,7 +2590,7 @@ export class StoreDataEngine {
   }
 
   /**
-   * The plan that sorts the data rows of `range` by `keys`: a `permuteRows`
+   * The plan that sorts the data rows of `range` by `keys`: a `permute_rows`
    * operation, no change, or Excel's refusal. Rows that are hidden or
    * filtered out keep their place, as in Excel; the others take the sorted
    * order among the visible positions. Keys are columns inside the range.
@@ -2590,26 +2598,26 @@ export class StoreDataEngine {
   sortRangePlan(range: Range, keys: readonly SortKey[], hasHeader: boolean): SortRangePlan {
     const bounds = normalizedRange(range);
     const sheet = this.sheets.sheetMeta(bounds.sheet);
-    const dataStart = bounds.start.row + (hasHeader ? 1 : 0);
-    const keysInside = keys.every(
+    const data_start = bounds.start.row + (hasHeader ? 1 : 0);
+    const keys_inside = keys.every(
       (key) => integerAt(key.col) && key.col >= bounds.start.col && key.col <= bounds.end.col,
     );
     if (
       keys.length === 0 ||
-      !keysInside ||
+      !keys_inside ||
       bounds.start.row < 0 ||
       bounds.start.col < 0 ||
       bounds.end.row >= sheet.rowCount ||
       bounds.end.col >= sheet.columns.length ||
-      dataStart > bounds.end.row
+      data_start > bounds.end.row
     ) {
       return { kind: "unchanged" };
     }
 
-    const height = this.recordHeight(sheet, bounds, dataStart);
+    const height = this.record_height(sheet, bounds, data_start);
     if (height === null) return { kind: "refused", message: MERGED_CELLS_SORT_MESSAGE };
 
-    const starts = this.visibleRecordStarts(bounds.sheet, dataStart, bounds.end.row, height);
+    const starts = this.visible_record_starts(bounds.sheet, data_start, bounds.end.row, height);
     if (starts.length < 2) return { kind: "unchanged" };
 
     const sorted = this.wasm.sortRowsMulti(
@@ -2618,27 +2626,27 @@ export class StoreDataEngine {
       Uint8Array.from(keys, (key) => (key.ascending ? 1 : 0)),
       starts,
     );
-    const order = new Uint32Array(bounds.end.row - dataStart + 1);
+    const order = new Uint32Array(bounds.end.row - data_start + 1);
     for (let offset = 0; offset < order.length; offset++) order[offset] = offset;
     for (const [position, target] of starts.entries()) {
       const source = sorted[position] ?? target;
       for (let row = 0; row < height; row++) {
-        order[target - dataStart + row] = source - dataStart + row;
+        order[target - data_start + row] = source - data_start + row;
       }
     }
 
-    const sortedRange: Range = {
+    const sorted_range: Range = {
       sheet: bounds.sheet,
-      start: { row: dataStart, col: bounds.start.col },
+      start: { row: data_start, col: bounds.start.col },
       end: { row: bounds.end.row, col: bounds.end.col },
     };
     const permute: PermuteRowsOperation = {
       op: "permuteRows",
-      range: sortedRange,
+      range: sorted_range,
       encoding: ROW_ORDER_ENCODING,
       order: encodeRowOrder(order),
     };
-    const table = tableWithBody(sheet.tables ?? [], sortedRange);
+    const table = tableWithBody(sheet.tables ?? [], sorted_range);
     const operations: DocumentOp[] = table
       ? [
           permute,
@@ -2646,7 +2654,7 @@ export class StoreDataEngine {
             op: "updateTable",
             sheet: bounds.sheet,
             tableId: table.id,
-            patch: { sortState: tableSortState(sortedRange, keys) },
+            patch: { sortState: tableSortState(sorted_range, keys) },
           },
         ]
       : [permute];
@@ -2657,7 +2665,7 @@ export class StoreDataEngine {
    * Visible rows from `first` to `last` that start a record of `height`
    * rows, in sheet order. A record is visible when its first row is.
    */
-  private visibleRecordStarts(
+  private visible_record_starts(
     sheet: SheetId,
     first: number,
     last: number,
@@ -2683,33 +2691,33 @@ export class StoreDataEngine {
    * make records of their height, which sort as units. Microsoft Learn, "An
    * error message when you sort a range that contains merged cells in Excel".
    */
-  private recordHeight(sheet: Sheet, bounds: Range, dataStart: number): number | null {
+  private record_height(sheet: Sheet, bounds: Range, data_start: number): number | null {
     const merges = (sheet.merges ?? []).filter(
       (merge) =>
         merge.r0 <= bounds.end.row &&
-        merge.r1 >= dataStart &&
+        merge.r1 >= data_start &&
         merge.c0 <= bounds.end.col &&
         merge.c1 >= bounds.start.col,
     );
     const [first] = merges;
     if (!first) return 1;
 
-    const rows = bounds.end.row - dataStart + 1;
+    const rows = bounds.end.row - data_start + 1;
     const height = first.r1 - first.r0 + 1;
     const width = first.c1 - first.c0 + 1;
     if (rows % height !== 0) return null;
 
-    const recordColumns = new Set<number>();
+    const record_columns = new Set<number>();
     for (const merge of merges) {
-      const sameSize = merge.r1 - merge.r0 + 1 === height && merge.c1 - merge.c0 + 1 === width;
+      const same_size = merge.r1 - merge.r0 + 1 === height && merge.c1 - merge.c0 + 1 === width;
       const inside =
-        merge.r0 >= dataStart && merge.c0 >= bounds.start.col && merge.c1 <= bounds.end.col;
-      if (!sameSize || !inside || (merge.r0 - dataStart) % height !== 0) return null;
-      recordColumns.add(merge.c0);
+        merge.r0 >= data_start && merge.c0 >= bounds.start.col && merge.c1 <= bounds.end.col;
+      if (!same_size || !inside || (merge.r0 - data_start) % height !== 0) return null;
+      record_columns.add(merge.c0);
     }
 
-    const everyRecordMerged = merges.length === (rows / height) * recordColumns.size;
-    return everyRecordMerged ? height : null;
+    const every_record_merged = merges.length === (rows / height) * record_columns.size;
+    return every_record_merged ? height : null;
   }
 
   /**
@@ -2723,7 +2731,7 @@ export class StoreDataEngine {
   ): Array<ResolvedCell & { value: CellValue; isSpillChild: boolean }> {
     if (coordinates.length === 0) return [];
 
-    const resolved = this.captureSparseBeforeCells(
+    const resolved = this.capture_sparse_before_cells(
       { sheet, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
       coordinates.map(({ row, col }) => ({ rowOffset: row, colOffset: col })),
     );
@@ -2733,12 +2741,12 @@ export class StoreDataEngine {
       isSpillChild: false,
     }));
 
-    const byRow = new Map<number, Map<number, number[]>>();
+    const by_row = new Map<number, Map<number, number[]>>();
     for (const [index, coordinate] of coordinates.entries()) {
-      let columns = byRow.get(coordinate.row);
+      let columns = by_row.get(coordinate.row);
       if (!columns) {
         columns = new Map();
-        byRow.set(coordinate.row, columns);
+        by_row.set(coordinate.row, columns);
       }
 
       const indices = columns.get(coordinate.col) ?? [];
@@ -2747,7 +2755,7 @@ export class StoreDataEngine {
     }
 
     const groups = new Map<string, { rows: number[]; cols: number[] }>();
-    for (const [row, columns] of byRow) {
+    for (const [row, columns] of by_row) {
       const cols = [...columns.keys()].sort((left, right) => left - right);
       const key = cols.join(",");
       const group = groups.get(key);
@@ -2756,29 +2764,33 @@ export class StoreDataEngine {
     }
 
     for (const { rows, cols } of groups.values()) {
-      const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
+      const snapshot = this.window_reader.captureSourcesForRows(
+        sheet,
+        Uint32Array.from(rows),
+        cols,
+      );
       if (!snapshot) continue;
 
-      const spillDerived = snapshot.spillDerived();
-      const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
-      for (const [rowIndex, row] of rows.entries()) {
-        const columns = byRow.get(row);
+      const spill_derived = snapshot.spillDerived();
+      const sources = consumeSourceSnapshot(snapshot, this.sheet_ids_by_handle);
+      for (const [row_index, row] of rows.entries()) {
+        const columns = by_row.get(row);
         if (!columns) throw new Error("Missing row in cell capture");
 
-        for (const [colIndex, col] of cols.entries()) {
-          const offset = rowIndex * cols.length + colIndex;
+        for (const [col_index, col] of cols.entries()) {
+          const offset = row_index * cols.length + col_index;
           const formula = sources.formulaAt(offset);
           const reference = sources.referenceAt(offset);
           for (const index of columns.get(col) ?? []) {
             const cell = captured[index];
             if (!cell) throw new Error("Missing resolved cell in cell capture");
 
-            cell.isSpillChild = Boolean(spillDerived[offset]);
+            cell.isSpillChild = Boolean(spill_derived[offset]);
             cell.value = formula
               ? { kind: "formula", src: formula }
               : reference
                 ? { kind: "ref", target: reference }
-                : { kind: "literal", value: spillDerived[offset] ? null : cell.resolved };
+                : { kind: "literal", value: spill_derived[offset] ? null : cell.resolved };
           }
         }
       }
@@ -2799,9 +2811,9 @@ export class StoreDataEngine {
       columns[index] = cell.col;
     }
 
-    return consumeCellSnapshots(
+    return consume_cell_snapshots(
       this.wasm.cellSnapshots(this.sheets.handleOf(sheet), rows, columns),
-      (styleId) => this.styles.get(styleId),
+      (style_id) => this.styles.get(style_id),
     );
   }
 
@@ -2812,7 +2824,7 @@ export class StoreDataEngine {
    * for that address; the batch exists so a large `setRange` costs one crossing
    * instead of one per captured cell.
    */
-  private captureSparseBeforeCells(
+  private capture_sparse_before_cells(
     bounds: Range,
     cells: readonly { rowOffset: number; colOffset: number }[],
   ): ResolvedCell[] {
@@ -2824,9 +2836,9 @@ export class StoreDataEngine {
       columns[index] = bounds.start.col + cell.colOffset;
     }
 
-    return consumeCellSnapshots(
+    return consume_cell_snapshots(
       this.wasm.cellSnapshots(this.sheets.handleOf(bounds.sheet), rows, columns),
-      (styleId) => this.styles.get(styleId),
+      (style_id) => this.styles.get(style_id),
     );
   }
 
@@ -2837,44 +2849,49 @@ export class StoreDataEngine {
    * address, so captured `oldValue`/`oldStyle` payloads stay unchanged while the
    * read costs one crossing instead of one per cell.
    */
-  private captureBlockBeforeCells(
+  private capture_block_before_cells(
     bounds: Range,
     rows: number,
     cols: number,
-    occupiedOnly = false,
+    occupied_only = false,
   ): Array<{ addr: CellAddress; before: ResolvedCell }> {
     const columns: number[] = new Array(cols);
     for (let col = 0; col < cols; col += 1) columns[col] = bounds.start.col + col;
 
-    const snapshot = this.windowReader.readRectangle(bounds.sheet, bounds.start.row, rows, columns);
+    const snapshot = this.window_reader.readRectangle(
+      bounds.sheet,
+      bounds.start.row,
+      rows,
+      columns,
+    );
     const cells: Array<{ addr: CellAddress; before: ResolvedCell }> = [];
     // Style ids index this window's own style list, so find its empty slots once.
-    const emptyStyleSlots = occupiedOnly
+    const empty_style_slots = occupied_only
       ? snapshot.styles.map((style) => Object.keys(style).length === 0)
       : [];
     // A formula or reference can resolve to empty and still be cleared.
-    const sources = occupiedOnly
-      ? this.captureSourceProjection(bounds.sheet, bounds.start.row, bounds.start.col, rows, cols)
+    const sources = occupied_only
+      ? this.capture_source_projection(bounds.sheet, bounds.start.row, bounds.start.col, rows, cols)
       : null;
-    const sourceOffsets = new Set([
+    const source_offsets = new Set([
       ...(sources?.formulaOffsets ?? []),
       ...(sources?.referenceOffsets ?? []),
     ]);
 
     for (let offset = 0; offset < rows * cols; offset += 1) {
       const resolved = snapshot.values[offset] ?? null;
-      const styleId = snapshot.styleIds[offset] ?? 0;
+      const style_id = snapshot.styleIds[offset] ?? 0;
       // A clear changes nothing in an empty, unstyled cell without a source;
       // skipping it keeps a whole-column clear from allocating one change per row.
       if (
-        occupiedOnly &&
+        occupied_only &&
         resolved === null &&
-        emptyStyleSlots[styleId] !== false &&
-        !sourceOffsets.has(offset)
+        empty_style_slots[style_id] !== false &&
+        !source_offsets.has(offset)
       ) {
         continue;
       }
-      const style = snapshot.styles[styleId] ?? EMPTY_STYLE;
+      const style = snapshot.styles[style_id] ?? EMPTY_STYLE;
 
       const row = bounds.start.row + Math.floor(offset / cols);
       const col = bounds.start.col + (offset % cols);
@@ -2884,54 +2901,54 @@ export class StoreDataEngine {
     return cells;
   }
 
-  private writePackedBlock(bounds: Range, block: PackedCellBlock): boolean {
+  private write_packed_block(bounds: Range, block: PackedCellBlock): boolean {
     const rows = bounds.end.row - bounds.start.row + 1;
     const cols = bounds.end.col - bounds.start.col + 1;
-    const cellCount = rows * cols;
+    const cell_count = rows * cols;
     const values = block.values;
-    const styleIds = block.styleIds;
-    const kinds = new Uint8Array(cellCount);
-    const numbers = new Float64Array(cellCount);
-    const wasmStyles = new Uint32Array(cellCount);
-    const styleTable = block.styleTable ?? [];
+    const style_ids = block.styleIds;
+    const kinds = new Uint8Array(cell_count);
+    const numbers = new Float64Array(cell_count);
+    const wasm_styles = new Uint32Array(cell_count);
+    const style_table = block.styleTable ?? [];
     // Interning builds a key from every style field, so each table entry is
     // interned once, on first use, instead of once per cell. First use keeps
     // the order in which the dictionary assigns ids.
-    const tableIds: Array<number | undefined> = new Array(styleTable.length);
+    const table_ids: Array<number | undefined> = new Array(style_table.length);
 
     const texts: string[] = [];
-    for (let offset = 0; offset < cellCount; offset++) {
+    for (let offset = 0; offset < cell_count; offset++) {
       const value = values[offset];
-      writeScalarWire(kinds, numbers, offset, value);
+      write_scalar_wire(kinds, numbers, offset, value);
       if (typeof value === "string") texts.push(value);
 
-      const styleId = styleIds?.[offset];
-      if (styleId === undefined) continue;
-      let id = tableIds[styleId];
+      const style_id = style_ids?.[offset];
+      if (style_id === undefined) continue;
+      let id = table_ids[style_id];
       if (id === undefined) {
-        id = this.styles.intern(styleTable[styleId]);
-        tableIds[styleId] = id;
+        id = this.styles.intern(style_table[style_id]);
+        table_ids[style_id] = id;
       }
-      wasmStyles[offset] = id;
+      wasm_styles[offset] = id;
     }
 
     const formulas = block.formulas ?? [];
     const refs = block.refs ?? [];
-    const referenceTargets = new Uint32Array(refs.length * 3);
+    const reference_targets = new Uint32Array(refs.length * 3);
 
     for (let index = 0; index < refs.length; index++) {
       const target = refs[index]![1];
-      const targetHandle = this.sheets.handles.get(target.sheet);
-      if (targetHandle === undefined || !this.isCellInBounds(target)) return false;
+      const target_handle = this.sheets.handles.get(target.sheet);
+      if (target_handle === undefined || !this.is_cell_in_bounds(target)) return false;
 
       const packed = index * 3;
-      referenceTargets[packed] = targetHandle;
-      referenceTargets[packed + 1] = target.row;
-      referenceTargets[packed + 2] = target.col;
+      reference_targets[packed] = target_handle;
+      reference_targets[packed + 1] = target.row;
+      reference_targets[packed + 2] = target.col;
     }
 
-    const packedText = packTexts(texts);
-    this.noteRangeMutationFfi(cellCount);
+    const packed_text = pack_texts(texts);
+    this.note_range_mutation_ffi(cell_count);
 
     return (
       this.wasm.setBlockPacked(
@@ -2942,30 +2959,30 @@ export class StoreDataEngine {
         cols,
         kinds,
         numbers,
-        packedText.bytes,
-        packedText.offsets,
-        wasmStyles,
+        packed_text.bytes,
+        packed_text.offsets,
+        wasm_styles,
         Uint32Array.from(formulas, ([offset]) => offset),
         formulas.map(([, source]) => source),
         Uint32Array.from(refs, ([offset]) => offset),
-        referenceTargets,
+        reference_targets,
       ) === 0
     );
   }
 
-  private writeSparseBlock(
+  private write_sparse_block(
     bounds: Range,
     cells: readonly { offset: number; value: CellValue; style?: CellStyle }[],
   ): boolean {
     const offsets = new Uint32Array(cells.length);
     const kinds = new Uint8Array(cells.length);
     const numbers = new Float64Array(cells.length);
-    const literalTexts: string[] = [];
+    const literal_texts: string[] = [];
     const styles = new Uint32Array(cells.length);
-    const formulaOffsets: number[] = [];
-    const formulaSources: string[] = [];
-    const referenceOffsets: number[] = [];
-    const referenceTargets: number[] = [];
+    const formula_offsets: number[] = [];
+    const formula_sources: string[] = [];
+    const reference_offsets: number[] = [];
+    const reference_targets: number[] = [];
 
     for (let index = 0; index < cells.length; index++) {
       const cell = cells[index]!;
@@ -2973,26 +2990,26 @@ export class StoreDataEngine {
       styles[index] = this.styles.intern(cell.style);
 
       if (cell.value.kind === "formula") {
-        formulaOffsets.push(cell.offset);
-        formulaSources.push(cell.value.src);
+        formula_offsets.push(cell.offset);
+        formula_sources.push(cell.value.src);
       } else if (cell.value.kind === "ref") {
-        const targetHandle = this.sheets.handles.get(cell.value.target.sheet);
-        if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
+        const target_handle = this.sheets.handles.get(cell.value.target.sheet);
+        if (target_handle === undefined || !this.is_cell_in_bounds(cell.value.target)) return false;
 
-        referenceOffsets.push(cell.offset);
-        referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
+        reference_offsets.push(cell.offset);
+        reference_targets.push(target_handle, cell.value.target.row, cell.value.target.col);
       } else {
         const value = cell.value.value;
-        writeScalarWire(kinds, numbers, index, value);
-        if (typeof value === "string") literalTexts.push(value);
+        write_scalar_wire(kinds, numbers, index, value);
+        if (typeof value === "string") literal_texts.push(value);
       }
     }
 
     // One UTF-8 buffer for the text cells, so a block does not cross the
     // boundary as one JS string per cell.
-    const packedText = packTexts(literalTexts);
+    const packed_text = pack_texts(literal_texts);
 
-    this.noteRangeMutationFfi(cells.length);
+    this.note_range_mutation_ffi(cells.length);
 
     return (
       this.wasm.setSparseBlock(
@@ -3004,13 +3021,13 @@ export class StoreDataEngine {
         offsets,
         kinds,
         numbers,
-        packedText.bytes,
-        packedText.offsets,
+        packed_text.bytes,
+        packed_text.offsets,
         styles,
-        Uint32Array.from(formulaOffsets),
-        formulaSources,
-        Uint32Array.from(referenceOffsets),
-        Uint32Array.from(referenceTargets),
+        Uint32Array.from(formula_offsets),
+        formula_sources,
+        Uint32Array.from(reference_offsets),
+        Uint32Array.from(reference_targets),
       ) === 0
     );
   }
@@ -3018,21 +3035,21 @@ export class StoreDataEngine {
   /**
    * Peer operations and history may restore a source that blocks derived
    * output. Uninstall only the pivots whose output a replayed write touches;
-   * `flushPivots` reinstalls them at the barrier. The engine keeps the caches
+   * `flush_pivots` reinstalls them at the barrier. The engine keeps the caches
    * of unchanged definitions, so other pivots on the sheet are not rebuilt.
    */
-  private releaseReplayedPivotOutputs(patches: readonly DocumentOp[]): void {
+  private release_replayed_pivot_outputs(patches: readonly DocumentOp[]): void {
     // One status call per sheet, not per patch; null marks a sheet without pivots.
-    const outputsBySheet = new Map<SheetId, Array<{ id: string; range: Range }> | null>();
-    const releasedBySheet = new Map<SheetId, Set<string>>();
+    const outputs_by_sheet = new Map<SheetId, Array<{ id: string; range: Range }> | null>();
+    const released_by_sheet = new Map<SheetId, Set<string>>();
     for (const patch of patches) {
-      const sheetId = patchSheetId(patch);
-      if (sheetId === null) continue;
-      let outputs = outputsBySheet.get(sheetId);
+      const sheet_id = patchSheetId(patch);
+      if (sheet_id === null) continue;
+      let outputs = outputs_by_sheet.get(sheet_id);
       if (outputs === undefined) {
-        const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
-        outputs = sheet?.pivots?.length ? this.pivotOutputs(sheetId) : null;
-        outputsBySheet.set(sheetId, outputs);
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheet_id);
+        outputs = sheet?.pivots?.length ? this.pivotOutputs(sheet_id) : null;
+        outputs_by_sheet.set(sheet_id, outputs);
       }
       if (!outputs?.length) continue;
 
@@ -3040,21 +3057,21 @@ export class StoreDataEngine {
       if (!written) continue;
       for (const output of outputs) {
         if (!rangesIntersect(output.range, written)) continue;
-        let released = releasedBySheet.get(sheetId);
+        let released = released_by_sheet.get(sheet_id);
         if (!released) {
           released = new Set();
-          releasedBySheet.set(sheetId, released);
+          released_by_sheet.set(sheet_id, released);
         }
         released.add(output.id);
       }
     }
 
-    for (const [sheetId, released] of releasedBySheet) {
-      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+    for (const [sheet_id, released] of released_by_sheet) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheet_id);
       if (!sheet) continue;
       const kept = (sheet.pivots ?? []).filter((pivot) => !released.has(pivot.id));
-      this.syncPivots({ ...sheet, pivots: kept });
-      this.pivotSheetsDirty.add(sheetId);
+      this.sync_pivots({ ...sheet, pivots: kept });
+      this.pivot_sheets_dirty.add(sheet_id);
     }
   }
 
@@ -3076,33 +3093,33 @@ export class StoreDataEngine {
     },
   ): StoreDataEngineEffects {
     // A check that spans this write reads its lists again after it.
-    this.validationReadsCache?.invalidate();
+    this.validation_reads_cache?.invalidate();
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
-    const appliedPatches: DocumentOp[] = [];
-    const touchedSheets = new Set<SheetId>();
-    let hasStructuralPatch = false;
-    const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
-    const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
-    const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
+    const applied_patches: DocumentOp[] = [];
+    const touched_sheets = new Set<SheetId>();
+    let has_structural_patch = false;
+    const tracks_paged_revision = !remoteLoad && this.storage_options.storage === "paged";
+    const mutation_revision = remoteLoad ? 0n : this.wasm.beginMutation();
+    const storage_revision = tracks_paged_revision ? mutation_revision : 0n;
 
     if (remoteLoad) this.wasm.beginRemoteLoad();
     try {
-      if (replayPivotSources) this.releaseReplayedPivotOutputs(patches);
+      if (replayPivotSources) this.release_replayed_pivot_outputs(patches);
       for (const patch of patches) {
         // Planned before the edit, from the same rule the undo inverse uses.
-        const pivotPlan = planPivotEdit(patch, this.workbook.sheets);
-        const rewrites = pivotPlan ? pivotRewrites(this.workbook.sheets, pivotPlan) : [];
-        if (!this.applyPatch(patch, changes, captureDetailedChanges, trustedHistory)) continue;
+        const pivot_plan = planPivotEdit(patch, this.workbook.sheets);
+        const rewrites = pivot_plan ? pivotRewrites(this.workbook.sheets, pivot_plan) : [];
+        if (!this.apply_patch(patch, changes, captureDetailedChanges, trustedHistory)) continue;
         if (rewrites.length > 0) {
           applyPivotRewrites(this.workbook.sheets, rewrites);
-          for (const rewrite of rewrites) this.pivotSheetsDirty.add(rewrite.owner);
+          for (const rewrite of rewrites) this.pivot_sheets_dirty.add(rewrite.owner);
         }
 
-        appliedPatches.push(patch);
+        applied_patches.push(patch);
 
         // A removed sheet has no spill blockers left to rebuild.
-        const touchedSheet = patch.op === "removeSheet" ? null : patchSheetId(patch);
-        if (touchedSheet !== null) touchedSheets.add(touchedSheet);
+        const touched_sheet = patch.op === "removeSheet" ? null : patchSheetId(patch);
+        if (touched_sheet !== null) touched_sheets.add(touched_sheet);
 
         if (
           patch.op === "addRows" ||
@@ -3114,61 +3131,61 @@ export class StoreDataEngine {
           patch.op === "addSheet" ||
           patch.op === "removeSheet"
         ) {
-          hasStructuralPatch = true;
+          has_structural_patch = true;
         }
       }
 
-      if (hasStructuralPatch) {
-        for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
+      if (has_structural_patch) {
+        for (const touched of touched_sheets) this.spill_blockers_dirty.add(touched);
       }
 
-      this.flushSpillBlockers();
-      this.flushPivots();
-      this.rangeMutationStats.documentOperations += appliedPatches.length;
-      this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
+      this.flush_spill_blockers();
+      this.flush_pivots();
+      this.range_mutation_stats.documentOperations += applied_patches.length;
+      this.range_mutation_stats.jsPatchObjects += applied_patches.length;
 
-      return { appliedPatches, changes, storageRevision };
+      return { appliedPatches: applied_patches, changes, storageRevision: storage_revision };
     } finally {
       // Most transactions queue no hidden rows. With the flush and its nested
       // try on every edit, JavaScriptCore optimized one-cell edits later, and
       // the engine memory probe measured a 27% slower edit median.
-      if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
-      else this.commitEngineSources();
+      if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
+      else this.commit_engine_sources();
     }
   }
 
   /** Send the queued hidden rows, then close the mutation, even when the engine rejects the runs. */
-  private flushHiddenRowsAndCommit(): void {
+  private flush_hidden_rows_and_commit(): void {
     try {
       this.view.flushHiddenRows();
     } finally {
-      this.commitEngineSources();
+      this.commit_engine_sources();
     }
   }
 
   /** Whether the sheet that `patch` targets takes it; a dashboard has no cells, rows or columns. */
-  private sheetTakes(patch: DocumentOp): boolean {
+  private sheet_takes(patch: DocumentOp): boolean {
     if (dashboardTakes(patch.op)) return true;
     const target = patchSheetId(patch);
     return !isDashboard(this.workbook.sheets.find((sheet) => sheet.id === target));
   }
 
-  private applyPatch(
+  private apply_patch(
     patch: DocumentOp,
     changes: ChangeEvent["changes"] | null,
-    captureDetailedChanges = false,
-    trustedHistory = false,
+    capture_detailed_changes = false,
+    trusted_history = false,
   ): boolean {
-    if (!this.sheetTakes(patch)) return false;
+    if (!this.sheet_takes(patch)) return false;
 
     switch (patch.op) {
       case "set": {
-        if (!this.isCellInBounds(patch.addr)) return false;
+        if (!this.is_cell_in_bounds(patch.addr)) return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const bounds: Range = cellRange(patch.addr);
 
         if (
-          !this.writeSparseBlock(bounds, [{ offset: 0, value: patch.value, style: patch.style }])
+          !this.write_sparse_block(bounds, [{ offset: 0, value: patch.value, style: patch.style }])
         ) {
           return false;
         }
@@ -3176,7 +3193,7 @@ export class StoreDataEngine {
         if (changes && before) {
           changes.push({
             addr: patch.addr,
-            oldValue: literalOf(before.resolved),
+            oldValue: literal_of(before.resolved),
             newValue: patch.value,
             oldStyle: before.style,
             newStyle: patch.style,
@@ -3211,8 +3228,8 @@ export class StoreDataEngine {
         }
 
         const cols = bounds.end.col - bounds.start.col + 1;
-        const beforeCells = changes ? this.captureSparseBeforeCells(bounds, patch.cells) : null;
-        const sparseCells = patch.cells.map((cell, index) => ({
+        const before_cells = changes ? this.capture_sparse_before_cells(bounds, patch.cells) : null;
+        const sparse_cells = patch.cells.map((cell, index) => ({
           offset: cell.rowOffset * cols + cell.colOffset,
           value: cell.value,
           style: cell.style,
@@ -3221,17 +3238,17 @@ export class StoreDataEngine {
             row: bounds.start.row + cell.rowOffset,
             col: bounds.start.col + cell.colOffset,
           },
-          before: beforeCells?.[index] ?? null,
+          before: before_cells?.[index] ?? null,
         }));
 
-        this.rangeMutationStats.jsPatchObjects += patch.cells.length;
-        if (!this.writeSparseBlock(bounds, sparseCells)) return false;
+        this.range_mutation_stats.jsPatchObjects += patch.cells.length;
+        if (!this.write_sparse_block(bounds, sparse_cells)) return false;
         if (changes) {
-          for (const cell of sparseCells) {
+          for (const cell of sparse_cells) {
             if (!cell.before) continue;
             changes.push({
               addr: cell.addr,
-              oldValue: literalOf(cell.before.resolved),
+              oldValue: literal_of(cell.before.resolved),
               newValue: cell.value,
               oldStyle: cell.before.style,
               newStyle: cell.style,
@@ -3250,9 +3267,9 @@ export class StoreDataEngine {
         const sheet = this.sheets.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
-        const cellCount = rows * cols;
-        const styleTable = block.styleTable ?? [];
-        const styleIds = block.styleIds;
+        const cell_count = rows * cols;
+        const style_table = block.styleTable ?? [];
+        const style_ids = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];
 
         if (
@@ -3262,30 +3279,31 @@ export class StoreDataEngine {
           bounds.end.col >= sheet.columns.length ||
           block.rowCount !== rows ||
           block.colCount !== cols ||
-          block.values.length !== cellCount ||
-          (styleIds !== undefined && styleIds.length !== cellCount) ||
+          block.values.length !== cell_count ||
+          (style_ids !== undefined && style_ids.length !== cell_count) ||
           exceptions.some(
-            ([offset]) => !Number.isInteger(offset) || offset < 0 || offset >= cellCount,
+            ([offset]) => !Number.isInteger(offset) || offset < 0 || offset >= cell_count,
           ) ||
-          (styleIds?.some(
-            (styleId) => !Number.isInteger(styleId) || styleId < 0 || styleId >= styleTable.length,
+          (style_ids?.some(
+            (style_id) =>
+              !Number.isInteger(style_id) || style_id < 0 || style_id >= style_table.length,
           ) ??
             false)
         ) {
           return false;
         }
 
-        const beforeCells =
-          changes && captureDetailedChanges
-            ? this.captureBlockBeforeCells(bounds, rows, cols)
+        const before_cells =
+          changes && capture_detailed_changes
+            ? this.capture_block_before_cells(bounds, rows, cols)
             : null;
-        const history = trustedHistory ? preparedHistoryBlock(block) : undefined;
-        const applied = history ? history.restore(bounds) : this.writePackedBlock(bounds, block);
-        if (!applied || !changes || !beforeCells) return applied;
+        const history = trusted_history ? preparedHistoryBlock(block) : undefined;
+        const applied = history ? history.restore(bounds) : this.write_packed_block(bounds, block);
+        if (!applied || !changes || !before_cells) return applied;
         const formulas = new Map(block.formulas ?? []);
         const refs = new Map(block.refs ?? []);
-        for (let offset = 0; offset < beforeCells.length; offset += 1) {
-          const entry = beforeCells[offset]!;
+        for (let offset = 0; offset < before_cells.length; offset += 1) {
+          const entry = before_cells[offset]!;
           const formula = formulas.get(offset);
           const target = refs.get(offset);
           const next: CellValue =
@@ -3296,7 +3314,7 @@ export class StoreDataEngine {
                 : { kind: "literal", value: block.values[offset]! };
           changes.push({
             addr: entry.addr,
-            oldValue: literalOf(entry.before.resolved),
+            oldValue: literal_of(entry.before.resolved),
             newValue: next,
             oldStyle: entry.before.style,
           });
@@ -3317,39 +3335,39 @@ export class StoreDataEngine {
           return false;
         }
 
-        this.noteRangeMutationFfi();
-        const oldIds = this.wasm.rangeStyleIds(
+        this.note_range_mutation_ffi();
+        const old_ids = this.wasm.rangeStyleIds(
           this.sheets.handleOf(bounds.sheet),
           bounds.start.row,
           bounds.start.col,
           bounds.end.row,
           bounds.end.col,
         );
-        this.rangeMutationStats.distinctStyleIds = Math.max(
-          this.rangeMutationStats.distinctStyleIds,
-          oldIds.length,
+        this.range_mutation_stats.distinctStyleIds = Math.max(
+          this.range_mutation_stats.distinctStyleIds,
+          old_ids.length,
         );
-        this.rangeMutationStats.maxTransferredArrayLength = Math.max(
-          this.rangeMutationStats.maxTransferredArrayLength,
-          oldIds.length,
+        this.range_mutation_stats.maxTransferredArrayLength = Math.max(
+          this.range_mutation_stats.maxTransferredArrayLength,
+          old_ids.length,
         );
-        const newIds = new Uint32Array(oldIds.length);
-        for (let i = 0; i < oldIds.length; i++) {
-          newIds[i] =
+        const new_ids = new Uint32Array(old_ids.length);
+        for (let i = 0; i < old_ids.length; i++) {
+          new_ids[i] =
             patch.style === null
               ? 0
-              : this.styles.intern({ ...this.styles.get(oldIds[i]!), ...patch.style });
+              : this.styles.intern({ ...this.styles.get(old_ids[i]!), ...patch.style });
         }
 
-        this.noteRangeMutationFfi(Math.max(oldIds.length, newIds.length));
+        this.note_range_mutation_ffi(Math.max(old_ids.length, new_ids.length));
         return this.wasm.remapRangeStyles(
           this.sheets.handleOf(bounds.sheet),
           bounds.start.row,
           bounds.start.col,
           bounds.end.row,
           bounds.end.col,
-          oldIds,
-          newIds,
+          old_ids,
+          new_ids,
         );
       }
 
@@ -3365,13 +3383,13 @@ export class StoreDataEngine {
           return false;
         }
 
-        if ((patch.contents ?? true) && !this.admitsSourceRange(bounds)) return false;
-        const clearContents = patch.contents ?? true;
-        const clearStyle = patch.style ?? true;
+        if ((patch.contents ?? true) && !this.admits_source_range(bounds)) return false;
+        const clear_contents = patch.contents ?? true;
+        const clear_style = patch.style ?? true;
 
-        const beforeCells =
-          changes && captureDetailedChanges && clearContents
-            ? this.captureBlockBeforeCells(
+        const before_cells =
+          changes && capture_detailed_changes && clear_contents
+            ? this.capture_block_before_cells(
                 bounds,
                 bounds.end.row - bounds.start.row + 1,
                 bounds.end.col - bounds.start.col + 1,
@@ -3385,19 +3403,19 @@ export class StoreDataEngine {
           bounds.start.col,
           bounds.end.row,
           bounds.end.col,
-          clearContents,
-          clearStyle,
+          clear_contents,
+          clear_style,
         );
 
-        if (applied && changes && beforeCells) {
+        if (applied && changes && before_cells) {
           capturedClearCells.set(
             patch,
-            beforeCells.map((entry) => entry.addr),
+            before_cells.map((entry) => entry.addr),
           );
-          for (const entry of beforeCells) {
+          for (const entry of before_cells) {
             changes.push({
               addr: entry.addr,
-              oldValue: literalOf(entry.before.resolved),
+              oldValue: literal_of(entry.before.resolved),
               newValue: { kind: "literal", value: null },
               oldStyle: entry.before.style,
             });
@@ -3417,12 +3435,12 @@ export class StoreDataEngine {
         if (!this.wasm.addRows(this.sheets.handleOf(patch.sheet), patch.at, patch.count))
           return false;
         meta.rowCount += patch.count;
-        this.rebaseSheetAxis(patch.sheet, "row", insertRemap(patch.at, patch.count), {
+        this.rebase_sheet_axis(patch.sheet, "row", insertRemap(patch.at, patch.count), {
           at: patch.at,
           delta: patch.count,
         });
 
-        this.rebaseCharts({
+        this.rebase_charts({
           kind: "insert",
           sheet: patch.sheet,
           axis: "row",
@@ -3446,11 +3464,11 @@ export class StoreDataEngine {
         if (!this.wasm.removeRows(this.sheets.handleOf(patch.sheet), patch.at, patch.count))
           return false;
         meta.rowCount -= patch.count;
-        this.rebaseSheetAxis(patch.sheet, "row", deleteRemap(patch.at, patch.count), {
+        this.rebase_sheet_axis(patch.sheet, "row", deleteRemap(patch.at, patch.count), {
           at: patch.at,
           delta: -patch.count,
         });
-        this.rebaseCharts({
+        this.rebase_charts({
           kind: "delete",
           sheet: patch.sheet,
           axis: "row",
@@ -3463,13 +3481,13 @@ export class StoreDataEngine {
       }
 
       case "moveRows":
-        return this.moveAxis(patch, changes, captureDetailedChanges);
+        return this.move_axis(patch, changes, capture_detailed_changes);
 
       case "permuteRows":
-        return this.permuteRows(patch, changes, captureDetailedChanges);
+        return this.permute_rows(patch, changes, capture_detailed_changes);
 
       case "moveCells":
-        return this.moveCells(patch, changes, captureDetailedChanges);
+        return this.move_cells(patch, changes, capture_detailed_changes);
 
       case "addColumns": {
         const meta = this.sheets.sheetMeta(patch.sheet);
@@ -3489,12 +3507,12 @@ export class StoreDataEngine {
         }
 
         meta.columns.splice(patch.at, 0, ...patch.columns);
-        this.rebaseSheetAxis(patch.sheet, "column", insertRemap(patch.at, patch.columns.length), {
+        this.rebase_sheet_axis(patch.sheet, "column", insertRemap(patch.at, patch.columns.length), {
           at: patch.at,
           delta: patch.columns.length,
           inserted: patch.columns,
         });
-        this.rebaseCharts({
+        this.rebase_charts({
           kind: "insert",
           sheet: patch.sheet,
           axis: "column",
@@ -3519,11 +3537,11 @@ export class StoreDataEngine {
         if (!this.wasm.removeCols(this.sheets.handleOf(patch.sheet), patch.at, patch.count))
           return false;
         meta.columns.splice(patch.at, patch.count);
-        this.rebaseSheetAxis(patch.sheet, "column", deleteRemap(patch.at, patch.count), {
+        this.rebase_sheet_axis(patch.sheet, "column", deleteRemap(patch.at, patch.count), {
           at: patch.at,
           delta: -patch.count,
         });
-        this.rebaseCharts({
+        this.rebase_charts({
           kind: "delete",
           sheet: patch.sheet,
           axis: "column",
@@ -3536,7 +3554,7 @@ export class StoreDataEngine {
       }
 
       case "moveColumns":
-        return this.moveAxis(patch, changes, captureDetailedChanges);
+        return this.move_axis(patch, changes, capture_detailed_changes);
 
       case "setColumn": {
         const meta = this.sheets.sheetMeta(patch.sheet);
@@ -3590,13 +3608,13 @@ export class StoreDataEngine {
 
         if (hyperlink.target.kind === "internal") {
           const target = hyperlink.target.range;
-          const targetSheet = this.workbook.sheets.find(
+          const target_sheet = this.workbook.sheets.find(
             (candidate) => candidate.id === target.sheet,
           );
           if (
-            !targetSheet ||
-            target.end.row >= targetSheet.rowCount ||
-            target.end.col >= targetSheet.columns.length
+            !target_sheet ||
+            target.end.row >= target_sheet.rowCount ||
+            target.end.col >= target_sheet.columns.length
           ) {
             return false;
           }
@@ -3631,7 +3649,7 @@ export class StoreDataEngine {
         sheet.charts = charts;
         // A chart over a pivot reads a copy of it that the pivot view adds.
         if (chart.pivot !== undefined || previous?.pivot !== undefined) {
-          this.pivotSheetsDirty.add(patch.sheet);
+          this.pivot_sheets_dirty.add(patch.sheet);
         }
 
         return true;
@@ -3643,7 +3661,7 @@ export class StoreDataEngine {
         const removed = charts.find((chart) => chart.id === patch.id);
         if (removed === undefined) return false;
         sheet.charts = charts.filter((chart) => chart !== removed);
-        if (removed.pivot !== undefined) this.pivotSheetsDirty.add(patch.sheet);
+        if (removed.pivot !== undefined) this.pivot_sheets_dirty.add(patch.sheet);
         return true;
       }
 
@@ -3660,7 +3678,7 @@ export class StoreDataEngine {
         if (!rules) return false;
         sheet.validationRules = rules;
 
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
@@ -3669,27 +3687,27 @@ export class StoreDataEngine {
         const rules = sheet.validationRules ?? [];
         if (!rules.some((rule) => rule.id === patch.id)) return false;
         sheet.validationRules = rules.filter((rule) => rule.id !== patch.id);
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
       case "setProtectedRange": {
         const sheet = this.sheets.sheetMeta(patch.sheet);
-        const protectedRange = {
+        const protected_range = {
           ...patch.protectedRange,
           range: normalizedRange(patch.protectedRange.range),
         };
 
         if (
-          protectedRange.range.sheet !== patch.sheet ||
-          !validProtectedRanges(sheet, [protectedRange])
+          protected_range.range.sheet !== patch.sheet ||
+          !validProtectedRanges(sheet, [protected_range])
         ) {
           return false;
         }
 
-        sheet.protectedRanges = upsertById(sheet.protectedRanges ?? [], protectedRange);
+        sheet.protectedRanges = upsertById(sheet.protectedRanges ?? [], protected_range);
 
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
@@ -3698,12 +3716,12 @@ export class StoreDataEngine {
         const ranges = sheet.protectedRanges ?? [];
         if (!ranges.some((range) => range.id === patch.id)) return false;
         sheet.protectedRanges = ranges.filter((range) => range.id !== patch.id);
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
       case "setNote": {
-        if (!this.isCellInBounds(patch.addr)) return false;
+        if (!this.is_cell_in_bounds(patch.addr)) return false;
         const sheet = this.sheets.sheetMeta(patch.addr.sheet);
         const notes = sheet.notes ?? [];
         const index = notes.findIndex(
@@ -3730,7 +3748,7 @@ export class StoreDataEngine {
         const merges = sheet.merges ?? [];
         if (merges.some((existing) => mergesOverlap(existing, merge))) return false;
         sheet.merges = [...merges, merge];
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
@@ -3741,15 +3759,15 @@ export class StoreDataEngine {
         const index = merges.findIndex((existing) => sameMerge(existing, merge));
         if (index < 0) return false;
         sheet.merges = [...merges.slice(0, index), ...merges.slice(index + 1)];
-        this.spillBlockersDirty.add(patch.sheet);
+        this.spill_blockers_dirty.add(patch.sheet);
         return true;
       }
 
       case "addSheet":
-        return this.addSheetSnapshot(patch.sheet, changes);
+        return this.add_sheet_snapshot(patch.sheet, changes);
 
       case "removeSheet":
-        return this.removeSheetSnapshot(patch.sheet);
+        return this.remove_sheet_snapshot(patch.sheet);
 
       case "renameSheet": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
@@ -3766,7 +3784,7 @@ export class StoreDataEngine {
         )
           return false;
         sheet.name = name.name;
-        this.refreshNamedFormulas();
+        this.refresh_named_formulas();
         return true;
       }
 
@@ -3776,7 +3794,7 @@ export class StoreDataEngine {
           return false;
         const [sheet] = this.workbook.sheets.splice(from, 1);
         this.workbook.sheets.splice(patch.to, 0, sheet!);
-        this.syncSheetOrder();
+        this.sync_sheet_order();
         return true;
       }
 
@@ -3817,12 +3835,12 @@ export class StoreDataEngine {
           (candidate) => candidate.id === patch.table.range.sheet,
         );
         if (!sheet) return false;
-        const tableCount = this.workbook.sheets.reduce(
+        const table_count = this.workbook.sheets.reduce(
           (count, candidate) => count + (candidate.tables?.length ?? 0),
           0,
         );
         if (
-          tableCount >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
+          table_count >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
           (this.workbook.namedRanges ?? []).some(
             (range) => formulaNameKey(range.name) === formulaNameKey(patch.table.name),
           )
@@ -3833,7 +3851,7 @@ export class StoreDataEngine {
         const existing = this.workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
         if (!validWorkbookTable(patch.table, sheet, existing)) return false;
         const table = structuredClone(patch.table);
-        if (!this.syncTable(table)) return false;
+        if (!this.sync_table(table)) return false;
         sheet.tables = [...(sheet.tables ?? []), table];
         return true;
       }
@@ -3864,8 +3882,8 @@ export class StoreDataEngine {
               : (patch.patch.sortState ?? current.sortState),
         };
 
-        const existing = this.workbook.sheets.flatMap((candidateSheet) =>
-          (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
+        const existing = this.workbook.sheets.flatMap((candidate_sheet) =>
+          (candidate_sheet.tables ?? []).filter((table) => table.id !== current.id),
         );
         if (
           (this.workbook.namedRanges ?? []).some(
@@ -3880,19 +3898,19 @@ export class StoreDataEngine {
         if (next.style === undefined) delete next.style;
         if (next.autoFilter === undefined) delete next.autoFilter;
         if (next.sortState === undefined) delete next.sortState;
-        if (!this.syncTable(next)) return false;
-        const nextTables = [...tables];
-        nextTables[index] = next;
-        sheet.tables = nextTables;
+        if (!this.sync_table(next)) return false;
+        const next_tables = [...tables];
+        next_tables[index] = next;
+        sheet.tables = next_tables;
 
         const renames: [string, string, string][] = [[current.name, "", next.name]];
         for (const column of next.columns) {
           const previous = current.columns.find((candidate) => candidate.id === column.id);
           if (previous) renames.push([next.name, previous.name, column.name]);
         }
-        const model = this.withRenames(this.workbook.dataModel, renames);
+        const model = this.with_renames(this.workbook.dataModel, renames);
         if (model === this.workbook.dataModel) return true;
-        if (!this.syncRelationships(model)) return false;
+        if (!this.sync_relationships(model)) return false;
         this.workbook.dataModel = model;
         return true;
       }
@@ -3911,18 +3929,18 @@ export class StoreDataEngine {
         if (
           !sheet ||
           !dashboardPivotAllowed(sheet, patch.pivot) ||
-          this.pivotIssues(patch.pivot, sheet, this.workbook.sheets).length > 0
+          this.pivot_issues(patch.pivot, sheet, this.workbook.sheets).length > 0
         ) {
           return false;
         }
 
         const owner = pivotOwner(this.workbook.sheets, patch.pivot.id);
         if (owner && owner !== sheet) return false;
-        if (!owner && this.pivotCount() >= MAX_PIVOTS_PER_WORKBOOK) return false;
+        if (!owner && this.pivot_count() >= MAX_PIVOTS_PER_WORKBOOK) return false;
 
         const pivot = clonePivot(patch.pivot);
         sheet.pivots = upsertById(sheet.pivots ?? [], pivot);
-        this.pivotSheetsDirty.add(sheet.id);
+        this.pivot_sheets_dirty.add(sheet.id);
         return true;
       }
 
@@ -3932,7 +3950,7 @@ export class StoreDataEngine {
         sheet.pivots = sheet.pivots.filter((pivot) => pivot.id !== patch.id);
         // Free the output now, not at the barrier: a later write in the same
         // batch may target the cells, and the engine refuses writes into output.
-        this.syncPivots(sheet);
+        this.sync_pivots(sheet);
         return true;
       }
 
@@ -3972,14 +3990,14 @@ export class StoreDataEngine {
         }
 
         // The protocol checked the color's format before the operation got here.
-        const { tabColor } = patch.patch;
-        if (tabColor !== undefined) sheet.tabColor = tabColor ?? undefined;
+        const { tabColor: tab_color } = patch.patch;
+        if (tab_color !== undefined) sheet.tabColor = tab_color ?? undefined;
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
           patch.patch.conditionalFormats = structuredClone(patch.patch.conditionalFormats);
           sheet.conditionalFormats = patch.patch.conditionalFormats;
-          this.windowReader.conditionalRulesChanged(patch.sheet);
+          this.window_reader.conditionalRulesChanged(patch.sheet);
         }
 
         if (patch.patch.rowGroups !== undefined) {
@@ -3987,11 +4005,11 @@ export class StoreDataEngine {
           this.view.metadataChanged(patch.sheet);
         }
 
-        const { autoFilter } = patch.patch;
+        const { autoFilter: auto_filter } = patch.patch;
         if (
           patch.patch.sortKeys !== undefined ||
           patch.patch.filters !== undefined ||
-          autoFilter !== undefined
+          auto_filter !== undefined
         ) {
           if (patch.patch.sortKeys !== undefined) {
             sheet.sortKeys = patch.patch.sortKeys.map((key) => ({ ...key }));
@@ -4004,8 +4022,8 @@ export class StoreDataEngine {
             ]);
           }
 
-          if (autoFilter === null) delete sheet.autoFilter;
-          else if (autoFilter !== undefined) sheet.autoFilter = cloneJsonValue(autoFilter);
+          if (auto_filter === null) delete sheet.autoFilter;
+          else if (auto_filter !== undefined) sheet.autoFilter = cloneJsonValue(auto_filter);
 
           this.view.metadataChanged(patch.sheet);
         }
@@ -4033,27 +4051,27 @@ export class StoreDataEngine {
           return false;
         }
 
-        const namedRange: NamedRangeSnapshot =
+        const named_range: NamedRangeSnapshot =
           patch.namedRange.range === undefined
             ? { ...patch.namedRange }
             : { ...patch.namedRange, range: normalizedRange(patch.namedRange.range) };
 
-        if (!this.syncNamedRange(namedRange)) return false;
-        this.upsertNamedRange(namedRange);
+        if (!this.sync_named_range(named_range)) return false;
+        this.upsert_named_range(named_range);
 
         return true;
       }
 
       case "removeNamedRange": {
         const ranges = this.workbook.namedRanges ?? [];
-        if (!ranges.some((range) => this.sameNamedRange(range, patch.name, patch.scope))) {
+        if (!ranges.some((range) => this.same_named_range(range, patch.name, patch.scope))) {
           return false;
         }
 
-        if (!this.wasm.removeNamedRange(patch.name, this.namedRangeScope(patch.scope)))
+        if (!this.wasm.removeNamedRange(patch.name, this.named_range_scope(patch.scope)))
           return false;
         this.workbook.namedRanges = ranges.filter(
-          (range) => !this.sameNamedRange(range, patch.name, patch.scope),
+          (range) => !this.same_named_range(range, patch.name, patch.scope),
         );
         return true;
       }
@@ -4076,7 +4094,7 @@ export class StoreDataEngine {
       }
 
       case "setCalculation": {
-        if (!this.syncCalculation(patch.calculation)) return false;
+        if (!this.sync_calculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
         return true;
       }
@@ -4095,11 +4113,11 @@ export class StoreDataEngine {
         const previous = findMeasure(current, patch.op === "setMeasure" ? patch.measure.id : "");
         const model =
           patch.op === "setMeasure"
-            ? this.withRenames(withMeasure(current, patch.measure), [
+            ? this.with_renames(withMeasure(current, patch.measure), [
                 ["", previous?.name ?? "", patch.measure.name],
               ])
             : withoutMeasure(current, patch.id);
-        if (!this.syncRelationships(model)) return false;
+        if (!this.sync_relationships(model)) return false;
         this.workbook.dataModel = model;
         return true;
       }
@@ -4112,7 +4130,7 @@ export class StoreDataEngine {
         if (issues.length > 0) return false;
         sheet.dashboard = withDashboardItem(sheet.dashboard, patch.item);
         // A slicer filters the dashboard's pivots.
-        this.pivotSheetsDirty.add(sheet.id);
+        this.pivot_sheets_dirty.add(sheet.id);
         return true;
       }
 
@@ -4120,7 +4138,7 @@ export class StoreDataEngine {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet || !findDashboardItem(sheet, patch.id)) return false;
         sheet.dashboard = withoutDashboardItem(sheet.dashboard, patch.id);
-        this.pivotSheetsDirty.add(sheet.id);
+        this.pivot_sheets_dirty.add(sheet.id);
         return true;
       }
 
@@ -4134,7 +4152,7 @@ export class StoreDataEngine {
         );
         if (issues.length > 0) return false;
         const model = withRelationship(this.workbook.dataModel, patch.relationship);
-        if (!this.syncRelationships(model)) return false;
+        if (!this.sync_relationships(model)) return false;
         this.workbook.dataModel = model;
         return true;
       }
@@ -4142,7 +4160,7 @@ export class StoreDataEngine {
       case "removeRelationship": {
         if (!findRelationship(this.workbook.dataModel, patch.id)) return false;
         const model = withoutRelationship(this.workbook.dataModel, patch.id);
-        if (!this.syncRelationships(model)) return false;
+        if (!this.sync_relationships(model)) return false;
         this.workbook.dataModel = model;
         return true;
       }
@@ -4172,10 +4190,10 @@ export class StoreDataEngine {
    * definitions, merges and tables with them and carries every range-keyed
    * item (rules, notes, hyperlinks, charts, names) to the moved positions.
    */
-  private moveAxis(
+  private move_axis(
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
     changes: ChangeEvent["changes"] | null,
-    captureDetailedChanges: boolean,
+    capture_detailed_changes: boolean,
   ): boolean {
     const sheet = this.sheets.sheetMeta(patch.sheet);
     const axis: SheetAxis = patch.op === "moveRows" ? "row" : "column";
@@ -4196,20 +4214,22 @@ export class StoreDataEngine {
       return false;
     }
 
-    const moveAt = moveRemap(patch.from, patch.count, patch.to);
+    const move_at = moveRemap(patch.from, patch.count, patch.to);
     const merges = sheet.merges
-      ?.map((merge) => rebaseMergeAxis(merge, axis, moveAt))
+      ?.map((merge) => rebase_merge_axis(merge, axis, move_at))
       .filter((merge): merge is MergeRange => merge !== null);
     if (merges?.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
 
-    const moved = this.captureMovedItems(sheet, axis);
-    const span = movedSpanRange(sheet, patch, axis);
+    const moved = this.capture_moved_items(sheet, axis);
+    const span = moved_span_range(sheet, patch, axis);
     const rows = span.end.row - span.start.row + 1;
     const cols = span.end.col - span.start.col + 1;
-    const beforeCells =
-      changes && captureDetailedChanges ? this.captureBlockBeforeCells(span, rows, cols) : null;
+    const before_cells =
+      changes && capture_detailed_changes
+        ? this.capture_block_before_cells(span, rows, cols)
+        : null;
 
-    this.noteRangeMutationFfi(rows);
+    this.note_range_mutation_ffi(rows);
     const handle = this.sheets.handleOf(patch.sheet);
     const status =
       axis === "row"
@@ -4218,30 +4238,30 @@ export class StoreDataEngine {
     if (status !== 0) return false;
 
     if (axis === "row") {
-      rebaseRowMeta(sheet, moveAt);
-      this.moveTableRows(sheet, patch);
+      rebase_row_meta(sheet, move_at);
+      this.move_table_rows(sheet, patch);
     } else {
       const columns = sheet.columns.splice(patch.from, patch.count);
       sheet.columns.splice(patch.to, 0, ...columns);
     }
     if (merges) {
       sheet.merges = merges;
-      this.spillBlockersDirty.add(patch.sheet);
+      this.spill_blockers_dirty.add(patch.sheet);
     }
 
-    const restored = this.restoreMovedItems(sheet, moved, patch, axis);
-    this.refreshNamedFormulas();
+    const restored = this.restore_moved_items(sheet, moved, patch, axis);
+    this.refresh_named_formulas();
     if (sheet.autoFilter) {
       sheet.autoFilter = { range: rebaseMovedRange(sheet.autoFilter.range, axis, patch) };
     }
     if (axis === "row") this.view.rowsChanged(patch.sheet);
-    else this.view.columnsChanged(patch.sheet, moveAt);
-    if (beforeCells && changes) this.pushPermutedChanges(span, beforeCells, changes);
+    else this.view.columnsChanged(patch.sheet, move_at);
+    if (before_cells && changes) this.push_permuted_changes(span, before_cells, changes);
     return restored;
   }
 
   /** A row move changes each table's rows as it changes a range; see `rebaseMovedRange`. */
-  private moveTableRows(
+  private move_table_rows(
     sheet: Sheet,
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
   ): void {
@@ -4251,7 +4271,7 @@ export class StoreDataEngine {
       const range = rebaseMovedRange(table.range, "row", patch);
       if (range === table.range) return table;
       const next = { ...table, range };
-      this.syncTable(next);
+      this.sync_table(next);
       return next;
     });
   }
@@ -4260,14 +4280,14 @@ export class StoreDataEngine {
    * Copies of the range-keyed items a move carries, taken before the move
    * and put back at the moved positions.
    */
-  private captureMovedItems(sheet: Sheet, axis: SheetAxis): MovedItems {
+  private capture_moved_items(sheet: Sheet, axis: SheetAxis): MovedItems {
     return {
       namedRanges: (this.workbook.namedRanges ?? [])
         .filter(
-          (namedRange): namedRange is NamedRangeSnapshot & { range: Range } =>
-            namedRange.range?.sheet === sheet.id,
+          (named_range): named_range is NamedRangeSnapshot & { range: Range } =>
+            named_range.range?.sheet === sheet.id,
         )
-        .map((namedRange) => cloneJsonValue(namedRange)),
+        .map((named_range) => cloneJsonValue(named_range)),
       validationRules: cloneJsonValue(sheet.validationRules) ?? [],
       protectedRanges: cloneJsonValue(sheet.protectedRanges) ?? [],
       notes: cloneJsonValue(sheet.notes) ?? [],
@@ -4275,69 +4295,71 @@ export class StoreDataEngine {
       hyperlinks: this.workbook.sheets.map(
         (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
       ),
-      // Only a column move puts table metadata back; see `restoreMovedTables`.
+      // Only a column move puts table metadata back; see `restore_moved_tables`.
       tables: axis === "column" ? cloneJsonValue(sheet.tables ?? []) : [],
-      charts: this.captureCharts(),
+      charts: this.capture_charts(),
     };
   }
 
-  private restoreMovedItems(
+  private restore_moved_items(
     sheet: Sheet,
     moved: MovedItems,
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
     axis: SheetAxis,
   ): boolean {
-    const moveAt = moveRemap(patch.from, patch.count, patch.to);
-    const formulaEdit: FormulaAxisEdit = {
+    const move_at = moveRemap(patch.from, patch.count, patch.to);
+    const formula_edit: FormulaAxisEdit = {
       kind: "move",
       from: patch.from,
       count: patch.count,
       to: patch.to,
     };
 
-    sheet.validationRules = rebaseValidationRules(
+    sheet.validationRules = rebase_validation_rules(
       moved.validationRules,
       sheet.id,
       axis,
-      moveAt,
-      formulaEdit,
+      move_at,
+      formula_edit,
     );
-    sheet.protectedRanges = rebaseRangeItems(moved.protectedRanges, sheet.id, axis, moveAt);
-    sheet.notes = rebaseNotes(moved.notes, sheet.id, axis, moveAt);
-    sheet.conditionalFormats = rebaseConditionalFormats(
+    sheet.protectedRanges = rebaseRangeItems(moved.protectedRanges, sheet.id, axis, move_at);
+    sheet.notes = rebase_notes(moved.notes, sheet.id, axis, move_at);
+    sheet.conditionalFormats = rebase_conditional_formats(
       moved.conditionalFormats,
       sheet.id,
       axis,
-      moveAt,
-      formulaEdit,
+      move_at,
+      formula_edit,
     );
-    for (const [ownerId, hyperlinks] of moved.hyperlinks) {
-      const owner = this.workbook.sheets.find((candidate) => candidate.id === ownerId);
-      if (owner) owner.hyperlinks = rebaseHyperlinks(hyperlinks, sheet.id, axis, moveAt);
+    for (const [owner_id, hyperlinks] of moved.hyperlinks) {
+      const owner = this.workbook.sheets.find((candidate) => candidate.id === owner_id);
+      if (owner) owner.hyperlinks = rebase_hyperlinks(hyperlinks, sheet.id, axis, move_at);
     }
 
-    if (axis === "column") this.restoreMovedTables(sheet, moved.tables, moveAt);
-    this.restoreMovedCharts(moved.charts, { ...formulaEdit, sheet: sheet.id, axis });
-    this.windowReader.conditionalRulesChanged(sheet.id);
+    if (axis === "column") this.restore_moved_tables(sheet, moved.tables, move_at);
+    this.restore_moved_charts(moved.charts, { ...formula_edit, sheet: sheet.id, axis });
+    this.window_reader.conditionalRulesChanged(sheet.id);
     // A named range changes as a formula's range does, so formulas that use
     // the name and formulas that use the range read the same cells.
     return moved.namedRanges.every((original) =>
-      this.upsertMovedNamedRange({
+      this.upsert_moved_named_range({
         ...original,
         range: rebaseMovedRange(original.range, axis, patch),
       }),
     );
   }
 
-  private upsertMovedNamedRange(namedRange: NamedRangeSnapshot): boolean {
-    this.upsertNamedRange(namedRange);
-    return this.syncNamedRange(namedRange);
+  private upsert_moved_named_range(named_range: NamedRangeSnapshot): boolean {
+    this.upsert_named_range(named_range);
+    return this.sync_named_range(named_range);
   }
 
-  /** Add `namedRange`, or replace the definition with its name and scope. */
-  private upsertNamedRange(namedRange: NamedRangeSnapshot): void {
-    this.workbook.namedRanges = upsertWhere(this.workbook.namedRanges ?? [], namedRange, (range) =>
-      this.sameNamedRange(range, namedRange.name, namedRange.scope),
+  /** Add `named_range`, or replace the definition with its name and scope. */
+  private upsert_named_range(named_range: NamedRangeSnapshot): void {
+    this.workbook.namedRanges = upsert_where(
+      this.workbook.namedRanges ?? [],
+      named_range,
+      (range) => this.same_named_range(range, named_range.name, named_range.scope),
     );
   }
 
@@ -4346,10 +4368,10 @@ export class StoreDataEngine {
    * cells and adjusts their formulas; notes, hyperlinks and merged cells of
    * the range move here. Nothing changes when a check fails.
    */
-  private permuteRows(
+  private permute_rows(
     patch: PermuteRowsOperation,
     changes: ChangeEvent["changes"] | null,
-    captureDetailedChanges: boolean,
+    capture_detailed_changes: boolean,
   ): boolean {
     const bounds = normalizedRange(patch.range);
     const sheet = this.sheets.sheetMeta(bounds.sheet);
@@ -4374,10 +4396,12 @@ export class StoreDataEngine {
     if (!tablesAllowRowMove(sheet.tables ?? [], bounds)) return false;
 
     const cols = bounds.end.col - bounds.start.col + 1;
-    const beforeCells =
-      changes && captureDetailedChanges ? this.captureBlockBeforeCells(bounds, rows, cols) : null;
+    const before_cells =
+      changes && capture_detailed_changes
+        ? this.capture_block_before_cells(bounds, rows, cols)
+        : null;
 
-    this.noteRangeMutationFfi(rows);
+    this.note_range_mutation_ffi(rows);
     const status = this.wasm.permuteRows(
       this.sheets.handleOf(bounds.sheet),
       bounds.start.row,
@@ -4389,12 +4413,12 @@ export class StoreDataEngine {
 
     if (sheet.merges) {
       sheet.merges = merges;
-      this.spillBlockersDirty.add(bounds.sheet);
+      this.spill_blockers_dirty.add(bounds.sheet);
     }
     if (sheet.notes) sheet.notes = permutedNotes(sheet.notes, move);
     if (sheet.hyperlinks) sheet.hyperlinks = permutedHyperlinks(sheet.hyperlinks, move);
 
-    if (beforeCells && changes) this.pushPermutedChanges(bounds, beforeCells, changes);
+    if (before_cells && changes) this.push_permuted_changes(bounds, before_cells, changes);
     return true;
   }
 
@@ -4406,24 +4430,24 @@ export class StoreDataEngine {
    * by the engine's rule. A block that would cut through a table, pivot
    * output or merged cell does not move.
    */
-  private moveCells(
+  private move_cells(
     patch: MoveCellsOperation,
     changes: ChangeEvent["changes"] | null,
-    captureDetailedChanges: boolean,
+    capture_detailed_changes: boolean,
   ): boolean {
     const move = cellBlockMove(patch);
     const { from, to } = move;
-    const fromSheet = this.workbook.sheets.find((sheet) => sheet.id === from.sheet);
-    const toSheet = this.workbook.sheets.find((sheet) => sheet.id === to.sheet);
+    const from_sheet = this.workbook.sheets.find((sheet) => sheet.id === from.sheet);
+    const to_sheet = this.workbook.sheets.find((sheet) => sheet.id === to.sheet);
     if (
-      !fromSheet ||
-      !toSheet ||
-      isDashboard(toSheet) ||
+      !from_sheet ||
+      !to_sheet ||
+      isDashboard(to_sheet) ||
       ![from.start.row, from.start.col, to.start.row, to.start.col].every(integerAt) ||
-      from.end.row >= fromSheet.rowCount ||
-      from.end.col >= fromSheet.columns.length ||
-      to.end.row >= toSheet.rowCount ||
-      to.end.col >= toSheet.columns.length
+      from.end.row >= from_sheet.rowCount ||
+      from.end.col >= from_sheet.columns.length ||
+      to.end.row >= to_sheet.rowCount ||
+      to.end.col >= to_sheet.columns.length
     ) {
       return false;
     }
@@ -4440,22 +4464,22 @@ export class StoreDataEngine {
     const bounds = movedCellBounds(patch);
     if (
       bounds.some((block) =>
-        this.blockMeetsOwnedCells(block.sheet === from.sheet ? fromSheet : toSheet, block),
+        this.block_meets_owned_cells(block.sheet === from.sheet ? from_sheet : to_sheet, block),
       )
     ) {
       return false;
     }
 
-    const merges = movedMerges(fromSheet, toSheet, move);
-    if (!merges || merges.to.some((merge) => mergeCrossesFreeze(toSheet, merge))) return false;
+    const merges = movedMerges(from_sheet, to_sheet, move);
+    if (!merges || merges.to.some((merge) => mergeCrossesFreeze(to_sheet, merge))) return false;
 
     const rows = from.end.row - from.start.row + 1;
     const cols = from.end.col - from.start.col + 1;
     const before =
-      changes && captureDetailedChanges
+      changes && capture_detailed_changes
         ? bounds.map((block) => ({
             bounds: block,
-            cells: this.captureBlockBeforeCells(
+            cells: this.capture_block_before_cells(
               block,
               block.end.row - block.start.row + 1,
               block.end.col - block.start.col + 1,
@@ -4463,7 +4487,7 @@ export class StoreDataEngine {
           }))
         : null;
 
-    this.noteRangeMutationFfi(rows);
+    this.note_range_mutation_ffi(rows);
     const status = this.wasm.moveCells(
       this.sheets.handleOf(from.sheet),
       from.start.row,
@@ -4477,19 +4501,19 @@ export class StoreDataEngine {
     );
     if (status !== 0) return false;
 
-    if (fromSheet.merges || merges.from.length > 0) fromSheet.merges = merges.from;
-    if (toSheet.merges || merges.to.length > 0) toSheet.merges = merges.to;
-    this.spillBlockersDirty.add(from.sheet);
-    this.spillBlockersDirty.add(to.sheet);
-    this.moveBlockItems(fromSheet, toSheet, move);
+    if (from_sheet.merges || merges.from.length > 0) from_sheet.merges = merges.from;
+    if (to_sheet.merges || merges.to.length > 0) to_sheet.merges = merges.to;
+    this.spill_blockers_dirty.add(from.sheet);
+    this.spill_blockers_dirty.add(to.sheet);
+    this.move_block_items(from_sheet, to_sheet, move);
     if (before && changes) {
-      for (const block of before) this.pushPermutedChanges(block.bounds, block.cells, changes);
+      for (const block of before) this.push_permuted_changes(block.bounds, block.cells, changes);
     }
     return true;
   }
 
   /** Whether a table or pivot output meets the block: a cut moves neither in part. */
-  private blockMeetsOwnedCells(sheet: Sheet, block: Range): boolean {
+  private block_meets_owned_cells(sheet: Sheet, block: Range): boolean {
     return (
       (sheet.tables ?? []).some((table) => rangesIntersect(table.range, block)) ||
       this.pivotOutputs(sheet.id).some((output) => rangesIntersect(output.range, block))
@@ -4500,45 +4524,46 @@ export class StoreDataEngine {
    * Carry the notes, hyperlinks, validation and conditional-format rules,
    * named ranges and chart sources that a block move takes along.
    */
-  private moveBlockItems(fromSheet: Sheet, toSheet: Sheet, move: CellBlockMove): void {
+  private move_block_items(from_sheet: Sheet, to_sheet: Sheet, move: CellBlockMove): void {
     const place = <K extends MovedSheetItems>(key: K, lists: { from: Sheet[K]; to: Sheet[K] }) => {
-      if (fromSheet[key] || lists.from?.length) fromSheet[key] = lists.from;
-      if (toSheet[key] || lists.to?.length) toSheet[key] = lists.to;
+      if (from_sheet[key] || lists.from?.length) from_sheet[key] = lists.from;
+      if (to_sheet[key] || lists.to?.length) to_sheet[key] = lists.to;
     };
-    place("notes", movedNotes(fromSheet.notes ?? [], toSheet.notes ?? [], move));
+    place("notes", movedNotes(from_sheet.notes ?? [], to_sheet.notes ?? [], move));
     place(
       "hyperlinks",
-      movedHyperlinks(fromSheet.hyperlinks ?? [], toSheet.hyperlinks ?? [], move),
+      movedHyperlinks(from_sheet.hyperlinks ?? [], to_sheet.hyperlinks ?? [], move),
     );
     place(
       "validationRules",
-      movedValidationRules(fromSheet.validationRules ?? [], toSheet.validationRules ?? [], move),
+      movedValidationRules(from_sheet.validationRules ?? [], to_sheet.validationRules ?? [], move),
     );
     place(
       "conditionalFormats",
       movedConditionalFormats(
-        fromSheet.conditionalFormats ?? [],
-        toSheet.conditionalFormats ?? [],
+        from_sheet.conditionalFormats ?? [],
+        to_sheet.conditionalFormats ?? [],
         move,
       ),
     );
-    this.windowReader.conditionalRulesChanged(fromSheet.id);
-    if (toSheet !== fromSheet) this.windowReader.conditionalRulesChanged(toSheet.id);
+    this.window_reader.conditionalRulesChanged(from_sheet.id);
+    if (to_sheet !== from_sheet) this.window_reader.conditionalRulesChanged(to_sheet.id);
 
-    this.rewriteCharts((chart) =>
+    this.rewrite_charts((chart) =>
       mapChartSources(chart, (range) => moveCellRange(range, move) ?? "#REF!"),
     );
     // A named range follows as a formula's range does; the engine moved its own copy.
-    for (const namedRange of [...(this.workbook.namedRanges ?? [])]) {
-      if (!namedRange.range) continue;
-      const range = moveCellRange(namedRange.range, move);
-      if (range && range !== namedRange.range) this.upsertMovedNamedRange({ ...namedRange, range });
+    for (const named_range of [...(this.workbook.namedRanges ?? [])]) {
+      if (!named_range.range) continue;
+      const range = moveCellRange(named_range.range, move);
+      if (range && range !== named_range.range)
+        this.upsert_moved_named_range({ ...named_range, range });
     }
-    this.refreshNamedFormulas();
+    this.refresh_named_formulas();
   }
 
   /** Whether every cell of the block is loaded, so a move can read and write it. */
-  private blockLoaded(range: Range): boolean {
+  private block_loaded(range: Range): boolean {
     if (!this.sheets.handles.has(range.sheet) || !this.isPaged(range.sheet)) return true;
     return this.isRangeFullyLoaded(range);
   }
@@ -4547,22 +4572,22 @@ export class StoreDataEngine {
    * Cell-level effects of a row permutation, for listeners that ask for them
    * (such as a row bridge). Other listeners read the operation's range.
    */
-  private pushPermutedChanges(
+  private push_permuted_changes(
     bounds: Range,
-    beforeCells: Array<{ addr: CellAddress; before: ResolvedCell }>,
+    before_cells: Array<{ addr: CellAddress; before: ResolvedCell }>,
     changes: ChangeEvent["changes"],
   ): void {
     const after = this.captureCells(
       bounds.sheet,
-      beforeCells.map(({ addr }) => addr),
+      before_cells.map(({ addr }) => addr),
     );
-    for (const [index, entry] of beforeCells.entries()) {
+    for (const [index, entry] of before_cells.entries()) {
       const next = after[index];
       if (!next) continue;
 
       changes.push({
         addr: entry.addr,
-        oldValue: literalOf(entry.before.resolved),
+        oldValue: literal_of(entry.before.resolved),
         newValue: next.value,
         oldStyle: entry.before.style,
       });
@@ -4578,15 +4603,15 @@ export class StoreDataEngine {
    * overlap another table, or that the engine rejects keeps the remove/add
    * result, so a move never stops half-applied after its cells moved.
    */
-  private restoreMovedTables(
+  private restore_moved_tables(
     sheet: Sheet,
     originals: readonly WorkbookTable[],
-    moveCol: (col: number) => number,
+    move_col: (col: number) => number,
   ): void {
     let tables = sheet.tables ?? [];
     for (const original of originals) {
       const positions = original.columns.map((_column, offset) =>
-        moveCol(original.range.start.col + offset),
+        move_col(original.range.start.col + offset),
       );
       const start = Math.min(...positions);
       const end = Math.max(...positions);
@@ -4607,11 +4632,11 @@ export class StoreDataEngine {
 
       delete restored.autoFilter;
       delete restored.sortState;
-      Object.assign(restored, remapWorkbookTableRuleColumns(original, moveCol, start, end));
+      Object.assign(restored, remapWorkbookTableRuleColumns(original, move_col, start, end));
       const others = this.workbook.sheets
         .flatMap((owner) => (owner === sheet ? tables : (owner.tables ?? [])))
         .filter((table) => table.id !== original.id);
-      if (!validWorkbookTable(restored, sheet, others) || !this.syncTable(restored)) continue;
+      if (!validWorkbookTable(restored, sheet, others) || !this.sync_table(restored)) continue;
       tables = upsertById(tables, restored);
     }
 
@@ -4619,7 +4644,7 @@ export class StoreDataEngine {
   }
 
   /** Keep chart list identity until a rewrite changes at least one definition. */
-  private rewriteCharts(map: (chart: ChartDefinition, ownerId: SheetId) => ChartDefinition): void {
+  private rewrite_charts(map: (chart: ChartDefinition, ownerId: SheetId) => ChartDefinition): void {
     for (const owner of this.workbook.sheets) {
       const charts = owner.charts;
       if (!charts) continue;
@@ -4641,8 +4666,8 @@ export class StoreDataEngine {
   }
 
   /** Rewrite every chart that is anchored on, or reads from, the edited sheet. */
-  private rebaseCharts(edit: ChartAxisEdit): void {
-    this.rewriteCharts((chart, ownerId) => rebaseChartAxis(chart, ownerId, edit));
+  private rebase_charts(edit: ChartAxisEdit): void {
+    this.rewrite_charts((chart, owner_id) => rebaseChartAxis(chart, owner_id, edit));
   }
 
   /**
@@ -4650,7 +4675,7 @@ export class StoreDataEngine {
    * would turn sources inside the moved block into `#REF!`; the lists are
    * replaced rather than mutated, so these references keep the pre-move state.
    */
-  private captureCharts(): Map<Sheet, readonly ChartDefinition[]> | null {
+  private capture_charts(): Map<Sheet, readonly ChartDefinition[]> | null {
     let captured: Map<Sheet, readonly ChartDefinition[]> | null = null;
     for (const owner of this.workbook.sheets) {
       if (!owner.charts?.length) continue;
@@ -4660,7 +4685,7 @@ export class StoreDataEngine {
     return captured;
   }
 
-  private restoreMovedCharts(
+  private restore_moved_charts(
     originals: ReadonlyMap<Sheet, readonly ChartDefinition[]> | null,
     edit: Extract<ChartAxisEdit, { kind: "move" }>,
   ): void {
@@ -4670,7 +4695,7 @@ export class StoreDataEngine {
     }
   }
 
-  private addSheetSnapshot(
+  private add_sheet_snapshot(
     snapshot: SheetSnapshot,
     changes: ChangeEvent["changes"] | null,
   ): boolean {
@@ -4733,13 +4758,13 @@ export class StoreDataEngine {
 
     if (snapshot.pivots?.length) {
       const sheets = [...this.workbook.sheets, sheet];
-      if (this.pivotCount() + snapshot.pivots.length > MAX_PIVOTS_PER_WORKBOOK) return false;
+      if (this.pivot_count() + snapshot.pivots.length > MAX_PIVOTS_PER_WORKBOOK) return false;
       const ids = new Set<string>();
       for (const pivot of snapshot.pivots) {
         if (
           ids.has(pivot.id) ||
           pivotOwner(this.workbook.sheets, pivot.id) ||
-          this.pivotIssues(pivot, sheet, sheets).length > 0
+          this.pivot_issues(pivot, sheet, sheets).length > 0
         ) {
           return false;
         }
@@ -4748,17 +4773,17 @@ export class StoreDataEngine {
       }
 
       sheet.pivots = snapshot.pivots.map(clonePivot);
-      this.pivotSheetsDirty.add(sheet.id);
+      this.pivot_sheets_dirty.add(sheet.id);
     }
 
-    const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
+    const handle = this.allocate_sheet(snapshot.columns.length, snapshot.rowCount);
     if (!this.wasm.setSheetName(handle, snapshot.id, name.name)) {
       this.wasm.removeSheet(handle);
       return false;
     }
 
     this.sheets.handles.set(snapshot.id, handle);
-    this.sheetIdsByHandle[handle] = snapshot.id;
+    this.sheet_ids_by_handle[handle] = snapshot.id;
     for (const [row, meta] of snapshot.rowMeta ?? []) {
       if (meta.height !== undefined) sheet.rowHeights!.set(row, meta.height);
       if (meta.hidden) sheet.hiddenRows!.add(row);
@@ -4766,14 +4791,14 @@ export class StoreDataEngine {
 
     this.view.queueHiddenRows(snapshot.id);
     this.sheets.insertSheet(sheet, snapshot.order);
-    this.syncSheetOrder();
+    this.sync_sheet_order();
     for (const table of sheet.tables ?? []) {
-      if (!this.syncTable(table)) return false;
+      if (!this.sync_table(table)) return false;
     }
 
     for (const block of snapshot.cells) {
       if (
-        !this.applyPatch(
+        !this.apply_patch(
           {
             op: "setRange",
             range: {
@@ -4793,14 +4818,14 @@ export class StoreDataEngine {
       }
     }
 
-    this.windowReader.conditionalRulesChanged(snapshot.id);
+    this.window_reader.conditionalRulesChanged(snapshot.id);
     this.view.sheetLoaded(snapshot.id);
-    if (this.snapshotAuthoritative) this.authoritativeSnapshotSheets.add(snapshot.id);
+    if (this.snapshot_authoritative) this.authoritative_snapshot_sheets.add(snapshot.id);
     return true;
   }
 
-  private removeSheetSnapshot(sheetId: SheetId): boolean {
-    const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
+  private remove_sheet_snapshot(sheet_id: SheetId): boolean {
+    const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheet_id);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
     const removed = this.workbook.sheets[index]!;
     if (
@@ -4812,30 +4837,30 @@ export class StoreDataEngine {
     }
 
     const fallback =
-      this.workbook.activeSheet === sheetId
-        ? visibleSheetNeighbor(this.workbook.sheets, sheetId)
+      this.workbook.activeSheet === sheet_id
+        ? visibleSheetNeighbor(this.workbook.sheets, sheet_id)
         : null;
-    if (this.workbook.activeSheet === sheetId && !fallback) return false;
-    if (!this.removeSheetFormulaIdentity(sheetId)) return false;
-    this.sheets.handles.delete(sheetId);
-    this.authoritativeSnapshotSheets.delete(sheetId);
-    this.view.removeSheet(sheetId);
-    this.windowReader.removeSheet(sheetId);
+    if (this.workbook.activeSheet === sheet_id && !fallback) return false;
+    if (!this.removeSheetFormulaIdentity(sheet_id)) return false;
+    this.sheets.handles.delete(sheet_id);
+    this.authoritative_snapshot_sheets.delete(sheet_id);
+    this.view.removeSheet(sheet_id);
+    this.window_reader.removeSheet(sheet_id);
     this.sheets.removeSheetAt(index);
     if (fallback) this.workbook.activeSheet = fallback;
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
-      (range) => range.range?.sheet !== sheetId && range.scope !== sheetId,
+      (range) => range.range?.sheet !== sheet_id && range.scope !== sheet_id,
     );
-    this.refreshNamedFormulas();
+    this.refresh_named_formulas();
     for (const owner of this.workbook.sheets) {
       owner.hyperlinks = owner.hyperlinks?.filter(
         (hyperlink) =>
-          hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheetId,
+          hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheet_id,
       );
     }
 
     // A chart keeps a source on a removed sheet as an explicit `#REF!`.
-    this.rewriteCharts((chart) => invalidateChartSheet(chart, sheetId));
+    this.rewrite_charts((chart) => invalidateChartSheet(chart, sheet_id));
 
     return true;
   }
@@ -4845,48 +4870,49 @@ export class StoreDataEngine {
    * delete that the engine already applied; `remap` gives each old index its
    * new one, or null for a removed index.
    */
-  private rebaseSheetAxis(
+  private rebase_sheet_axis(
     sheet: SheetId,
     axis: SheetAxis,
     remap: (index: number) => number | null,
     edit: { at: number; delta: number; inserted?: readonly Column[] },
   ): void {
     const meta = this.sheets.sheetMeta(sheet);
-    if (axis === "row") rebaseRowMeta(meta, remap);
+    if (axis === "row") rebase_row_meta(meta, remap);
 
     meta.merges = meta.merges
-      ?.map((merge) => rebaseMergeAxis(merge, axis, remap))
+      ?.map((merge) => rebase_merge_axis(merge, axis, remap))
       .filter((merge): merge is MergeRange => merge !== null);
-    const formulaEdit: FormulaAxisEdit = { kind: "shift", at: edit.at, delta: edit.delta };
+    const formula_edit: FormulaAxisEdit = { kind: "shift", at: edit.at, delta: edit.delta };
     meta.conditionalFormats =
       meta.conditionalFormats &&
-      rebaseConditionalFormats(meta.conditionalFormats, sheet, axis, remap, formulaEdit);
+      rebase_conditional_formats(meta.conditionalFormats, sheet, axis, remap, formula_edit);
     for (const owner of this.workbook.sheets) {
-      owner.hyperlinks = owner.hyperlinks && rebaseHyperlinks(owner.hyperlinks, sheet, axis, remap);
+      owner.hyperlinks =
+        owner.hyperlinks && rebase_hyperlinks(owner.hyperlinks, sheet, axis, remap);
     }
 
-    this.windowReader.conditionalRulesChanged(sheet);
+    this.window_reader.conditionalRulesChanged(sheet);
     meta.validationRules =
       meta.validationRules &&
-      rebaseValidationRules(meta.validationRules, sheet, axis, remap, formulaEdit);
+      rebase_validation_rules(meta.validationRules, sheet, axis, remap, formula_edit);
     meta.protectedRanges =
       meta.protectedRanges && rebaseRangeItems(meta.protectedRanges, sheet, axis, remap);
-    meta.notes = meta.notes && rebaseNotes(meta.notes, sheet, axis, remap);
-    meta.tables = this.rebaseTables(meta, axis, remap, edit);
+    meta.notes = meta.notes && rebase_notes(meta.notes, sheet, axis, remap);
+    meta.tables = this.rebase_tables(meta, axis, remap, edit);
     if (axis === "row" && meta.frozenRows)
-      meta.frozenRows = frozenCountAfter(meta.frozenRows, remap);
+      meta.frozenRows = frozen_count_after(meta.frozenRows, remap);
     if (axis === "column" && meta.frozenCols) {
-      meta.frozenCols = frozenCountAfter(meta.frozenCols, remap);
+      meta.frozenCols = frozen_count_after(meta.frozenCols, remap);
     }
 
     this.workbook.namedRanges = this.workbook.namedRanges
-      ?.map((namedRange) =>
-        namedRange.range === undefined
-          ? namedRange
-          : rebaseRangeAxis(namedRange, sheet, axis, remap),
+      ?.map((named_range) =>
+        named_range.range === undefined
+          ? named_range
+          : rebaseRangeAxis(named_range, sheet, axis, remap),
       )
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
-    this.refreshNamedFormulas();
+    this.refresh_named_formulas();
     rebaseSheetAutoFilter(meta, axis, remap);
     if (axis === "row") this.view.rowsChanged(sheet);
     else this.view.columnsChanged(sheet, remap);
@@ -4899,7 +4925,7 @@ export class StoreDataEngine {
    * filter and sort rules; a table whose columns no longer match its span
    * is dropped.
    */
-  private rebaseTables(
+  private rebase_tables(
     meta: Sheet,
     axis: SheetAxis,
     remap: (index: number) => number | null,
@@ -4910,19 +4936,21 @@ export class StoreDataEngine {
       const range = rebaseRangeSpan(table.range, axis, remap);
       const next =
         range &&
-        (axis === "row" ? { ...table, range } : this.rebaseTableColumns(table, range, remap, edit));
+        (axis === "row"
+          ? { ...table, range }
+          : this.rebase_table_columns(table, range, remap, edit));
       if (!next) {
         this.wasm.removeTable(table.id);
         continue;
       }
 
       tables.push(next);
-      this.syncTable(next);
+      this.sync_table(next);
     }
     return tables;
   }
 
-  private rebaseTableColumns(
+  private rebase_table_columns(
     table: WorkbookTable,
     range: Range,
     remap: (col: number) => number | null,
@@ -4930,7 +4958,7 @@ export class StoreDataEngine {
   ): WorkbookTable | null {
     let columns = table.columns;
     if (edit.delta > 0 && edit.at > table.range.start.col && edit.at <= table.range.end.col) {
-      const added = this.insertedTableColumns(table, edit.inserted ?? []);
+      const added = this.inserted_table_columns(table, edit.inserted ?? []);
       const offset = edit.at - table.range.start.col;
       columns = [...columns.slice(0, offset), ...added, ...columns.slice(offset)];
     } else if (edit.delta < 0) {
@@ -4949,20 +4977,20 @@ export class StoreDataEngine {
     return next;
   }
 
-  private acknowledgedSetStillMatches(
+  private acknowledged_set_still_matches(
     addr: CellAddress,
     value: CellValue,
     style: CellStyle | undefined,
     sources?: RangeSourceProjection | null,
-    sourceOffset = 0,
+    source_offset = 0,
     current: ResolvedCell = this.getCell(addr),
   ): boolean {
     if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
 
     const formula =
-      sources === undefined ? this.getFormula(addr) : sources?.formulaAt(sourceOffset);
+      sources === undefined ? this.getFormula(addr) : sources?.formulaAt(source_offset);
     const target =
-      sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(sourceOffset);
+      sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(source_offset);
 
     if (value.kind === "formula") return formula === value.src;
     if (value.kind === "ref") {
@@ -4985,7 +5013,9 @@ export class StoreDataEngine {
     for (const operation of operations) {
       if (operation.op === "set") {
         // Read in operation order so a later invalid address cannot prevent earlier acknowledgements.
-        if (!this.acknowledgedSetStillMatches(operation.addr, operation.value, operation.style)) {
+        if (
+          !this.acknowledged_set_still_matches(operation.addr, operation.value, operation.style)
+        ) {
           continue;
         }
 
@@ -5000,7 +5030,7 @@ export class StoreDataEngine {
         const range = normalizedRange(operation.range);
         const rows = range.end.row - range.start.row + 1;
         const cols = range.end.col - range.start.col + 1;
-        const sources = this.captureSourceProjection(
+        const sources = this.capture_source_projection(
           range.sheet,
           range.start.row,
           range.start.col,
@@ -5008,17 +5038,17 @@ export class StoreDataEngine {
           cols,
         );
 
-        const currentCells = this.captureSparseBeforeCells(range, operation.cells);
-        const matchedRowsByColumn = new Map<number, Set<number>>();
+        const current_cells = this.capture_sparse_before_cells(range, operation.cells);
+        const matched_rows_by_column = new Map<number, Set<number>>();
 
         for (const [index, cell] of operation.cells.entries()) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
-          const current = currentCells[index];
+          const current = current_cells[index];
           if (!current) continue;
 
           if (
-            !this.acknowledgedSetStillMatches(
+            !this.acknowledged_set_still_matches(
               { sheet: range.sheet, row, col },
               cell.value,
               cell.style,
@@ -5030,21 +5060,21 @@ export class StoreDataEngine {
             continue;
           }
 
-          let matchedRows = matchedRowsByColumn.get(col);
-          if (!matchedRows) {
-            matchedRows = new Set<number>();
-            matchedRowsByColumn.set(col, matchedRows);
+          let matched_rows = matched_rows_by_column.get(col);
+          if (!matched_rows) {
+            matched_rows = new Set<number>();
+            matched_rows_by_column.set(col, matched_rows);
           }
 
-          matchedRows.add(row);
+          matched_rows.add(row);
         }
 
-        for (const [col, matchedRows] of matchedRowsByColumn) {
-          const sortedRows = [...matchedRows].sort((left, right) => left - right);
+        for (const [col, matched_rows] of matched_rows_by_column) {
+          const sorted_rows = [...matched_rows].sort((left, right) => left - right);
           let start: number | undefined;
           let end: number | undefined;
 
-          for (const row of sortedRows) {
+          for (const row of sorted_rows) {
             if (end !== undefined && row !== end && start !== undefined) {
               this.wasm.markRangeClean(this.sheets.handleOf(range.sheet), start, end, col, col + 1);
               start = undefined;
@@ -5083,7 +5113,7 @@ export class StoreDataEngine {
     for (const sheet of this.workbook.sheets) {
       this.requireCompleteQuery(sheet.id);
     }
-    return this.snapshotCodec.encode(documentId, documentVersion);
+    return this.snapshot_codec.encode(documentId, documentVersion);
   }
 
   /** Rewrite resolved formula sheet identity without changing the stable WASM handle. */
@@ -5099,7 +5129,7 @@ export class StoreDataEngine {
   }
 
   /** Give the engine the tab order, which 3-D references such as `Sheet1:Sheet3!A1` span. */
-  private syncSheetOrder(): void {
+  private sync_sheet_order(): void {
     const order = Uint32Array.from(this.workbook.sheets, (sheet) => this.sheets.handleOf(sheet.id));
     if (!this.wasm.setSheetOrder(order)) {
       throw new Error("engine sheet handles do not match the workbook tabs");
@@ -5116,20 +5146,20 @@ export class StoreDataEngine {
   ): void {
     if (rows.length === 0 || columns.length === 0) return;
     const meta = this.sheets.sheetMeta(sheet);
-    const rowCount = Math.min(rows.length, Math.max(0, meta.rowCount - start));
-    if (rowCount === 0) return;
+    const row_count = Math.min(rows.length, Math.max(0, meta.rowCount - start));
+    if (row_count === 0) return;
     if (!Number.isSafeInteger(start) || start < 0) {
       throw datasourceFailure("datasource page contains an invalid row start");
     }
 
-    let previousEnd = -1;
-    const declaredKeys = new Set<string>();
+    let previous_end = -1;
+    const declared_keys = new Set<string>();
     for (const band of columns) {
       if (
         !Number.isSafeInteger(band.start) ||
         !Number.isSafeInteger(band.end) ||
         band.start < 0 ||
-        band.start < previousEnd ||
+        band.start < previous_end ||
         band.end <= band.start ||
         band.end > meta.columns.length ||
         band.keys.length !== band.end - band.start
@@ -5139,54 +5169,54 @@ export class StoreDataEngine {
 
       for (let offset = 0; offset < band.keys.length; offset++) {
         const key = band.keys[offset]!;
-        if (meta.columns[band.start + offset]?.key !== key || declaredKeys.has(key)) {
+        if (meta.columns[band.start + offset]?.key !== key || declared_keys.has(key)) {
           throw datasourceFailure("datasource page contains invalid column keys");
         }
 
-        declaredKeys.add(key);
+        declared_keys.add(key);
       }
 
-      previousEnd = band.end;
+      previous_end = band.end;
     }
 
-    for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
-      const row = rows[rowOffset]!;
-      for (const key of declaredKeys) {
+    for (let row_offset = 0; row_offset < row_count; row_offset++) {
+      const row = rows[row_offset]!;
+      for (const key of declared_keys) {
         if (!Object.hasOwn(row, key)) {
           throw datasourceFailure("datasource page omits declared cell data");
         }
       }
 
       for (const key of Object.keys(row)) {
-        if (!declaredKeys.has(key))
+        if (!declared_keys.has(key))
           throw datasourceFailure("datasource page contains undeclared cell data");
       }
     }
 
-    const blockStart = columns[0]!.start;
-    const blockEnd = columns[columns.length - 1]!.end;
-    const blockWidth = blockEnd - blockStart;
+    const block_start = columns[0]!.start;
+    const block_end = columns[columns.length - 1]!.end;
+    const block_width = block_end - block_start;
 
     const cells: Array<{ offset: number; value: CellValue; style?: CellStyle }> = [];
-    const address: CellAddress = { sheet, row: start, col: blockStart };
-    for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
-      address.row = start + rowOffset;
-      const row = rows[rowOffset]!;
+    const address: CellAddress = { sheet, row: start, col: block_start };
+    for (let row_offset = 0; row_offset < row_count; row_offset++) {
+      address.row = start + row_offset;
+      const row = rows[row_offset]!;
       for (const band of columns) {
         for (let col = band.start; col < band.end; col++) {
           address.col = col;
           if (protect?.(address)) continue;
           const column = meta.columns[col]!;
-          const dataCell = row[column.key];
-          const wrapped = isStyledDataCell(dataCell) ? dataCell : undefined;
+          const data_cell = row[column.key];
+          const wrapped = is_styled_data_cell(data_cell) ? data_cell : undefined;
 
-          const source = columnarScalar(dataCellValue(dataCell), column.type);
+          const source = columnar_scalar(data_cell_value(data_cell), column.type);
           const value: CellValue =
             source && typeof source === "object"
               ? source
               : { kind: "literal", value: source ?? null };
           cells.push({
-            offset: rowOffset * blockWidth + col - blockStart,
+            offset: row_offset * block_width + col - block_start,
             value,
             style: wrapped?.style,
           });
@@ -5197,20 +5227,25 @@ export class StoreDataEngine {
     if (cells.length === 0) return;
     const bounds: Range = {
       sheet,
-      start: { row: start, col: blockStart },
-      end: { row: start + rowCount - 1, col: blockEnd - 1 },
+      start: { row: start, col: block_start },
+      end: { row: start + row_count - 1, col: block_end - 1 },
     };
 
-    const previousOperation = this.resourceOperation;
-    this.resourceOperation ??= "ingest";
+    const previous_operation = this.resource_operation;
+    this.resource_operation ??= "ingest";
     let accepted = false;
     this.wasm.beginPageLoad();
     try {
-      accepted = this.writeSparseBlock(bounds, cells);
+      accepted = this.write_sparse_block(bounds, cells);
     } finally {
-      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.commitEngineSources();
-      this.resourceOperation = previousOperation;
+      this.boundary_accounting.record(
+        this.resource_operation ?? "ingest",
+        "js-to-wasm",
+        0,
+        "scalar",
+      );
+      this.commit_engine_sources();
+      this.resource_operation = previous_operation;
     }
 
     if (!accepted) throw new Error("datasource page contains invalid persisted sources");
@@ -5220,10 +5255,10 @@ export class StoreDataEngine {
     let accepted = true;
     this.wasm.beginPageLoad();
     try {
-      for (const sourceSheet of snapshot.sheets) {
-        for (const block of sourceSheet.cells) {
+      for (const source_sheet of snapshot.sheets) {
+        for (const block of source_sheet.cells) {
           const bounds: Range = {
-            sheet: sourceSheet.id,
+            sheet: source_sheet.id,
             start: { row: block.startRow, col: block.startCol },
             end: {
               row: block.startRow + block.rowCount - 1,
@@ -5237,68 +5272,68 @@ export class StoreDataEngine {
             style: cell.style,
           }));
 
-          if (!this.writeSparseBlock(bounds, cells)) {
+          if (!this.write_sparse_block(bounds, cells)) {
             accepted = false;
             break;
           }
         }
 
         if (!accepted) break;
-        this.windowReader.conditionalRulesChanged(sourceSheet.id);
+        this.window_reader.conditionalRulesChanged(source_sheet.id);
       }
     } finally {
-      this.commitEngineSources();
+      this.commit_engine_sources();
     }
 
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
-    this.snapshotAuthoritative = true;
+    this.snapshot_authoritative = true;
     for (const sheet of snapshot.sheets) {
-      this.authoritativeSnapshotSheets.add(sheet.id);
+      this.authoritative_snapshot_sheets.add(sheet.id);
       this.view.cellsLoaded(sheet.id);
     }
 
-    if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
+    if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
   }
 
   beginPageRequest(): void {
-    this.pendingPageRequests += 1;
+    this.pending_page_requests += 1;
   }
 
   endPageRequest(): void {
-    this.pendingPageRequests -= 1;
+    this.pending_page_requests -= 1;
 
-    if (this.pendingPageRequests === 0) this.releasePageIdleWaiters();
+    if (this.pending_page_requests === 0) this.release_page_idle_waiters();
   }
 
   /** A memory release waits here; a disposed store has no page load left to wait for. */
-  private releasePageIdleWaiters(): void {
-    const waiters = this.pageIdleWaiters;
-    this.pageIdleWaiters = undefined;
+  private release_page_idle_waiters(): void {
+    const waiters = this.page_idle_waiters;
+    this.page_idle_waiters = undefined;
     if (waiters) for (const resolve of waiters) resolve();
   }
 
   waitForPageLoads(): Promise<void> | undefined {
-    if (this.disposed || this.pendingPageRequests === 0) return undefined;
+    if (this.disposed || this.pending_page_requests === 0) return undefined;
 
     const { promise, resolve } = Promise.withResolvers<void>();
-    this.pageIdleWaiters ??= [];
-    this.pageIdleWaiters.push(resolve);
+    this.page_idle_waiters ??= [];
+    this.page_idle_waiters.push(resolve);
 
     return promise;
   }
 
   /** Drop the window reader's rebuildable caches; cell data stays in the engine. */
   trimMemory(): void {
-    this.windowReader.trim();
+    this.window_reader.trim();
   }
 
   onMemoryRelease(listener: () => void): () => void {
-    this.memoryReleaseListeners.add(listener);
-    return () => this.memoryReleaseListeners.delete(listener);
+    this.memory_release_listeners.add(listener);
+    return () => this.memory_release_listeners.delete(listener);
   }
 
   notifyMemoryRelease(): void {
-    for (const listener of this.memoryReleaseListeners) listener();
+    for (const listener of this.memory_release_listeners) listener();
   }
 
   /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
@@ -5312,7 +5347,7 @@ export class StoreDataEngine {
     }> = [];
 
     try {
-      for (const [snapshot, owner] of this.rangeHistory) {
+      for (const [snapshot, owner] of this.range_history) {
         history.push({
           replacement: replacement.importRangeMemoryState(
             snapshot.resource.exportMemoryState(owner.sheetHandle),
@@ -5329,11 +5364,11 @@ export class StoreDataEngine {
       // that call them. The registry switches to the replacement only in
       // commit, so an aborted release leaves it on the live store.
       this.hostFunctions?.restore(replacement);
-      if (!this.syncRelationships(this.workbook.dataModel, replacement)) {
+      if (!this.sync_relationships(this.workbook.dataModel, replacement)) {
         throw new Error("Sheetwrite: the replacement engine refused the relationships");
       }
       for (const sheet of this.workbook.sheets) {
-        if (sheet.pivots?.length) this.syncPivots(sheet, replacement);
+        if (sheet.pivots?.length) this.sync_pivots(sheet, replacement);
       }
       // Installing definitions marks pivots dirty; finish calculation before the
       // replacement becomes observable, without changing no-pivot transfers.
@@ -5352,11 +5387,11 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
-        if (this.chartRecalculationTracked) replacement.setRecalculationTracking(true);
+        if (this.chart_recalculation_tracked) replacement.setRecalculationTracking(true);
         this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
-        this.windowReader.replaceEngine(replacement);
-        this.pagedDirtyPreflight?.replaceEngine(replacement);
+        this.window_reader.replaceEngine(replacement);
+        this.paged_dirty_preflight?.replaceEngine(replacement);
 
         for (const snapshot of history) snapshot.replace(snapshot.replacement);
 
@@ -5369,16 +5404,16 @@ export class StoreDataEngine {
   dispose(): void {
     if (this.disposed) return;
     const committed = this.wasm.wasmCommittedBytes();
-    this.committedBytesAfterDispose = committed > 0 ? committed : null;
-    this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
-    for (const history of this.rangeHistory.keys()) history.dispose();
-    this.memoryReleaseListeners.clear();
-    this.releasePageIdleWaiters();
+    this.committed_bytes_after_dispose = committed > 0 ? committed : null;
+    this.boundary_accounting.record("teardown", "js-to-wasm", 0, "scalar");
+    for (const history of this.range_history.keys()) history.dispose();
+    this.memory_release_listeners.clear();
+    this.release_page_idle_waiters();
     this.view.dispose();
-    this.windowReader.clear();
+    this.window_reader.clear();
     this.styles.clear();
     this.sheets.handles.clear();
-    this.authoritativeSnapshotSheets.clear();
+    this.authoritative_snapshot_sheets.clear();
     this.wasm.free();
     this.disposed = true;
   }
@@ -5391,76 +5426,76 @@ export class StoreDataEngine {
    * column: cell `(row, col)` sits at `col * rowCount + row`. No row-major
    * `values` copy is built.
    */
-  private loadColumnar(sheet: SheetId, data: ColumnarData): void {
+  private load_columnar(sheet: SheetId, data: ColumnarData): void {
     const meta = this.sheets.sheetMeta(sheet);
     const columns = meta.columns;
-    const rowCount = Math.min(data.rowCount, meta.rowCount);
-    if (rowCount === 0 || columns.length === 0) return;
-    const colCount = columns.length;
-    const cellCount = rowCount * colCount;
-    const kinds = new Uint8Array(cellCount);
-    const numbers = new Float64Array(cellCount);
-    const wasmStyles = new Uint32Array(cellCount);
+    const row_count = Math.min(data.rowCount, meta.rowCount);
+    if (row_count === 0 || columns.length === 0) return;
+    const col_count = columns.length;
+    const cell_count = row_count * col_count;
+    const kinds = new Uint8Array(cell_count);
+    const numbers = new Float64Array(cell_count);
+    const wasm_styles = new Uint32Array(cell_count);
     const formulas: Array<[number, string]> = [];
     const refs: Array<[number, CellAddress]> = [];
     const texts: string[] = [];
-    for (let col = 0; col < colCount; col++) {
+    for (let col = 0; col < col_count; col++) {
       const column = columns[col]!;
       const source = data.columns[column.key];
-      const base = col * rowCount;
-      for (let row = 0; row < rowCount; row++) {
-        const parsed = columnarScalar(source?.[row], column.type);
+      const base = col * row_count;
+      for (let row = 0; row < row_count; row++) {
+        const parsed = columnar_scalar(source?.[row], column.type);
         const offset = base + row;
         if (parsed && typeof parsed === "object") {
           if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
           else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
-          else writeColumnarValue(kinds, numbers, texts, offset, parsed.value);
+          else write_columnar_value(kinds, numbers, texts, offset, parsed.value);
         } else {
-          writeColumnarValue(kinds, numbers, texts, offset, parsed);
+          write_columnar_value(kinds, numbers, texts, offset, parsed);
         }
       }
     }
 
-    const referenceTargets = new Uint32Array(refs.length * 3);
+    const reference_targets = new Uint32Array(refs.length * 3);
     for (let index = 0; index < refs.length; index++) {
       const target = refs[index]![1];
-      const targetHandle = this.sheets.handles.get(target.sheet);
-      if (targetHandle === undefined || !this.isCellInBounds(target)) {
+      const target_handle = this.sheets.handles.get(target.sheet);
+      if (target_handle === undefined || !this.is_cell_in_bounds(target)) {
         throw new Error("columnar import contains invalid persisted sources");
       }
 
       const packed = index * 3;
-      referenceTargets[packed] = targetHandle;
-      referenceTargets[packed + 1] = target.row;
-      referenceTargets[packed + 2] = target.col;
+      reference_targets[packed] = target_handle;
+      reference_targets[packed + 1] = target.row;
+      reference_targets[packed + 2] = target.col;
     }
 
-    const packedText = packTexts(texts);
+    const packed_text = pack_texts(texts);
 
-    this.noteRangeMutationFfi(cellCount);
+    this.note_range_mutation_ffi(cell_count);
     const applied = this.wasm.setColumnBlockPacked(
       this.sheets.handleOf(sheet),
       0,
       0,
-      rowCount,
-      colCount,
+      row_count,
+      col_count,
       kinds,
       numbers,
-      packedText.bytes,
-      packedText.offsets,
-      wasmStyles,
+      packed_text.bytes,
+      packed_text.offsets,
+      wasm_styles,
       Uint32Array.from(formulas, ([offset]) => offset),
       formulas.map(([, source]) => source),
       Uint32Array.from(refs, ([offset]) => offset),
-      referenceTargets,
+      reference_targets,
     );
     if (applied !== 0) {
       throw new Error("columnar import contains invalid persisted sources");
     }
 
-    this.noteRangeMutationFfi();
-    this.commitEngineSources();
-    this.noteRangeMutationFfi();
+    this.note_range_mutation_ffi();
+    this.commit_engine_sources();
+    this.note_range_mutation_ffi();
     this.wasm.compactStringStorage();
   }
 }
@@ -5470,7 +5505,7 @@ export class StoreDataEngine {
  * value leaves the slot at KIND_EMPTY; the caller stores string text in its
  * own text buffer.
  */
-function writeScalarWire(
+function write_scalar_wire(
   kinds: Uint8Array,
   numbers: Float64Array,
   offset: number,
@@ -5488,18 +5523,18 @@ function writeScalarWire(
 }
 
 /** Write one columnar source scalar into the column-major block arrays. */
-function writeColumnarValue(
+function write_columnar_value(
   kinds: Uint8Array,
   numbers: Float64Array,
   texts: string[],
   offset: number,
   value: CellScalar | undefined,
 ): void {
-  writeScalarWire(kinds, numbers, offset, value);
+  write_scalar_wire(kinds, numbers, offset, value);
   if (typeof value === "string") texts.push(value);
 }
 
-function resolvedScalar(kind: number, num: number, text: string | null): CellScalar {
+function resolved_scalar(kind: number, num: number, text: string | null): CellScalar {
   if (kind === KIND_NUMBER || kind === KIND_FORMULA) return num;
   if (kind === KIND_BOOL) return num !== 0;
   if (kind === KIND_STRING) return text;
@@ -5507,23 +5542,23 @@ function resolvedScalar(kind: number, num: number, text: string | null): CellSca
 }
 
 /** Read one batched cell snapshot into resolved cells, then release WASM memory. */
-function consumeCellSnapshots(
+function consume_cell_snapshots(
   snapshot: CellSnapshot | undefined,
-  styleOf: (styleId: number) => CellStyle,
+  style_of: (styleId: number) => CellStyle,
 ): ResolvedCell[] {
   if (!snapshot) throw new Error("Sheetwrite: cell snapshot batch has mismatched coordinates");
   try {
-    const { kinds, numbers, styles, textIndex, strings } = snapshot;
+    const { kinds, numbers, styles, textIndex: text_index, strings } = snapshot;
     const cells = new Array<ResolvedCell>(kinds.length);
     for (const [index, kind] of kinds.entries()) {
-      const slot = textIndex[index] ?? -1;
+      const slot = text_index[index] ?? -1;
       cells[index] = {
-        resolved: resolvedScalar(
+        resolved: resolved_scalar(
           kind,
           numbers[index] ?? 0,
           slot < 0 ? null : (strings[slot] ?? null),
         ),
-        style: styleOf(styles[index] ?? 0),
+        style: style_of(styles[index] ?? 0),
       };
     }
     return cells;
@@ -5533,29 +5568,29 @@ function consumeCellSnapshots(
 }
 
 /** Whether a data cell is the `{ value, style }` form rather than a bare value. */
-function isStyledDataCell(
+function is_styled_data_cell(
   value: DataCell | undefined,
 ): value is { value: CellValue; style?: CellStyle } {
   return value !== null && typeof value === "object" && !("kind" in value) && "value" in value;
 }
 
-function dataCellValue(value: DataCell | undefined): CellScalar | CellValue | undefined {
-  return isStyledDataCell(value) ? value.value : value;
+function data_cell_value(value: DataCell | undefined): CellScalar | CellValue | undefined {
+  return is_styled_data_cell(value) ? value.value : value;
 }
 
-function columnarScalar(
+function columnar_scalar(
   value: CellScalar | CellValue | undefined,
   type: CellFormat,
 ): CellScalar | CellValue | undefined {
-  const unwrapped = dataCellValue(value);
+  const unwrapped = data_cell_value(value);
   if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
-    return columnarScalar(unwrapped.value, type);
+    return columnar_scalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
 }
 
 /** The engine's number for the kind of a trial value: 0 blank, 1 number, 2 text, 3 logical. */
-function trialKind(trial: CellScalar): number {
+function trial_kind(trial: CellScalar): number {
   if (trial === null) return 0;
   if (typeof trial === "number") return 1;
   return typeof trial === "string" ? 2 : 3;

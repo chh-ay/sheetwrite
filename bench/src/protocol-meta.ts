@@ -28,7 +28,7 @@ export function packageVersion(path: string): string {
   return manifest.version;
 }
 
-function gitOutput(args: readonly string[]): string {
+function git_output(args: readonly string[]): string {
   const result = Bun.spawnSync(["git", ...args], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
@@ -47,7 +47,7 @@ function gitOutput(args: readonly string[]): string {
  */
 export function sourceTreeDirty(includeUntracked: boolean): boolean {
   return (
-    gitOutput([
+    git_output([
       "status",
       "--porcelain",
       ...(includeUntracked ? [] : ["--untracked-files=no"]),
@@ -59,7 +59,7 @@ export function sourceTreeDirty(includeUntracked: boolean): boolean {
 
 export function protocolCaptureMeta(): ProtocolCaptureMeta {
   return {
-    commit: gitOutput(["rev-parse", "HEAD"]),
+    commit: git_output(["rev-parse", "HEAD"]),
     dirty: sourceTreeDirty(false),
     timestamp: new Date().toISOString(),
   };

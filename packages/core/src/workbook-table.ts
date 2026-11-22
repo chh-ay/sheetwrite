@@ -103,7 +103,7 @@ export function validateWorkbookTableName(
   return { ok: true, name };
 }
 
-function validId(value: string, limits: Readonly<WorkbookTableResourceLimits>): boolean {
+function valid_id(value: string, limits: Readonly<WorkbookTableResourceLimits>): boolean {
   return value.length > 0 && value.length <= limits.maxIdLength;
 }
 
@@ -119,7 +119,7 @@ const XML_NONCHARACTER_FFFE = 0xfffe;
 const XML_NONCHARACTER_FFFF = 0xffff;
 
 /** XML 1.0 forbids these code units; a char-code scan avoids a control-character regex. */
-function hasInvalidXmlCharacter(text: string): boolean {
+function has_invalid_xml_character(text: string): boolean {
   for (let index = 0; index < text.length; index++) {
     const code = text.charCodeAt(index);
     if (
@@ -204,11 +204,11 @@ export function validWorkbookTableXmlElement(
     if (typeof element.name !== "string" || !allowed.includes(element.name)) return false;
     const attributes = element.attributes;
     if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) return false;
-    const allowedAttributes = TABLE_RULE_ATTRIBUTES[element.name];
-    const allowedChildren = TABLE_RULE_CHILDREN[element.name];
-    if (!allowedAttributes || !allowedChildren) return false;
+    const allowed_attributes = TABLE_RULE_ATTRIBUTES[element.name];
+    const allowed_children = TABLE_RULE_CHILDREN[element.name];
+    if (!allowed_attributes || !allowed_children) return false;
     if (typeof element.text !== "string" || !Array.isArray(element.children)) return false;
-    if (hasInvalidXmlCharacter(element.text)) return false;
+    if (has_invalid_xml_character(element.text)) return false;
     if (element.differentialStyle !== undefined) {
       if (
         (element.name !== "colorFilter" && element.name !== "sortCondition") ||
@@ -219,9 +219,9 @@ export function validWorkbookTableXmlElement(
 
     if (element.name === "colorFilter" && element.differentialStyle === undefined) return false;
     if (element.name === "sortCondition") {
-      const sortBy = (attributes as Record<string, unknown>).sortBy;
+      const sort_by = (attributes as Record<string, unknown>).sortBy;
       if (
-        (sortBy === "cellColor" || sortBy === "fontColor") &&
+        (sort_by === "cellColor" || sort_by === "fontColor") &&
         element.differentialStyle === undefined
       )
         return false;
@@ -230,9 +230,9 @@ export function validWorkbookTableXmlElement(
     budget.characters += element.text.length;
     for (const [name, attribute] of Object.entries(attributes)) {
       if (
-        !allowedAttributes.includes(name) ||
+        !allowed_attributes.includes(name) ||
         typeof attribute !== "string" ||
-        hasInvalidXmlCharacter(attribute)
+        has_invalid_xml_character(attribute)
       )
         return false;
       budget.characters += name.length + attribute.length;
@@ -240,7 +240,7 @@ export function validWorkbookTableXmlElement(
 
     if (budget.characters > TABLE_RULE_MAX_TEXT) return false;
     for (const child of element.children) {
-      if (!visit(child, allowedChildren, depth + 1)) return false;
+      if (!visit(child, allowed_children, depth + 1)) return false;
     }
 
     return true;
@@ -255,19 +255,19 @@ const COLUMN_SPAN_REF = /^\$?([A-Za-z]{1,3})(\$?\d*)(?::\$?([A-Za-z]{1,3})(\$?\d
  * Move one stored A1 span through a column remap, keeping its row parts.
  * Returns null when the span is unreadable or either edge column was deleted.
  */
-function remapColumnSpan(
+function remap_column_span(
   ref: string | undefined,
   remap: (col: number) => number | null,
 ): string | null {
   const match = COLUMN_SPAN_REF.exec(ref ?? "");
-  const startLabel = match?.[1];
-  if (!match || !startLabel) return null;
-  const start = remap(labelToCol(startLabel.toUpperCase()));
-  const end = remap(labelToCol((match[3] ?? startLabel).toUpperCase()));
+  const start_label = match?.[1];
+  if (!match || !start_label) return null;
+  const start = remap(labelToCol(start_label.toUpperCase()));
+  const end = remap(labelToCol((match[3] ?? start_label).toUpperCase()));
   if (start === null || end === null) return null;
-  const startRow = match[2] ?? "";
-  const endRow = match[3] ? (match[4] ?? "") : startRow;
-  return `${colToA1(start)}${startRow}:${colToA1(end)}${endRow}`;
+  const start_row = match[2] ?? "";
+  const end_row = match[3] ? (match[4] ?? "") : start_row;
+  return `${colToA1(start)}${start_row}:${colToA1(end)}${end_row}`;
 }
 
 /**
@@ -282,40 +282,40 @@ export function remapWorkbookTableRuleColumns(
   newStart: number,
   newEnd: number,
 ): Pick<WorkbookTable, "autoFilter" | "sortState"> {
-  const oldStart = table.range.start.col;
+  const old_start = table.range.start.col;
   // Table-wide refs: map the old outer edges onto the new table edges.
-  const edges = (col: number): number => (col <= oldStart ? newStart : newEnd);
-  const tableRef = (rule: WorkbookTableXmlElement): Record<string, string> => {
-    const ref = remapColumnSpan(rule.attributes.ref, edges);
+  const edges = (col: number): number => (col <= old_start ? newStart : newEnd);
+  const table_ref = (rule: WorkbookTableXmlElement): Record<string, string> => {
+    const ref = remap_column_span(rule.attributes.ref, edges);
     return ref === null ? rule.attributes : { ...rule.attributes, ref };
   };
 
-  const sortState = (rule: WorkbookTableXmlElement): WorkbookTableXmlElement | undefined => {
+  const sort_state = (rule: WorkbookTableXmlElement): WorkbookTableXmlElement | undefined => {
     const children: WorkbookTableXmlElement[] = [];
     for (const condition of rule.children) {
-      const ref = remapColumnSpan(condition.attributes.ref, remap);
+      const ref = remap_column_span(condition.attributes.ref, remap);
       if (ref !== null) {
         children.push({ ...condition, attributes: { ...condition.attributes, ref } });
       }
     }
 
-    return children.length > 0 ? { ...rule, attributes: tableRef(rule), children } : undefined;
+    return children.length > 0 ? { ...rule, attributes: table_ref(rule), children } : undefined;
   };
 
-  let autoFilter: WorkbookTableXmlElement | undefined;
+  let auto_filter: WorkbookTableXmlElement | undefined;
   if (table.autoFilter) {
     const children: WorkbookTableXmlElement[] = [];
     for (const child of table.autoFilter.children) {
       if (child.name === "sortState") {
-        const remapped = sortState(child);
+        const remapped = sort_state(child);
         if (remapped) children.push(remapped);
         continue;
       }
 
-      const colId = Number(child.attributes.colId);
+      const col_id = Number(child.attributes.colId);
       // An unreadable colId cannot follow its column; drop it like a deleted one.
-      if (!Number.isSafeInteger(colId) || colId < 0) continue;
-      const moved = remap(oldStart + colId);
+      if (!Number.isSafeInteger(col_id) || col_id < 0) continue;
+      const moved = remap(old_start + col_id);
       if (moved === null) continue;
       children.push({
         ...child,
@@ -323,25 +323,25 @@ export function remapWorkbookTableRuleColumns(
       });
     }
 
-    autoFilter = { ...table.autoFilter, attributes: tableRef(table.autoFilter), children };
+    auto_filter = { ...table.autoFilter, attributes: table_ref(table.autoFilter), children };
   }
 
-  const remappedSort = table.sortState ? sortState(table.sortState) : undefined;
+  const remapped_sort = table.sortState ? sort_state(table.sortState) : undefined;
   return {
-    ...(autoFilter ? { autoFilter } : {}),
-    ...(remappedSort ? { sortState: remappedSort } : {}),
+    ...(auto_filter ? { autoFilter: auto_filter } : {}),
+    ...(remapped_sort ? { sortState: remapped_sort } : {}),
   };
 }
 
-function validColumn(
+function valid_column(
   column: WorkbookTableColumn,
   names: Set<string>,
   ids: Set<string>,
   limits: Readonly<WorkbookTableResourceLimits>,
   budget: { nodes: number; characters: number },
 ): boolean {
-  const idKey = workbookTableNameKey(column.id);
-  if (!validId(column.id, limits) || column.id !== column.id.normalize("NFC") || ids.has(idKey)) {
+  const id_key = workbookTableNameKey(column.id);
+  if (!valid_id(column.id, limits) || column.id !== column.id.normalize("NFC") || ids.has(id_key)) {
     return false;
   }
 
@@ -376,12 +376,12 @@ function validColumn(
     !validWorkbookTableXmlElement(column.calculatedColumnFormula, "calculatedColumnFormula", budget)
   )
     return false;
-  ids.add(idKey);
+  ids.add(id_key);
   names.add(key);
   return true;
 }
 
-function validStyle(
+function valid_style(
   style: WorkbookTableStyle | undefined,
   limits: Readonly<WorkbookTableResourceLimits>,
 ): boolean {
@@ -411,16 +411,16 @@ export function validWorkbookTable(
   existing: readonly WorkbookTable[],
   limits: Readonly<WorkbookTableResourceLimits> = DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
 ): boolean {
-  if (!validId(table.id, limits) || existing.some((candidate) => candidate.id === table.id)) {
+  if (!valid_id(table.id, limits) || existing.some((candidate) => candidate.id === table.id)) {
     return false;
   }
 
-  const validatedName = validateWorkbookTableName(
+  const validated_name = validateWorkbookTableName(
     table.name,
     existing.map((candidate) => candidate.name),
     limits.maxNameLength,
   );
-  if (!validatedName.ok || validatedName.name !== table.name) return false;
+  if (!validated_name.ok || validated_name.name !== table.name) return false;
   if (table.range.sheet !== sheet.id) return false;
   const r0 = Math.min(table.range.start.row, table.range.end.row);
   const r1 = Math.max(table.range.start.row, table.range.end.row);
@@ -452,26 +452,26 @@ export function validWorkbookTable(
   if (width > limits.maxColumnsPerTable || table.columns.length !== width) return false;
   if (typeof table.headerRow !== "boolean" || typeof table.totalsRow !== "boolean") return false;
   if (table.headerRow && table.totalsRow && r0 === r1) return false;
-  const columnNames = new Set<string>();
-  const columnIds = new Set<string>();
-  const ruleBudget = { nodes: 0, characters: 0 };
+  const column_names = new Set<string>();
+  const column_ids = new Set<string>();
+  const rule_budget = { nodes: 0, characters: 0 };
   if (
     !table.columns.every((column) =>
-      validColumn(column, columnNames, columnIds, limits, ruleBudget),
+      valid_column(column, column_names, column_ids, limits, rule_budget),
     )
   ) {
     return false;
   }
 
-  if (!validStyle(table.style, limits)) return false;
+  if (!valid_style(table.style, limits)) return false;
   if (
     table.autoFilter !== undefined &&
-    !validWorkbookTableXmlElement(table.autoFilter, "autoFilter", ruleBudget)
+    !validWorkbookTableXmlElement(table.autoFilter, "autoFilter", rule_budget)
   )
     return false;
   if (
     table.sortState !== undefined &&
-    !validWorkbookTableXmlElement(table.sortState, "sortState", ruleBudget)
+    !validWorkbookTableXmlElement(table.sortState, "sortState", rule_budget)
   )
     return false;
   if (
@@ -499,13 +499,13 @@ export function assertWorkbookTables(
   limits: Readonly<WorkbookTableResourceLimits> = DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   reservedNames: readonly string[] = [],
 ): void {
-  const tableCount = sheets.reduce((count, sheet) => count + (sheet.tables?.length ?? 0), 0);
-  if (tableCount > limits.maxTables) {
+  const table_count = sheets.reduce((count, sheet) => count + (sheet.tables?.length ?? 0), 0);
+  if (table_count > limits.maxTables) {
     throw new SheetwriteError(
       "resource-limit",
       "snapshot-allocate",
-      `Sheetwrite: workbook table limit is ${limits.maxTables}; observed ${tableCount}`,
-      { context: { resource: "tables", limit: limits.maxTables, actual: tableCount } },
+      `Sheetwrite: workbook table limit is ${limits.maxTables}; observed ${table_count}`,
+      { context: { resource: "tables", limit: limits.maxTables, actual: table_count } },
     );
   }
   const reserved = new Set(reservedNames.map(workbookTableNameKey));

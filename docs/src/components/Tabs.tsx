@@ -44,7 +44,7 @@ interface TabEventDetail {
   readonly title: string;
 }
 
-function isTabEventDetail(value: unknown): value is TabEventDetail {
+function is_tab_event_detail(value: unknown): value is TabEventDetail {
   if (typeof value !== "object" || value === null) return false;
 
   const detail: { key?: unknown; title?: unknown } = value;
@@ -79,38 +79,38 @@ export function Tabs(rawProps: Readonly<TabsProps>) {
   const tabs = createMemo(() =>
     resolved.toArray().flatMap((child) => (isTab(child) ? [child] : [])),
   );
-  const [selected, setSelected] = createSignal(0);
+  const [selected, set_selected] = createSignal(0);
   const id = createUniqueId();
   const titles = createMemo(() => tabs().map((tab) => tab.title));
-  const tabElementId = (title: string) => `${id}-tab-${titles().indexOf(title)}`;
-  const preferenceKey = () =>
+  const tab_element_id = (title: string) => `${id}-tab-${titles().indexOf(title)}`;
+  const preference_key = () =>
     props.sync === undefined ? undefined : `${PREFERENCE_PREFIX}${props.sync}`;
 
   createEffect(() => {
-    const key = preferenceKey();
+    const key = preference_key();
     const current = titles();
     if (key === undefined) return;
     const stored = readPreference(key);
     const index = current.indexOf(stored ?? "");
-    if (index >= 0) setSelected(index);
+    if (index >= 0) set_selected(index);
 
-    const onChange = (event: Event) => {
+    const on_change = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
 
       const detail: unknown = event.detail;
-      if (!isTabEventDetail(detail) || detail.key !== key) return;
+      if (!is_tab_event_detail(detail) || detail.key !== key) return;
 
       const next = current.indexOf(detail.title);
-      if (next >= 0) setSelected(next);
+      if (next >= 0) set_selected(next);
     };
-    window.addEventListener(TAB_EVENT, onChange);
-    onCleanup(() => window.removeEventListener(TAB_EVENT, onChange));
+    window.addEventListener(TAB_EVENT, on_change);
+    onCleanup(() => window.removeEventListener(TAB_EVENT, on_change));
   });
 
   const select = (index: number) => {
-    setSelected(index);
+    set_selected(index);
     const title = titles()[index];
-    const key = preferenceKey();
+    const key = preference_key();
     if (key === undefined || title === undefined) return;
     writePreference(key, title);
     window.dispatchEvent(new CustomEvent<TabEventDetail>(TAB_EVENT, { detail: { key, title } }));
@@ -133,7 +133,7 @@ export function Tabs(rawProps: Readonly<TabsProps>) {
                     titles(),
                     tab.title,
                     (title) => select(titles().indexOf(title)),
-                    tabElementId,
+                    tab_element_id,
                   )
                 }
                 role="tab"

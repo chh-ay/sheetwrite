@@ -2,9 +2,9 @@ import { expect, test } from "./fixtures.js";
 
 for (const engine of ["default", "full"] as const) {
   test(`a real Grid evaluates distributions with the ${engine} engine`, async ({ page }) => {
-    const wasmRequests: string[] = [];
+    const wasm_requests: string[] = [];
     page.on("request", (request) => {
-      if (new URL(request.url()).pathname.endsWith(".wasm")) wasmRequests.push(request.url());
+      if (new URL(request.url()).pathname.endsWith(".wasm")) wasm_requests.push(request.url());
     });
     await page.goto(`/test/formulas-engine/?engine=${engine}`);
     await expect(page.locator("#formula-engine-status")).toHaveAttribute("data-status", "ready");
@@ -16,7 +16,7 @@ for (const engine of ["default", "full"] as const) {
     } else {
       expect(value).toBe("#NAME?");
     }
-    expect(wasmRequests).toHaveLength(1);
+    expect(wasm_requests).toHaveLength(1);
     await expect(page.locator('[aria-label="Distribution grid"] canvas')).toBeVisible();
   });
 }

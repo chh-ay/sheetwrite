@@ -21,7 +21,7 @@ const sales: SavedQuery = {
   output: { table: "sales-table", tableName: "Sales", anchor: { sheet: "s1", row: 0, col: 0 } },
 };
 
-const powerQuery: PowerQueryCodec = {
+const power_query: PowerQueryCodec = {
   encode: (queries) => ({
     section: SECTION,
     members: queries.map((query) => query.name),
@@ -56,26 +56,29 @@ const snapshot = (queries: SavedQuery[] = [sales]) =>
 
 describe("Power Query packaging", () => {
   it("reports each M difference and binds the output table to a new connection", async () => {
-    const { warnings, onWarning } = collectWarnings();
-    const bytes = await backend.toXlsxWorkbook(snapshot(), { onWarning, powerQuery });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const bytes = await backend.toXlsxWorkbook(snapshot(), {
+      onWarning: on_warning,
+      powerQuery: power_query,
+    });
     expect(warnings).toContainEqual(
       expect.objectContaining({
         code: "query-loss",
         message: expect.stringContaining("host-source"),
       }),
     );
-    const tableXml = partText(bytes, "xl/tables/table1.xml");
-    expect(tableXml).toContain('tableType="queryTable"');
-    expect(tableXml).toContain('queryTableFieldId="1"');
+    const table_xml = partText(bytes, "xl/tables/table1.xml");
+    expect(table_xml).toContain('tableType="queryTable"');
+    expect(table_xml).toContain('queryTableFieldId="1"');
     expect(partText(bytes, "xl/tables/_rels/table1.xml.rels")).toContain("queryTable1.xml");
     expect(partText(bytes, "xl/queryTables/queryTable1.xml")).toContain('connectionId="1"');
     expect(partText(bytes, "[Content_Types].xml")).toContain("/xl/connections.xml");
   });
 
   it("binds a re-exported table to its kept connection without rewriting the kept parts", async () => {
-    const first = await backend.toXlsxWorkbook(snapshot(), { powerQuery });
-    const imported = await backend.fromXlsxWorkbook(first, { powerQuery });
-    const second = await backend.toXlsxWorkbook(imported, { powerQuery });
+    const first = await backend.toXlsxWorkbook(snapshot(), { powerQuery: power_query });
+    const imported = await backend.fromXlsxWorkbook(first, { powerQuery: power_query });
+    const second = await backend.toXlsxWorkbook(imported, { powerQuery: power_query });
 
     expect(imported.workbook.queries).toEqual([sales]);
     expect(unzipSync(second)["xl/connections.xml"]).toEqual(unzipSync(first)["xl/connections.xml"]);
@@ -83,8 +86,8 @@ describe("Power Query packaging", () => {
   });
 
   it("restores definitions from hidden metadata when no M parts were written", async () => {
-    const valuesOnly = await backend.toXlsxWorkbook(snapshot());
-    expect((await backend.fromXlsxWorkbook(valuesOnly)).workbook.queries).toEqual([sales]);
+    const values_only = await backend.toXlsxWorkbook(snapshot());
+    expect((await backend.fromXlsxWorkbook(values_only)).workbook.queries).toEqual([sales]);
   });
 
   it("reads a UTF-16 DataMashup item and reports one that cannot be read", async () => {
@@ -92,7 +95,7 @@ describe("Power Query packaging", () => {
     const utf16 = new Uint8Array(2 + item.length * 2);
     utf16.set([0xff, 0xfe]);
     for (let index = 0; index < item.length; index++) utf16[2 + index * 2] = item.charCodeAt(index);
-    const withItem = editParts(await backend.toXlsxWorkbook(snapshot([])), {
+    const with_item = editParts(await backend.toXlsxWorkbook(snapshot([])), {
       "customXml/item9.xml": utf16,
       "xl/_rels/workbook.xml.rels": (xml) =>
         xml.replace(
@@ -101,8 +104,11 @@ describe("Power Query packaging", () => {
         ),
     });
 
-    const { warnings, onWarning } = collectWarnings();
-    const imported = await backend.fromXlsxWorkbook(withItem, { onWarning, powerQuery });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(with_item, {
+      onWarning: on_warning,
+      powerQuery: power_query,
+    });
     expect(imported.workbook.queries).toBeUndefined();
     expect(warnings).toContainEqual(
       expect.objectContaining({

@@ -22,18 +22,18 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-const originalRaf = globalThis.requestAnimationFrame;
-let restoreStubs: () => void;
+const original_raf = globalThis.requestAnimationFrame;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
     callback(0);
     return 0;
   }) as typeof globalThis.requestAnimationFrame;
 });
 afterEach(() => {
-  restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
+  restore_stubs();
+  globalThis.requestAnimationFrame = original_raf;
 });
 
 function snapshot(version = 7): WorkbookSnapshot {
@@ -58,7 +58,7 @@ function snapshot(version = 7): WorkbookSnapshot {
   };
 }
 
-function mountGrid(input = snapshot()): { grid: Grid; host: HTMLDivElement } {
+function mount_grid(input = snapshot()): { grid: Grid; host: HTMLDivElement } {
   const host = document.createElement("div");
   host.style.width = "600px";
   host.style.height = "300px";
@@ -82,7 +82,7 @@ class PresenceBus {
   }
 }
 
-function serverThread(overrides: Partial<CommentThread> = {}): CommentThread {
+function server_thread(overrides: Partial<CommentThread> = {}): CommentThread {
   return {
     id: "thread-1",
     documentId: "collab-doc",
@@ -103,7 +103,7 @@ function serverThread(overrides: Partial<CommentThread> = {}): CommentThread {
 
 describe("presence coordinator", () => {
   it("reports failures while reading the active sheet", async () => {
-    const mounted = mountGrid();
+    const mounted = mount_grid();
     const coordinator = new PresenceCoordinator(mounted.grid, new PresenceBus().endpoint(), {
       actor: { id: "local" },
       heartbeatMs: 0,
@@ -122,17 +122,17 @@ describe("presence coordinator", () => {
 
   it("truncates remote selections, preserves the document, and expires presence", async () => {
     const bus = new PresenceBus();
-    const left = mountGrid();
-    const right = mountGrid();
+    const left = mount_grid();
+    const right = mount_grid();
     let now = 1_000;
-    const leftPresence = new PresenceCoordinator(left.grid, bus.endpoint(), {
+    const left_presence = new PresenceCoordinator(left.grid, bus.endpoint(), {
       actor: { id: "left", displayName: "Left User", color: "#ef4444" },
       heartbeatMs: 0,
       timeoutMs: 100,
       maxRangesPerActor: 2,
       now: () => now,
     });
-    const rightPresence = new PresenceCoordinator(right.grid, bus.endpoint(), {
+    const right_presence = new PresenceCoordinator(right.grid, bus.endpoint(), {
       actor: { id: "right", displayName: "Right User", color: "#2563eb" },
       heartbeatMs: 0,
       timeoutMs: 100,
@@ -152,7 +152,7 @@ describe("presence coordinator", () => {
     await Promise.resolve();
     right.grid.refresh();
 
-    expect(rightPresence.remotePresence()).toEqual([
+    expect(right_presence.remotePresence()).toEqual([
       {
         actor: { id: "left", displayName: "Left User", color: "#ef4444" },
         activeSheet: "s1",
@@ -163,38 +163,38 @@ describe("presence coordinator", () => {
         sentAt: 1_000,
       },
     ]);
-    const presenceLabels = right.host.querySelectorAll('[data-sheetwrite-presence-label="left"]');
-    expect(presenceLabels.length).toBeGreaterThan(0);
-    expect(presenceLabels[0]?.getAttribute("title")).toBe("Left User");
+    const presence_labels = right.host.querySelectorAll('[data-sheetwrite-presence-label="left"]');
+    expect(presence_labels.length).toBeGreaterThan(0);
+    expect(presence_labels[0]?.getAttribute("title")).toBe("Left User");
     expect(right.grid.exportSnapshot()).toEqual(before);
 
     now = 1_101;
-    rightPresence.pruneStale();
+    right_presence.pruneStale();
     right.grid.refresh();
-    expect(rightPresence.remotePresence()).toEqual([]);
+    expect(right_presence.remotePresence()).toEqual([]);
     expect(right.host.querySelectorAll('[data-sheetwrite-presence="left"]')).toHaveLength(0);
 
-    leftPresence.destroy();
-    rightPresence.destroy();
+    left_presence.destroy();
+    right_presence.destroy();
     left.grid.destroy();
     right.grid.destroy();
   });
 
   it("honors outbound display-name and selection privacy", async () => {
     const bus = new PresenceBus();
-    const privateGrid = mountGrid();
-    const receiverGrid = mountGrid();
-    const sender = new PresenceCoordinator(privateGrid.grid, bus.endpoint(), {
+    const private_grid = mount_grid();
+    const receiver_grid = mount_grid();
+    const sender = new PresenceCoordinator(private_grid.grid, bus.endpoint(), {
       actor: { id: "private", displayName: "Hidden Name", color: "#111111" },
       privacy: { shareDisplayName: false, shareSelection: false },
       heartbeatMs: 0,
     });
-    const receiver = new PresenceCoordinator(receiverGrid.grid, bus.endpoint(), {
+    const receiver = new PresenceCoordinator(receiver_grid.grid, bus.endpoint(), {
       actor: { id: "receiver" },
       heartbeatMs: 0,
     });
 
-    privateGrid.grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
+    private_grid.grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
     await Promise.resolve();
     expect(receiver.remotePresence()[0]).toMatchObject({
       actor: { id: "private", color: "#111111" },
@@ -204,23 +204,23 @@ describe("presence coordinator", () => {
 
     sender.destroy();
     receiver.destroy();
-    privateGrid.grid.destroy();
-    receiverGrid.grid.destroy();
+    private_grid.grid.destroy();
+    receiver_grid.grid.destroy();
   });
 });
 
 describe("comment coordinator", () => {
   it("keeps identity host-owned while requiring server authorship and timestamps", async () => {
     const requests: CommentMutationRequest[] = [];
-    let remoteListener: ((event: VersionedCommentEvent) => void) | undefined;
+    let remote_listener: ((event: VersionedCommentEvent) => void) | undefined;
     const adapter: CommentAdapter = {
       async listComments() {
-        return { version: 1, threads: [serverThread()] };
+        return { version: 1, threads: [server_thread()] };
       },
       async mutateComment(request) {
         requests.push(request);
         const messages = [
-          ...serverThread().messages,
+          ...server_thread().messages,
           ...(request.mutation.kind === "reply"
             ? [
                 {
@@ -236,11 +236,11 @@ describe("comment coordinator", () => {
           status: "applied",
           version: request.baseVersion + 1,
           clientMutationId: request.clientMutationId,
-          thread: serverThread({ version: request.baseVersion + 1, messages }),
+          thread: server_thread({ version: request.baseVersion + 1, messages }),
         };
       },
-      subscribeComments(_documentId, listener) {
-        remoteListener = listener;
+      subscribeComments(_document_id, listener) {
+        remote_listener = listener;
       },
     };
     const coordinator = new CommentCoordinator(adapter, {
@@ -269,7 +269,7 @@ describe("comment coordinator", () => {
 
     const events: string[] = [];
     coordinator.on((event) => events.push(event.type));
-    remoteListener?.({ version: 4, thread: serverThread({ version: 4 }) });
+    remote_listener?.({ version: 4, thread: server_thread({ version: 4 }) });
     expect(events).toContain("gap");
     expect(coordinator.serverVersion).toBe(2);
     coordinator.destroy();
@@ -285,7 +285,7 @@ describe("comment coordinator", () => {
           status: "applied",
           version: 1,
           clientMutationId: request.clientMutationId,
-          thread: serverThread({
+          thread: server_thread({
             id: request.mutation.threadId,
             version: 1,
             messages: [
@@ -322,7 +322,7 @@ describe("comment coordinator", () => {
     let request: CommentMutationRequest | undefined;
     const adapter: CommentAdapter = {
       async listComments() {
-        return { version: 3, threads: [serverThread({ version: 3 })] };
+        return { version: 3, threads: [server_thread({ version: 3 })] };
       },
       async mutateComment(input) {
         request = input;
@@ -359,8 +359,8 @@ describe("comment coordinator", () => {
     coordinator.on((event) => {
       if (event.type === "error") errors.push(event.error);
     });
-    const pendingList = coordinator.load().catch((error: unknown) => error);
-    const pendingMutation = coordinator
+    const pending_list = coordinator.load().catch((error: unknown) => error);
+    const pending_mutation = coordinator
       .create(
         "thread-destroyed",
         "message-destroyed",
@@ -370,16 +370,16 @@ describe("comment coordinator", () => {
       )
       .catch((error: unknown) => error);
     coordinator.destroy();
-    listing.resolve({ version: 1, threads: [serverThread({ version: 1 })] });
+    listing.resolve({ version: 1, threads: [server_thread({ version: 1 })] });
     mutation.resolve({
       status: "applied",
       version: 2,
       clientMutationId: "comment-destroyed",
-      thread: serverThread({ id: "thread-destroyed", version: 2 }),
+      thread: server_thread({ id: "thread-destroyed", version: 2 }),
     });
 
-    expect(await pendingList).toMatchObject({ name: "AbortError" });
-    expect(await pendingMutation).toMatchObject({ name: "AbortError" });
+    expect(await pending_list).toMatchObject({ name: "AbortError" });
+    expect(await pending_mutation).toMatchObject({ name: "AbortError" });
     expect(coordinator.serverVersion).toBe(0);
     expect(coordinator.commentThreads()).toEqual([]);
     expect(errors).toHaveLength(0);

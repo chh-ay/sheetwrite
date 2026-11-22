@@ -9,7 +9,7 @@ export interface PanelMenuItem {
   readonly run: () => void;
 }
 
-let menuSerial = 0;
+let menu_serial = 0;
 
 /**
  * A button that opens a `role="menu"` list of `items()`, read on each open.
@@ -24,8 +24,8 @@ export function menuButton(
   items: () => readonly PanelMenuItem[],
   signal: AbortSignal,
 ): HTMLElement {
-  menuSerial += 1;
-  const menuId = `sheetwrite-panel-menu-${menuSerial}`;
+  menu_serial += 1;
+  const menu_id = `sheetwrite-panel-menu-${menu_serial}`;
 
   const wrapper = document.createElement("div");
   wrapper.className = "sheetwrite-panel-menu-anchor";
@@ -41,17 +41,17 @@ export function menuButton(
 
   let menu: HTMLElement | null = null;
 
-  const close = (returnFocus: boolean): void => {
+  const close = (return_focus: boolean): void => {
     if (menu === null) return;
     menu.remove();
     menu = null;
     button.setAttribute("aria-expanded", "false");
     button.removeAttribute("aria-controls");
-    document.removeEventListener("pointerdown", onOutsidePointer, true);
-    if (returnFocus) button.focus();
+    document.removeEventListener("pointerdown", on_outside_pointer, true);
+    if (return_focus) button.focus();
   };
 
-  const onOutsidePointer = (event: PointerEvent): void => {
+  const on_outside_pointer = (event: PointerEvent): void => {
     if (event.target instanceof Node && wrapper.contains(event.target)) return;
     close(false);
   };
@@ -61,7 +61,7 @@ export function menuButton(
       ? []
       : [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')];
 
-  const onMenuKeydown = (event: KeyboardEvent): void => {
+  const on_menu_keydown = (event: KeyboardEvent): void => {
     const list = entries();
     const current = list.findIndex((entry) => entry === document.activeElement);
     const moves: Record<string, number> = {
@@ -84,7 +84,7 @@ export function menuButton(
   const open = (keyboard: boolean): void => {
     menu = document.createElement("div");
     menu.className = "sheetwrite-panel-menu";
-    menu.id = menuId;
+    menu.id = menu_id;
     menu.setAttribute("role", "menu");
     menu.setAttribute("aria-label", label);
     for (const item of items()) {
@@ -103,11 +103,11 @@ export function menuButton(
       }
       menu.appendChild(entry);
     }
-    menu.addEventListener("keydown", onMenuKeydown);
+    menu.addEventListener("keydown", on_menu_keydown);
     wrapper.appendChild(menu);
     button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-controls", menuId);
-    document.addEventListener("pointerdown", onOutsidePointer, { capture: true, signal });
+    button.setAttribute("aria-controls", menu_id);
+    document.addEventListener("pointerdown", on_outside_pointer, { capture: true, signal });
     // A pointer user keeps focus on the button; a keyboard user lands on the first entry.
     if (keyboard) entries()[0]?.focus();
   };

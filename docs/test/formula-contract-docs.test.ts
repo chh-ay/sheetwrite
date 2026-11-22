@@ -82,13 +82,13 @@ describe("generated formula documentation contract", () => {
     for (const [family, card] of Object.entries(FORMULA_FAMILY_CARDS)) {
       const members = inventory.functions.filter((formula) => formula.family === family);
       const href = `/docs/reference/formula-functions/${family}/`;
-      const inDefault = members.filter((formula) => formula.builds.includes("@sheetwrite/wasm"));
+      const in_default = members.filter((formula) => formula.builds.includes("@sheetwrite/wasm"));
       const builds =
-        inDefault.length === 0
+        in_default.length === 0
           ? "full build only"
-          : inDefault.length === members.length
+          : in_default.length === members.length
             ? "all in the default build"
-            : `${inDefault.length} in the default build`;
+            : `${in_default.length} in the default build`;
       expect(overview.content).toContain(
         `<p class="sw-function-family__count">${members.length} functions · ${builds}</p>`,
       );

@@ -77,12 +77,12 @@ function tab(host: HTMLElement, name: string): HTMLElement {
 it("Formulas › Insert Function shows only in a grid with host functions, and starts a formula", async () => {
   const plain = await setup({ ribbon: true }, []);
   tab(plain.host, "Formulas").click();
-  const plainInsert = plain.host.querySelector<HTMLButtonElement>(
+  const plain_insert = plain.host.querySelector<HTMLButtonElement>(
     '[data-command="insertFunction"]',
   );
-  if (plainInsert === null) throw new Error("no Insert Function command");
+  if (plain_insert === null) throw new Error("no Insert Function command");
   // Explain Formula keeps the tab when there is no host function.
-  expect(plainInsert.hidden).toBe(true);
+  expect(plain_insert.hidden).toBe(true);
   expect(tab(plain.host, "Formulas").hidden).toBe(false);
 
   const { grid, host } = await setup({ ribbon: true }, [TAX_RATE_FUNCTION]);

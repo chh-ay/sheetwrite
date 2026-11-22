@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 import { commandArtifact } from "../src/verify.js";
 
-const repositoryRoot = resolve(import.meta.dir, "../..");
+const repository_root = resolve(import.meta.dir, "../..");
 
 test("fails a gate, prints its measured values and preserves a structured error artifact", () => {
   const directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-verify-"));
@@ -28,11 +28,11 @@ test("fails a gate, prints its measured values and preserves a structured error 
       [
         "bun",
         "run",
-        resolve(repositoryRoot, "bench/src/verify.ts"),
+        resolve(repository_root, "bench/src/verify.ts"),
         "--fixture",
         `view-index:${path}`,
       ],
-      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
+      { cwd: repository_root, stdout: "pipe", stderr: "pipe" },
     );
 
     const failure = "view-index runtime gates failed: lookupP95";
@@ -44,11 +44,11 @@ test("fails a gate, prints its measured values and preserves a structured error 
       baseline: { lookupP95Ns: 100 },
       packed: { lookupP95Ns: 125 },
     });
-    const errorArtifact = resolve(
-      repositoryRoot,
+    const error_artifact = resolve(
+      repository_root,
       "test-results/performance-gates/view-index-error.json",
     );
-    expect(readFileSync(errorArtifact, "utf8")).toContain(failure);
+    expect(readFileSync(error_artifact, "utf8")).toContain(failure);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

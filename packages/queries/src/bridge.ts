@@ -49,7 +49,7 @@ function invoke<T>(wasm: WasmModule, operation: () => T): T {
   }
 }
 
-function importColumn(
+function import_column(
   wasm: WasmModule,
   column: QueryColumn,
   rows: number,
@@ -99,12 +99,12 @@ function importColumn(
   }
 }
 
-function importBatch(wasm: WasmModule, source: QueryBatch): WasmBatch {
+function import_batch(wasm: WasmModule, source: QueryBatch): WasmBatch {
   const batch = new wasm.QueryBatch(checkedU32(source.rowCount));
 
   try {
     for (const column of source.columns) {
-      batch.addColumn(importColumn(wasm, column, source.rowCount));
+      batch.addColumn(import_column(wasm, column, source.rowCount));
     }
 
     return batch;
@@ -114,8 +114,8 @@ function importBatch(wasm: WasmModule, source: QueryBatch): WasmBatch {
   }
 }
 
-function exportColumn(column: WasmColumn): QueryColumn {
-  const [id, name, ...errorPool] = unpackStrings(
+function export_column(column: WasmColumn): QueryColumn {
+  const [id, name, ...error_pool] = unpackStrings(
     column.takeMetadata(),
     column.takeMetadataOffsets(),
   );
@@ -126,7 +126,7 @@ function exportColumn(column: WasmColumn): QueryColumn {
   const state = {
     id,
     name,
-    errorPool,
+    errorPool: error_pool,
     validity: column.takeValidity(),
     errorRows: column.takeErrorRows(),
     errorCodes: column.takeErrorCodes(),
@@ -159,13 +159,13 @@ function exportColumn(column: WasmColumn): QueryColumn {
   }
 }
 
-function exportBatch(batch: WasmBatch): QueryBatch {
+function export_batch(batch: WasmBatch): QueryBatch {
   try {
     const columns: QueryColumn[] = [];
     for (let index = 0; index < batch.columnCount; index += 1) {
       const column = batch.takeColumn(index);
       try {
-        columns.push(exportColumn(column));
+        columns.push(export_column(column));
       } finally {
         column.free();
       }
@@ -177,7 +177,7 @@ function exportBatch(batch: WasmBatch): QueryBatch {
   }
 }
 
-function withRunner<T>(
+function with_runner<T>(
   wasm: WasmModule,
   limits: Partial<QueryLimits> | undefined,
   operation: (runner: WasmRunner) => T,
@@ -218,7 +218,7 @@ function parse(
   const schema = new wasm.QuerySchema(types, names.bytes, names.offsets);
 
   // parseSource consumes the schema even when Rust returns a source failure.
-  return exportBatch(
+  return export_batch(
     runner.parseSource(
       bytes,
       schema,
@@ -235,7 +235,7 @@ export function createEngine(wasm: WasmModule): QueryEngine {
   return {
     parse(bytes: Uint8Array, source: QuerySource, limits?: Partial<QueryLimits>): QueryBatch {
       return invoke(wasm, () =>
-        withRunner(wasm, limits, (runner) => parse(wasm, runner, bytes, source)),
+        with_runner(wasm, limits, (runner) => parse(wasm, runner, bytes, source)),
       );
     },
 
@@ -246,15 +246,15 @@ export function createEngine(wasm: WasmModule): QueryEngine {
       limits?: Partial<QueryLimits>,
     ): QueryBatch {
       return invoke(wasm, () =>
-        withRunner(wasm, limits, (runner) => {
+        with_runner(wasm, limits, (runner) => {
           for (const input of inputs) {
-            runner.addInput(input.id, importBatch(wasm, input.batch));
+            runner.addInput(input.id, import_batch(wasm, input.batch));
           }
 
           const plan = encodePlan(steps);
-          return exportBatch(
+          return export_batch(
             runner.execute(
-              importBatch(wasm, source),
+              import_batch(wasm, source),
               plan.codes,
               plan.numbers,
               plan.text,

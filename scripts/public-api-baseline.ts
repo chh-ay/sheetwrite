@@ -33,26 +33,26 @@ export function validateManifest(value: unknown): ApiIssue[] {
         return malformed(`${pkg.name} ${entry.subpath} has no valid classification`);
       }
       const names = new Set<string>();
-      for (const apiExport of entry.exports) {
+      for (const api_export of entry.exports) {
         if (
-          typeof apiExport?.name !== "string" ||
-          typeof apiExport.kind !== "string" ||
-          typeof apiExport.signature !== "string" ||
-          !Array.isArray(apiExport.owners) ||
-          typeof apiExport.source !== "string" ||
-          !Array.isArray(apiExport.jsDocTags) ||
-          typeof apiExport.documentation !== "string" ||
-          !Array.isArray(apiExport.memberDocs) ||
-          apiExport.memberDocs.some(
+          typeof api_export?.name !== "string" ||
+          typeof api_export.kind !== "string" ||
+          typeof api_export.signature !== "string" ||
+          !Array.isArray(api_export.owners) ||
+          typeof api_export.source !== "string" ||
+          !Array.isArray(api_export.jsDocTags) ||
+          typeof api_export.documentation !== "string" ||
+          !Array.isArray(api_export.memberDocs) ||
+          api_export.memberDocs.some(
             (member) =>
               typeof member?.name !== "string" || typeof member.documentation !== "string",
           )
         ) {
           return malformed(`${pkg.name} ${entry.subpath} contains a partial export`);
         }
-        if (names.has(apiExport.name))
-          return malformed(`${pkg.name} ${entry.subpath} repeats ${apiExport.name}`);
-        names.add(apiExport.name);
+        if (names.has(api_export.name))
+          return malformed(`${pkg.name} ${entry.subpath} repeats ${api_export.name}`);
+        names.add(api_export.name);
       }
     }
   }
@@ -76,7 +76,7 @@ const BASELINE_COMMAND = "bun run api:baseline";
 const SIGNATURE_DIGEST_LENGTH = 12;
 const SIGNATURE_DIGEST = new RegExp(`^[0-9a-f]{${SIGNATURE_DIGEST_LENGTH}}$`);
 
-function invalidBaseline(reason: string): TypeError {
+function invalid_baseline(reason: string): TypeError {
   return new TypeError(`Invalid public API baseline artifact: ${reason}`);
 }
 
@@ -106,7 +106,7 @@ export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
     value.exports === null ||
     Array.isArray(value.exports)
   ) {
-    throw invalidBaseline("expected schemaVersion 4, manifestFormatVersion 2 and exports");
+    throw invalid_baseline("expected schemaVersion 4, manifestFormatVersion 2 and exports");
   }
   const exports: Record<string, string> = {};
   for (const [key, digest] of Object.entries(value.exports)) {
@@ -115,13 +115,13 @@ export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
       typeof digest !== "string" ||
       !SIGNATURE_DIGEST.test(digest)
     ) {
-      throw invalidBaseline(`${key} needs a package#entryPoint#name key and a signature digest`);
+      throw invalid_baseline(`${key} needs a package#entryPoint#name key and a signature digest`);
     }
     exports[key] = digest;
   }
   const keys = Object.keys(exports);
   if (keys.join("\0") !== [...keys].sort().join("\0")) {
-    throw invalidBaseline("exports are not sorted by key");
+    throw invalid_baseline("exports are not sorted by key");
   }
   return { schemaVersion: 4, manifestFormatVersion: 2, exports };
 }
@@ -136,7 +136,7 @@ export async function readPublicApiBaseline(repositoryRoot: string): Promise<Pub
   const text = await readFile(join(repositoryRoot, PUBLIC_API_BASELINE_PATH), "utf8");
   const baseline = parsePublicApiBaseline(JSON.parse(text));
   if (renderPublicApiBaseline(baseline) !== text) {
-    throw invalidBaseline(`not one export per line; run \`${BASELINE_COMMAND}\``);
+    throw invalid_baseline(`not one export per line; run \`${BASELINE_COMMAND}\``);
   }
   return baseline;
 }
@@ -147,10 +147,10 @@ export function baselineFromManifest(manifest: PublicApiManifest): PublicApiBase
   for (const pkg of manifest.packages) {
     for (const entry of pkg.entryPoints) {
       if (entry.kind !== "typescript") continue;
-      for (const apiExport of entry.exports) {
+      for (const api_export of entry.exports) {
         entries.push([
-          publicApiExportKey(pkg.name, entry.subpath, apiExport.name),
-          signatureDigest(apiExport),
+          publicApiExportKey(pkg.name, entry.subpath, api_export.name),
+          signatureDigest(api_export),
         ]);
       }
     }
@@ -169,19 +169,19 @@ export async function writePublicApiBaseline(
 ): Promise<PublicApiBaseline> {
   const baseline = baselineFromManifest(manifest);
   const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
-  const temporaryPath = `${path}.tmp`;
-  await writeFile(temporaryPath, renderPublicApiBaseline(baseline));
-  await rename(temporaryPath, path);
+  const temporary_path = `${path}.tmp`;
+  await writeFile(temporary_path, renderPublicApiBaseline(baseline));
+  await rename(temporary_path, path);
   return baseline;
 }
 
-function baselineIssue(code: ApiIssue["code"], key: string, problem: string): ApiIssue {
-  const [packageName = "", entryPoint = "", symbol = ""] = key.split("#");
+function baseline_issue(code: ApiIssue["code"], key: string, problem: string): ApiIssue {
+  const [package_name = "", entry_point = "", symbol = ""] = key.split("#");
   return {
     code,
-    message: `${packageName} ${entryPoint} ${symbol} ${problem}; review it, then run \`${BASELINE_COMMAND}\``,
-    package: packageName,
-    entryPoint,
+    message: `${package_name} ${entry_point} ${symbol} ${problem}; review it, then run \`${BASELINE_COMMAND}\``,
+    package: package_name,
+    entryPoint: entry_point,
     symbol,
   };
 }
@@ -202,7 +202,7 @@ export function checkPublicApiBaseline(
     const reviewed = baseline.exports[key];
     if (reviewed === undefined) {
       issues.push(
-        baselineIssue(
+        baseline_issue(
           "unlisted-export",
           key,
           `is exported but ${PUBLIC_API_BASELINE_PATH} does not list it`,
@@ -210,7 +210,7 @@ export function checkPublicApiBaseline(
       );
     } else if (reviewed !== digest) {
       issues.push(
-        baselineIssue(
+        baseline_issue(
           "changed-signature",
           key,
           `changed its declaration (${reviewed} -> ${digest})`,
@@ -221,7 +221,7 @@ export function checkPublicApiBaseline(
   for (const key of Object.keys(baseline.exports)) {
     if (built[key] === undefined) {
       issues.push(
-        baselineIssue(
+        baseline_issue(
           "removed-export",
           key,
           `is listed in ${PUBLIC_API_BASELINE_PATH} but no longer exported`,

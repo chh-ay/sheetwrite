@@ -7,9 +7,9 @@ export const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
  * as an inline script after the sidebar, before first paint.
  */
 export function revealCurrentNavigation(): void {
-  const reveal = (listSelector: string, itemSelector: string, vertical: boolean): void => {
-    const list = document.querySelector(listSelector);
-    const item = list?.querySelector(itemSelector);
+  const reveal = (list_selector: string, item_selector: string, vertical: boolean): void => {
+    const list = document.querySelector(list_selector);
+    const item = list?.querySelector(item_selector);
     if (!list || !item) return;
     const box = list.getBoundingClientRect();
     const row = item.getBoundingClientRect();

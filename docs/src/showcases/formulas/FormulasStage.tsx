@@ -32,28 +32,28 @@ const SHEETS = [
 /** The formulas showcase's island: the order ledger, its dashboard and the playground. */
 export function FormulasStage(props: FormulasStageProps) {
   let host!: HTMLDivElement;
-  const [workbook, setWorkbook] = createSignal<FormulasWorkbook | null>(null);
-  const [state, setState] = createSignal<GridState>("loading");
-  const [error, setError] = createSignal("");
-  const [activeSheet, setActiveSheet] = createSignal<string>(ANALYSIS_SHEET_ID);
-  const [selected, setSelected] = createSignal<FormulaPanel["id"]>(FORMULA_PANELS[0].id);
-  const [promoted, setPromoted] = createSignal(false);
-  const [recalc, setRecalc] = createSignal<Recalc | null>(null);
-  const [draft, setDraft] = createSignal(PLAYGROUND_EXAMPLE);
-  const [playground, setPlayground] = createSignal<{ result: string; ms: number } | null>(null);
-  const [revision, setRevision] = createSignal(0);
+  const [workbook, set_workbook] = createSignal<FormulasWorkbook | null>(null);
+  const [state, set_state] = createSignal<GridState>("loading");
+  const [error, set_error] = createSignal("");
+  const [active_sheet, set_active_sheet] = createSignal<string>(ANALYSIS_SHEET_ID);
+  const [selected, set_selected] = createSignal<FormulaPanel["id"]>(FORMULA_PANELS[0].id);
+  const [promoted, set_promoted] = createSignal(false);
+  const [recalc, set_recalc] = createSignal<Recalc | null>(null);
+  const [draft, set_draft] = createSignal(PLAYGROUND_EXAMPLE);
+  const [playground, set_playground] = createSignal<{ result: string; ms: number } | null>(null);
+  const [revision, set_revision] = createSignal(0);
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       import("./boot.js")
-        .then(({ startFormulasWorkbook }) =>
-          startFormulasWorkbook(
+        .then(({ startFormulasWorkbook: start_formulas_workbook }) =>
+          start_formulas_workbook(
             host,
             {
-              onFollow: setSelected,
-              onActiveSheet: setActiveSheet,
-              onChange: () => setRevision((value) => value + 1),
+              onFollow: set_selected,
+              onActiveSheet: set_active_sheet,
+              onChange: () => set_revision((value) => value + 1),
             },
             () => disposed,
           ),
@@ -61,19 +61,19 @@ export function FormulasStage(props: FormulasStageProps) {
         .then((started) => {
           if (started === null) return;
           if (disposed) return started.dispose();
-          setWorkbook(started);
-          setRecalc(started.firstRecalc);
-          setState("ready");
+          set_workbook(started);
+          set_recalc(started.firstRecalc);
+          set_state("ready");
         })
         .catch((cause: unknown) => {
           if (disposed) return;
-          setState("error");
-          setError(errorText(cause));
+          set_state("error");
+          set_error(errorText(cause));
         });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       workbook()?.dispose();
     });
   });
@@ -81,14 +81,14 @@ export function FormulasStage(props: FormulasStageProps) {
   const ready = () => state() === "ready";
   const panel = () =>
     FORMULA_PANELS.find((candidate) => candidate.id === selected()) ?? FORMULA_PANELS[0];
-  const panelValue = createMemo(() => {
+  const panel_value = createMemo(() => {
     revision();
     const current = workbook();
     return current === null ? "—" : current.describeResult(panel().row, panel().col);
   });
 
-  const showPanel = (next: FormulaPanel) => {
-    setSelected(next.id);
+  const show_panel = (next: FormulaPanel) => {
+    set_selected(next.id);
     const grid = workbook()?.grid;
     if (!grid) return;
     grid.setActiveSheet(ANALYSIS_SHEET_ID);
@@ -96,15 +96,15 @@ export function FormulasStage(props: FormulasStageProps) {
     grid.setSelection({ kind: "cell", addr });
     grid.scrollToCell(addr);
   };
-  const togglePromotion = () => {
+  const toggle_promotion = () => {
     const result = workbook()?.togglePromotion();
     if (!result) return;
-    setRecalc(result);
-    setPromoted(workbook()?.promoted() ?? false);
+    set_recalc(result);
+    set_promoted(workbook()?.promoted() ?? false);
   };
-  const switchSheet = (sheet: string) => {
+  const switch_sheet = (sheet: string) => {
     workbook()?.grid.setActiveSheet(sheet);
-    setActiveSheet(sheet);
+    set_active_sheet(sheet);
   };
 
   return (
@@ -119,7 +119,7 @@ export function FormulasStage(props: FormulasStageProps) {
               aria-pressed={promoted()}
               data-testid="formulas-promotion"
               disabled={!ready()}
-              onClick={togglePromotion}
+              onClick={toggle_promotion}
               variant="primary"
             >
               <Icon name={promoted() ? "undo" : "bolt"} />
@@ -161,7 +161,7 @@ export function FormulasStage(props: FormulasStageProps) {
                       data-size="sm"
                       data-testid={`formulas-recipe-${candidate.id}`}
                       disabled={!ready()}
-                      onClick={() => showPanel(candidate)}
+                      onClick={() => show_panel(candidate)}
                       variant="quiet"
                     >
                       <code>{props.addresses[candidate.id]}</code>
@@ -174,7 +174,7 @@ export function FormulasStage(props: FormulasStageProps) {
             <article class="sw-fx-detail" data-testid="formulas-detail">
               <p class="sw-fx-detail__kicker">
                 {props.addresses[panel().id]} · {panel().families.join(" · ")} · first value{" "}
-                <span data-testid="formulas-detail-value">{panelValue()}</span>
+                <span data-testid="formulas-detail-value">{panel_value()}</span>
               </p>
               <h3>{panel().title}</h3>
               <p>{panel().explanation}</p>
@@ -187,14 +187,14 @@ export function FormulasStage(props: FormulasStageProps) {
               onSubmit={(event) => {
                 event.preventDefault();
                 const result = workbook()?.runDraft(draft());
-                if (result) setPlayground(result);
+                if (result) set_playground(result);
               }}
             >
               <input
                 aria-label="Formula"
                 autocomplete="off"
                 data-testid="formulas-draft"
-                onInput={(event) => setDraft(event.currentTarget.value)}
+                onInput={(event) => set_draft(event.currentTarget.value)}
                 spellcheck={false}
                 value={draft()}
               />
@@ -228,10 +228,10 @@ export function FormulasStage(props: FormulasStageProps) {
           <For each={SHEETS}>
             {(sheet) => (
               <Button
-                aria-pressed={activeSheet() === sheet.id}
+                aria-pressed={active_sheet() === sheet.id}
                 data-size="sm"
                 disabled={!ready()}
-                onClick={() => switchSheet(sheet.id)}
+                onClick={() => switch_sheet(sheet.id)}
                 variant="quiet"
               >
                 {sheet.label}

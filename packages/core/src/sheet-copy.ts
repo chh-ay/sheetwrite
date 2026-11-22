@@ -36,26 +36,33 @@ export function planSheetCopy(
   if (!source) return null;
 
   const used = new Set(workbook.sheets.map((sheet) => sheet.id));
-  let copyId = `${id}-copy`;
-  for (let suffix = 2; used.has(copyId); suffix++) copyId = `${id}-copy-${suffix}`;
+  let copy_id = `${id}-copy`;
+  for (let suffix = 2; used.has(copy_id); suffix++) copy_id = `${id}-copy-${suffix}`;
   const name =
     options.name ??
-    copySheetName(
+    copy_sheet_name(
       source.name,
       workbook.sheets.map((sheet) => sheet.name),
     );
-  const copy = copySheet(source, { id: copyId, name, order: options.index ?? from + 1 }, workbook);
+  const copy = copy_sheet(
+    source,
+    { id: copy_id, name, order: options.index ?? from + 1 },
+    workbook,
+  );
   return {
-    sheet: copyId,
+    sheet: copy_id,
     operations: [
       { op: "addSheet", sheet: copy.sheet },
-      ...copy.names.map((namedRange) => ({ op: "setNamedRange" as const, namedRange })),
+      ...copy.names.map((named_range) => ({
+        op: "setNamedRange" as const,
+        namedRange: named_range,
+      })),
     ],
   };
 }
 
 /** Excel's name for a copy of the sheet `name`: `Sales (2)`, or the next free number. */
-function copySheetName(name: string, taken: readonly string[]): string {
+function copy_sheet_name(name: string, taken: readonly string[]): string {
   const keys = new Set(taken.map(sheetNameKey));
   for (let number = 2; ; number++) {
     const suffix = ` (${number})`;
@@ -73,9 +80,9 @@ export function referenceSheetName(name: string): string {
  * Point the references of `text` that name sheet `from` at sheet `to`. A
  * 3-D reference such as `Sheet1:Sheet3!A1` names a span of sheets and stays.
  */
-function renameSheetReferences(text: string, from: string, to: string): string {
+function rename_sheet_references(text: string, from: string, to: string): string {
   const tokens = formulaTokens(text);
-  const fromKey = sheetNameKey(from);
+  const from_key = sheetNameKey(from);
   let out = "";
   let copied = 0;
   tokens.forEach(({ kind, from: start, to: end, text: written }, index) => {
@@ -83,7 +90,7 @@ function renameSheetReferences(text: string, from: string, to: string): string {
     // `Sheet1:Sheet3!`: the sheet before the colon has no `!` of its own.
     if (tokens[index - 1]?.kind === "colon" && tokens[index - 3]?.kind !== "bang") return;
     const name = kind === "quoted" ? written.slice(1, -1).replaceAll("''", "'") : written;
-    if (sheetNameKey(name) === fromKey) {
+    if (sheetNameKey(name) === from_key) {
       out += text.slice(copied, start) + referenceSheetName(to);
       copied = end;
     }
@@ -92,7 +99,7 @@ function renameSheetReferences(text: string, from: string, to: string): string {
 }
 
 /** `base` with the first free number appended: `Sales2`, `Sales3`, ... */
-function nextFree(base: string, taken: Set<string>, key: (name: string) => string): string {
+function next_free(base: string, taken: Set<string>, key: (name: string) => string): string {
   for (let number = 2; ; number++) {
     const candidate = `${base}${number}`;
     if (!taken.has(key(candidate))) {
@@ -103,16 +110,16 @@ function nextFree(base: string, taken: Set<string>, key: (name: string) => strin
 }
 
 /** Replace `sheet: from` with `sheet: to` in every range and address under `value`. */
-function moveSheetIds(value: unknown, from: SheetId, to: SheetId): void {
+function move_sheet_ids(value: unknown, from: SheetId, to: SheetId): void {
   if (Array.isArray(value)) {
-    for (const item of value) moveSheetIds(item, from, to);
+    for (const item of value) move_sheet_ids(item, from, to);
     return;
   }
   if (value === null || typeof value !== "object") return;
   const record = value as Record<string, unknown>;
   for (const [key, child] of Object.entries(record)) {
     if (key === "sheet" && child === from) record[key] = to;
-    else moveSheetIds(child, from, to);
+    else move_sheet_ids(child, from, to);
   }
 }
 
@@ -122,35 +129,35 @@ function moveSheetIds(value: unknown, from: SheetId, to: SheetId): void {
  * get new names (`Sales` becomes `Sales2`) that the copy's structured
  * references follow, and pivots get new IDs that the copy's charts follow.
  */
-function copySheet(
+function copy_sheet(
   source: SheetSnapshot,
   target: { id: SheetId; name: string; order: number },
   workbook: Workbook,
 ): SheetCopy {
   const { cells, ...rest } = source;
   const sheet: SheetSnapshot = { ...structuredClone(rest), ...target, cells: [] };
-  moveSheetIds(sheet, source.id, target.id);
+  move_sheet_ids(sheet, source.id, target.id);
 
-  const nameKeys = new Set(
+  const name_keys = new Set(
     [
       ...(workbook.namedRanges ?? []).map((name) => name.name),
       ...workbook.sheets.flatMap((candidate) => candidate.tables ?? []).map((table) => table.name),
     ].map(formulaNameKey),
   );
-  const tableIds = new Set(
+  const table_ids = new Set(
     workbook.sheets.flatMap((candidate) => candidate.tables ?? []).map((table) => table.id),
   );
-  const tableNames: Array<[from: string, to: string]> = [];
+  const table_names: Array<[from: string, to: string]> = [];
   for (const table of sheet.tables ?? []) {
-    const name = nextFree(table.name, nameKeys, formulaNameKey);
-    tableNames.push([table.name, name]);
+    const name = next_free(table.name, name_keys, formulaNameKey);
+    table_names.push([table.name, name]);
     table.name = name;
-    table.id = nextFree(`${table.id}-`, tableIds, (id) => id);
+    table.id = next_free(`${table.id}-`, table_ids, (id) => id);
   }
   const rewrite = (text: string): string =>
-    tableNames.reduce(
+    table_names.reduce(
       (formula, [from, to]) => getEngine().renameStructuredReference(formula, from, "", to),
-      renameSheetReferences(text, source.name, target.name),
+      rename_sheet_references(text, source.name, target.name),
     );
 
   sheet.cells = cells.map((block) => ({
@@ -173,12 +180,12 @@ function copySheet(
     rule.condition = mapValidationFormulas(rule.condition, rewrite);
   }
 
-  const pivotIds = new Set(
+  const pivot_ids = new Set(
     workbook.sheets.flatMap((candidate) => candidate.pivots ?? []).map((pivot) => pivot.id),
   );
   const pivots = new Map<string, string>();
   for (const pivot of sheet.pivots ?? []) {
-    const id = nextFree(`${pivot.id}-`, pivotIds, (candidate) => candidate);
+    const id = next_free(`${pivot.id}-`, pivot_ids, (candidate) => candidate);
     pivots.set(pivot.id, id);
     pivot.id = id;
   }
@@ -190,7 +197,7 @@ function copySheet(
   for (const name of workbook.namedRanges ?? []) {
     if (name.scope !== source.id) continue;
     const copy = structuredClone(name);
-    moveSheetIds(copy, source.id, target.id);
+    move_sheet_ids(copy, source.id, target.id);
     copy.scope = target.id;
     if ("formula" in copy && copy.formula !== undefined) copy.formula = rewrite(copy.formula);
     names.push(copy);

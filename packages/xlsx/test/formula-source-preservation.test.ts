@@ -178,9 +178,9 @@ it("writes reference operators as Excel text and recalculates them after import"
       { activeSheet: "summary" },
     ),
   );
-  const summaryXml = partText(encoded, "xl/worksheets/sheet5.xml");
+  const summary_xml = partText(encoded, "xl/worksheets/sheet5.xml");
   for (const source of sources)
-    expect(summaryXml).toContain(`<f>${escapeXml(source.slice(1))}</f>`);
+    expect(summary_xml).toContain(`<f>${escapeXml(source.slice(1))}</f>`);
 
   const decoded = await fromXlsxWorkbook(encoded);
   const summary = sheetNamed(decoded, "Summary");

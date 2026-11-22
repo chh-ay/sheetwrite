@@ -83,7 +83,7 @@ const API_PACKAGE_ICONS: Readonly<Record<string, IconName>> = {
 };
 
 /** An API package's icon. Every package has its own; a new one must add it here. */
-function apiPackageIcon(name: string): IconName {
+function api_package_icon(name: string): IconName {
   const icon = API_PACKAGE_ICONS[name];
   if (icon === undefined) throw new Error(`No sidebar icon for API package ${name}`);
   return icon;
@@ -105,7 +105,7 @@ const FORMULA_FAMILY_ICONS: Readonly<Record<string, IconName>> = {
 };
 
 /** A formula family page's icon. Every family has its own; a new one must add it here. */
-function formulaFamilyIcon(href: string): IconName {
+function formula_family_icon(href: string): IconName {
   const slug = /\/formula-functions\/([^/]+)\/$/.exec(href)?.[1] ?? "";
   const icon = FORMULA_FAMILY_ICONS[slug];
   if (icon === undefined) throw new Error(`No sidebar icon for formula family ${slug}`);
@@ -113,7 +113,7 @@ function formulaFamilyIcon(href: string): IconName {
 }
 
 /** Narrows a linkable entry without copying its authored metadata. */
-function isPage(item: NavigationItem): item is NavigationPage {
+function is_page(item: NavigationItem): item is NavigationPage {
   return item.href !== undefined;
 }
 
@@ -532,7 +532,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     tab: "api",
     items: [
       { label: "All entry points", href: "/docs/api/", icon: "package" },
-      ...apiNav.map((entry) => ({ ...entry, icon: apiPackageIcon(entry.label) })),
+      ...apiNav.map((entry) => ({ ...entry, icon: api_package_icon(entry.label) })),
     ],
   },
   {
@@ -540,7 +540,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     tab: "formulas",
     items: [
       { label: "Overview", href: "/docs/reference/formula-functions/", icon: "formula" },
-      ...formulaNav.map((entry) => ({ ...entry, icon: formulaFamilyIcon(entry.href) })),
+      ...formulaNav.map((entry) => ({ ...entry, icon: formula_family_icon(entry.href) })),
       {
         label: "Excel function coverage",
         href: "/docs/reference/excel-function-coverage/",
@@ -583,7 +583,7 @@ export function tabForHref(activeHref: string | undefined): DocsTabId {
 export function navigationPages(items: readonly NavigationItem[]): NavigationPage[] {
   const pages: NavigationPage[] = [];
   const visit = (item: NavigationItem): void => {
-    if (isPage(item)) pages.push(item);
+    if (is_page(item)) pages.push(item);
     for (const child of item.items ?? []) visit(child);
   };
   for (const item of items) visit(item);
@@ -614,7 +614,7 @@ const READING_ORDER: readonly NavigationPage[] = navigationPages(
 export type NavigationBadge = "new" | "updated";
 
 /** The major and minor version; patch releases share the same feature set. */
-function minorVersion(version: string): string {
+function minor_version(version: string): string {
   return version.replace(/\.\d+$/, "");
 }
 
@@ -628,17 +628,17 @@ export function navigationBadge(
   item: NavigationItem,
   release: string,
 ): NavigationBadge | undefined {
-  const minor = minorVersion(release);
-  const sameMinor = (version: string | undefined) =>
-    version !== undefined && minorVersion(version) === minor;
+  const minor = minor_version(release);
+  const same_minor = (version: string | undefined) =>
+    version !== undefined && minor_version(version) === minor;
 
-  if (sameMinor(item.added)) return "new";
+  if (same_minor(item.added)) return "new";
 
-  let badge: NavigationBadge | undefined = sameMinor(item.updated) ? "updated" : undefined;
+  let badge: NavigationBadge | undefined = same_minor(item.updated) ? "updated" : undefined;
   for (const child of item.items ?? []) {
-    const childBadge = navigationBadge(child, release);
-    if (childBadge === "new") return "new";
-    badge ??= childBadge;
+    const child_badge = navigationBadge(child, release);
+    if (child_badge === "new") return "new";
+    badge ??= child_badge;
   }
   return badge;
 }

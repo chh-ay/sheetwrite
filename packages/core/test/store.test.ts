@@ -15,7 +15,7 @@ import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
 const at = (sheet: string, row: number, col: number) => ({ sheet, row, col });
-const setLiteral = (
+const set_literal = (
   address: CellAddress,
   value: string | number | boolean | null,
   style?: CellStyle,
@@ -25,23 +25,23 @@ const setLiteral = (
   value: { kind: "literal", value },
   ...(style && { style }),
 });
-const setFormula = (address: CellAddress, src: string, style?: CellStyle): DocumentOp => ({
+const set_formula = (address: CellAddress, src: string, style?: CellStyle): DocumentOp => ({
   op: "set",
   addr: address,
   value: { kind: "formula", src },
   ...(style && { style }),
 });
-const setRef = (address: CellAddress, target: CellAddress, style?: CellStyle): DocumentOp => ({
+const set_ref = (address: CellAddress, target: CellAddress, style?: CellStyle): DocumentOp => ({
   op: "set",
   addr: address,
   value: { kind: "ref", target },
   ...(style && { style }),
 });
 /** A paged store over the fixture workbook. */
-const pagedStore = (rows: number, options: Record<string, number> = {}) =>
+const paged_store = (rows: number, options: Record<string, number> = {}) =>
   new SheetwriteStore(makeWorkbook(rows), undefined, { storage: "paged", ...options });
 /** The fixture workbook with a second sheet "s2". */
-function withSecondSheet(rows: number): Workbook {
+function with_second_sheet(rows: number): Workbook {
   const workbook = makeWorkbook(rows);
   workbook.sheets.push({ ...structuredClone(workbook.sheets[0]!), id: "s2", name: "Second" });
   return workbook;
@@ -101,15 +101,15 @@ describe("SheetwriteStore", () => {
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
     try {
       store.applyTransaction({
-        patches: [setLiteral(addr(0, 0), "original")],
+        patches: [set_literal(addr(0, 0), "original")],
       });
       const before = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
-      const issuingEpoch = before.stringPoolEpoch;
+      const issuing_epoch = before.stringPoolEpoch;
       expect(before.values[0]).toBe("original");
       const history = store.captureRangeHistory(range);
       if (!history) throw new Error("Expected captured text history");
       try {
-        let observedSweep = false;
+        let observed_sweep = false;
         for (let edit = 0; edit < 6_000; edit++) {
           store.applyTransaction({
             patches: [
@@ -121,14 +121,14 @@ describe("SheetwriteStore", () => {
             ],
           });
           const refreshed = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
-          if (refreshed.stringPoolEpoch !== issuingEpoch) {
+          if (refreshed.stringPoolEpoch !== issuing_epoch) {
             expect(refreshed.stringPoolIds?.[0]).toBe(before.stringPoolIds?.[0]);
             expect(refreshed.values[0]).toBe(`${edit}-${"x".repeat(128)}`);
-            observedSweep = true;
+            observed_sweep = true;
             break;
           }
         }
-        expect(observedSweep).toBe(true);
+        expect(observed_sweep).toBe(true);
         store.applyTransaction({ patches: [history.toDocumentOp(range)] });
         expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values[0]).toBe("original");
       } finally {
@@ -160,9 +160,9 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
       patches: [
-        setLiteral(addr(0, 0), 41),
-        setRef(addr(1, 0), addr(0, 0)),
-        setFormula(addr(2, 0), "=A2+1"),
+        set_literal(addr(0, 0), 41),
+        set_ref(addr(1, 0), addr(0, 0)),
+        set_formula(addr(2, 0), "=A2+1"),
       ],
     });
 
@@ -176,7 +176,7 @@ describe("SheetwriteStore", () => {
 
     // Editing the target refreshes the displayed reference value and dependents.
     store.applyTransaction({
-      patches: [setLiteral(addr(0, 0), 10)],
+      patches: [set_literal(addr(0, 0), 10)],
     });
     expect(store.getVisibleWindow("s1", { start: 1, end: 2 }, [0]).values[0]).toBe(10);
     expect(store.getCell(addr(2, 0)).resolved).toBe(11);
@@ -185,14 +185,14 @@ describe("SheetwriteStore", () => {
   it("keeps local change payloads bounded to their own transaction", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
-      patches: [setLiteral(addr(0, 0), 0)],
+      patches: [set_literal(addr(0, 0), 0)],
     });
     const events: ChangeEvent[] = [];
     store.on("change", (event) => events.push(event));
 
     for (let index = 0; index < 128; index++) {
       store.applyTransaction({
-        patches: [setLiteral(addr(0, 0), index % 2)],
+        patches: [set_literal(addr(0, 0), index % 2)],
       });
     }
 
@@ -216,8 +216,8 @@ describe("SheetwriteStore", () => {
   for (const operation of ["setBlock", "setRange", "clearRange"] as const) {
     it(`preserves resolved before-values and styles in ${operation} rollback events`, () => {
       const store = new SheetwriteStore(makeWorkbook(3));
-      const initialValues = ["雪😀", true, null, 7, null, null] as const;
-      const boldStyle = { bold: true };
+      const initial_values = ["雪😀", true, null, 7, null, null] as const;
+      const bold_style = { bold: true };
       store.applyTransaction({
         patches: [
           {
@@ -226,8 +226,8 @@ describe("SheetwriteStore", () => {
             block: {
               rowCount: 2,
               colCount: 3,
-              values: [...initialValues],
-              styleTable: [boldStyle],
+              values: [...initial_values],
+              styleTable: [bold_style],
               styleIds: [0, 0, 0, 0, 0, 0],
               formulas: [
                 [2, "=1/0"],
@@ -254,7 +254,7 @@ describe("SheetwriteStore", () => {
             : {
                 op: "setRange",
                 range,
-                cells: Array.from({ length: initialValues.length }, (_, offset) => ({
+                cells: Array.from({ length: initial_values.length }, (_, offset) => ({
                   rowOffset: Math.floor(offset / 3),
                   colOffset: offset % 3,
                   value: { kind: "literal" as const, value: null },
@@ -275,7 +275,7 @@ describe("SheetwriteStore", () => {
           addr: addr(Math.floor(offset / 3), offset % 3),
           oldValue: { kind: "literal", value },
           newValue: { kind: "literal", value: null },
-          oldStyle: boldStyle,
+          oldStyle: bold_style,
         })),
       ]);
       store.dispose();
@@ -285,7 +285,7 @@ describe("SheetwriteStore", () => {
   it("captures resolved spill children before clearing their complete spill", () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     store.applyTransaction({
-      patches: [setFormula(addr(0, 0), "=SEQUENCE(2,2)")],
+      patches: [set_formula(addr(0, 0), "=SEQUENCE(2,2)")],
     });
     store.setDetailedChangeCapture(true);
     const events: ChangeEvent[] = [];
@@ -311,40 +311,40 @@ describe("SheetwriteStore", () => {
   });
 
   it("keeps rewritten formula source authoritative across row and column deletes", () => {
-    const rowStore = new SheetwriteStore(makeWorkbook(8));
-    rowStore.applyTransaction({
+    const row_store = new SheetwriteStore(makeWorkbook(8));
+    row_store.applyTransaction({
       patches: [
-        setLiteral(addr(0, 0), 1),
-        setLiteral(addr(1, 0), 2),
-        setLiteral(addr(2, 0), 3),
-        setLiteral(addr(3, 0), 4),
-        setFormula(addr(5, 1), "=$A$2"),
-        setFormula(addr(6, 1), "=SUM(A1:A4)"),
+        set_literal(addr(0, 0), 1),
+        set_literal(addr(1, 0), 2),
+        set_literal(addr(2, 0), 3),
+        set_literal(addr(3, 0), 4),
+        set_formula(addr(5, 1), "=$A$2"),
+        set_formula(addr(6, 1), "=SUM(A1:A4)"),
       ],
     });
-    rowStore.applyTransaction({
+    row_store.applyTransaction({
       patches: [{ op: "removeRows", sheet: "s1", at: 1, count: 2 }],
     });
 
-    expect(rowStore.getCell(addr(3, 1)).resolved).toBe("#REF!");
-    expect(rowStore.getFormula(addr(3, 1))).toBe("=#REF!");
-    expect(rowStore.getCell(addr(4, 1)).resolved).toBe(5);
-    expect(rowStore.getFormula(addr(4, 1))).toBe("=SUM(A1:A2)");
+    expect(row_store.getCell(addr(3, 1)).resolved).toBe("#REF!");
+    expect(row_store.getFormula(addr(3, 1))).toBe("=#REF!");
+    expect(row_store.getCell(addr(4, 1)).resolved).toBe(5);
+    expect(row_store.getFormula(addr(4, 1))).toBe("=SUM(A1:A2)");
 
-    const invalidSource = rowStore.getFormula(addr(3, 1));
-    expect(invalidSource).not.toBeNull();
-    rowStore.applyTransaction({
+    const invalid_source = row_store.getFormula(addr(3, 1));
+    expect(invalid_source).not.toBeNull();
+    row_store.applyTransaction({
       patches: [
         {
           op: "set",
           addr: addr(0, 2),
-          value: { kind: "formula", src: invalidSource! },
+          value: { kind: "formula", src: invalid_source! },
         },
       ],
     });
-    expect(rowStore.getCell(addr(0, 2)).resolved).toBe("#REF!");
+    expect(row_store.getCell(addr(0, 2)).resolved).toBe("#REF!");
 
-    const columnWorkbook: Workbook = {
+    const column_workbook: Workbook = {
       activeSheet: "s1",
       sheets: [
         {
@@ -360,25 +360,25 @@ describe("SheetwriteStore", () => {
         },
       ],
     };
-    const columnStore = new SheetwriteStore(columnWorkbook);
-    columnStore.applyTransaction({
+    const column_store = new SheetwriteStore(column_workbook);
+    column_store.applyTransaction({
       patches: [
-        setLiteral(addr(0, 0), 1),
-        setLiteral(addr(0, 1), 2),
-        setLiteral(addr(0, 2), 3),
-        setLiteral(addr(0, 3), 4),
-        setFormula(addr(1, 4), "=B1"),
-        setFormula(addr(1, 5), "=SUM(A1:D1)"),
+        set_literal(addr(0, 0), 1),
+        set_literal(addr(0, 1), 2),
+        set_literal(addr(0, 2), 3),
+        set_literal(addr(0, 3), 4),
+        set_formula(addr(1, 4), "=B1"),
+        set_formula(addr(1, 5), "=SUM(A1:D1)"),
       ],
     });
-    columnStore.applyTransaction({
+    column_store.applyTransaction({
       patches: [{ op: "removeColumns", sheet: "s1", at: 1, count: 2 }],
     });
 
-    expect(columnStore.getCell(addr(1, 2)).resolved).toBe("#REF!");
-    expect(columnStore.getFormula(addr(1, 2))).toBe("=#REF!");
-    expect(columnStore.getCell(addr(1, 3)).resolved).toBe(5);
-    expect(columnStore.getFormula(addr(1, 3))).toBe("=SUM(A1:B1)");
+    expect(column_store.getCell(addr(1, 2)).resolved).toBe("#REF!");
+    expect(column_store.getFormula(addr(1, 2))).toBe("=#REF!");
+    expect(column_store.getCell(addr(1, 3)).resolved).toBe(5);
+    expect(column_store.getFormula(addr(1, 3))).toBe("=SUM(A1:B1)");
   });
 
   it("rewrites cross-sheet formulas without shifting unrelated absolute targets", () => {
@@ -396,10 +396,10 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
       patches: [
-        setLiteral(at("source", 1, 0), 9),
-        setLiteral(at("other", 0, 0), 7),
-        setFormula(at("summary", 0, 0), "='Source Data'!$A$2"),
-        setFormula(at("summary", 1, 0), "=Other!A1"),
+        set_literal(at("source", 1, 0), 9),
+        set_literal(at("other", 0, 0), 7),
+        set_formula(at("summary", 0, 0), "='Source Data'!$A$2"),
+        set_formula(at("summary", 1, 0), "=Other!A1"),
       ],
     });
     store.applyTransaction({
@@ -423,11 +423,11 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(6));
     store.applyTransaction({
       patches: [
-        setLiteral(addr(0, 0), false),
-        setLiteral(addr(1, 0), true),
-        setFormula(addr(2, 0), "=1=1"),
-        setFormula(addr(3, 0), "=1=2"),
-        setLiteral(addr(4, 0), 7),
+        set_literal(addr(0, 0), false),
+        set_literal(addr(1, 0), true),
+        set_formula(addr(2, 0), "=1=1"),
+        set_formula(addr(3, 0), "=1=2"),
+        set_literal(addr(4, 0), 7),
       ],
     });
 
@@ -472,9 +472,9 @@ describe("SheetwriteStore", () => {
       expect(
         store.applyTransaction({
           patches: [
-            setLiteral(addr(1, 1), 7),
+            set_literal(addr(1, 1), 7),
             { op: "setNamedRange", namedRange: { name: "Input", formula: "='Sheet 1'!$B$2*2" } },
-            setFormula(addr(0, 2), "=Input"),
+            set_formula(addr(0, 2), "=Input"),
           ],
         }).status,
       ).toBe("applied");
@@ -521,14 +521,14 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
       patches: [
-        setLiteral(at("data", 0, 0), 1),
-        setLiteral(at("data", 1, 0), 2),
-        setLiteral(at("data", 2, 0), 3),
-        setLiteral(at("data", 0, 1), 10),
-        setLiteral(at("data", 1, 1), 20),
-        setLiteral(at("data", 2, 1), 30),
-        setFormula(at("summary", 0, 0), "=SUM(Values)"),
-        setFormula(at("other", 0, 0), "=SUM(Values)"),
+        set_literal(at("data", 0, 0), 1),
+        set_literal(at("data", 1, 0), 2),
+        set_literal(at("data", 2, 0), 3),
+        set_literal(at("data", 0, 1), 10),
+        set_literal(at("data", 1, 1), 20),
+        set_literal(at("data", 2, 1), 30),
+        set_formula(at("summary", 0, 0), "=SUM(Values)"),
+        set_formula(at("other", 0, 0), "=SUM(Values)"),
         {
           op: "setNamedRange",
           namedRange: {
@@ -552,23 +552,23 @@ describe("SheetwriteStore", () => {
             },
           },
         },
-        setFormula(at("summary", 0, 2), "=TODAY()"),
-        setFormula(at("summary", 0, 3), "=NOW()"),
+        set_formula(at("summary", 0, 2), "=TODAY()"),
+        set_formula(at("summary", 0, 3), "=NOW()"),
       ],
     });
 
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(60);
     expect(store.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
-    let volatileEvents = 0;
+    let volatile_events = 0;
     store.on("change", (event) => {
-      if (event.transaction.patches.length === 0) volatileEvents += 1;
+      if (event.transaction.patches.length === 0) volatile_events += 1;
     });
     const now = new Date("2026-07-13T18:00:00.000Z");
     const serial = now.getTime() / 86_400_000 + 25_569;
     store.recalculateVolatile(now);
     expect(store.getCell({ sheet: "summary", row: 0, col: 2 }).resolved).toBe(Math.floor(serial));
     expect(store.getCell({ sheet: "summary", row: 0, col: 3 }).resolved).toBe(serial);
-    expect(volatileEvents).toBe(1);
+    expect(volatile_events).toBe(1);
 
     store.applyTransaction({
       patches: [{ op: "addRows", sheet: "data", at: 1, count: 1 }],
@@ -643,8 +643,8 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(3));
     const italic: CellStyle = { italic: true };
     const bold: CellStyle = { bold: true };
-    const styleTable = [italic, {}, bold, { bold: true }, { color: "#ff0000" }];
-    const styleIds = [2, 0, 1, 3, 2, 0];
+    const style_table = [italic, {}, bold, { bold: true }, { color: "#ff0000" }];
+    const style_ids = [2, 0, 1, 3, 2, 0];
     const range = { sheet: "s1", start: addr(0, 0), end: addr(1, 2) };
     // A formula (offset 1) and a ref (offset 5) take their own table ids, not the first cell's.
     const block = {
@@ -653,8 +653,8 @@ describe("SheetwriteStore", () => {
       values: [1, null, 3, 4, 5, null],
       formulas: [[1, "=A1*2"]] as [number, string][],
       refs: [[5, addr(0, 0)]] as [number, CellAddress][],
-      styleTable,
-      styleIds,
+      styleTable: style_table,
+      styleIds: style_ids,
     };
     expect(store.applyTransaction({ patches: [{ op: "setBlock", range, block }] }).status).toBe(
       "applied",
@@ -681,7 +681,7 @@ describe("datasource row hydration", () => {
 });
 
 describe("stable formula sheet identity", () => {
-  function lifecycleWorkbook(): Workbook {
+  function lifecycle_workbook(): Workbook {
     return {
       activeSheet: "summary",
       sheets: [
@@ -705,10 +705,13 @@ describe("stable formula sheet identity", () => {
   }
 
   it("rewrites references through renameSheet, quoting names and saving the new name", () => {
-    const workbook = lifecycleWorkbook();
+    const workbook = lifecycle_workbook();
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
-      patches: [setLiteral(at("source", 0, 0), 4), setFormula(at("summary", 0, 0), "=Sales!A1+1")],
+      patches: [
+        set_literal(at("source", 0, 0), 4),
+        set_formula(at("summary", 0, 0), "=Sales!A1+1"),
+      ],
     });
 
     const rename = (name: string) =>
@@ -720,10 +723,10 @@ describe("stable formula sheet identity", () => {
 
     expect(rename("O'Brien")).toBe("applied");
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("='O''Brien'!A1+1");
-    const roundTrip = validateWorkbookSnapshot(JSON.parse(JSON.stringify(store.exportSnapshot())));
-    expect(roundTrip.ok).toBe(true);
-    if (!roundTrip.ok) throw new Error("renamed snapshot did not validate");
-    const summary = roundTrip.value.sheets.find((sheet) => sheet.id === "summary");
+    const round_trip = validateWorkbookSnapshot(JSON.parse(JSON.stringify(store.exportSnapshot())));
+    expect(round_trip.ok).toBe(true);
+    if (!round_trip.ok) throw new Error("renamed snapshot did not validate");
+    const summary = round_trip.value.sheets.find((sheet) => sheet.id === "summary");
     expect(summary?.cells.flatMap((block) => block.cells).map((cell) => cell.value)).toContainEqual(
       {
         kind: "formula",
@@ -737,25 +740,25 @@ describe("stable formula sheet identity", () => {
   });
 
   it("turns references to a removed sheet into #REF! through their dependents", () => {
-    const workbook = lifecycleWorkbook();
+    const workbook = lifecycle_workbook();
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
       patches: [
-        setLiteral(at("source", 0, 0), 4),
-        setFormula(at("summary", 0, 0), "=Sales!A1+1"),
-        setFormula(at("summary", 0, 1), "=A1+1"),
+        set_literal(at("source", 0, 0), 4),
+        set_formula(at("summary", 0, 0), "=Sales!A1+1"),
+        set_formula(at("summary", 0, 1), "=A1+1"),
       ],
     });
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(6);
 
-    const removeSource = () =>
+    const remove_source = () =>
       store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "source" }] }).status;
-    expect(removeSource()).toBe("applied");
+    expect(remove_source()).toBe("applied");
 
     expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=#REF!+1");
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe("#REF!");
-    expect(removeSource()).not.toBe("applied");
+    expect(remove_source()).not.toBe("applied");
     store.dispose();
   });
 });
@@ -765,7 +768,7 @@ describe("range-native mutations", () => {
     // More strings than one packing chunk (65,536), with non-ASCII text only
     // in the second chunk and an empty string on each side of the boundary.
     const rows = 70_000;
-    const textAt = (row: number): string => {
+    const text_at = (row: number): string => {
       if (row === 65_535 || row === 65_536) return "";
       if (row > 65_536 && row % 1_000 === 7) return `é😀${row}`;
       return `r${row}`;
@@ -779,7 +782,7 @@ describe("range-native mutations", () => {
           block: {
             rowCount: rows,
             colCount: 1,
-            values: Array.from({ length: rows }, (_, row) => textAt(row)),
+            values: Array.from({ length: rows }, (_, row) => text_at(row)),
           },
         },
       ],
@@ -787,12 +790,12 @@ describe("range-native mutations", () => {
     expect(outcome.status).toBe("applied");
     const mismatches: number[] = [];
     for (let row = 0; row < rows; row++) {
-      if (store.getCell(addr(row, 0)).resolved !== textAt(row)) mismatches.push(row);
+      if (store.getCell(addr(row, 0)).resolved !== text_at(row)) mismatches.push(row);
     }
     expect(mismatches).toEqual([]);
 
     store.applyTransaction({
-      patches: [setLiteral(addr(0, 2), "naïve ✓"), setLiteral(addr(1, 2), "plain")],
+      patches: [set_literal(addr(0, 2), "naïve ✓"), set_literal(addr(1, 2), "plain")],
     });
     expect(store.getCell(addr(0, 2)).resolved).toBe("naïve ✓");
     expect(store.getCell(addr(1, 2)).resolved).toBe("plain");
@@ -819,17 +822,17 @@ describe("range-native mutations", () => {
       { verticalAlign: "top" },
       { verticalAlign: "bottom" },
     ];
-    const addressOf = (index: number) => ({ sheet: "s1", row: index % 4, col: index >> 2 });
+    const address_of = (index: number) => ({ sheet: "s1", row: index % 4, col: index >> 2 });
     store.applyTransaction({
       patches: styles.map((style, index) => ({
         op: "set" as const,
-        addr: addressOf(index),
+        addr: address_of(index),
         value: { kind: "literal" as const, value: 1 },
         style,
       })),
     });
 
-    expect(styles.map((_, index) => store.getCell(addressOf(index)).style)).toEqual(styles);
+    expect(styles.map((_, index) => store.getCell(address_of(index)).style)).toEqual(styles);
   });
 
   it("materializes an opaque history snapshot only as a JSON-safe setBlock operation", () => {
@@ -871,18 +874,18 @@ describe("range-native mutations", () => {
 
 describe("paged datasource storage", () => {
   it("hydrates pages without overwriting dirty or revision-protected rich cells", () => {
-    const store = pagedStore(4, { chunkRows: 4, cacheBytes: 1_000_000 });
+    const store = paged_store(4, { chunkRows: 4, cacheBytes: 1_000_000 });
     store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "source zero", amount: 1, city: "A" },
       { name: "source target", amount: 2, city: "B" },
     ]);
-    const literal: DocumentOp = setLiteral(addr(0, 0), "local literal", { bold: true });
-    const formula: DocumentOp = setFormula(addr(0, 1), "=40+2", { italic: true });
-    const reference: DocumentOp = setRef(addr(0, 2), addr(1, 0), { underline: true });
+    const literal: DocumentOp = set_literal(addr(0, 0), "local literal", { bold: true });
+    const formula: DocumentOp = set_formula(addr(0, 1), "=40+2", { italic: true });
+    const reference: DocumentOp = set_ref(addr(0, 2), addr(1, 0), { underline: true });
     store.applyTransaction({ patches: [literal, formula, reference] });
     store.acknowledgeOperations([literal]);
 
-    const revisionAddresses = new Set<object>();
+    const revision_addresses = new Set<object>();
     store.loadPage(
       "s1",
       0,
@@ -892,12 +895,12 @@ describe("paged datasource storage", () => {
         { name: "server target", amount: 4, city: "server" },
       ],
       (address) => {
-        revisionAddresses.add(address);
+        revision_addresses.add(address);
         return address.row === 0 && address.col === 0;
       },
     );
 
-    expect(revisionAddresses.size).toBe(1);
+    expect(revision_addresses.size).toBe(1);
     expect(store.getCell(addr(0, 0))).toMatchObject({
       resolved: "local literal",
       style: { bold: true },
@@ -916,7 +919,7 @@ describe("paged datasource storage", () => {
   });
 
   it("hydrates disjoint bands without marking the physical holes in their bounding rectangle", () => {
-    const store = pagedStore(4, { chunkRows: 2, cacheBytes: 1_000_000 });
+    const store = paged_store(4, { chunkRows: 2, cacheBytes: 1_000_000 });
     store.loadPage(
       "s1",
       0,
@@ -959,8 +962,8 @@ describe("paged datasource storage", () => {
   });
 
   it("rejects malformed rectangular pages atomically without marking any target cell loaded", () => {
-    const store = pagedStore(4, { chunkRows: 4, cacheBytes: 1_000_000 });
-    const expectRowUnloaded = (row: number) => {
+    const store = paged_store(4, { chunkRows: 4, cacheBytes: 1_000_000 });
+    const expect_row_unloaded = (row: number) => {
       for (const col of [0, 1, 2]) {
         expect(store.getCellLoadState(addr(row, col))).toBe("unloaded");
       }
@@ -969,12 +972,12 @@ describe("paged datasource storage", () => {
     expect(() =>
       store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "missing", amount: 1 }]),
     ).toThrow(Error);
-    expectRowUnloaded(0);
+    expect_row_unloaded(0);
 
     expect(() =>
       store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "extra", amount: null }]),
     ).toThrow(Error);
-    expectRowUnloaded(1);
+    expect_row_unloaded(1);
 
     expect(() =>
       store.loadPage(
@@ -987,12 +990,12 @@ describe("paged datasource storage", () => {
         [{ name: "reordered", city: "C" }],
       ),
     ).toThrow(Error);
-    expectRowUnloaded(2);
+    expect_row_unloaded(2);
 
     expect(() =>
       store.loadPage("s1", 2, [{ start: 0, end: 1, keys: ["city"] }], [{ city: "wrong-position" }]),
     ).toThrow(Error);
-    expectRowUnloaded(2);
+    expect_row_unloaded(2);
 
     expect(() =>
       store.loadPage(
@@ -1005,7 +1008,7 @@ describe("paged datasource storage", () => {
         [{ name: "overlap", amount: 3, city: "D" }],
       ),
     ).toThrow(Error);
-    expectRowUnloaded(3);
+    expect_row_unloaded(3);
     expect(store.queryCapability("s1")).toEqual({
       status: "incomplete",
       loadedCells: 0,
@@ -1015,7 +1018,7 @@ describe("paged datasource storage", () => {
   });
 
   it("keeps whole-sheet reads and unloaded formula dependencies incomplete after a partial page", () => {
-    const store = pagedStore(2, { chunkRows: 2, cacheBytes: 1_000_000 });
+    const store = paged_store(2, { chunkRows: 2, cacheBytes: 1_000_000 });
     store.loadPage(
       "s1",
       0,
@@ -1034,7 +1037,7 @@ describe("paged datasource storage", () => {
     expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
 
     store.applyTransaction({
-      patches: [setFormula(addr(0, 2), "=A1")],
+      patches: [set_formula(addr(0, 2), "=A1")],
     });
     expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
     expect(store.queryCapability("s1").status).toBe("incomplete");
@@ -1043,7 +1046,7 @@ describe("paged datasource storage", () => {
   });
 
   it("rejects style remapping across loading cells before crossing the WASM boundary", () => {
-    const store = pagedStore(4, { chunkRows: 2, cacheBytes: 1_000_000 });
+    const store = paged_store(4, { chunkRows: 2, cacheBytes: 1_000_000 });
     const range = {
       sheet: "s1",
       start: { row: 0, col: 0 },
@@ -1089,22 +1092,22 @@ describe("paged datasource storage", () => {
   });
 
   it("acknowledges matching sparse runs without cleaning newer values, sources or styles", () => {
-    const store = pagedStore(12);
+    const store = paged_store(12);
     const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 11, col: 1 } };
-    const cells = Array.from({ length: 12 }, (_, rowOffset) => ({
-      rowOffset,
+    const cells = Array.from({ length: 12 }, (_, row_offset) => ({
+      rowOffset: row_offset,
       colOffset: 0,
-      value: { kind: "literal" as const, value: rowOffset },
+      value: { kind: "literal" as const, value: row_offset },
       style: { bold: true },
     }));
     const operation: DocumentOp = { op: "setRange", range, cells };
     store.applyTransaction({ patches: [operation] });
     store.applyTransaction({
       patches: [
-        setLiteral(addr(3, 1), 300, { bold: true }),
-        setFormula(addr(7, 1), "=7", { bold: true }),
-        setRef(addr(8, 1), addr(0, 1), { bold: true }),
-        setLiteral(addr(9, 1), 9, { italic: true }),
+        set_literal(addr(3, 1), 300, { bold: true }),
+        set_formula(addr(7, 1), "=7", { bold: true }),
+        set_ref(addr(8, 1), addr(0, 1), { bold: true }),
+        set_literal(addr(9, 1), 9, { italic: true }),
       ],
     });
 
@@ -1123,8 +1126,8 @@ describe("paged datasource storage", () => {
 
   for (const mode of ["set", "setRange"] as const) {
     it(`counts existing and duplicate sparse ${mode} targets once at the dirty limit`, () => {
-      const store = pagedStore(1_200, { dirtyCellLimit: 1_100 });
-      const patchesFor = (count: number, distinct: number): DocumentOp[] => {
+      const store = paged_store(1_200, { dirtyCellLimit: 1_100 });
+      const patches_for = (count: number, distinct: number): DocumentOp[] => {
         const cells = Array.from({ length: count }, (_, index) => ({
           rowOffset: index % distinct,
           colOffset: 0,
@@ -1140,16 +1143,16 @@ describe("paged datasource storage", () => {
               }))
           : cells.map((cell) => ({ op: "set", addr: addr(cell.rowOffset, 0), value: cell.value }));
       };
-      store.applyTransaction({ patches: patchesFor(100, 100) });
+      store.applyTransaction({ patches: patches_for(100, 100) });
       let events = 0;
       store.on("change", () => {
         events += 1;
       });
 
-      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_100) }).status).toBe("applied");
+      expect(store.applyTransaction({ patches: patches_for(1_200, 1_100) }).status).toBe("applied");
       expect(store.getPagedStats("s1").dirtyCells).toBe(1_100);
       expect(events).toBe(1);
-      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_101) })).toMatchObject({
+      expect(store.applyTransaction({ patches: patches_for(1_200, 1_101) })).toMatchObject({
         status: "rejected",
         issues: [
           { kind: "resource-limit", resource: "paged-dirty-cells", actual: 1_101, max: 1_100 },
@@ -1163,9 +1166,9 @@ describe("paged datasource storage", () => {
   }
 
   it("recomputes formulas and references after unloaded dependencies arrive", () => {
-    const store = pagedStore(6000, { cacheBytes: 2_000_000 });
+    const store = paged_store(6000, { cacheBytes: 2_000_000 });
     store.applyTransaction({
-      patches: [setFormula(addr(0, 2), "=B5001+1"), setRef(addr(1, 2), addr(5000, 1))],
+      patches: [set_formula(addr(0, 2), "=B5001+1"), set_ref(addr(1, 2), addr(5000, 1))],
     });
     expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
     expect(store.getCell(addr(1, 2)).resolved).toBe("#LOADING!");
@@ -1181,14 +1184,14 @@ describe("paged datasource storage", () => {
   });
 
   it("rejects dirty-capacity overflow atomically before formula/ref bookkeeping or events", () => {
-    const store = pagedStore(4, { chunkRows: 4, cacheBytes: 1024, dirtyCellLimit: 1 });
+    const store = paged_store(4, { chunkRows: 4, cacheBytes: 1024, dirtyCellLimit: 1 });
     let events = 0;
     store.on("change", () => {
       events += 1;
     });
 
     const rejected = store.applyTransaction({
-      patches: [setFormula(addr(0, 0), "=1+1"), setRef(addr(1, 0), addr(2, 0))],
+      patches: [set_formula(addr(0, 0), "=1+1"), set_ref(addr(1, 0), addr(2, 0))],
     });
     expect(rejected).toMatchObject({
       status: "rejected",
@@ -1201,13 +1204,13 @@ describe("paged datasource storage", () => {
     expect(events).toBe(0);
 
     const applied = store.applyTransaction({
-      patches: [setFormula(addr(0, 0), "=1+1")],
+      patches: [set_formula(addr(0, 0), "=1+1")],
     });
     expect(applied).toMatchObject({ status: "applied", epoch: 1 });
-    const secondRejected = store.applyTransaction({
-      patches: [setRef(addr(1, 0), addr(2, 0))],
+    const second_rejected = store.applyTransaction({
+      patches: [set_ref(addr(1, 0), addr(2, 0))],
     });
-    expect(secondRejected).toMatchObject({ status: "rejected", epoch: 1 });
+    expect(second_rejected).toMatchObject({ status: "rejected", epoch: 1 });
     expect(store.getFormula(addr(0, 0))).toBe("=1+1");
     expect(store.getRefTarget(addr(1, 0))).toBeNull();
     expect(store.getPagedStats("s1").dirtyCells).toBe(1);
@@ -1216,16 +1219,16 @@ describe("paged datasource storage", () => {
   });
 });
 it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
-  const store = pagedStore(1_000_000, { dirtyCellLimit: 1 });
+  const store = paged_store(1_000_000, { dirtyCellLimit: 1 });
   const cyclic: Record<string, unknown> = { op: "set" };
   cyclic.self = cyclic;
-  const throwingAccessor = Object.defineProperty({}, "op", {
+  const throwing_accessor = Object.defineProperty({}, "op", {
     enumerable: true,
     get: () => {
       throw new Error("hostile getter");
     },
   });
-  const throwingAddr = Object.defineProperty(
+  const throwing_addr = Object.defineProperty(
     { op: "set", value: { kind: "literal", value: 1 } },
     "addr",
     {
@@ -1235,23 +1238,23 @@ it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
       },
     },
   );
-  const throwingRow = Object.defineProperty({ sheet: "s1", col: 0 }, "row", {
+  const throwing_row = Object.defineProperty({ sheet: "s1", col: 0 }, "row", {
     enumerable: true,
     get: () => {
       throw new Error("hostile row getter");
     },
   });
-  const throwingStartRow = Object.defineProperty({ col: 0 }, "row", {
+  const throwing_start_row = Object.defineProperty({ col: 0 }, "row", {
     enumerable: true,
     get: () => {
       throw new Error("hostile range row getter");
     },
   });
-  const throwingRangeRow = {
+  const throwing_range_row = {
     op: "setRangeStyle",
     range: {
       sheet: "s1",
-      start: throwingStartRow,
+      start: throwing_start_row,
       end: { row: 0, col: 0 },
     },
     style: { bold: true },
@@ -1260,12 +1263,12 @@ it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
   for (const patch of [
     1,
     { op: "setRangeStyle", range: {}, style: { bold: true } },
-    setLiteral(addr(0, 0), Number.NaN),
+    set_literal(addr(0, 0), Number.NaN),
     cyclic,
-    throwingAccessor,
-    throwingAddr,
-    { op: "set", addr: throwingRow, value: { kind: "literal", value: 1 } },
-    throwingRangeRow,
+    throwing_accessor,
+    throwing_addr,
+    { op: "set", addr: throwing_row, value: { kind: "literal", value: 1 } },
+    throwing_range_row,
   ] as const) {
     expect(
       store.applyTransaction({
@@ -1320,7 +1323,7 @@ it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
 });
 
 it("rejects unknown operation and reference sheets before policy or engine access", () => {
-  const store = pagedStore(4);
+  const store = paged_store(4);
   const missing = "missing";
   const range = {
     sheet: missing,
@@ -1385,7 +1388,7 @@ it("rejects unknown operation and reference sheets before policy or engine acces
 });
 
 it("fails closed before retaining an oversized ref graph for later removal", () => {
-  const workbook = withSecondSheet(4);
+  const workbook = with_second_sheet(4);
   const store = new SheetwriteStore(workbook, undefined, {
     storage: "paged",
     referenceSimulationLimit: 1,
@@ -1405,7 +1408,7 @@ it("fails closed before retaining an oversized ref graph for later removal", () 
   store.resetRangeMutationAllocationStats();
 
   const outcome = store.applyTransaction({
-    patches: [setLiteral(addr(3, 0), "local"), { op: "removeSheet", sheet: "s2" }],
+    patches: [set_literal(addr(3, 0), "local"), { op: "removeSheet", sheet: "s2" }],
   });
   expect(outcome).toMatchObject({
     status: "rejected",
@@ -1427,7 +1430,7 @@ it("fails closed before retaining an oversized ref graph for later removal", () 
 });
 
 it("caps transaction-created refs before virtual retention grows past its limit", () => {
-  const workbook = withSecondSheet(4);
+  const workbook = with_second_sheet(4);
   const store = new SheetwriteStore(workbook, undefined, {
     storage: "paged",
     referenceSimulationLimit: 1,
@@ -1468,7 +1471,7 @@ it("caps transaction-created refs before virtual retention grows past its limit"
 });
 
 it("keeps virtual sheet membership aligned when addSheet snapshots are semantically invalid", () => {
-  const baseSheet = {
+  const base_sheet = {
     id: "s2",
     name: "Second",
     order: 1,
@@ -1476,20 +1479,20 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
     columns: [{ key: "value", header: "Value", width: 100, type: "text" as const }],
     cells: [],
   };
-  const invalidSheets = [
+  const invalid_sheets = [
     {
-      ...baseSheet,
+      ...base_sheet,
       columns: [
-        ...baseSheet.columns,
+        ...base_sheet.columns,
         { key: "value", header: "Duplicate", width: 100, type: "text" as const },
       ],
     },
-    { ...baseSheet, order: 2 },
-    { ...baseSheet, frozenRows: 3 },
+    { ...base_sheet, order: 2 },
+    { ...base_sheet, frozenRows: 3 },
   ];
-  const expectedCodes = ["invalid-sheet", "invalid-position", "invalid-sheet"] as const;
-  for (const [index, sheet] of invalidSheets.entries()) {
-    const store = pagedStore(4);
+  const expected_codes = ["invalid-sheet", "invalid-position", "invalid-sheet"] as const;
+  for (const [index, sheet] of invalid_sheets.entries()) {
+    const store = paged_store(4);
     const outcome = store.applyTransaction({
       patches: [
         { op: "addSheet", sheet },
@@ -1503,7 +1506,7 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
     expect(outcome).toMatchObject({
       status: "rejected",
       epoch: 0,
-      issues: [{ kind: "sheet-lifecycle", code: expectedCodes[index], operationIndex: 0 }],
+      issues: [{ kind: "sheet-lifecycle", code: expected_codes[index], operationIndex: 0 }],
     });
     expect(store.getWorkbook().sheets.map((candidate) => candidate.id)).toEqual(["s1"]);
     store.dispose();
@@ -1511,7 +1514,7 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
 });
 
 it("keeps lifecycle names aligned when rename collides with another sheet id", () => {
-  const workbook = withSecondSheet(4);
+  const workbook = with_second_sheet(4);
   const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
   const outcome = store.applyTransaction({
     patches: [
@@ -1527,7 +1530,7 @@ it("keeps lifecycle names aligned when rename collides with another sheet id", (
           cells: [],
         },
       },
-      setLiteral(at("s3", 0, 0), "unsafe"),
+      set_literal(at("s3", 0, 0), "unsafe"),
     ],
   });
   expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
@@ -1554,7 +1557,7 @@ describe("validation, protection, and notes metadata", () => {
     ];
     const atomic = new SheetwriteStore(workbook);
     const rejected = atomic.applyTransaction({
-      patches: [setLiteral(addr(0, 1), 20), setLiteral(addr(0, 0), "kept out")],
+      patches: [set_literal(addr(0, 1), 20), set_literal(addr(0, 0), "kept out")],
     });
     expect(rejected.status).toBe("rejected");
     expect(rejected.status === "rejected" ? rejected.issues : []).toMatchObject([
@@ -1572,7 +1575,7 @@ describe("validation, protection, and notes metadata", () => {
       ],
     });
     const warned = atomic.applyTransaction({
-      patches: [setLiteral(addr(0, 1), 20)],
+      patches: [set_literal(addr(0, 1), 20)],
     });
     expect(warned.status).toBe("applied");
     expect(warned.status === "applied" ? warned.warnings : []).toMatchObject([
@@ -1584,7 +1587,7 @@ describe("validation, protection, and notes metadata", () => {
 
     const partial = new SheetwriteStore(workbook, undefined, { mutationPolicy: "partial" });
     const outcome = partial.applyTransaction({
-      patches: [setLiteral(addr(1, 1), -1), setLiteral(addr(1, 0), "applied")],
+      patches: [set_literal(addr(1, 1), -1), set_literal(addr(1, 0), "applied")],
     });
     expect(outcome.status).toBe("applied");
     expect(outcome.status === "applied" ? outcome.transaction.patches : []).toHaveLength(1);
@@ -1600,18 +1603,18 @@ describe("validation, protection, and notes metadata", () => {
         },
       ],
     });
-    const clearIssues =
+    const clear_issues =
       clear.status === "rejected"
         ? clear.issues
         : clear.status === "applied"
           ? (clear.rejections ?? [])
           : [];
-    expect(clearIssues).toMatchObject([{ ruleId: "amount-limit" }]);
+    expect(clear_issues).toMatchObject([{ ruleId: "amount-limit" }]);
     partial.dispose();
   });
 
   it("revalidates resource and address limits after permission callbacks mutate live operations", () => {
-    const maxEncodedBytes = 256;
+    const max_encoded_bytes = 256;
     for (const mutation of ["payload", "address"] as const) {
       const workbook = makeWorkbook(3);
       const sheet = workbook.sheets[0];
@@ -1623,18 +1626,18 @@ describe("validation, protection, and notes metadata", () => {
         },
       ];
       const store = new SheetwriteStore(workbook, undefined, {
-        transactionResourceLimits: { maxEncodedBytes },
+        transactionResourceLimits: { maxEncodedBytes: max_encoded_bytes },
       });
       store.setProtectionResolver(({ operation }) => {
         if (operation.op === "set" && operation.value.kind === "literal") {
-          if (mutation === "payload") operation.value.value = "x".repeat(maxEncodedBytes * 2);
+          if (mutation === "payload") operation.value.value = "x".repeat(max_encoded_bytes * 2);
           else operation.addr.sheet = "missing-sheet";
         }
         return "allow";
       });
       try {
         const result = store.applyTransaction({
-          patches: [setLiteral(addr(0, 0), "small")],
+          patches: [set_literal(addr(0, 0), "small")],
         });
         expect(result.status).toBe("rejected");
         expect(store.getCell(addr(0, 0)).resolved).toBeNull();
@@ -1693,7 +1696,7 @@ describe("validation, protection, and notes metadata", () => {
       const store = new SheetwriteStore(makeWorkbook(3));
       try {
         const outcome = store.applyTransaction({
-          patches: [setLiteral(addr(0, 1), 42), restore],
+          patches: [set_literal(addr(0, 1), 42), restore],
         });
         expect(outcome.status).toBe("rejected");
         expect(store.getCell(addr(0, 0)).resolved).toBeNull();
@@ -1715,7 +1718,7 @@ describe("validation, protection, and notes metadata", () => {
     ];
     const store = new SheetwriteStore(workbook);
     const denied = store.applyTransaction({
-      patches: [setLiteral(addr(0, 0), "blocked")],
+      patches: [set_literal(addr(0, 0), "blocked")],
     });
     expect(denied.status).toBe("rejected");
     expect(denied.status === "rejected" ? denied.issues : []).toMatchObject([
@@ -1730,7 +1733,7 @@ describe("validation, protection, and notes metadata", () => {
     expect(
       store.applyTransaction(
         {
-          patches: [setLiteral(addr(0, 0), "allowed")],
+          patches: [set_literal(addr(0, 0), "allowed")],
         },
         { commitReason: "edit-enter" },
       ).status,
@@ -1741,7 +1744,7 @@ describe("validation, protection, and notes metadata", () => {
     expect(
       store.applyTransaction(
         {
-          patches: [setLiteral(addr(0, 1), "server")],
+          patches: [set_literal(addr(0, 1), "server")],
         },
         { source: "remote" },
       ).status,
@@ -1803,30 +1806,30 @@ describe("transaction resource ingress", () => {
         range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 2 } },
       },
     ];
-    let policyCalls = 0;
+    let policy_calls = 0;
     const limits = resolveTransactionResourceLimits({ maxOperations: 1 });
     const store = new SheetwriteStore(workbook, undefined, {
       transactionResourceLimits: limits,
       protectionResolver: () => {
-        policyCalls += 1;
+        policy_calls += 1;
         return "allow";
       },
     });
     const events: ChangeEvent[] = [];
     store.on("change", (event) => events.push(event));
 
-    const accepted = store.applyTransaction({ patches: [setLiteral(addr(0, 0), "accepted")] });
+    const accepted = store.applyTransaction({ patches: [set_literal(addr(0, 0), "accepted")] });
     expect(accepted.status).toBe("applied");
     if (accepted.status !== "applied") throw new Error("count-limit transaction rejected");
     expect(validateTransactionResources(accepted.transaction.patches, limits).ok).toBe(true);
-    expect(policyCalls).toBe(1);
-    policyCalls = 0;
+    expect(policy_calls).toBe(1);
+    policy_calls = 0;
 
-    const oversizedPatches = [
-      setLiteral(addr(1, 0), "blocked"),
-      setLiteral(addr(2, 0), "also blocked"),
+    const oversized_patches = [
+      set_literal(addr(1, 0), "blocked"),
+      set_literal(addr(2, 0), "also blocked"),
     ];
-    const local = store.applyTransaction({ patches: oversizedPatches });
+    const local = store.applyTransaction({ patches: oversized_patches });
     expect(local).toMatchObject({
       status: "rejected",
       epoch: 1,
@@ -1840,21 +1843,21 @@ describe("transaction resource ingress", () => {
         },
       ],
     });
-    expect(policyCalls).toBe(0);
+    expect(policy_calls).toBe(0);
     expect(events).toHaveLength(1);
     expect(store.getCell(addr(1, 0)).resolved).toBeNull();
     expect(store.getCell(addr(2, 0)).resolved).toBeNull();
 
-    const remote = store.applyTransaction({ patches: oversizedPatches }, { source: "remote" });
+    const remote = store.applyTransaction({ patches: oversized_patches }, { source: "remote" });
     expect(remote).toMatchObject({ status: "rejected", epoch: 1 });
     expect(events).toHaveLength(1);
     expect(store.getCell(addr(1, 0)).resolved).toBeNull();
 
-    const acceptedRemote = store.applyTransaction(
-      { patches: [setLiteral(addr(1, 0), "remote")] },
+    const accepted_remote = store.applyTransaction(
+      { patches: [set_literal(addr(1, 0), "remote")] },
       { source: "remote" },
     );
-    expect(acceptedRemote.status).toBe("applied");
+    expect(accepted_remote.status).toBe("applied");
     expect(events).toHaveLength(2);
     expect(events[1]).toMatchObject({ epoch: 2, source: "remote" });
     expect(store.getCell(addr(1, 0)).resolved).toBe("remote");

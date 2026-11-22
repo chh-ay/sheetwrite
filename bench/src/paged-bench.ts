@@ -32,10 +32,10 @@ const SMOKE_RUNS = 2;
 const PAGE_ROWS = 120;
 const CHUNK_ROWS = 4096;
 const CACHE_BYTES = 32 * 1024 * 1024;
-function chunkBytes(chunkRows: number): number {
+function chunk_bytes(chunk_rows: number): number {
   return (
-    chunkRows * (1 + Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT) +
-    Math.ceil(chunkRows / 64) * BigUint64Array.BYTES_PER_ELEMENT
+    chunk_rows * (1 + Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT) +
+    Math.ceil(chunk_rows / 64) * BigUint64Array.BYTES_PER_ELEMENT
   );
 }
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
@@ -43,35 +43,35 @@ const WIDE_PAGE_COLUMNS = 256;
 const CACHE_CHURN_CHUNK_ROWS = 4;
 const CACHE_CHURN_PAGES = 2048;
 const CACHE_CHURN_RETAINED_CHUNKS = 512;
-const CACHE_CHURN_CHUNK_BYTES = chunkBytes(CACHE_CHURN_CHUNK_ROWS);
+const CACHE_CHURN_CHUNK_BYTES = chunk_bytes(CACHE_CHURN_CHUNK_ROWS);
 const CACHE_CHURN_BUDGET_BYTES = CACHE_CHURN_RETAINED_CHUNKS * CACHE_CHURN_CHUNK_BYTES;
 const DIRTY_100_BASELINE_BYTES = 5_427_200;
 const DIRTY_COUNTS = [100, 10_000] as const;
 
-const datasourcePageBands = new WeakMap<
+const datasource_page_bands = new WeakMap<
   SheetwriteStore,
   Map<string, readonly DataSourceColumnBand[]>
 >();
 
-function loadDatasourcePage(
+function load_datasource_page(
   store: SheetwriteStore,
   sheet: string,
   start: number,
-  pageRows: readonly RowData[],
+  page_rows: readonly RowData[],
 ): void {
-  let bySheet = datasourcePageBands.get(store);
-  if (!bySheet) {
-    bySheet = new Map();
-    datasourcePageBands.set(store, bySheet);
+  let by_sheet = datasource_page_bands.get(store);
+  if (!by_sheet) {
+    by_sheet = new Map();
+    datasource_page_bands.set(store, by_sheet);
   }
-  let bands = bySheet.get(sheet);
+  let bands = by_sheet.get(sheet);
   if (!bands) {
     const columns = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.columns;
     if (!columns || columns.length === 0) throw new Error(`Missing benchmark sheet ${sheet}`);
     bands = [{ start: 0, end: columns.length, keys: columns.map((column) => column.key) }];
-    bySheet.set(sheet, bands);
+    by_sheet.set(sheet, bands);
   }
-  store.loadPage(sheet, start, bands, pageRows);
+  store.loadPage(sheet, start, bands, page_rows);
 }
 export const PAGED_SCENARIOS = [
   "empty",
@@ -106,7 +106,7 @@ export interface ProbeResult {
   readonly fullyLoaded: boolean;
 }
 
-function dirtyCount(scenario: PagedScenario): number | undefined {
+function dirty_count(scenario: PagedScenario): number | undefined {
   if (!scenario.startsWith("dirty-")) return undefined;
   const count = Number(scenario.slice("dirty-".length));
   return DIRTY_COUNTS.includes(count as (typeof DIRTY_COUNTS)[number]) ? count : undefined;
@@ -161,16 +161,16 @@ export function validatePagedBenchmark(
 ): void {
   assertGateIdentity("paged", expectedMode, result);
   validateEngineVersions(result.meta.engineVersions, ["sheetwrite"]);
-  const expectedRows = expectedMode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
-  const expectedRuns = expectedMode === "smoke" ? SMOKE_RUNS : FULL_RUNS;
+  const expected_rows = expectedMode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
+  const expected_runs = expectedMode === "smoke" ? SMOKE_RUNS : FULL_RUNS;
   if (
-    result.rows !== expectedRows ||
+    result.rows !== expected_rows ||
     result.columns !== COLUMNS ||
-    result.runs !== expectedRuns ||
+    result.runs !== expected_runs ||
     result.pageRows !== PAGE_ROWS ||
     result.cacheBudgetBytes !== CACHE_BYTES ||
     result.chunkRows !== CHUNK_ROWS ||
-    result.denseLogicalBytes !== expectedRows * COLUMNS * (1 + 8 + 4) ||
+    result.denseLogicalBytes !== expected_rows * COLUMNS * (1 + 8 + 4) ||
     result.widePageColumns !== WIDE_PAGE_COLUMNS ||
     result.cacheChurnPages !== CACHE_CHURN_PAGES ||
     result.cacheChurnBudgetBytes !== CACHE_CHURN_BUDGET_BYTES ||
@@ -200,8 +200,8 @@ export function validatePagedBenchmark(
     const key = pagedMatrixKey(result.rows, "workload", workload);
     const timing = result.timings[workload];
     validateRawStat(timing.samplesMs, timing.stat, key);
-    if (timing.samplesMs.length !== expectedRuns) {
-      throw new Error(`${key} must contain ${expectedRuns} raw samples`);
+    if (timing.samplesMs.length !== expected_runs) {
+      throw new Error(`${key} must contain ${expected_runs} raw samples`);
     }
     if (timing.stat.p95 >= 30_000) {
       throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
@@ -217,10 +217,10 @@ export function validatePagedBenchmark(
   ) {
     throw new Error("paged peak resource counters violate the declared cache budget");
   }
-  if (result.peakAllocatedBytes !== result.peakChunks * chunkBytes(result.chunkRows)) {
+  if (result.peakAllocatedBytes !== result.peakChunks * chunk_bytes(result.chunkRows)) {
     throw new Error("paged peak allocation does not match its retained chunk count");
   }
-  const logicalCells = result.rows * result.columns;
+  const logical_cells = result.rows * result.columns;
   for (const probe of result.probes) {
     const key = pagedMatrixKey(result.rows, "probe", probe.scenario);
     for (const field of [
@@ -246,7 +246,7 @@ export function validatePagedBenchmark(
       throw new Error(`${key} resource counters must be integers`);
     }
     if (
-      probe.loadedCells > logicalCells ||
+      probe.loadedCells > logical_cells ||
       probe.dirtyCells > probe.loadedCells ||
       probe.allocatedBytes > result.cacheBudgetBytes
     ) {
@@ -255,7 +255,7 @@ export function validatePagedBenchmark(
     if (probe.retainedBytes !== probe.allocatedBytes + probe.dirtyAllocatedBytes) {
       throw new Error(`${key}.retainedBytes does not match clean plus dirty allocation`);
     }
-    if (probe.allocatedBytes !== probe.chunks * chunkBytes(result.chunkRows)) {
+    if (probe.allocatedBytes !== probe.chunks * chunk_bytes(result.chunkRows)) {
       throw new Error(`${key}.allocatedBytes does not match its retained chunk count`);
     }
     if (probe.wasmDeltaBytes >= 1024 * 1024 * 1024) {
@@ -283,25 +283,26 @@ export function validatePagedBenchmark(
       throw new Error(`${key} did not load exactly the declared ten-percent traversal`);
     }
     if (probe.scenario === "scroll-100") {
-      const totalChunks = Math.ceil(result.rows / result.chunkRows) * COLUMNS;
-      const retainedChunks = Math.min(
-        totalChunks,
-        Math.floor(CACHE_BYTES / chunkBytes(result.chunkRows)),
+      const total_chunks = Math.ceil(result.rows / result.chunkRows) * COLUMNS;
+      const retained_chunks = Math.min(
+        total_chunks,
+        Math.floor(CACHE_BYTES / chunk_bytes(result.chunkRows)),
       );
-      const finalChunkRows = result.rows % result.chunkRows;
-      const retainedPartialChunks = finalChunkRows === 0 ? 0 : Math.min(COLUMNS, retainedChunks);
-      const expectedLoadedCells =
-        retainedChunks * result.chunkRows -
-        retainedPartialChunks * (result.chunkRows - finalChunkRows);
-      if (probe.chunks !== retainedChunks || probe.loadedCells !== expectedLoadedCells) {
+      const final_chunk_rows = result.rows % result.chunkRows;
+      const retained_partial_chunks =
+        final_chunk_rows === 0 ? 0 : Math.min(COLUMNS, retained_chunks);
+      const expected_loaded_cells =
+        retained_chunks * result.chunkRows -
+        retained_partial_chunks * (result.chunkRows - final_chunk_rows);
+      if (probe.chunks !== retained_chunks || probe.loadedCells !== expected_loaded_cells) {
         throw new Error(`${key} does not match the cache-bounded full traversal`);
       }
     }
-    const expectedDirty = dirtyCount(probe.scenario);
-    if (expectedDirty !== undefined && probe.dirtyCells !== expectedDirty) {
-      throw new Error(`${key} did not preserve exactly ${expectedDirty} dirty cells`);
+    const expected_dirty = dirty_count(probe.scenario);
+    if (expected_dirty !== undefined && probe.dirtyCells !== expected_dirty) {
+      throw new Error(`${key} did not preserve exactly ${expected_dirty} dirty cells`);
     }
-    if (probe.fullyLoaded !== (probe.loadedCells === logicalCells)) {
+    if (probe.fullyLoaded !== (probe.loadedCells === logical_cells)) {
       throw new Error(`${key}.fullyLoaded does not match the retained cell evidence`);
     }
   }
@@ -318,27 +319,27 @@ export function validatePagedBenchmark(
   }
   const dirty10000 = result.probes.find((probe) => probe.scenario === "dirty-10000");
   if (dirty100 && dirty10000) {
-    const smallBytesPerCell = dirty100.dirtyAllocatedBytes / 100;
-    const largeBytesPerCell = dirty10000.dirtyAllocatedBytes / 10_000;
+    const small_bytes_per_cell = dirty100.dirtyAllocatedBytes / 100;
+    const large_bytes_per_cell = dirty10000.dirtyAllocatedBytes / 10_000;
     if (
       dirty10000.allocatedBytes !== 0 ||
-      largeBytesPerCell < smallBytesPerCell * 0.5 ||
-      largeBytesPerCell > smallBytesPerCell * 1.5
+      large_bytes_per_cell < small_bytes_per_cell * 0.5 ||
+      large_bytes_per_cell > small_bytes_per_cell * 1.5
     ) {
       throw new Error("paged dirty-10000 did not retain near-linear dirty bytes per cell");
     }
   }
 }
 
-function workbook(rowCount: number, columnCount = COLUMNS): Workbook {
+function workbook(row_count: number, column_count = COLUMNS): Workbook {
   return {
     activeSheet: "s1",
     sheets: [
       {
         id: "s1",
-        name: `${rowCount.toLocaleString("en-US")} rows`,
-        rowCount,
-        columns: Array.from({ length: columnCount }, (_, col) => ({
+        name: `${row_count.toLocaleString("en-US")} rows`,
+        rowCount: row_count,
+        columns: Array.from({ length: column_count }, (_, col) => ({
           key: `c${col}`,
           header: `Column ${col + 1}`,
           width: 120,
@@ -356,7 +357,7 @@ function rows(start: number, count = PAGE_ROWS): RowData[] {
   });
 }
 
-function wideRows(start: number, count: number): RowData[] {
+function wide_rows(start: number, count: number): RowData[] {
   return Array.from({ length: count }, (_, offset) => {
     const row: RowData = {};
     for (let col = 0; col < WIDE_PAGE_COLUMNS; col++) row[`c${col}`] = start + offset + col;
@@ -364,27 +365,27 @@ function wideRows(start: number, count: number): RowData[] {
   });
 }
 
-function loadFraction(
+function load_fraction(
   store: SheetwriteStore,
   fraction: number,
-  rowCount: number,
-  chunkRows: number,
+  row_count: number,
+  chunk_rows: number,
 ): void {
-  const limit = Math.floor(rowCount * fraction);
-  for (let start = 0; start < limit; start += chunkRows) {
-    loadDatasourcePage(store, "s1", start, rows(start, Math.min(chunkRows, limit - start)));
+  const limit = Math.floor(row_count * fraction);
+  for (let start = 0; start < limit; start += chunk_rows) {
+    load_datasource_page(store, "s1", start, rows(start, Math.min(chunk_rows, limit - start)));
   }
 }
 
-function isScenario(value: string | undefined): value is PagedScenario {
+function is_scenario(value: string | undefined): value is PagedScenario {
   return PAGED_SCENARIOS.some((scenario) => scenario === value);
 }
 
-function dirtyPatches(count: number, rowCount: number): DocumentOp[] {
+function dirty_patches(count: number, row_count: number): DocumentOp[] {
   return Array.from({ length: count }, (_, index): DocumentOp => {
     const addr = {
       sheet: "s1",
-      row: Math.floor((index * rowCount) / count),
+      row: Math.floor((index * row_count) / count),
       col: index % COLUMNS,
     };
     const style =
@@ -418,81 +419,81 @@ function dirtyPatches(count: number, rowCount: number): DocumentOp[] {
   });
 }
 
-function verifyDirtySemantics(
+function verify_dirty_semantics(
   store: SheetwriteStore,
-  rowCount: number,
+  row_count: number,
   patches: readonly DocumentOp[],
 ): void {
-  const stringPatch = patches[1];
-  const formulaPatch = patches[2];
-  const refPatch = patches[3];
+  const string_patch = patches[1];
+  const formula_patch = patches[2];
+  const ref_patch = patches[3];
   if (
-    stringPatch?.op !== "set" ||
-    formulaPatch?.op !== "set" ||
-    refPatch?.op !== "set" ||
-    store.getCell(stringPatch.addr).resolved !== "dirty-1" ||
-    store.getFormula(formulaPatch.addr) !== "=2+1" ||
-    store.getCell(formulaPatch.addr).resolved !== 3 ||
-    store.getRefTarget(refPatch.addr)?.row !== 0 ||
-    store.getCell(stringPatch.addr).style.italic !== true
+    string_patch?.op !== "set" ||
+    formula_patch?.op !== "set" ||
+    ref_patch?.op !== "set" ||
+    store.getCell(string_patch.addr).resolved !== "dirty-1" ||
+    store.getFormula(formula_patch.addr) !== "=2+1" ||
+    store.getCell(formula_patch.addr).resolved !== 3 ||
+    store.getRefTarget(ref_patch.addr)?.row !== 0 ||
+    store.getCell(string_patch.addr).style.italic !== true
   ) {
     throw new Error("dirty rich-cell read/formula/ref/style semantics changed");
   }
 
-  loadDatasourcePage(store, "s1", stringPatch.addr.row, [
+  load_datasource_page(store, "s1", string_patch.addr.row, [
     { c0: -1, c1: "server-overwrite", c2: -1, c3: -1, c4: -1 },
   ]);
   if (
-    store.getCell(stringPatch.addr).resolved !== "dirty-1" ||
-    store.getCellLoadState(stringPatch.addr) !== "local-edit"
+    store.getCell(string_patch.addr).resolved !== "dirty-1" ||
+    store.getCellLoadState(string_patch.addr) !== "local-edit"
   ) {
     throw new Error("dirty local value lost a hydration collision");
   }
 
-  const revisionAddr = { sheet: "s1", row: rowCount - 1, col: COLUMNS - 1 };
+  const revision_addr = { sheet: "s1", row: row_count - 1, col: COLUMNS - 1 };
   const first: DocumentOp = {
     op: "set",
-    addr: revisionAddr,
+    addr: revision_addr,
     value: { kind: "literal", value: "revision-one" },
   };
   const second: DocumentOp = {
     op: "set",
-    addr: revisionAddr,
+    addr: revision_addr,
     value: { kind: "literal", value: "revision-two" },
   };
   store.applyTransaction({ patches: [first] });
   store.applyTransaction({ patches: [second] });
   store.acknowledgeOperations([first]);
   if (
-    store.getCell(revisionAddr).resolved !== "revision-two" ||
-    store.getCellLoadState(revisionAddr) !== "local-edit"
+    store.getCell(revision_addr).resolved !== "revision-two" ||
+    store.getCellLoadState(revision_addr) !== "local-edit"
   ) {
     throw new Error("stale acknowledgement cleaned a newer dirty revision");
   }
   store.acknowledgeOperations([second]);
-  if (store.getCellLoadState(revisionAddr) === "local-edit") {
+  if (store.getCellLoadState(revision_addr) === "local-edit") {
     throw new Error("matching acknowledgement did not clean its dirty revision");
   }
 
-  const historyRange = {
+  const history_range = {
     sheet: "s1",
-    start: { row: revisionAddr.row, col: revisionAddr.col },
-    end: { row: revisionAddr.row, col: revisionAddr.col },
+    start: { row: revision_addr.row, col: revision_addr.col },
+    end: { row: revision_addr.row, col: revision_addr.col },
   };
-  const history = store.captureRangeHistory(historyRange);
+  const history = store.captureRangeHistory(history_range);
   if (!history) throw new Error("dirty undo snapshot was not captured");
   store.applyTransaction({
     patches: [
       {
         op: "set",
-        addr: revisionAddr,
+        addr: revision_addr,
         value: { kind: "literal", value: "after-history" },
       },
     ],
   });
-  store.applyTransaction({ patches: [history.toDocumentOp(historyRange)] });
+  store.applyTransaction({ patches: [history.toDocumentOp(history_range)] });
   history.dispose();
-  if (store.getCell(revisionAddr).resolved !== "revision-two") {
+  if (store.getCell(revision_addr).resolved !== "revision-two") {
     throw new Error("dirty undo snapshot did not restore its rich cell");
   }
 
@@ -501,7 +502,7 @@ function verifyDirtySemantics(
     chunkRows: 4,
     cacheBytes: CACHE_BYTES,
   });
-  loadDatasourcePage(persisted, "s1", 0, rows(0, 2));
+  load_datasource_page(persisted, "s1", 0, rows(0, 2));
   persisted.applyTransaction({
     patches: patches.slice(0, 4).map((patch, index) =>
       patch.op === "set"
@@ -532,38 +533,38 @@ function verifyDirtySemantics(
   persisted.dispose();
 }
 
-async function runProbe(
+async function run_probe(
   scenario: PagedScenario,
-  rowCount: number,
-  chunkRows: number,
-  admissionOnly: boolean,
+  row_count: number,
+  chunk_rows: number,
+  admission_only: boolean,
 ): Promise<ProbeResult> {
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite({ source: bytes });
   const memory = getEngine().getMemory();
 
   Bun.gc(true);
-  const wasmBefore = memory.buffer.byteLength;
+  const wasm_before = memory.buffer.byteLength;
 
-  const store = new SheetwriteStore(workbook(rowCount), undefined, {
+  const store = new SheetwriteStore(workbook(row_count), undefined, {
     storage: "paged",
-    chunkRows,
+    chunkRows: chunk_rows,
     cacheBytes: CACHE_BYTES,
   });
   let patches: DocumentOp[] = [];
 
   if (scenario === "viewport") {
-    loadDatasourcePage(store, "s1", 0, rows(0, 30));
+    load_datasource_page(store, "s1", 0, rows(0, 30));
   } else if (scenario === "scroll-1") {
-    loadFraction(store, 0.01, rowCount, chunkRows);
+    load_fraction(store, 0.01, row_count, chunk_rows);
   } else if (scenario === "scroll-10") {
-    loadFraction(store, 0.1, rowCount, chunkRows);
+    load_fraction(store, 0.1, row_count, chunk_rows);
   } else if (scenario === "scroll-100") {
-    loadFraction(store, 1, rowCount, chunkRows);
+    load_fraction(store, 1, row_count, chunk_rows);
   } else {
-    const count = dirtyCount(scenario);
+    const count = dirty_count(scenario);
     if (count !== undefined) {
-      patches = dirtyPatches(count, rowCount);
+      patches = dirty_patches(count, row_count);
       const outcome = store.applyTransaction({ patches });
       if (outcome.status !== "applied") {
         throw new Error(`${scenario} dirty transaction was ${outcome.status}`);
@@ -573,29 +574,29 @@ async function runProbe(
 
   Bun.gc(true);
   const stats = store.getPagedStats("s1");
-  const dirtyAllocatedBytes =
+  const dirty_allocated_bytes =
     "dirtyAllocatedBytes" in stats && typeof stats.dirtyAllocatedBytes === "number"
       ? stats.dirtyAllocatedBytes
       : 0;
   const result = {
     scenario,
-    wasmDeltaBytes: memory.buffer.byteLength - wasmBefore,
+    wasmDeltaBytes: memory.buffer.byteLength - wasm_before,
     ...stats,
-    dirtyAllocatedBytes,
-    retainedBytes: stats.allocatedBytes + dirtyAllocatedBytes,
+    dirtyAllocatedBytes: dirty_allocated_bytes,
+    retainedBytes: stats.allocatedBytes + dirty_allocated_bytes,
   };
 
   if (store.getWorkbook().sheets.length !== 1) {
     throw new Error("benchmark store was optimized away");
   }
-  if (!admissionOnly && patches.length > 0) verifyDirtySemantics(store, rowCount, patches);
+  if (!admission_only && patches.length > 0) verify_dirty_semantics(store, row_count, patches);
 
   store.dispose();
 
   return result;
 }
 
-function parseProbe(stdout: string, scenario: PagedScenario): ProbeResult {
+function parse_probe(stdout: string, scenario: PagedScenario): ProbeResult {
   const line = stdout
     .trim()
     .split("\n")
@@ -640,11 +641,11 @@ function parseProbe(stdout: string, scenario: PagedScenario): ProbeResult {
   };
 }
 
-function isolatedProbe(
+function isolated_probe(
   scenario: PagedScenario,
-  rowCount: number,
-  chunkRows: number,
-  admissionOnly: boolean,
+  row_count: number,
+  chunk_rows: number,
+  admission_only: boolean,
 ): ProbeResult {
   const process = Bun.spawnSync(
     [
@@ -654,10 +655,10 @@ function isolatedProbe(
       "--probe",
       scenario,
       "--rows",
-      String(rowCount),
+      String(row_count),
       "--chunk-rows",
-      String(chunkRows),
-      ...(admissionOnly ? ["--admission"] : []),
+      String(chunk_rows),
+      ...(admission_only ? ["--admission"] : []),
     ],
     {
       cwd: new URL("..", import.meta.url).pathname,
@@ -666,84 +667,84 @@ function isolatedProbe(
     },
   );
   if (process.exitCode !== 0) throw new Error(`${scenario} probe exited ${process.exitCode}`);
-  return parseProbe(process.stdout.toString(), scenario);
+  return parse_probe(process.stdout.toString(), scenario);
 }
 
-async function runBenchmark(
+async function run_benchmark(
   mode: BenchmarkMode,
-  chunkRows: number,
+  chunk_rows: number,
   prototype: boolean,
-  outputPath?: string,
+  output_path?: string,
 ): Promise<void> {
   await initSheetwrite();
-  const rowCount = mode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
+  const row_count = mode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
   const runs = mode === "smoke" ? SMOKE_RUNS : FULL_RUNS;
   const scenarios = mode === "smoke" ? PAGED_SMOKE_SCENARIOS : PAGED_SCENARIOS;
   const startup: number[] = [];
-  const firstPage: number[] = [];
-  const distantPage: number[] = [];
-  const widePage: readonly RowData[] = wideRows(0, PAGE_ROWS);
-  const churnPages: ReadonlyArray<readonly RowData[]> = Array.from(
+  const first_page: number[] = [];
+  const distant_page: number[] = [];
+  const wide_page: readonly RowData[] = wide_rows(0, PAGE_ROWS);
+  const churn_pages: ReadonlyArray<readonly RowData[]> = Array.from(
     { length: CACHE_CHURN_PAGES },
     (_, page) => rows(page * CACHE_CHURN_CHUNK_ROWS, CACHE_CHURN_CHUNK_ROWS),
   );
-  const widePageMs: number[] = [];
-  const cacheChurnMs: number[] = [];
-  let cacheChurnRetainedChunks = 0;
-  let peakAllocatedBytes = 0;
-  let peakChunks = 0;
+  const wide_page_ms: number[] = [];
+  const cache_churn_ms: number[] = [];
+  let cache_churn_retained_chunks = 0;
+  let peak_allocated_bytes = 0;
+  let peak_chunks = 0;
   for (let run = 0; run < runs; run++) {
     let started = performance.now();
-    const store = new SheetwriteStore(workbook(rowCount), undefined, {
+    const store = new SheetwriteStore(workbook(row_count), undefined, {
       storage: "paged",
-      chunkRows,
+      chunkRows: chunk_rows,
       cacheBytes: CACHE_BYTES,
     });
     startup.push(performance.now() - started);
 
     started = performance.now();
-    loadDatasourcePage(store, "s1", 0, rows(0));
-    firstPage.push(performance.now() - started);
+    load_datasource_page(store, "s1", 0, rows(0));
+    first_page.push(performance.now() - started);
 
-    const distantStart = Math.floor(rowCount / 2);
+    const distant_start = Math.floor(row_count / 2);
     started = performance.now();
-    loadDatasourcePage(store, "s1", distantStart, rows(distantStart));
-    distantPage.push(performance.now() - started);
+    load_datasource_page(store, "s1", distant_start, rows(distant_start));
+    distant_page.push(performance.now() - started);
 
     const stats = store.getPagedStats("s1");
-    peakAllocatedBytes = Math.max(peakAllocatedBytes, stats.allocatedBytes);
-    peakChunks = Math.max(peakChunks, stats.chunks);
+    peak_allocated_bytes = Math.max(peak_allocated_bytes, stats.allocatedBytes);
+    peak_chunks = Math.max(peak_chunks, stats.chunks);
     store.dispose();
 
-    const wideStore = new SheetwriteStore(workbook(rowCount, WIDE_PAGE_COLUMNS), undefined, {
+    const wide_store = new SheetwriteStore(workbook(row_count, WIDE_PAGE_COLUMNS), undefined, {
       storage: "paged",
-      chunkRows,
+      chunkRows: chunk_rows,
       cacheBytes: CACHE_BYTES,
     });
     started = performance.now();
-    loadDatasourcePage(wideStore, "s1", 0, widePage);
-    widePageMs.push(performance.now() - started);
-    wideStore.dispose();
+    load_datasource_page(wide_store, "s1", 0, wide_page);
+    wide_page_ms.push(performance.now() - started);
+    wide_store.dispose();
 
-    const churnStore = new SheetwriteStore(workbook(rowCount), undefined, {
+    const churn_store = new SheetwriteStore(workbook(row_count), undefined, {
       storage: "paged",
       chunkRows: CACHE_CHURN_CHUNK_ROWS,
       cacheBytes: CACHE_CHURN_BUDGET_BYTES,
     });
     started = performance.now();
-    for (let page = 0; page < churnPages.length; page++) {
-      loadDatasourcePage(churnStore, "s1", page * CACHE_CHURN_CHUNK_ROWS, churnPages[page]!);
+    for (let page = 0; page < churn_pages.length; page++) {
+      load_datasource_page(churn_store, "s1", page * CACHE_CHURN_CHUNK_ROWS, churn_pages[page]!);
     }
-    cacheChurnMs.push(performance.now() - started);
-    cacheChurnRetainedChunks = Math.max(
-      cacheChurnRetainedChunks,
-      churnStore.getPagedStats("s1").chunks,
+    cache_churn_ms.push(performance.now() - started);
+    cache_churn_retained_chunks = Math.max(
+      cache_churn_retained_chunks,
+      churn_store.getPagedStats("s1").chunks,
     );
-    churnStore.dispose();
+    churn_store.dispose();
   }
 
   const probes = scenarios.map((scenario) =>
-    isolatedProbe(scenario, rowCount, chunkRows, prototype),
+    isolated_probe(scenario, row_count, chunk_rows, prototype),
   );
   const result: PagedBenchmarkResult = {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
@@ -753,26 +754,26 @@ async function runBenchmark(
       ...protocolCaptureMeta(),
       engineVersions: { sheetwrite: packageVersion("packages/core/package.json") },
     },
-    rows: rowCount,
+    rows: row_count,
     columns: COLUMNS,
     runs,
     pageRows: PAGE_ROWS,
     cacheBudgetBytes: CACHE_BYTES,
-    chunkRows,
-    denseLogicalBytes: rowCount * COLUMNS * (1 + 8 + 4),
+    chunkRows: chunk_rows,
+    denseLogicalBytes: row_count * COLUMNS * (1 + 8 + 4),
     widePageColumns: WIDE_PAGE_COLUMNS,
     cacheChurnPages: CACHE_CHURN_PAGES,
     cacheChurnBudgetBytes: CACHE_CHURN_BUDGET_BYTES,
-    cacheChurnRetainedChunks,
+    cacheChurnRetainedChunks: cache_churn_retained_chunks,
     timings: {
       startup: { samplesMs: startup, stat: summarize(startup) },
-      "first-page": { samplesMs: firstPage, stat: summarize(firstPage) },
-      "distant-page": { samplesMs: distantPage, stat: summarize(distantPage) },
-      "wide-page": { samplesMs: widePageMs, stat: summarize(widePageMs) },
-      "cache-churn": { samplesMs: cacheChurnMs, stat: summarize(cacheChurnMs) },
+      "first-page": { samplesMs: first_page, stat: summarize(first_page) },
+      "distant-page": { samplesMs: distant_page, stat: summarize(distant_page) },
+      "wide-page": { samplesMs: wide_page_ms, stat: summarize(wide_page_ms) },
+      "cache-churn": { samplesMs: cache_churn_ms, stat: summarize(cache_churn_ms) },
     },
-    peakAllocatedBytes,
-    peakChunks,
+    peakAllocatedBytes: peak_allocated_bytes,
+    peakChunks: peak_chunks,
     probes,
   };
   if (!prototype) validatePagedBenchmark(result, mode);
@@ -780,7 +781,7 @@ async function runBenchmark(
   console.log("| workload | median ms | p95 ms |");
   console.log("|---|---:|---:|");
   for (const [name, timing] of [
-    [`${rowCount.toLocaleString("en-US")}-row paged startup`, result.timings.startup],
+    [`${row_count.toLocaleString("en-US")}-row paged startup`, result.timings.startup],
     ["first 120-row page", result.timings["first-page"]],
     ["distant 120-row page", result.timings["distant-page"]],
     [`wide ${WIDE_PAGE_COLUMNS}-column page`, result.timings["wide-page"]],
@@ -797,9 +798,9 @@ async function runBenchmark(
       `| ${probe.scenario} | ${(probe.wasmDeltaBytes / 1024 / 1024).toFixed(2)} | ${(probe.allocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.dirtyAllocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.retainedBytes / 1024 / 1024).toFixed(2)} | ${probe.chunks} | ${probe.loadedCells} | ${probe.dirtyCells} |`,
     );
   }
-  if (outputPath !== undefined || (mode === "full" && !prototype)) {
+  if (output_path !== undefined || (mode === "full" && !prototype)) {
     await Bun.write(
-      outputPath ?? new URL("../results/paged-results.json", import.meta.url),
+      output_path ?? new URL("../results/paged-results.json", import.meta.url),
       `${JSON.stringify(result, null, 2)}\n`,
     );
   }
@@ -807,30 +808,30 @@ async function runBenchmark(
 }
 
 if (import.meta.main) {
-  const outputPath = optionValue(process.argv, "--output");
+  const output_path = optionValue(process.argv, "--output");
   const scenario = optionValue(process.argv, "--probe");
-  const rowsText = optionValue(process.argv, "--rows");
-  const rowCount = rowsText === undefined ? Number.NaN : Number(rowsText);
-  const chunkRowsText = optionValue(process.argv, "--chunk-rows");
-  const chunkRows = chunkRowsText === undefined ? CHUNK_ROWS : Number(chunkRowsText);
-  if (!Number.isInteger(chunkRows) || chunkRows <= 0) {
+  const rows_text = optionValue(process.argv, "--rows");
+  const row_count = rows_text === undefined ? Number.NaN : Number(rows_text);
+  const chunk_rows_text = optionValue(process.argv, "--chunk-rows");
+  const chunk_rows = chunk_rows_text === undefined ? CHUNK_ROWS : Number(chunk_rows_text);
+  if (!Number.isInteger(chunk_rows) || chunk_rows <= 0) {
     throw new Error("paged benchmark requires positive integer --chunk-rows");
   }
-  if (isScenario(scenario)) {
-    if (!Number.isInteger(rowCount) || rowCount <= 0) {
+  if (is_scenario(scenario)) {
+    if (!Number.isInteger(row_count) || row_count <= 0) {
       throw new Error("paged probe requires a positive integer --rows value");
     }
     console.log(
       JSON.stringify(
-        await runProbe(scenario, rowCount, chunkRows, process.argv.includes("--admission")),
+        await run_probe(scenario, row_count, chunk_rows, process.argv.includes("--admission")),
       ),
     );
   } else {
-    await runBenchmark(
+    await run_benchmark(
       process.argv.includes("--smoke") ? "smoke" : "full",
-      chunkRows,
+      chunk_rows,
       process.argv.includes("--prototype"),
-      outputPath,
+      output_path,
     );
   }
 }

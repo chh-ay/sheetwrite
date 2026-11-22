@@ -10,20 +10,20 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
 const amount = { sheet: "s1", row: 0, col: 1 };
 
-function amountRule(fields: Partial<DataValidationRule> = {}): DataValidationRule {
+function amount_rule(fields: Partial<DataValidationRule> = {}): DataValidationRule {
   return {
     id: "amount",
     range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 9, col: 1 } },
@@ -33,7 +33,7 @@ function amountRule(fields: Partial<DataValidationRule> = {}): DataValidationRul
   };
 }
 
-function editorOf(host: HTMLElement): HTMLTextAreaElement {
+function editor_of(host: HTMLElement): HTMLTextAreaElement {
   const editor = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
   if (!editor) throw new Error("expected the cell editor");
   return editor;
@@ -44,17 +44,17 @@ function press(target: HTMLElement, key: string): void {
 }
 
 /** Type `text` into B1 and press Enter, as a user does. */
-function typeIntoAmount(host: HTMLElement, grid: GridImpl, text: string): void {
+function type_into_amount(host: HTMLElement, grid: GridImpl, text: string): void {
   grid.beginEdit(0, 1, text);
-  press(editorOf(host), "Enter");
+  press(editor_of(host), "Enter");
 }
 
 describe("data validation error alert", () => {
   it("drops the entry on Cancel and shows the rule's own title and message", async () => {
     const { grid, host, store } = mountGridWithData(10);
-    grid.setValidationRule(amountRule({ errorTitle: "Quantity", helpText: "Enter 1 to 5." }));
+    grid.setValidationRule(amount_rule({ errorTitle: "Quantity", helpText: "Enter 1 to 5." }));
 
-    typeIntoAmount(host, grid, "99");
+    type_into_amount(host, grid, "99");
     const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.querySelector(".sheetwrite-dialog-title")?.textContent).toBe("Quantity");
     expect(dialog.textContent).toContain("Enter 1 to 5.");
@@ -67,18 +67,18 @@ describe("data validation error alert", () => {
 
   it("keeps the value on a Warning's Yes and returns to the entry on No", async () => {
     const { grid, host, store } = mountGridWithData(10);
-    grid.setValidationRule(amountRule({ policy: "warn" }));
+    grid.setValidationRule(amount_rule({ policy: "warn" }));
 
-    typeIntoAmount(host, grid, "99");
+    type_into_amount(host, grid, "99");
     const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.textContent).toContain("Continue?");
     expect(dialog.querySelector(".sheetwrite-dialog-default")?.textContent).toBe("No");
     await answerDialog(host, "No");
-    expect(editorOf(host).value).toBe("99");
+    expect(editor_of(host).value).toBe("99");
     expect(store.getCell(amount).resolved).toBe(0.5);
 
-    press(editorOf(host), "Escape");
-    typeIntoAmount(host, grid, "99");
+    press(editor_of(host), "Escape");
+    type_into_amount(host, grid, "99");
     await answerDialog(host, "Yes");
     expect(store.getCell(amount).resolved).toBe(99);
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
@@ -88,9 +88,9 @@ describe("data validation error alert", () => {
 
   it("keeps the value on an Information alert's OK", async () => {
     const { grid, host, store } = mountGridWithData(10);
-    grid.setValidationRule(amountRule({ policy: "warn", errorStyle: "information" }));
+    grid.setValidationRule(amount_rule({ policy: "warn", errorStyle: "information" }));
 
-    typeIntoAmount(host, grid, "99");
+    type_into_amount(host, grid, "99");
     const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect([...dialog.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
       "OK",
@@ -104,13 +104,13 @@ describe("data validation error alert", () => {
 
   it("checks a formula by its result", async () => {
     const { grid, host, store } = mountGridWithData(10);
-    grid.setValidationRule(amountRule());
+    grid.setValidationRule(amount_rule());
 
-    typeIntoAmount(host, grid, "=2+1");
+    type_into_amount(host, grid, "=2+1");
     expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
     expect(store.getCell(amount).resolved).toBe(3);
 
-    typeIntoAmount(host, grid, "=2*50");
+    type_into_amount(host, grid, "=2*50");
     await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(store.getCell(amount).resolved).toBe(3);
     grid.destroy();

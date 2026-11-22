@@ -21,7 +21,7 @@ const LINE_ALPHA = 0.45;
  * mouse pointers (not touch or pen) and only when motion is allowed. The loop
  * stops as soon as every cell has faded.
  */
-function installGridGlow(canvas: HTMLCanvasElement): void {
+function install_grid_glow(canvas: HTMLCanvasElement): void {
   const page = canvas.closest<HTMLElement>(".sw-landing");
   const context = canvas.getContext("2d");
   if (page === null || context === null) return;
@@ -34,7 +34,7 @@ function installGridGlow(canvas: HTMLCanvasElement): void {
   let last = 0;
   let color = "#34d399";
 
-  const cellSize = (): number =>
+  const cell_size = (): number =>
     Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 4;
 
   const resize = (): void => {
@@ -44,14 +44,14 @@ function installGridGlow(canvas: HTMLCanvasElement): void {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
   };
   // Read on every wake, so a theme switch changes the colour.
-  const readColor = (): void => {
+  const read_color = (): void => {
     color = getComputedStyle(page).getPropertyValue("--sw-accent").trim() || color;
   };
 
   const frame = (now: number): void => {
     const seconds = Math.min(0.1, (now - last) / 1000);
     last = now;
-    const size = cellSize();
+    const size = cell_size();
     const box = page.getBoundingClientRect();
     // The grid is drawn with `background-position: center top`.
     const origin = {
@@ -66,9 +66,9 @@ function installGridGlow(canvas: HTMLCanvasElement): void {
       const reach = Math.ceil(RADIUS_CELLS);
       for (let dy = -reach; dy <= reach; dy++) {
         for (let dx = -reach; dx <= reach; dx++) {
-          const centreX = origin.left + (column + dx + 0.5) * size;
-          const centreY = origin.top + (row + dy + 0.5) * size;
-          const distance = Math.hypot(centreX - pointer.x, centreY - pointer.y) / size;
+          const centre_x = origin.left + (column + dx + 0.5) * size;
+          const centre_y = origin.top + (row + dy + 0.5) * size;
+          const distance = Math.hypot(centre_x - pointer.x, centre_y - pointer.y) / size;
           const strength = 1 - distance / RADIUS_CELLS;
           if (strength <= 0) continue;
           const key = `${column + dx},${row + dy}`;
@@ -106,7 +106,7 @@ function installGridGlow(canvas: HTMLCanvasElement): void {
   const wake = (): void => {
     if (raf !== 0) return;
     last = performance.now();
-    readColor();
+    read_color();
     raf = requestAnimationFrame(frame);
   };
 
@@ -136,7 +136,7 @@ function installGridGlow(canvas: HTMLCanvasElement): void {
 
 export function installLanding(): void {
   const glow = document.querySelector(".sw-landing__glow");
-  if (glow instanceof HTMLCanvasElement) installGridGlow(glow);
+  if (glow instanceof HTMLCanvasElement) install_grid_glow(glow);
   for (const cards of document.querySelectorAll<HTMLElement>(".sw-landing .sw-features")) {
     playScene(cards);
   }

@@ -49,7 +49,7 @@ export interface SheetwriteCodeHoverOptions {
 }
 
 /** `grid-change` template events document as the adapter's `onGridChange` member. */
-function memberLookupNames(target: string): string[] {
+function member_lookup_names(target: string): string[] {
   const names = [target];
   if (/^[a-z][\w-]*$/.test(target)) {
     const camel = target
@@ -61,7 +61,7 @@ function memberLookupNames(target: string): string[] {
   return names;
 }
 
-function memberDocsFor(
+function member_docs_for(
   target: string,
   signature: string,
   members: ReadonlyMap<string, MemberReference>,
@@ -70,8 +70,8 @@ function memberDocsFor(
   // raw hover target (`ready`, `grid-change`) is only a fallback spelling.
   const declared = /^(?:let|const|var|function)\s+([A-Za-z_$][\w$]*)/.exec(signature)?.[1];
   const candidates = declared
-    ? [declared, ...memberLookupNames(target)]
-    : memberLookupNames(target);
+    ? [declared, ...member_lookup_names(target)]
+    : member_lookup_names(target);
   for (const name of candidates) {
     const member = members.get(name);
     if (member) return member;
@@ -103,7 +103,7 @@ interface RenderedHover {
   symbol?: string;
 }
 
-function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
+function nested_renderer_config(config: ResolvedExpressiveCodeEngineConfig) {
   return {
     cascadeLayer: config.cascadeLayer,
     customizeTheme: config.customizeTheme,
@@ -126,7 +126,7 @@ function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
   };
 }
 
-function normalizeQuickInfo(raw: string): string {
+function normalize_quick_info(raw: string): string {
   let signature = raw.replace(LEADING_KIND, "").replace(IMPORT_SUFFIX, "").trim();
   if (TYPE_MEMBER.test(signature)) signature = `type ${signature}`;
   if (FUNCTION_MEMBER.test(signature)) signature = `function ${signature}`;
@@ -134,32 +134,32 @@ function normalizeQuickInfo(raw: string): string {
 }
 
 /** Rewrites checker member paths into parseable TS so signatures render with syntax colors. */
-function renderableSignature(signature: string): string {
+function renderable_signature(signature: string): string {
   const member = signature.match(MEMBER_PATH);
   if (member) return `interface ${member[1]} { ${member[2]}${member[3]}: ${member[4]} }`;
   if (/^[a-z_$][\w$]*: /.test(signature)) return `let ${signature}`;
   return signature;
 }
 
-async function formatSignature(rawSignature: string, printWidth: number): Promise<string> {
-  if (!rawSignature) return rawSignature;
-  const signature = renderableSignature(rawSignature);
+async function format_signature(raw_signature: string, print_width: number): Promise<string> {
+  if (!raw_signature) return raw_signature;
+  const signature = renderable_signature(raw_signature);
 
-  const needsDeclaration = /^(const|let|var|function)\b/.test(signature);
-  const source = needsDeclaration ? `declare ${signature.replace(/;?$/, ";")}` : signature;
+  const needs_declaration = /^(const|let|var|function)\b/.test(signature);
+  const source = needs_declaration ? `declare ${signature.replace(/;?$/, ";")}` : signature;
   try {
     const formatted = await format(source, {
       parser: "typescript",
-      printWidth,
+      printWidth: print_width,
       tabWidth: 2,
       semi: true,
       singleQuote: false,
       trailingComma: "all",
     });
-    const withoutDeclaration = needsDeclaration
+    const without_declaration = needs_declaration
       ? formatted.replace(/^declare\s+/, "").replace(/;\s*$/, "")
       : formatted.trimEnd();
-    return withoutDeclaration.trim();
+    return without_declaration.trim();
   } catch {
     return signature;
   }
@@ -170,7 +170,7 @@ async function formatSignature(rawSignature: string, printWidth: number): Promis
  * it through a synthetic alias, so prettier can lay out long object types.
  */
 export async function formatTypeExpression(type: string, printWidth = 78): Promise<string> {
-  const formatted = await formatSignature(
+  const formatted = await format_signature(
     `type __Variant = ${type.replace(/;?\s*$/, "")};`,
     printWidth,
   );
@@ -179,29 +179,29 @@ export async function formatTypeExpression(type: string, printWidth = 78): Promi
 
 /** Pretty-prints a full declaration for the generated reference pages. */
 export async function formatDeclaration(code: string, printWidth = 78): Promise<string> {
-  return formatSignature(code, printWidth);
+  return format_signature(code, printWidth);
 }
 
 /** Truncates a formatted declaration for preview use, closing the brace. */
-function capPreviewLines(formatted: string, maxLines: number): string {
+function cap_preview_lines(formatted: string, max_lines: number): string {
   const lines = formatted.split("\n");
-  if (lines.length <= maxLines) return formatted;
-  const kept = lines.slice(0, maxLines - 1);
+  if (lines.length <= max_lines) return formatted;
+  const kept = lines.slice(0, max_lines - 1);
   const remaining = lines.length - kept.length;
   return [...kept, `  // … ${remaining} more lines — see the API reference`, "}"].join("\n");
 }
 
 /** Light-theme token colour -> syntax role; each role's colour is unique. */
-let roleByColour: ReadonlyMap<string, CodeRole> | undefined;
+let role_by_colour: ReadonlyMap<string, CodeRole> | undefined;
 
-function codeRoleOf(colour: string): CodeRole | undefined {
-  if (roleByColour === undefined) {
+function code_role_of(colour: string): CodeRole | undefined {
+  if (role_by_colour === undefined) {
     const tokens = themeTokens("light");
-    roleByColour = new Map(
+    role_by_colour = new Map(
       CODE_ROLES.map((role) => [tokenColour(tokens, `--sw-code-${role}`), role]),
     );
   }
-  return roleByColour.get(colour.toLowerCase());
+  return role_by_colour.get(colour.toLowerCase());
 }
 
 const LIGHT_COLOUR = /--0:\s*(#[0-9a-fA-F]{3,8})/;
@@ -213,29 +213,29 @@ const LIGHT_COLOUR = /--0:\s*(#[0-9a-fA-F]{3,8})/;
  * browser build a separate style for each when the panel first opened.
  * Plain-text tokens lose their span altogether.
  */
-function withRoleClasses(nodes: readonly ElementContent[]): ElementContent[] {
+function with_role_classes(nodes: readonly ElementContent[]): ElementContent[] {
   const output: ElementContent[] = [];
-  const pushText = (value: string): void => {
+  const push_text = (value: string): void => {
     const last = output.at(-1);
     if (last?.type === "text") last.value += value;
     else output.push({ type: "text", value });
   };
   for (const node of nodes) {
     if (node.type === "text") {
-      pushText(node.value);
+      push_text(node.value);
       continue;
     }
     if (node.type !== "element") continue;
     const colour = LIGHT_COLOUR.exec(String(node.properties.style ?? ""))?.[1];
-    const children = withRoleClasses(node.children);
+    const children = with_role_classes(node.children);
     if (colour === undefined) {
       output.push({ ...node, children });
       continue;
     }
-    const role = codeRoleOf(colour);
+    const role = code_role_of(colour);
     if (role === undefined) {
       for (const child of children) {
-        if (child.type === "text") pushText(child.value);
+        if (child.type === "text") push_text(child.value);
         else output.push(child);
       }
       continue;
@@ -245,7 +245,7 @@ function withRoleClasses(nodes: readonly ElementContent[]): ElementContent[] {
   return output;
 }
 
-function codeLineContents(ast: Element): ElementContent[] {
+function code_line_contents(ast: Element): ElementContent[] {
   const lines = selectAll(".ec-line > .code", ast);
   const output: ElementContent[] = [];
   for (const [index, line] of lines.entries()) {
@@ -254,13 +254,15 @@ function codeLineContents(ast: Element): ElementContent[] {
       line.children.length === 1 &&
       line.children[0]?.type === "text" &&
       line.children[0].value === "\n";
-    output.push(h("span.sw-code-popover__line", placeholder ? [] : withRoleClasses(line.children)));
+    output.push(
+      h("span.sw-code-popover__line", placeholder ? [] : with_role_classes(line.children)),
+    );
     if (index < lines.length - 1) output.push({ type: "text", value: "\n" });
   }
   return output;
 }
 
-function cleanDocumentation(value: string): string {
+function clean_documentation(value: string): string {
   return (
     value
       // Unwrap fenced examples before inline-code cleanup so no stray fences survive.
@@ -276,8 +278,8 @@ function cleanDocumentation(value: string): string {
   );
 }
 
-function resolvedQuickInfo(hover: SheetwriteTypeHover, language: string): string {
-  const signature = normalizeQuickInfo(hover.text);
+function resolved_quick_info(hover: SheetwriteTypeHover, language: string): string {
+  const signature = normalize_quick_info(hover.text);
   if (
     language === "vue" &&
     hover.target === "Sheetwrite" &&
@@ -288,14 +290,14 @@ function resolvedQuickInfo(hover: SheetwriteTypeHover, language: string): string
   return signature;
 }
 export function isHighQualityHover(hover: SheetwriteTypeHover, language = "ts"): boolean {
-  return hover.origin === "lib" || !LOW_QUALITY_HOVER.test(resolvedQuickInfo(hover, language));
+  return hover.origin === "lib" || !LOW_QUALITY_HOVER.test(resolved_quick_info(hover, language));
 }
 
 /**
  * Docs for `names` from the sample's script blocks analyzed on their own: hovers in the
  * svelte2tsx output lose the JSDoc of some script declarations. Only `names` are asked.
  */
-async function svelteScriptDocumentation(
+async function svelte_script_documentation(
   source: string,
   analyzer: SheetwriteTypeEngine,
   names: ReadonlySet<string>,
@@ -322,22 +324,25 @@ interface SvelteCode {
   map: string;
 }
 
-/** Sources waiting for the next codegen process; see `svelteCode`. */
-let svelteQueue: { source: string; resolve(code: SvelteCode): void; reject(error: Error): void }[] =
-  [];
+/** Sources waiting for the next codegen process; see `svelte_code`. */
+let svelte_queue: {
+  source: string;
+  resolve(code: SvelteCode): void;
+  reject(error: Error): void;
+}[] = [];
 
 /**
  * TypeScript for a Svelte sample, from svelte2tsx in a short-lived child process
  * (`docs/svelte-codegen/svelte-codegen.mjs`). Samples requested in the same turn of the event loop share one
  * process, so a cold `docs:check` starts it once.
  */
-function svelteCode(source: string): Promise<SvelteCode> {
+function svelte_code(source: string): Promise<SvelteCode> {
   return new Promise((resolve, reject) => {
-    svelteQueue.push({ source, resolve, reject });
-    if (svelteQueue.length > 1) return;
+    svelte_queue.push({ source, resolve, reject });
+    if (svelte_queue.length > 1) return;
     setTimeout(() => {
-      const batch = svelteQueue;
-      svelteQueue = [];
+      const batch = svelte_queue;
+      svelte_queue = [];
       const script = fileURLToPath(
         new URL("../../svelte-codegen/svelte-codegen.mjs", import.meta.url),
       );
@@ -369,62 +374,62 @@ function svelteCode(source: string): Promise<SvelteCode> {
   });
 }
 
-async function svelteSourceHovers(
+async function svelte_source_hovers(
   source: string,
   analyzer: SheetwriteTypeEngine,
 ): Promise<SheetwriteTypeHover[]> {
-  const transformed = await svelteCode(source);
-  const sourceMap = new TraceMap(JSON.parse(transformed.map.toString()));
-  const sourceLines = source.split("\n");
-  const lineOffsets = lineStartOffsets(source);
-  const mapsBack = (node: { line: number; character: number; target: string }) => {
-    const original = originalPositionFor(sourceMap, {
+  const transformed = await svelte_code(source);
+  const source_map = new TraceMap(JSON.parse(transformed.map.toString()));
+  const source_lines = source.split("\n");
+  const line_offsets = lineStartOffsets(source);
+  const maps_back = (node: { line: number; character: number; target: string }) => {
+    const original = originalPositionFor(source_map, {
       line: node.line + 1,
       column: node.character,
     });
     if (original.line === null || original.column === null) return undefined;
-    const sourceLine = sourceLines[original.line - 1];
-    const text = sourceLine?.slice(original.column, original.column + node.target.length);
+    const source_line = source_lines[original.line - 1];
+    const text = source_line?.slice(original.column, original.column + node.target.length);
     return text === node.target ? { line: original.line - 1, column: original.column } : undefined;
   };
 
   // Only generated identifiers that map back into the Svelte source can become hovers.
   const result = await analyzer.analyze(transformed.code, "tsx", {
     key: `svelte\0${source}`,
-    keep: (identifier) => mapsBack({ ...identifier, target: identifier.text }) !== undefined,
+    keep: (identifier) => maps_back({ ...identifier, target: identifier.text }) !== undefined,
   });
   const undocumented = new Set(
     result
-      .filter((node) => !node.docs?.trim() && mapsBack(node) !== undefined)
+      .filter((node) => !node.docs?.trim() && maps_back(node) !== undefined)
       .map((node) => node.target),
   );
-  const scriptDocumentation = await svelteScriptDocumentation(source, analyzer, undocumented);
+  const script_documentation = await svelte_script_documentation(source, analyzer, undocumented);
   const hovers: SheetwriteTypeHover[] = [];
   for (const node of result) {
-    const original = mapsBack(node);
+    const original = maps_back(node);
     if (!original) continue;
-    const lineIndex = original.line;
+    const line_index = original.line;
     hovers.push({
       ...node,
-      docs: node.docs?.trim() ? node.docs : scriptDocumentation.get(node.target),
-      line: lineIndex,
+      docs: node.docs?.trim() ? node.docs : script_documentation.get(node.target),
+      line: line_index,
       character: original.column,
-      start: (lineOffsets[lineIndex] ?? 0) + original.column,
+      start: (line_offsets[line_index] ?? 0) + original.column,
       length: node.target.length,
     });
   }
   return hovers;
 }
 
-async function mapSvelteHovers(
+async function map_svelte_hovers(
   source: string,
   analyzer: SheetwriteTypeEngine,
 ): Promise<SheetwriteTypeHover[]> {
-  return analyzer.resolveFrameworkTypes(await svelteSourceHovers(source, analyzer), source);
+  return analyzer.resolveFrameworkTypes(await svelte_source_hovers(source, analyzer), source);
 }
 
 /** Where an analyzed identifier sits in the page's code, or null inside the prelude. */
-function originalPosition(
+function original_position(
   identifier: { line: number; character: number; target: string },
   injection: PreludeInjection,
   lines: readonly string[],
@@ -439,15 +444,15 @@ function originalPosition(
   return line?.slice(position.character, end) === identifier.target ? position : null;
 }
 
-function remapThroughInjection(
+function remap_through_injection(
   hovers: readonly SheetwriteTypeHover[],
   injection: PreludeInjection,
-  originalSource: string,
+  original_source: string,
 ): SheetwriteTypeHover[] {
-  const lines = originalSource.split("\n");
+  const lines = original_source.split("\n");
   const remapped: SheetwriteTypeHover[] = [];
   for (const hover of hovers) {
-    const position = originalPosition(hover, injection, lines);
+    const position = original_position(hover, injection, lines);
     if (position === null) continue;
     remapped.push({
       ...hover,
@@ -467,10 +472,10 @@ export async function collectFenceHovers(
   preludeName?: string,
 ): Promise<SheetwriteTypeHover[]> {
   if (language === "svelte") {
-    if (preludeName === undefined) return mapSvelteHovers(code, analyzer);
+    if (preludeName === undefined) return map_svelte_hovers(code, analyzer);
     const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
-    const mapped = remapThroughInjection(
-      await svelteSourceHovers(injection.analysisSource, analyzer),
+    const mapped = remap_through_injection(
+      await svelte_source_hovers(injection.analysisSource, analyzer),
       injection,
       code,
     );
@@ -483,9 +488,9 @@ export async function collectFenceHovers(
   const hovers = await analyzer.analyze(injection.analysisSource, language, {
     key: `prelude\0${preludeName}\0${code}`,
     keep: (identifier) =>
-      originalPosition({ ...identifier, target: identifier.text }, injection, lines) !== null,
+      original_position({ ...identifier, target: identifier.text }, injection, lines) !== null,
   });
-  return remapThroughInjection(hovers, injection, code);
+  return remap_through_injection(hovers, injection, code);
 }
 
 export function hoverPopoverId(
@@ -493,21 +498,21 @@ export function hoverPopoverId(
   hover: Pick<SheetwriteTypeHover, "character" | "length" | "line" | "target">,
   hoverIndex: number,
 ): string {
-  const groupIndex = codeBlock.parentDocument?.positionInDocument?.groupIndex;
-  const blockIdentity =
-    groupIndex === undefined
+  const group_index = codeBlock.parentDocument?.positionInDocument?.groupIndex;
+  const block_identity =
+    group_index === undefined
       ? hashIdentifier(`${codeBlock.language}\0${codeBlock.meta}\0${codeBlock.code}`)
-      : String(groupIndex);
-  return `sheetwrite-code-popover-${blockIdentity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
+      : String(group_index);
+  return `sheetwrite-code-popover-${block_identity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
 }
 
 /** Make external URLs and site paths clickable in tag text. */
-function tagValueContents(value: string): ElementContent[] {
-  const cleaned = cleanDocumentation(value);
+function tag_value_contents(value: string): ElementContent[] {
+  const cleaned = clean_documentation(value);
   const contents: ElementContent[] = [];
-  const urlPattern = /https?:\/\/[^\s"'<>)]+|\/(?:docs|showcases)\/[^\s"'<>)`]*/g;
+  const url_pattern = /https?:\/\/[^\s"'<>)]+|\/(?:docs|showcases)\/[^\s"'<>)`]*/g;
   let cursor = 0;
-  for (const match of cleaned.matchAll(urlPattern)) {
+  for (const match of cleaned.matchAll(url_pattern)) {
     const start = match.index ?? 0;
     if (start > cursor) contents.push({ type: "text", value: cleaned.slice(cursor, start) });
     contents.push(
@@ -538,7 +543,7 @@ const TAG_LABELS: Readonly<Record<string, string>> = {
   throws: "Throws",
 };
 
-function tagLabel(name: string): Element {
+function tag_label(name: string): Element {
   return h("span.sw-code-popover__tag-name", TAG_LABELS[name] ?? `@${name}`);
 }
 
@@ -548,12 +553,12 @@ function tagLabel(name: string): Element {
  * large panel one long style task. Symbol pages hold them under "Examples";
  * a member route already points at the member row that holds its own.
  */
-function exampleHref(exampleRoute: string): string {
-  return exampleRoute.includes("#") ? exampleRoute : `${exampleRoute}#examples`;
+function example_href(example_route: string): string {
+  return example_route.includes("#") ? example_route : `${example_route}#examples`;
 }
 
 /** `@see` targets separated by commas, each linked when it names a page. */
-function seeAlsoTargets(values: readonly string[], rendered: RenderedHover): ElementContent[] {
+function see_also_targets(values: readonly string[], rendered: RenderedHover): ElementContent[] {
   return values.flatMap((value, index): ElementContent[] => [
     ...(index > 0 ? [{ type: "text" as const, value: ", " }] : []),
     ...(rendered.seeRoutes?.has(value)
@@ -561,25 +566,25 @@ function seeAlsoTargets(values: readonly string[], rendered: RenderedHover): Ele
           h(
             "a.sw-code-popover__tag-link",
             { href: rendered.seeRoutes.get(value) },
-            cleanDocumentation(value),
+            clean_documentation(value),
           ),
         ]
-      : tagValueContents(value)),
+      : tag_value_contents(value)),
   ]);
 }
 
 /** The panel's one link line: "See also Grid, GridOptions · Example". */
-function linksLine(seeAlso: readonly string[], rendered: RenderedHover, hasExample: boolean) {
+function links_line(see_also: readonly string[], rendered: RenderedHover, has_example: boolean) {
   const example =
-    hasExample && rendered.exampleRoute !== undefined
-      ? h("a.sw-code-popover__tag-link", { href: exampleHref(rendered.exampleRoute) }, "Example")
+    has_example && rendered.exampleRoute !== undefined
+      ? h("a.sw-code-popover__tag-link", { href: example_href(rendered.exampleRoute) }, "Example")
       : undefined;
-  if (seeAlso.length === 0 && example === undefined) return undefined;
+  if (see_also.length === 0 && example === undefined) return undefined;
   const parts: ElementContent[] = [];
-  if (seeAlso.length > 0) {
+  if (see_also.length > 0) {
     parts.push(
       h("span.sw-code-popover__tag-name", "See also"),
-      ...seeAlsoTargets(seeAlso, rendered),
+      ...see_also_targets(see_also, rendered),
     );
   }
   if (example !== undefined) {
@@ -591,17 +596,19 @@ function linksLine(seeAlso: readonly string[], rendered: RenderedHover, hasExamp
 }
 
 /** Other tags in source order, then the link line. */
-function panelTags(rendered: RenderedHover): Element[] {
-  const seeAlso: string[] = [];
+function panel_tags(rendered: RenderedHover): Element[] {
+  const see_also: string[] = [];
   const tags: Element[] = [];
-  let hasExample = false;
+  let has_example = false;
   for (const [name, value] of rendered.tags) {
-    if (name === "see" && value) seeAlso.push(value);
-    else if (name === "example") hasExample = true;
+    if (name === "see" && value) see_also.push(value);
+    else if (name === "example") has_example = true;
     else
-      tags.push(h("span.sw-code-popover__tag", [tagLabel(name), ...tagValueContents(value ?? "")]));
+      tags.push(
+        h("span.sw-code-popover__tag", [tag_label(name), ...tag_value_contents(value ?? "")]),
+      );
   }
-  const links = linksLine(seeAlso, rendered, hasExample);
+  const links = links_line(see_also, rendered, has_example);
   if (links !== undefined) tags.push(links);
   return tags;
 }
@@ -611,12 +618,12 @@ function panelTags(rendered: RenderedHover): Element[] {
  * the highlighted signature at two widths, the docs, the tags and the link to
  * the API reference. `dedupe-code-popovers.ts` moves it into the page's store.
  */
-function popoverPanel(rendered: RenderedHover, popoverId: string): Element {
-  const tags = panelTags(rendered);
+function popover_panel(rendered: RenderedHover, popover_id: string): Element {
+  const tags = panel_tags(rendered);
   return h(
     "span.sw-code-popover__panel",
     {
-      id: popoverId,
+      id: popover_id,
       role: "tooltip",
       dataSwCodePopoverPanel: "",
       // Popover text is preview chrome; indexing it lets giant embedded
@@ -635,7 +642,7 @@ function popoverPanel(rendered: RenderedHover, popoverId: string): Element {
         { ariaHidden: "true" },
         h("span.sw-code-popover__signature-text", rendered.narrowSignature),
       ),
-      rendered.docs ? h("span.sw-code-popover__docs", cleanDocumentation(rendered.docs)) : [],
+      rendered.docs ? h("span.sw-code-popover__docs", clean_documentation(rendered.docs)) : [],
       tags.length > 0 ? h("span.sw-code-popover__tags", tags) : [],
       rendered.referenceRoute
         ? h("a.sw-code-popover__link", { href: rendered.referenceRoute }, "API reference")
@@ -661,15 +668,15 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   }
 
   override render({ nodesToTransform }: AnnotationRenderOptions): Element[] {
-    const { docs, navigable, referenceRoute } = this.rendered;
-    const kind = docs ? "documented" : referenceRoute ? "reference" : "type";
-    const isLink = navigable === true && referenceRoute !== undefined;
+    const { docs, navigable, referenceRoute: reference_route } = this.rendered;
+    const kind = docs ? "documented" : reference_route ? "reference" : "type";
+    const is_link = navigable === true && reference_route !== undefined;
     return nodesToTransform.map((node) =>
       h("span.sw-code-popover", [
         h(
-          isLink ? "a.sw-code-popover__trigger" : "span.sw-code-popover__trigger",
+          is_link ? "a.sw-code-popover__trigger" : "span.sw-code-popover__trigger",
           {
-            ...(isLink ? { href: referenceRoute } : {}),
+            ...(is_link ? { href: reference_route } : {}),
             // One Tab stop per code block: `rovingCodeFocus` gives the block's
             // first trigger tabindex 0; arrow keys move between the others.
             tabIndex: -1,
@@ -682,7 +689,7 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
           },
           [node],
         ),
-        popoverPanel(this.rendered, this.popoverId),
+        popover_panel(this.rendered, this.popoverId),
       ]),
     );
   }
@@ -712,7 +719,7 @@ export function collectReferenceLinks(
   if (routes.size === 0) return [];
   const declared = code.match(DECLARED_NAME)?.[1];
   const links: ReferenceLink[] = [];
-  for (const [lineIndex, text] of code.split("\n").entries()) {
+  for (const [line_index, text] of code.split("\n").entries()) {
     for (const match of text.matchAll(/[A-Za-z_$][\w$]*/g)) {
       const name = match[0];
       if (name === declared) continue;
@@ -722,7 +729,7 @@ export function collectReferenceLinks(
       const before = start > 0 ? text[start - 1] : "";
       if (before === "." || before === '"' || before === "'") continue;
       links.push({
-        line: lineIndex,
+        line: line_index,
         columnStart: start,
         columnEnd: start + name.length,
         route,
@@ -737,7 +744,7 @@ export function referenceRouteForHover(
   signature: string,
   routes: ReadonlyMap<string, string>,
 ): string | undefined {
-  return routes.get(target) ?? typeRouteOf(signature, routes, target);
+  return routes.get(target) ?? type_route_of(signature, routes, target);
 }
 
 /**
@@ -745,18 +752,18 @@ export function referenceRouteForHover(
  * name itself (`let error: SheetwriteError` links SheetwriteError); none when
  * it names several or none.
  */
-function typeRouteOf(
+function type_route_of(
   signature: string,
   routes: ReadonlyMap<string, string>,
-  hoveredName: string,
+  hovered_name: string,
 ): string | undefined {
-  const referencedRoutes = new Set<string>();
+  const referenced_routes = new Set<string>();
   for (const match of signature.matchAll(/[A-Za-z_$][\w$]*/g)) {
-    if (match[0] === hoveredName) continue;
+    if (match[0] === hovered_name) continue;
     const route = routes.get(match[0]);
-    if (route !== undefined) referencedRoutes.add(route);
+    if (route !== undefined) referenced_routes.add(route);
   }
-  return referencedRoutes.size === 1 ? referencedRoutes.values().next().value : undefined;
+  return referenced_routes.size === 1 ? referenced_routes.values().next().value : undefined;
 }
 
 class SheetwriteReferenceLinkAnnotation extends ExpressiveCodeAnnotation {
@@ -780,11 +787,11 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     cwd: options.cwd,
     fsMap: options.fsMap,
   });
-  let signatureRenderer: ExpressiveCode | undefined;
-  let referenceRoutes: ReadonlyMap<string, string> | undefined;
-  let memberReferences: ReadonlyMap<string, MemberReference> | undefined;
-  let symbolPreviews: ReadonlyMap<string, SymbolPreview> | undefined;
-  const previewParts = new Map<
+  let signature_renderer: ExpressiveCode | undefined;
+  let reference_routes: ReadonlyMap<string, string> | undefined;
+  let member_references: ReadonlyMap<string, MemberReference> | undefined;
+  let symbol_previews: ReadonlyMap<string, SymbolPreview> | undefined;
+  const preview_parts = new Map<
     string,
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
@@ -792,42 +799,42 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
   // The build compiles every generated API page at once, and each asks for
   // the manifest before the first read ends. One shared read keeps one copy
   // of the file in memory instead of one per page.
-  let manifestRead: Promise<void> | undefined;
-  const resolveManifest = (): Promise<void> =>
-    (manifestRead ??= (async () => {
+  let manifest_read: Promise<void> | undefined;
+  const resolve_manifest = (): Promise<void> =>
+    (manifest_read ??= (async () => {
       try {
-        const { readFile } = await import("node:fs/promises");
+        const { readFile: read_file } = await import("node:fs/promises");
         const { join } = await import("node:path");
-        const manifestPath = join(options.cwd, "src/generated/public-api.json");
-        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
-        referenceRoutes = apiReferenceRoutes(manifest);
-        memberReferences = apiMemberReferences(manifest);
-        symbolPreviews = apiSymbolPreviews(manifest);
+        const manifest_path = join(options.cwd, "src/generated/public-api.json");
+        const manifest = JSON.parse(await read_file(manifest_path, "utf8")) as ApiManifestShape;
+        reference_routes = apiReferenceRoutes(manifest);
+        member_references = apiMemberReferences(manifest);
+        symbol_previews = apiSymbolPreviews(manifest);
       } catch {
         // Docs generation has not run yet; hovers simply render without links.
-        referenceRoutes = new Map();
-        memberReferences = new Map();
-        symbolPreviews = new Map();
+        reference_routes = new Map();
+        member_references = new Map();
+        symbol_previews = new Map();
       }
     })());
 
   return definePlugin({
     name: "sheetwrite-code-hovers",
     hooks: {
-      async preprocessCode({ codeBlock, config }) {
+      async preprocessCode({ codeBlock: code_block, config }) {
         // Generated declaration fences carry no imports, so the type engine
         // cannot resolve their identifiers. The manifest can: each public
         // symbol gets a preview popover, and the token itself navigates.
-        if (/\bgenerated\b/.test(codeBlock.meta)) {
-          if (!GENERATED_LANGUAGES.has(codeBlock.language)) return;
-          await resolveManifest();
-          signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
-          const previews = symbolPreviews ?? new Map<string, SymbolPreview>();
-          for (const [linkIndex, link] of collectReferenceLinks(
-            codeBlock.code,
-            referenceRoutes ?? new Map<string, string>(),
+        if (/\bgenerated\b/.test(code_block.meta)) {
+          if (!GENERATED_LANGUAGES.has(code_block.language)) return;
+          await resolve_manifest();
+          signature_renderer ??= new ExpressiveCode(nested_renderer_config(config));
+          const previews = symbol_previews ?? new Map<string, SymbolPreview>();
+          for (const [link_index, link] of collectReferenceLinks(
+            code_block.code,
+            reference_routes ?? new Map<string, string>(),
           ).entries()) {
-            const line = codeBlock.getLine(link.line);
+            const line = code_block.getLine(link.line);
             if (!line) continue;
             const name = line.text.slice(link.columnStart, link.columnEnd);
             const preview = previews.get(name);
@@ -839,33 +846,33 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
             }
             // Symbols repeat across hundreds of generated pages; render each
             // preview once and clone the hast per use (trees must not share nodes).
-            let parts = previewParts.get(name);
+            let parts = preview_parts.get(name);
             if (parts === undefined) {
-              const [wideSignature, narrowSignature] = await Promise.all([
-                formatSignature(preview.signature, 68),
-                formatSignature(preview.signature, 34),
+              const [wide_signature, narrow_signature] = await Promise.all([
+                format_signature(preview.signature, 68),
+                format_signature(preview.signature, 34),
               ]);
               // Whole-interface previews (Grid: ~50 members) would embed pages
               // of HTML at every mention; the popover is a preview, the page
               // behind the link is the reference.
-              const [renderedWideSignature, renderedNarrowSignature] = await Promise.all([
-                signatureRenderer.render({
-                  code: capPreviewLines(wideSignature, 16),
+              const [rendered_wide_signature, rendered_narrow_signature] = await Promise.all([
+                signature_renderer.render({
+                  code: cap_preview_lines(wide_signature, 16),
                   language: "ts",
                   meta: "",
                 }),
-                signatureRenderer.render({
-                  code: capPreviewLines(narrowSignature, 20),
+                signature_renderer.render({
+                  code: cap_preview_lines(narrow_signature, 20),
                   language: "ts",
                   meta: "",
                 }),
               ]);
               parts = {
-                accessible: capPreviewLines(wideSignature, 16),
-                wide: codeLineContents(renderedWideSignature.renderedGroupAst),
-                narrow: codeLineContents(renderedNarrowSignature.renderedGroupAst),
+                accessible: cap_preview_lines(wide_signature, 16),
+                wide: code_line_contents(rendered_wide_signature.renderedGroupAst),
+                narrow: code_line_contents(rendered_narrow_signature.renderedGroupAst),
               };
-              previewParts.set(name, parts);
+              preview_parts.set(name, parts);
             }
             const hover: SheetwriteTypeHover = {
               type: "hover",
@@ -891,104 +898,104 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                   navigable: true,
                   isApiName: true,
                 },
-                hoverPopoverId(codeBlock, hover, linkIndex),
+                hoverPopoverId(code_block, hover, link_index),
               ),
             );
           }
           return;
         }
-        if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
-        if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
+        if (!SUPPORTED_LANGUAGES.has(code_block.language)) return;
+        if (options.shouldTransform && !options.shouldTransform(code_block)) return;
 
-        signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
+        signature_renderer ??= new ExpressiveCode(nested_renderer_config(config));
         const hovers = (
           await collectFenceHovers(
-            codeBlock.code,
-            codeBlock.language as "ts" | "tsx" | "vue" | "svelte",
+            code_block.code,
+            code_block.language as "ts" | "tsx" | "vue" | "svelte",
             analyzer,
-            codeBlock.metaOptions.getString("prelude"),
+            code_block.metaOptions.getString("prelude"),
           )
-        ).filter((hover) => isHighQualityHover(hover, codeBlock.language));
+        ).filter((hover) => isHighQualityHover(hover, code_block.language));
 
-        await resolveManifest();
-        const routes = referenceRoutes ?? new Map<string, string>();
-        const members = memberReferences ?? new Map<string, MemberReference>();
-        for (const [hoverIndex, hover] of hovers.entries()) {
-          const line = codeBlock.getLine(hover.line);
+        await resolve_manifest();
+        const routes = reference_routes ?? new Map<string, string>();
+        const members = member_references ?? new Map<string, MemberReference>();
+        for (const [hover_index, hover] of hovers.entries()) {
+          const line = code_block.getLine(hover.line);
           if (!line) continue;
-          const accessibleSignature = resolvedQuickInfo(hover, codeBlock.language);
-          if (!accessibleSignature) continue;
+          const accessible_signature = resolved_quick_info(hover, code_block.language);
+          if (!accessible_signature) continue;
           // Import aliases and self-restating declarations waste the reader's hover.
-          if (/^import\s/.test(accessibleSignature)) continue;
+          if (/^import\s/.test(accessible_signature)) continue;
           // DOM and standard-library names (`document`, `style.height`) are
           // never Sheetwrite APIs, even when a Sheetwrite member shares the name.
-          const isLibrarySymbol = hover.origin === "lib";
+          const is_library_symbol = hover.origin === "lib";
           // A name the sample declares (`const list = …`) is the sample's own:
           // no Sheetwrite symbol is looked up by its name, though its type
           // still links to the type's page.
-          const isSampleSymbol = hover.origin === "snippet";
-          const memberReference =
-            isLibrarySymbol || isSampleSymbol
+          const is_sample_symbol = hover.origin === "snippet";
+          const member_reference =
+            is_library_symbol || is_sample_symbol
               ? undefined
-              : memberDocsFor(hover.target, accessibleSignature, members);
+              : member_docs_for(hover.target, accessible_signature, members);
           // Without its own docs the hover shows the manifest member's summary and tags.
-          const docsFromMember = hover.docs === undefined ? memberReference : undefined;
-          const tags = docsFromMember?.tags ?? hover.tags ?? [];
-          const hasDetails = Boolean(hover.docs ?? docsFromMember?.docs) || tags.length > 0;
-          if (!hasDetails) {
-            const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
+          const docs_from_member = hover.docs === undefined ? member_reference : undefined;
+          const tags = docs_from_member?.tags ?? hover.tags ?? [];
+          const has_details = Boolean(hover.docs ?? docs_from_member?.docs) || tags.length > 0;
+          if (!has_details) {
+            const restated = accessible_signature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
           }
           // The symbol's own page or member row, which holds its examples;
           // else the page of the one Sheetwrite type its signature names.
-          const ownRoute =
-            isLibrarySymbol || isSampleSymbol
+          const own_route =
+            is_library_symbol || is_sample_symbol
               ? undefined
-              : (routes.get(hover.target) ?? memberReference?.route);
-          const referenceRoute = isLibrarySymbol
+              : (routes.get(hover.target) ?? member_reference?.route);
+          const reference_route = is_library_symbol
             ? undefined
-            : (ownRoute ?? typeRouteOf(accessibleSignature, routes, hover.target));
-          const [wideSignature, narrowSignature] = await Promise.all([
-            formatSignature(accessibleSignature, 68),
-            formatSignature(accessibleSignature, 34),
+            : (own_route ?? type_route_of(accessible_signature, routes, hover.target));
+          const [wide_signature, narrow_signature] = await Promise.all([
+            format_signature(accessible_signature, 68),
+            format_signature(accessible_signature, 34),
           ]);
-          const [renderedWideSignature, renderedNarrowSignature] = await Promise.all([
-            signatureRenderer.render({
-              code: wideSignature,
+          const [rendered_wide_signature, rendered_narrow_signature] = await Promise.all([
+            signature_renderer.render({
+              code: wide_signature,
               language: "ts",
               meta: "",
             }),
-            signatureRenderer.render({
-              code: narrowSignature,
+            signature_renderer.render({
+              code: narrow_signature,
               language: "ts",
               meta: "",
             }),
           ]);
-          const seeRoutes = new Map<string, string>();
+          const see_routes = new Map<string, string>();
           for (const [name, value] of tags) {
             if (name !== "see" || !value) continue;
-            const label = cleanDocumentation(value);
+            const label = clean_documentation(value);
             const route = referenceRouteForHover(label, label, routes);
-            if (route) seeRoutes.set(value, route);
+            if (route) see_routes.set(value, route);
           }
-          const popoverId = hoverPopoverId(codeBlock, hover, hoverIndex);
+          const popover_id = hoverPopoverId(code_block, hover, hover_index);
           line.addAnnotation(
             new SheetwriteHoverAnnotation(
               hover,
               {
-                accessibleSignature,
-                wideSignature: codeLineContents(renderedWideSignature.renderedGroupAst),
-                narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
-                docs: hover.docs ?? docsFromMember?.docs,
+                accessibleSignature: accessible_signature,
+                wideSignature: code_line_contents(rendered_wide_signature.renderedGroupAst),
+                narrowSignature: code_line_contents(rendered_narrow_signature.renderedGroupAst),
+                docs: hover.docs ?? docs_from_member?.docs,
                 tags,
-                seeRoutes,
-                referenceRoute,
-                exampleRoute: ownRoute,
-                navigable: referenceRoute !== undefined,
-                isApiName: !isLibrarySymbol && routes.has(hover.target),
-                symbol: isLibrarySymbol ? undefined : hover.target,
+                seeRoutes: see_routes,
+                referenceRoute: reference_route,
+                exampleRoute: own_route,
+                navigable: reference_route !== undefined,
+                isApiName: !is_library_symbol && routes.has(hover.target),
+                symbol: is_library_symbol ? undefined : hover.target,
               },
-              popoverId,
+              popover_id,
             ),
           );
         }

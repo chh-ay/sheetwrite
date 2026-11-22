@@ -74,7 +74,7 @@ export function isValidHyperlinkId(id: string): boolean {
   );
 }
 
-function sanitizeTarget(value: unknown): HyperlinkTarget | null {
+function sanitize_target(value: unknown): HyperlinkTarget | null {
   const target = dataProperties(value, TARGET_KEYS);
   if (!target) return null;
   if (target.kind === "external") {
@@ -97,7 +97,7 @@ export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
   const link = dataProperties(value, HYPERLINK_KEYS);
   if (!link || typeof link.id !== "string" || !isValidHyperlinkId(link.id)) return null;
   const range = sanitizeRange(link.range);
-  const target = sanitizeTarget(link.target);
+  const target = sanitize_target(link.target);
   if (!range || !target) return null;
   if (
     link.display !== undefined &&
@@ -169,7 +169,7 @@ export function resolveHyperlinkTarget(
   workbook: Workbook,
   target: HyperlinkTarget,
 ): ResolvedHyperlinkTarget {
-  const sanitized = sanitizeTarget(target);
+  const sanitized = sanitize_target(target);
   if (!sanitized) {
     throw new SheetwriteError(
       "unsafe-hyperlink",
@@ -196,13 +196,13 @@ export function resolveHyperlinkTarget(
   };
 }
 
-let fallbackId = 0;
+let fallback_id = 0;
 
 /** Produce a new stable identity for copied hyperlinks without trusting clipboard IDs. */
 export function createHyperlinkId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `link-${crypto.randomUUID()}`;
   }
-  fallbackId += 1;
-  return `link-${Date.now().toString(36)}-${fallbackId.toString(36)}`;
+  fallback_id += 1;
+  return `link-${Date.now().toString(36)}-${fallback_id.toString(36)}`;
 }

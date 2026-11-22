@@ -10,7 +10,7 @@ const INVENTORY = JSON.parse(
 ) as MutableContract;
 
 /** Every spelling (canonical name and aliases) of the functions in one build. */
-function spellingsIn(build: string): Set<string> {
+function spellings_in(build: string): Set<string> {
   return new Set(
     INVENTORY.functions
       .filter((entry) => entry.builds.includes(build))
@@ -80,8 +80,8 @@ const MUTATIONS: [string, (contract: MutableContract) => void, string][] = [
   [
     "pins LET as required-supported",
     (contract) => {
-      const letEntry = contract.functions.find((entry) => entry.canonical === "LET");
-      if (letEntry) letEntry.contractStatus = "supported";
+      const let_entry = contract.functions.find((entry) => entry.canonical === "LET");
+      if (let_entry) let_entry.contractStatus = "supported";
     },
     "LET must remain required-supported",
   ],
@@ -118,23 +118,23 @@ describe("formula capability contract", () => {
     expect(result.issues).toEqual([]);
     // Counts come from the inventory, so pull requests that add different
     // functions do not edit the same lines here.
-    const parserSpellings = spellingsIn("@sheetwrite/wasm");
-    const formulasSpellings = spellingsIn("@sheetwrite/formulas");
+    const parser_spellings = spellings_in("@sheetwrite/wasm");
+    const formulas_spellings = spellings_in("@sheetwrite/formulas");
     expect(result.summary).toEqual({
       functions: INVENTORY.functions.length,
       requiredSupported: 100,
       unsupportedCategories: INVENTORY.unsupportedCategories.length,
-      parserSpellings: parserSpellings.size,
-      assistSpellings: new Set([...parserSpellings, ...formulasSpellings]).size,
-      formulasSpellings: formulasSpellings.size,
+      parserSpellings: parser_spellings.size,
+      assistSpellings: new Set([...parser_spellings, ...formulas_spellings]).size,
+      formulasSpellings: formulas_spellings.size,
     });
   });
 
-  test.each(MUTATIONS)("%s", async (_name, mutate, expectedIssue) => {
+  test.each(MUTATIONS)("%s", async (_name, mutate, expected_issue) => {
     const candidate = structuredClone(INVENTORY);
     mutate(candidate);
     const result = await validateFormulaContractRepository(ROOT, candidate);
-    expect(result.issues).toContainEqual(expect.stringContaining(expectedIssue));
+    expect(result.issues).toContainEqual(expect.stringContaining(expected_issue));
   });
 
   // Engine selection is process-global; isolation protects both initialization
@@ -151,12 +151,12 @@ describe("formula capability contract", () => {
         ],
         { cwd: ROOT, stdout: "pipe", stderr: "pipe" },
       );
-      const [stdout, stderr, exitCode] = await Promise.all([
+      const [stdout, stderr, exit_code] = await Promise.all([
         new Response(probe.stdout).text(),
         new Response(probe.stderr).text(),
         probe.exited,
       ]);
-      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expect(exit_code, `${stdout}\n${stderr}`).toBe(0);
       expect(stdout).toContain(`${build}: distribution evaluation and assist contract passed`);
     });
   }

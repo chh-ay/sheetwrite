@@ -221,7 +221,7 @@ function Landing() {
     bench.available && bench.sizes && bench.heroStats && bench.capture
       ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
       : undefined;
-  const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
+  const million_row = evidence?.sizes.find((entry) => entry.size === 1_000_000);
   const { downloads } = bench;
   const highlighted = releaseFacts.highlighted;
   return (
@@ -267,7 +267,7 @@ function Landing() {
                   <dt>{measured().heroStats.millionRowMedianMs} ms</dt>
                   <dd>median interaction at 1,000,000 rows, Linux x86-64</dd>
                 </div>
-                <Show when={millionRow}>
+                <Show when={million_row}>
                   {(row) => (
                     <div>
                       <dt>{row().medianRatio}×</dt>

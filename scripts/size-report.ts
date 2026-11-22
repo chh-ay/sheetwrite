@@ -198,8 +198,8 @@ export interface SizeReport {
 
 export const repositoryRoot = resolve(import.meta.dir, "..");
 export const bundlerEvidenceRoot = join(repositoryRoot, "test-results/bundlers");
-const reportPath = join(import.meta.dir, "size-report.json");
-const historyPath = join(import.meta.dir, "size-history.json");
+const report_path = join(import.meta.dir, "size-report.json");
+const history_path = join(import.meta.dir, "size-history.json");
 export function isNonNegativeInteger(value: unknown): value is number {
   return (
     typeof value === "number" && Number.isFinite(value) && value >= 0 && Number.isInteger(value)
@@ -224,7 +224,7 @@ export function compressedSizes(data: Uint8Array): {
   };
 }
 
-function addMetric(
+function add_metric(
   metrics: Record<string, Metric>,
   key: string,
   actual: number,
@@ -237,12 +237,12 @@ function addMetric(
   metrics[key] = { actual, unit, category, owner };
 }
 
-async function reportAsset(asset: BundlerAsset): Promise<AssetReport> {
-  const absolutePath = resolve(repositoryRoot, asset.path);
-  if (!absolutePath.startsWith(`${repositoryRoot}${sep}`)) {
+async function report_asset(asset: BundlerAsset): Promise<AssetReport> {
+  const absolute_path = resolve(repositoryRoot, asset.path);
+  if (!absolute_path.startsWith(`${repositoryRoot}${sep}`)) {
     throw new Error(`Bundler asset escapes repository root: ${asset.path}`);
   }
-  const content = await readFile(absolutePath);
+  const content = await readFile(absolute_path);
   const compressed = compressedSizes(content);
   return {
     ...asset,
@@ -250,7 +250,7 @@ async function reportAsset(asset: BundlerAsset): Promise<AssetReport> {
     sha256: createHash("sha256").update(content).digest("hex"),
   };
 }
-function metricSegment(value: string): string {
+function metric_segment(value: string): string {
   return value.replace(/[^a-zA-Z0-9]+(.)/g, (_, next: string) => next.toUpperCase());
 }
 
@@ -259,7 +259,7 @@ export function addPackageSizeMetrics(
   report: PackageReport,
 ): void {
   const prefix = `package.${report.name}`;
-  addMetric(
+  add_metric(
     metrics,
     `${prefix}.tarballBytes`,
     report.tarballBytes,
@@ -267,7 +267,7 @@ export function addPackageSizeMetrics(
     "package-tarball",
     report.name,
   );
-  addMetric(
+  add_metric(
     metrics,
     `${prefix}.unpackedBytes`,
     report.unpackedBytes,
@@ -275,7 +275,7 @@ export function addPackageSizeMetrics(
     "package-unpacked",
     report.name,
   );
-  addMetric(
+  add_metric(
     metrics,
     `${prefix}.fileCount`,
     report.fileCount,
@@ -286,9 +286,9 @@ export function addPackageSizeMetrics(
   for (const [category, bytes] of Object.entries(report.categories).sort(([left], [right]) =>
     left.localeCompare(right),
   )) {
-    addMetric(
+    add_metric(
       metrics,
-      `${prefix}.${metricSegment(category)}Bytes`,
+      `${prefix}.${metric_segment(category)}Bytes`,
       bytes,
       "bytes",
       `package-unpacked-${category}`,
@@ -302,16 +302,16 @@ export function addPackageSizeMetrics(
  * imports (all of them, in order), each part on its own, the icon sheet that
  * icons.css loads, and shell.css.
  */
-async function coreStylesheets(): Promise<{ name: string; owner: string; bytes: Uint8Array }[]> {
+async function core_stylesheets(): Promise<{ name: string; owner: string; bytes: Uint8Array }[]> {
   const core = join(repositoryRoot, "packages/core");
   const index = await readFile(join(core, "styles.css"), "utf8");
   const parts = [...index.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map(
     (match) => match[1] ?? "",
   );
   if (parts.length === 0) throw new Error("packages/core/styles.css imports no style parts");
-  const partSheets = await Promise.all(
+  const part_sheets = await Promise.all(
     parts.map(async (part) => ({
-      name: `styles.${metricSegment(part)}`,
+      name: `styles.${metric_segment(part)}`,
       owner: `@sheetwrite/core/styles/${part}.css`,
       bytes: await readFile(join(core, "styles", `${part}.css`)),
     })),
@@ -320,9 +320,9 @@ async function coreStylesheets(): Promise<{ name: string; owner: string; bytes: 
     {
       name: "styles",
       owner: "@sheetwrite/core/styles.css",
-      bytes: Buffer.concat(partSheets.map((sheet) => sheet.bytes)),
+      bytes: Buffer.concat(part_sheets.map((sheet) => sheet.bytes)),
     },
-    ...partSheets,
+    ...part_sheets,
     {
       name: "styles.iconSheet",
       owner: "@sheetwrite/core/styles/icons.svg",
@@ -336,18 +336,18 @@ async function coreStylesheets(): Promise<{ name: string; owner: string; bytes: 
   ];
 }
 
-async function buildSizeReport(
-  reuseBundlers: boolean,
-  artifactDirectory?: string,
+async function build_size_report(
+  reuse_bundlers: boolean,
+  artifact_directory?: string,
 ): Promise<SizeReport> {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-size-report-"));
+  const temporary_root = await mkdtemp(join(tmpdir(), "sheetwrite-size-report-"));
   try {
-    const packedPackages =
-      artifactDirectory === undefined
-        ? await packPackages(temporaryRoot)
-        : await loadPackedArtifacts(artifactDirectory, temporaryRoot);
-    const tarballs = new Map(packedPackages.map((entry) => [entry.name, entry.tarballPath]));
-    const closureSpecs: Array<[string, string[]]> = [
+    const packed_packages =
+      artifact_directory === undefined
+        ? await packPackages(temporary_root)
+        : await loadPackedArtifacts(artifact_directory, temporary_root);
+    const tarballs = new Map(packed_packages.map((entry) => [entry.name, entry.tarballPath]));
+    const closure_specs: Array<[string, string[]]> = [
       ["core", ["@sheetwrite/wasm", "@sheetwrite/core"]],
       ["react", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/react"]],
       ["vue", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/vue"]],
@@ -361,32 +361,32 @@ async function buildSizeReport(
       ["core-queries", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/queries"]],
     ];
     const closures = await Promise.all(
-      closureSpecs.map(([name, names], index) =>
-        measureClosure(name, names, tarballs, temporaryRoot, index),
+      closure_specs.map(([name, names], index) =>
+        measureClosure(name, names, tarballs, temporary_root, index),
       ),
     );
-    const repeatedCore = await measureClosure(
+    const repeated_core = await measureClosure(
       "core",
-      closureSpecs[0]?.[1] ?? [],
+      closure_specs[0]?.[1] ?? [],
       tarballs,
-      temporaryRoot,
-      closureSpecs.length,
+      temporary_root,
+      closure_specs.length,
     );
     const core = closures[0];
     if (
       core === undefined ||
-      core.packageCount !== repeatedCore.packageCount ||
-      core.logicalBytes !== repeatedCore.logicalBytes ||
-      JSON.stringify(core.packages) !== JSON.stringify(repeatedCore.packages)
+      core.packageCount !== repeated_core.packageCount ||
+      core.logicalBytes !== repeated_core.logicalBytes ||
+      JSON.stringify(core.packages) !== JSON.stringify(repeated_core.packages)
     ) {
       throw new Error("Repeated core clean-install closure measurement was not deterministic");
     }
 
-    const bundlerEvidence = await loadBundlerEvidence(reuseBundlers, artifactDirectory);
-    const attributionFindings = buildAttributionFindings(bundlerEvidence);
+    const bundler_evidence = await loadBundlerEvidence(reuse_bundlers, artifact_directory);
+    const attribution_findings = buildAttributionFindings(bundler_evidence);
     const bundlers: SizeReport["bundlers"] = [];
-    for (const evidence of bundlerEvidence) {
-      const assets = await Promise.all(evidence.assets.map(reportAsset));
+    for (const evidence of bundler_evidence) {
+      const assets = await Promise.all(evidence.assets.map(report_asset));
       assets.sort((left, right) => left.path.localeCompare(right.path));
       assertAttributionAssetsFresh(evidence, assets);
       bundlers.push({
@@ -400,10 +400,10 @@ async function buildSizeReport(
     bundlers.sort((left, right) => left.name.localeCompare(right.name));
 
     const metrics: Record<string, Metric> = {};
-    for (const entry of packedPackages) addPackageSizeMetrics(metrics, entry.report);
+    for (const entry of packed_packages) addPackageSizeMetrics(metrics, entry.report);
     for (const closure of closures) {
       const prefix = `closure.${closure.name}`;
-      addMetric(
+      add_metric(
         metrics,
         `${prefix}.packageCount`,
         closure.packageCount,
@@ -411,7 +411,7 @@ async function buildSizeReport(
         "install-closure",
         closure.name,
       );
-      addMetric(
+      add_metric(
         metrics,
         `${prefix}.logicalBytes`,
         closure.logicalBytes,
@@ -422,7 +422,7 @@ async function buildSizeReport(
       for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
         if (closure.name === optional.closure) continue;
 
-        addMetric(
+        add_metric(
           metrics,
           `${prefix}.${optional.metric}`,
           closure.packages.filter((identity) => identity.startsWith(`${optional.packageName}@`))
@@ -441,8 +441,8 @@ async function buildSizeReport(
             (asset) => asset.kind === kind && asset.roles.includes(role),
           );
           if (selected.length === 0) continue;
-          const prefix = `bundler.${bundler.name}.${metricSegment(role)}.${kind}`;
-          addMetric(
+          const prefix = `bundler.${bundler.name}.${metric_segment(role)}.${kind}`;
+          add_metric(
             metrics,
             `${prefix}.rawBytes`,
             selected.reduce((sum, asset) => sum + asset.rawBytes, 0),
@@ -450,7 +450,7 @@ async function buildSizeReport(
             `browser-${kind}`,
             `${bundler.name}:${role}`,
           );
-          addMetric(
+          add_metric(
             metrics,
             `${prefix}.gzipBytes`,
             selected.reduce((sum, asset) => sum + asset.gzipBytes, 0),
@@ -458,7 +458,7 @@ async function buildSizeReport(
             `browser-${kind}`,
             `${bundler.name}:${role}`,
           );
-          addMetric(
+          add_metric(
             metrics,
             `${prefix}.brotliBytes`,
             selected.reduce((sum, asset) => sum + asset.brotliBytes, 0),
@@ -469,8 +469,8 @@ async function buildSizeReport(
         }
       }
     }
-    for (const entry of attributionFindings.firstPaint) {
-      addMetric(
+    for (const entry of attribution_findings.firstPaint) {
+      add_metric(
         metrics,
         `attribution.${entry.bundler}.coreFirstPaint.sheetwriteRawBytes`,
         entry.sheetwriteRawBytes,
@@ -478,7 +478,7 @@ async function buildSizeReport(
         "browser-module-attribution",
         `${entry.bundler}:@sheetwrite/core`,
       );
-      addMetric(
+      add_metric(
         metrics,
         `attribution.${entry.bundler}.coreFirstPaint.rootBarrelRawBytes`,
         entry.rootBarrelRawBytes,
@@ -487,9 +487,9 @@ async function buildSizeReport(
         `${entry.bundler}:@sheetwrite/core`,
       );
     }
-    for (const candidate of attributionFindings.subpaths) {
+    for (const candidate of attribution_findings.subpaths) {
       for (const retained of candidate.retainedModules) {
-        addMetric(
+        add_metric(
           metrics,
           `attribution.${retained.bundler}.${candidate.subpath}.rawBytes`,
           retained.rawBytes,
@@ -497,7 +497,7 @@ async function buildSizeReport(
           "browser-module-attribution",
           `${retained.bundler}:@sheetwrite/core/${candidate.subpath}`,
         );
-        addMetric(
+        add_metric(
           metrics,
           `attribution.${retained.bundler}.${candidate.subpath}.brotliBytes`,
           retained.brotliBytes,
@@ -507,9 +507,9 @@ async function buildSizeReport(
         );
       }
     }
-    for (const stylesheet of await coreStylesheets()) {
+    for (const stylesheet of await core_stylesheets()) {
       for (const [metric, value] of Object.entries(compressedSizes(stylesheet.bytes))) {
-        addMetric(
+        add_metric(
           metrics,
           `css.${stylesheet.name}.${metric}`,
           value,
@@ -520,8 +520,8 @@ async function buildSizeReport(
       }
     }
 
-    const nodeVersion = (await runCommand(["node", "--version"])).trim().replace(/^v/, "");
-    const npmVersion = (await runCommand(["npm", "--version"])).trim();
+    const node_version = (await runCommand(["node", "--version"])).trim().replace(/^v/, "");
+    const npm_version = (await runCommand(["npm", "--version"])).trim();
 
     return {
       schemaVersion: SIZE_PROTOCOL_VERSION,
@@ -537,24 +537,24 @@ async function buildSizeReport(
       toolchain: {
         bun: Bun.version,
         next: bundlers.find((entry) => entry.name === "next")?.version ?? "missing",
-        node: nodeVersion,
-        npm: npmVersion,
+        node: node_version,
+        npm: npm_version,
         vite: bundlers.find((entry) => entry.name === "vite")?.version ?? "missing",
         webpack: bundlers.find((entry) => entry.name === "webpack")?.version ?? "missing",
       },
       metrics: Object.fromEntries(
         Object.entries(metrics).sort(([left], [right]) => left.localeCompare(right)),
       ),
-      packages: packedPackages
+      packages: packed_packages
         .map((entry) => entry.report)
         .sort((left, right) => left.name.localeCompare(right.name)),
       closures: closures.sort((left, right) => left.name.localeCompare(right.name)),
       bundlers,
-      attributionFindings,
+      attributionFindings: attribution_findings,
       reproduction: "bun run size:report",
     };
   } finally {
-    await rm(temporaryRoot, { recursive: true, force: true });
+    await rm(temporary_root, { recursive: true, force: true });
   }
 }
 
@@ -609,23 +609,23 @@ export function formatReleaseComparison(
   return rows.join("\n");
 }
 
-function assertReleaseVersion(version: string): void {
+function assert_release_version(version: string): void {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`Invalid release version: ${version}`);
   }
 }
 
 export async function capturePublishedRelease(version: string): Promise<SizeReleaseSnapshot> {
-  assertReleaseVersion(version);
+  assert_release_version(version);
   const metrics: SizeReleaseSnapshot["metrics"] = {};
-  for (const packageName of PUBLISHABLE_PACKAGE_ORDER) {
-    const metadataResponse = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
+  for (const package_name of PUBLISHABLE_PACKAGE_ORDER) {
+    const metadata_response = await fetch(
+      `https://registry.npmjs.org/${encodeURIComponent(package_name)}/${encodeURIComponent(version)}`,
     );
-    if (!metadataResponse.ok) {
-      throw new Error(`Published package not found: ${packageName}@${version}`);
+    if (!metadata_response.ok) {
+      throw new Error(`Published package not found: ${package_name}@${version}`);
     }
-    const metadata = (await metadataResponse.json()) as {
+    const metadata = (await metadata_response.json()) as {
       dist?: { fileCount?: number; tarball?: string; unpackedSize?: number };
       version?: string;
     };
@@ -635,13 +635,13 @@ export async function capturePublishedRelease(version: string): Promise<SizeRele
       !isNonNegativeInteger(metadata.dist.fileCount) ||
       !isNonNegativeInteger(metadata.dist.unpackedSize)
     ) {
-      throw new Error(`Incomplete registry size metadata: ${packageName}@${version}`);
+      throw new Error(`Incomplete registry size metadata: ${package_name}@${version}`);
     }
-    const tarballResponse = await fetch(metadata.dist.tarball);
-    if (!tarballResponse.ok) throw new Error(`Cannot download ${packageName}@${version}`);
-    const prefix = `package.${packageName}`;
+    const tarball_response = await fetch(metadata.dist.tarball);
+    if (!tarball_response.ok) throw new Error(`Cannot download ${package_name}@${version}`);
+    const prefix = `package.${package_name}`;
     metrics[`${prefix}.tarballBytes`] = {
-      actual: (await tarballResponse.arrayBuffer()).byteLength,
+      actual: (await tarball_response.arrayBuffer()).byteLength,
       unit: "bytes",
     };
     metrics[`${prefix}.unpackedBytes`] = {
@@ -696,11 +696,11 @@ export function validateSizeHistory(value: unknown): SizeHistory {
   return candidate as SizeHistory;
 }
 
-async function readSizeHistory(): Promise<SizeHistory> {
-  return validateSizeHistory(await readJson<unknown>(historyPath));
+async function read_size_history(): Promise<SizeHistory> {
+  return validateSizeHistory(await readJson<unknown>(history_path));
 }
 
-async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot): Promise<void> {
+async function record_release(history: SizeHistory, release: SizeReleaseSnapshot): Promise<void> {
   if (history.releases.some((entry) => entry.version === release.version)) {
     throw new Error(`Size history already contains v${release.version}`);
   }
@@ -708,17 +708,17 @@ async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot)
     schemaVersion: 1,
     releases: [...history.releases, release],
   };
-  await writeFile(historyPath, `${JSON.stringify(updated, null, 2)}\n`);
-  await runCommand(["bun", "fmt", historyPath]);
+  await writeFile(history_path, `${JSON.stringify(updated, null, 2)}\n`);
+  await runCommand(["bun", "fmt", history_path]);
 }
 
-async function writeReport(report: SizeReport): Promise<void> {
+async function write_report(report: SizeReport): Promise<void> {
   await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
-  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  await runCommand(["bun", "fmt", reportPath]);
+  await writeFile(report_path, `${JSON.stringify(report, null, 2)}\n`);
+  await runCommand(["bun", "fmt", report_path]);
 }
 
-async function writeFailure(error: unknown): Promise<void> {
+async function write_failure(error: unknown): Promise<void> {
   const message = error instanceof Error ? error.message : String(error);
   await writeFile(
     join(import.meta.dir, "size-report-failure.json"),
@@ -737,39 +737,40 @@ async function writeFailure(error: unknown): Promise<void> {
 
 async function cli(): Promise<void> {
   const mode = process.argv[2] ?? "report";
-  const reuseBundlers = process.argv.includes("--reuse-bundlers");
+  const reuse_bundlers = process.argv.includes("--reuse-bundlers");
   try {
-    const artifactDirectory = optionValue(process.argv, "--artifacts");
+    const artifact_directory = optionValue(process.argv, "--artifacts");
     if (mode !== "report" && mode !== "record") {
       throw new Error(`Unknown size-report mode: ${mode}`);
     }
-    const history = await readSizeHistory();
+    const history = await read_size_history();
     if (mode === "record") {
       const version = optionValue(process.argv, "--version");
       if (version === undefined) throw new Error("record mode requires --version");
       if (history.releases.some((release) => release.version === version)) {
         console.log(
-          `Published v${version} is already present in ${relative(repositoryRoot, historyPath)}`,
+          `Published v${version} is already present in ${relative(repositoryRoot, history_path)}`,
         );
         return;
       }
       const release = await capturePublishedRelease(version);
-      await recordRelease(history, release);
-      console.log(`Recorded published v${version} in ${relative(repositoryRoot, historyPath)}`);
+      await record_release(history, release);
+      console.log(`Recorded published v${version} in ${relative(repositoryRoot, history_path)}`);
       return;
     }
-    const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
-    if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+    const required_artifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+    if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifact_directory === undefined) {
       throw new Error("Artifact-only size reporting requires --artifacts");
     }
     if (
-      requiredArtifacts !== undefined &&
-      (artifactDirectory === undefined || resolve(artifactDirectory) !== resolve(requiredArtifacts))
+      required_artifacts !== undefined &&
+      (artifact_directory === undefined ||
+        resolve(artifact_directory) !== resolve(required_artifacts))
     ) {
       throw new Error("Size report artifact input differs from the canonical artifact set");
     }
-    const report = await buildSizeReport(reuseBundlers, artifactDirectory);
-    await writeReport(report);
+    const report = await build_size_report(reuse_bundlers, artifact_directory);
+    await write_report(report);
     console.log(formatTable(report));
     const baseline = history.releases.at(-1);
     if (baseline !== undefined) {
@@ -777,14 +778,14 @@ async function cli(): Promise<void> {
         `\nCurrent workspace vs latest published release:\n${formatReleaseComparison(report.metrics, baseline)}`,
       );
     }
-    console.log(`JSON report: ${relative(repositoryRoot, reportPath)}`);
-    if (artifactDirectory !== undefined) {
+    console.log(`JSON report: ${relative(repositoryRoot, report_path)}`);
+    if (artifact_directory !== undefined) {
       console.log(
-        `Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifactDirectory)}`,
+        `Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifact_directory)}`,
       );
     }
   } catch (error) {
-    await writeFailure(error);
+    await write_failure(error);
     throw error;
   }
 }

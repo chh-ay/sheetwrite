@@ -6,9 +6,9 @@ it("keeps relationships and model pivots through refreshes on the full engine, i
     [process.execPath, "test", "./packages/queries/test/data-model.full-engine.ts"],
     { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
   );
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+  const [exit_code, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
 
-  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
+  expect({ exitCode: exit_code, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
     exitCode: 0,
     failures: [],
   });

@@ -19,16 +19,16 @@ import { writeIfChanged } from "./script-io.js";
 const FUNCTION_METADATA_PATH = "packages/core/src/generated/function-metadata.ts";
 
 /** Renders the table from the formula contract inventory, the engine's volatile functions and Excel's syntax lines. */
-async function renderFunctionMetadataModule(repositoryRoot: string): Promise<string> {
-  const [inventory, engineTypes, engineCalc, reference] = await Promise.all([
-    loadFormulaContractInventory(repositoryRoot),
-    readFile(join(repositoryRoot, "packages/wasm/src/types.rs"), "utf8"),
-    readFile(join(repositoryRoot, "packages/wasm/src/calc/functions.rs"), "utf8"),
-    loadFormulaReferenceEntries(repositoryRoot),
+async function render_function_metadata_module(repository_root: string): Promise<string> {
+  const [inventory, engine_types, engine_calc, reference] = await Promise.all([
+    loadFormulaContractInventory(repository_root),
+    readFile(join(repository_root, "packages/wasm/src/types.rs"), "utf8"),
+    readFile(join(repository_root, "packages/wasm/src/calc/functions.rs"), "utf8"),
+    loadFormulaReferenceEntries(repository_root),
   ]);
   return renderFunctionMetadata(
     inventory,
-    new Set(extractVolatileFunctions(engineTypes, engineCalc)),
+    new Set(extractVolatileFunctions(engine_types, engine_calc)),
     reference,
   );
 }
@@ -37,7 +37,7 @@ async function renderFunctionMetadataModule(repositoryRoot: string): Promise<str
 export async function generateFunctionMetadata(repositoryRoot: string): Promise<void> {
   await writeIfChanged(
     join(repositoryRoot, FUNCTION_METADATA_PATH),
-    await renderFunctionMetadataModule(repositoryRoot),
+    await render_function_metadata_module(repositoryRoot),
   );
 }
 

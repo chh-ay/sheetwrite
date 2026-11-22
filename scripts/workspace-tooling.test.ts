@@ -21,11 +21,11 @@ import {
   validateWorkspaceGraph,
 } from "./workspace-tooling.js";
 
-const fixtureRoots: string[] = [];
+const fixture_roots: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    fixtureRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+    fixture_roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
   );
 });
 
@@ -40,33 +40,33 @@ describe("canonical workspace graph", () => {
 
   it("covers every discovered workspace and verification typecheck exactly once", async () => {
     const root = resolve(import.meta.dir, "..");
-    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
+    const root_manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
       readonly workspaces: readonly string[];
       readonly scripts: Readonly<Record<string, string>>;
     };
-    const workspaceNames: string[] = [];
-    for (const workspace of rootManifest.workspaces) {
+    const workspace_names: string[] = [];
+    for (const workspace of root_manifest.workspaces) {
       const glob = new Bun.Glob(`${workspace}/package.json`);
       for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
-        const workspaceManifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+        const workspace_manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
           readonly name?: string;
           readonly scripts?: Readonly<Record<string, string>>;
         };
-        if (workspaceManifest.name && typeof workspaceManifest.scripts?.typecheck === "string") {
-          workspaceNames.push(workspaceManifest.name);
+        if (workspace_manifest.name && typeof workspace_manifest.scripts?.typecheck === "string") {
+          workspace_names.push(workspace_manifest.name);
         }
       }
     }
 
-    for (const name of workspaceNames) {
+    for (const name of workspace_names) {
       expect(TYPECHECK_NODES.filter((node) => node.id === `typecheck:${name}`)).toHaveLength(1);
     }
 
-    const verificationProjects = Object.values(rootManifest.scripts).flatMap((command) => {
+    const verification_projects = Object.values(root_manifest.scripts).flatMap((command) => {
       const match = /\btsc\b.*(?:^|\s)-p\s+(\S+)/u.exec(command);
       return match?.[1] ? [match[1]] : [];
     });
-    for (const project of verificationProjects) {
+    for (const project of verification_projects) {
       expect(
         TYPECHECK_NODES.filter((node) =>
           node.command.some(
@@ -75,13 +75,13 @@ describe("canonical workspace graph", () => {
         ),
       ).toHaveLength(1);
     }
-    const nodeProjects = TYPECHECK_NODES.flatMap((node) => {
+    const node_projects = TYPECHECK_NODES.flatMap((node) => {
       const index = node.command.indexOf("-p");
       return index >= 0 ? [node.command[index + 1] ?? ""] : [];
     });
-    expect(nodeProjects.filter((project) => !existsSync(join(root, project)))).toEqual([]);
-    expect(new Set(nodeProjects).size).toBe(nodeProjects.length);
-    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + nodeProjects.length);
+    expect(node_projects.filter((project) => !existsSync(join(root, project)))).toEqual([]);
+    expect(new Set(node_projects).size).toBe(node_projects.length);
+    expect(TYPECHECK_NODES).toHaveLength(workspace_names.length + node_projects.length);
   });
 
   it("runs every script test suite from exactly one test list", async () => {
@@ -116,18 +116,18 @@ describe("canonical workspace graph", () => {
       .slice(2)
       .map((argument) => JSON.parse(argument) as string);
 
-    const packageTestDirectories: string[] = [];
+    const package_test_directories: string[] = [];
     for await (const path of new Bun.Glob("packages/*/test").scan({
       cwd: root,
       onlyFiles: false,
     })) {
-      packageTestDirectories.push(path);
+      package_test_directories.push(path);
     }
-    const packageRuns = [
+    const package_runs = [
       ...paths.filter((path) => path.startsWith("packages/")),
       ...COVERED_PACKAGE_TEST_ROOTS,
     ];
-    expect(packageRuns.sort()).toEqual(packageTestDirectories.sort());
+    expect(package_runs.sort()).toEqual(package_test_directories.sort());
     expect(paths.filter((path) => !path.startsWith("packages/"))).toEqual(
       UNIT_TEST_PATHS.filter((path) => path !== "packages"),
     );
@@ -135,29 +135,29 @@ describe("canonical workspace graph", () => {
 
   it("runs one cargo build up front for each wasm-pack package build", async () => {
     const root = resolve(import.meta.dir, "..");
-    const wasmPackBuilds: [packageName: string, command: string][] = [];
+    const wasm_pack_builds: [packageName: string, command: string][] = [];
     for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {
       const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
         readonly name: string;
         readonly scripts?: { readonly build?: string };
       };
       for (const command of manifest.scripts?.build?.split("&&") ?? []) {
-        if (command.includes("wasm-pack build")) wasmPackBuilds.push([manifest.name, command]);
+        if (command.includes("wasm-pack build")) wasm_pack_builds.push([manifest.name, command]);
       }
     }
 
     expect(BUILD_NODES[0]?.command).toEqual(["bun", "scripts/workspace-tooling.ts", "build-rust"]);
-    expect(RUST_BUILD_NODES).toHaveLength(wasmPackBuilds.length);
+    expect(RUST_BUILD_NODES).toHaveLength(wasm_pack_builds.length);
     // The full engine's wasm-pack build reuses the target directory its cargo build fills.
-    const wasmPack = wasmPackBuilds.find(([name]) => name === "@sheetwrite/formulas")?.[1] ?? "";
+    const wasm_pack = wasm_pack_builds.find(([name]) => name === "@sheetwrite/formulas")?.[1] ?? "";
     const cargo = RUST_BUILD_NODES.find((node) => node.id === "cargo:@sheetwrite/formulas");
     if (cargo === undefined) throw new Error("No cargo build for @sheetwrite/formulas");
-    const cargoTargetDir = cargo.command[cargo.command.indexOf("--target-dir") + 1] ?? "";
-    const wasmPackTargetDir = /CARGO_TARGET_DIR=(\S+)/.exec(wasmPack)?.[1] ?? "";
-    expect(resolve(root, "packages/formulas", wasmPackTargetDir)).toBe(
-      resolve(root, cargo.cwd ?? "", cargoTargetDir),
+    const cargo_target_dir = cargo.command[cargo.command.indexOf("--target-dir") + 1] ?? "";
+    const wasm_pack_target_dir = /CARGO_TARGET_DIR=(\S+)/.exec(wasm_pack)?.[1] ?? "";
+    expect(resolve(root, "packages/formulas", wasm_pack_target_dir)).toBe(
+      resolve(root, cargo.cwd ?? "", cargo_target_dir),
     );
-    const features = /--features (\S+)/.exec(wasmPack)?.[1] ?? "";
+    const features = /--features (\S+)/.exec(wasm_pack)?.[1] ?? "";
     expect(features).not.toBe("");
     expect(cargo.command[cargo.command.indexOf("--features") + 1]).toBe(features);
   });
@@ -193,23 +193,23 @@ describe("changeset workspace contract", () => {
 
   it("requires every publishable package to match the release branch version", async () => {
     const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-versions-"));
-    fixtureRoots.push(root);
-    const writeVersions = async (versionOf: (name: string) => string) => {
+    fixture_roots.push(root);
+    const write_versions = async (version_of: (name: string) => string) => {
       for (const name of PUBLISHABLE_PACKAGE_ORDER) {
         const directory = join(root, "packages", name.slice("@sheetwrite/".length));
         await mkdir(directory, { recursive: true });
         await writeFile(
           join(directory, "package.json"),
-          JSON.stringify({ name, version: versionOf(name) }),
+          JSON.stringify({ name, version: version_of(name) }),
         );
       }
     };
 
-    await writeVersions(() => "7.8.9");
+    await write_versions(() => "7.8.9");
     expect(() => validateReleasePackageVersions("7.8.9", root)).not.toThrow();
     expect(() => validateReleasePackageVersions("7.8.10", root)).toThrow("7.8.10");
     const last = PUBLISHABLE_PACKAGE_ORDER.at(-1)!;
-    await writeVersions((name) => (name === last ? "7.8.8" : "7.8.9"));
+    await write_versions((name) => (name === last ? "7.8.8" : "7.8.9"));
     expect(() => validateReleasePackageVersions("7.8.9", root)).toThrow(last);
 
     // The CLI takes the release shortcut for the checkout's own version.

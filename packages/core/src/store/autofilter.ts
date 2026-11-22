@@ -145,8 +145,8 @@ export function dynamicDateSpan(
   const month = now.getMonth();
   const day = now.getDate();
   // Date.UTC carries a day or month past its end into the next one.
-  const serial = (atMonth: number, atDay: number) =>
-    dateToSerial(new Date(Date.UTC(year, atMonth, atDay)));
+  const serial = (at_month: number, at_day: number) =>
+    dateToSerial(new Date(Date.UTC(year, at_month, at_day)));
   const days = (offset: number, length: number) => ({
     start: serial(month, day + offset),
     end: serial(month, day + offset + length),
@@ -155,8 +155,8 @@ export function dynamicDateSpan(
     start: serial(first, 1),
     end: serial(first + length, 1),
   });
-  const weekStart = -now.getDay();
-  const quarterStart = month - (month % MONTHS_IN_QUARTER);
+  const week_start = -now.getDay();
+  const quarter_start = month - (month % MONTHS_IN_QUARTER);
   switch (type) {
     case "yesterday":
       return days(-1, 1);
@@ -165,11 +165,11 @@ export function dynamicDateSpan(
     case "tomorrow":
       return days(1, 1);
     case "lastWeek":
-      return days(weekStart - DAYS_IN_WEEK, DAYS_IN_WEEK);
+      return days(week_start - DAYS_IN_WEEK, DAYS_IN_WEEK);
     case "thisWeek":
-      return days(weekStart, DAYS_IN_WEEK);
+      return days(week_start, DAYS_IN_WEEK);
     case "nextWeek":
-      return days(weekStart + DAYS_IN_WEEK, DAYS_IN_WEEK);
+      return days(week_start + DAYS_IN_WEEK, DAYS_IN_WEEK);
     case "lastMonth":
       return months(month - 1, 1);
     case "thisMonth":
@@ -177,11 +177,11 @@ export function dynamicDateSpan(
     case "nextMonth":
       return months(month + 1, 1);
     case "lastQuarter":
-      return months(quarterStart - MONTHS_IN_QUARTER, MONTHS_IN_QUARTER);
+      return months(quarter_start - MONTHS_IN_QUARTER, MONTHS_IN_QUARTER);
     case "thisQuarter":
-      return months(quarterStart, MONTHS_IN_QUARTER);
+      return months(quarter_start, MONTHS_IN_QUARTER);
     case "nextQuarter":
-      return months(quarterStart + MONTHS_IN_QUARTER, MONTHS_IN_QUARTER);
+      return months(quarter_start + MONTHS_IN_QUARTER, MONTHS_IN_QUARTER);
     case "lastYear":
       return months(-MONTHS_IN_YEAR, MONTHS_IN_YEAR);
     case "thisYear":

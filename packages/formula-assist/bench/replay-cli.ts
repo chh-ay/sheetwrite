@@ -26,22 +26,22 @@ const { values } = parseArgs({
   },
 });
 
-function isSetName(name: string): name is ReplaySetName {
+function is_set_name(name: string): name is ReplaySetName {
   return REPLAY_SETS.some((set) => set === name);
 }
 
 const requested = values.set ?? DEVELOPMENT_SETS;
 const sets = requested.map((name) => {
-  if (!isSetName(name)) throw new Error(`Unknown set ${name}; sets: ${REPLAY_SETS.join(", ")}`);
+  if (!is_set_name(name)) throw new Error(`Unknown set ${name}; sets: ${REPLAY_SETS.join(", ")}`);
   return name;
 });
 
-function isSignalName(name: string): name is SignalName {
+function is_signal_name(name: string): name is SignalName {
   return SIGNALS.some((signal) => signal === name);
 }
 
 const chosen = (values.signals?.split(",") ?? SIGNALS).map((name) => {
-  if (!isSignalName(name))
+  if (!is_signal_name(name))
     throw new Error(`Unknown signal ${name}; signals: ${SIGNALS.join(", ")}`);
   return name;
 });

@@ -124,17 +124,17 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   // emission, so a host that adds or drops the handler later is picked up by the
   // next such call without rebuilding the grid.
   let destroyed = false;
-  let commandStateUnsubscribe: (() => void) | undefined;
-  const syncCommandStateSubscription = (): void => {
+  let command_state_unsubscribe: (() => void) | undefined;
+  const sync_command_state_subscription = (): void => {
     if (destroyed) return;
     const wanted = handlers.onCommandStateChange !== undefined;
-    if (wanted === (commandStateUnsubscribe !== undefined)) return;
+    if (wanted === (command_state_unsubscribe !== undefined)) return;
     if (!wanted) {
-      commandStateUnsubscribe?.();
-      commandStateUnsubscribe = undefined;
+      command_state_unsubscribe?.();
+      command_state_unsubscribe = undefined;
       return;
     }
-    commandStateUnsubscribe = grid.on("command-state-change", (event) =>
+    command_state_unsubscribe = grid.on("command-state-change", (event) =>
       handlers.onCommandStateChange?.(event),
     );
   };
@@ -142,38 +142,38 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   // `setSelection` and store changes reach the controller through the
   // subscriptions below, but these Grid calls emit command state without
   // passing through a controller method, so a direct call must refresh too.
-  const gridSetReadOnly = grid.setReadOnly.bind(grid);
-  const gridUndo = grid.undo.bind(grid);
-  const gridRedo = grid.redo.bind(grid);
-  grid.setReadOnly = (readOnly) => {
-    syncCommandStateSubscription();
-    gridSetReadOnly(readOnly);
+  const grid_set_read_only = grid.setReadOnly.bind(grid);
+  const grid_undo = grid.undo.bind(grid);
+  const grid_redo = grid.redo.bind(grid);
+  grid.setReadOnly = (read_only) => {
+    sync_command_state_subscription();
+    grid_set_read_only(read_only);
   };
   grid.undo = () => {
-    syncCommandStateSubscription();
-    gridUndo();
+    sync_command_state_subscription();
+    grid_undo();
   };
   grid.redo = () => {
-    syncCommandStateSubscription();
-    gridRedo();
+    sync_command_state_subscription();
+    grid_redo();
   };
 
   // Each closure reads `handlers.*` lazily, so mutating a field on the passed
   // handlers object takes effect on the next event without resubscribing.
   const unsubscribes: Array<() => void> = [
     grid.on("change", (event) => {
-      syncCommandStateSubscription();
+      sync_command_state_subscription();
       handlers.onGridChange?.(event);
       const projection = rowBridge?.project(event);
       if (projection) handlers.onRowDelta?.(projection);
       // A host callback may add or drop the handler just before the queued
       // command-state emission, so reconcile again after calling it.
-      syncCommandStateSubscription();
+      sync_command_state_subscription();
     }),
     grid.on("selection", (event) => {
-      syncCommandStateSubscription();
+      sync_command_state_subscription();
       handlers.onSelectionChange?.(event.selection);
-      syncCommandStateSubscription();
+      sync_command_state_subscription();
     }),
     grid.on("scroll", (event) => handlers.onViewportChange?.(event)),
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
@@ -187,7 +187,7 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     grid.on("key-bindings-change", (event) => handlers.onKeyBindingsChange?.(event)),
   ];
 
-  syncCommandStateSubscription();
+  sync_command_state_subscription();
 
   const destroy = (): void => {
     if (destroyed) return;
@@ -195,8 +195,8 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     for (const unsubscribe of unsubscribes) {
       unsubscribe();
     }
-    commandStateUnsubscribe?.();
-    commandStateUnsubscribe = undefined;
+    command_state_unsubscribe?.();
+    command_state_unsubscribe = undefined;
 
     grid.store.setDetailedChangeCapture?.(false);
     grid.destroy();
@@ -208,8 +208,8 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     setTheme(theme) {
       grid.replaceTheme(theme);
     },
-    setReadOnly(readOnly) {
-      grid.setReadOnly(readOnly);
+    setReadOnly(read_only) {
+      grid.setReadOnly(read_only);
     },
 
     setConfig(config) {
@@ -219,8 +219,8 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     setOverscan(overscan) {
       grid.setOverscan(overscan);
     },
-    setMinColumns(minColumns) {
-      grid.setMinColumns(minColumns);
+    setMinColumns(min_columns) {
+      grid.setMinColumns(min_columns);
     },
 
     destroy,

@@ -28,14 +28,14 @@ export function rowsToTsv(
   rows: readonly (readonly CellScalar[])[],
   options: DelimitedTextOptions = {},
 ): string {
-  function* externalRows(): Generator<readonly string[]> {
+  function* external_rows(): Generator<readonly string[]> {
     for (const row of rows) {
       yield row.map((value) =>
         typeof value === "string" ? neutralizeInjection(value) : cellScalarToText(value),
       );
     }
   }
-  return encodeDelimitedText(externalRows(), "\t", options);
+  return encodeDelimitedText(external_rows(), "\t", options);
 }
 
 /**

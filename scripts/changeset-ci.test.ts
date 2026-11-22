@@ -8,11 +8,11 @@ describe("changeset comparison base", () => {
     ["release/next", "origin/release/next"],
     ["", "origin/develop"],
     [undefined, "origin/develop"],
-  ])("compares GITHUB_BASE_REF %p against %s", (githubBaseRef, baseRef) => {
-    expect(changesetComparisonFromBaseRef(githubBaseRef)).toEqual({
-      baseRef,
-      diffRange: `${baseRef}...HEAD`,
-      sinceArgument: `--since=${baseRef}`,
+  ])("compares GITHUB_BASE_REF %p against %s", (github_base_ref, base_ref) => {
+    expect(changesetComparisonFromBaseRef(github_base_ref)).toEqual({
+      baseRef: base_ref,
+      diffRange: `${base_ref}...HEAD`,
+      sinceArgument: `--since=${base_ref}`,
     });
   });
 });

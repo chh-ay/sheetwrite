@@ -100,8 +100,8 @@ export function measureJson(
 ): JsonMeasure {
   const walk: JsonWalk = { limit, options, segments: [], ancestors: new Set(), bytes: 0 };
   try {
-    if (options.builtByCaller) visitBuiltJson(walk, value);
-    else visitJson(walk, value);
+    if (options.builtByCaller) visit_built_json(walk, value);
+    else visit_json(walk, value);
     return { bytes: walk.bytes };
   } catch (stop) {
     if (!(stop instanceof JsonWalkStop)) throw stop;
@@ -110,11 +110,11 @@ export function measureJson(
   }
 }
 
-function stopInvalid(walk: JsonWalk, message: string): never {
+function stop_invalid(walk: JsonWalk, message: string): never {
   throw new JsonWalkStop({ kind: "invalid", message, segments: [...walk.segments] });
 }
 
-function addBytes(walk: JsonWalk, amount: number): void {
+function add_bytes(walk: JsonWalk, amount: number): void {
   walk.bytes += amount;
   if (walk.bytes <= walk.limit) return;
 
@@ -125,13 +125,13 @@ function addBytes(walk: JsonWalk, amount: number): void {
   });
 }
 
-function isPlainAscii(code: number): boolean {
+function is_plain_ascii(code: number): boolean {
   return (
     code >= FIRST_PRINTABLE && code <= ONE_BYTE_MAX && code !== DOUBLE_QUOTE && code !== BACKSLASH
   );
 }
 
-function isShortEscape(code: number): boolean {
+function is_short_escape(code: number): boolean {
   return (
     code === DOUBLE_QUOTE ||
     code === BACKSLASH ||
@@ -144,35 +144,35 @@ function isShortEscape(code: number): boolean {
 }
 
 /** Encoded bytes of the code point at `index`, sized like `utf8CodePointBytes`. */
-function encodedCodePointBytes(text: string, index: number): number {
+function encoded_code_point_bytes(text: string, index: number): number {
   const code = text.charCodeAt(index);
-  if (isShortEscape(code)) return SHORT_ESCAPE_BYTES;
+  if (is_short_escape(code)) return SHORT_ESCAPE_BYTES;
   if (code < FIRST_PRINTABLE) return UNICODE_ESCAPE_BYTES;
 
   const bytes = utf8CodePointBytes(text, index);
-  const isLoneSurrogate =
+  const is_lone_surrogate =
     code >= SURROGATE_MIN && code <= SURROGATE_MAX && utf8CodePointUnits(bytes) === 1;
   // JSON.stringify writes a lone surrogate as a \uXXXX escape.
-  return isLoneSurrogate ? UNICODE_ESCAPE_BYTES : bytes;
+  return is_lone_surrogate ? UNICODE_ESCAPE_BYTES : bytes;
 }
 
-function addJsonString(walk: JsonWalk, text: string): void {
-  addBytes(walk, DELIMITER_PAIR_BYTES);
+function add_json_string(walk: JsonWalk, text: string): void {
+  add_bytes(walk, DELIMITER_PAIR_BYTES);
 
   let index = 0;
   while (index < text.length) {
-    if (isPlainAscii(text.charCodeAt(index))) {
+    if (is_plain_ascii(text.charCodeAt(index))) {
       // Batch plain ASCII, but stop scanning at the first overflowing byte.
-      const runLimit = Math.min(text.length, index + Math.floor(walk.limit - walk.bytes) + 1);
-      let runEnd = index + 1;
-      while (runEnd < runLimit && isPlainAscii(text.charCodeAt(runEnd))) runEnd += 1;
-      addBytes(walk, runEnd - index);
-      index = runEnd;
+      const run_limit = Math.min(text.length, index + Math.floor(walk.limit - walk.bytes) + 1);
+      let run_end = index + 1;
+      while (run_end < run_limit && is_plain_ascii(text.charCodeAt(run_end))) run_end += 1;
+      add_bytes(walk, run_end - index);
+      index = run_end;
       continue;
     }
 
-    const bytes = encodedCodePointBytes(text, index);
-    addBytes(walk, bytes);
+    const bytes = encoded_code_point_bytes(text, index);
+    add_bytes(walk, bytes);
     index += utf8CodePointUnits(bytes);
   }
 }
@@ -181,19 +181,19 @@ function addJsonString(walk: JsonWalk, text: string): void {
  * Encoded bytes of `text` as a JSON string, or a total above `budget` as soon
  * as the count passes it, so an oversized string is never scanned to its end.
  */
-function jsonStringBytes(text: string, budget: number): number {
+function json_string_bytes(text: string, budget: number): number {
   let bytes = DELIMITER_PAIR_BYTES;
   let index = 0;
   while (index < text.length && bytes <= budget) {
-    if (isPlainAscii(text.charCodeAt(index))) {
+    if (is_plain_ascii(text.charCodeAt(index))) {
       bytes += 1;
       index += 1;
       continue;
     }
 
-    const codePointBytes = encodedCodePointBytes(text, index);
-    bytes += codePointBytes;
-    index += utf8CodePointUnits(codePointBytes);
+    const code_point_bytes = encoded_code_point_bytes(text, index);
+    bytes += code_point_bytes;
+    index += utf8CodePointUnits(code_point_bytes);
   }
   return bytes;
 }
@@ -218,111 +218,111 @@ export function jsonNumberLength(value: number): number {
 }
 
 /** Count `value` when it is a JSON scalar and return true; return false for an object or array. */
-function addJsonScalar(walk: JsonWalk, value: unknown): boolean {
+function add_json_scalar(walk: JsonWalk, value: unknown): boolean {
   if (value === null) {
-    addBytes(walk, FOUR_LETTER_LITERAL_BYTES);
+    add_bytes(walk, FOUR_LETTER_LITERAL_BYTES);
     return true;
   }
 
   switch (typeof value) {
     case "string":
-      addJsonString(walk, value);
+      add_json_string(walk, value);
       return true;
     case "boolean":
-      addBytes(walk, value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES);
+      add_bytes(walk, value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES);
       return true;
     case "number":
-      if (!Number.isFinite(value)) stopInvalid(walk, "JSON numbers must be finite");
-      addBytes(walk, jsonNumberLength(value));
+      if (!Number.isFinite(value)) stop_invalid(walk, "JSON numbers must be finite");
+      add_bytes(walk, jsonNumberLength(value));
       return true;
     case "object":
       return false;
     default:
-      stopInvalid(walk, `${typeof value} values are not JSON-safe`);
+      stop_invalid(walk, `${typeof value} values are not JSON-safe`);
   }
 }
 
-function visitJson(walk: JsonWalk, value: unknown): void {
-  if (addJsonScalar(walk, value)) return;
+function visit_json(walk: JsonWalk, value: unknown): void {
+  if (add_json_scalar(walk, value)) return;
   const record = value as object;
-  if (walk.ancestors.has(record)) stopInvalid(walk, "JSON values cannot contain cycles");
+  if (walk.ancestors.has(record)) stop_invalid(walk, "JSON values cannot contain cycles");
   if (Object.getOwnPropertySymbols(record).length > 0) {
-    stopInvalid(walk, "Symbol-keyed properties are not JSON-safe");
+    stop_invalid(walk, "Symbol-keyed properties are not JSON-safe");
   }
 
   walk.ancestors.add(record);
-  if (Array.isArray(record)) visitJsonArray(walk, record);
-  else visitJsonObject(walk, record);
+  if (Array.isArray(record)) visit_json_array(walk, record);
+  else visit_json_object(walk, record);
   walk.ancestors.delete(record);
 }
 
-function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
+function visit_json_array(walk: JsonWalk, array: unknown[]): void {
   if (Object.getPrototypeOf(array) !== Array.prototype) {
-    stopInvalid(walk, "Arrays with custom prototypes are not JSON-safe");
+    stop_invalid(walk, "Arrays with custom prototypes are not JSON-safe");
   }
-  if (ownedArrays.get(array) === ownedGeneration && addOwnedScalarArray(walk, array)) return;
+  if (owned_arrays.get(array) === owned_generation && add_owned_scalar_array(walk, array)) return;
 
   for (const key in array) {
     if (!Object.hasOwn(array, key)) continue;
     if (!CANONICAL_ARRAY_INDEX.test(key) || Number(key) >= array.length) {
       walk.segments.push(key);
-      stopInvalid(walk, "Arrays may contain only indexed data properties");
+      stop_invalid(walk, "Arrays may contain only indexed data properties");
     }
   }
 
-  addBytes(walk, DELIMITER_PAIR_BYTES);
+  add_bytes(walk, DELIMITER_PAIR_BYTES);
   for (let index = 0; index < array.length; index++) {
-    if (index > 0) addBytes(walk, 1);
+    if (index > 0) add_bytes(walk, 1);
     walk.segments.push(index);
     const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
     if (!descriptor?.enumerable || !("value" in descriptor)) {
-      stopInvalid(walk, "Array entries must be enumerable data properties");
+      stop_invalid(walk, "Array entries must be enumerable data properties");
     }
 
-    visitJson(walk, descriptor.value);
+    visit_json(walk, descriptor.value);
     walk.segments.pop();
   }
 }
 
 /**
- * `visitJson` for a value the caller built (`builtByCaller`): fields and
+ * `visit_json` for a value the caller built (`builtByCaller`): fields and
  * entries are read directly, and symbol keys are not looked for. It does not
  * share functions with the exact walk, so neither makes the other's property
  * reads polymorphic.
  */
-function visitBuiltJson(walk: JsonWalk, value: unknown): void {
-  if (addJsonScalar(walk, value)) return;
+function visit_built_json(walk: JsonWalk, value: unknown): void {
+  if (add_json_scalar(walk, value)) return;
   const record = value as object;
-  if (walk.ancestors.has(record)) stopInvalid(walk, "JSON values cannot contain cycles");
+  if (walk.ancestors.has(record)) stop_invalid(walk, "JSON values cannot contain cycles");
   walk.ancestors.add(record);
   if (Array.isArray(record)) {
     if (Object.getPrototypeOf(record) !== Array.prototype) {
-      stopInvalid(walk, "Arrays with custom prototypes are not JSON-safe");
+      stop_invalid(walk, "Arrays with custom prototypes are not JSON-safe");
     }
-    addBytes(walk, DELIMITER_PAIR_BYTES);
+    add_bytes(walk, DELIMITER_PAIR_BYTES);
     for (let index = 0; index < record.length; index++) {
-      if (index > 0) addBytes(walk, 1);
+      if (index > 0) add_bytes(walk, 1);
       walk.segments.push(index);
       // A hole reads as undefined, which the walk refuses.
-      visitBuiltJson(walk, record[index]);
+      visit_built_json(walk, record[index]);
       walk.segments.pop();
     }
   } else {
     if (Object.getPrototypeOf(record) !== Object.prototype) {
-      stopInvalid(walk, "Only plain objects are JSON-safe");
+      stop_invalid(walk, "Only plain objects are JSON-safe");
     }
-    addBytes(walk, DELIMITER_PAIR_BYTES);
-    let isFirstField = true;
+    add_bytes(walk, DELIMITER_PAIR_BYTES);
+    let is_first_field = true;
     for (const key in record) {
       if (!Object.hasOwn(record, key)) continue;
       const field: unknown = record[key as keyof object];
       if (field === undefined && walk.options.omitUndefinedProperties) continue;
       walk.segments.push(key);
-      if (!isFirstField) addBytes(walk, 1);
-      isFirstField = false;
-      addJsonString(walk, key);
-      addBytes(walk, 1);
-      visitBuiltJson(walk, field);
+      if (!is_first_field) add_bytes(walk, 1);
+      is_first_field = false;
+      add_json_string(walk, key);
+      add_bytes(walk, 1);
+      visit_built_json(walk, field);
       walk.segments.pop();
     }
   }
@@ -330,9 +330,9 @@ function visitBuiltJson(walk: JsonWalk, value: unknown): void {
 }
 
 /** Arrays Sheetwrite built itself from values it read once, by the generation they were built in. */
-const ownedArrays = new WeakMap<unknown[], number>();
+const owned_arrays = new WeakMap<unknown[], number>();
 /** Only arrays marked in this generation are trusted; `releaseOwnedArrays` starts the next one. */
-let ownedGeneration = 0;
+let owned_generation = 0;
 
 /**
  * Record that `array` is a dense array of plain data properties that only
@@ -340,12 +340,12 @@ let ownedGeneration = 0;
  * the next `releaseOwnedArrays`.
  */
 export function markOwnedArray(array: unknown[]): void {
-  ownedArrays.set(array, ownedGeneration);
+  owned_arrays.set(array, owned_generation);
 }
 
 /** Whether `value` was recorded by `markOwnedArray` since the last `releaseOwnedArrays`. */
 export function isOwnedArray(value: unknown): boolean {
-  return Array.isArray(value) && ownedArrays.get(value) === ownedGeneration;
+  return Array.isArray(value) && owned_arrays.get(value) === owned_generation;
 }
 
 /**
@@ -356,7 +356,7 @@ export function isOwnedArray(value: unknown): boolean {
  * costs more than copying them again.
  */
 export function releaseOwnedArrays(): void {
-  ownedGeneration++;
+  owned_generation++;
 }
 
 /**
@@ -365,12 +365,12 @@ export function releaseOwnedArrays(): void {
  * finite number, string, boolean or null, or when the array would pass the
  * byte limit; the general walk then measures it and reports the exact issue.
  */
-function addOwnedScalarArray(walk: JsonWalk, array: readonly unknown[]): boolean {
+function add_owned_scalar_array(walk: JsonWalk, array: readonly unknown[]): boolean {
   const budget = walk.limit - walk.bytes;
   let bytes = DELIMITER_PAIR_BYTES + Math.max(0, array.length - 1);
   // Repeated text is common in a block, so one measurement covers each run.
-  let previousText: string | undefined;
-  let previousTextBytes = 0;
+  let previous_text: string | undefined;
+  let previous_text_bytes = 0;
   for (let index = 0; index < array.length && bytes <= budget; index++) {
     const value = array[index];
     switch (typeof value) {
@@ -379,11 +379,11 @@ function addOwnedScalarArray(walk: JsonWalk, array: readonly unknown[]): boolean
         bytes += jsonNumberLength(value);
         break;
       case "string":
-        if (value !== previousText) {
-          previousText = value;
-          previousTextBytes = jsonStringBytes(value, budget - bytes);
+        if (value !== previous_text) {
+          previous_text = value;
+          previous_text_bytes = json_string_bytes(value, budget - bytes);
         }
-        bytes += previousTextBytes;
+        bytes += previous_text_bytes;
         break;
       case "boolean":
         bytes += value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES;
@@ -399,19 +399,19 @@ function addOwnedScalarArray(walk: JsonWalk, array: readonly unknown[]): boolean
   return true;
 }
 
-function visitJsonObject(walk: JsonWalk, record: object): void {
+function visit_json_object(walk: JsonWalk, record: object): void {
   if (Object.getPrototypeOf(record) !== Object.prototype) {
-    stopInvalid(walk, "Only plain objects are JSON-safe");
+    stop_invalid(walk, "Only plain objects are JSON-safe");
   }
 
-  addBytes(walk, DELIMITER_PAIR_BYTES);
-  let isFirstField = true;
+  add_bytes(walk, DELIMITER_PAIR_BYTES);
+  let is_first_field = true;
   for (const key in record) {
     if (!Object.hasOwn(record, key)) continue;
     walk.segments.push(key);
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
     if (!descriptor?.enumerable || !("value" in descriptor)) {
-      stopInvalid(walk, "Object properties must be enumerable data properties");
+      stop_invalid(walk, "Object properties must be enumerable data properties");
     }
 
     if (descriptor.value === undefined && walk.options.omitUndefinedProperties) {
@@ -419,11 +419,11 @@ function visitJsonObject(walk: JsonWalk, record: object): void {
       continue;
     }
 
-    if (!isFirstField) addBytes(walk, 1);
-    isFirstField = false;
-    addJsonString(walk, key);
-    addBytes(walk, 1);
-    visitJson(walk, descriptor.value);
+    if (!is_first_field) add_bytes(walk, 1);
+    is_first_field = false;
+    add_json_string(walk, key);
+    add_bytes(walk, 1);
+    visit_json(walk, descriptor.value);
     walk.segments.pop();
   }
 }

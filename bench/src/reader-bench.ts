@@ -326,14 +326,14 @@ const DISCARD: ResultSink = {
  */
 class ContentHash implements ResultSink {
   readonly #float = new Float64Array(1);
-  readonly #floatWords = new Uint32Array(this.#float.buffer);
+  readonly #float_words = new Uint32Array(this.#float.buffer);
   #high = HASH_SEED_HIGH;
   #low = HASH_SEED_LOW;
 
   number(value: number): void {
     this.#float[0] = value;
-    this.#word(this.#floatWords[0] ?? 0);
-    this.#word(this.#floatWords[1] ?? 0);
+    this.#word(this.#float_words[0] ?? 0);
+    this.#word(this.#float_words[1] ?? 0);
   }
 
   numbers(values: Float64Array): void {
@@ -380,7 +380,7 @@ class ContentHash implements ResultSink {
 }
 
 /** Deterministic LCG: both engines must see byte-identical fixtures. */
-function createUnitRandom(): () => number {
+function create_unit_random(): () => number {
   let state = LCG_SEED;
   return () => {
     state = (Math.imul(state, LCG_MULTIPLIER) + LCG_INCREMENT) >>> 0;
@@ -388,7 +388,7 @@ function createUnitRandom(): () => number {
   };
 }
 
-function consumeWindow(view: WindowViewHandle, sink: ResultSink): void {
+function consume_window(view: WindowViewHandle, sink: ResultSink): void {
   const packed = view.takePacked();
   const strings = view.takeStrings();
   view.free();
@@ -396,7 +396,7 @@ function consumeWindow(view: WindowViewHandle, sink: ResultSink): void {
   sink.texts(strings);
 }
 
-function consumeDistinct(column: DistinctColumnHandle, sink: ResultSink): void {
+function consume_distinct(column: DistinctColumnHandle, sink: ResultSink): void {
   const kinds = column.takeKinds();
   const numbers = column.takeNumbers();
   const texts = column.takeTexts();
@@ -407,7 +407,7 @@ function consumeDistinct(column: DistinctColumnHandle, sink: ResultSink): void {
 }
 
 /** Read one cell's kind, number and text; error results read as text. */
-function consumeCell(
+function consume_cell(
   store: Engine,
   sheet: number,
   row: number,
@@ -426,7 +426,7 @@ function consumeCell(
  * like a valid formula over an empty cell, so callers check the value after
  * recompute.
  */
-function writeFormula(
+function write_formula(
   store: Engine,
   sheet: number,
   row: number,
@@ -439,7 +439,7 @@ function writeFormula(
 }
 
 /** A recomputed formula cell must hold a number; an error reads as text. */
-function recomputedNumber(store: Engine, sheet: number, row: number, col: number): number {
+function recomputed_number(store: Engine, sheet: number, row: number, col: number): number {
   const cell = store.getCell(sheet, row, col);
   const { kind, num, string } = cell;
   cell.free();
@@ -449,12 +449,12 @@ function recomputedNumber(store: Engine, sheet: number, row: number, col: number
   return num;
 }
 
-function rowStartFor(iteration: number): number {
+function row_start_for(iteration: number): number {
   return (iteration * ROW_START_STRIDE) % (ROWS - LARGE_WINDOW_ROWS);
 }
 
 /** `X{index+1}:X100000`, so the formulas of one family are distinct but each spans ~100k rows. */
-function rangeOf(col: number, index: number): string {
+function range_of(col: number, index: number): string {
   const letter = String.fromCharCode("A".charCodeAt(0) + col);
   return `${letter}${index + 1}:${letter}${ROWS}`;
 }
@@ -463,7 +463,7 @@ function rangeOf(col: number, index: number): string {
 class FixtureWriter {
   readonly #store: Engine;
   /** Shared with the scattered-cell picks, which draw from the same stream between sheets. */
-  readonly nextUnit = createUnitRandom();
+  readonly nextUnit = create_unit_random();
 
   constructor(store: Engine) {
     this.#store = store;
@@ -473,31 +473,31 @@ class FixtureWriter {
   dataSheet(columns: number): number {
     const store = this.#store;
     const sheet = store.addSheet(columns, ROWS);
-    const columnA = this.#randomNumbers(ROWS);
-    writeNumberColumn(store, sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
-    this.#writeLabels(sheet, COLUMN_B);
-    this.#writeMixed(sheet, COLUMN_C);
-    this.#writeDoublingFormulas(sheet, COLUMN_D);
+    const column_a = this.#random_numbers(ROWS);
+    writeNumberColumn(store, sheet, COLUMN_A, 0, column_a, DEFAULT_STYLE);
+    this.#write_labels(sheet, COLUMN_B);
+    this.#write_mixed(sheet, COLUMN_C);
+    this.#write_doubling_formulas(sheet, COLUMN_D);
     if (columns === MAIN_COLUMNS) {
-      this.#writeNumbersWithGaps(sheet, COLUMN_E);
+      this.#write_numbers_with_gaps(sheet, COLUMN_E);
       for (let col = COLUMN_E + 1; col < MAIN_COLUMNS; col++) {
-        writeNumberColumn(store, sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
+        writeNumberColumn(store, sheet, col, 0, this.#random_numbers(ROWS), DEFAULT_STYLE);
       }
     }
 
     store.recompute(sheet);
-    this.#checkDoubling(sheet, COLUMN_D, columnA);
+    this.#check_doubling(sheet, COLUMN_D, column_a);
     return sheet;
   }
 
-  #randomNumbers(length: number): Float64Array {
+  #random_numbers(length: number): Float64Array {
     return Float64Array.from(
       { length },
       () => Math.round(this.nextUnit() * NUMBER_SCALE * CENTS) / CENTS,
     );
   }
 
-  #writeLabels(sheet: number, col: number): void {
+  #write_labels(sheet: number, col: number): void {
     const labels = Array.from(
       { length: ROWS },
       () => `item-${Math.floor(this.nextUnit() * DISTINCT_LABELS)}`,
@@ -506,7 +506,7 @@ class FixtureWriter {
   }
 
   /** Column C: number, text, boolean and blank cells in turn. */
-  #writeMixed(sheet: number, col: number): void {
+  #write_mixed(sheet: number, col: number): void {
     const store = this.#store;
     for (let row = 0; row < ROWS; row++) {
       const kind = row % MIXED_KINDS;
@@ -521,16 +521,16 @@ class FixtureWriter {
   }
 
   /** Column D: `=A{r}*2`, so readers see calculated values. */
-  #writeDoublingFormulas(sheet: number, col: number): void {
+  #write_doubling_formulas(sheet: number, col: number): void {
     for (let row = 0; row < ROWS; row++)
-      writeFormula(this.#store, sheet, row, col, `=A${row + 1}*2`);
+      write_formula(this.#store, sheet, row, col, `=A${row + 1}*2`);
   }
 
   /** Every `=A{r}*2` cell must hold twice A after recompute, or readers would time error cells. */
-  #checkDoubling(sheet: number, col: number, columnA: Float64Array): void {
+  #check_doubling(sheet: number, col: number, columnA: Float64Array): void {
     for (let row = 0; row < ROWS; row++) {
       const expected = (columnA[row] ?? Number.NaN) * 2;
-      const actual = recomputedNumber(this.#store, sheet, row, col);
+      const actual = recomputed_number(this.#store, sheet, row, col);
       if (actual !== expected) {
         throw new Error(`row ${row}: =A${row + 1}*2 computed ${actual}, expected ${expected}`);
       }
@@ -538,7 +538,7 @@ class FixtureWriter {
   }
 
   /** Numbers in every row except the EDGE_GAP_ROWS, which stay blank. */
-  #writeNumbersWithGaps(sheet: number, col: number): void {
+  #write_numbers_with_gaps(sheet: number, col: number): void {
     let start = 0;
     for (const gap of [...EDGE_GAP_ROWS, ROWS]) {
       if (gap > start) {
@@ -547,7 +547,7 @@ class FixtureWriter {
           sheet,
           col,
           start,
-          this.#randomNumbers(gap - start),
+          this.#random_numbers(gap - start),
           DEFAULT_STYLE,
         );
       }
@@ -569,34 +569,34 @@ const RANGE_FIXTURE =
 
 /** Formula families for the range readers; each scenario holds RANGE_FORMULAS_PER_SCENARIO of one. */
 const RANGE_FORMULAS: readonly { name: string; formula: (index: number) => string }[] = [
-  { name: "range SUM(A) dense numbers", formula: (i) => `=SUM(${rangeOf(COLUMN_A, i)})` },
-  { name: "range SUM(D) calculated values", formula: (i) => `=SUM(${rangeOf(COLUMN_D, i)})` },
-  { name: "range AVERAGE(A)", formula: (i) => `=AVERAGE(${rangeOf(COLUMN_A, i)})` },
-  { name: "range COUNTA(C) mixed", formula: (i) => `=COUNTA(${rangeOf(COLUMN_C, i)})` },
+  { name: "range SUM(A) dense numbers", formula: (i) => `=SUM(${range_of(COLUMN_A, i)})` },
+  { name: "range SUM(D) calculated values", formula: (i) => `=SUM(${range_of(COLUMN_D, i)})` },
+  { name: "range AVERAGE(A)", formula: (i) => `=AVERAGE(${range_of(COLUMN_A, i)})` },
+  { name: "range COUNTA(C) mixed", formula: (i) => `=COUNTA(${range_of(COLUMN_C, i)})` },
   {
     name: "range MAX(A,D) two ranges",
-    formula: (i) => `=MAX(${rangeOf(COLUMN_A, i)},${rangeOf(COLUMN_D, i)})`,
+    formula: (i) => `=MAX(${range_of(COLUMN_A, i)},${range_of(COLUMN_D, i)})`,
   },
   {
     name: "range COUNTIF(B) text",
-    formula: (i) => `=COUNTIF(${rangeOf(COLUMN_B, i)},"item-17")`,
+    formula: (i) => `=COUNTIF(${range_of(COLUMN_B, i)},"item-17")`,
   },
   {
     name: "range SUMIF(A,>500,D)",
-    formula: (i) => `=SUMIF(${rangeOf(COLUMN_A, i)},">500",${rangeOf(COLUMN_D, i)})`,
+    formula: (i) => `=SUMIF(${range_of(COLUMN_A, i)},">500",${range_of(COLUMN_D, i)})`,
   },
   {
     name: "range SUMIFS(A;B,C)",
     formula: (i) =>
-      `=SUMIFS(${rangeOf(COLUMN_A, i)},${rangeOf(COLUMN_B, i)},"<>item-17",${rangeOf(COLUMN_C, i)},">0")`,
+      `=SUMIFS(${range_of(COLUMN_A, i)},${range_of(COLUMN_B, i)},"<>item-17",${range_of(COLUMN_C, i)},">0")`,
   },
   {
     name: "range SUMPRODUCT(A,D) array args",
-    formula: (i) => `=SUMPRODUCT(${rangeOf(COLUMN_A, i)},${rangeOf(COLUMN_D, i)})`,
+    formula: (i) => `=SUMPRODUCT(${range_of(COLUMN_A, i)},${range_of(COLUMN_D, i)})`,
   },
   {
     name: "range MATCH(B) miss, full scan",
-    formula: (i) => `=IFERROR(MATCH("absent",${rangeOf(COLUMN_B, i)},0),0)`,
+    formula: (i) => `=IFERROR(MATCH("absent",${range_of(COLUMN_B, i)},0),0)`,
   },
 ];
 
@@ -605,83 +605,83 @@ const RANGE_FORMULAS: readonly { name: string; formula: (index: number) => strin
  * family, each over a ~100k-row column range. Every iteration edits the last
  * row of A, B and C (D follows A), which every range contains, then recalculates.
  */
-function rangeScenario(
+function range_scenario(
   store: Engine,
   fixtures: FixtureWriter,
-  formulaFor: (index: number) => string,
+  formula_for: (index: number) => string,
 ): ReaderCase["run"] {
   const sheet = fixtures.dataSheet(RANGE_COLUMNS);
   for (let index = 0; index < RANGE_FORMULAS_PER_SCENARIO; index++) {
-    writeFormula(store, sheet, index, RANGE_RESULT_COLUMN, formulaFor(index));
+    write_formula(store, sheet, index, RANGE_RESULT_COLUMN, formula_for(index));
   }
 
   store.recompute(sheet);
   for (let row = 0; row < RANGE_FORMULAS_PER_SCENARIO; row++) {
-    recomputedNumber(store, sheet, row, RANGE_RESULT_COLUMN);
+    recomputed_number(store, sheet, row, RANGE_RESULT_COLUMN);
   }
 
-  const lastRow = ROWS - 1;
+  const last_row = ROWS - 1;
   return (iteration, sink) => {
-    store.setNumber(sheet, lastRow, COLUMN_A, iteration % NUMBER_SCALE, DEFAULT_STYLE);
+    store.setNumber(sheet, last_row, COLUMN_A, iteration % NUMBER_SCALE, DEFAULT_STYLE);
     store.setString(
       sheet,
-      lastRow,
+      last_row,
       COLUMN_B,
       `item-${iteration % EDIT_LABEL_VARIANTS}`,
       DEFAULT_STYLE,
     );
-    store.setNumber(sheet, lastRow, COLUMN_C, iteration % MIXED_TEXT_VARIANTS, DEFAULT_STYLE);
+    store.setNumber(sheet, last_row, COLUMN_C, iteration % MIXED_TEXT_VARIANTS, DEFAULT_STYLE);
     store.recompute(sheet);
     for (let row = 0; row < RANGE_FORMULAS_PER_SCENARIO; row++) {
-      consumeCell(store, sheet, row, RANGE_RESULT_COLUMN, sink);
+      consume_cell(store, sheet, row, RANGE_RESULT_COLUMN, sink);
     }
   };
 }
 
 /** Build every fixture, untimed, and return the readers over them in READER_CASE_NAMES order. */
-function buildReaderCases(store: Engine): ReaderCase[] {
+function build_reader_cases(store: Engine): ReaderCase[] {
   const fixtures = new FixtureWriter(store);
-  const mainSheet = fixtures.dataSheet(MAIN_COLUMNS);
-  const allColumns = Uint32Array.from({ length: MAIN_COLUMNS }, (_, col) => col);
-  const sortA = Uint32Array.of(COLUMN_A);
-  const sortB = Uint32Array.of(COLUMN_B);
-  const sortD = Uint32Array.of(COLUMN_D);
+  const main_sheet = fixtures.dataSheet(MAIN_COLUMNS);
+  const all_columns = Uint32Array.from({ length: MAIN_COLUMNS }, (_, col) => col);
+  const sort_a = Uint32Array.of(COLUMN_A);
+  const sort_b = Uint32Array.of(COLUMN_B);
+  const sort_d = Uint32Array.of(COLUMN_D);
   const ascending = Uint8Array.of(SORT_ASCENDING);
   const descending = Uint8Array.of(SORT_DESCENDING);
-  const allRows = new Uint32Array(0);
-  const ascendingByA = store.sortRowsMulti(mainSheet, sortA, ascending, allRows);
-  const sortedViewportRows = ascendingByA.slice(0, VIEWPORT_ROWS);
-  const sortedLargeRows = ascendingByA.slice(0, LARGE_WINDOW_ROWS);
-  const scatteredRows = Uint32Array.from({ length: SCATTERED_CELLS }, () =>
+  const all_rows = new Uint32Array(0);
+  const ascending_by_a = store.sortRowsMulti(main_sheet, sort_a, ascending, all_rows);
+  const sorted_viewport_rows = ascending_by_a.slice(0, VIEWPORT_ROWS);
+  const sorted_large_rows = ascending_by_a.slice(0, LARGE_WINDOW_ROWS);
+  const scattered_rows = Uint32Array.from({ length: SCATTERED_CELLS }, () =>
     Math.floor(fixtures.nextUnit() * ROWS),
   );
-  const scatteredCols = Uint32Array.from({ length: SCATTERED_CELLS }, () =>
+  const scattered_cols = Uint32Array.from({ length: SCATTERED_CELLS }, () =>
     Math.floor(fixtures.nextUnit() * MAIN_COLUMNS),
   );
-  const evenRows = Uint32Array.from({ length: ROWS / 2 }, (_, index) => index * 2);
+  const even_rows = Uint32Array.from({ length: ROWS / 2 }, (_, index) => index * 2);
 
-  const conditionalSheet = fixtures.dataSheet(MAIN_COLUMNS);
-  const lastRow = ROWS - 1;
+  const conditional_sheet = fixtures.dataSheet(MAIN_COLUMNS);
+  const last_row = ROWS - 1;
   store.setConditionalRules(
-    conditionalSheet,
+    conditional_sheet,
     Uint8Array.of(COND_GREATER, COND_TEXT_EQUAL, COND_CONTAINS, COND_FORMULA),
     // (firstRow, col, lastRow, col) per rule: each rule covers one whole column A..D.
     Uint32Array.of(
       0,
       COLUMN_A,
-      lastRow,
+      last_row,
       COLUMN_A,
       0,
       COLUMN_B,
-      lastRow,
+      last_row,
       COLUMN_B,
       0,
       COLUMN_C,
-      lastRow,
+      last_row,
       COLUMN_C,
       0,
       COLUMN_D,
-      lastRow,
+      last_row,
       COLUMN_D,
     ),
     Float64Array.of(COND_A_THRESHOLD, 0, 0, 0),
@@ -689,26 +689,26 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     Uint8Array.of(0, 0, 0, 0),
   );
 
-  const formulaRuleSheet = fixtures.dataSheet(MAIN_COLUMNS);
+  const formula_rule_sheet = fixtures.dataSheet(MAIN_COLUMNS);
   store.setConditionalRules(
-    formulaRuleSheet,
+    formula_rule_sheet,
     Uint8Array.of(COND_FORMULA),
-    Uint32Array.of(0, COLUMN_A, lastRow, MAIN_COLUMNS - 1),
+    Uint32Array.of(0, COLUMN_A, last_row, MAIN_COLUMNS - 1),
     Float64Array.of(0),
     [`=$A1>${COND_A_THRESHOLD}`],
     Uint8Array.of(0),
   );
 
   // Range scenarios build their sheets last, after the main and conditional sheets.
-  const rangeCases = RANGE_FORMULAS.map(({ name, formula }): ReaderCase => ({
+  const range_cases = RANGE_FORMULAS.map(({ name, formula }): ReaderCase => ({
     name,
     group: "range",
     fixture: RANGE_FIXTURE,
-    run: rangeScenario(store, fixtures, formula),
+    run: range_scenario(store, fixtures, formula),
   }));
 
   // A > 100 (most rows pass) AND B contains "item-1" AND C in {x1, x2, TRUE, 0, 4, 8}.
-  const filterMulti = {
+  const filter_multi = {
     cols: Uint32Array.of(COLUMN_A, COLUMN_B, COLUMN_C),
     kinds: Uint8Array.of(FILTER_NUMBER_COMPARE, FILTER_CONTAINS, FILTER_VALUE_SET),
     flags: Uint8Array.of(COMPARE_GREATER, 0, 0),
@@ -727,101 +727,108 @@ function buildReaderCases(store: Engine): ReaderCase[] {
       fixture,
       run,
     });
-  const windowReader = reader("window", MAIN_FIXTURE);
-  const conditionalWindowReader = reader("window", COND_FIXTURE);
-  const formulaRuleWindowReader = reader("window", FORMULA_RULE_FIXTURE);
-  const queryReader = reader("query", MAIN_FIXTURE);
-  const cellsReader = reader("cells", MAIN_FIXTURE);
-  const windowOf = (sheet: number, iteration: number, rows: number, sink: ResultSink): void =>
-    consumeWindow(
-      store.getWindow(sheet, rowStartFor(iteration), rowStartFor(iteration) + rows, allColumns),
+  const window_reader = reader("window", MAIN_FIXTURE);
+  const conditional_window_reader = reader("window", COND_FIXTURE);
+  const formula_rule_window_reader = reader("window", FORMULA_RULE_FIXTURE);
+  const query_reader = reader("query", MAIN_FIXTURE);
+  const cells_reader = reader("cells", MAIN_FIXTURE);
+  const window_of = (sheet: number, iteration: number, rows: number, sink: ResultSink): void =>
+    consume_window(
+      store.getWindow(
+        sheet,
+        row_start_for(iteration),
+        row_start_for(iteration) + rows,
+        all_columns,
+      ),
       sink,
     );
 
-  const windowCases = [
-    windowReader("getWindow 40x8", (i, sink) => windowOf(mainSheet, i, VIEWPORT_ROWS, sink)),
-    windowReader("getWindow 1000x8", (i, sink) => windowOf(mainSheet, i, LARGE_WINDOW_ROWS, sink)),
-    conditionalWindowReader("getWindow 40x8 cond rules", (i, sink) =>
-      windowOf(conditionalSheet, i, VIEWPORT_ROWS, sink),
+  const window_cases = [
+    window_reader("getWindow 40x8", (i, sink) => window_of(main_sheet, i, VIEWPORT_ROWS, sink)),
+    window_reader("getWindow 1000x8", (i, sink) =>
+      window_of(main_sheet, i, LARGE_WINDOW_ROWS, sink),
     ),
-    conditionalWindowReader("getWindow 1000x8 cond rules", (i, sink) =>
-      windowOf(conditionalSheet, i, LARGE_WINDOW_ROWS, sink),
+    conditional_window_reader("getWindow 40x8 cond rules", (i, sink) =>
+      window_of(conditional_sheet, i, VIEWPORT_ROWS, sink),
     ),
-    formulaRuleWindowReader("getWindow 1000x8 formula rule", (i, sink) =>
-      windowOf(formulaRuleSheet, i, LARGE_WINDOW_ROWS, sink),
+    conditional_window_reader("getWindow 1000x8 cond rules", (i, sink) =>
+      window_of(conditional_sheet, i, LARGE_WINDOW_ROWS, sink),
     ),
-    windowReader("getWindowRows 40x8 sorted", (_, sink) =>
-      consumeWindow(store.getWindowRows(mainSheet, sortedViewportRows, allColumns), sink),
+    formula_rule_window_reader("getWindow 1000x8 formula rule", (i, sink) =>
+      window_of(formula_rule_sheet, i, LARGE_WINDOW_ROWS, sink),
     ),
-    windowReader("getWindowRows 1000x8 sorted", (_, sink) =>
-      consumeWindow(store.getWindowRows(mainSheet, sortedLargeRows, allColumns), sink),
+    window_reader("getWindowRows 40x8 sorted", (_, sink) =>
+      consume_window(store.getWindowRows(main_sheet, sorted_viewport_rows, all_columns), sink),
+    ),
+    window_reader("getWindowRows 1000x8 sorted", (_, sink) =>
+      consume_window(store.getWindowRows(main_sheet, sorted_large_rows, all_columns), sink),
     ),
   ];
 
-  const queryCases = [
-    queryReader("aggregate SUM A", (_, sink) =>
-      sink.number(store.aggregate(mainSheet, COLUMN_A, AGGREGATE_SUM)),
+  const query_cases = [
+    query_reader("aggregate SUM A", (_, sink) =>
+      sink.number(store.aggregate(main_sheet, COLUMN_A, AGGREGATE_SUM)),
     ),
-    queryReader("aggregate AVG D (formulas)", (_, sink) =>
-      sink.number(store.aggregate(mainSheet, COLUMN_D, AGGREGATE_AVERAGE)),
+    query_reader("aggregate AVG D (formulas)", (_, sink) =>
+      sink.number(store.aggregate(main_sheet, COLUMN_D, AGGREGATE_AVERAGE)),
     ),
-    queryReader("aggregate COUNT C (mixed)", (_, sink) =>
-      sink.number(store.aggregate(mainSheet, COLUMN_C, AGGREGATE_COUNT)),
+    query_reader("aggregate COUNT C (mixed)", (_, sink) =>
+      sink.number(store.aggregate(main_sheet, COLUMN_C, AGGREGATE_COUNT)),
     ),
-    queryReader("sortRowsMulti A numeric", (_, sink) =>
-      sink.integers(store.sortRowsMulti(mainSheet, sortA, ascending, allRows)),
+    query_reader("sortRowsMulti A numeric", (_, sink) =>
+      sink.integers(store.sortRowsMulti(main_sheet, sort_a, ascending, all_rows)),
     ),
-    queryReader("sortRowsMulti B text", (_, sink) =>
-      sink.integers(store.sortRowsMulti(mainSheet, sortB, ascending, allRows)),
+    query_reader("sortRowsMulti B text", (_, sink) =>
+      sink.integers(store.sortRowsMulti(main_sheet, sort_b, ascending, all_rows)),
     ),
-    queryReader("sortRowsMulti D formulas", (_, sink) =>
-      sink.integers(store.sortRowsMulti(mainSheet, sortD, descending, allRows)),
+    query_reader("sortRowsMulti D formulas", (_, sink) =>
+      sink.integers(store.sortRowsMulti(main_sheet, sort_d, descending, all_rows)),
     ),
-    queryReader("sortRowsMulti B,A all rows", (_, sink) =>
+    query_reader("sortRowsMulti B,A all rows", (_, sink) =>
       sink.integers(
         store.sortRowsMulti(
-          mainSheet,
+          main_sheet,
           Uint32Array.of(COLUMN_B, COLUMN_A),
           Uint8Array.of(SORT_ASCENDING, SORT_DESCENDING),
-          allRows,
+          all_rows,
         ),
       ),
     ),
-    queryReader("sortRowsMulti C,D 50k candidates", (_, sink) =>
+    query_reader("sortRowsMulti C,D 50k candidates", (_, sink) =>
       sink.integers(
         store.sortRowsMulti(
-          mainSheet,
+          main_sheet,
           Uint32Array.of(COLUMN_C, COLUMN_D),
           Uint8Array.of(SORT_ASCENDING, SORT_ASCENDING),
-          evenRows,
+          even_rows,
         ),
       ),
     ),
-    queryReader("filterRows B contains", (_, sink) =>
-      sink.integers(store.filterRows(mainSheet, COLUMN_B, FILTER_LABEL_NEEDLE)),
+    query_reader("filterRows B contains", (_, sink) =>
+      sink.integers(store.filterRows(main_sheet, COLUMN_B, FILTER_LABEL_NEEDLE)),
     ),
-    queryReader("filterRows C mixed", (_, sink) =>
-      sink.integers(store.filterRows(mainSheet, COLUMN_C, FILTER_MIXED_NEEDLE)),
+    query_reader("filterRows C mixed", (_, sink) =>
+      sink.integers(store.filterRows(main_sheet, COLUMN_C, FILTER_MIXED_NEEDLE)),
     ),
-    queryReader("filterRowsMulti A>100,B~item-1,C set", (_, sink) =>
+    query_reader("filterRowsMulti A>100,B~item-1,C set", (_, sink) =>
       sink.integers(
         store.filterRowsMulti(
-          mainSheet,
-          filterMulti.cols,
-          filterMulti.kinds,
-          filterMulti.flags,
-          filterMulti.nums,
-          filterMulti.numCounts,
-          filterMulti.textCounts,
-          filterMulti.valueNums,
-          filterMulti.valueTexts,
+          main_sheet,
+          filter_multi.cols,
+          filter_multi.kinds,
+          filter_multi.flags,
+          filter_multi.nums,
+          filter_multi.numCounts,
+          filter_multi.textCounts,
+          filter_multi.valueNums,
+          filter_multi.valueTexts,
         ),
       ),
     ),
-    queryReader("search B,C,D substring", (_, sink) =>
+    query_reader("search B,C,D substring", (_, sink) =>
       sink.integers(
         store.search(
-          mainSheet,
+          main_sheet,
           Uint32Array.of(COLUMN_B, COLUMN_C, COLUMN_D),
           SEARCH_SUBSTRING,
           true,
@@ -829,27 +836,29 @@ function buildReaderCases(store: Engine): ReaderCase[] {
         ),
       ),
     ),
-    queryReader("search all cols whole-cell", (_, sink) =>
-      sink.integers(store.search(mainSheet, allColumns, SEARCH_WHOLE_CELL, true, true)),
+    query_reader("search all cols whole-cell", (_, sink) =>
+      sink.integers(store.search(main_sheet, all_columns, SEARCH_WHOLE_CELL, true, true)),
     ),
-    queryReader("distinctValues B text", (_, sink) =>
-      consumeDistinct(store.distinctValues(mainSheet, COLUMN_B, DISTINCT_LIMIT), sink),
+    query_reader("distinctValues B text", (_, sink) =>
+      consume_distinct(store.distinctValues(main_sheet, COLUMN_B, DISTINCT_LIMIT), sink),
     ),
-    queryReader("distinctValues D formulas", (_, sink) =>
-      consumeDistinct(store.distinctValues(mainSheet, COLUMN_D, DISTINCT_LIMIT), sink),
+    query_reader("distinctValues D formulas", (_, sink) =>
+      consume_distinct(store.distinctValues(main_sheet, COLUMN_D, DISTINCT_LIMIT), sink),
     ),
-    queryReader("dataEdge E down to gap", (i, sink) =>
-      sink.number(store.dataEdge(mainSheet, rowStartFor(i) % FIRST_EDGE_GAP_ROW, COLUMN_E, 1, 0)),
+    query_reader("dataEdge E down to gap", (i, sink) =>
+      sink.number(
+        store.dataEdge(main_sheet, row_start_for(i) % FIRST_EDGE_GAP_ROW, COLUMN_E, 1, 0),
+      ),
     ),
-    queryReader("dataEdge row right", (i, sink) =>
-      sink.number(store.dataEdge(mainSheet, rowStartFor(i), 0, 0, 1)),
+    query_reader("dataEdge row right", (i, sink) =>
+      sink.number(store.dataEdge(main_sheet, row_start_for(i), 0, 0, 1)),
     ),
-    queryReader("dataEdgeOrdered E by A order", (i, sink) =>
+    query_reader("dataEdgeOrdered E by A order", (i, sink) =>
       sink.number(
         store.dataEdgeOrdered(
-          mainSheet,
-          ascendingByA,
-          rowStartFor(i) % FIRST_EDGE_GAP_ROW,
+          main_sheet,
+          ascending_by_a,
+          row_start_for(i) % FIRST_EDGE_GAP_ROW,
           COLUMN_E,
           1,
           0,
@@ -858,53 +867,65 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     ),
   ];
 
-  const cellCases = [
-    cellsReader("getCell 4096 scattered", (_, sink) => {
+  const cell_cases = [
+    cells_reader("getCell 4096 scattered", (_, sink) => {
       for (let index = 0; index < SCATTERED_CELLS; index++) {
-        consumeCell(store, mainSheet, scatteredRows[index] ?? 0, scatteredCols[index] ?? 0, sink);
+        consume_cell(
+          store,
+          main_sheet,
+          scattered_rows[index] ?? 0,
+          scattered_cols[index] ?? 0,
+          sink,
+        );
       }
     }),
-    cellsReader("cellSnapshots 4096 scattered", (_, sink) => {
-      const snapshot = store.cellSnapshots(mainSheet, scatteredRows, scatteredCols);
+    cells_reader("cellSnapshots 4096 scattered", (_, sink) => {
+      const snapshot = store.cellSnapshots(main_sheet, scattered_rows, scattered_cols);
       if (snapshot === undefined) throw new Error("cellSnapshots returned nothing");
       sink.integers(snapshot.kinds);
       sink.numbers(snapshot.numbers);
       sink.texts(snapshot.strings);
       snapshot.free();
     }),
-    cellsReader("captureRange 1000x8 + numbers", (i, sink) => {
-      const snapshot = store.captureRange(mainSheet, rowStartFor(i), 0, CAPTURE_ROWS, MAIN_COLUMNS);
+    cells_reader("captureRange 1000x8 + numbers", (i, sink) => {
+      const snapshot = store.captureRange(
+        main_sheet,
+        row_start_for(i),
+        0,
+        CAPTURE_ROWS,
+        MAIN_COLUMNS,
+      );
       if (snapshot === undefined) throw new Error("captureRange returned nothing");
       sink.number(snapshot.byteLength());
       sink.integers(snapshot.kinds());
       sink.numbers(store.snapshotNumbers(snapshot));
       snapshot.free();
     }),
-    cellsReader("persistedCellData whole sheet", (_, sink) =>
-      sink.numbers(store.persistedCellData(mainSheet)),
+    cells_reader("persistedCellData whole sheet", (_, sink) =>
+      sink.numbers(store.persistedCellData(main_sheet)),
     ),
-    cellsReader("rangeStyleIds whole sheet", (_, sink) =>
-      sink.integers(store.rangeStyleIds(mainSheet, 0, 0, lastRow, MAIN_COLUMNS - 1)),
+    cells_reader("rangeStyleIds whole sheet", (_, sink) =>
+      sink.integers(store.rangeStyleIds(main_sheet, 0, 0, last_row, MAIN_COLUMNS - 1)),
     ),
   ];
 
-  const cases = [...windowCases, ...queryCases, ...cellCases, ...rangeCases];
+  const cases = [...window_cases, ...query_cases, ...cell_cases, ...range_cases];
   validateExactMatrix(
     "reader bench cases",
     READER_CASE_NAMES,
-    cases.map((readerCase) => readerCase.name),
+    cases.map((reader_case) => reader_case.name),
   );
   return cases;
 }
 
-function timeLoop(reader: ReaderCase, iterations: number): number {
+function time_loop(reader: ReaderCase, iterations: number): number {
   const started = now();
   for (let iteration = 0; iteration < iterations; iteration++) reader.run(iteration, DISCARD);
   return now() - started;
 }
 
 /** Hash the first iterations' full results. Untimed, so hashing cost never dilutes a ratio. */
-function digestOf(reader: ReaderCase, iterations: number): number {
+function digest_of(reader: ReaderCase, iterations: number): number {
   const hash = new ContentHash();
   for (let iteration = 0; iteration < Math.min(iterations, DIGEST_ITERATIONS); iteration++) {
     reader.run(iteration, hash);
@@ -914,34 +935,34 @@ function digestOf(reader: ReaderCase, iterations: number): number {
 
 function calibrate(reader: ReaderCase): number {
   // Warm the reader so JIT tier-up does not inflate the first sizing loop.
-  timeLoop(reader, 1);
+  time_loop(reader, 1);
   let iterations = 1;
   for (;;) {
-    const elapsedMs = timeLoop(reader, iterations);
-    if (elapsedMs >= TARGET_SAMPLE_MS) return iterations;
+    const elapsed_ms = time_loop(reader, iterations);
+    if (elapsed_ms >= TARGET_SAMPLE_MS) return iterations;
     const scaled = Math.ceil(
       (iterations * TARGET_SAMPLE_MS * CALIBRATION_HEADROOM) /
-        Math.max(elapsedMs, MIN_MEASURABLE_MS),
+        Math.max(elapsed_ms, MIN_MEASURABLE_MS),
     );
     iterations = Math.max(iterations * 2, Math.min(scaled, iterations * MAX_CALIBRATION_GROWTH));
   }
 }
 
 function measure(reader: ReaderCase, iterations: number): ReaderRunResult {
-  for (let warmup = 0; warmup < WARMUP_SAMPLES; warmup++) timeLoop(reader, iterations);
-  const sampleMs = Array.from({ length: SAMPLES }, () => timeLoop(reader, iterations));
+  for (let warmup = 0; warmup < WARMUP_SAMPLES; warmup++) time_loop(reader, iterations);
+  const sample_ms = Array.from({ length: SAMPLES }, () => time_loop(reader, iterations));
   return {
     name: reader.name,
     group: reader.group,
     fixture: reader.fixture,
     iterations,
-    sampleMs,
-    medianSampleMs: summarize(sampleMs).median,
-    digest: digestOf(reader, iterations),
+    sampleMs: sample_ms,
+    medianSampleMs: summarize(sample_ms).median,
+    digest: digest_of(reader, iterations),
   };
 }
 
-function readIterations(path: string): Record<string, number> {
+function read_iterations(path: string): Record<string, number> {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error(`${path} must map reader names to iteration counts`);
@@ -956,33 +977,33 @@ function readIterations(path: string): Record<string, number> {
   return iterations;
 }
 
-async function loadEngine(checkout: string): Promise<Engine> {
-  const pkgDir = resolve(checkout, WASM_PACKAGE);
+async function load_engine(checkout: string): Promise<Engine> {
+  const pkg_dir = resolve(checkout, WASM_PACKAGE);
   // Dynamic import: the engine package is chosen per process from argv (base or candidate).
-  const engineModule = (await import(resolve(pkgDir, "sheetwrite_wasm.js"))) as EngineModule;
-  engineModule.initSync({ module: readFileSync(resolve(pkgDir, "sheetwrite_wasm_bg.wasm")) });
-  return new engineModule.CellStore();
+  const engine_module = (await import(resolve(pkg_dir, "sheetwrite_wasm.js"))) as EngineModule;
+  engine_module.initSync({ module: readFileSync(resolve(pkg_dir, "sheetwrite_wasm_bg.wasm")) });
+  return new engine_module.CellStore();
 }
 
 if (import.meta.main) {
-  const [checkout, mode, iterationsPath] = process.argv.slice(2);
+  const [checkout, mode, iterations_path] = process.argv.slice(2);
   const usage = "usage: bun reader-bench.ts <checkout> <calibrate | run <iterations.json>>";
   if (checkout === undefined || (mode !== "calibrate" && mode !== "run")) throw new Error(usage);
-  if ((mode === "run") !== (iterationsPath !== undefined)) throw new Error(usage);
-  const iterations = iterationsPath === undefined ? undefined : readIterations(iterationsPath);
-  const store = await loadEngine(resolve(checkout));
+  if ((mode === "run") !== (iterations_path !== undefined)) throw new Error(usage);
+  const iterations = iterations_path === undefined ? undefined : read_iterations(iterations_path);
+  const store = await load_engine(resolve(checkout));
   const selected = new Set(selectedReaderCaseNames());
-  const cases = buildReaderCases(store).filter((readerCase) => selected.has(readerCase.name));
+  const cases = build_reader_cases(store).filter((reader_case) => selected.has(reader_case.name));
   if (iterations === undefined) {
     const calibrated: Record<string, number> = {};
-    for (const readerCase of cases) calibrated[readerCase.name] = calibrate(readerCase);
+    for (const reader_case of cases) calibrated[reader_case.name] = calibrate(reader_case);
     process.stdout.write(`${JSON.stringify(calibrated)}\n`);
   } else {
-    const results = cases.map((readerCase) => {
-      const loopCount = iterations[readerCase.name];
-      if (loopCount === undefined)
-        throw new Error(`no calibrated iterations for ${readerCase.name}`);
-      return measure(readerCase, loopCount);
+    const results = cases.map((reader_case) => {
+      const loop_count = iterations[reader_case.name];
+      if (loop_count === undefined)
+        throw new Error(`no calibrated iterations for ${reader_case.name}`);
+      return measure(reader_case, loop_count);
     });
     process.stdout.write(`${JSON.stringify({ results })}\n`);
   }

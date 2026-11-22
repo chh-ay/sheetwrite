@@ -77,7 +77,7 @@ function artifact(): DeepMutable<RangeGateArtifact> {
   } satisfies RangeGateArtifact);
 }
 
-const resultOf = (value: DeepMutable<RangeGateArtifact>, workload: Workload) =>
+const result_of = (value: DeepMutable<RangeGateArtifact>, workload: Workload) =>
   must(
     value.results.find((entry) => entry.workload === workload),
     workload,
@@ -88,18 +88,18 @@ it("fails closed on incomplete matrices, retained revisions and oversized auto-f
     [(value) => value.results.shift(), /missing 10000:style merge and clear/],
     [
       (value) =>
-        (resultOf(value, "datasource revision retention").retainedRevisionRectanglesAfter = 1),
+        (result_of(value, "datasource revision retention").retainedRevisionRectanglesAfter = 1),
       /retained revision rectangles/,
     ],
     [
       (value) =>
-        (resultOf(value, "large exact auto-fit").autoFitChunkCellLimit =
+        (result_of(value, "large exact auto-fit").autoFitChunkCellLimit =
           RANGE_AUTO_FIT_CHUNK_CELLS + 1),
       /reported a stale auto-fit chunk-cell limit/,
     ],
     [
       (value) =>
-        (resultOf(value, "large exact auto-fit").maxVisibleWindowCells =
+        (result_of(value, "large exact auto-fit").maxVisibleWindowCells =
           RANGE_AUTO_FIT_CHUNK_CELLS + 1),
       /exceeded the auto-fit chunk-cell limit/,
     ],

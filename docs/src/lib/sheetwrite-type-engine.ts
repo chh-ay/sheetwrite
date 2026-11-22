@@ -27,22 +27,22 @@ const UNRESOLVED_ANY = /\bany\b/;
 /** Compiler-generated scaffolding (Vue SFC virtual code, private helpers) is never reader-facing. */
 const INTERNAL_TAG_TEXT = /__(?:VLS|vls)_?\w*|__sheetwrite/;
 
-function usefulType(text: string): boolean {
+function useful_type(text: string): boolean {
   return text.length > 0 && !UNRESOLVED_ANY.test(text);
 }
 
-function eventPropertyName(target: string): string {
+function event_property_name(target: string): string {
   return `on${target
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("")}`;
 }
 
-function typeAfterDeclaration(text: string): string | undefined {
+function type_after_declaration(text: string): string | undefined {
   const separator = text.indexOf(":");
   if (separator < 0) return undefined;
   const value = text.slice(separator + 1).trim();
-  return usefulType(value) ? value : undefined;
+  return useful_type(value) ? value : undefined;
 }
 
 /**
@@ -86,41 +86,41 @@ export class SheetwriteTypeEngine {
       ...hover,
       text: hover.text.replace(/<__VLS_[A-Za-z0-9_$]+>/g, ""),
     }));
-    const resolvedByTarget = new Map<string, SheetwriteTypeHover>();
+    const resolved_by_target = new Map<string, SheetwriteTypeHover>();
     for (const hover of normalized) {
-      if (usefulType(hover.text)) resolvedByTarget.set(hover.target, hover);
+      if (useful_type(hover.text)) resolved_by_target.set(hover.target, hover);
     }
-    const scriptBoundary = source?.lastIndexOf("</script>") ?? -1;
+    const script_boundary = source?.lastIndexOf("</script>") ?? -1;
 
     const repaired = normalized.map((hover) => {
-      if (usefulType(hover.text)) return hover;
+      if (useful_type(hover.text)) return hover;
       if (source && hover.target === "$props") {
-        const lineStart = source.lastIndexOf("\n", hover.start) + 1;
-        const prefix = source.slice(lineStart, hover.start);
-        const annotatedType = prefix.match(/:\s*([^=]+?)\s*=\s*$/)?.[1]?.trim();
-        if (annotatedType && usefulType(annotatedType)) {
-          return { ...hover, text: `function $props(): ${annotatedType}` };
+        const line_start = source.lastIndexOf("\n", hover.start) + 1;
+        const prefix = source.slice(line_start, hover.start);
+        const annotated_type = prefix.match(/:\s*([^=]+?)\s*=\s*$/)?.[1]?.trim();
+        if (annotated_type && useful_type(annotated_type)) {
+          return { ...hover, text: `function $props(): ${annotated_type}` };
         }
       }
-      const sameTarget = resolvedByTarget.get(hover.target);
-      if (sameTarget && source && scriptBoundary >= 0 && hover.start > scriptBoundary) {
-        return { ...hover, text: sameTarget.text, docs: hover.docs ?? sameTarget.docs };
+      const same_target = resolved_by_target.get(hover.target);
+      if (same_target && source && script_boundary >= 0 && hover.start > script_boundary) {
+        return { ...hover, text: same_target.text, docs: hover.docs ?? same_target.docs };
       }
 
       if (source && hover.target.includes("-")) {
         const suffix = source.slice(hover.start + hover.length);
-        const handlerName = suffix.match(/^="([A-Za-z_$][\w$]*)"/)?.[1];
-        const handler = handlerName ? resolvedByTarget.get(handlerName) : undefined;
-        const handlerType = handler ? typeAfterDeclaration(handler.text) : undefined;
-        if (handlerType) {
-          return { ...hover, text: `${eventPropertyName(hover.target)}: ${handlerType}` };
+        const handler_name = suffix.match(/^="([A-Za-z_$][\w$]*)"/)?.[1];
+        const handler = handler_name ? resolved_by_target.get(handler_name) : undefined;
+        const handler_type = handler ? type_after_declaration(handler.text) : undefined;
+        if (handler_type) {
+          return { ...hover, text: `${event_property_name(hover.target)}: ${handler_type}` };
         }
       }
       return hover;
     });
 
-    const byRange = new Map<string, SheetwriteTypeHover>();
-    for (const hover of repaired) byRange.set(`${hover.start}:${hover.length}`, hover);
-    return [...byRange.values()].sort((left, right) => left.start - right.start);
+    const by_range = new Map<string, SheetwriteTypeHover>();
+    for (const hover of repaired) by_range.set(`${hover.start}:${hover.length}`, hover);
+    return [...by_range.values()].sort((left, right) => left.start - right.start);
   }
 }

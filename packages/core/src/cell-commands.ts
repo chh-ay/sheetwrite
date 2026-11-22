@@ -83,7 +83,7 @@ export function runCellCommand(host: CellCommandsHost, command: CellCommand): vo
       break;
     case "unhideRows":
     case "unhideColumns":
-      unhideInSelection(host, command === "unhideRows");
+      unhide_in_selection(host, command === "unhideRows");
       break;
     case "insertCells":
     case "deleteCells":
@@ -103,20 +103,20 @@ export function runCellCommand(host: CellCommandsHost, command: CellCommand): vo
  * ends at the last shown row also takes the hidden rows beyond it, so the
  * whole sheet selected shows every hidden row.
  */
-function unhideInSelection(host: CellCommandsHost, rows: boolean): void {
+function unhide_in_selection(host: CellCommandsHost, rows: boolean): void {
   const { grid, style } = host;
   const rect = host.rect();
   if (rect === null || style.readOnly()) return;
-  const [rowCount, firstCol, lastCol] = host.bounds();
+  const [row_count, first_col, last_col] = host.bounds();
   if (rows) {
     const first = rect.r0 === 0 ? 0 : style.toDataRow(rect.r0);
-    const last = rect.r1 >= rowCount - 1 ? Infinity : style.toDataRow(rect.r1);
+    const last = rect.r1 >= row_count - 1 ? Infinity : style.toDataRow(rect.r1);
     const hidden = grid.hiddenRows().filter((row) => row >= first && row <= last);
     if (hidden.length > 0) grid.actions.showRows(hidden);
     return;
   }
-  const first = rect.c0 <= firstCol ? 0 : rect.c0;
-  const last = rect.c1 >= lastCol ? Infinity : rect.c1;
+  const first = rect.c0 <= first_col ? 0 : rect.c0;
+  const last = rect.c1 >= last_col ? Infinity : rect.c1;
   const hidden = grid.hiddenColumns().filter((col) => col >= first && col <= last);
   if (hidden.length > 0) grid.actions.showColumns(hidden);
 }
@@ -137,9 +137,9 @@ export function insertOrDelete(
   const { actions } = host.grid;
   const run = (choice: string | null): void => {
     if (choice === "shiftRight" || choice === "right") {
-      shiftCells(host, rect, insert, false);
+      shift_cells(host, rect, insert, false);
     } else if (choice === "shiftDown" || choice === "down") {
-      shiftCells(host, rect, insert, true);
+      shift_cells(host, rect, insert, true);
     } else if (choice === "row") {
       if (insert) actions.insertRowAbove();
       else actions.deleteRow();
@@ -148,11 +148,11 @@ export function insertOrDelete(
       else actions.deleteColumn();
     }
   };
-  const [rowCount, firstCol, lastCol] = host.bounds();
-  const wholeRows = rect.c0 <= firstCol && rect.c1 >= lastCol;
-  const wholeColumns = rect.r0 === 0 && rect.r1 >= rowCount - 1;
-  if (wholeRows || wholeColumns) {
-    run(wholeRows ? "row" : "column");
+  const [row_count, first_col, last_col] = host.bounds();
+  const whole_rows = rect.c0 <= first_col && rect.c1 >= last_col;
+  const whole_columns = rect.r0 === 0 && rect.r1 >= row_count - 1;
+  if (whole_rows || whole_columns) {
+    run(whole_rows ? "row" : "column");
     return;
   }
   // Excel's default choice follows the range's shape.
@@ -174,7 +174,7 @@ const SHIFT_IN_VIEW = "Cells can't be shifted while the sheet is sorted or filte
  * shift down, a row for a shift right), that holds a value or a formula;
  * -1 when none does. `last` is the line's last index.
  */
-function lastUsedAlong(
+function last_used_along(
   host: CellCommandsHost,
   down: boolean,
   line: number,
@@ -210,10 +210,10 @@ function lastUsedAlong(
  * deleted cells. An insert that would push cells that are not blank off the
  * sheet does nothing, with Excel's message.
  */
-function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down: boolean): void {
+function shift_cells(host: CellCommandsHost, rect: SelRect, insert: boolean, down: boolean): void {
   const { style } = host;
   const sheet = style.sheet();
-  const sheetId = style.activeSheet();
+  const sheet_id = style.activeSheet();
   const r0 = style.toDataRow(rect.r0);
   const r1 = style.toDataRow(rect.r1);
   if (r1 - r0 !== rect.r1 - rect.r0 || host.bounds()[0] !== sheet.rowCount) {
@@ -222,20 +222,20 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
   }
   // Along the shift, then across it.
   const [first, last] = down ? [r0, r1] : [rect.c0, rect.c1];
-  const [crossFirst, crossLast] = down ? [rect.c0, rect.c1] : [r0, r1];
-  const lastAlong = down ? sheet.rowCount - 1 : sheet.columns.length - 1;
+  const [cross_first, cross_last] = down ? [rect.c0, rect.c1] : [r0, r1];
+  const last_along = down ? sheet.rowCount - 1 : sheet.columns.length - 1;
   const count = last - first + 1;
   const at = (along: number, across: number) =>
     down ? { row: along, col: across } : { row: across, col: along };
   const span = (start: number, end: number): Range => ({
-    sheet: sheetId,
-    start: at(start, crossFirst),
-    end: at(end, crossLast),
+    sheet: sheet_id,
+    start: at(start, cross_first),
+    end: at(end, cross_last),
   });
-  const lastUsed = (from: number): number => {
+  const last_used = (from: number): number => {
     let used = -1;
-    for (let line = crossFirst; line <= crossLast; line++) {
-      used = Math.max(used, lastUsedAlong(host, down, line, from, lastAlong));
+    for (let line = cross_first; line <= cross_last; line++) {
+      used = Math.max(used, last_used_along(host, down, line, from, last_along));
     }
     return used;
   };
@@ -244,9 +244,9 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
   if (insert) {
     // The used cells from the selection on move; with none, one empty line
     // still carries the references to the cells after it.
-    const used = lastUsed(first);
+    const used = last_used(first);
     const end = Math.max(used, first);
-    if (end + count > lastAlong) {
+    if (end + count > last_along) {
       if (used >= first) host.alert(insert ? "Insert" : "Delete", SHIFT_OFF_SHEET);
       else host.commit([{ op: "clearRange", range: span(first, last) }]);
       return;
@@ -254,22 +254,22 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
     patch = {
       op: "moveCells",
       range: span(first, end),
-      to: { sheet: sheetId, ...at(first + count, crossFirst) },
+      to: { sheet: sheet_id, ...at(first + count, cross_first) },
       shift: true,
     };
   } else {
     const below = last + 1;
-    if (below > lastAlong) {
+    if (below > last_along) {
       host.commit([{ op: "clearRange", range: span(first, last) }]);
       return;
     }
     // At least as many cells as are deleted move up, so they cover them;
     // the engine empties what a shorter block at the sheet's edge leaves.
-    const end = Math.min(Math.max(lastUsed(below), below + count - 1), lastAlong);
+    const end = Math.min(Math.max(last_used(below), below + count - 1), last_along);
     patch = {
       op: "moveCells",
       range: span(below, end),
-      to: { sheet: sheetId, ...at(first, crossFirst) },
+      to: { sheet: sheet_id, ...at(first, cross_first) },
       shift: true,
     };
   }
@@ -281,7 +281,7 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
  * border `preset`, as one undoable step. The style operations come first, so
  * the border runs merge into the styles they leave.
  */
-function formatSelection(
+function format_selection(
   deps: StyleActionsDeps,
   style: Partial<CellStyle>,
   preset: BorderPreset | null,
@@ -304,10 +304,10 @@ export function formatCells(
   const deps = host.style;
   if (deps.selection().focusCell === null || deps.readOnly()) return;
   if (format) {
-    formatSelection(deps, format.style ?? {}, format.border ?? null);
+    format_selection(deps, format.style ?? {}, format.border ?? null);
     return;
   }
   void host.formatCellsDialog().then((change) => {
-    if (change !== null) formatSelection(deps, change.style, change.border);
+    if (change !== null) format_selection(deps, change.style, change.border);
   });
 }

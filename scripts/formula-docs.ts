@@ -53,14 +53,14 @@ function string(value: unknown, label: string): string {
   return value;
 }
 
-function stringArray(value: unknown, label: string): string[] {
+function string_array(value: unknown, label: string): string[] {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
     throw new Error(`${label} must be a string array`);
   }
   return value as string[];
 }
 
-function recordMap(value: unknown, label: string): Record<string, JsonObject> {
+function record_map(value: unknown, label: string): Record<string, JsonObject> {
   const source = object(value, label);
   return Object.fromEntries(
     Object.entries(source).map(([key, entry]) => [key, object(entry, `${label}.${key}`)]),
@@ -78,13 +78,13 @@ function anchor(value: string): string {
     .replaceAll(/(^-|-$)/gu, "");
 }
 
-function parseSignatureProfiles(value: unknown): Record<string, SignatureProfile> {
+function parse_signature_profiles(value: unknown): Record<string, SignatureProfile> {
   return Object.fromEntries(
-    Object.entries(recordMap(value, "signatureProfiles")).map(([id, raw]) => {
-      const argumentsValue = raw.arguments;
-      if (!Array.isArray(argumentsValue))
+    Object.entries(record_map(value, "signatureProfiles")).map(([id, raw]) => {
+      const arguments_value = raw.arguments;
+      if (!Array.isArray(arguments_value))
         throw new Error(`signatureProfiles.${id}.arguments must be an array`);
-      const args = argumentsValue.map((entry, index): FormulaArgument => {
+      const args = arguments_value.map((entry, index): FormulaArgument => {
         const argument = object(entry, `signatureProfiles.${id}.arguments[${index}]`);
         if (typeof argument.required !== "boolean") {
           throw new Error(`signatureProfiles.${id}.arguments[${index}].required must be boolean`);
@@ -93,7 +93,7 @@ function parseSignatureProfiles(value: unknown): Record<string, SignatureProfile
           name: string(argument.name, `signatureProfiles.${id}.arguments[${index}].name`),
           required: argument.required,
           default: argument.default,
-          accepts: stringArray(
+          accepts: string_array(
             argument.accepts,
             `signatureProfiles.${id}.arguments[${index}].accepts`,
           ),
@@ -115,26 +115,26 @@ const SYNTAX_TOKEN = /(\[|\]|\(|\)|,\s*|\.\.\.|…|[^[\](),.…]+)/g;
  * Inline code in a static table, classed as the docs build classes inline
  * code in pages (short code stays on one line).
  */
-function inlineCode(text: string): string {
-  const className = text.length <= SHORT_CODE_LENGTH ? ` class="${SHORT_CODE_CLASS}"` : "";
-  return `<code${className}>${html(text)}</code>`;
+function inline_code(text: string): string {
+  const class_name = text.length <= SHORT_CODE_LENGTH ? ` class="${SHORT_CODE_CLASS}"` : "";
+  return `<code${class_name}>${html(text)}</code>`;
 }
 
 /** The top-level arguments of a syntax line: `[value2, ...]` and `lambda(row, col)` stay one argument. */
-function syntaxArguments(argumentsText: string): string[] {
+function syntax_arguments(arguments_text: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let start = 0;
-  for (let index = 0; index < argumentsText.length; index++) {
-    const char = argumentsText[index];
+  for (let index = 0; index < arguments_text.length; index++) {
+    const char = arguments_text[index];
     if (char === "(" || char === "[") depth++;
     else if (char === ")" || char === "]") depth--;
     else if (char === "," && depth === 0) {
-      parts.push(argumentsText.slice(start, index).trim());
+      parts.push(arguments_text.slice(start, index).trim());
       start = index + 1;
     }
   }
-  parts.push(argumentsText.slice(start).trim());
+  parts.push(arguments_text.slice(start).trim());
   return parts.filter((part) => part !== "");
 }
 
@@ -146,11 +146,11 @@ function syntaxArguments(argumentsText: string): string[] {
  * inside one; optional arguments and the trailing ellipsis are marked so they
  * read quieter.
  */
-function excelSyntaxHtml(name: string, syntax: string): string {
+function excel_syntax_html(name: string, syntax: string): string {
   const open = syntax.indexOf("(");
   const close = syntax.lastIndexOf(")");
-  const argumentsText = open < 0 || close < open ? "" : syntax.slice(open + 1, close);
-  const parts = syntaxArguments(argumentsText).map((argument) => {
+  const arguments_text = open < 0 || close < open ? "" : syntax.slice(open + 1, close);
+  const parts = syntax_arguments(arguments_text).map((argument) => {
     // Argument names are `<var>` elements; punctuation stays bare text in the
     // code element's punctuation colour.
     const tokens = [...argument.matchAll(SYNTAX_TOKEN)].map(([token]) =>
@@ -166,22 +166,22 @@ function excelSyntaxHtml(name: string, syntax: string): string {
   return `<code class="sw-formula-syntax"><span class="sw-code-function" data-pagefind-weight="10">${html(name)}</span>(${parts.join(", ")})</code>`;
 }
 
-function parseFunctions(value: unknown): FormulaRecord[] {
+function parse_functions(value: unknown): FormulaRecord[] {
   if (!Array.isArray(value)) throw new Error("functions must be an array");
   return value.map((entry, index): FormulaRecord => {
     const formula = object(entry, `functions[${index}]`);
-    const contractStatus = string(formula.contractStatus, `functions[${index}].contractStatus`);
-    if (contractStatus !== "required-supported" && contractStatus !== "supported") {
-      throw new Error(`functions[${index}].contractStatus is unsupported: ${contractStatus}`);
+    const contract_status = string(formula.contractStatus, `functions[${index}].contractStatus`);
+    if (contract_status !== "required-supported" && contract_status !== "supported") {
+      throw new Error(`functions[${index}].contractStatus is unsupported: ${contract_status}`);
     }
     if (typeof formula.version !== "number")
       throw new Error(`functions[${index}].version must be numeric`);
     return {
       canonical: string(formula.canonical, `functions[${index}].canonical`),
-      aliases: stringArray(formula.aliases, `functions[${index}].aliases`),
+      aliases: string_array(formula.aliases, `functions[${index}].aliases`),
       family: string(formula.family, `functions[${index}].family`),
-      builds: stringArray(formula.builds, `functions[${index}].builds`),
-      contractStatus,
+      builds: string_array(formula.builds, `functions[${index}].builds`),
+      contractStatus: contract_status,
       signature: string(formula.signature, `functions[${index}].signature`),
       semantics: string(formula.semantics, `functions[${index}].semantics`),
       dialects: string(formula.dialects, `functions[${index}].dialects`),
@@ -201,13 +201,13 @@ const BUILD_FLAGS: Readonly<Record<string, number>> = {
 };
 
 /** An argument name from a part of a syntax line: `[sum_range]` is `sum_range`; a repeating `number1` is `number`. */
-function excelArgumentName(part: string, repeating: boolean): string {
+function excel_argument_name(part: string, repeating: boolean): string {
   const name = part.replaceAll(/[[\]]/g, "").trim();
   return repeating ? name.replace(/\d+$/, "") : name;
 }
 
 /** `instanceNum` as `instance_num`, for an argument the syntax line gives no single name. */
-function snakeCase(name: string): string {
+function snake_case(name: string): string {
   return name.replaceAll(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
@@ -219,15 +219,15 @@ function snakeCase(name: string): string {
  * both names (`criteria_range, criteria`), and an argument after the
  * repeating one the name at the same place from the end of the line.
  */
-function excelArgumentNames(args: readonly FormulaArgument[], syntax: string): string[] {
-  const parts = syntaxArguments(
+function excel_argument_names(args: readonly FormulaArgument[], syntax: string): string[] {
+  const parts = syntax_arguments(
     syntax.slice(syntax.indexOf("(") + 1, syntax.lastIndexOf(")")),
   ).filter((part) => part !== "…");
   const repeating = args.findIndex((argument) => argument.repeat !== "once");
   const single = (part: string | undefined, argument: FormulaArgument, repeats = false) =>
     part === undefined || part.includes(",")
-      ? snakeCase(argument.name)
-      : excelArgumentName(part, repeats);
+      ? snake_case(argument.name)
+      : excel_argument_name(part, repeats);
 
   return args.map((argument, index) => {
     if (repeating < 0 || index < repeating) return single(parts[index], argument);
@@ -236,11 +236,11 @@ function excelArgumentNames(args: readonly FormulaArgument[], syntax: string): s
 
     const part = parts[index] ?? "";
     const pair = part.includes(",")
-      ? syntaxArguments(part.replaceAll(/[[\]]/g, ""))
+      ? syntax_arguments(part.replaceAll(/[[\]]/g, ""))
       : [part, parts[index + 1] ?? ""];
     return pair
       .slice(0, 2)
-      .map((name) => excelArgumentName(name, true))
+      .map((name) => excel_argument_name(name, true))
       .join(", ");
   });
 }
@@ -258,23 +258,23 @@ export function renderFunctionMetadata(
   reference: Readonly<Record<string, FormulaReferenceEntry>>,
 ): string {
   const inventory = object(inventoryValue, "formula inventory");
-  const signatures = parseSignatureProfiles(inventory.signatureProfiles);
-  const families = recordMap(inventory.families, "families");
-  const familyIds = Object.keys(families);
-  const signatureIds = Object.keys(signatures);
-  const argumentNames = new Map<string, number>();
+  const signatures = parse_signature_profiles(inventory.signatureProfiles);
+  const families = record_map(inventory.families, "families");
+  const family_ids = Object.keys(families);
+  const signature_ids = Object.keys(signatures);
+  const argument_names = new Map<string, number>();
 
-  const rows = parseFunctions(inventory.functions).flatMap((formula) => {
-    const familyIndex = familyIds.indexOf(formula.family);
-    const profileIndex = signatureIds.indexOf(formula.signature);
+  const rows = parse_functions(inventory.functions).flatMap((formula) => {
+    const family_index = family_ids.indexOf(formula.family);
+    const profile_index = signature_ids.indexOf(formula.signature);
     const profile = signatures[formula.signature];
     const syntax = reference[formula.canonical]?.syntax;
-    if (familyIndex < 0 || profile === undefined || syntax === undefined) {
+    if (family_index < 0 || profile === undefined || syntax === undefined) {
       throw new Error(`Missing metadata for ${formula.canonical}`);
     }
-    const names = JSON.stringify(excelArgumentNames(profile.arguments, syntax));
-    const namesIndex = argumentNames.get(names) ?? argumentNames.size;
-    argumentNames.set(names, namesIndex);
+    const names = JSON.stringify(excel_argument_names(profile.arguments, syntax));
+    const names_index = argument_names.get(names) ?? argument_names.size;
+    argument_names.set(names, names_index);
 
     let flags = volatileNames.has(formula.canonical) ? FUNCTION_FLAG_VOLATILE : 0;
     for (const build of formula.builds) {
@@ -284,14 +284,14 @@ export function renderFunctionMetadata(
     }
 
     return [formula.canonical, ...formula.aliases].map((name) =>
-      JSON.stringify([name, familyIndex, profileIndex, flags, namesIndex]),
+      JSON.stringify([name, family_index, profile_index, flags, names_index]),
     );
   });
 
-  const familyTitles = familyIds.map((id) =>
+  const family_titles = family_ids.map((id) =>
     JSON.stringify(string(families[id]?.title, `families.${id}.title`)),
   );
-  const profiles = signatureIds.map((id) => {
+  const profiles = signature_ids.map((id) => {
     const signature = signatures[id];
     if (!signature) throw new Error(`Missing signature ${id}`);
 
@@ -316,9 +316,9 @@ export function renderFunctionMetadata(
     'export { ARGUMENT_CHOICES } from "../functions/argument-choices.js";',
     "",
     "export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {",
-    `  families: [\n    ${familyTitles.join(",\n    ")},\n  ],`,
+    `  families: [\n    ${family_titles.join(",\n    ")},\n  ],`,
     `  profiles: [\n    ${profiles.join(",\n    ")},\n  ],`,
-    `  argumentNames: [\n    ${[...argumentNames.keys()].join(",\n    ")},\n  ],`,
+    `  argumentNames: [\n    ${[...argument_names.keys()].join(",\n    ")},\n  ],`,
     `  functions: [\n    ${rows.join(",\n    ")},\n  ],`,
     "};",
     "",
@@ -344,8 +344,8 @@ export async function loadFormulaReferenceEntries(
 ): Promise<Readonly<Record<string, FormulaReferenceEntry>>> {
   const value: unknown = JSON.parse(await readFile(resolve(root, REFERENCE_PATH), "utf8"));
   const entries = object(value, REFERENCE_PATH);
-  for (const [name, entryValue] of Object.entries(entries)) {
-    const entry = object(entryValue, `${REFERENCE_PATH}.${name}`);
+  for (const [name, entry_value] of Object.entries(entries)) {
+    const entry = object(entry_value, `${REFERENCE_PATH}.${name}`);
     string(entry.summary, `${REFERENCE_PATH}.${name}.summary`);
     const syntax = string(entry.syntax, `${REFERENCE_PATH}.${name}.syntax`);
     if (!syntax.startsWith(`${name}(`) || !syntax.endsWith(")")) {
@@ -434,12 +434,12 @@ export function renderFormulaFunctionPages(
   if (typeof inventory.version !== "number")
     throw new Error("formula inventory version must be numeric");
 
-  const families = recordMap(inventory.families, "families");
-  const signatures = parseSignatureProfiles(inventory.signatureProfiles);
-  const semantics = recordMap(inventory.semanticsProfiles, "semanticsProfiles");
-  const dialects = recordMap(inventory.dialectProfiles, "dialectProfiles");
-  const implementations = recordMap(inventory.implementationProfiles, "implementationProfiles");
-  const functions = parseFunctions(inventory.functions);
+  const families = record_map(inventory.families, "families");
+  const signatures = parse_signature_profiles(inventory.signatureProfiles);
+  const semantics = record_map(inventory.semanticsProfiles, "semanticsProfiles");
+  const dialects = record_map(inventory.dialectProfiles, "dialectProfiles");
+  const implementations = record_map(inventory.implementationProfiles, "implementationProfiles");
+  const functions = parse_functions(inventory.functions);
   if (!Array.isArray(inventory.unsupportedCategories)) {
     throw new Error("unsupportedCategories must be an array");
   }
@@ -447,11 +447,11 @@ export function renderFormulaFunctionPages(
     object(entry, `unsupportedCategories[${index}]`),
   );
 
-  const duplicateNames = functions
+  const duplicate_names = functions
     .map((formula) => formula.canonical)
     .filter((name, index, names) => names.indexOf(name) !== index);
-  if (duplicateNames.length > 0)
-    throw new Error(`duplicate formula names: ${duplicateNames.join(", ")}`);
+  if (duplicate_names.length > 0)
+    throw new Error(`duplicate formula names: ${duplicate_names.join(", ")}`);
 
   const required = functions.filter((formula) => formula.contractStatus === "required-supported");
   const extension = functions.filter((formula) => !formula.builds.includes("@sheetwrite/wasm"));
@@ -467,8 +467,8 @@ export function renderFormulaFunctionPages(
       `${REFERENCE_PATH} has no entry for ${undescribed.map((formula) => formula.canonical).join(", ")}`,
     );
   }
-  const canonicalNames = new Set(functions.map((formula) => formula.canonical));
-  const unknown = Object.keys(entries).filter((name) => !canonicalNames.has(name));
+  const canonical_names = new Set(functions.map((formula) => formula.canonical));
+  const unknown = Object.keys(entries).filter((name) => !canonical_names.has(name));
   if (unknown.length > 0) {
     throw new Error(`${REFERENCE_PATH} describes unknown functions: ${unknown.join(", ")}`);
   }
@@ -491,23 +491,23 @@ export function renderFormulaFunctionPages(
   }
 
   // A family with no functions has nothing to publish.
-  const publishedFamilies = Object.entries(families).flatMap(([familyId, family]) => {
-    const familyFunctions = functions.filter((formula) => formula.family === familyId);
-    if (familyFunctions.length === 0) return [];
+  const published_families = Object.entries(families).flatMap(([family_id, family]) => {
+    const family_functions = functions.filter((formula) => formula.family === family_id);
+    if (family_functions.length === 0) return [];
     return [
       {
-        id: familyId,
-        title: string(family.title, `families.${familyId}.title`),
-        functions: familyFunctions,
+        id: family_id,
+        title: string(family.title, `families.${family_id}.title`),
+        functions: family_functions,
       },
     ];
   });
-  const familyRoute = (id: string): string => `${FORMULA_FUNCTIONS_ROUTE}${anchor(id)}/`;
-  const entryHref = (formula: FormulaRecord): string =>
-    `${familyRoute(formula.family)}#${functionAnchor(formula.canonical)}`;
-  const inDefaultEngine = (formula: FormulaRecord): boolean =>
+  const family_route = (id: string): string => `${FORMULA_FUNCTIONS_ROUTE}${anchor(id)}/`;
+  const entry_href = (formula: FormulaRecord): string =>
+    `${family_route(formula.family)}#${function_anchor(formula.canonical)}`;
+  const in_default_engine = (formula: FormulaRecord): boolean =>
     formula.builds.includes("@sheetwrite/wasm");
-  const summaryOf = (formula: FormulaRecord): string => entries[formula.canonical]?.summary ?? "";
+  const summary_of = (formula: FormulaRecord): string => entries[formula.canonical]?.summary ?? "";
 
   const overview = [
     "---",
@@ -519,7 +519,11 @@ export function renderFormulaFunctionPages(
     "",
     "## Functions by category",
     "",
-    familyCards(publishedFamilies, { familyRoute, entryHref, inDefaultEngine }),
+    family_cards(published_families, {
+      familyRoute: family_route,
+      entryHref: entry_href,
+      inDefaultEngine: in_default_engine,
+    }),
     "",
     "## Function index",
     "",
@@ -551,18 +555,18 @@ export function renderFormulaFunctionPages(
     "",
     "Some Excel functions need a network, a service or another file. Sheetwrite does not run them. It keeps the formula as written, so the workbook saves and opens again unchanged.",
     "",
-    unsupportedList(unsupported),
+    unsupported_list(unsupported),
     "",
     "`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit. `OFFSET` and `INDIRECT` return references that can feed reference-taking functions or spill their values. `INDIRECT` reference text is not rewritten by fill, copy, or structural edits.",
     "",
   ];
 
-  const indexHtml = functionIndexHtml(
+  const index_html = function_index_html(
     [...functions].sort((left, right) => left.canonical.localeCompare(right.canonical)),
-    { entryHref, inDefaultEngine, summaryOf },
+    { entryHref: entry_href, inDefaultEngine: in_default_engine, summaryOf: summary_of },
   );
 
-  const familyPages = publishedFamilies.map((family): FormulaReferencePage => {
+  const family_pages = published_families.map((family): FormulaReferencePage => {
     const slug = anchor(family.id);
     // Each dialect profile that differs from Excel, with this family's functions that use it.
     const differences = [...new Set(family.functions.map((formula) => formula.dialects))].flatMap(
@@ -572,28 +576,28 @@ export function renderFormulaFunctionPages(
         const members = family.functions.filter((formula) => formula.dialects === id);
         const [first] = members;
         if (first === undefined) return [];
-        const { partial, notes } = excelDifference(first, dialect);
+        const { partial, notes } = excel_difference(first, dialect);
         return partial ? [{ id, names: members.map((formula) => formula.canonical), notes }] : [];
       },
     );
     const differing = new Set(differences.map((difference) => difference.id));
-    const tableHtml = [
+    const table_html = [
       '<section class="sw-formula-family"><table class="sw-formula-table"><thead><tr><th>Function and syntax</th><th>What it does</th></tr></thead><tbody>',
       ...family.functions.map((formula) => {
         const names = [formula.canonical, ...formula.aliases];
-        const aliases = formula.aliases.map((name) => inlineCode(name)).join(", ");
-        const isDefault = inDefaultEngine(formula);
-        const syntax = excelSyntaxHtml(
+        const aliases = formula.aliases.map((name) => inline_code(name)).join(", ");
+        const is_default = in_default_engine(formula);
+        const syntax = excel_syntax_html(
           formula.canonical,
           entries[formula.canonical]?.syntax ?? `${formula.canonical}()`,
         );
         const badges = [
-          isDefault ? "" : FULL_BUILD_BADGE,
+          is_default ? "" : FULL_BUILD_BADGE,
           differing.has(formula.dialects)
-            ? `<a class="sw-formula-differs" href="#${differenceAnchor(formula.dialects)}">Differs from Excel</a>`
+            ? `<a class="sw-formula-differs" href="#${difference_anchor(formula.dialects)}">Differs from Excel</a>`
             : "",
         ].join("");
-        return `<tr id="${functionAnchor(formula.canonical)}" data-formula-name="${html(names.join(" "))}" data-engine="${isDefault ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}${badges === "" ? "" : `<span class="sw-formula-badges">${badges}</span>`}</td><td class="sw-formula-summary">${html(summaryOf(formula))}</td></tr>`;
+        return `<tr id="${function_anchor(formula.canonical)}" data-formula-name="${html(names.join(" "))}" data-engine="${is_default ? "default" : "full"}"><td>${syntax}${aliases ? `<small>Also ${aliases}</small>` : ""}${badges === "" ? "" : `<span class="sw-formula-badges">${badges}</span>`}</td><td class="sw-formula-summary">${html(summary_of(formula))}</td></tr>`;
       }),
       "</tbody></table></section>",
     ].join("");
@@ -622,7 +626,7 @@ export function renderFormulaFunctionPages(
         `<ul class="sw-formula-differences">${differences
           .map(
             (difference) =>
-              `<li id="${differenceAnchor(difference.id)}"><b>${html(difference.names.join(", "))}</b> ${html(difference.notes.join(" "))}</li>`,
+              `<li id="${difference_anchor(difference.id)}"><b>${html(difference.names.join(", "))}</b> ${html(difference.notes.join(" "))}</li>`,
           )
           .join("")}</ul>`,
         "",
@@ -631,7 +635,7 @@ export function renderFormulaFunctionPages(
     return {
       route: `reference/formula-functions/${slug}.md`,
       content: `${lines.join("\n").trimEnd()}\n`,
-      table: { family: slug, html: `${tableHtml}\n` },
+      table: { family: slug, html: `${table_html}\n` },
     };
   });
 
@@ -639,9 +643,9 @@ export function renderFormulaFunctionPages(
     {
       route: "reference/formula-functions.md",
       content: `${overview.join("\n").trimEnd()}\n`,
-      table: { family: FUNCTION_INDEX, html: `${indexHtml}\n` },
+      table: { family: FUNCTION_INDEX, html: `${index_html}\n` },
     },
-    ...familyPages,
+    ...family_pages,
   ];
 }
 
@@ -651,12 +655,12 @@ const FUNCTION_INDEX = "index";
 const FULL_BUILD_BADGE = '<span class="sw-formula-build" data-build="full">Full build</span>';
 
 /** The id of a function's row on its family page: `fn-sum`. */
-function functionAnchor(name: string): string {
+function function_anchor(name: string): string {
   return `fn-${anchor(name)}`;
 }
 
 /** The id of one Excel difference on a family page. */
-function differenceAnchor(dialect: string): string {
+function difference_anchor(dialect: string): string {
   return `excel-difference-${anchor(dialect)}`;
 }
 
@@ -667,7 +671,7 @@ interface FamilyLinks {
 }
 
 /** One card per family: what it is for, how many functions it has, and its most used ones. */
-function familyCards(
+function family_cards(
   families: ReadonlyArray<{
     readonly id: string;
     readonly title: string;
@@ -687,13 +691,13 @@ function familyCards(
       throw new Error(`docs/src/lib/formula-overview.ts has a card for unknown family ${id}`);
     }
     const total = family.functions.length;
-    const inDefault = family.functions.filter(links.inDefaultEngine).length;
+    const in_default = family.functions.filter(links.inDefaultEngine).length;
     const builds =
-      inDefault === 0
+      in_default === 0
         ? "full build only"
-        : inDefault === total
+        : in_default === total
           ? "all in the default build"
-          : `${inDefault} in the default build`;
+          : `${in_default} in the default build`;
     const common = card.common.map((name) => {
       const formula = family.functions.find((entry) => entry.canonical === name);
       if (formula === undefined)
@@ -709,7 +713,7 @@ function familyCards(
 }
 
 /** Every function from A to Z, one group per first letter, for the overview's filter. */
-function functionIndexHtml(
+function function_index_html(
   sorted: readonly FormulaRecord[],
   links: Omit<FamilyLinks, "familyRoute"> & {
     readonly summaryOf: (formula: FormulaRecord) => string;
@@ -726,10 +730,10 @@ function functionIndexHtml(
       ([letter, group]) =>
         `<section class="sw-formula-family sw-function-index"><h3>${html(letter)}</h3><ul>${group
           .map((formula) => {
-            const isDefault = links.inDefaultEngine(formula);
+            const is_default = links.inDefaultEngine(formula);
             // The first sentence is enough to tell functions apart.
             const [summary = ""] = links.summaryOf(formula).split(/(?<=\.)\s/u);
-            return `<li data-formula-name="${html([formula.canonical, ...formula.aliases].join(" "))}" data-engine="${isDefault ? "default" : "full"}"><a href="${links.entryHref(formula)}">${html(formula.canonical)}</a><span>${html(summary)}</span>${isDefault ? "" : FULL_BUILD_BADGE}</li>`;
+            return `<li data-formula-name="${html([formula.canonical, ...formula.aliases].join(" "))}" data-engine="${is_default ? "default" : "full"}"><a href="${links.entryHref(formula)}">${html(formula.canonical)}</a><span>${html(summary)}</span>${is_default ? "" : FULL_BUILD_BADGE}</li>`;
           })
           .join("")}</ul></section>`,
     )
@@ -737,14 +741,14 @@ function functionIndexHtml(
 }
 
 /** The unsupported categories in plain words: why, examples, what the cell shows, and where to read more. */
-function unsupportedList(categories: readonly JsonObject[]): string {
+function unsupported_list(categories: readonly JsonObject[]): string {
   const items = categories.map((category, index) => {
     const id = string(category.id, `unsupportedCategories[${index}].id`);
     const group = UNSUPPORTED_FORMULA_GROUPS[id];
     if (group === undefined) {
       throw new Error(`docs/src/lib/formula-overview.ts does not describe unsupported group ${id}`);
     }
-    const examples = stringArray(category.examples, `unsupportedCategories[${index}].examples`);
+    const examples = string_array(category.examples, `unsupportedCategories[${index}].examples`);
     return `<li><p class="sw-unsupported__name">${html(group.name)}</p><p>${html(group.why)}</p><p class="sw-unsupported__facts"><span>Examples: ${html(examples.join(", "))}</span><span>The cell shows <code>${html(group.shows)}</code>${group.when === undefined ? "" : ` ${html(group.when)}`}</span></p><a class="sw-unsupported__more" href="${group.see.href}">${html(group.see.label)}</a></li>`;
   });
   return `<ul class="sw-unsupported">${items.join("")}</ul>`;
@@ -771,7 +775,7 @@ interface ExcelCoverageContext {
   readonly summary: { supported: number; partial: number; missing: number };
 }
 
-function excelDifference(
+function excel_difference(
   formula: FormulaRecord,
   dialect: JsonObject,
 ): {
@@ -779,7 +783,7 @@ function excelDifference(
   readonly notes: readonly string[];
 } {
   const partial = dialect.excel === "divergent";
-  const notes = stringArray(dialect.divergences, `${formula.dialects}.divergences`)
+  const notes = string_array(dialect.divergences, `${formula.dialects}.divergences`)
     .filter((note) => !note.startsWith("Google Sheets and OpenFormula"))
     .map((note) => note.replace(/^Available only[^.]*\.\s*/u, ""))
     .filter((note) => note.length > 0);
@@ -790,7 +794,7 @@ function excelDifference(
   return { partial, notes };
 }
 
-function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): string {
+function render_excel_coverage_row(value: unknown, context: ExcelCoverageContext): string {
   const entry = object(value, "Excel function");
   const name = string(entry.name, "Excel function name");
   const url = string(entry.url, `${name} URL`);
@@ -815,21 +819,21 @@ function renderExcelCoverageRow(value: unknown, context: ExcelCoverageContext): 
 
   const dialect = context.dialects[formula.dialects];
   if (dialect === undefined) throw new Error(`${name} has unknown dialect ${formula.dialects}`);
-  const { partial, notes } = excelDifference(formula, dialect);
+  const { partial, notes } = excel_difference(formula, dialect);
   const status = partial ? "Partly supported" : "Supported";
-  const isFull = formula.builds.includes("@sheetwrite/formulas");
-  const isLite = formula.builds.includes("@sheetwrite/wasm");
-  if (!isFull) throw new Error(`${name} is registered without full-engine support`);
+  const is_full = formula.builds.includes("@sheetwrite/formulas");
+  const is_lite = formula.builds.includes("@sheetwrite/wasm");
+  if (!is_full) throw new Error(`${name} is registered without full-engine support`);
   context.summary[partial ? "partial" : "supported"]++;
 
-  const referenceLink = `${FORMULA_FUNCTIONS_ROUTE}${anchor(formula.family)}/`;
+  const reference_link = `${FORMULA_FUNCTIONS_ROUTE}${anchor(formula.family)}/`;
   const alias = name === formula.canonical ? "" : `Alias of \`${formula.canonical}\`. `;
-  const availability = isLite ? "" : "Lite engine: not registered. ";
+  const availability = is_lite ? "" : "Lite engine: not registered. ";
   const detail = notes.length > 0 ? `${notes.join(" ")} ` : "";
-  return `| [\`${name}\`](${url}) | ${status} | ${isLite ? status : "Not supported"} | ${cell(`${alias}${availability}${detail}[Reference](${referenceLink})`)} |`;
+  return `| [\`${name}\`](${url}) | ${status} | ${is_lite ? status : "Not supported"} | ${cell(`${alias}${availability}${detail}[Reference](${reference_link})`)} |`;
 }
 
-function renderExcelCoverageFamilies(
+function render_excel_coverage_families(
   families: readonly unknown[],
   context: ExcelCoverageContext,
 ): string[] {
@@ -843,20 +847,20 @@ function renderExcelCoverageFamilies(
       "",
       "| Excel function | Full engine | Lite engine | Notes and differences |",
       "| --- | --- | --- | --- |",
-      ...family.functions.map((entry) => renderExcelCoverageRow(entry, context)),
+      ...family.functions.map((entry) => render_excel_coverage_row(entry, context)),
       "",
     ];
   });
 }
 
-function unsupportedExamples(value: unknown): Map<string, string> {
+function unsupported_examples(value: unknown): Map<string, string> {
   if (!Array.isArray(value)) throw new Error("unsupportedCategories must be an array");
 
   return new Map(
     value.flatMap((entry, index) => {
       const category = object(entry, `unsupportedCategories[${index}]`);
       const scope = string(category.scope, `unsupportedCategories[${index}].scope`);
-      return stringArray(category.examples, `unsupportedCategories[${index}].examples`).map(
+      return string_array(category.examples, `unsupportedCategories[${index}].examples`).map(
         (name) => [name, scope] as const,
       );
     }),
@@ -872,7 +876,7 @@ export function renderExcelCoveragePage(
   catalogValue: unknown,
 ): FormulaReferencePage {
   const inventory = object(inventoryValue, "formula inventory");
-  const functions = parseFunctions(inventory.functions);
+  const functions = parse_functions(inventory.functions);
   const catalog = object(catalogValue, "Excel catalog");
   if (!Array.isArray(catalog.families)) throw new Error("Excel catalog families must be an array");
 
@@ -882,12 +886,12 @@ export function renderExcelCoveragePage(
         [formula.canonical, ...formula.aliases].map((name) => [name, formula] as const),
       ),
     ),
-    dialects: recordMap(inventory.dialectProfiles, "dialectProfiles"),
-    exclusions: unsupportedExamples(inventory.unsupportedCategories),
+    dialects: record_map(inventory.dialectProfiles, "dialectProfiles"),
+    exclusions: unsupported_examples(inventory.unsupportedCategories),
     seen: new Set<string>(),
     summary: { supported: 0, partial: 0, missing: 0 },
   };
-  const familyLines = renderExcelCoverageFamilies(catalog.families, context);
+  const family_lines = render_excel_coverage_families(catalog.families, context);
   const { seen, summary } = context;
 
   return {
@@ -912,7 +916,7 @@ export function renderExcelCoveragePage(
       "- To refresh the baseline, update `scripts/excel-functions.json` from the linked Microsoft catalog. Keep one row per name, split compound names, omit the featured-function duplicates, and prefer a function's current category over its compatibility duplicate. Run `bun run docs:generate`, then `bun run docs:check`.",
       "- Reviewed external workbook results are separate from registry coverage; see [compatibility results](/docs/reference/compatibility-results/).",
       "",
-      ...familyLines,
+      ...family_lines,
     ].join("\n"),
   };
 }

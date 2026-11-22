@@ -16,7 +16,7 @@ const CLIPBOARD_MESSAGES: Partial<Record<ClipboardOutcome, string>> = {
 /** How long a message stays before it clears itself. */
 const MESSAGE_MS = 6000;
 
-function isClipboardOutcome(value: unknown): value is ClipboardOutcome {
+function is_clipboard_outcome(value: unknown): value is ClipboardOutcome {
   return (
     value === "done" ||
     value === "empty" ||
@@ -68,7 +68,7 @@ class ActionFeedback {
   async run(key: string, command: () => unknown, button?: HTMLButtonElement): Promise<void> {
     if (this.running.has(key)) return;
     this.running.add(key);
-    const wasDisabled = button?.disabled ?? false;
+    const was_disabled = button?.disabled ?? false;
     const label = button?.getAttribute("aria-label");
     const title = button?.title;
     if (button) {
@@ -80,7 +80,7 @@ class ActionFeedback {
     if (button) button.disabled = true;
     try {
       const outcome = await command();
-      if (isClipboardOutcome(outcome)) {
+      if (is_clipboard_outcome(outcome)) {
         const message = CLIPBOARD_MESSAGES[outcome];
         if (message !== undefined) this.show(message);
       }
@@ -95,7 +95,7 @@ class ActionFeedback {
         button.title = title ?? "";
       }
       // Command state may have changed meanwhile; only undo our own disable.
-      if (button && !wasDisabled) button.disabled = false;
+      if (button && !was_disabled) button.disabled = false;
     }
   }
 

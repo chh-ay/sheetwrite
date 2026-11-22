@@ -19,7 +19,7 @@ const RESULT_OVERSCAN = 4;
 const PREVIEW_DELAY_MS = 150;
 
 /** Counter label: empty when idle, "No results", or "<active+1> of <total>". */
-function formatCount(result: SearchResult): string {
+function format_count(result: SearchResult): string {
   if (result.matches.length === 0) {
     return result.query ? "No results" : "";
   }
@@ -31,7 +31,7 @@ function formatCount(result: SearchResult): string {
  * Replace all's summary: "8 cells, 2 of them formulas", "3 notes" or "Nothing
  * to replace", and how many of them the list shows when it shows fewer.
  */
-function previewSummary({ changes, total: count, formulas }: ReplacePreview): string {
+function preview_summary({ changes, total: count, formulas }: ReplacePreview): string {
   if (count === 0) return "Nothing to replace";
   const listed =
     changes.length < count ? `; the first ${changes.length.toLocaleString("en-US")} listed` : "";
@@ -46,7 +46,7 @@ function previewSummary({ changes, total: count, formulas }: ReplacePreview): st
 }
 
 /** A unique element ID for ARIA references inside one find bar. */
-function uniqueId(part: string): string {
+function unique_id(part: string): string {
   return `sheetwrite-find-${part}-${Math.random().toString(36).slice(2)}`;
 }
 
@@ -61,9 +61,9 @@ class CellList {
   private readonly list = document.createElement("div");
   private readonly spacer = document.createElement("div");
   private readonly status = document.createElement("span");
-  private rowCount = 0;
+  private row_count = 0;
   private active = -1;
-  private rowText: (index: number) => readonly string[] = () => [];
+  private row_text: (index: number) => readonly string[] = () => [];
 
   constructor(
     className: string,
@@ -85,7 +85,7 @@ class CellList {
 
     const list = this.list;
     list.className = "sheetwrite-find-results-list";
-    list.id = uniqueId("list");
+    list.id = unique_id("list");
     list.tabIndex = 0;
     list.setAttribute("role", "listbox");
     list.setAttribute("aria-label", label);
@@ -96,7 +96,7 @@ class CellList {
       this.render();
     });
     list.addEventListener("keydown", (e) => {
-      const last = this.rowCount - 1;
+      const last = this.row_count - 1;
       const target =
         e.key === "ArrowDown"
           ? Math.min(last, this.active + 1)
@@ -125,16 +125,16 @@ class CellList {
     this.el.append(head, list, this.status);
   }
 
-  /** List `rowCount` rows, with row `active` (or none, -1) highlighted and scrolled into view. */
+  /** List `row_count` rows, with row `active` (or none, -1) highlighted and scrolled into view. */
   show(
     rowCount: number,
     active: number,
     status: string,
     rowText: (index: number) => readonly string[],
   ): void {
-    this.rowCount = rowCount;
+    this.row_count = rowCount;
     this.active = active;
-    this.rowText = rowText;
+    this.row_text = rowText;
     this.status.textContent = status;
     this.spacer.style.height = `${rowCount * RESULT_ROW_HEIGHT}px`;
 
@@ -151,7 +151,7 @@ class CellList {
     const list = this.list;
     const first = Math.max(0, Math.floor(list.scrollTop / RESULT_ROW_HEIGHT) - RESULT_OVERSCAN);
     const end = Math.min(
-      this.rowCount,
+      this.row_count,
       Math.ceil((list.scrollTop + list.clientHeight) / RESULT_ROW_HEIGHT) + RESULT_OVERSCAN,
     );
     const rows: HTMLDivElement[] = [];
@@ -164,7 +164,7 @@ class CellList {
       row.setAttribute("aria-selected", String(index === this.active));
       row.style.position = "absolute";
       row.style.top = `${index * RESULT_ROW_HEIGHT}px`;
-      for (const text of this.rowText(index)) {
+      for (const text of this.row_text(index)) {
         const span = document.createElement("span");
         span.textContent = text;
         span.title = text;
@@ -210,21 +210,21 @@ type AccessKeyAction = () => void;
 export class FindBar {
   private readonly host: HTMLElement;
   private readonly grid: Grid;
-  private readonly readOnly: boolean;
+  private readonly read_only: boolean;
   private elements: FindBarElements | null = null;
   private _open = false;
   private options: SearchOptions = {};
   /** The changes the Replace all preview lists, in its row order. */
   private changes: ReplaceChange[] = [];
   /** The planned preview that waits for typing to pause. */
-  private previewTimer: ReturnType<typeof setTimeout> | undefined;
+  private preview_timer: ReturnType<typeof setTimeout> | undefined;
   private result: SearchResult = { query: "", matches: [], active: -1 };
   private unsubscribe: (() => void) | null = null;
 
   constructor(host: HTMLElement, theme: Theme, grid: Grid, readOnly = false) {
     this.host = host;
     this.grid = grid;
-    this.readOnly = readOnly;
+    this.read_only = readOnly;
 
     seedWidgetTheme(host, theme);
   }
@@ -243,7 +243,7 @@ export class FindBar {
   }
 
   close(): void {
-    clearTimeout(this.previewTimer);
+    clearTimeout(this.preview_timer);
     if (this.elements) {
       this.elements.el.style.display = "none";
       this.elements.findAll.el.hidden = true;
@@ -260,7 +260,7 @@ export class FindBar {
   }
 
   destroy(): void {
-    clearTimeout(this.previewTimer);
+    clearTimeout(this.preview_timer);
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.elements?.el.remove();
@@ -281,7 +281,7 @@ export class FindBar {
     el.style.right = "10px";
     el.style.display = "none";
 
-    const findRow = this.row("sheetwrite-find-row");
+    const find_row = this.row("sheetwrite-find-row");
 
     // The match count sits inside the field, on the right, as in Google Sheets.
     const field = document.createElement("span");
@@ -315,25 +315,25 @@ export class FindBar {
         this.grid.findNext();
       },
     );
-    const findAllButton = this.button(
+    const find_all_button = this.button(
       "sheetwrite-find-all",
       "sheetwrite-find-icon-btn",
       "≡",
       "Find all",
       () => {
-        this.showFindAll();
+        this.show_find_all();
       },
     );
-    const optionsToggle = this.button(
+    const options_toggle = this.button(
       "sheetwrite-find-options-toggle",
       "sheetwrite-find-icon-btn",
       "⋯",
       "Options",
       () => {
-        this.toggleOptions();
+        this.toggle_options();
       },
     );
-    optionsToggle.setAttribute("aria-expanded", "false");
+    options_toggle.setAttribute("aria-expanded", "false");
     const close = this.button(
       "sheetwrite-find-close",
       "sheetwrite-find-icon-btn",
@@ -349,7 +349,7 @@ export class FindBar {
     });
 
     input.addEventListener("keydown", (e) => {
-      if (this.handleFieldShortcut(e)) return;
+      if (this.handle_field_shortcut(e)) return;
 
       if (e.key === "Enter") {
         e.stopPropagation();
@@ -358,12 +358,12 @@ export class FindBar {
       }
     });
 
-    findRow.append(field, prev, next, findAllButton, optionsToggle, close);
-    el.appendChild(findRow);
+    find_row.append(field, prev, next, find_all_button, options_toggle, close);
+    el.appendChild(find_row);
 
-    const replace = this.readOnly ? null : this.buildReplaceRow(el);
-    const options = this.buildOptions();
-    const findAll = new CellList(
+    const replace = this.read_only ? null : this.build_replace_row(el);
+    const options = this.build_options();
+    const find_all = new CellList(
       "sheetwrite-find-all-results",
       "Find all results",
       ["Sheet", "Cell", "Value", "Formula"],
@@ -377,23 +377,23 @@ export class FindBar {
           "Replace all preview",
           ["Sheet", "Cell", "Before", "After"],
           (index) => {
-            this.goToChange(index);
+            this.go_to_change(index);
           },
         )
       : null;
     if (preview) {
       el.append(preview.el);
       replace?.input.addEventListener("input", () => {
-        this.schedulePreview();
+        this.schedule_preview();
       });
       el.addEventListener("focusin", () => {
-        this.schedulePreview();
+        this.schedule_preview();
       });
       el.addEventListener("focusout", () => {
-        this.schedulePreview();
+        this.schedule_preview();
       });
     }
-    el.append(options.panel, findAll.el);
+    el.append(options.panel, find_all.el);
     this.host.appendChild(el);
     checkStylePart(el, "find", "The find bar");
 
@@ -402,25 +402,25 @@ export class FindBar {
       input,
       count,
       replaceInput: replace?.input ?? null,
-      optionsToggle,
+      optionsToggle: options_toggle,
       options: options.panel,
-      findAll,
+      findAll: find_all,
       preview,
     };
-    options.panel.id = uniqueId("options");
-    optionsToggle.setAttribute("aria-controls", options.panel.id);
+    options.panel.id = unique_id("options");
+    options_toggle.setAttribute("aria-controls", options.panel.id);
 
     // Excel's Find and Replace dialog: Alt and the underlined letter.
-    const accessKeys: Record<string, AccessKeyAction> = {
+    const access_keys: Record<string, AccessKeyAction> = {
       n: () => input.focus(),
       f: () => this.grid.findNext(),
-      i: () => this.showFindAll(),
-      t: () => this.toggleOptions(),
-      h: () => this.focusOption(options.within),
-      s: () => this.focusOption(options.searchBy),
-      l: () => this.focusOption(options.lookIn),
-      c: () => this.focusOption(options.matchCase, true),
-      o: () => this.focusOption(options.wholeCell, true),
+      i: () => this.show_find_all(),
+      t: () => this.toggle_options(),
+      h: () => this.focus_option(options.within),
+      s: () => this.focus_option(options.searchBy),
+      l: () => this.focus_option(options.lookIn),
+      c: () => this.focus_option(options.matchCase, true),
+      o: () => this.focus_option(options.wholeCell, true),
       ...(replace && {
         e: () => replace.input.focus(),
         r: () => replace.replaceButton.click(),
@@ -436,7 +436,7 @@ export class FindBar {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
       // On macOS Option+letter types a character instead (Option+C is ç), so
       // it never equals the letter and typing keeps working there.
-      const action = accessKeys[e.key.toLowerCase()];
+      const action = access_keys[e.key.toLowerCase()];
       if (!action) return;
       e.preventDefault();
       e.stopPropagation();
@@ -449,55 +449,55 @@ export class FindBar {
     return this.elements;
   }
 
-  private buildReplaceRow(el: HTMLDivElement): {
+  private build_replace_row(el: HTMLDivElement): {
     input: HTMLInputElement;
     replaceButton: HTMLButtonElement;
     allButton: HTMLButtonElement;
   } {
-    const replaceRow = this.row("sheetwrite-find-replace-row");
+    const replace_row = this.row("sheetwrite-find-replace-row");
 
-    const replaceInput = document.createElement("input");
-    replaceInput.className = "sheetwrite-find-replace-input";
-    replaceInput.placeholder = "Replace with";
-    replaceInput.setAttribute("aria-label", "Replace with");
+    const replace_input = document.createElement("input");
+    replace_input.className = "sheetwrite-find-replace-input";
+    replace_input.placeholder = "Replace with";
+    replace_input.setAttribute("aria-label", "Replace with");
 
-    const replaceButton = this.button(
+    const replace_button = this.button(
       "sheetwrite-find-replace",
       "sheetwrite-find-text-btn",
       "Replace",
       "Replace",
       () => {
-        this.grid.replaceCurrent(replaceInput.value);
+        this.grid.replaceCurrent(replace_input.value);
       },
     );
 
-    const allButton = this.button(
+    const all_button = this.button(
       "sheetwrite-find-replace-all",
       "sheetwrite-find-text-btn",
       "Replace all",
       "Replace all",
       () => {
-        this.grid.replaceAll(replaceInput.value);
+        this.grid.replaceAll(replace_input.value);
       },
     );
 
-    replaceInput.addEventListener("keydown", (e) => {
-      if (this.handleFieldShortcut(e)) return;
+    replace_input.addEventListener("keydown", (e) => {
+      if (this.handle_field_shortcut(e)) return;
 
       if (e.key === "Enter") {
         e.stopPropagation();
         e.preventDefault();
-        replaceButton.click();
+        replace_button.click();
       }
     });
 
-    replaceRow.append(replaceInput, replaceButton, allButton);
-    el.appendChild(replaceRow);
-    return { input: replaceInput, replaceButton, allButton };
+    replace_row.append(replace_input, replace_button, all_button);
+    el.appendChild(replace_row);
+    return { input: replace_input, replaceButton: replace_button, allButton: all_button };
   }
 
   /** Excel's Options: Within, Search and Look in, Match case, Match entire cell contents. */
-  private buildOptions(): {
+  private build_options(): {
     panel: HTMLDivElement;
     within: HTMLSelectElement;
     searchBy: HTMLSelectElement;
@@ -513,25 +513,26 @@ export class FindBar {
       ["sheet", "Sheet"],
       ["workbook", "Workbook"],
     ]);
-    const searchBy = this.select(panel, "Search:", "S", [
+    const search_by = this.select(panel, "Search:", "S", [
       ["rows", "By Rows"],
       ["columns", "By Columns"],
     ]);
-    const lookIn = this.select(panel, "Look in:", "L", [
+    const look_in = this.select(panel, "Look in:", "L", [
       ["formulas", "Formulas"],
       ["values", "Values"],
       ["notes", "Notes"],
     ]);
-    const matchCase = this.checkbox(panel, "Match case", "C");
-    const wholeCell = this.checkbox(panel, "Match entire cell contents", "O");
+    const match_case = this.checkbox(panel, "Match case", "C");
+    const whole_cell = this.checkbox(panel, "Match entire cell contents", "O");
 
     const apply = (): void => {
       this.options = {
         within: within.value === "workbook" ? "workbook" : "sheet",
-        searchBy: searchBy.value === "columns" ? "columns" : "rows",
-        lookIn: lookIn.value === "values" || lookIn.value === "notes" ? lookIn.value : "formulas",
-        matchCase: matchCase.checked,
-        wholeCell: wholeCell.checked,
+        searchBy: search_by.value === "columns" ? "columns" : "rows",
+        lookIn:
+          look_in.value === "values" || look_in.value === "notes" ? look_in.value : "formulas",
+        matchCase: match_case.checked,
+        wholeCell: whole_cell.checked,
       };
       const input = this.elements?.input;
       if (input) {
@@ -541,14 +542,21 @@ export class FindBar {
       }
       this.search();
     };
-    for (const control of [within, searchBy, lookIn, matchCase, wholeCell]) {
+    for (const control of [within, search_by, look_in, match_case, whole_cell]) {
       control.addEventListener("change", apply);
     }
 
-    return { panel, within, searchBy, lookIn, matchCase, wholeCell };
+    return {
+      panel,
+      within,
+      searchBy: search_by,
+      lookIn: look_in,
+      matchCase: match_case,
+      wholeCell: whole_cell,
+    };
   }
 
-  private toggleOptions(): void {
+  private toggle_options(): void {
     const elements = this.elements;
     if (!elements) return;
     const hidden = !elements.options.hidden;
@@ -557,33 +565,33 @@ export class FindBar {
   }
 
   /** Show the options, then focus `control`, or toggle a checkbox, as Alt+letter does in Excel. */
-  private focusOption(control: HTMLSelectElement | HTMLInputElement, toggle = false): void {
-    if (this.elements?.options.hidden) this.toggleOptions();
+  private focus_option(control: HTMLSelectElement | HTMLInputElement, toggle = false): void {
+    if (this.elements?.options.hidden) this.toggle_options();
     control.focus();
     if (toggle) control.click();
   }
 
   /** Find All: list every match with its sheet, cell, value and formula. */
-  private showFindAll(): void {
-    const findAll = this.elements?.findAll;
-    if (!findAll) return;
-    if (findAll.el.hidden) {
-      findAll.el.hidden = false;
+  private show_find_all(): void {
+    const find_all = this.elements?.findAll;
+    if (!find_all) return;
+    if (find_all.el.hidden) {
+      find_all.el.hidden = false;
       this.search();
     }
-    this.renderFindAll();
+    this.render_find_all();
   }
 
   private update(result: SearchResult): void {
     this.result = result;
     const elements = this.elements;
     if (!elements) return;
-    elements.count.textContent = formatCount(result);
-    if (!elements.findAll.el.hidden) this.renderFindAll();
-    this.schedulePreview();
+    elements.count.textContent = format_count(result);
+    if (!elements.findAll.el.hidden) this.render_find_all();
+    this.schedule_preview();
   }
 
-  private renderFindAll(): void {
+  private render_find_all(): void {
     const { matches, active } = this.result;
     const store = this.grid.store;
     const names = new Map(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]));
@@ -609,10 +617,10 @@ export class FindBar {
    * Plan the preview once typing or focus changes pause, so a burst of keys
    * plans it once: each plan runs the replacement over every match.
    */
-  private schedulePreview(): void {
-    clearTimeout(this.previewTimer);
-    this.previewTimer = setTimeout(() => {
-      this.renderPreview();
+  private schedule_preview(): void {
+    clearTimeout(this.preview_timer);
+    this.preview_timer = setTimeout(() => {
+      this.render_preview();
     }, PREVIEW_DELAY_MS);
   }
 
@@ -621,22 +629,22 @@ export class FindBar {
    * focus: a summary, and the first changes, each cell or note with its text
    * before and after.
    */
-  private renderPreview(): void {
+  private render_preview(): void {
     const preview = this.elements?.preview;
-    const replaceInput = this.elements?.replaceInput;
-    if (!preview || !replaceInput) return;
+    const replace_input = this.elements?.replaceInput;
+    if (!preview || !replace_input) return;
     const focused = document.activeElement;
     const engaged =
-      replaceInput.value !== "" ||
-      (focused instanceof Node && (focused === replaceInput || preview.el.contains(focused)));
+      replace_input.value !== "" ||
+      (focused instanceof Node && (focused === replace_input || preview.el.contains(focused)));
     preview.el.hidden = !this.result.query || !engaged;
     if (preview.el.hidden) return;
 
-    const planned = this.grid.previewReplaceAll(replaceInput.value);
+    const planned = this.grid.previewReplaceAll(replace_input.value);
     const { changes } = planned;
     this.changes = changes;
     const active = this.result.matches[this.result.active];
-    const activeRow = active
+    const active_row = active
       ? changes.findIndex(
           ({ addr }) =>
             addr.sheet === active.sheet && addr.row === active.row && addr.col === active.col,
@@ -645,7 +653,7 @@ export class FindBar {
     const names = new Map(
       this.grid.store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]),
     );
-    preview.show(changes.length, activeRow, previewSummary(planned), (index) => {
+    preview.show(changes.length, active_row, preview_summary(planned), (index) => {
       const change = changes[index];
       if (!change) return [];
       const { addr } = change;
@@ -659,7 +667,7 @@ export class FindBar {
   }
 
   /** Go to the cell of one previewed change, as clicking a Find All result does. */
-  private goToChange(index: number): void {
+  private go_to_change(index: number): void {
     const addr = this.changes[index]?.addr;
     if (!addr) return;
     const match = this.result.matches.findIndex(
@@ -673,7 +681,7 @@ export class FindBar {
    * fields instead of falling through to the browser's native find dialog (the
    * grid's host handler never sees keys originating in editable widgets).
    */
-  private handleFieldShortcut(e: KeyboardEvent): boolean {
+  private handle_field_shortcut(e: KeyboardEvent): boolean {
     if (!(e.ctrlKey || e.metaKey)) return false;
     const key = e.key.toLowerCase();
     if (key !== "f" && key !== "h") return false;
@@ -684,23 +692,23 @@ export class FindBar {
     return true;
   }
 
-  private row(className: string): HTMLDivElement {
+  private row(class_name: string): HTMLDivElement {
     const row = document.createElement("div");
-    row.className = className;
+    row.className = class_name;
     return row;
   }
 
-  /** A labelled select in the options panel; `accessKey` is Excel's Alt letter. */
+  /** A labelled select in the options panel; `access_key` is Excel's Alt letter. */
   private select(
     panel: HTMLDivElement,
     text: string,
-    accessKey: string,
+    access_key: string,
     choices: readonly (readonly [value: string, label: string])[],
   ): HTMLSelectElement {
     const label = document.createElement("label");
     label.className = "sheetwrite-find-option";
     const select = document.createElement("select");
-    select.setAttribute("aria-keyshortcuts", `Alt+${accessKey}`);
+    select.setAttribute("aria-keyshortcuts", `Alt+${access_key}`);
     for (const [value, name] of choices) {
       const option = document.createElement("option");
       option.value = value;
@@ -712,35 +720,35 @@ export class FindBar {
     return select;
   }
 
-  /** A labelled checkbox in the options panel; `accessKey` is Excel's Alt letter. */
-  private checkbox(panel: HTMLDivElement, text: string, accessKey: string): HTMLInputElement {
+  /** A labelled checkbox in the options panel; `access_key` is Excel's Alt letter. */
+  private checkbox(panel: HTMLDivElement, text: string, access_key: string): HTMLInputElement {
     const label = document.createElement("label");
     label.className = "sheetwrite-find-option sheetwrite-find-check";
     const box = document.createElement("input");
     box.type = "checkbox";
-    box.setAttribute("aria-keyshortcuts", `Alt+${accessKey}`);
+    box.setAttribute("aria-keyshortcuts", `Alt+${access_key}`);
     label.append(box, text);
     panel.appendChild(label);
     return box;
   }
 
   /**
-   * A flat button that keeps grid focus (mousedown is suppressed). `typeClass`
+   * A flat button that keeps grid focus (mousedown is suppressed). `type_class`
    * selects the icon (square nav/close) vs. text (Replace / Replace all)
-   * sizing rule; `className` is the per-button hook. `title` is also the
+   * sizing rule; `class_name` is the per-button hook. `title` is also the
    * accessible name, so ↑, ↓ and ✕ are announced as Previous, Next and Close.
    * All cosmetics live in styles.css.
    */
   private button(
-    className: string,
-    typeClass: string,
+    class_name: string,
+    type_class: string,
     label: string,
     title: string,
-    onClick: () => void,
+    on_click: () => void,
   ): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `sheetwrite-find-btn ${typeClass} ${className}`;
+    btn.className = `sheetwrite-find-btn ${type_class} ${class_name}`;
     btn.textContent = label;
     btn.title = title;
     btn.setAttribute("aria-label", title);
@@ -749,9 +757,9 @@ export class FindBar {
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.addEventListener("click", () => {
       const feedback =
-        typeClass === "sheetwrite-find-text-btn" ? actionFeedbackFor(this.grid) : undefined;
-      if (feedback) void feedback.run(`find:${className}`, onClick, btn);
-      else onClick();
+        type_class === "sheetwrite-find-text-btn" ? actionFeedbackFor(this.grid) : undefined;
+      if (feedback) void feedback.run(`find:${class_name}`, on_click, btn);
+      else on_click();
     });
 
     return btn;

@@ -12,12 +12,12 @@ import {
 } from "./fixture.js";
 
 export default function ReactFixture() {
-  const [wasmSource, setWasmSource] = useState<Uint8Array | undefined>(INVALID_WASM_SOURCE);
-  const [data, setData] = useState(LIFECYCLE_DATA);
-  const [mounted, setMounted] = useState(true);
-  const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
-  const [errors, setErrors] = useState(0);
-  const [ready, setReady] = useState("");
+  const [wasm_source, set_wasm_source] = useState<Uint8Array | undefined>(INVALID_WASM_SOURCE);
+  const [data, set_data] = useState(LIFECYCLE_DATA);
+  const [mounted, set_mounted] = useState(true);
+  const [status, set_status] = useState<"loading" | "error" | "ready">("loading");
+  const [errors, set_errors] = useState(0);
+  const [ready, set_ready] = useState("");
 
   return (
     <main data-framework-lifecycle="react">
@@ -25,16 +25,16 @@ export default function ReactFixture() {
         type="button"
         data-lifecycle-retry
         onClick={() => {
-          setStatus("loading");
-          setWasmSource(undefined);
+          set_status("loading");
+          set_wasm_source(undefined);
         }}
       >
         Retry React
       </button>
-      <button type="button" data-lifecycle-reset onClick={() => setData(LIFECYCLE_RESET_DATA)}>
+      <button type="button" data-lifecycle-reset onClick={() => set_data(LIFECYCLE_RESET_DATA)}>
         Reset React input
       </button>
-      <button type="button" data-lifecycle-unmount onClick={() => setMounted(false)}>
+      <button type="button" data-lifecycle-unmount onClick={() => set_mounted(false)}>
         Unmount React
       </button>
       <output data-lifecycle-status>{status}</output>
@@ -45,15 +45,15 @@ export default function ReactFixture() {
           workbook={LIFECYCLE_WORKBOOK}
           data={data}
           height={320}
-          wasmSource={wasmSource}
+          wasmSource={wasm_source}
           fallback={<span data-lifecycle-fallback>React fallback</span>}
           onInitializationError={() => {
-            setErrors((count) => count + 1);
-            setStatus("error");
+            set_errors((count) => count + 1);
+            set_status("error");
           }}
           onReady={({ generation, reason }) => {
-            setReady(`${generation}:${reason}`);
-            setStatus("ready");
+            set_ready(`${generation}:${reason}`);
+            set_status("ready");
           }}
         />
       ) : null}

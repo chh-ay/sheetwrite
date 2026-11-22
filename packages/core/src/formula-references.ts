@@ -48,7 +48,7 @@ type ReferenceEnd =
   | { readonly kind: "column"; readonly col: number }
   | { readonly kind: "row"; readonly row: number };
 
-function referenceEnd(token: RawToken | undefined): ReferenceEnd | null {
+function reference_end(token: RawToken | undefined): ReferenceEnd | null {
   if (token === undefined) return null;
   if (token.kind === "num") {
     const row = Number(token.text) - 1;
@@ -98,12 +98,12 @@ function span(
   return null;
 }
 
-function sheetName(token: RawToken): string {
+function sheet_name(token: RawToken): string {
   return token.kind === "quoted" ? token.text.slice(1, -1).replaceAll("''", "'") : token.text;
 }
 
 /** The token indexes a reference covers, or null when no reference starts at `index`. */
-function referenceAt(
+function reference_at(
   tokens: readonly RawToken[],
   index: number,
 ): { reference: Omit<FormulaReference, "colorIndex">; next: number } | null {
@@ -114,15 +114,15 @@ function referenceAt(
     (qualifier?.kind === "ident" || qualifier?.kind === "quoted") &&
     tokens[at + 1]?.kind === "bang"
   ) {
-    sheet = sheetName(qualifier);
+    sheet = sheet_name(qualifier);
     at += 2;
   }
 
-  const first = referenceEnd(tokens[at]);
+  const first = reference_end(tokens[at]);
   if (first === null || isCallName(tokens, at)) return null;
 
-  const hasLast = tokens[at + 1]?.kind === "colon" && !isCallName(tokens, at + 2);
-  const last = hasLast ? referenceEnd(tokens[at + 2]) : null;
+  const has_last = tokens[at + 1]?.kind === "colon" && !isCallName(tokens, at + 2);
+  const last = has_last ? reference_end(tokens[at + 2]) : null;
   const rectangle = span(first, last);
   if (rectangle === null) return null;
 
@@ -139,7 +139,7 @@ export function findReferences(tokens: readonly RawToken[]): FormulaReference[] 
 
   let index = 0;
   while (index < tokens.length) {
-    const found = referenceAt(tokens, index);
+    const found = reference_at(tokens, index);
     if (found === null) {
       index += 1;
       continue;
@@ -147,9 +147,9 @@ export function findReferences(tokens: readonly RawToken[]): FormulaReference[] 
 
     const { reference } = found;
     const key = `${reference.sheet?.toUpperCase() ?? ""}!${reference.start.row},${reference.start.col}:${reference.end.row},${reference.end.col}`;
-    const colorIndex = colours.get(key) ?? colours.size;
-    colours.set(key, colorIndex);
-    references.push({ ...reference, colorIndex });
+    const color_index = colours.get(key) ?? colours.size;
+    colours.set(key, color_index);
+    references.push({ ...reference, colorIndex: color_index });
     index = found.next;
   }
 

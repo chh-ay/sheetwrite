@@ -73,10 +73,10 @@ function snapshot(queries: SavedQuery[] = [sales]): WorkbookSnapshot {
             startCol: 0,
             rowCount: 3,
             colCount: 2,
-            cells: ROWS.flatMap((row, rowOffset) =>
-              row.map((value, colOffset) => ({
-                rowOffset,
-                colOffset,
+            cells: ROWS.flatMap((row, row_offset) =>
+              row.map((value, col_offset) => ({
+                rowOffset: row_offset,
+                colOffset: col_offset,
                 value: { kind: "literal" as const, value },
               })),
             ),
@@ -89,20 +89,20 @@ function snapshot(queries: SavedQuery[] = [sales]): WorkbookSnapshot {
 
 type Warnings = XlsxWorkbookWarning[];
 
-function options(warnings: Warnings, withCodec: boolean) {
+function options(warnings: Warnings, with_codec: boolean) {
   return {
     onWarning: (warning: XlsxWorkbookWarning) => warnings.push(warning),
-    ...(withCodec ? { powerQuery: codec } : {}),
+    ...(with_codec ? { powerQuery: codec } : {}),
   };
 }
 
 const text = (bytes: Uint8Array | undefined) => strFromU8(bytes ?? new Uint8Array());
-const isMashupItem = (name: string) => /^customXml\/item\d+\.xml$/u.test(name);
+const is_mashup_item = (name: string) => /^customXml\/item\d+\.xml$/u.test(name);
 
 /** The decoded Section1.m of a written DataMashup item ([MS-QDEFF] 2.2). */
-function sectionOf(files: Record<string, Uint8Array>): string | undefined {
+function section_of(files: Record<string, Uint8Array>): string | undefined {
   for (const [name, bytes] of Object.entries(files)) {
-    if (!isMashupItem(name)) continue;
+    if (!is_mashup_item(name)) continue;
 
     const match = /<DataMashup[^>]*>([^<]+)<\/DataMashup>/u.exec(strFromU8(bytes));
     if (!match?.[1]) continue;
@@ -122,7 +122,7 @@ describe("Power Query export", () => {
     const warnings: Warnings = [];
     const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, true)));
 
-    expect(sectionOf(files)).toBe(codec.encode([sales]).section);
+    expect(section_of(files)).toBe(codec.encode([sales]).section);
     expect(text(files["xl/connections.xml"])).toContain("Location=Sales;");
     expect(text(files["xl/tables/table1.xml"])).toContain('tableType="queryTable"');
     expect(Object.keys(files)).toContain("xl/queryTables/queryTable1.xml");
@@ -135,7 +135,7 @@ describe("Power Query export", () => {
     const warnings: Warnings = [];
     const files = unzipSync(await backend.toXlsxWorkbook(snapshot(), options(warnings, false)));
 
-    expect(sectionOf(files)).toBeUndefined();
+    expect(section_of(files)).toBeUndefined();
     expect(files["xl/connections.xml"]).toBeUndefined();
     expect(warnings).toContainEqual(expect.objectContaining({ code: "query-loss" }));
   });
@@ -147,7 +147,7 @@ describe("Power Query round trip", () => {
     const imported = await backend.fromXlsxWorkbook(first, options([], true));
     const second = unzipSync(await backend.toXlsxWorkbook(imported, options([], true)));
     const original = unzipSync(first);
-    const item = Object.keys(original).find(isMashupItem) ?? "";
+    const item = Object.keys(original).find(is_mashup_item) ?? "";
 
     expect(second[item]).toEqual(original[item]);
     expect(second["xl/connections.xml"]).toEqual(original["xl/connections.xml"]);
@@ -157,8 +157,8 @@ describe("Power Query round trip", () => {
   test("restores exact definitions written by Sheetwrite, with or without a codec", async () => {
     const file = await backend.toXlsxWorkbook(snapshot(), options([], true));
 
-    for (const withCodec of [true, false]) {
-      const imported = await backend.fromXlsxWorkbook(file, options([], withCodec));
+    for (const with_codec of [true, false]) {
+      const imported = await backend.fromXlsxWorkbook(file, options([], with_codec));
       expect(imported.workbook.queries).toEqual([sales]);
     }
   });
@@ -176,7 +176,7 @@ in
 shared Files = Folder.Files("C:\\data");
 `;
     const warnings: Warnings = [];
-    const file = await withMashup(section, "Orders");
+    const file = await with_mashup(section, "Orders");
     const imported = await backend.fromXlsxWorkbook(file, options(warnings, true));
 
     expect(imported.workbook.queries).toEqual([
@@ -213,7 +213,7 @@ shared Files = Folder.Files("C:\\data");
 
   test("writes retained parts back byte-for-byte without a codec until the saved queries change", async () => {
     const section = 'section Section1;\n\nshared Files = Folder.Files("C:\\\\data");\n';
-    const original = await withMashup(section, "Files");
+    const original = await with_mashup(section, "Files");
     const imported = await backend.fromXlsxWorkbook(original, options([], false));
     const unchanged = unzipSync(await backend.toXlsxWorkbook(imported, options([], false)));
 
@@ -224,7 +224,7 @@ shared Files = Folder.Files("C:\\data");
     const warnings: Warnings = [];
     const changed = unzipSync(await backend.toXlsxWorkbook(imported, options(warnings, false)));
 
-    expect(sectionOf(changed)).toBeUndefined();
+    expect(section_of(changed)).toBeUndefined();
     expect(warnings).toContainEqual(
       expect.objectContaining({
         code: "query-loss",
@@ -240,7 +240,7 @@ shared Files = Folder.Files("C:\\data");
  * Permissions, Metadata and a one-byte null Permission Bindings stream.
  * `member` fills the Sales table.
  */
-async function withMashup(section: string, member: string): Promise<Uint8Array> {
+async function with_mashup(section: string, member: string): Promise<Uint8Array> {
   const files = unzipSync(await backend.toXlsxWorkbook(snapshot([]), options([], false)));
   const u32 = (value: number): Uint8Array => {
     const bytes = new Uint8Array(4);
@@ -266,14 +266,14 @@ async function withMashup(section: string, member: string): Promise<Uint8Array> 
     ),
     "Formulas/Section1.m": strToU8(section),
   });
-  const metadataXml = strToU8(
+  const metadata_xml = strToU8(
     `<LocalPackageMetadataFile><Items><Item><ItemLocation><ItemType>Formula</ItemType><ItemPath>Section1/${member}</ItemPath></ItemLocation><StableEntries><Entry Type="FillEnabled" Value="l1"/><Entry Type="FillTarget" Value="sSales"/></StableEntries></Item></Items></LocalPackageMetadataFile>`,
   );
   const binary = join([
     u32(0),
     prefixed(parts),
     prefixed(strToU8("<PermissionList/>")),
-    prefixed(join([u32(0), prefixed(metadataXml), u32(0)])),
+    prefixed(join([u32(0), prefixed(metadata_xml), u32(0)])),
     prefixed(Uint8Array.of(0)),
   ]);
   const item = `<?xml version="1.0" encoding="utf-8"?><DataMashup xmlns="http://schemas.microsoft.com/DataMashup">${btoa(String.fromCharCode(...binary))}</DataMashup>`;

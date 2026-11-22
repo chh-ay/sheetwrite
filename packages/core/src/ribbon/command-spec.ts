@@ -182,7 +182,7 @@ export interface RibbonTabSpec {
 }
 
 /** Whether `flags` show a command. `export` and `keyboardSettings` are opt-in; every other switch is opt-out. */
-function commandShown(spec: RibbonControlSpec, flags: CommandFlags): boolean {
+function command_shown(spec: RibbonControlSpec, flags: CommandFlags): boolean {
   if (spec.flags === undefined) return true;
 
   return spec.flags.some((flag) =>
@@ -192,14 +192,14 @@ function commandShown(spec: RibbonControlSpec, flags: CommandFlags): boolean {
   );
 }
 
-function shownGroup(group: RibbonGroupSpec, flags: CommandFlags): RibbonGroupSpec[] {
+function shown_group(group: RibbonGroupSpec, flags: CommandFlags): RibbonGroupSpec[] {
   if (group.layout === "flow") {
-    const controls = group.controls.filter((control) => commandShown(control, flags));
+    const controls = group.controls.filter((control) => command_shown(control, flags));
     return controls.length === 0 ? [] : [{ ...group, controls }];
   }
 
   const rows = group.rows
-    .map((row) => row.filter((control) => commandShown(control, flags)))
+    .map((row) => row.filter((control) => command_shown(control, flags)))
     .filter((row) => row.length > 0);
   return rows.length === 0 ? [] : [{ ...group, rows }];
 }
@@ -208,7 +208,7 @@ function shownGroup(group: RibbonGroupSpec, flags: CommandFlags): RibbonGroupSpe
 export function shownTabs(tabs: readonly RibbonTabSpec[], flags: CommandFlags): RibbonTabSpec[] {
   return tabs.map((tab) => ({
     ...tab,
-    groups: tab.groups.flatMap((group) => shownGroup(group, flags)),
+    groups: tab.groups.flatMap((group) => shown_group(group, flags)),
   }));
 }
 

@@ -10,6 +10,7 @@ export const Route = createFileRoute("/docs/")({
     if (document === undefined) throw notFound();
     return { ...document, href: "/docs/" };
   },
-  head: ({ loaderData }) => (loaderData === undefined ? {} : documentHead(loaderData)),
+  head: ({ loaderData: loader_data }) =>
+    loader_data === undefined ? {} : documentHead(loader_data),
   component: () => <DocumentRoute metadata={Route.useLoaderData()()} />,
 });

@@ -7,16 +7,16 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, GridActions, GridConfig } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
-let restoreCanvasStubs: () => void;
-let clipboardDescriptor: PropertyDescriptor | undefined;
+let restore_canvas_stubs: () => void;
+let clipboard_descriptor: PropertyDescriptor | undefined;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreCanvasStubs = installCanvasTestStubs();
-  clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  restore_canvas_stubs = installCanvasTestStubs();
+  clipboard_descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 });
 
 /** Each live menu and its grid, destroyed after its test. */
@@ -24,9 +24,9 @@ const live: (() => void)[] = [];
 
 afterEach(() => {
   for (const destroy of live.splice(0)) destroy();
-  restoreCanvasStubs();
-  if (clipboardDescriptor) {
-    Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+  restore_canvas_stubs();
+  if (clipboard_descriptor) {
+    Object.defineProperty(navigator, "clipboard", clipboard_descriptor);
   } else {
     Reflect.deleteProperty(navigator, "clipboard");
   }
@@ -45,7 +45,7 @@ describe("ContextMenu", () => {
         },
       },
     ) as GridActions;
-    const actionMethods = [
+    const action_methods = [
       ["cut", "cut"],
       ["paste", "paste"],
       ["clearContents", "clearContents"],
@@ -70,7 +70,7 @@ describe("ContextMenu", () => {
       host,
       {
         contextMenu: [
-          ...actionMethods.map(([action]) => ({ id: action, action })),
+          ...action_methods.map(([action]) => ({ id: action, action })),
           { id: "no-op", label: "No operation" },
         ],
       },
@@ -79,34 +79,34 @@ describe("ContextMenu", () => {
       {} as Grid,
     );
 
-    for (const [action] of actionMethods) {
+    for (const [action] of action_methods) {
       menu.open({ cell: null, clientX: 0, clientY: 0 });
       host.querySelector<HTMLElement>(`[data-context-menu-item="${action}"]`)!.click();
     }
     menu.open({ cell: null, clientX: 0, clientY: 0 });
     host.querySelector<HTMLElement>('[data-context-menu-item="no-op"]')!.click();
 
-    expect(calls).toEqual(actionMethods.map(([, method]) => method));
+    expect(calls).toEqual(action_methods.map(([, method]) => method));
     menu.destroy();
   });
 
-  const rowsOf = (menu: Element): HTMLElement[] => [
+  const rows_of = (menu: Element): HTMLElement[] => [
     ...menu.querySelectorAll<HTMLElement>(":scope > .sheetwrite-context-menu-item"),
   ];
   /** Rows of one open menu, in order, as their stable ids. */
-  const rowIds = (menu: Element): (string | undefined)[] =>
-    rowsOf(menu).map((row) => row.dataset.contextMenuItem);
-  const openMenus = (host: HTMLElement): HTMLElement[] =>
+  const row_ids = (menu: Element): (string | undefined)[] =>
+    rows_of(menu).map((row) => row.dataset.contextMenuItem);
+  const open_menus = (host: HTMLElement): HTMLElement[] =>
     [...host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu")].filter(
       (menu) => menu.style.display !== "none",
     );
   /** The open menu at `level` (0 is the root); throws when that menu is not open. */
-  const openMenu = (host: HTMLElement, level = 0): HTMLElement => {
-    const menu = openMenus(host)[level];
+  const open_menu = (host: HTMLElement, level = 0): HTMLElement => {
+    const menu = open_menus(host)[level];
     if (menu === undefined) throw new Error(`No context menu is open at level ${level}`);
     return menu;
   };
-  const focusedId = (): string | undefined => {
+  const focused_id = (): string | undefined => {
     const active = document.activeElement;
     return active instanceof HTMLElement ? active.dataset.contextMenuItem : undefined;
   };
@@ -114,7 +114,7 @@ describe("ContextMenu", () => {
     target?.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
   };
 
-  function liveMenu(config: GridConfig = {}) {
+  function live_menu(config: GridConfig = {}) {
     const host = mountHost();
     const grid = createGrid(host, {
       workbook: makeWorkbook(3),
@@ -130,7 +130,7 @@ describe("ContextMenu", () => {
   }
 
   it("offers PivotTable Fields only on a pivot's output, and not on a read-only grid", () => {
-    const { host, grid, menu } = liveMenu();
+    const { host, grid, menu } = live_menu();
     // A pivot over A1:B3 with its output anchored at C1. The default engine keeps
     // the definition without output, so the anchor alone is the output cell.
     const placed = grid.setPivot(
@@ -147,39 +147,39 @@ describe("ContextMenu", () => {
     );
     expect(placed.status).toBe("applied");
     /** Open the menu on a cell; returns its row ids. */
-    const openAt = (row: number, col: number) => {
+    const open_at = (row: number, col: number) => {
       const cell = { sheet: "s1", row, col };
       grid.setSelection({ kind: "cell", addr: cell });
       menu.open({ cell, clientX: 10, clientY: 10 });
-      const ids = rowIds(openMenu(host));
+      const ids = row_ids(open_menu(host));
       menu.close();
       return ids;
     };
 
-    expect(openAt(0, 2)).toContain("pivotFields");
-    expect(openAt(2, 0)).not.toContain("pivotFields");
+    expect(open_at(0, 2)).toContain("pivotFields");
+    expect(open_at(2, 0)).not.toContain("pivotFields");
 
     grid.setReadOnly(true);
-    expect(openAt(0, 2)).not.toContain("pivotFields");
+    expect(open_at(0, 2)).not.toContain("pivotFields");
   });
 
   it("shows Excel's cell dialogs: Cells… first in Insert and Delete, and Format cells…", () => {
-    const { host, grid, menu } = liveMenu();
+    const { host, grid, menu } = live_menu();
     const cell = { sheet: "s1", row: 1, col: 1 };
     grid.setSelection({ kind: "cell", addr: cell });
     menu.open({ cell, clientX: 10, clientY: 10 });
-    const openSubmenu = (id: string): void =>
-      openMenu(host).querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
+    const open_submenu = (id: string): void =>
+      open_menu(host).querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
 
-    expect(rowIds(openMenu(host))).toContain("formatCells");
-    openSubmenu("insert");
-    expect(rowIds(openMenu(host, 1))[0]).toBe("insertCells");
-    openSubmenu("delete");
-    expect(rowIds(openMenu(host, 1))[0]).toBe("deleteCells");
+    expect(row_ids(open_menu(host))).toContain("formatCells");
+    open_submenu("insert");
+    expect(row_ids(open_menu(host, 1))[0]).toBe("insertCells");
+    open_submenu("delete");
+    expect(row_ids(open_menu(host, 1))[0]).toBe("deleteCells");
   });
 
   it("moves through the menu and its submenus with the keyboard", () => {
-    const { host, grid, menu } = liveMenu();
+    const { host, grid, menu } = live_menu();
     const cell = { sheet: "s1", row: 0, col: 0 };
     grid.setSelection({ kind: "cell", addr: cell });
     const before = document.createElement("button");
@@ -188,61 +188,61 @@ describe("ContextMenu", () => {
     menu.open({ cell, clientX: 10, clientY: 10 });
 
     // Focus moves into the menu so the keys reach it.
-    expect(focusedId()).toBe("cut");
+    expect(focused_id()).toBe("cut");
     key(document.activeElement, "ArrowDown");
-    expect(focusedId()).toBe("copy");
+    expect(focused_id()).toBe("copy");
     key(document.activeElement, "End");
-    expect(focusedId()).toBe("editNote");
+    expect(focused_id()).toBe("editNote");
     key(document.activeElement, "Home");
     // Cut, Copy, the Paste Options row (one stop), Paste Special…, then Insert.
     for (let step = 0; step < 4; step += 1) key(document.activeElement, "ArrowDown");
-    expect(focusedId()).toBe("insert");
+    expect(focused_id()).toBe("insert");
 
     // Right opens the submenu on its first row; Left or Escape returns to the parent.
     key(document.activeElement, "ArrowRight");
-    expect(openMenus(host)).toHaveLength(2);
-    expect(focusedId()).toBe("insertCells");
+    expect(open_menus(host)).toHaveLength(2);
+    expect(focused_id()).toBe("insertCells");
     key(document.activeElement, "ArrowLeft");
-    expect(openMenus(host)).toHaveLength(1);
-    expect(focusedId()).toBe("insert");
+    expect(open_menus(host)).toHaveLength(1);
+    expect(focused_id()).toBe("insert");
     key(document.activeElement, "ArrowRight");
     key(document.activeElement, "Escape");
-    expect(openMenus(host)).toHaveLength(1);
-    expect(focusedId()).toBe("insert");
+    expect(open_menus(host)).toHaveLength(1);
+    expect(focused_id()).toBe("insert");
 
     // Enter on a submenu row runs it, closes every menu and gives focus back.
     key(document.activeElement, "ArrowRight");
     key(document.activeElement, "ArrowDown");
     key(document.activeElement, "Enter");
     expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(4);
-    expect(openMenus(host)).toHaveLength(0);
+    expect(open_menus(host)).toHaveLength(0);
     expectSame(document.activeElement, before);
   });
 
   it("closes on the user's scroll, not on the page's own", () => {
-    const { host, menu } = liveMenu();
+    const { host, menu } = live_menu();
     const open = (): void => menu.open({ cell: null, clientX: 10, clientY: 10 });
 
     // Focusing the grid scrolls it into view, and the browser sends that scroll
     // event at its next frame, which can come after a right-click opened the menu.
     open();
     document.dispatchEvent(new Event("scroll"));
-    expect(openMenus(host)).toHaveLength(1);
+    expect(open_menus(host)).toHaveLength(1);
 
     // A wheel turn over the menu does not scroll the page.
-    openMenu(host).dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
-    expect(openMenus(host)).toHaveLength(1);
+    open_menu(host).dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    expect(open_menus(host)).toHaveLength(1);
 
     document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
-    expect(openMenus(host)).toHaveLength(0);
+    expect(open_menus(host)).toHaveLength(0);
 
     open();
     document.body.dispatchEvent(new Event("touchmove", { bubbles: true }));
-    expect(openMenus(host)).toHaveLength(0);
+    expect(open_menus(host)).toHaveLength(0);
 
     // Page Down is not a menu key, so it scrolls the page.
     open();
     key(document.activeElement, "PageDown");
-    expect(openMenus(host)).toHaveLength(0);
+    expect(open_menus(host)).toHaveLength(0);
   });
 });

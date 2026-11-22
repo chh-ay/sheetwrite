@@ -92,15 +92,15 @@ function roots(owner: Pick<HistoryVersion, "checkpoint" | "tail" | "checkpoints"
   return [...new Set([owner.checkpoint, ...owner.tail, ...owner.checkpoints])];
 }
 
-function metadataBytes(value: unknown): number {
+function metadata_bytes(value: unknown): number {
   return jsonBytes(value, MAX_METADATA_BYTES).length;
 }
 
-function oldestFirst(left: HistoryVersion, right: HistoryVersion): number {
+function oldest_first(left: HistoryVersion, right: HistoryVersion): number {
   return left.time - right.time || compareCodeUnits(left.id, right.id);
 }
 
-function checkOwner(
+function check_owner(
   owner: Pick<HistoryVersion, "revision" | "checkpoint" | "tail" | "checkpoints">,
 ): void {
   const valid =
@@ -118,8 +118,8 @@ function checkOwner(
   }
 }
 
-function checkHead(head: HistoryHead): void {
-  checkOwner(head);
+function check_head(head: HistoryHead): void {
+  check_owner(head);
 
   const counters = [
     head.time,
@@ -135,10 +135,10 @@ function checkHead(head: HistoryHead): void {
   }
 }
 
-function checkVersion(version: HistoryVersion): void {
-  checkOwner(version);
+function check_version(version: HistoryVersion): void {
+  check_owner(version);
 
-  const validName =
+  const valid_name =
     version.kind === "automatic" ||
     (version.kind === "named" &&
       typeof version.name === "string" &&
@@ -151,7 +151,7 @@ function checkVersion(version: HistoryVersion): void {
     typeof version.authorId === "string" &&
     version.authorId.length > 0 &&
     version.authorId.length <= MAX_LABEL_LENGTH &&
-    validName;
+    valid_name;
 
   if (!valid) {
     throw new HistoryError("invalid-history", "Invalid history version marker");
@@ -203,7 +203,7 @@ async function release(
   }
 }
 
-async function expirePins(
+async function expire_pins(
   transaction: HistoryStorageTransaction,
   manifest: HistoryManifest,
 ): Promise<void> {
@@ -216,11 +216,11 @@ async function expirePins(
 
     await release(transaction, roots(pin.version), manifest);
     await transaction.deletePin(pin.token);
-    manifest.encodedBytes -= metadataBytes(pin);
+    manifest.encodedBytes -= metadata_bytes(pin);
   }
 }
 
-async function removeVersion(
+async function remove_version(
   transaction: HistoryStorageTransaction,
   manifest: HistoryManifest,
   version: HistoryVersion,
@@ -231,19 +231,19 @@ async function removeVersion(
   if (version.kind === "named") {
     manifest.namedVersionCount--;
   }
-  manifest.encodedBytes -= metadataBytes(version);
+  manifest.encodedBytes -= metadata_bytes(version);
 
   await release(transaction, roots(version), manifest);
 }
 
 /** Copy and validate a publication before the first await, so later host edits cannot change it. */
-async function admitPublication(input: HistoryPublishRequest): Promise<HistoryPublishRequest> {
-  const payloadBytes = input.records.reduce((total, record) => total + record.bytes.length, 0);
-  const tooLarge =
-    payloadBytes > input.limits.maxWorkingBytes / 2 ||
+async function admit_publication(input: HistoryPublishRequest): Promise<HistoryPublishRequest> {
+  const payload_bytes = input.records.reduce((total, record) => total + record.bytes.length, 0);
+  const too_large =
+    payload_bytes > input.limits.maxWorkingBytes / 2 ||
     input.records.length > MAX_PUBLICATION_RECORDS;
 
-  if (tooLarge) {
+  if (too_large) {
     throw new HistoryError("capacity", "History publication exceeds the working-set reservation");
   }
 
@@ -254,22 +254,22 @@ async function admitPublication(input: HistoryPublishRequest): Promise<HistoryPu
     version: structuredClone(input.version),
   };
 
-  let submittedBytes = 0;
+  let submitted_bytes = 0;
   for (const record of request.records) {
     await checkRecord(record, request.limits);
-    submittedBytes += recordBytes(record);
+    submitted_bytes += recordBytes(record);
   }
 
-  if (submittedBytes > request.limits.maxSnapshotBytes + request.limits.maxTransactionBytes) {
+  if (submitted_bytes > request.limits.maxSnapshotBytes + request.limits.maxTransactionBytes) {
     throw new HistoryError("capacity", "One history publication exceeds its byte ceiling");
   }
 
   if (request.head) {
-    checkHead(request.head);
+    check_head(request.head);
   }
 
   if (request.version) {
-    checkVersion(request.version);
+    check_version(request.version);
   }
 
   return request;
@@ -293,7 +293,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       return this.transact(input, (transaction) => this.lease(transaction, { ...input }));
     }
 
-    const request = await admitPublication(input);
+    const request = await admit_publication(input);
 
     return this.transact(request, (transaction) => this.publish(transaction, request));
   }
@@ -303,7 +303,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     request: HistoryPinRequest,
   ): Promise<HistoryManifest> {
     const manifest = await transaction.manifest();
-    await expirePins(transaction, manifest);
+    await expire_pins(transaction, manifest);
 
     const pins = await transaction.pins();
     const existing = pins.find((pin) => pin.token === request.token);
@@ -312,7 +312,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       if (existing) {
         await release(transaction, roots(existing.version), manifest);
         await transaction.deletePin(existing.token);
-        manifest.encodedBytes -= metadataBytes(existing);
+        manifest.encodedBytes -= metadata_bytes(existing);
       }
 
       await transaction.saveManifest(manifest);
@@ -349,7 +349,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     const pin = { token: request.token, expires: Date.now() + READER_LEASE_MS, version };
     await retain(transaction, roots(version));
     await transaction.savePin(pin);
-    manifest.encodedBytes += metadataBytes(pin);
+    manifest.encodedBytes += metadata_bytes(pin);
 
     await transaction.saveManifest(manifest);
     return manifest;
@@ -360,22 +360,22 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     request: HistoryPublishRequest,
   ): Promise<HistoryManifest> {
     const manifest = await transaction.manifest();
-    await expirePins(transaction, manifest);
+    await expire_pins(transaction, manifest);
 
     if (manifest.generation !== request.expectedGeneration) {
       throw new HistoryError("conflict", "History manifest advanced");
     }
 
-    const inserted = await this.insertRecords(transaction, manifest, request.records);
+    const inserted = await this.insert_records(transaction, manifest, request.records);
 
     // The marker first: it takes over checkpoints that the new head no longer
     // lists, so they keep an owner while the old head lets them go.
     if (request.version) {
-      await this.addVersion(transaction, manifest, request.version, request.head ?? manifest.head);
+      await this.add_version(transaction, manifest, request.version, request.head ?? manifest.head);
     }
 
     if (request.head) {
-      await this.moveHead(transaction, manifest, request.head);
+      await this.move_head(transaction, manifest, request.head);
     }
 
     // Every new record must have an owner; an orphan would never be pruned.
@@ -386,14 +386,14 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       }
     }
 
-    await this.expireAutomatic(transaction, manifest, request);
+    await this.expire_automatic(transaction, manifest, request);
 
-    const overCapacity =
+    const over_capacity =
       manifest.namedVersionCount > request.limits.maxNamedVersions ||
       manifest.versionCount > request.limits.maxVersions ||
       manifest.encodedBytes > request.limits.maxStorageBytes;
 
-    if (overCapacity) {
+    if (over_capacity) {
       throw new HistoryError(
         "capacity",
         "Pinned history or the current head exceeds archive capacity",
@@ -413,7 +413,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
    * in a publication, so a record can only refer to stored records and the
    * reference graph cannot form a cycle.
    */
-  private async insertRecords(
+  private async insert_records(
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     records: readonly HistoryStoredRecord[],
@@ -436,7 +436,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     return inserted;
   }
 
-  private async moveHead(
+  private async move_head(
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     head: HistoryHead,
@@ -450,14 +450,14 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
 
     if (manifest.head) {
       await release(transaction, roots(manifest.head), manifest);
-      manifest.encodedBytes -= metadataBytes(manifest.head);
+      manifest.encodedBytes -= metadata_bytes(manifest.head);
     }
 
     manifest.head = structuredClone(head);
-    manifest.encodedBytes += metadataBytes(head);
+    manifest.encodedBytes += metadata_bytes(head);
   }
 
-  private async addVersion(
+  private async add_version(
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     version: HistoryVersion,
@@ -486,22 +486,22 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     if (version.kind === "named") {
       manifest.namedVersionCount++;
     }
-    manifest.encodedBytes += metadataBytes(version);
+    manifest.encodedBytes += metadata_bytes(version);
   }
 
   /** Remove the oldest automatic markers past the age ceiling or while the archive is over capacity. */
-  private async expireAutomatic(
+  private async expire_automatic(
     transaction: HistoryStorageTransaction,
     manifest: HistoryManifest,
     request: HistoryPublishRequest,
   ): Promise<void> {
     const versions = await transaction.versions();
-    const automatic = versions.filter((version) => version.kind === "automatic").sort(oldestFirst);
-    const expiresBefore = (manifest.head?.time ?? 0) - request.limits.maxAgeMs;
+    const automatic = versions.filter((version) => version.kind === "automatic").sort(oldest_first);
+    const expires_before = (manifest.head?.time ?? 0) - request.limits.maxAgeMs;
 
     for (const version of automatic) {
       const keep =
-        version.time >= expiresBefore &&
+        version.time >= expires_before &&
         manifest.encodedBytes <= request.limits.maxStorageBytes &&
         manifest.versionCount <= request.limits.maxVersions;
 
@@ -509,7 +509,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
         break;
       }
 
-      await removeVersion(transaction, manifest, version);
+      await remove_version(transaction, manifest, version);
     }
   }
 
@@ -559,7 +559,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
   }
 
   async list(request: HistoryListRequest): Promise<HistoryListPage> {
-    const validPage =
+    const valid_page =
       integer(request.maxEntries) &&
       request.maxEntries > 0 &&
       request.maxEntries <= request.limits.maxPageEntries &&
@@ -567,15 +567,15 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       request.maxBytes > 0 &&
       request.maxBytes <= request.limits.maxPageBytes;
 
-    if (!validPage) {
+    if (!valid_page) {
       throw new HistoryError("capacity", "History metadata page exceeds its bounds");
     }
 
-    const validInterval =
+    const valid_interval =
       (request.fromRevision === undefined || integer(request.fromRevision)) &&
       (request.toRevision === undefined || integer(request.toRevision));
 
-    if (!validInterval) {
+    if (!valid_interval) {
       throw new HistoryError("invalid-history", "Invalid history listing revision interval");
     }
 
@@ -599,14 +599,14 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
       }
 
       if (kind === "versions") {
-        return this.listVersions(transaction, request, manifest, scope, position);
+        return this.list_versions(transaction, request, manifest, scope, position);
       }
 
-      return this.listRecords(transaction, request, manifest, kind, scope, position);
+      return this.list_records(transaction, request, manifest, kind, scope, position);
     });
   }
 
-  private async listVersions(
+  private async list_versions(
     transaction: HistoryStorageTransaction,
     request: HistoryListRequest,
     manifest: HistoryManifest,
@@ -622,7 +622,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     const to = request.toRevision ?? Number.MAX_SAFE_INTEGER;
     const versions = (await transaction.versions())
       .filter((version) => version.revision >= from && version.revision <= to)
-      .sort((left, right) => oldestFirst(right, left));
+      .sort((left, right) => oldest_first(right, left));
 
     const page: HistoryVersion[] = [];
     let bytes = 0;
@@ -634,7 +634,7 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
         break;
       }
 
-      const size = metadataBytes(version);
+      const size = metadata_bytes(version);
       if (bytes + size > request.maxBytes) {
         if (page.length === 0) {
           throw new HistoryError("capacity", "A history marker exceeds the metadata page limit");
@@ -652,26 +652,26 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
     return { versions: page, generation: manifest.generation, ...cursor };
   }
 
-  private async listRecords(
+  private async list_records(
     transaction: HistoryStorageTransaction,
     request: HistoryListRequest,
     manifest: HistoryManifest,
     kind: HistoryStoredRecord["kind"],
     scope: string,
-    afterId: string,
+    after_id: string,
   ): Promise<HistoryListPage> {
-    if (afterId !== "" && !validId(afterId)) {
+    if (after_id !== "" && !validId(after_id)) {
       throw new HistoryError("invalid-history", "Invalid history record cursor");
     }
 
     // One extra candidate tells whether another page exists.
-    const candidates = await transaction.recordPage(kind, afterId, request.maxEntries + 1);
+    const candidates = await transaction.recordPage(kind, after_id, request.maxEntries + 1);
 
     const records: HistoryRecordMetadata[] = [];
     let bytes = 0;
 
     for (const candidate of candidates) {
-      const size = metadataBytes(candidate);
+      const size = metadata_bytes(candidate);
       if (records.length === request.maxEntries || bytes + size > request.maxBytes) {
         break;
       }
@@ -698,19 +698,19 @@ export abstract class AtomicHistoryStorage implements HistoryStorageAdapter {
         throw new HistoryError("conflict", "History manifest advanced before prune");
       }
 
-      await expirePins(transaction, manifest);
+      await expire_pins(transaction, manifest);
 
-      const targetBytes = request.targetBytes ?? request.limits.maxStorageBytes;
-      const versions = (await transaction.versions()).sort(oldestFirst);
+      const target_bytes = request.targetBytes ?? request.limits.maxStorageBytes;
+      const versions = (await transaction.versions()).sort(oldest_first);
 
       for (const version of versions) {
         const explicit = version.id === request.deleteVersionId;
         const expired =
           version.kind === "automatic" &&
-          (version.time <= request.beforeTime || manifest.encodedBytes > targetBytes);
+          (version.time <= request.beforeTime || manifest.encodedBytes > target_bytes);
 
         if (explicit || expired) {
-          await removeVersion(transaction, manifest, version);
+          await remove_version(transaction, manifest, version);
         }
       }
 
@@ -786,11 +786,11 @@ class PendingMapWrites<T> {
   }
 }
 
-function emptyManifest(): HistoryManifest {
+function empty_manifest(): HistoryManifest {
   return { generation: 0, encodedBytes: 0, recordCount: 0, versionCount: 0, namedVersionCount: 0 };
 }
 
-function recordMetadata(stored: StoredHistoryRecord): HistoryRecordMetadata {
+function record_metadata(stored: StoredHistoryRecord): HistoryRecordMetadata {
   return {
     id: stored.record.id,
     kind: stored.record.kind,
@@ -824,7 +824,7 @@ export class MemoryHistoryStorage extends AtomicHistoryStorage {
       checkAbort(request.signal);
 
       const current = this.documents.get(request.documentId) ?? {
-        manifest: emptyManifest(),
+        manifest: empty_manifest(),
         records: new Map(),
         versions: new Map(),
         pins: new Map(),
@@ -848,11 +848,11 @@ export class MemoryHistoryStorage extends AtomicHistoryStorage {
         deleteRecord: async (id) => {
           records.delete(id);
         },
-        recordPage: async (kind, afterId, count) => {
+        recordPage: async (kind, after_id, count) => {
           const page: HistoryRecordMetadata[] = [];
           for (const [id, stored] of records.entries()) {
-            if (id > afterId && stored.record.kind === kind) {
-              page.push(recordMetadata(stored));
+            if (id > after_id && stored.record.kind === kind) {
+              page.push(record_metadata(stored));
             }
           }
 

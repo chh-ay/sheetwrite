@@ -60,11 +60,11 @@ export function unresolvedSiteLinks(
   return failures;
 }
 
-async function routeComponentFiles(directory: string): Promise<string[]> {
+async function route_component_files(directory: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...(await routeComponentFiles(path)));
+    if (entry.isDirectory()) files.push(...(await route_component_files(path)));
     else if (/\.tsx?$/.test(entry.name)) files.push(path);
   }
   return files;
@@ -86,7 +86,7 @@ export async function siteLinkIssues(documents: readonly MarkdownDocument[]): Pr
       links.push({ source: "docs/src/lib/navigation.ts", link: page.href });
     }
   }
-  for (const path of await routeComponentFiles(join(repositoryRoot, "docs/src"))) {
+  for (const path of await route_component_files(join(repositoryRoot, "docs/src"))) {
     const source = posix(relative(repositoryRoot, path));
     // The moved-page map names old addresses on purpose.
     if (source === "docs/src/lib/moved-pages.ts") continue;
@@ -195,12 +195,12 @@ export function parseFences(content: string): Fence[] {
   });
 }
 
-function fenceMetaValue(meta: string, name: string): string | undefined {
+function fence_meta_value(meta: string, name: string): string | undefined {
   const match = new RegExp(`(?:^|\\s)${name}=(?:"([^"]+)"|'([^']+)')`).exec(meta);
   return match?.[1] ?? match?.[2];
 }
 
-function maskCode(content: string): string {
+function mask_code(content: string): string {
   return maskFences(content).replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length));
 }
 
@@ -208,13 +208,13 @@ export function contentPathForRoute(
   route: string,
   documents: readonly MarkdownDocument[],
 ): string | undefined {
-  const normalizedRoute = route.endsWith("/") ? route : `${route}/`;
+  const normalized_route = route.endsWith("/") ? route : `${route}/`;
   return documents.find(
-    (document) => routeForContentPath(contentRoot, document.path) === normalizedRoute,
+    (document) => routeForContentPath(contentRoot, document.path) === normalized_route,
   )?.path;
 }
 
-function packageAndSubpath(
+function package_and_subpath(
   specifier: string,
 ): { packageName: string; subpath: string } | undefined {
   const clean = specifier.split("?")[0] ?? specifier;
@@ -228,7 +228,11 @@ function packageAndSubpath(
  * compile-checked TypeScript example, and it may import only the packages the
  * playground loads.
  */
-function runnableFenceIssues(document: MarkdownDocument, fence: Fence, partial: boolean): string[] {
+function runnable_fence_issues(
+  document: MarkdownDocument,
+  fence: Fence,
+  partial: boolean,
+): string[] {
   const location = `${posix(relative(repositoryRoot, document.path))}:${fence.line}`;
   const failures: string[] = [];
   if (fence.language !== "ts" || !/(?:^|\s)compile(?:\s|$)/.test(fence.meta) || partial) {
@@ -246,7 +250,7 @@ function runnableFenceIssues(document: MarkdownDocument, fence: Fence, partial: 
   return failures;
 }
 
-function validateImports(
+function validate_imports(
   document: MarkdownDocument,
   fence: Fence,
   manifest: PublicApiManifest,
@@ -257,7 +261,7 @@ function validateImports(
   );
   for (const match of imports) {
     const specifier = match[2] ?? match[3] ?? "";
-    const parsed = packageAndSubpath(specifier);
+    const parsed = package_and_subpath(specifier);
     if (parsed === undefined) continue;
     const pkg = manifest.packages.find((item) => item.name === parsed.packageName);
     const entry = pkg?.entryPoints.find((item) => item.subpath === parsed.subpath);
@@ -318,24 +322,24 @@ const SNIPPET_COMPILER_OPTIONS = {
   target: "es2022",
 } as const;
 
-function diagnosticText(diagnostic: Diagnostic): string {
-  return [diagnostic.text, ...(diagnostic.messageChain ?? []).map(diagnosticText)].join("\n");
+function diagnostic_text(diagnostic: Diagnostic): string {
+  return [diagnostic.text, ...(diagnostic.messageChain ?? []).map(diagnostic_text)].join("\n");
 }
 
-async function preEmitDiagnostics(project: Project): Promise<readonly Diagnostic[]> {
+async function pre_emit_diagnostics(project: Project): Promise<readonly Diagnostic[]> {
   const diagnostics = [...(await project.program.getConfigFileParsingDiagnostics())];
-  const configFileCount = diagnostics.length;
+  const config_file_count = diagnostics.length;
   diagnostics.push(...(await project.program.getSyntacticDiagnostics()));
-  if (diagnostics.length !== configFileCount) return diagnostics;
+  if (diagnostics.length !== config_file_count) return diagnostics;
   diagnostics.push(...(await project.program.getProgramDiagnostics()));
   diagnostics.push(...(await project.program.getGlobalDiagnostics()));
-  if (diagnostics.length === configFileCount) {
+  if (diagnostics.length === config_file_count) {
     diagnostics.push(...(await project.program.getSemanticDiagnostics()));
   }
   return diagnostics;
 }
 
-async function validateCompiledSnippets(
+async function validate_compiled_snippets(
   snippets: Array<{ document: MarkdownDocument; fence: Fence }>,
 ): Promise<string[]> {
   if (snippets.length === 0) return [];
@@ -346,36 +350,36 @@ async function validateCompiledSnippets(
     for (const [index, snippet] of snippets.entries()) {
       const extension = snippet.fence.language === "tsx" ? "tsx" : "ts";
       const path = join(directory, `snippet-${index}.${extension}`);
-      const compileSource = snippet.fence.code.replace(
+      const compile_source = snippet.fence.code.replace(
         /^\s*import\s+["'][^"']+\.css["'];?\s*$/gm,
         "",
       );
-      await writeFile(path, `${compileSource}\nexport {};\n`);
+      await writeFile(path, `${compile_source}\nexport {};\n`);
       files.push(path);
     }
-    const configPath = join(directory, "tsconfig.json");
+    const config_path = join(directory, "tsconfig.json");
     await writeFile(
-      configPath,
+      config_path,
       `${JSON.stringify({ compilerOptions: SNIPPET_COMPILER_OPTIONS, files }, null, 2)}\n`,
     );
-    const snapshot = await api.updateSnapshot({ openProjects: [configPath] });
+    const snapshot = await api.updateSnapshot({ openProjects: [config_path] });
     try {
-      const project = snapshot.getProject(configPath);
+      const project = snapshot.getProject(config_path);
       if (project === undefined) {
-        throw new Error(`TypeScript 7 could not open the snippet project ${configPath}`);
+        throw new Error(`TypeScript 7 could not open the snippet project ${config_path}`);
       }
       const failures: string[] = [];
-      for (const diagnostic of await preEmitDiagnostics(project)) {
-        const message = diagnosticText(diagnostic);
-        const fileName = diagnostic.fileName;
-        const index = fileName === undefined ? -1 : files.indexOf(fileName);
-        if (fileName === undefined || index < 0) {
+      for (const diagnostic of await pre_emit_diagnostics(project)) {
+        const message = diagnostic_text(diagnostic);
+        const file_name = diagnostic.fileName;
+        const index = file_name === undefined ? -1 : files.indexOf(file_name);
+        if (file_name === undefined || index < 0) {
           failures.push(`compiled snippet: ${message}`);
           continue;
         }
-        const sourceFile = await project.program.getSourceFile(fileName);
+        const source_file = await project.program.getSourceFile(file_name);
         const snippet = snippets[index];
-        const position = sourceFile?.getLineAndCharacterOfPosition(diagnostic.pos);
+        const position = source_file?.getLineAndCharacterOfPosition(diagnostic.pos);
         failures.push(
           `${posix(relative(repositoryRoot, snippet?.document.path ?? ""))}:${
             (snippet?.fence.line ?? 0) + (position?.line ?? 0) + 1
@@ -392,20 +396,20 @@ async function validateCompiledSnippets(
   }
 }
 
-function validateVerifiedShell(
+function validate_verified_shell(
   document: MarkdownDocument,
   fence: Fence,
   manifest: PublicApiManifest,
 ): string[] {
   const failures: string[] = [];
-  const knownPackages = new Set(manifest.packages.map((pkg) => pkg.name));
+  const known_packages = new Set(manifest.packages.map((pkg) => pkg.name));
   for (const match of fence.code.matchAll(
     /(?:bun\s+add|npm\s+install)\s+(@sheetwrite\/[^\s#]+)/g,
   )) {
-    const packageName = match[1] ?? "";
-    if (!knownPackages.has(packageName)) {
+    const package_name = match[1] ?? "";
+    if (!known_packages.has(package_name)) {
       failures.push(
-        `${posix(relative(repositoryRoot, document.path))}:${fence.line} installs unknown package ${packageName}`,
+        `${posix(relative(repositoryRoot, document.path))}:${fence.line} installs unknown package ${package_name}`,
       );
     }
   }
@@ -422,23 +426,23 @@ export async function validateMarkdown(
   manifest: PublicApiManifest,
   generatedPublicFiles: ReadonlySet<string> = new Set(),
 ): Promise<string[]> {
-  const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
+  const hover_analyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
   try {
     // Every typed fence is requested at once so the type engine analyzes them in one batch.
-    const hoverFailures = Promise.all(
-      documents.flatMap((document) => fenceHoverFailures(document, hoverAnalyzer)),
+    const hover_failures = Promise.all(
+      documents.flatMap((document) => fence_hover_failures(document, hover_analyzer)),
     );
-    const failures = await validateDocuments(documents, manifest, generatedPublicFiles);
-    failures.push(...(await hoverFailures).flat());
+    const failures = await validate_documents(documents, manifest, generatedPublicFiles);
+    failures.push(...(await hover_failures).flat());
     return failures;
   } finally {
-    await hoverAnalyzer.dispose();
+    await hover_analyzer.dispose();
   }
 }
 
 type TypedFence = Fence & { language: "ts" | "tsx" | "vue" | "svelte" };
 
-function isTypedFence(fence: Fence): fence is TypedFence {
+function is_typed_fence(fence: Fence): fence is TypedFence {
   return (
     (fence.language === "ts" ||
       fence.language === "tsx" ||
@@ -448,7 +452,7 @@ function isTypedFence(fence: Fence): fence is TypedFence {
   );
 }
 
-function fenceHoverFailures(
+function fence_hover_failures(
   document: MarkdownDocument,
   analyzer: SheetwriteTypeEngine,
 ): Promise<string[]>[] {
@@ -456,18 +460,18 @@ function fenceHoverFailures(
   try {
     fences = parseFences(document.content);
   } catch (error) {
-    // validateDocuments reports the unclosed fence for this document.
+    // validate_documents reports the unclosed fence for this document.
     if (error instanceof Error) return [];
     throw error;
   }
   const page = posix(relative(repositoryRoot, document.path));
-  return fences.filter(isTypedFence).map(async (fence) => {
+  return fences.filter(is_typed_fence).map(async (fence) => {
     try {
       const hovers = await collectFenceHovers(
         fence.code,
         fence.language,
         analyzer,
-        fenceMetaValue(fence.meta, "prelude"),
+        fence_meta_value(fence.meta, "prelude"),
       );
       return hovers
         .filter((hover) => !isHighQualityHover(hover, fence.language))
@@ -483,15 +487,15 @@ function fenceHoverFailures(
   });
 }
 
-async function validateDocuments(
+async function validate_documents(
   documents: readonly MarkdownDocument[],
   manifest: PublicApiManifest,
-  generatedPublicFiles: ReadonlySet<string>,
+  generated_public_files: ReadonlySet<string>,
 ): Promise<string[]> {
   const failures: string[] = [];
   const compiled: Array<{ document: MarkdownDocument; fence: Fence }> = [];
   // Generated pages are checked as rendered, before any copy is on disk.
-  const documentPaths = new Set(documents.map((document) => document.path));
+  const document_paths = new Set(documents.map((document) => document.path));
   for (const document of documents) {
     let fences: Fence[];
     try {
@@ -511,15 +515,15 @@ async function validateDocuments(
           `${posix(relative(repositoryRoot, document.path))}:${fence.line} code fence is not compile-checked or explicitly classified`,
         );
       }
-      const typedLanguage =
+      const typed_language =
         fence.language === "ts" ||
         fence.language === "tsx" ||
         fence.language === "vue" ||
         fence.language === "svelte";
       const generated = /(?:^|\s)generated(?:\s|$)/.test(fence.meta);
       const partial = /(?:^|\s)partial=(?:"[^"]+"|'[^']+')/.test(fence.meta);
-      const prelude = fenceMetaValue(fence.meta, "prelude");
-      if (typedLanguage && !generated) {
+      const prelude = fence_meta_value(fence.meta, "prelude");
+      if (typed_language && !generated) {
         if (partial && prelude === undefined) {
           failures.push(
             `${posix(relative(repositoryRoot, document.path))}:${fence.line} typed partial fence requires a named hover prelude`,
@@ -527,7 +531,7 @@ async function validateDocuments(
         }
       }
       if (isRunnableMeta(fence.meta)) {
-        failures.push(...runnableFenceIssues(document, fence, partial));
+        failures.push(...runnable_fence_issues(document, fence, partial));
       }
       if (/(?:^|\s)compile(?:\s|$)/.test(fence.meta)) {
         if (fence.language !== "ts" && fence.language !== "tsx") {
@@ -537,68 +541,68 @@ async function validateDocuments(
         } else compiled.push({ document, fence });
       }
       if (fence.language === "ts" || fence.language === "tsx") {
-        failures.push(...validateImports(document, fence, manifest));
+        failures.push(...validate_imports(document, fence, manifest));
       }
       if (fence.language === "sh" && /(?:^|\s)verify(?:\s|$)/.test(fence.meta)) {
-        failures.push(...validateVerifiedShell(document, fence, manifest));
+        failures.push(...validate_verified_shell(document, fence, manifest));
       }
     }
 
-    const masked = maskCode(document.content);
-    const linkTargets = [
+    const masked = mask_code(document.content);
+    const link_targets = [
       ...[...masked.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]),
       ...[...masked.matchAll(/\shref=["']([^"']+)["']/gi)].map((match) => match[1]),
     ];
-    for (const target of linkTargets) {
-      const rawTarget = target?.trim() ?? "";
+    for (const target of link_targets) {
+      const raw_target = target?.trim() ?? "";
       if (
-        rawTarget.length === 0 ||
-        /^(?:https?:|mailto:|tel:)/.test(rawTarget) ||
-        rawTarget.startsWith("{")
+        raw_target.length === 0 ||
+        /^(?:https?:|mailto:|tel:)/.test(raw_target) ||
+        raw_target.startsWith("{")
       ) {
         continue;
       }
-      const [targetWithoutFragment = "", fragment] = rawTarget.split("#", 2);
-      const [targetRoute = ""] = targetWithoutFragment.split("?", 1);
-      if (generatedPublicFiles.has(targetRoute)) continue;
-      let targetPath: string | undefined;
-      if (targetRoute === "") targetPath = document.path;
-      else if (targetRoute.startsWith("/docs/")) {
-        targetPath = contentPathForRoute(targetRoute, documents);
-      } else if (targetRoute.startsWith("/") && !targetRoute.includes("..")) {
-        const routeSlug = targetRoute.replace(/^\//, "").replace(/\/$/, "").replaceAll("/", ".");
-        targetPath = join(repositoryRoot, `docs/src/routes/${routeSlug || "index"}.tsx`);
-      } else if (targetRoute.startsWith("/")) {
+      const [target_without_fragment = "", fragment] = raw_target.split("#", 2);
+      const [target_route = ""] = target_without_fragment.split("?", 1);
+      if (generated_public_files.has(target_route)) continue;
+      let target_path: string | undefined;
+      if (target_route === "") target_path = document.path;
+      else if (target_route.startsWith("/docs/")) {
+        target_path = contentPathForRoute(target_route, documents);
+      } else if (target_route.startsWith("/") && !target_route.includes("..")) {
+        const route_slug = target_route.replace(/^\//, "").replace(/\/$/, "").replaceAll("/", ".");
+        target_path = join(repositoryRoot, `docs/src/routes/${route_slug || "index"}.tsx`);
+      } else if (target_route.startsWith("/")) {
         failures.push(
-          `${posix(relative(repositoryRoot, document.path))} links invalid internal route ${rawTarget}`,
+          `${posix(relative(repositoryRoot, document.path))} links invalid internal route ${raw_target}`,
         );
         continue;
       } else {
-        targetPath = resolve(dirname(document.path), targetWithoutFragment);
-        if (!/\.[a-zA-Z]+$/.test(targetPath)) {
-          targetPath = `${targetPath}.md`;
+        target_path = resolve(dirname(document.path), target_without_fragment);
+        if (!/\.[a-zA-Z]+$/.test(target_path)) {
+          target_path = `${target_path}.md`;
         }
       }
       if (
-        targetPath === undefined ||
-        (!documentPaths.has(targetPath) && !(await exists(targetPath)))
+        target_path === undefined ||
+        (!document_paths.has(target_path) && !(await exists(target_path)))
       ) {
         failures.push(
-          `${posix(relative(repositoryRoot, document.path))} links missing target ${rawTarget}`,
+          `${posix(relative(repositoryRoot, document.path))} links missing target ${raw_target}`,
         );
         continue;
       }
-      if (fragment !== undefined && fragment.length > 0 && /\.mdx?$/.test(targetPath)) {
-        const target = documents.find((item) => item.path === targetPath);
+      if (fragment !== undefined && fragment.length > 0 && /\.mdx?$/.test(target_path)) {
+        const target = documents.find((item) => item.path === target_path);
         if (target !== undefined && !headingAnchors(target.content).has(fragment)) {
           failures.push(
-            `${posix(relative(repositoryRoot, document.path))} links missing anchor ${rawTarget}`,
+            `${posix(relative(repositoryRoot, document.path))} links missing anchor ${raw_target}`,
           );
         }
       }
     }
   }
-  failures.push(...(await validateCompiledSnippets(compiled)));
+  failures.push(...(await validate_compiled_snippets(compiled)));
   return failures;
 }
 

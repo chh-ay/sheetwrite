@@ -87,7 +87,7 @@ const FINANCIAL_COLUMNS = [
 ] as const;
 const encoder = new TextEncoder();
 
-function rowHash(row: number, salt: number): number {
+function row_hash(row: number, salt: number): number {
   let hash = (row + 1) * 2654435761 + salt * 40503;
   hash = Math.imul(hash ^ (hash >>> 16), 2246822519);
   hash = Math.imul(hash ^ (hash >>> 13), 3266489917);
@@ -114,24 +114,24 @@ interface FinancialRow {
   status: string;
 }
 
-function roundMoney(value: number): number {
+function round_money(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function financialRowAt(row: number): FinancialRow {
-  const hash = rowHash(row, 1);
-  const fiscalYear = 2024 + (Math.floor(row / 12) % 5);
-  const period = `FY${fiscalYear} P${String((row % 12) + 1).padStart(2, "0")}`;
-  const revenue = roundMoney(90_000 + (hash % 360_000) + (row % 12) * 4_500);
-  const cogs = roundMoney(revenue * (0.36 + (rowHash(row, 2) % 9) / 100));
-  const grossProfit = roundMoney(revenue - cogs);
-  const operatingExpenses = roundMoney(revenue * (0.24 + (rowHash(row, 3) % 8) / 100));
-  const ebitda = roundMoney(grossProfit - operatingExpenses);
-  const ebitdaMargin = Math.round((ebitda / revenue) * 10_000) / 10_000;
-  const forecastRate = ((rowHash(row, 4) % 1_701) - 700) / 10_000;
-  const forecastRevenue = roundMoney(revenue / (1 + forecastRate));
-  const variance = roundMoney(revenue - forecastRevenue);
-  const varianceRate = variance / forecastRevenue;
+function financial_row_at(row: number): FinancialRow {
+  const hash = row_hash(row, 1);
+  const fiscal_year = 2024 + (Math.floor(row / 12) % 5);
+  const period = `FY${fiscal_year} P${String((row % 12) + 1).padStart(2, "0")}`;
+  const revenue = round_money(90_000 + (hash % 360_000) + (row % 12) * 4_500);
+  const cogs = round_money(revenue * (0.36 + (row_hash(row, 2) % 9) / 100));
+  const gross_profit = round_money(revenue - cogs);
+  const operating_expenses = round_money(revenue * (0.24 + (row_hash(row, 3) % 8) / 100));
+  const ebitda = round_money(gross_profit - operating_expenses);
+  const ebitda_margin = Math.round((ebitda / revenue) * 10_000) / 10_000;
+  const forecast_rate = ((row_hash(row, 4) % 1_701) - 700) / 10_000;
+  const forecast_revenue = round_money(revenue / (1 + forecast_rate));
+  const variance = round_money(revenue - forecast_revenue);
+  const variance_rate = variance / forecast_revenue;
 
   return {
     period,
@@ -139,46 +139,46 @@ function financialRowAt(row: number): FinancialRow {
     region: REGIONS[hash % REGIONS.length] ?? REGIONS[0],
     revenue,
     cogs,
-    grossProfit,
-    operatingExpenses,
+    grossProfit: gross_profit,
+    operatingExpenses: operating_expenses,
     ebitda,
-    ebitdaMargin,
-    forecastRevenue,
+    ebitdaMargin: ebitda_margin,
+    forecastRevenue: forecast_revenue,
     variance,
-    status: varianceRate > 0.03 ? "Ahead" : varianceRate < -0.03 ? "Watch" : "On plan",
+    status: variance_rate > 0.03 ? "Ahead" : variance_rate < -0.03 ? "Watch" : "On plan",
   };
 }
 
-function scaleCellAt(row: number, column: number, financial: FinancialRow): DataCell {
-  const sheetRow = row + 1;
+function scale_cell_at(row: number, column: number, financial: FinancialRow): DataCell {
+  const sheet_row = row + 1;
   if (column === 0) return financial.period;
   if (column === 1) return financial.account;
   if (column === 2) return financial.region;
   if (column === 3) return financial.revenue;
   if (column === 4) return financial.cogs;
-  if (column === 5) return { kind: "formula", src: `=D${sheetRow}-E${sheetRow}` };
+  if (column === 5) return { kind: "formula", src: `=D${sheet_row}-E${sheet_row}` };
   if (column === 6) return financial.operatingExpenses;
-  if (column === 7) return { kind: "formula", src: `=F${sheetRow}-G${sheetRow}` };
+  if (column === 7) return { kind: "formula", src: `=F${sheet_row}-G${sheet_row}` };
   if (column === 8) {
-    return { kind: "formula", src: `=IF(D${sheetRow}=0,0,H${sheetRow}/D${sheetRow})` };
+    return { kind: "formula", src: `=IF(D${sheet_row}=0,0,H${sheet_row}/D${sheet_row})` };
   }
   if (column === 9) return financial.forecastRevenue;
-  if (column === 10) return { kind: "formula", src: `=D${sheetRow}-J${sheetRow}` };
+  if (column === 10) return { kind: "formula", src: `=D${sheet_row}-J${sheet_row}` };
   if (column === 11) return financial.status;
 
   const horizon = column - (FINANCIAL_COLUMNS.length - 1);
-  const seasonalRate = ((rowHash(row, column + 1) % 201) - 100) / 10_000;
-  const growthRate = horizon * 0.0015 + seasonalRate;
-  return { kind: "formula", src: `=J${sheetRow}*(1+${growthRate})` };
+  const seasonal_rate = ((row_hash(row, column + 1) % 201) - 100) / 10_000;
+  const growth_rate = horizon * 0.0015 + seasonal_rate;
+  return { kind: "formula", src: `=J${sheet_row}*(1+${growth_rate})` };
 }
 
 export function scaleRowAt(row: number, bands: readonly DataSourceColumnBand[]): RowData {
   const out: RowData = {};
-  const financial = financialRowAt(row);
+  const financial = financial_row_at(row);
   for (const band of bands) {
     for (let offset = 0; offset < band.keys.length; offset += 1) {
       const key = band.keys[offset];
-      if (key !== undefined) out[key] = scaleCellAt(row, band.start + offset, financial);
+      if (key !== undefined) out[key] = scale_cell_at(row, band.start + offset, financial);
     }
   }
   return out;
@@ -193,14 +193,14 @@ export function createScaleWorkbook(): Workbook {
         name: SCALE_SHEETS[FEED_SHEET].label,
         rowCount: SCALE_ROWS,
         columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => {
-          const financialColumn = FINANCIAL_COLUMNS[column];
-          const type = financialColumn?.type ?? ("currency" as const);
+          const financial_column = FINANCIAL_COLUMNS[column];
+          const type = financial_column?.type ?? ("currency" as const);
           return {
             key: scaleColumnKey(column),
             header:
-              financialColumn?.header ??
+              financial_column?.header ??
               `Forecast M+${String(column - (FINANCIAL_COLUMNS.length - 1)).padStart(3, "0")}`,
-            width: financialColumn?.width ?? 116,
+            width: financial_column?.width ?? 116,
             type,
             // Whole units: mixed one- and two-decimal amounts read as noise.
             ...(column === 8
@@ -265,11 +265,11 @@ export function createScaleDataSource(
   onUpdate: (telemetry: Readonly<DatasourceTelemetry>) => void,
 ): DataSource {
   const telemetry = emptyTelemetry();
-  let firstRequest = true;
-  let nextTileId = 1;
+  let first_request = true;
+  let next_tile_id = 1;
 
   const publish = () => onUpdate({ ...telemetry, recentTiles: [...telemetry.recentTiles] });
-  const replaceTile = (next: DatasourceTile) => {
+  const replace_tile = (next: DatasourceTile) => {
     telemetry.recentTiles = telemetry.recentTiles.map((tile) =>
       tile.id === next.id ? next : tile,
     );
@@ -279,39 +279,39 @@ export function createScaleDataSource(
     capabilities: { protocol: 2, columns: "windowed" },
     getRows(request) {
       const { protocol, sheet, start, end, columns, signal, revision } = request;
-      const requestedColumns = columns.reduce((count, band) => count + band.keys.length, 0);
-      const cells = (end - start) * requestedColumns;
-      const requestBytes = encoder.encode(
+      const requested_columns = columns.reduce((count, band) => count + band.keys.length, 0);
+      const cells = (end - start) * requested_columns;
+      const request_bytes = encoder.encode(
         JSON.stringify({ protocol, sheet, start, end, columns, revision }),
       ).byteLength;
       const tile: DatasourceTile = {
-        id: nextTileId,
+        id: next_tile_id,
         sheet,
         start,
         end,
         columns,
         cells,
-        requestBytes,
+        requestBytes: request_bytes,
         returnedBytes: 0,
         latencyMs: null,
         state: "requested",
       };
-      nextTileId += 1;
+      next_tile_id += 1;
       telemetry.requests += 1;
       telemetry.requestedCells += cells;
-      telemetry.requestBytes += requestBytes;
+      telemetry.requestBytes += request_bytes;
       telemetry.lastRequest = tile;
       telemetry.recentTiles = [tile, ...telemetry.recentTiles].slice(0, 256);
       publish();
 
-      const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
-      firstRequest = false;
-      const startedAt = performance.now();
+      const latency = first_request ? 0 : PAGE_LATENCY_MS;
+      first_request = false;
+      const started_at = performance.now();
 
       const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
       const rows: RowData[] = [];
       let cursor = start;
-      let returnedBytes = 2;
+      let returned_bytes = 2;
       let timer = 0;
       let settled = false;
 
@@ -319,13 +319,13 @@ export function createScaleDataSource(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        const abortedTile: DatasourceTile = {
+        const aborted_tile: DatasourceTile = {
           ...tile,
-          latencyMs: performance.now() - startedAt,
+          latencyMs: performance.now() - started_at,
           state: "aborted",
         };
         telemetry.aborted += 1;
-        replaceTile(abortedTile);
+        replace_tile(aborted_tile);
         publish();
         reject(new DOMException("Datasource request aborted", "AbortError"));
       };
@@ -335,11 +335,11 @@ export function createScaleDataSource(
           abort();
           return;
         }
-        const sliceEnd = Math.min(cursor + GENERATION_SLICE_ROWS, end);
-        for (; cursor < sliceEnd; cursor += 1) {
+        const slice_end = Math.min(cursor + GENERATION_SLICE_ROWS, end);
+        for (; cursor < slice_end; cursor += 1) {
           const row = scaleRowAt(cursor, columns);
-          const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
-          returnedBytes += rowBytes + (rows.length === 0 ? 0 : 1);
+          const row_bytes = encoder.encode(JSON.stringify(row)).byteLength;
+          returned_bytes += row_bytes + (rows.length === 0 ? 0 : 1);
           rows.push(row);
         }
         if (cursor < end) {
@@ -349,17 +349,17 @@ export function createScaleDataSource(
 
         settled = true;
         signal.removeEventListener("abort", abort);
-        const returnedTile: DatasourceTile = {
+        const returned_tile: DatasourceTile = {
           ...tile,
-          returnedBytes,
-          latencyMs: performance.now() - startedAt,
+          returnedBytes: returned_bytes,
+          latencyMs: performance.now() - started_at,
           state: "returned",
         };
         telemetry.returnedRows += rows.length;
         telemetry.returnedCells += cells;
-        telemetry.returnedBytes += returnedBytes;
-        telemetry.lastReturn = returnedTile;
-        replaceTile(returnedTile);
+        telemetry.returnedBytes += returned_bytes;
+        telemetry.lastReturn = returned_tile;
+        replace_tile(returned_tile);
         publish();
         resolve({ protocol: 2, start, columns, rows, revision });
       };
@@ -371,20 +371,20 @@ export function createScaleDataSource(
   };
 }
 
-function loadableStoreOf(grid: Grid): SheetwriteStore | null {
+function loadable_store_of(grid: Grid): SheetwriteStore | null {
   return grid.store instanceof SheetwriteStore ? grid.store : null;
 }
 
 /** Live allocation stats for one paged sheet; null for dense stores. */
 export function pagedStatsOf(grid: Grid, sheet: SheetId): PagedStoreStats | null {
-  const store = loadableStoreOf(grid);
+  const store = loadable_store_of(grid);
   if (!store?.isPaged(sheet)) return null;
   return store.getPagedStats(sheet);
 }
 
 /** Explicit partial-data state the engine reports for full-sheet operations. */
 export function queryCapabilityOf(grid: Grid, sheet: SheetId): QueryCapability | null {
-  return loadableStoreOf(grid)?.queryCapability?.(sheet) ?? null;
+  return loadable_store_of(grid)?.queryCapability?.(sheet) ?? null;
 }
 
 export type FullExportAttempt =
@@ -434,10 +434,10 @@ export type ScanAttempt =
  */
 export function attemptColumnScan(grid: Grid, col: number, op: AggregateOp): ScanAttempt {
   const label = `${op.toUpperCase()}(column ${col})`;
-  const startedAt = performance.now();
+  const started_at = performance.now();
   try {
     const value = grid.aggregate(col, op);
-    return { ok: true, op: label, value, durationMs: performance.now() - startedAt };
+    return { ok: true, op: label, value, durationMs: performance.now() - started_at };
   } catch (error) {
     if (error instanceof IncompleteDataError) {
       return {
@@ -445,7 +445,7 @@ export function attemptColumnScan(grid: Grid, col: number, op: AggregateOp): Sca
         op: label,
         loadedCells: error.capability.loadedCells,
         totalCells: error.capability.totalCells,
-        durationMs: performance.now() - startedAt,
+        durationMs: performance.now() - started_at,
         message: error.message,
       };
     }
@@ -473,7 +473,7 @@ export function measureBulkMutation(
   kind: "values" | "styles",
   rows: number,
 ): CrossingReport {
-  const store = loadableStoreOf(grid);
+  const store = loadable_store_of(grid);
   if (!store) throw new Error("Crossing measurement requires the packed Sheetwrite store");
   const range = {
     sheet: FEED_SHEET,
@@ -481,7 +481,7 @@ export function measureBulkMutation(
     end: { row: rows - 1, col: 3 },
   };
   store.resetRangeMutationAllocationStats();
-  const startedAt = performance.now();
+  const started_at = performance.now();
   if (kind === "values") {
     grid.applyTransaction({
       patches: [
@@ -491,7 +491,7 @@ export function measureBulkMutation(
           block: {
             rowCount: rows,
             colCount: 1,
-            values: Array.from({ length: rows }, (_, row) => (rowHash(row, 99) % 9_000) / 10),
+            values: Array.from({ length: rows }, (_, row) => (row_hash(row, 99) % 9_000) / 10),
           },
         },
       ],
@@ -501,11 +501,11 @@ export function measureBulkMutation(
       patches: [{ op: "setRangeStyle", range, style: { bold: true } }],
     });
   }
-  const durationMs = performance.now() - startedAt;
+  const duration_ms = performance.now() - started_at;
   const stats = store.getRangeMutationAllocationStats();
   return {
     cells: rows,
-    durationMs,
+    durationMs: duration_ms,
     ffiCalls: stats.ffiCalls,
     documentOperations: stats.documentOperations,
     jsPatchObjects: stats.jsPatchObjects,
@@ -533,15 +533,15 @@ export async function sweepCacheChurn(
   jumps: number,
   isCancelled: () => boolean,
 ): Promise<ChurnReport> {
-  const rowsVisited: number[] = [];
+  const rows_visited: number[] = [];
   const stride = Math.floor(FEED_ROWS / (jumps + 1));
   for (let jump = 1; jump <= jumps; jump++) {
     if (isCancelled()) break;
     const row = Math.min(
       FEED_ROWS - 1,
-      jump * stride + (rowHash(jump, 7) % SCALE_STORAGE.chunkRows),
+      jump * stride + (row_hash(jump, 7) % SCALE_STORAGE.chunkRows),
     );
-    rowsVisited.push(row);
+    rows_visited.push(row);
     grid.scrollToCell({ sheet: FEED_SHEET, row, col: 0 });
     const settle = Promise.withResolvers<void>();
     setTimeout(settle.resolve, PAGE_LATENCY_MS + 70);
@@ -549,8 +549,8 @@ export async function sweepCacheChurn(
   }
   const stats = pagedStatsOf(grid, FEED_SHEET);
   return {
-    jumps: rowsVisited.length,
-    rowsVisited,
+    jumps: rows_visited.length,
+    rowsVisited: rows_visited,
     allocatedBytes: stats?.allocatedBytes ?? 0,
     chunks: stats?.chunks ?? 0,
     loadedCells: stats?.loadedCells ?? 0,
@@ -565,7 +565,7 @@ export interface EvidenceStat {
   iterations: number;
 }
 
-function statOf(timing: { stat: { median: number; p95: number; iters: number } }): EvidenceStat {
+function stat_of(timing: { stat: { median: number; p95: number; iters: number } }): EvidenceStat {
   return {
     medianMs: timing.stat.median,
     p95Ms: timing.stat.p95,
@@ -588,9 +588,9 @@ export const PAGED_EVIDENCE = {
   denseLogicalBytes: pagedResults.denseLogicalBytes,
   peakAllocatedBytes: pagedResults.peakAllocatedBytes,
   peakChunks: pagedResults.peakChunks,
-  startup: statOf(pagedResults.timings.startup),
-  firstPage: statOf(pagedResults.timings["first-page"]),
-  distantPage: statOf(pagedResults.timings["distant-page"]),
+  startup: stat_of(pagedResults.timings.startup),
+  firstPage: stat_of(pagedResults.timings["first-page"]),
+  distantPage: stat_of(pagedResults.timings["distant-page"]),
   probes: pagedResults.probes,
 } as const;
 
@@ -640,7 +640,7 @@ interface InteractionArtifact {
   readonly previous: InteractionArtifactPrevious | null;
 }
 
-const interactionArtifact: InteractionArtifact = interactionResults;
+const interaction_artifact: InteractionArtifact = interactionResults;
 
 /**
  * Committed interaction evidence for the performance showcase: the current
@@ -649,37 +649,37 @@ const interactionArtifact: InteractionArtifact = interactionResults;
  */
 export const INTERACTION_EVIDENCE = {
   source: "bench/results/interaction-results.json",
-  protocol: `${interactionArtifact.matrixId} (protocol v${interactionArtifact.protocolVersion}, ${interactionArtifact.mode} mode)`,
+  protocol: `${interaction_artifact.matrixId} (protocol v${interaction_artifact.protocolVersion}, ${interaction_artifact.mode} mode)`,
   capture: {
-    commit: interactionArtifact.metadata.commit,
-    dirty: interactionArtifact.metadata.dirty,
-    timestamp: interactionArtifact.metadata.timestamp,
-    runtime: interactionArtifact.runner.runtime,
-    browser: interactionArtifact.runner.browser,
-    cpu: interactionArtifact.runner.cpu,
-    samples: interactionArtifact.samples.lookupMedianNs.length,
+    commit: interaction_artifact.metadata.commit,
+    dirty: interaction_artifact.metadata.dirty,
+    timestamp: interaction_artifact.metadata.timestamp,
+    runtime: interaction_artifact.runner.runtime,
+    browser: interaction_artifact.runner.browser,
+    cpu: interaction_artifact.runner.cpu,
+    samples: interaction_artifact.samples.lookupMedianNs.length,
   },
-  ceilings: interactionArtifact.ceilings,
+  ceilings: interaction_artifact.ceilings,
   current: {
-    lookupMedianNs: interactionArtifact.values.lookupMedianNs.median,
-    lookupP95Ns: interactionArtifact.values.lookupP95Ns.median,
-    viewIndexBytes: interactionArtifact.values.inverseIndexBytes.median,
-    dirty100Bytes: interactionArtifact.values.dirty100Bytes.median,
-    coldOwnedLongTaskMs: interactionArtifact.values.ownedColdLongTaskMs.median,
-    coldUnattributedLongTaskMs: interactionArtifact.values.unattributedColdLongTaskMs.median,
-    usableMs: interactionArtifact.values.usableMs.median,
+    lookupMedianNs: interaction_artifact.values.lookupMedianNs.median,
+    lookupP95Ns: interaction_artifact.values.lookupP95Ns.median,
+    viewIndexBytes: interaction_artifact.values.inverseIndexBytes.median,
+    dirty100Bytes: interaction_artifact.values.dirty100Bytes.median,
+    coldOwnedLongTaskMs: interaction_artifact.values.ownedColdLongTaskMs.median,
+    coldUnattributedLongTaskMs: interaction_artifact.values.unattributedColdLongTaskMs.median,
+    usableMs: interaction_artifact.values.usableMs.median,
   },
   previous:
-    interactionArtifact.previous === null
+    interaction_artifact.previous === null
       ? null
       : {
-          commit: interactionArtifact.previous.commit,
-          mode: interactionArtifact.previous.mode,
-          timestamp: interactionArtifact.previous.timestamp,
-          lookupMedianNs: interactionArtifact.previous.values.lookupMedianNs.median,
-          viewIndexBytes: interactionArtifact.previous.values.inverseIndexBytes.median,
-          dirty100Bytes: interactionArtifact.previous.values.dirty100Bytes.median,
-          coldOwnedLongTaskMs: interactionArtifact.previous.values.ownedColdLongTaskMs.median,
+          commit: interaction_artifact.previous.commit,
+          mode: interaction_artifact.previous.mode,
+          timestamp: interaction_artifact.previous.timestamp,
+          lookupMedianNs: interaction_artifact.previous.values.lookupMedianNs.median,
+          viewIndexBytes: interaction_artifact.previous.values.inverseIndexBytes.median,
+          dirty100Bytes: interaction_artifact.previous.values.dirty100Bytes.median,
+          coldOwnedLongTaskMs: interaction_artifact.previous.values.ownedColdLongTaskMs.median,
         },
 } as const;
 

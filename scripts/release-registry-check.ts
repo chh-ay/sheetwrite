@@ -4,11 +4,11 @@ import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 /** Whether npm has any version of a package. */
 export type RegistryPresence = (name: string) => Promise<boolean>;
 
-async function isOnRegistry(name: string): Promise<boolean> {
+async function is_on_registry(name: string): Promise<boolean> {
   try {
     await captureProcess(["npm", "view", name, "version"], {
-      failure: ({ stdout, stderr, exitCode }) =>
-        `npm view ${name} version failed (${exitCode}): ${stderr || stdout}`,
+      failure: ({ stdout, stderr, exitCode: exit_code }) =>
+        `npm view ${name} version failed (${exit_code}): ${stderr || stdout}`,
     });
     return true;
   } catch (error) {
@@ -25,7 +25,7 @@ async function isOnRegistry(name: string): Promise<boolean> {
  */
 export async function assertPackagesOnRegistry(
   names: readonly string[],
-  isPresent: RegistryPresence = isOnRegistry,
+  isPresent: RegistryPresence = is_on_registry,
 ): Promise<void> {
   const presence = await Promise.all(names.map((name) => isPresent(name)));
   const missing = names.filter((_, index) => !presence[index]);

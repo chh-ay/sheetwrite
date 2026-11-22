@@ -12,11 +12,11 @@ import {
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const sha = "a".repeat(40);
-const olderCommit = "b".repeat(40);
+const older_commit = "b".repeat(40);
 const version = "0.5.4";
 
-function result(exitCode: number, stdout = "", stderr = ""): CommandResult {
-  return { exitCode, stdout, stderr };
+function result(exit_code: number, stdout = "", stderr = ""): CommandResult {
+  return { exitCode: exit_code, stdout, stderr };
 }
 
 /** One line as `@changesets/changelog-github` writes it. */
@@ -28,8 +28,8 @@ const provenance = entry(173, "chh-ay", "Publish each package with npm provenanc
 const pivots = `${entry(170, "chh-ay", "Add pivot tables.")}
   
   Pivot tables update when their source cells change.`;
-const engineStart = entry(176, "alice", "Make the engine start faster.");
-const dependencyUpdate = `- Updated dependencies [[\`1700000\`](https://github.com/chh-ay/sheetwrite/commit/1700000)]:
+const engine_start = entry(176, "alice", "Make the engine start faster.");
+const dependency_update = `- Updated dependencies [[\`1700000\`](https://github.com/chh-ay/sheetwrite/commit/1700000)]:
   - @sheetwrite/core@0.5.4`;
 
 function changelog(name: string, groups: Readonly<Record<string, readonly string[]>>): string {
@@ -42,12 +42,12 @@ function changelog(name: string, groups: Readonly<Record<string, readonly string
 const changelogs: Readonly<Record<string, string>> = {
   "@sheetwrite/core": changelog("@sheetwrite/core", {
     "Minor Changes": [pivots],
-    "Patch Changes": [provenance, dependencyUpdate],
+    "Patch Changes": [provenance, dependency_update],
   }),
   "@sheetwrite/wasm": changelog("@sheetwrite/wasm", {
     "Patch Changes": [
       entry(171, "alice", "Fix a rounding error in `ROUND`."),
-      engineStart,
+      engine_start,
       provenance,
     ],
   }),
@@ -55,12 +55,12 @@ const changelogs: Readonly<Record<string, string>> = {
   "@sheetwrite/formulas": changelog("@sheetwrite/formulas", {
     "Patch Changes": [
       entry(175, "carol", "Fix a rounding error in `ROUND`."),
-      engineStart,
+      engine_start,
       provenance,
     ],
   }),
   "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
-    "Minor Changes": [dependencyUpdate],
+    "Minor Changes": [dependency_update],
     "Patch Changes": [provenance],
   }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
@@ -68,20 +68,20 @@ const changelogs: Readonly<Record<string, string>> = {
       pivots,
       entry(172, "bob", "Keep focus in the grid after paste."),
       provenance,
-      dependencyUpdate,
+      dependency_update,
     ],
   }),
   "@sheetwrite/svelte": changelog("@sheetwrite/svelte", {
-    "Patch Changes": [dependencyUpdate, provenance],
+    "Patch Changes": [dependency_update, provenance],
   }),
 };
 
 /** Packages without their own fixture got only the shared provenance fix and a dependency update. */
-async function changelogFor(name: string): Promise<string> {
-  return changelogs[name] ?? changelog(name, { "Patch Changes": [provenance, dependencyUpdate] });
+async function changelog_for(name: string): Promise<string> {
+  return changelogs[name] ?? changelog(name, { "Patch Changes": [provenance, dependency_update] });
 }
 
-const expectedNotes = `## All packages
+const expected_notes = `## All packages
 
 ### Patch Changes
 
@@ -176,16 +176,16 @@ class RepositoryState {
   }
 }
 
-const allPackages: readonly PackageReleaseIdentity[] = PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
+const all_packages: readonly PackageReleaseIdentity[] = PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
   name,
   version,
 }));
 
-function release(state: RepositoryState, attested = sha, published = allPackages) {
-  return ensureVersionRelease(allPackages, published, sha, {
+function release(state: RepositoryState, attested = sha, published = all_packages) {
+  return ensureVersionRelease(all_packages, published, sha, {
     runner: state.runner,
     provenance: async () => attested,
-    readChangelog: changelogFor,
+    readChangelog: changelog_for,
   });
 }
 
@@ -227,7 +227,7 @@ describe("version GitHub release", () => {
         "--title",
         "Sheetwrite 0.5.4",
         "--notes",
-        expectedNotes,
+        expected_notes,
         "--latest",
       ],
     ]);
@@ -241,9 +241,9 @@ describe("version GitHub release", () => {
 
   it("updates the existing release on a rerun instead of creating another", async () => {
     const state = new RepositoryState();
-    for (const identity of allPackages) state.tags.set(`${identity.name}@${version}`, sha);
+    for (const identity of all_packages) state.tags.set(`${identity.name}@${version}`, sha);
     state.tags.set("v0.5.4", sha);
-    state.tags.set("v0.5.3", olderCommit);
+    state.tags.set("v0.5.3", older_commit);
     state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
 
     expect(await release(state, sha, [])).toBe("v0.5.4");
@@ -254,7 +254,7 @@ describe("version GitHub release", () => {
         (command) => command[1] === "push" || (command[1] === "tag" && command[2] !== "--list"),
       ),
     ).toEqual([]);
-    const notes = expectedNotes.replace("@sheetwrite/core@0.5.3...v0.5.4", "v0.5.3...v0.5.4");
+    const notes = expected_notes.replace("@sheetwrite/core@0.5.3...v0.5.4", "v0.5.3...v0.5.4");
     expect(state.releaseCommands("edit")).toEqual([
       [
         "gh",
@@ -275,10 +275,10 @@ describe("version GitHub release", () => {
     ["updating", "edit", true],
   ])(
     "does not move Latest when %s the release of an older version",
-    async (_label, verb, hasRelease) => {
+    async (_label, verb, has_release) => {
       const state = new RepositoryState();
-      state.tags.set("v0.10.0", olderCommit);
-      if (hasRelease) state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
+      state.tags.set("v0.10.0", older_commit);
+      if (has_release) state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
 
       await release(state);
 
@@ -304,24 +304,25 @@ describe("version GitHub release", () => {
     ["the version tag", "v0.5.4"],
   ])("fails closed when %s targets another commit", async (_label, tag) => {
     const state = new RepositoryState();
-    state.tags.set(tag, olderCommit);
+    state.tags.set(tag, older_commit);
 
-    await expect(release(state)).rejects.toThrow(`${tag} targets ${olderCommit}, expected ${sha}`);
+    await expect(release(state)).rejects.toThrow(`${tag} targets ${older_commit}, expected ${sha}`);
     expect(state.releaseCommands("create")).toEqual([]);
   });
 
   it("only verifies package tags when this commit published nothing", async () => {
     const state = new RepositoryState();
-    for (const identity of allPackages) state.tags.set(`${identity.name}@${version}`, olderCommit);
+    for (const identity of all_packages)
+      state.tags.set(`${identity.name}@${version}`, older_commit);
 
-    expect(await release(state, olderCommit, [])).toBeUndefined();
+    expect(await release(state, older_commit, [])).toBeUndefined();
     expect(
       state.commands.filter((command) => command[0] !== "git" || command[1] !== "rev-parse"),
     ).toEqual([]);
 
     // A package published from this commit must attest to it.
-    await expect(release(new RepositoryState(), olderCommit)).rejects.toThrow(
-      `@sheetwrite/wasm@0.5.4 provenance targets ${olderCommit}, expected ${sha}`,
+    await expect(release(new RepositoryState(), older_commit)).rejects.toThrow(
+      `@sheetwrite/wasm@0.5.4 provenance targets ${older_commit}, expected ${sha}`,
     );
   });
 
@@ -338,8 +339,8 @@ describe("version GitHub release", () => {
     expect(config.changelog).toEqual(["./changelog.js", { repo: "chh-ay/sheetwrite" }]);
     const { default: github } = await import("@changesets/changelog-github");
     // The wrapper is plain JavaScript without declarations, so it takes the wrapped type.
-    const wrapperPath = "../.changeset/changelog.js";
-    const { default: changelog } = (await import(wrapperPath)) as { default: typeof github };
+    const wrapper_path = "../.changeset/changelog.js";
+    const { default: changelog } = (await import(wrapper_path)) as { default: typeof github };
     expect(changelog.getReleaseLine).toBe(github.getReleaseLine);
     expect(await changelog.getDependencyReleaseLine([], [], null)).toBe("");
   });

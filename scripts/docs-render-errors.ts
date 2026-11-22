@@ -22,17 +22,17 @@ export function renderErrors(html: string): string[] {
   );
 }
 
-function htmlFiles(directory: string): string[] {
+function html_files(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return htmlFiles(path);
+    if (entry.isDirectory()) return html_files(path);
     return entry.name.endsWith(".html") ? [path] : [];
   });
 }
 
 if (import.meta.main) {
   const root = resolve(process.argv[2] ?? "docs/dist/client");
-  const issues = htmlFiles(root).flatMap((file) =>
+  const issues = html_files(root).flatMap((file) =>
     renderErrors(readFileSync(file, "utf8")).map((error) => `${relative(root, file)}: ${error}`),
   );
   if (issues.length > 0) {

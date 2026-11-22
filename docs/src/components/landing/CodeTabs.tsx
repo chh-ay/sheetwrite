@@ -25,7 +25,7 @@ export interface CodeTabsProps {
  * island reads the panels back from the page when it hydrates.
  */
 export function CodeTabs(props: CodeTabsProps) {
-  const [active, setActive] = createSignal<FrameworkId>("vanilla");
+  const [active, set_active] = createSignal<FrameworkId>("vanilla");
   const ids = CODE_TAB_FRAMEWORKS.map((framework) => framework.id);
   return (
     <div class="sw-code-tabs">
@@ -34,7 +34,7 @@ export function CodeTabs(props: CodeTabsProps) {
         aria-label="Framework"
         class="sw-code-tabs__list"
         onKeyDown={(event) =>
-          onTabListKey(event, ids, active(), setActive, (id) => `landing-tab-${id}`)
+          onTabListKey(event, ids, active(), set_active, (id) => `landing-tab-${id}`)
         }
         role="tablist"
       >
@@ -45,7 +45,7 @@ export function CodeTabs(props: CodeTabsProps) {
               aria-selected={framework.id === active()}
               data-framework={framework.id}
               id={`landing-tab-${framework.id}`}
-              onClick={() => setActive(framework.id)}
+              onClick={() => set_active(framework.id)}
               role="tab"
               tabIndex={framework.id === active() ? 0 : -1}
               type="button"

@@ -104,7 +104,7 @@ export interface QuerySession {
 
 const DEFAULT_CSV_DELIMITER = 44;
 
-function emptyColumn(spec: QueryColumnSpec): QueryColumn {
+function empty_column(spec: QueryColumnSpec): QueryColumn {
   const state = {
     id: spec.id,
     name: spec.name,
@@ -142,11 +142,11 @@ function emptyColumn(spec: QueryColumnSpec): QueryColumn {
 }
 
 /** A zero-row batch with the source schema, used to check plans without data. */
-function emptyBatch(source: SavedQuerySource): QueryBatch {
-  return { rowCount: 0, columns: source.columns.map(emptyColumn) };
+function empty_batch(source: SavedQuerySource): QueryBatch {
+  return { rowCount: 0, columns: source.columns.map(empty_column) };
 }
 
-function parseSpec(source: Exclude<SavedQuerySource, { kind: "host" }>): QuerySource {
+function parse_spec(source: Exclude<SavedQuerySource, { kind: "host" }>): QuerySource {
   if (source.kind === "json") {
     return {
       format: "json",
@@ -164,16 +164,16 @@ function parseSpec(source: Exclude<SavedQuerySource, { kind: "host" }>): QuerySo
   };
 }
 
-function diagnosticOf(error: unknown): QueryDiagnostic | undefined {
+function diagnostic_of(error: unknown): QueryDiagnostic | undefined {
   return error instanceof QueryError ? error.diagnostic : undefined;
 }
 
 /** Saved queries in an order where every joined query comes before the query that reads it. */
-function dependencyOrder(
+function dependency_order(
   queries: readonly SavedQuery[],
   roots: readonly string[],
 ): SavedQuery[] | { missing: string } {
-  const byId = new Map(queries.map((query) => [query.id, query]));
+  const by_id = new Map(queries.map((query) => [query.id, query]));
   const ordered: SavedQuery[] = [];
   const visited = new Set<string>();
 
@@ -181,7 +181,7 @@ function dependencyOrder(
   const visit = (id: string): string | undefined => {
     if (visited.has(id)) return undefined;
 
-    const query = byId.get(id);
+    const query = by_id.get(id);
     if (!query) return id;
 
     visited.add(id);
@@ -204,7 +204,7 @@ function dependencyOrder(
   return ordered;
 }
 
-function joinInputs(query: SavedQuery, results: ReadonlyMap<string, QueryBatch>): QueryInput[] {
+function join_inputs(query: SavedQuery, results: ReadonlyMap<string, QueryBatch>): QueryInput[] {
   const inputs: QueryInput[] = [];
 
   for (const step of query.steps) {
@@ -219,7 +219,7 @@ function joinInputs(query: SavedQuery, results: ReadonlyMap<string, QueryBatch>)
   return inputs;
 }
 
-function findTable(workbook: Workbook, id: string): WorkbookTable | undefined {
+function find_table(workbook: Workbook, id: string): WorkbookTable | undefined {
   for (const sheet of workbook.sheets) {
     const table = sheet.tables?.find((candidate) => candidate.id === id);
     if (table) return table;
@@ -253,7 +253,7 @@ function fingerprint(workbook: Workbook, ids: readonly string[]): string {
   return JSON.stringify(
     ids.map((id) => {
       const query = workbook.queries?.find((candidate) => candidate.id === id);
-      const table = query?.output ? findTable(workbook, query.output.table) : undefined;
+      const table = query?.output ? find_table(workbook, query.output.table) : undefined;
 
       return [query ?? null, table ?? null];
     }),
@@ -271,14 +271,14 @@ interface PlannedOutput {
  * Cells the table did not hold before must be empty and outside other
  * tables, so growth never overwrites unrelated data.
  */
-function planOutput(
+function plan_output(
   grid: Grid,
   workbook: Workbook,
   output: SavedQueryOutput,
   batch: QueryBatch,
   planned: readonly Range[],
 ): PlannedOutput | QueryOutputBlock {
-  const existing = findTable(workbook, output.table);
+  const existing = find_table(workbook, output.table);
   const anchor = existing
     ? { sheet: existing.range.sheet, row: existing.range.start.row, col: existing.range.start.col }
     : output.anchor;
@@ -299,8 +299,8 @@ function planOutput(
   if (others.some((table) => intersects(table.range, range))) return "occupied";
   if (planned.some((other) => intersects(other, range))) return "occupied";
 
-  const lastRow = Math.min(range.end.row, sheet.rowCount - 1);
-  for (let row = range.start.row; row <= lastRow; row += 1) {
+  const last_row = Math.min(range.end.row, sheet.rowCount - 1);
+  for (let row = range.start.row; row <= last_row; row += 1) {
     for (let col = range.start.col; col <= range.end.col; col += 1) {
       if (contains(existing?.range, row, col)) continue;
 
@@ -360,14 +360,14 @@ export function createSessionWithEngine(
 ): QuerySession {
   const lifetime = new AbortController();
 
-  const savedQueries = (): SavedQuery[] => structuredClone(grid.store.getWorkbook().queries ?? []);
+  const saved_queries = (): SavedQuery[] => structuredClone(grid.store.getWorkbook().queries ?? []);
 
   /** Runs each plan on zero-row inputs, so the engine checks columns, types and joins. */
   const check = (
     query: SavedQuery,
     queries: readonly SavedQuery[],
   ): QueryDiagnostic | undefined => {
-    const order = dependencyOrder(
+    const order = dependency_order(
       [...queries.filter((candidate) => candidate.id !== query.id), query],
       [query.id],
     );
@@ -381,15 +381,15 @@ export function createSessionWithEngine(
         results.set(
           entry.id,
           engine.execute(
-            emptyBatch(entry.source),
+            empty_batch(entry.source),
             entry.steps,
-            joinInputs(entry, results),
+            join_inputs(entry, results),
             options.limits,
           ),
         );
       }
     } catch (error) {
-      const diagnostic = diagnosticOf(error);
+      const diagnostic = diagnostic_of(error);
       if (diagnostic) return diagnostic;
 
       throw error;
@@ -424,20 +424,20 @@ export function createSessionWithEngine(
       throw new QueryError({ code: "source-kind", step: null, row: null, column: null });
     }
 
-    return engine.parse(fetched.bytes, parseSpec(source), options.limits);
+    return engine.parse(fetched.bytes, parse_spec(source), options.limits);
   };
 
   const run = async (
     roots: readonly string[],
-    refreshOptions: QueryRefreshOptions | undefined,
+    refresh_options: QueryRefreshOptions | undefined,
   ): Promise<QueryRefreshResult> => {
-    if (lifetime.signal.aborted || refreshOptions?.signal?.aborted) return { status: "aborted" };
+    if (lifetime.signal.aborted || refresh_options?.signal?.aborted) return { status: "aborted" };
 
-    const signal = refreshOptions?.signal
-      ? AbortSignal.any([lifetime.signal, refreshOptions.signal])
+    const signal = refresh_options?.signal
+      ? AbortSignal.any([lifetime.signal, refresh_options.signal])
       : lifetime.signal;
-    const queries = savedQueries();
-    const order = dependencyOrder(queries, roots);
+    const queries = saved_queries();
+    const order = dependency_order(queries, roots);
     if (!Array.isArray(order)) return { status: "missing", queryId: order.missing };
 
     const ids = order.map((query) => query.id);
@@ -451,11 +451,11 @@ export function createSessionWithEngine(
         const source = await load(query, signal);
         if (signal.aborted) return { status: "aborted" };
 
-        batch = engine.execute(source, query.steps, joinInputs(query, results), options.limits);
+        batch = engine.execute(source, query.steps, join_inputs(query, results), options.limits);
       } catch (error) {
         if (signal.aborted) return { status: "aborted" };
 
-        const diagnostic = diagnosticOf(error);
+        const diagnostic = diagnostic_of(error);
         if (!diagnostic) throw error;
 
         return { status: "failed", queryId: query.id, diagnostic };
@@ -473,7 +473,7 @@ export function createSessionWithEngine(
       const batch = results.get(query.id);
       if (!query.output || !batch || !roots.includes(query.id)) continue;
 
-      const plan = planOutput(grid, workbook, query.output, batch, planned);
+      const plan = plan_output(grid, workbook, query.output, batch, planned);
       if (typeof plan === "string") return { status: "blocked", queryId: query.id, reason: plan };
 
       planned.push(plan.range);
@@ -488,7 +488,7 @@ export function createSessionWithEngine(
 
   const session: QuerySession = {
     define(query) {
-      const diagnostic = check(query, savedQueries());
+      const diagnostic = check(query, saved_queries());
       if (diagnostic) return { status: "invalid", diagnostic };
 
       return grid.applyTransaction({ patches: [{ op: "setQuery", query }] });
@@ -498,16 +498,16 @@ export function createSessionWithEngine(
       return grid.applyTransaction({ patches: [{ op: "removeQuery", id }] });
     },
 
-    refresh(id, refreshOptions) {
-      return run([id], refreshOptions);
+    refresh(id, refresh_options) {
+      return run([id], refresh_options);
     },
 
-    refreshAll(refreshOptions) {
-      const roots = savedQueries()
+    refreshAll(refresh_options) {
+      const roots = saved_queries()
         .filter((query) => query.output !== undefined)
         .map((query) => query.id);
 
-      return run(roots, refreshOptions);
+      return run(roots, refresh_options);
     },
 
     dispose() {

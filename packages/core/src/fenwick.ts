@@ -15,7 +15,7 @@ const MIN_CAPACITY = 4;
 
 export class OffsetIndex {
   private readonly n: number;
-  private readonly defaultHeight: number;
+  private readonly default_height: number;
   /** Resized rows in ascending order; the first `size` entries are in use. */
   private rows = NO_ROWS;
   /** Height of each resized row, parallel to `rows`. */
@@ -30,7 +30,7 @@ export class OffsetIndex {
 
   constructor(count: number, defaultHeight: number) {
     this.n = count;
-    this.defaultHeight = defaultHeight;
+    this.default_height = defaultHeight;
     this.total = count * defaultHeight;
   }
 
@@ -49,7 +49,7 @@ export class OffsetIndex {
   }
 
   heightOf(row: number): number {
-    return this.queued?.get(row) ?? this.storedHeight(row);
+    return this.queued?.get(row) ?? this.stored_height(row);
   }
 
   setHeight(row: number, h: number): void {
@@ -61,13 +61,13 @@ export class OffsetIndex {
       this.queued?.set(row, h);
       return;
     }
-    const index = this.lowerBound(row);
+    const index = this.lower_bound(row);
     const resized = index < this.size && this.rows[index] === row;
-    const current = resized ? (this.heights[index] ?? this.defaultHeight) : this.defaultHeight;
+    const current = resized ? (this.heights[index] ?? this.default_height) : this.default_height;
     const delta = h - current;
     if (delta === 0) return;
     this.total += delta;
-    if (resized && h !== this.defaultHeight) {
+    if (resized && h !== this.default_height) {
       this.heights[index] = h;
       for (let i = index + 1; i <= this.size; i += i & -i) {
         this.tree[i] = (this.tree[i] ?? 0) + delta;
@@ -84,11 +84,11 @@ export class OffsetIndex {
   setHeights(rows: ArrayLike<number>, heights: ArrayLike<number>): void {
     if (rows.length === 0) return;
     if (rows.length === 1) {
-      this.setHeight(rows[0] ?? -1, heights[0] ?? this.defaultHeight);
+      this.setHeight(rows[0] ?? -1, heights[0] ?? this.default_height);
       return;
     }
     this.merge();
-    this.mergeSorted(rows, heights);
+    this.merge_sorted(rows, heights);
   }
 
   /**
@@ -102,8 +102,8 @@ export class OffsetIndex {
     }
     let size = 0;
     for (let position = 0; position < rows.length; position++) {
-      const height = heights[position] ?? this.defaultHeight;
-      if (height === this.defaultHeight) continue;
+      const height = heights[position] ?? this.default_height;
+      if (height === this.default_height) continue;
       rows[size] = rows[position] ?? 0;
       heights[size] = height;
       size++;
@@ -113,16 +113,16 @@ export class OffsetIndex {
     this.heights = heights;
     this.tree = new Float64Array(rows.length + 1);
     this.size = size;
-    this.rebuildTree();
+    this.rebuild_tree();
   }
 
   /** Sum of heights of rows [0, row); i.e. the top Y of `row`. */
   offsetOf(row: number): number {
     this.merge();
     const r = Math.max(0, Math.min(row, this.n));
-    if (this.size === 0) return r * this.defaultHeight;
-    const index = this.lowerBound(r);
-    return this.prefix(index) + (r - this.segmentStart(index)) * this.defaultHeight;
+    if (this.size === 0) return r * this.default_height;
+    const index = this.lower_bound(r);
+    return this.prefix(index) + (r - this.segment_start(index)) * this.default_height;
   }
 
   /**
@@ -137,10 +137,10 @@ export class OffsetIndex {
       return { row: last, top: this.offsetOf(last) };
     }
     this.merge();
-    const defaultHeight = this.defaultHeight;
+    const default_height = this.default_height;
     if (this.size === 0) {
-      const row = Math.floor(offset / defaultHeight);
-      return { row, top: row * defaultHeight };
+      const row = Math.floor(offset / default_height);
+      return { row, top: row * default_height };
     }
     // Largest segment count whose segments all end at or before `offset`.
     let index = 0;
@@ -153,24 +153,24 @@ export class OffsetIndex {
       }
     }
     // `offset` is inside segment `index`: in its default run or on its resized row.
-    const start = this.segmentStart(index);
+    const start = this.segment_start(index);
     const end = index < this.size ? (this.rows[index] ?? this.n) : this.n;
-    const segmentTop = offset - remaining;
-    const defaultRows = Math.floor(remaining / defaultHeight);
-    if (defaultRows < end - start) {
-      return { row: start + defaultRows, top: segmentTop + defaultRows * defaultHeight };
+    const segment_top = offset - remaining;
+    const default_rows = Math.floor(remaining / default_height);
+    if (default_rows < end - start) {
+      return { row: start + default_rows, top: segment_top + default_rows * default_height };
     }
-    if (index < this.size) return { row: end, top: segmentTop + (end - start) * defaultHeight };
+    if (index < this.size) return { row: end, top: segment_top + (end - start) * default_height };
     const last = this.n - 1;
     return { row: last, top: this.offsetOf(last) };
   }
 
   /** Height of `row` in the sorted rows, ignoring queued changes. */
-  private storedHeight(row: number): number {
-    const index = this.lowerBound(row);
+  private stored_height(row: number): number {
+    const index = this.lower_bound(row);
     return index < this.size && this.rows[index] === row
-      ? (this.heights[index] ?? this.defaultHeight)
-      : this.defaultHeight;
+      ? (this.heights[index] ?? this.default_height)
+      : this.default_height;
   }
 
   /** Merge queued heights into the sorted rows and rebuild the tree. */
@@ -180,75 +180,75 @@ export class OffsetIndex {
     if (queued.size === 1) {
       for (const [row, h] of queued) {
         queued.clear();
-        this.mergeOne(row, h);
+        this.merge_one(row, h);
       }
       return;
     }
     const rows = Int32Array.from(queued.keys()).sort();
     const heights = new Float64Array(rows.length);
     for (let position = 0; position < rows.length; position++) {
-      heights[position] = queued.get(rows[position] ?? 0) ?? this.defaultHeight;
+      heights[position] = queued.get(rows[position] ?? 0) ?? this.default_height;
     }
     queued.clear();
-    this.mergeSorted(rows, heights);
+    this.merge_sorted(rows, heights);
   }
 
   /** One queued row, in place: no new arrays unless they must grow. */
-  private mergeOne(row: number, h: number): void {
-    const index = this.lowerBound(row);
+  private merge_one(row: number, h: number): void {
+    const index = this.lower_bound(row);
     const resized = index < this.size && this.rows[index] === row;
     if (!resized) {
-      if (h !== this.defaultHeight) this.insertAt(index, row, h);
-    } else if (h === this.defaultHeight) {
-      this.removeAt(index);
+      if (h !== this.default_height) this.insert_at(index, row, h);
+    } else if (h === this.default_height) {
+      this.remove_at(index);
     } else {
       this.heights[index] = h;
-      this.rebuildTree();
+      this.rebuild_tree();
     }
   }
 
   /** Merge ascending, distinct `rows` into the sorted rows in O(k + m). */
-  private mergeSorted(rows: ArrayLike<number>, heights: ArrayLike<number>): void {
+  private merge_sorted(rows: ArrayLike<number>, heights: ArrayLike<number>): void {
     const count = rows.length;
     const capacity = this.size + count;
-    const nextRows = new Int32Array(capacity);
-    const nextHeights = new Float64Array(capacity);
+    const next_rows = new Int32Array(capacity);
+    const next_heights = new Float64Array(capacity);
     let size = 0;
     let kept = 0;
     for (let update = 0; update < count; update++) {
       const row = rows[update] ?? 0;
       while (kept < this.size && (this.rows[kept] ?? 0) < row) {
-        nextRows[size] = this.rows[kept] ?? 0;
-        nextHeights[size] = this.heights[kept] ?? 0;
+        next_rows[size] = this.rows[kept] ?? 0;
+        next_heights[size] = this.heights[kept] ?? 0;
         size++;
         kept++;
       }
       if (kept < this.size && this.rows[kept] === row) kept++;
-      const height = heights[update] ?? this.defaultHeight;
-      if (height !== this.defaultHeight) {
-        nextRows[size] = row;
-        nextHeights[size] = height;
+      const height = heights[update] ?? this.default_height;
+      if (height !== this.default_height) {
+        next_rows[size] = row;
+        next_heights[size] = height;
         size++;
       }
     }
     for (; kept < this.size; kept++) {
-      nextRows[size] = this.rows[kept] ?? 0;
-      nextHeights[size] = this.heights[kept] ?? 0;
+      next_rows[size] = this.rows[kept] ?? 0;
+      next_heights[size] = this.heights[kept] ?? 0;
       size++;
     }
     if (size === 0) {
       this.release();
       return;
     }
-    this.rows = nextRows;
-    this.heights = nextHeights;
+    this.rows = next_rows;
+    this.heights = next_heights;
     this.tree = new Float64Array(capacity + 1);
     this.size = size;
-    this.rebuildTree();
+    this.rebuild_tree();
   }
 
   /** Resized rows before `row`, which is also the segment that holds `row`. */
-  private lowerBound(row: number): number {
+  private lower_bound(row: number): number {
     let lo = 0;
     let hi = this.size;
     while (lo < hi) {
@@ -260,7 +260,7 @@ export class OffsetIndex {
   }
 
   /** First row of segment `index`. */
-  private segmentStart(index: number): number {
+  private segment_start(index: number): number {
     return index === 0 ? 0 : (this.rows[index - 1] ?? -1) + 1;
   }
 
@@ -271,7 +271,7 @@ export class OffsetIndex {
     return sum;
   }
 
-  private insertAt(index: number, row: number, h: number): void {
+  private insert_at(index: number, row: number, h: number): void {
     if (this.size === this.rows.length) {
       const capacity = Math.max(MIN_CAPACITY, this.size * 2);
       const rows = new Int32Array(capacity);
@@ -287,10 +287,10 @@ export class OffsetIndex {
     this.rows[index] = row;
     this.heights[index] = h;
     this.size++;
-    this.rebuildTree();
+    this.rebuild_tree();
   }
 
-  private removeAt(index: number): void {
+  private remove_at(index: number): void {
     if (this.size === 1) {
       this.release();
       return;
@@ -298,7 +298,7 @@ export class OffsetIndex {
     this.rows.copyWithin(index, index + 1, this.size);
     this.heights.copyWithin(index, index + 1, this.size);
     this.size--;
-    this.rebuildTree();
+    this.rebuild_tree();
   }
 
   /** Back to the arithmetic default geometry. */
@@ -307,27 +307,27 @@ export class OffsetIndex {
     this.heights = NO_HEIGHTS;
     this.tree = NO_HEIGHTS;
     this.size = 0;
-    this.total = this.n * this.defaultHeight;
+    this.total = this.n * this.default_height;
   }
 
   /** O(k) Fenwick construction from `rows` and `heights`; also refreshes `total`. */
-  private rebuildTree(): void {
+  private rebuild_tree(): void {
     const tree = this.tree;
     const size = this.size;
-    const defaultHeight = this.defaultHeight;
+    const default_height = this.default_height;
     tree.fill(0, 0, size + 1);
     let total = 0;
     let start = 0;
     for (let i = 1; i <= size; i++) {
       const row = this.rows[i - 1] ?? 0;
-      const segment = (row - start) * defaultHeight + (this.heights[i - 1] ?? 0);
+      const segment = (row - start) * default_height + (this.heights[i - 1] ?? 0);
       start = row + 1;
       total += segment;
       tree[i] = (tree[i] ?? 0) + segment;
       const parent = i + (i & -i);
       if (parent <= size) tree[parent] = (tree[parent] ?? 0) + (tree[i] ?? 0);
     }
-    this.total = total + (this.n - start) * defaultHeight;
+    this.total = total + (this.n - start) * default_height;
   }
 }
 
@@ -361,18 +361,18 @@ export class ScaledScroll {
   /** DOM scrollTop -> content-space offset. */
   toContent(scrollTop: number): number {
     if (!this.scaled) return scrollTop;
-    const scrollRange = this.cap - this.viewport;
-    const contentRange = this.totalHeight - this.viewport;
-    if (scrollRange <= 0) return 0;
-    return (scrollTop / scrollRange) * contentRange;
+    const scroll_range = this.cap - this.viewport;
+    const content_range = this.totalHeight - this.viewport;
+    if (scroll_range <= 0) return 0;
+    return (scrollTop / scroll_range) * content_range;
   }
 
   /** Content-space offset -> DOM scrollTop. */
   toScroll(contentOffset: number): number {
     if (!this.scaled) return contentOffset;
-    const scrollRange = this.cap - this.viewport;
-    const contentRange = this.totalHeight - this.viewport;
-    if (contentRange <= 0) return 0;
-    return (contentOffset / contentRange) * scrollRange;
+    const scroll_range = this.cap - this.viewport;
+    const content_range = this.totalHeight - this.viewport;
+    if (content_range <= 0) return 0;
+    return (contentOffset / content_range) * scroll_range;
   }
 }

@@ -12,7 +12,7 @@ const OPCODE_I32_LOAD = 0x28;
 const OPCODE_END = 0x0b;
 const WORD_ALIGNMENT = 2;
 
-function unsignedLeb(value: number): number[] {
+function unsigned_leb(value: number): number[] {
   const bytes: number[] = [];
   let rest = value;
   do {
@@ -23,29 +23,29 @@ function unsignedLeb(value: number): number[] {
   return bytes;
 }
 
-function signedLeb(value: number): number[] {
+function signed_leb(value: number): number[] {
   const bytes: number[] = [];
   let rest = value;
   for (;;) {
     const low = rest & 0x7f;
     rest >>= 7;
-    const isDone = (rest === 0 && (low & 0x40) === 0) || (rest === -1 && (low & 0x40) !== 0);
-    bytes.push(isDone ? low : low | 0x80);
-    if (isDone) return bytes;
+    const is_done = (rest === 0 && (low & 0x40) === 0) || (rest === -1 && (low & 0x40) !== 0);
+    bytes.push(is_done ? low : low | 0x80);
+    if (is_done) return bytes;
   }
 }
 
 function vector(items: number[][]): number[] {
-  return [...unsignedLeb(items.length), ...items.flat()];
+  return [...unsigned_leb(items.length), ...items.flat()];
 }
 
 function text(value: string): number[] {
   const bytes = [...new TextEncoder().encode(value)];
-  return [...unsignedLeb(bytes.length), ...bytes];
+  return [...unsigned_leb(bytes.length), ...bytes];
 }
 
 function section(id: number, body: number[]): number[] {
-  return [id, ...unsignedLeb(body.length), ...body];
+  return [id, ...unsigned_leb(body.length), ...body];
 }
 
 interface TestFunction {
@@ -59,14 +59,14 @@ function module(functions: TestFunction[], data: { address: number; bytes: numbe
   const type = [0x60, 0, 0];
   const bodies = functions.map(({ body }) => {
     const code = [0, ...body, OPCODE_END];
-    return [...unsignedLeb(code.length), ...code];
+    return [...unsigned_leb(code.length), ...code];
   });
-  const names = vector(functions.map(({ name }, index) => [...unsignedLeb(index), ...text(name)]));
+  const names = vector(functions.map(({ name }, index) => [...unsigned_leb(index), ...text(name)]));
   return new Uint8Array([
     ...[0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00],
     ...section(1, vector([type])),
     ...section(3, vector(functions.map(() => [0]))),
-    ...section(5, vector([[0, ...unsignedLeb(MEMORY_PAGES)]])),
+    ...section(5, vector([[0, ...unsigned_leb(MEMORY_PAGES)]])),
     ...section(10, vector(bodies)),
     ...section(
       11,
@@ -74,7 +74,7 @@ function module(functions: TestFunction[], data: { address: number; bytes: numbe
         [
           0,
           OPCODE_I32_CONST,
-          ...signedLeb(data.address),
+          ...signed_leb(data.address),
           OPCODE_END,
           ...vector(data.bytes.map((byte) => [byte])),
         ],
@@ -86,11 +86,18 @@ function module(functions: TestFunction[], data: { address: number; bytes: numbe
 
 /** Loads the word at `address` and drops it. */
 function load(address: number): number[] {
-  return [OPCODE_I32_CONST, ...signedLeb(address), OPCODE_I32_LOAD, WORD_ALIGNMENT, 0, OPCODE_DROP];
+  return [
+    OPCODE_I32_CONST,
+    ...signed_leb(address),
+    OPCODE_I32_LOAD,
+    WORD_ALIGNMENT,
+    0,
+    OPCODE_DROP,
+  ];
 }
 
 function call(index: number): number[] {
-  return [OPCODE_CALL, ...unsignedLeb(index)];
+  return [OPCODE_CALL, ...unsigned_leb(index)];
 }
 
 const GREETING = [...new TextEncoder().encode("greeting")];

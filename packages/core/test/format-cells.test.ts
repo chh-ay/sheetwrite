@@ -21,13 +21,13 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let grid: GridImpl;
 let store: SheetwriteStore;
 let host: HTMLDivElement;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   const workbook = makeWorkbook(10);
   store = new SheetwriteStore(workbook, makeColumnarData(10));
   host = mountHost();
@@ -37,13 +37,13 @@ beforeEach(() => {
 afterEach(() => {
   grid.destroy();
   store.dispose();
-  restoreStubs();
+  restore_stubs();
 });
 
 const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col });
 
 /** Ctrl+1 on the grid over B1:B2, then the open dialog. */
-async function openFormatCells(): Promise<HTMLDialogElement> {
+async function open_format_cells(): Promise<HTMLDialogElement> {
   grid.setSelection({
     kind: "range",
     range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
@@ -69,14 +69,14 @@ function control<T extends HTMLElement>(dialog: HTMLElement, label: string, type
   throw new Error(`no ${label} control`);
 }
 
-function setValue(element: HTMLInputElement | HTMLSelectElement, value: string): void {
+function set_value(element: HTMLInputElement | HTMLSelectElement, value: string): void {
   element.value = value;
   element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 describe("Format Cells", () => {
   it("opens with Ctrl+1 as a labelled dialog with Excel's five tabs", async () => {
-    const dialog = await openFormatCells();
+    const dialog = await open_format_cells();
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")?.textContent).toBe(
       "Format Cells",
@@ -105,11 +105,11 @@ describe("Format Cells", () => {
   });
 
   it("applies the number, alignment, font, border and fill changes as one undo step", async () => {
-    const dialog = await openFormatCells();
-    setValue(control(dialog, "Category", HTMLSelectElement), "Percentage");
-    setValue(control(dialog, "Decimal places", HTMLInputElement), "1");
+    const dialog = await open_format_cells();
+    set_value(control(dialog, "Category", HTMLSelectElement), "Percentage");
+    set_value(control(dialog, "Decimal places", HTMLInputElement), "1");
     expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe("50.0%");
-    setValue(control(dialog, "Horizontal", HTMLSelectElement), "center");
+    set_value(control(dialog, "Horizontal", HTMLSelectElement), "center");
     const bold = control(dialog, "Bold", HTMLInputElement);
     bold.checked = true;
     const outline = [...dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")].find(
@@ -137,8 +137,8 @@ describe("Format Cells", () => {
   });
 
   it("shows a custom code's sample in its section's color, and keeps OK from closing while the code is empty", async () => {
-    const dialog = await openFormatCells();
-    setValue(control(dialog, "Category", HTMLSelectElement), "Custom");
+    const dialog = await open_format_cells();
+    set_value(control(dialog, "Category", HTMLSelectElement), "Custom");
     const code = [...dialog.querySelectorAll<HTMLInputElement>("input[type=text]")][0]!;
     const type = (text: string) => {
       code.value = text;
@@ -160,21 +160,21 @@ describe("Format Cells", () => {
   });
 
   it("offers Excel's Fraction types and the Text category", async () => {
-    let dialog = await openFormatCells();
-    setValue(control(dialog, "Category", HTMLSelectElement), "Fraction");
+    let dialog = await open_format_cells();
+    set_value(control(dialog, "Category", HTMLSelectElement), "Fraction");
     const type = [...dialog.querySelectorAll("select")].find((select) =>
       [...select.options].some((option) => option.value === "# ?/4"),
     )!;
     expect(type.closest("label")!.hidden).toBe(false);
     expect([...type.options].map((option) => option.textContent)).toContain("As quarters (2/4)");
-    setValue(type, "# ?/4");
+    set_value(type, "# ?/4");
     expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe(" 2/4");
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe("# ?/4");
 
-    dialog = await openFormatCells();
+    dialog = await open_format_cells();
     expect(control(dialog, "Category", HTMLSelectElement).value).toBe("Fraction");
-    setValue(control(dialog, "Category", HTMLSelectElement), "Text");
+    set_value(control(dialog, "Category", HTMLSelectElement), "Text");
     expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe("0.5");
     await answerDialog(host, "OK");
     expect(cell(1, 1).style.numberFormat).toBe("@");
@@ -199,7 +199,7 @@ describe("Format Cells", () => {
     let changes = 0;
     grid.on("change", () => changes++);
 
-    const dialog = await openFormatCells();
+    const dialog = await open_format_cells();
     const bold = control(dialog, "Bold", HTMLInputElement);
     bold.checked = true;
     bold.dispatchEvent(new Event("change", { bubbles: true }));

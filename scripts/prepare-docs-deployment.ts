@@ -3,8 +3,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const requiredFiles = [
+const repository_root = resolve(import.meta.dir, "..");
+const required_files = [
   "index.html",
   "404.html",
   "docs/index.html",
@@ -41,28 +41,28 @@ const IMMUTABLE_PATHS = [
  */
 const REDIRECT_PATTERN_LENGTH = 4000;
 
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape_reg_exp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-async function requireDirectory(path: string): Promise<void> {
+async function require_directory(path: string): Promise<void> {
   if (!(await lstat(path)).isDirectory()) {
     throw new Error(`Expected a real directory, not a symlink or special file: ${path}`);
   }
 }
 
-async function collectFiles(sourceRoot: string, directory = ""): Promise<Map<string, number>> {
+async function collect_files(source_root: string, directory = ""): Promise<Map<string, number>> {
   const files = new Map<string, number>();
-  for (const entry of await readdir(join(sourceRoot, directory))) {
-    const relativePath = directory ? `${directory}/${entry}` : entry;
-    const sourcePath = join(sourceRoot, relativePath);
-    const stats = await lstat(sourcePath);
+  for (const entry of await readdir(join(source_root, directory))) {
+    const relative_path = directory ? `${directory}/${entry}` : entry;
+    const source_path = join(source_root, relative_path);
+    const stats = await lstat(source_path);
     if (stats.isDirectory()) {
-      for (const [path, size] of await collectFiles(sourceRoot, relativePath)) {
+      for (const [path, size] of await collect_files(source_root, relative_path)) {
         files.set(path, size);
       }
     } else if (stats.isFile()) {
-      files.set(relativePath, stats.size);
+      files.set(relative_path, stats.size);
     } else {
-      throw new Error(`Cannot package a symlink or special file: ${sourcePath}`);
+      throw new Error(`Cannot package a symlink or special file: ${source_path}`);
     }
   }
   return files;
@@ -72,7 +72,7 @@ async function collectFiles(sourceRoot: string, directory = ""): Promise<Map<str
  * Permanent redirects from each page's address without its trailing slash to
  * the canonical address with it, so a page has one URL.
  */
-function trailingSlashRedirects(pages: readonly string[]): object[] {
+function trailing_slash_redirects(pages: readonly string[]): object[] {
   const routes: object[] = [];
   let alternatives: string[] = [];
   let length = 0;
@@ -87,7 +87,7 @@ function trailingSlashRedirects(pages: readonly string[]): object[] {
     length = 0;
   };
   for (const page of pages) {
-    const pattern = escapeRegExp(page);
+    const pattern = escape_reg_exp(page);
     if (length + pattern.length + 1 > REDIRECT_PATTERN_LENGTH) flush();
     alternatives.push(pattern);
     length += pattern.length + 1;
@@ -96,36 +96,36 @@ function trailingSlashRedirects(pages: readonly string[]): object[] {
   return routes;
 }
 
-export async function prepareDocsDeployment(root = repositoryRoot): Promise<void> {
-  const sourceRoot = join(root, "docs/dist/client");
+export async function prepareDocsDeployment(root = repository_root): Promise<void> {
+  const source_root = join(root, "docs/dist/client");
   for (const directory of ["docs", "docs/dist", "docs/dist/client"]) {
-    await requireDirectory(join(root, directory));
+    await require_directory(join(root, directory));
   }
-  const files = await collectFiles(sourceRoot);
-  for (const required of requiredFiles) {
+  const files = await collect_files(source_root);
+  for (const required of required_files) {
     if (!files.has(required) || files.get(required) === 0) {
-      throw new Error(`Docs build is incomplete: missing or empty ${join(sourceRoot, required)}`);
+      throw new Error(`Docs build is incomplete: missing or empty ${join(source_root, required)}`);
     }
   }
   const pages = [...files.keys()]
     .filter((path) => path.endsWith("/index.html"))
     .map((path) => path.slice(0, -"/index.html".length));
 
-  const vercelRoot = join(root, ".vercel");
-  await mkdir(vercelRoot, { recursive: true });
-  await requireDirectory(vercelRoot);
-  const outputRoot = join(vercelRoot, "output");
+  const vercel_root = join(root, ".vercel");
+  await mkdir(vercel_root, { recursive: true });
+  await require_directory(vercel_root);
+  const output_root = join(vercel_root, "output");
   // Validate the complete source before discarding the previous deployment.
-  await rm(outputRoot, { recursive: true, force: true });
-  const staticRoot = join(outputRoot, "static");
-  await mkdir(staticRoot, { recursive: true });
+  await rm(output_root, { recursive: true, force: true });
+  const static_root = join(output_root, "static");
+  await mkdir(static_root, { recursive: true });
   for (const path of files.keys()) {
-    const destination = join(staticRoot, path);
+    const destination = join(static_root, path);
     await mkdir(dirname(destination), { recursive: true });
-    await copyFile(join(sourceRoot, path), destination);
+    await copyFile(join(source_root, path), destination);
   }
   await writeFile(
-    join(outputRoot, "config.json"),
+    join(output_root, "config.json"),
     `${JSON.stringify(
       {
         version: 3,
@@ -148,14 +148,14 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             ...Object.entries(MOVED_SHOWCASES),
             ...Object.entries(REMOVED_API_PAGES),
           ].map(([from, to]) => ({
-            src: `^${escapeRegExp(from).replace(/\/$/, "")}/?$`,
+            src: `^${escape_reg_exp(from).replace(/\/$/, "")}/?$`,
             status: 308,
             headers: { Location: to },
           })),
-          ...trailingSlashRedirects(pages),
+          ...trailing_slash_redirects(pages),
           { src: "^/$", dest: "/index.html" },
           ...pages.map((page) => ({
-            src: `^/${escapeRegExp(page)}/$`,
+            src: `^/${escape_reg_exp(page)}/$`,
             dest: `/${page}/index.html`,
           })),
           { handle: "filesystem" },

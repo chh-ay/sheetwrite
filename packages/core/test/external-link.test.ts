@@ -44,13 +44,13 @@ const names: ExternalLinkName[] = [
   { name: "Local", refersTo: "=Annual!$C$11", sheet: "Annual" },
 ];
 
-function linkedStore(externalLinks: ExternalLink[]): SheetwriteStore {
+function linked_store(external_links: ExternalLink[]): SheetwriteStore {
   const workbook = makeWorkbook(8);
-  workbook.externalLinks = externalLinks;
+  workbook.externalLinks = external_links;
   return new SheetwriteStore(workbook);
 }
 
-function resolvedAfter(store: SheetwriteStore, src: string): unknown {
+function resolved_after(store: SheetwriteStore, src: string): unknown {
   const addr = { sheet: "s1", row: 0, col: 1 };
   store.applyTransaction({ patches: [{ op: "set", addr, value: { kind: "formula", src } }] });
   return store.getCell(addr).resolved;
@@ -85,9 +85,9 @@ describe("external formula text", () => {
         [`"${name}(1)"&A1`, false, false],
       ]),
     ];
-    for (const [formula, external, liveData] of cases) {
+    for (const [formula, external, live_data] of cases) {
       expect(formulaContainsExternalReference(formula), formula).toBe(external);
-      expect(formulaCallsExternalData(formula), formula).toBe(liveData);
+      expect(formulaCallsExternalData(formula), formula).toBe(live_data);
     }
   });
 
@@ -112,13 +112,13 @@ describe("external formula text", () => {
 
 describe("external workbook links", () => {
   it("shows the saved values of a linked workbook in formulas", () => {
-    const store = linkedStore([budget]);
+    const store = linked_store([budget]);
     try {
-      expect(resolvedAfter(store, "=SUM([Budget.xlsx]Annual!C10:C11)")).toBe(12);
-      expect(resolvedAfter(store, "=[Budget.xlsx]Annual!C12")).toBe("North");
-      expect(resolvedAfter(store, "=[Budget.xlsx]Annual!C13")).toBe(true);
-      expect(resolvedAfter(store, "=ISNA([Budget.xlsx]Annual!C14)")).toBe(true);
-      expect(resolvedAfter(store, "=[Sales.xlsx]Annual!C10")).toBe("#REF!");
+      expect(resolved_after(store, "=SUM([Budget.xlsx]Annual!C10:C11)")).toBe(12);
+      expect(resolved_after(store, "=[Budget.xlsx]Annual!C12")).toBe("North");
+      expect(resolved_after(store, "=[Budget.xlsx]Annual!C13")).toBe(true);
+      expect(resolved_after(store, "=ISNA([Budget.xlsx]Annual!C14)")).toBe(true);
+      expect(resolved_after(store, "=[Sales.xlsx]Annual!C10")).toBe("#REF!");
       expect(store.exportSnapshot().workbook.externalLinks).toEqual([budget]);
     } finally {
       store.dispose();
@@ -129,12 +129,12 @@ describe("external workbook links", () => {
   // another workbook as `=SUM(Budget.xlsx!Sales)`, and shows the values the
   // link saved for it.
   it("reads the defined names of a linked workbook from its saved values", () => {
-    const store = linkedStore([{ ...budget, names }]);
+    const store = linked_store([{ ...budget, names }]);
     try {
-      expect(resolvedAfter(store, "=Budget.xlsx!Total*2")).toBe(14);
-      expect(resolvedAfter(store, "=SUM('C:\\Reports\\Budget.xlsx'!Both)")).toBe(12);
-      expect(resolvedAfter(store, "=[Budget.xlsx]Annual!Local")).toBe(5);
-      expect(resolvedAfter(store, "=Budget.xlsx!Missing")).toBe("#REF!");
+      expect(resolved_after(store, "=Budget.xlsx!Total*2")).toBe(14);
+      expect(resolved_after(store, "=SUM('C:\\Reports\\Budget.xlsx'!Both)")).toBe(12);
+      expect(resolved_after(store, "=[Budget.xlsx]Annual!Local")).toBe(5);
+      expect(resolved_after(store, "=Budget.xlsx!Missing")).toBe("#REF!");
       expect(store.exportSnapshot().workbook.externalLinks).toEqual([{ ...budget, names }]);
     } finally {
       store.dispose();
@@ -142,9 +142,9 @@ describe("external workbook links", () => {
 
     // Without values for the link, a name is `#REF!`, as in Excel, and the
     // empty link list is not saved.
-    const unlinked = linkedStore([]);
+    const unlinked = linked_store([]);
     try {
-      expect(resolvedAfter(unlinked, "=Budget.xlsx!Total")).toBe("#REF!");
+      expect(resolved_after(unlinked, "=Budget.xlsx!Total")).toBe("#REF!");
       expect(unlinked.exportSnapshot().workbook.externalLinks).toBeUndefined();
     } finally {
       unlinked.dispose();
@@ -152,12 +152,12 @@ describe("external workbook links", () => {
   });
 
   it("rejects links that the engine cannot hold", () => {
-    const snapshot = (externalLinks: unknown): WorkbookSnapshot => {
+    const snapshot = (external_links: unknown): WorkbookSnapshot => {
       const workbook = makeWorkbook(1);
       // The validator receives untrusted data, so the cast is the point of the test.
       return {
         schemaVersion: 1,
-        workbook: { activeSheet: "s1", externalLinks },
+        workbook: { activeSheet: "s1", externalLinks: external_links },
         sheets: [{ ...workbook.sheets[0]!, order: 0, cells: [] }],
       } as unknown as WorkbookSnapshot;
     };
@@ -180,18 +180,18 @@ describe("external workbook links", () => {
     }
 
     // The store checks each saved cell when it gives the links to the engine.
-    const withCell = (row: number, col: number, value: unknown): ExternalLink[] => [
+    const with_cell = (row: number, col: number, value: unknown): ExternalLink[] => [
       // The store receives untrusted values, so the cast is the point of the test.
       { ...budget, sheets: [{ name: "Annual", cells: [{ row, col, value } as ExternalLinkCell] }] },
     ];
     for (const links of [
-      withCell(0, 0, { error: "#BUSY!" }),
-      withCell(0, 0, Number.NaN),
-      withCell(1_048_576, 0, 1),
+      with_cell(0, 0, { error: "#BUSY!" }),
+      with_cell(0, 0, Number.NaN),
+      with_cell(1_048_576, 0, 1),
       // The engine holds a linked sheet from A1 to its last cell.
-      withCell(999_999, 9, 1),
+      with_cell(999_999, 9, 1),
     ]) {
-      expect(() => linkedStore(links)).toThrow(
+      expect(() => linked_store(links)).toThrow(
         expect.objectContaining({ code: "invalid-snapshot" }),
       );
     }

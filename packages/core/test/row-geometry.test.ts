@@ -7,34 +7,34 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { DocumentOp } from "../src/types.js";
 import { mountGridWithData, scrollerOf } from "./fixtures.js";
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
 });
 
-function geometryOf(grid: GridImpl): GeometryLayoutController {
+function geometry_of(grid: GridImpl): GeometryLayoutController {
   return Reflect.get(grid, "geometry") as GeometryLayoutController;
 }
 
 /** Every view row's height, top and hit test against the store's committed heights. */
-function expectCommittedGeometry(grid: GridImpl, store: SheetwriteStore): void {
-  const geometry = geometryOf(grid);
+function expect_committed_geometry(grid: GridImpl, store: SheetwriteStore): void {
+  const geometry = geometry_of(grid);
   const zoom = grid.getZoom();
-  const rowHeights = store.getWorkbook().sheets[0]!.rowHeights;
+  const row_heights = store.getWorkbook().sheets[0]!.rowHeights;
   const rows = store.viewRowCount("s1");
   expect(geometry.rowCount).toBe(rows);
   let top = 0;
   for (let row = 0; row < rows; row++) {
-    const height = (rowHeights?.get(store.dataRowAt("s1", row)) ?? DEFAULT_THEME.rowHeight) * zoom;
+    const height = (row_heights?.get(store.dataRowAt("s1", row)) ?? DEFAULT_THEME.rowHeight) * zoom;
     expect(geometry.rowHeight(row)).toBe(height);
     expect(geometry.rowOffset(row)).toBe(top);
     expect(geometry.rowAtOffset(top + height / 2)).toBe(row);
@@ -43,7 +43,7 @@ function expectCommittedGeometry(grid: GridImpl, store: SheetwriteStore): void {
   expect(geometry.rowOffset(rows)).toBe(top);
 }
 
-function setRowMeta(row: number, height?: number): DocumentOp {
+function set_row_meta(row: number, height?: number): DocumentOp {
   return { op: "setRowMeta", sheet: "s1", row, meta: height === undefined ? {} : { height } };
 }
 
@@ -53,12 +53,12 @@ describe("row geometry", () => {
     grid.setRowHeight(0, 50);
     grid.setRowHeight(99, 61);
     grid.setRowHeight(50, 3);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.undo();
     grid.undo();
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.redo();
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -68,18 +68,18 @@ describe("row geometry", () => {
     grid.setRowHeight(20, 45);
     const outcome = grid.applyTransaction({
       patches: [
-        setRowMeta(10, DEFAULT_THEME.rowHeight),
-        setRowMeta(20),
-        setRowMeta(3, 33),
-        setRowMeta(80, 90),
-        setRowMeta(3, 34),
-        setRowMeta(99, 12),
+        set_row_meta(10, DEFAULT_THEME.rowHeight),
+        set_row_meta(20),
+        set_row_meta(3, 33),
+        set_row_meta(80, 90),
+        set_row_meta(3, 34),
+        set_row_meta(99, 12),
       ],
     });
     expect(outcome.status).toBe("applied");
-    expect(geometryOf(grid).rowHeight(3)).toBe(34);
-    expect(geometryOf(grid).rowHeight(20)).toBe(DEFAULT_THEME.rowHeight);
-    expectCommittedGeometry(grid, store);
+    expect(geometry_of(grid).rowHeight(3)).toBe(34);
+    expect(geometry_of(grid).rowHeight(20)).toBe(DEFAULT_THEME.rowHeight);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -91,22 +91,22 @@ describe("row geometry", () => {
       patches: [{ op: "addRows", sheet: "s1", at: 0, count: 3 }],
     });
     expect(insert.status).toBe("applied");
-    expect(geometryOf(grid).rowHeight(8)).toBe(50);
-    expect(geometryOf(grid).rowHeight(102)).toBe(70);
-    expectCommittedGeometry(grid, store);
+    expect(geometry_of(grid).rowHeight(8)).toBe(50);
+    expect(geometry_of(grid).rowHeight(102)).toBe(70);
+    expect_committed_geometry(grid, store);
     const remove = grid.applyTransaction({
       patches: [{ op: "removeRows", sheet: "s1", at: 0, count: 4 }],
     });
     expect(remove.status).toBe("applied");
-    expect(geometryOf(grid).rowHeight(4)).toBe(50);
-    expectCommittedGeometry(grid, store);
+    expect(geometry_of(grid).rowHeight(4)).toBe(50);
+    expect_committed_geometry(grid, store);
     grid.applyTransaction({ patches: [{ op: "removeRows", sheet: "s1", at: 4, count: 1 }] });
-    expect(geometryOf(grid).rowHeight(4)).toBe(DEFAULT_THEME.rowHeight);
-    expectCommittedGeometry(grid, store);
+    expect(geometry_of(grid).rowHeight(4)).toBe(DEFAULT_THEME.rowHeight);
+    expect_committed_geometry(grid, store);
     grid.undo();
     grid.undo();
     grid.undo();
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -114,33 +114,33 @@ describe("row geometry", () => {
     const { store, host, grid } = mountGridWithData(30);
     grid.setRowHeight(3, 44);
     const scroller = scrollerOf(host);
-    const borderY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
+    const border_y = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
     const pointer = (type: string, y: number): void => {
       scroller.dispatchEvent(
         new PointerEvent(type, { clientX: 10, clientY: y, pointerId: 1, button: 0, bubbles: true }),
       );
     };
-    pointer("pointerdown", borderY);
-    pointer("pointermove", borderY + 30);
-    expect(geometryOf(grid).rowHeight(0)).toBe(DEFAULT_THEME.rowHeight + 30);
-    expect(geometryOf(grid).rowOffset(1)).toBe(DEFAULT_THEME.rowHeight + 30);
-    pointer("pointercancel", borderY + 30);
+    pointer("pointerdown", border_y);
+    pointer("pointermove", border_y + 30);
+    expect(geometry_of(grid).rowHeight(0)).toBe(DEFAULT_THEME.rowHeight + 30);
+    expect(geometry_of(grid).rowOffset(1)).toBe(DEFAULT_THEME.rowHeight + 30);
+    pointer("pointercancel", border_y + 30);
     expect(store.getWorkbook().sheets[0]!.rowHeights?.has(0)).toBe(false);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
 
     // A cancelled preview of a resized row restores its committed height.
-    const row3Border = DEFAULT_THEME.headerHeight + 3 * DEFAULT_THEME.rowHeight + 44;
-    pointer("pointerdown", row3Border);
-    pointer("pointermove", row3Border + 46);
-    expect(geometryOf(grid).rowHeight(3)).toBe(90);
-    pointer("pointercancel", row3Border + 46);
-    expect(geometryOf(grid).rowHeight(3)).toBe(44);
+    const row3_border = DEFAULT_THEME.headerHeight + 3 * DEFAULT_THEME.rowHeight + 44;
+    pointer("pointerdown", row3_border);
+    pointer("pointermove", row3_border + 46);
+    expect(geometry_of(grid).rowHeight(3)).toBe(90);
+    pointer("pointercancel", row3_border + 46);
+    expect(geometry_of(grid).rowHeight(3)).toBe(44);
 
-    pointer("pointerdown", borderY);
-    pointer("pointermove", borderY + 20);
-    pointer("pointerup", borderY + 20);
+    pointer("pointerdown", border_y);
+    pointer("pointermove", border_y + 20);
+    pointer("pointerup", border_y + 20);
     expect(store.getWorkbook().sheets[0]!.rowHeights?.get(0)).toBe(DEFAULT_THEME.rowHeight + 20);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -153,12 +153,14 @@ describe("row geometry", () => {
     });
     grid.setRowHeight(0, 45);
     expect(store.getWorkbook().sheets[0]!.rowHeights?.get(19)).toBe(45);
-    grid.applyTransaction({ patches: [setRowMeta(0, 50)] });
-    expect(geometryOf(grid).rowHeight(19)).toBe(50);
-    expectCommittedGeometry(grid, store);
-    grid.applyTransaction({ patches: [setRowMeta(1, 41), setRowMeta(2, 42), setRowMeta(1, 43)] });
-    expect(geometryOf(grid).rowHeight(18)).toBe(43);
-    expectCommittedGeometry(grid, store);
+    grid.applyTransaction({ patches: [set_row_meta(0, 50)] });
+    expect(geometry_of(grid).rowHeight(19)).toBe(50);
+    expect_committed_geometry(grid, store);
+    grid.applyTransaction({
+      patches: [set_row_meta(1, 41), set_row_meta(2, 42), set_row_meta(1, 43)],
+    });
+    expect(geometry_of(grid).rowHeight(18)).toBe(43);
+    expect_committed_geometry(grid, store);
     const sort = (ascending: boolean): void => {
       grid.applyTransaction({
         patches: [
@@ -167,9 +169,9 @@ describe("row geometry", () => {
       });
     };
     sort(true);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     sort(false);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -177,10 +179,12 @@ describe("row geometry", () => {
     const { store, grid } = mountGridWithData(30);
     grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
     expect(store.viewRowCount("s1")).toBe(10);
-    grid.applyTransaction({ patches: [setRowMeta(0, 99), setRowMeta(1, 41), setRowMeta(28, 17)] });
-    expect(geometryOf(grid).rowHeight(0)).toBe(41);
-    expect(geometryOf(grid).rowHeight(9)).toBe(17);
-    expectCommittedGeometry(grid, store);
+    grid.applyTransaction({
+      patches: [set_row_meta(0, 99), set_row_meta(1, 41), set_row_meta(28, 17)],
+    });
+    expect(geometry_of(grid).rowHeight(0)).toBe(41);
+    expect(geometry_of(grid).rowHeight(9)).toBe(17);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 
@@ -188,12 +192,12 @@ describe("row geometry", () => {
     const { store, grid } = mountGridWithData(40);
     grid.setRowHeight(4, 30);
     grid.setZoom(2);
-    expect(geometryOf(grid).rowHeight(4)).toBe(60);
+    expect(geometry_of(grid).rowHeight(4)).toBe(60);
     grid.setRowHeight(39, 25);
-    expect(geometryOf(grid).rowHeight(39)).toBe(50);
-    expectCommittedGeometry(grid, store);
+    expect(geometry_of(grid).rowHeight(39)).toBe(50);
+    expect_committed_geometry(grid, store);
     grid.setZoom(1);
-    expectCommittedGeometry(grid, store);
+    expect_committed_geometry(grid, store);
     grid.destroy();
   });
 });

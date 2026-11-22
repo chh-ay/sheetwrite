@@ -96,7 +96,7 @@ const KEY_COLS = 16_384;
 const MAX_NAME_FORMULA = 200;
 
 /** Mulberry32: small, seeded and the same on every machine. */
-function seededRandom(seed: number): () => number {
+function seeded_random(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -132,7 +132,7 @@ async function run(command: string[]): Promise<string> {
 }
 
 /** Download the archive to `path` unless it is there already. */
-async function ensureArchive(path: string): Promise<void> {
+async function ensure_archive(path: string): Promise<void> {
   if (await Bun.file(path).exists()) return;
   process.stdout.write(`Downloading ${ARCHIVE_URL} to ${path} (1 GB)\n`);
   const response = await fetch(ARCHIVE_URL);
@@ -140,7 +140,7 @@ async function ensureArchive(path: string): Promise<void> {
   await Bun.write(path, response);
 }
 
-async function checkArchive(path: string): Promise<void> {
+async function check_archive(path: string): Promise<void> {
   const hasher = new Bun.CryptoHasher("md5");
   for await (const chunk of Bun.file(path).stream()) hasher.update(chunk);
   const digest = hasher.digest("hex");
@@ -153,23 +153,23 @@ async function checkArchive(path: string): Promise<void> {
  * spreadsheet sent in different messages; keeping one per title stops a
  * spreadsheet from landing in both sets.
  */
-async function distinctSpreadsheets(archive: string): Promise<string[]> {
+async function distinct_spreadsheets(archive: string): Promise<string[]> {
   const listing = await run(["7z", "l", "-slt", archive]);
-  const byTitle = new Map<string, string>();
+  const by_title = new Map<string, string>();
   const paths = listing
     .split("\n")
     .filter((line) => line.startsWith("Path = ") && line.endsWith(".xlsx"))
     .map((line) => line.slice("Path = ".length))
     .sort();
   for (const path of paths) {
-    const title = titleOf(path);
-    if (!byTitle.has(title)) byTitle.set(title, path);
+    const title = title_of(path);
+    if (!by_title.has(title)) by_title.set(title, path);
   }
-  return [...byTitle.values()];
+  return [...by_title.values()];
 }
 
 /** A file's spreadsheet title, which copies of one spreadsheet in several messages share. */
-function titleOf(path: string): string {
+function title_of(path: string): string {
   return (path.split("__").at(-1) ?? path).toLowerCase();
 }
 /** A cell of the sample: `[row, col, value]`; a formula is its text with `=`. */
@@ -193,7 +193,7 @@ interface SampleWorkbook {
 }
 
 /** The cells of each sheet by `row × KEY_COLS + col`; formulas as their text. */
-function cellMaps(snapshot: WorkbookSnapshot): Map<number, CellScalar>[] {
+function cell_maps(snapshot: WorkbookSnapshot): Map<number, CellScalar>[] {
   return snapshot.sheets.map((sheet) => {
     const cells = new Map<number, CellScalar>();
     for (const block of sheet.cells) {
@@ -213,14 +213,20 @@ function cellMaps(snapshot: WorkbookSnapshot): Map<number, CellScalar>[] {
 /** The cells to keep of one sheet, as keys. */
 type KeptCells = Set<number>;
 
-function keepArea(kept: KeptCells, top: number, left: number, bottom: number, right: number): void {
+function keep_area(
+  kept: KeptCells,
+  top: number,
+  left: number,
+  bottom: number,
+  right: number,
+): void {
   for (let row = Math.max(0, top); row <= bottom; row++) {
     for (let col = Math.max(0, left); col <= right; col++) kept.add(row * KEY_COLS + col);
   }
 }
 
 /** Keep the cells a formula's typist would see and the ranges it reads. */
-function keepAround(
+function keep_around(
   snapshot: WorkbookSnapshot,
   kept: KeptCells[],
   target: { sheet: number; row: number; col: number; formula: string },
@@ -228,8 +234,8 @@ function keepAround(
   const own = kept[target.sheet];
   if (own === undefined) return;
   const { row, col } = target;
-  keepArea(own, row - ROWS_ABOVE, col - COLS_LEFT, row + ROWS_BELOW, col + COLS_RIGHT);
-  keepArea(own, 0, col - COLS_LEFT, HEADER_ROWS - 1, col + COLS_RIGHT);
+  keep_area(own, row - ROWS_ABOVE, col - COLS_LEFT, row + ROWS_BELOW, col + COLS_RIGHT);
+  keep_area(own, 0, col - COLS_LEFT, HEADER_ROWS - 1, col + COLS_RIGHT);
 
   for (const reference of analyzeFormula(target.formula, 0, []).references) {
     const sheet =
@@ -241,7 +247,7 @@ function keepAround(
     const area = kept[sheet];
     if (area === undefined) continue;
     const { start, end } = reference;
-    keepArea(
+    keep_area(
       area,
       start.row - HEADER_ROWS,
       start.col,
@@ -262,7 +268,7 @@ type SampleName =
     };
 
 /** The workbook's defined names, the first of each name only (a sheet-scoped copy is dropped). */
-function sampleNames(snapshot: WorkbookSnapshot): SampleName[] {
+function sample_names(snapshot: WorkbookSnapshot): SampleName[] {
   const seen = new Set<string>();
   const names: SampleName[] = [];
   for (const named of snapshot.workbook.namedRanges ?? []) {
@@ -282,7 +288,7 @@ function sampleNames(snapshot: WorkbookSnapshot): SampleName[] {
   return names;
 }
 
-function sampledValue(value: CellScalar): CellScalar {
+function sampled_value(value: CellScalar): CellScalar {
   return typeof value === "string" && !value.startsWith("=") && value.length > MAX_TEXT
     ? value.slice(0, MAX_TEXT)
     : value;
@@ -292,13 +298,13 @@ function sampledValue(value: CellScalar): CellScalar {
  * The sample of one workbook, or null when it has too few formulas. With
  * `whole`, it keeps every cell and marks hidden sheets.
  */
-function sampleWorkbook(
+function sample_workbook(
   file: string,
   snapshot: WorkbookSnapshot,
   random: () => number,
   whole: boolean,
 ): SampleWorkbook | null {
-  const cells = cellMaps(snapshot);
+  const cells = cell_maps(snapshot);
   const formulas = cells.flatMap((map, sheet) =>
     [...map].flatMap(([key, value]) =>
       typeof value === "string" && value.startsWith("=")
@@ -310,32 +316,38 @@ function sampleWorkbook(
 
   const targets = shuffled(formulas, random).slice(0, TARGETS_PER_WORKBOOK);
   const kept: KeptCells[] = cells.map((map) => (whole ? new Set(map.keys()) : new Set()));
-  if (!whole) for (const target of targets) keepAround(snapshot, kept, target);
+  if (!whole) for (const target of targets) keep_around(snapshot, kept, target);
 
   const sheets = snapshot.sheets.map((sheet, index): SampleSheet => {
     const map = cells[index] ?? new Map<number, CellScalar>();
-    const sheetCells: SampleCell[] = [...(kept[index] ?? [])]
+    const sheet_cells: SampleCell[] = [...(kept[index] ?? [])]
       .sort((left, right) => left - right)
       .flatMap((key) => {
         const value = map.get(key);
         if (value === undefined || value === null) return [];
-        return [[Math.floor(key / KEY_COLS), key % KEY_COLS, sampledValue(value)]];
+        return [[Math.floor(key / KEY_COLS), key % KEY_COLS, sampled_value(value)]];
       });
     // A loop, not Math.max(...cells): a whole sheet can hold more cells than a call takes arguments.
     let rows = 1;
     let cols = 1;
-    for (const [row, col] of sheetCells) {
+    for (const [row, col] of sheet_cells) {
       rows = Math.max(rows, row + 1);
       cols = Math.max(cols, col + 1);
     }
     const hidden = whole && (sheet.visibility ?? "visible") !== "visible";
-    return { name: sheet.name, rows, cols, cells: sheetCells, ...(hidden ? { hidden: true } : {}) };
+    return {
+      name: sheet.name,
+      rows,
+      cols,
+      cells: sheet_cells,
+      ...(hidden ? { hidden: true } : {}),
+    };
   });
   return {
     file,
     sheets,
     targets: targets.map(({ sheet, row, col }) => [sheet, row, col]),
-    names: sampleNames(snapshot),
+    names: sample_names(snapshot),
   };
 }
 
@@ -345,10 +357,10 @@ async function draw(
   scratch: string,
   options: { seed: number; count: number; exclude: ReadonlySet<string>; whole?: boolean },
 ): Promise<{ sampled: SampleWorkbook[]; refused: number }> {
-  const random = seededRandom(options.seed);
-  const spreadsheets = await distinctSpreadsheets(archive);
+  const random = seeded_random(options.seed);
+  const spreadsheets = await distinct_spreadsheets(archive);
   const candidates = shuffled(
-    spreadsheets.filter((path) => !options.exclude.has(titleOf(path))),
+    spreadsheets.filter((path) => !options.exclude.has(title_of(path))),
     random,
   );
   const sampled: SampleWorkbook[] = [];
@@ -378,7 +390,7 @@ async function draw(
         refused++;
         continue;
       }
-      const workbook = sampleWorkbook(file, snapshot, random, options.whole ?? false);
+      const workbook = sample_workbook(file, snapshot, random, options.whole ?? false);
       if (workbook !== null) sampled.push(workbook);
     }
   }
@@ -386,14 +398,14 @@ async function draw(
   return { sampled, refused };
 }
 
-async function writeSet(name: string, seed: number, workbooks: SampleWorkbook[]): Promise<URL> {
+async function write_set(name: string, seed: number, workbooks: SampleWorkbook[]): Promise<URL> {
   const path = new URL(`./${name}.json`, import.meta.url);
   await writeFile(path, `${JSON.stringify({ seed, workbooks })}\n`);
   return path;
 }
 
 /** The spreadsheet titles of a written set, so a later draw can stay clear of them. */
-async function titlesIn(name: string): Promise<string[]> {
+async function titles_in(name: string): Promise<string[]> {
   const text = await readFile(new URL(`./${name}.json`, import.meta.url), "utf8");
   const set: unknown = JSON.parse(text);
   const workbooks =
@@ -404,19 +416,19 @@ async function titlesIn(name: string): Promise<string[]> {
     workbook !== null &&
     "file" in workbook &&
     typeof workbook.file === "string"
-      ? [titleOf(workbook.file)]
+      ? [title_of(workbook.file)]
       : [],
   );
 }
 
 /** Write a set that isn't committed, and check it against its recorded SHA-256. */
-async function writeChecked(
+async function write_checked(
   name: string,
   seed: number,
   workbooks: SampleWorkbook[],
   sha256: string,
 ): Promise<void> {
-  const written = await writeSet(name, seed, workbooks);
+  const written = await write_set(name, seed, workbooks);
   const digest = new Bun.CryptoHasher("sha256").update(await readFile(written)).digest("hex");
   if (digest !== sha256) throw new Error(`${name}.json: SHA-256 ${digest}, recorded ${sha256}`);
 }
@@ -434,44 +446,44 @@ async function main(): Promise<void> {
       `Usage: bun build.ts <spreadsheets.7z> <scratch folder> [${MODES.join(" | ")}]`,
     );
   }
-  await ensureArchive(archive);
-  await checkArchive(archive);
+  await ensure_archive(archive);
+  await check_archive(archive);
   await initSheetwrite({ addons: [xlsxAddon()] });
 
   let report: { sampled: SampleWorkbook[]; refused: number };
   if (mode !== undefined) {
-    const exclude = new Set([...(await titlesIn("dev")), ...(await titlesIn("dev2"))]);
+    const exclude = new Set([...(await titles_in("dev")), ...(await titles_in("dev2"))]);
     const burned = await draw(archive, scratch, {
       seed: BURNED_HELD_OUT_SEED,
       count: HELD_OUT_WORKBOOKS,
       exclude,
     });
     process.stdout.write(`Burned draw (seed ${BURNED_HELD_OUT_SEED}): ${summary(burned)}\n`);
-    for (const workbook of burned.sampled) exclude.add(titleOf(workbook.file));
+    for (const workbook of burned.sampled) exclude.add(title_of(workbook.file));
     if (mode === "--held-out") {
       report = await draw(archive, scratch, {
         seed: HELD_OUT_SEED,
         count: HELD_OUT_WORKBOOKS,
         exclude,
       });
-      await writeSet("heldout", HELD_OUT_SEED, report.sampled);
+      await write_set("heldout", HELD_OUT_SEED, report.sampled);
     } else if (mode === "--held-out-whole") {
-      for (const title of await titlesIn("heldout")) exclude.add(title);
-      for (const title of await titlesIn("dev-large")) exclude.add(title);
+      for (const title of await titles_in("heldout")) exclude.add(title);
+      for (const title of await titles_in("dev-large")) exclude.add(title);
       report = await draw(archive, scratch, {
         seed: HELD_OUT_WHOLE_SEED,
         count: HELD_OUT_WORKBOOKS,
         exclude,
         whole: true,
       });
-      await writeChecked(
+      await write_checked(
         "heldout-whole",
         HELD_OUT_WHOLE_SEED,
         report.sampled,
         HELD_OUT_WHOLE_SHA256,
       );
     } else {
-      for (const title of await titlesIn("heldout")) exclude.add(title);
+      for (const title of await titles_in("heldout")) exclude.add(title);
       const whole = mode === "--dev-large-whole";
       report = await draw(archive, scratch, {
         seed: DEV_LARGE_SEED,
@@ -479,7 +491,7 @@ async function main(): Promise<void> {
         exclude,
         whole,
       });
-      await writeChecked(
+      await write_checked(
         whole ? "dev-large-whole" : "dev-large",
         DEV_LARGE_SEED,
         report.sampled,
@@ -493,12 +505,12 @@ async function main(): Promise<void> {
       exclude: new Set(),
     });
     // Alternate the drawn order between the two development sets.
-    await writeSet(
+    await write_set(
       "dev",
       DEV_SEED,
       report.sampled.filter((_, index) => index % 2 === 0),
     );
-    await writeSet(
+    await write_set(
       "dev2",
       DEV_SEED,
       report.sampled.filter((_, index) => index % 2 === 1),

@@ -65,9 +65,9 @@ export function FlightReadout(props: Readonly<FlightReadoutProps>) {
   const live = () => props.flight.live();
   const report = () => props.flight.report();
   const flying = () => props.flight.flying();
-  const shownBytes = () => live()?.residentBytes ?? props.resident.bytes;
-  const shownCells = () => live()?.loadedCells ?? props.resident.cells;
-  const residentShare = () => (shownCells() / SCALE_LOGICAL_CELLS) * 100;
+  const shown_bytes = () => live()?.residentBytes ?? props.resident.bytes;
+  const shown_cells = () => live()?.loadedCells ?? props.resident.cells;
+  const resident_share = () => (shown_cells() / SCALE_LOGICAL_CELLS) * 100;
   const measured = () => report() !== null && report()?.instant !== true;
   const unmeasured = () => (report()?.instant ? "No frames with reduced motion" : "Run a flight");
 
@@ -108,13 +108,13 @@ export function FlightReadout(props: Readonly<FlightReadoutProps>) {
           {
             label: "Cells in memory",
             get value() {
-              return `${shownCells().toLocaleString("en")} · ${formatSize(shownBytes())}`;
+              return `${shown_cells().toLocaleString("en")} · ${formatSize(shown_bytes())}`;
             },
           },
           {
             label: "Share of the billion",
             get value() {
-              return `${residentShare() < 0.0001 && shownCells() > 0 ? "<0.0001" : residentShare().toFixed(4)}%`;
+              return `${resident_share() < 0.0001 && shown_cells() > 0 ? "<0.0001" : resident_share().toFixed(4)}%`;
             },
           },
           {
@@ -173,11 +173,11 @@ export function ScaleMinimap(props: Readonly<ScaleMinimapProps>) {
   let canvas!: HTMLCanvasElement;
   let seen = new Map<number, DatasourceTile & { residence: string }>();
   // Canvas colors are resolved at draw time, so a theme change must redraw.
-  const [themeRevision, setThemeRevision] = createSignal(0);
-  onMount(() => onCleanup(observeSiteTheme(() => setThemeRevision((revision) => revision + 1))));
+  const [theme_revision, set_theme_revision] = createSignal(0);
+  onMount(() => onCleanup(observeSiteTheme(() => set_theme_revision((revision) => revision + 1))));
 
   createEffect(() => {
-    themeRevision();
+    theme_revision();
     for (const tile of props.tiles) seen.set(tile.id, tile);
     if (seen.size > MAP_MEMORY) seen = new Map([...seen.entries()].slice(-MAP_MEMORY));
     const view = props.window;
@@ -223,21 +223,26 @@ export function ScaleMinimap(props: Readonly<ScaleMinimapProps>) {
     const y = ((view.firstRow + view.lastRow) / 2 / SCALE_ROWS) * MAP_HEIGHT;
     // Keep the finder inside the map: at A1 an unclamped marker would sit half
     // outside the canvas and read as a rendering fault.
-    const markerHalf = 5;
-    const markerX = Math.min(Math.max(x, markerHalf), MAP_WIDTH - markerHalf);
-    const markerY = Math.min(Math.max(y, markerHalf), MAP_HEIGHT - markerHalf);
+    const marker_half = 5;
+    const marker_x = Math.min(Math.max(x, marker_half), MAP_WIDTH - marker_half);
+    const marker_y = Math.min(Math.max(y, marker_half), MAP_HEIGHT - marker_half);
     context.strokeStyle = strong;
     context.globalAlpha = 0.6;
     context.lineWidth = 1;
     context.beginPath();
-    context.moveTo(0, Math.round(markerY) + 0.5);
-    context.lineTo(MAP_WIDTH, Math.round(markerY) + 0.5);
-    context.moveTo(Math.round(markerX) + 0.5, 0);
-    context.lineTo(Math.round(markerX) + 0.5, MAP_HEIGHT);
+    context.moveTo(0, Math.round(marker_y) + 0.5);
+    context.lineTo(MAP_WIDTH, Math.round(marker_y) + 0.5);
+    context.moveTo(Math.round(marker_x) + 0.5, 0);
+    context.lineTo(Math.round(marker_x) + 0.5, MAP_HEIGHT);
     context.stroke();
     context.globalAlpha = 1;
     context.lineWidth = 2;
-    context.strokeRect(markerX - markerHalf, markerY - markerHalf, markerHalf * 2, markerHalf * 2);
+    context.strokeRect(
+      marker_x - marker_half,
+      marker_y - marker_half,
+      marker_half * 2,
+      marker_half * 2,
+    );
   });
 
   // Clicking is a pointer shortcut only, so it is attached outside the

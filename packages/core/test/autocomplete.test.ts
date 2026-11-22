@@ -17,7 +17,7 @@ beforeAll(async () => {
   await import("../src/autocomplete.js");
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let grid: GridImpl;
 let store: SheetwriteStore;
 let host: HTMLDivElement;
@@ -28,7 +28,7 @@ let host: HTMLDivElement;
  */
 function mount(
   values: readonly CellScalar[],
-  { rows: rowCount = 12, config }: { rows?: number; config?: GridConfig } = {},
+  { rows: row_count = 12, config }: { rows?: number; config?: GridConfig } = {},
 ): void {
   const workbook: Workbook = {
     activeSheet: "s1",
@@ -36,7 +36,7 @@ function mount(
       {
         id: "s1",
         name: "Sheet1",
-        rowCount,
+        rowCount: row_count,
         columns: [
           { key: "a", header: "A", type: "text", width: 100 },
           { key: "b", header: "B", type: "text", width: 100 },
@@ -44,23 +44,23 @@ function mount(
       },
     ],
   };
-  const a = Array.from({ length: rowCount }, (_, row) => values[row] ?? null);
+  const a = Array.from({ length: row_count }, (_, row) => values[row] ?? null);
   store = new SheetwriteStore(workbook, {
-    rowCount,
-    columns: { a, b: Array.from({ length: rowCount }, () => null) },
+    rowCount: row_count,
+    columns: { a, b: Array.from({ length: row_count }, () => null) },
   });
   host = mountHost();
   grid = new GridImpl(host, { workbook, config }, store);
 }
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
   grid.destroy();
   store.dispose();
-  restoreStubs();
+  restore_stubs();
 });
 
 function editor(): HTMLTextAreaElement {
@@ -145,7 +145,7 @@ describe("AutoComplete", () => {
   it.each([
     ["Backspace", "deleteContentBackward"],
     ["Delete", "deleteContentForward"],
-  ])("removes the completion with %s, and Enter stores what was typed", async (_, inputType) => {
+  ])("removes the completion with %s, and Enter stores what was typed", async (_, input_type) => {
     mount(["Apple", "Banana"]);
     at(2);
     await type("Ap");
@@ -153,7 +153,7 @@ describe("AutoComplete", () => {
     const field = editor();
     field.value = "Ap";
     field.setSelectionRange(2, 2);
-    field.dispatchEvent(new InputEvent("input", { inputType, bubbles: true }));
+    field.dispatchEvent(new InputEvent("input", { inputType: input_type, bubbles: true }));
     expect(shown()).toEqual(["Ap", ""]);
     key("Enter");
     expect(value(2)).toBe("Ap");

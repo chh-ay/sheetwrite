@@ -28,13 +28,13 @@ export async function captureProcess(
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
 
-  if (exitCode !== 0) throw new Error(options.failure({ stdout, stderr, exitCode }));
+  if (exit_code !== 0) throw new Error(options.failure({ stdout, stderr, exitCode: exit_code }));
   return stdout;
 }
 

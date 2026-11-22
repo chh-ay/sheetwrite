@@ -26,19 +26,19 @@ const SHEET = "bench";
 const SCROLL_STEP_PX = 84;
 const START_ROW = FORCED_LAYOUT_ROWS / 2;
 
-const status = requiredElement("#bench-status", HTMLOutputElement);
-const runButton = requiredElement("#bench-run", HTMLButtonElement);
-const host = requiredElement("#grid-host", HTMLDivElement);
-const formulaHost = requiredElement("#formula-host", HTMLDivElement);
+const status = required_element("#bench-status", HTMLOutputElement);
+const run_button = required_element("#bench-run", HTMLButtonElement);
+const host = required_element("#grid-host", HTMLDivElement);
+const formula_host = required_element("#formula-host", HTMLDivElement);
 
-function requiredElement<T extends Element>(selector: string, type: new () => T): T {
+function required_element<T extends Element>(selector: string, type: new () => T): T {
   const element = document.querySelector(selector);
   if (!(element instanceof type)) throw new Error(`The benchmark page has no ${selector}.`);
 
   return element;
 }
 
-function positiveIntegerParameter(params: URLSearchParams, name: string): number {
+function positive_integer_parameter(params: URLSearchParams, name: string): number {
   const value = Number(params.get(name));
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`Invalid ${name} parameter.`);
 
@@ -61,12 +61,12 @@ function workbook(): Workbook {
   };
 }
 
-function dispatchKey(target: Element, key: string): void {
+function dispatch_key(target: Element, key: string): void {
   target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
 /** Resolves after the next frame has painted, before any later frame. */
-function afterFrame(): Promise<void> {
+function after_frame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => setTimeout(resolve, 0));
   });
@@ -74,8 +74,8 @@ function afterFrame(): Promise<void> {
 
 /** Two frames: input that schedules its paint from a frame callback still lands inside. */
 async function settle(): Promise<void> {
-  await afterFrame();
-  await afterFrame();
+  await after_frame();
+  await after_frame();
 }
 
 function scroller(): HTMLElement {
@@ -92,21 +92,21 @@ function editor(): HTMLTextAreaElement {
   return element;
 }
 
-function openEditor(): void {
+function open_editor(): void {
   host.focus();
-  dispatchKey(host, "F2");
+  dispatch_key(host, "F2");
   editor();
 }
 
-function formulaBar(): HTMLTextAreaElement {
-  const element = formulaHost.querySelector<HTMLTextAreaElement>("textarea");
+function formula_bar(): HTMLTextAreaElement {
+  const element = formula_host.querySelector<HTMLTextAreaElement>("textarea");
   if (!element) throw new Error("The formula bar is not mounted.");
 
   return element;
 }
 
 /** One typed character at the end of `field`, as a keystroke delivers it. */
-function typeCharacter(field: HTMLTextAreaElement): void {
+function type_character(field: HTMLTextAreaElement): void {
   const end = field.value.length;
   field.setRangeText("x", end, end, "end");
   field.dispatchEvent(
@@ -114,16 +114,16 @@ function typeCharacter(field: HTMLTextAreaElement): void {
   );
 }
 
-function commitEdit(step: number): void {
-  openEditor();
+function commit_edit(step: number): void {
+  open_editor();
   const field = editor();
   field.value = `Edited ${step}`;
   field.dispatchEvent(new Event("input", { bubbles: true }));
-  dispatchKey(field, "Enter");
+  dispatch_key(field, "Enter");
 }
 
 /** The measured input of one step. */
-function performStep(grid: Grid, action: ForcedLayoutAction, step: number): void {
+function perform_step(grid: Grid, action: ForcedLayoutAction, step: number): void {
   switch (action) {
     case "scroll":
     case "editor-scroll":
@@ -134,37 +134,37 @@ function performStep(grid: Grid, action: ForcedLayoutAction, step: number): void
       grid.refresh();
       break;
     case "arrow-down":
-      dispatchKey(host, "ArrowDown");
+      dispatch_key(host, "ArrowDown");
       break;
     case "arrow-down-refresh":
-      dispatchKey(host, "ArrowDown");
+      dispatch_key(host, "ArrowDown");
       grid.refresh();
       break;
     case "edit-type":
-      typeCharacter(editor());
+      type_character(editor());
       break;
     case "bar-type":
-      typeCharacter(formulaBar());
+      type_character(formula_bar());
       break;
     case "edit-open":
-      openEditor();
+      open_editor();
       break;
     case "edit-commit":
     case "edit-commit-refresh":
-      commitEdit(step);
+      commit_edit(step);
       break;
   }
 }
 
-function selectStartCell(grid: Grid): void {
+function select_start_cell(grid: Grid): void {
   grid.setSelection({ kind: "cell", addr: { sheet: SHEET, row: START_ROW, col: COL.customer } });
 }
 
 /** Untimed reset after a step that leaves state the next step must not see. */
-function resetStep(grid: Grid, action: ForcedLayoutAction): void {
-  if (action === "edit-open") dispatchKey(editor(), "Escape");
+function reset_step(grid: Grid, action: ForcedLayoutAction): void {
+  if (action === "edit-open") dispatch_key(editor(), "Escape");
   // Enter commits and moves down; every commit edits the same cell.
-  if (action === "edit-commit" || action === "edit-commit-refresh") selectStartCell(grid);
+  if (action === "edit-commit" || action === "edit-commit-refresh") select_start_cell(grid);
   // The render benchmark's untimed preparation reveals the cell and paints.
   if (action === "edit-commit-refresh") {
     grid.scrollToCell({ sheet: SHEET, row: START_ROW, col: COL.customer });
@@ -173,7 +173,7 @@ function resetStep(grid: Grid, action: ForcedLayoutAction): void {
 }
 
 /** Each step waits for the frames that paint it. */
-async function runFramedSteps(
+async function run_framed_steps(
   grid: Grid,
   action: ForcedLayoutAction,
   warmups: number,
@@ -182,16 +182,16 @@ async function runFramedSteps(
   for (let step = -warmups; step < steps; step++) {
     const measured = step >= 0;
     if (measured) performance.mark(stepMarkName(step, "start"));
-    performStep(grid, action, step);
+    perform_step(grid, action, step);
     await settle();
     if (measured) performance.mark(stepMarkName(step, "end"));
-    resetStep(grid, action);
+    reset_step(grid, action);
     await settle();
   }
 }
 
 /** Steps back to back in one task, as the render benchmark's timed loop runs them. */
-function runSynchronousSteps(
+function run_synchronous_steps(
   grid: Grid,
   action: ForcedLayoutAction,
   warmups: number,
@@ -200,36 +200,36 @@ function runSynchronousSteps(
   for (let step = -warmups; step < steps; step++) {
     const measured = step >= 0;
     if (measured) performance.mark(stepMarkName(step, "start"));
-    performStep(grid, action, step);
+    perform_step(grid, action, step);
     if (measured) performance.mark(stepMarkName(step, "end"));
-    resetStep(grid, action);
+    reset_step(grid, action);
   }
 }
 
-async function runAction(
+async function run_action(
   grid: Grid,
   action: ForcedLayoutAction,
   warmups: number,
   steps: number,
 ): Promise<void> {
-  selectStartCell(grid);
+  select_start_cell(grid);
   grid.scrollToCell({ sheet: SHEET, row: START_ROW, col: COL.customer });
   host.focus();
   await settle();
   if (action === "edit-type") {
-    openEditor();
+    open_editor();
     await settle();
   }
   if (action === "bar-type") {
-    formulaBar().focus();
+    formula_bar().focus();
     await settle();
   }
   if (action === "editor-scroll") {
-    openEditor();
+    open_editor();
     await settle();
   }
-  if (SYNCHRONOUS_ACTIONS[action]) runSynchronousSteps(grid, action, warmups, steps);
-  else await runFramedSteps(grid, action, warmups, steps);
+  if (SYNCHRONOUS_ACTIONS[action]) run_synchronous_steps(grid, action, warmups, steps);
+  else await run_framed_steps(grid, action, warmups, steps);
   await settle();
 }
 
@@ -237,8 +237,8 @@ async function start(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const action = params.get("action") ?? "";
   if (!isForcedLayoutAction(action)) throw new Error(`Unknown action: ${action}`);
-  const warmups = positiveIntegerParameter(params, "warmups");
-  const steps = positiveIntegerParameter(params, "steps");
+  const warmups = positive_integer_parameter(params, "warmups");
+  const steps = positive_integer_parameter(params, "steps");
 
   await initSheetwrite();
   const grid = createGrid(host, {
@@ -246,14 +246,14 @@ async function start(): Promise<void> {
     data: toSheetwriteColumnar(makeColumnar(FORCED_LAYOUT_ROWS)),
   });
   // The typing rows type with a formula bar beside the grid, as the shell shows one.
-  if (TYPING_ACTIONS[action]) createFormulaBar(formulaHost, grid);
+  if (TYPING_ACTIONS[action]) createFormulaBar(formula_host, grid);
   await settle();
-  runButton.addEventListener(
+  run_button.addEventListener(
     "click",
     () => {
-      runButton.disabled = true;
+      run_button.disabled = true;
       status.dataset.status = "running";
-      runAction(grid, action, warmups, steps).then(
+      run_action(grid, action, warmups, steps).then(
         () => {
           status.dataset.status = "done";
         },
@@ -265,7 +265,7 @@ async function start(): Promise<void> {
     },
     { once: true },
   );
-  runButton.disabled = false;
+  run_button.disabled = false;
   status.dataset.status = "idle";
 }
 

@@ -27,7 +27,7 @@ const PLAIN_QUALIFIER = /^[\p{L}\p{N}_.\\]+/u;
  * Index after the bracket that closes the `[` at `open`. Brackets nest, and
  * `'` escapes the next character, as in a structured reference.
  */
-function closingBracket(formula: string, open: number): number {
+function closing_bracket(formula: string, open: number): number {
   let depth = 0;
   let index = open;
   while (index < formula.length) {
@@ -46,7 +46,7 @@ function closingBracket(formula: string, open: number): number {
 }
 
 /** Index after the quote that closes the `quote` at `open`; a doubled quote is one character. */
-function closingQuote(formula: string, open: number, quote: string): number {
+function closing_quote(formula: string, open: number, quote: string): number {
   let index = open + 1;
   while (index < formula.length) {
     if (formula.charAt(index) !== quote) {
@@ -61,7 +61,7 @@ function closingQuote(formula: string, open: number, quote: string): number {
 }
 
 /** Whether a quoted sheet name, such as `'C:\Books\[Budget.xlsx]Annual'`, names another workbook. */
-function quotedNameHasExternalBook(name: string): boolean {
+function quoted_name_has_external_book(name: string): boolean {
   const open = name.indexOf("[");
   const close = name.indexOf("]", open);
   return open >= 0 && close > open && EXTERNAL_BOOK.test(name.slice(open + 1, close));
@@ -72,7 +72,7 @@ function quotedNameHasExternalBook(name: string): boolean {
  * workbook (`[1]Sheet1!A1`, `[1]!Name`), rather than a structured reference
  * such as `Sales[2023]` or `[@2023]`.
  */
-function isExternalBook(formula: string, open: number, end: number): boolean {
+function is_external_book(formula: string, open: number, end: number): boolean {
   if (open > 0 && TABLE_NAME_END.test(formula.charAt(open - 1))) return false;
 
   const content = formula.slice(open + 1, end - 1);
@@ -100,14 +100,14 @@ export function formulaContainsExternalReference(formula: string): boolean {
 
     executable += `${formula.slice(copied, index)} `;
     if (char === '"') {
-      index = closingQuote(formula, index, '"');
+      index = closing_quote(formula, index, '"');
     } else if (char === "'") {
-      const end = closingQuote(formula, index, "'");
-      if (quotedNameHasExternalBook(formula.slice(index + 1, end - 1))) return true;
+      const end = closing_quote(formula, index, "'");
+      if (quoted_name_has_external_book(formula.slice(index + 1, end - 1))) return true;
       index = end;
     } else {
-      const end = closingBracket(formula, index);
-      if (isExternalBook(formula, index, end)) return true;
+      const end = closing_bracket(formula, index);
+      if (is_external_book(formula, index, end)) return true;
       index = end;
     }
     copied = index;
@@ -167,7 +167,7 @@ export function externalSheetText(book: string, sheet: string): string {
  * column or row range: `Budget.xlsx!Total`, not `Budget.xlsx!A1` on a sheet
  * named `Budget.xlsx`.
  */
-function namesDefinedName(formula: string, bang: number): boolean {
+function names_defined_name(formula: string, bang: number): boolean {
   if (formula.charAt(bang) !== "!") return false;
   const name = PLAIN_QUALIFIER.exec(formula.slice(bang + 1))?.[0] ?? "";
   return (
@@ -178,7 +178,7 @@ function namesDefinedName(formula: string, bang: number): boolean {
 }
 
 /** The workbook whose defined name follows `qualifier!`, when the qualifier ends with a workbook file name. */
-function bookName(qualifier: string, text: string): ExternalSheetName | undefined {
+function book_name(qualifier: string, text: string): ExternalSheetName | undefined {
   const book = BOOK_FILE.exec(qualifier)?.[0];
   return book ? { book, sheet: "", text } : undefined;
 }
@@ -205,24 +205,24 @@ export function rewriteExternalSheets(
     let end = index + 1;
     let name: ExternalSheetName | undefined;
     if (char === '"') {
-      end = closingQuote(formula, index, '"');
+      end = closing_quote(formula, index, '"');
     } else if (char === "'") {
-      end = closingQuote(formula, index, "'");
+      end = closing_quote(formula, index, "'");
       const quoted = formula.slice(index + 1, end - 1).replaceAll("''", "'");
       const open = quoted.indexOf("[");
       const close = quoted.indexOf("]", open);
-      if (quotedNameHasExternalBook(quoted)) {
+      if (quoted_name_has_external_book(quoted)) {
         name = {
           book: quoted.slice(open + 1, close),
           sheet: quoted.slice(close + 1),
           text: formula.slice(index, end),
         };
-      } else if (namesDefinedName(formula, end)) {
-        name = bookName(quoted, formula.slice(index, end));
+      } else if (names_defined_name(formula, end)) {
+        name = book_name(quoted, formula.slice(index, end));
       }
     } else if (char === "[") {
-      end = closingBracket(formula, index);
-      if (isExternalBook(formula, index, end)) {
+      end = closing_bracket(formula, index);
+      if (is_external_book(formula, index, end)) {
         const sheet = PLAIN_SHEET_NAME.exec(formula.slice(end))?.[0] ?? "";
         name = {
           book: formula.slice(index + 1, end - 1),
@@ -236,7 +236,7 @@ export function rewriteExternalSheets(
       // defined name of that workbook: `Budget.xlsx!Total`.
       const qualifier = PLAIN_QUALIFIER.exec(formula.slice(index))?.[0] ?? "";
       end = index + Math.max(qualifier.length, 1);
-      if (qualifier && namesDefinedName(formula, end)) name = bookName(qualifier, qualifier);
+      if (qualifier && names_defined_name(formula, end)) name = book_name(qualifier, qualifier);
     }
 
     if (name) {

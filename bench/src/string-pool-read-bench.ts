@@ -10,29 +10,31 @@ import { writeStringColumn } from "./packed-fixture.js";
 
 const root = process.env.STRING_POOL_CHECKOUT ?? new URL("../../", import.meta.url).pathname;
 // Runtime selection keeps the two checked-out implementations isolated.
-const { initSheetwrite } = (await import(
+const { initSheetwrite: init_sheetwrite } = (await import(
   `${root}/packages/core/src/grid.ts`
 )) as typeof CoreGridModule;
 const { SheetwriteStore } = (await import(
   `${root}/packages/core/src/store.ts`
 )) as typeof CoreStoreModule;
-const { getEngine } = (await import(
+const { getEngine: get_engine } = (await import(
   `${root}/packages/core/src/engine.ts`
 )) as typeof CoreEngineModule;
-await initSheetwrite({ source: readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`) });
-const selectedEngine = getEngine();
-const engineResolution = {
+await init_sheetwrite({
+  source: readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`),
+});
+const selected_engine = get_engine();
+const engine_resolution = {
   commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
   matchesSelectedCheckout: true,
-  hasPoolEpoch: "stringPoolEpoch" in selectedEngine.CellStore.prototype,
+  hasPoolEpoch: "stringPoolEpoch" in selected_engine.CellStore.prototype,
 };
 const ROWS = 100_000;
 const READS = 30_000;
 const INGEST_ROWS = 1_000_000;
 const BATCH_ROWS = 10_000;
-const ingestSamples: number[] = [];
+const ingest_samples: number[] = [];
 for (let sample = 0; sample <= 7; sample++) {
-  const engine = new selectedEngine.CellStore();
+  const engine = new selected_engine.CellStore();
   try {
     const sheet = engine.addSheet(1, INGEST_ROWS);
     const start = performance.now();
@@ -46,7 +48,7 @@ for (let sample = 0; sample <= 7; sample++) {
         0,
       );
     }
-    if (sample > 0) ingestSamples.push(performance.now() - start);
+    if (sample > 0) ingest_samples.push(performance.now() - start);
     const last = engine.getCell(sheet, INGEST_ROWS - 1, 0);
     try {
       if (last.string !== `distinct-${INGEST_ROWS - 1}`)
@@ -90,11 +92,11 @@ try {
   const sorted = samples.toSorted((left, right) => left - right);
   process.stdout.write(
     `${JSON.stringify({
-      engineResolution,
+      engineResolution: engine_resolution,
       samples,
       medianMs: sorted[3],
-      ingestSamples,
-      distinctIngestMedianMs: ingestSamples.toSorted((left, right) => left - right)[3],
+      ingestSamples: ingest_samples,
+      distinctIngestMedianMs: ingest_samples.toSorted((left, right) => left - right)[3],
     })}\n`,
   );
 } finally {

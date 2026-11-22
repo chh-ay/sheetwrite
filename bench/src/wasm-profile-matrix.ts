@@ -153,13 +153,13 @@ function commit(value: unknown, label: string): string {
   return parsed;
 }
 
-function stringArray(value: unknown, label: string): string[] {
+function string_array(value: unknown, label: string): string[] {
   if (!Array.isArray(value) || value.length === 0)
     throw new Error(`${label} must be a non-empty array`);
   return value.map((entry, index) => string(entry, `${label}[${index}]`));
 }
 
-function canonicalTimestamp(value: unknown, label: string): string {
+function canonical_timestamp(value: unknown, label: string): string {
   const parsed = string(value, label);
   const milliseconds = Date.parse(parsed);
   if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== parsed) {
@@ -181,7 +181,7 @@ function profile(value: unknown, label: string): WasmOptProfile {
   return value as WasmOptProfile;
 }
 
-function exactProfiles(value: unknown, label: string): WasmOptProfile[] {
+function exact_profiles(value: unknown, label: string): WasmOptProfile[] {
   if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
   const parsed = value.map((entry, index) => profile(entry, `${label}[${index}]`));
   if (
@@ -193,66 +193,68 @@ function exactProfiles(value: unknown, label: string): WasmOptProfile[] {
   return parsed;
 }
 
-function commandList(value: unknown, label: string): string[][] {
+function command_list(value: unknown, label: string): string[][] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`${label} must be a non-empty array`);
   }
-  return value.map((entry, index) => stringArray(entry, `${label}[${index}]`));
+  return value.map((entry, index) => string_array(entry, `${label}[${index}]`));
 }
 
-function parseGate(
+function parse_gate(
   value: unknown,
   label: string,
   kind: "formula" | "render",
-  expectedCommit: string,
-  expectedWasmSha256: string,
+  expected_commit: string,
+  expected_wasm_sha256: string,
 ): MatrixGateEvidence {
   const gate = record(value, label);
   const status = gate.status;
   if (status !== "passed" && status !== "failed") {
     throw new Error(`${label}.status must be passed or failed`);
   }
-  const exitCode = integer(gate.exitCode, `${label}.exitCode`);
-  if ((status === "passed") !== (exitCode === 0)) {
+  const exit_code = integer(gate.exitCode, `${label}.exitCode`);
+  if ((status === "passed") !== (exit_code === 0)) {
     throw new Error(`${label} status and exitCode disagree`);
   }
   const parsed: MatrixGateEvidence = {
     status,
-    commands: commandList(gate.commands, `${label}.commands`),
-    exitCode,
+    commands: command_list(gate.commands, `${label}.commands`),
+    exitCode: exit_code,
     artifactPath: string(gate.artifactPath, `${label}.artifactPath`),
     evidenceSha256: hash(gate.evidenceSha256, `${label}.evidenceSha256`),
     wasmSha256: hash(gate.wasmSha256, `${label}.wasmSha256`),
     commit: commit(gate.commit, `${label}.commit`),
     runnerFingerprint: hash(gate.runnerFingerprint, `${label}.runnerFingerprint`),
   };
-  const runsFormula = parsed.commands.some(
+  const runs_formula = parsed.commands.some(
     (command) =>
       command.includes("bench:formula") ||
       command.some((token) => token.endsWith("/formula-bench.ts") || token === "formula-bench.ts"),
   );
-  const runsRender = parsed.commands.some(
+  const runs_render = parsed.commands.some(
     (command) =>
       command.includes("bench:render") ||
       command.some((token) => token.endsWith("/render-driver.ts") || token === "render-driver.ts"),
   );
-  const runsRenderCheck = parsed.commands.some(
+  const runs_render_check = parsed.commands.some(
     (command) =>
       command.includes("bench:check") ||
       command.some((token) => token.endsWith("/check.ts") || token === "check.ts"),
   );
-  const commandLines = parsed.commands.map((command) => command.join(" "));
+  const command_lines = parsed.commands.map((command) => command.join(" "));
   if (kind === "formula") {
     if (
-      !runsFormula ||
-      commandLines.some((command) => /(?:--preliminary|--smoke|bench:formula:smoke)/u.test(command))
+      !runs_formula ||
+      command_lines.some((command) =>
+        /(?:--preliminary|--smoke|bench:formula:smoke)/u.test(command),
+      )
     ) {
       throw new Error(`${label} must run the gating formula benchmark`);
     }
   } else if (
-    !runsRender ||
-    !runsRenderCheck ||
-    commandLines.some((command) =>
+    !runs_render ||
+    !runs_render_check ||
+    command_lines.some((command) =>
       /(?:--report-only|--smoke|--scenario-set\s+diagnostic|bench:render:(?:smoke|diagnostic))/u.test(
         command,
       ),
@@ -260,25 +262,25 @@ function parseGate(
   ) {
     throw new Error(`${label} must run the render capture and fail-closed check`);
   }
-  if (parsed.commit !== expectedCommit) throw new Error(`${label} commit is incomparable`);
-  if (parsed.wasmSha256 !== expectedWasmSha256) {
+  if (parsed.commit !== expected_commit) throw new Error(`${label} commit is incomparable`);
+  if (parsed.wasmSha256 !== expected_wasm_sha256) {
     throw new Error(`${label} was not run against its variant artifact`);
   }
   return parsed;
 }
 
-function parseStoreOnlyProbe(value: unknown, expectedCommit: string): StoreOnlyProbe {
+function parse_store_only_probe(value: unknown, expected_commit: string): StoreOnlyProbe {
   const probe = record(value, "storeOnlyProbe");
-  const provenanceRaw = record(probe.provenance, "storeOnlyProbe.provenance");
+  const provenance_raw = record(probe.provenance, "storeOnlyProbe.provenance");
   const provenance = {
-    commit: commit(provenanceRaw.commit, "storeOnlyProbe.provenance.commit"),
-    dirty: literal(provenanceRaw.dirty, false, "storeOnlyProbe.provenance.dirty"),
-    timestamp: canonicalTimestamp(provenanceRaw.timestamp, "storeOnlyProbe.provenance.timestamp"),
+    commit: commit(provenance_raw.commit, "storeOnlyProbe.provenance.commit"),
+    dirty: literal(provenance_raw.dirty, false, "storeOnlyProbe.provenance.dirty"),
+    timestamp: canonical_timestamp(provenance_raw.timestamp, "storeOnlyProbe.provenance.timestamp"),
   } as const;
-  if (provenance.commit !== expectedCommit) {
+  if (provenance.commit !== expected_commit) {
     throw new Error("storeOnlyProbe commit does not match matrix provenance");
   }
-  const command = stringArray(probe.command, "storeOnlyProbe.command");
+  const command = string_array(probe.command, "storeOnlyProbe.command");
   if (JSON.stringify(command) !== JSON.stringify(STORE_ONLY_COMMAND)) {
     throw new Error("storeOnlyProbe.command must be the controlled --no-default-features check");
   }
@@ -286,8 +288,8 @@ function parseStoreOnlyProbe(value: unknown, expectedCommit: string): StoreOnlyP
   if (outcome !== "compiled" && outcome !== "blocked" && outcome !== "failed") {
     throw new Error("storeOnlyProbe.outcome must be compiled, blocked, or failed");
   }
-  const exitCode = integer(probe.exitCode, "storeOnlyProbe.exitCode");
-  if ((outcome === "compiled") !== (exitCode === 0)) {
+  const exit_code = integer(probe.exitCode, "storeOnlyProbe.exitCode");
+  if ((outcome === "compiled") !== (exit_code === 0)) {
     throw new Error("storeOnlyProbe outcome and exitCode disagree");
   }
   if (!Array.isArray(probe.blockers)) throw new Error("storeOnlyProbe.blockers must be an array");
@@ -319,7 +321,7 @@ function parseStoreOnlyProbe(value: unknown, expectedCommit: string): StoreOnlyP
     provenance,
     command,
     outcome,
-    exitCode,
+    exitCode: exit_code,
     stdoutSha256: hash(probe.stdoutSha256, "storeOnlyProbe.stdoutSha256"),
     stderrSha256: hash(probe.stderrSha256, "storeOnlyProbe.stderrSha256"),
     blockers,
@@ -330,94 +332,94 @@ export function parseWasmProfileMatrix(value: unknown): WasmProfileMatrixEvidenc
   const root = record(value, "matrix");
   literal(root.schemaVersion, WASM_PROFILE_MATRIX_SCHEMA_VERSION, "schemaVersion");
   literal(root.protocol, WASM_PROFILE_MATRIX_PROTOCOL, "protocol");
-  const provenanceRaw = record(root.provenance, "provenance");
+  const provenance_raw = record(root.provenance, "provenance");
   const provenance = {
-    commit: commit(provenanceRaw.commit, "provenance.commit"),
-    dirty: literal(provenanceRaw.dirty, false, "provenance.dirty"),
-    timestamp: string(provenanceRaw.timestamp, "provenance.timestamp"),
-    host: string(provenanceRaw.host, "provenance.host"),
-    rustc: string(provenanceRaw.rustc, "provenance.rustc"),
-    cargo: string(provenanceRaw.cargo, "provenance.cargo"),
-    wasmPack: string(provenanceRaw.wasmPack, "provenance.wasmPack"),
-    wasmOptVersion: string(provenanceRaw.wasmOptVersion, "provenance.wasmOptVersion"),
-    wasmOptSha256: hash(provenanceRaw.wasmOptSha256, "provenance.wasmOptSha256"),
-    bun: string(provenanceRaw.bun, "provenance.bun"),
+    commit: commit(provenance_raw.commit, "provenance.commit"),
+    dirty: literal(provenance_raw.dirty, false, "provenance.dirty"),
+    timestamp: string(provenance_raw.timestamp, "provenance.timestamp"),
+    host: string(provenance_raw.host, "provenance.host"),
+    rustc: string(provenance_raw.rustc, "provenance.rustc"),
+    cargo: string(provenance_raw.cargo, "provenance.cargo"),
+    wasmPack: string(provenance_raw.wasmPack, "provenance.wasmPack"),
+    wasmOptVersion: string(provenance_raw.wasmOptVersion, "provenance.wasmOptVersion"),
+    wasmOptSha256: hash(provenance_raw.wasmOptSha256, "provenance.wasmOptSha256"),
+    bun: string(provenance_raw.bun, "provenance.bun"),
   } as const;
-  const provenanceTimestamp = canonicalTimestamp(provenance.timestamp, "provenance.timestamp");
-  const normalizedProvenance = { ...provenance, timestamp: provenanceTimestamp };
-  const rustRaw = record(root.rustProfile, "rustProfile");
-  const rustProfile = {
-    optLevel: literal(rustRaw.optLevel, 3, "rustProfile.optLevel"),
-    lto: literal(rustRaw.lto, "fat", "rustProfile.lto"),
-    codegenUnits: literal(rustRaw.codegenUnits, 1, "rustProfile.codegenUnits"),
+  const provenance_timestamp = canonical_timestamp(provenance.timestamp, "provenance.timestamp");
+  const normalized_provenance = { ...provenance, timestamp: provenance_timestamp };
+  const rust_raw = record(root.rustProfile, "rustProfile");
+  const rust_profile = {
+    optLevel: literal(rust_raw.optLevel, 3, "rustProfile.optLevel"),
+    lto: literal(rust_raw.lto, "fat", "rustProfile.lto"),
+    codegenUnits: literal(rust_raw.codegenUnits, 1, "rustProfile.codegenUnits"),
   } as const;
-  const postLinkRaw = record(root.postLink, "postLink");
-  const compressionRaw = record(postLinkRaw.compression, "postLink.compression");
-  const postLink = {
-    inputWasmSha256: hash(postLinkRaw.inputWasmSha256, "postLink.inputWasmSha256"),
+  const post_link_raw = record(root.postLink, "postLink");
+  const compression_raw = record(post_link_raw.compression, "postLink.compression");
+  const post_link = {
+    inputWasmSha256: hash(post_link_raw.inputWasmSha256, "postLink.inputWasmSha256"),
     compression: {
-      gzipLevel: literal(compressionRaw.gzipLevel, 9, "postLink.compression.gzipLevel"),
+      gzipLevel: literal(compression_raw.gzipLevel, 9, "postLink.compression.gzipLevel"),
       brotliQuality: literal(
-        compressionRaw.brotliQuality,
+        compression_raw.brotliQuality,
         11,
         "postLink.compression.brotliQuality",
       ),
-      brotliMode: literal(compressionRaw.brotliMode, "generic", "postLink.compression.brotliMode"),
+      brotliMode: literal(compression_raw.brotliMode, "generic", "postLink.compression.brotliMode"),
     },
   } as const;
-  const policyRaw = record(root.decisionPolicy, "decisionPolicy");
-  const decisionPolicy = {
-    sizeMetric: literal(policyRaw.sizeMetric, "brotliBytes", "decisionPolicy.sizeMetric"),
+  const policy_raw = record(root.decisionPolicy, "decisionPolicy");
+  const decision_policy = {
+    sizeMetric: literal(policy_raw.sizeMetric, "brotliBytes", "decisionPolicy.sizeMetric"),
     requireFormulaGate: literal(
-      policyRaw.requireFormulaGate,
+      policy_raw.requireFormulaGate,
       true,
       "decisionPolicy.requireFormulaGate",
     ),
     requireRenderGate: literal(
-      policyRaw.requireRenderGate,
+      policy_raw.requireRenderGate,
       true,
       "decisionPolicy.requireRenderGate",
     ),
   } as const;
-  const orderRaw = record(root.captureOrder, "captureOrder");
-  const captureOrder = {
-    formula: exactProfiles(orderRaw.formula, "captureOrder.formula"),
-    render: exactProfiles(orderRaw.render, "captureOrder.render"),
+  const order_raw = record(root.captureOrder, "captureOrder");
+  const capture_order = {
+    formula: exact_profiles(order_raw.formula, "captureOrder.formula"),
+    render: exact_profiles(order_raw.render, "captureOrder.render"),
   };
 
   if (!Array.isArray(root.variants)) throw new Error("variants must be an array");
   const modes = new Set<WasmOptProfile>();
   const variants = root.variants.map((raw, index): WasmProfileVariant => {
     const variant = record(raw, `variants[${index}]`);
-    const wasmOpt = profile(variant.wasmOpt, `variants[${index}].wasmOpt`);
-    if (modes.has(wasmOpt)) throw new Error(`duplicate ${wasmOpt} variant`);
-    modes.add(wasmOpt);
-    const inputWasmSha256 = hash(variant.inputWasmSha256, `variants[${index}].inputWasmSha256`);
-    if (inputWasmSha256 !== postLink.inputWasmSha256) {
-      throw new Error(`${wasmOpt} did not use the shared pre-post-link artifact`);
+    const wasm_opt = profile(variant.wasmOpt, `variants[${index}].wasmOpt`);
+    if (modes.has(wasm_opt)) throw new Error(`duplicate ${wasm_opt} variant`);
+    modes.add(wasm_opt);
+    const input_wasm_sha256 = hash(variant.inputWasmSha256, `variants[${index}].inputWasmSha256`);
+    if (input_wasm_sha256 !== post_link.inputWasmSha256) {
+      throw new Error(`${wasm_opt} did not use the shared pre-post-link artifact`);
     }
-    const artifactRaw = record(variant.artifact, `variants[${index}].artifact`);
+    const artifact_raw = record(variant.artifact, `variants[${index}].artifact`);
     const artifact = {
-      rawBytes: integer(artifactRaw.rawBytes, `variants[${index}].artifact.rawBytes`, 1),
-      gzipBytes: integer(artifactRaw.gzipBytes, `variants[${index}].artifact.gzipBytes`, 1),
-      brotliBytes: integer(artifactRaw.brotliBytes, `variants[${index}].artifact.brotliBytes`, 1),
-      sha256: hash(artifactRaw.sha256, `variants[${index}].artifact.sha256`),
+      rawBytes: integer(artifact_raw.rawBytes, `variants[${index}].artifact.rawBytes`, 1),
+      gzipBytes: integer(artifact_raw.gzipBytes, `variants[${index}].artifact.gzipBytes`, 1),
+      brotliBytes: integer(artifact_raw.brotliBytes, `variants[${index}].artifact.brotliBytes`, 1),
+      sha256: hash(artifact_raw.sha256, `variants[${index}].artifact.sha256`),
     };
     if (artifact.gzipBytes >= artifact.rawBytes || artifact.brotliBytes >= artifact.rawBytes) {
-      throw new Error(`${wasmOpt} compressed sizes must be smaller than raw size`);
+      throw new Error(`${wasm_opt} compressed sizes must be smaller than raw size`);
     }
     return {
-      wasmOpt,
-      inputWasmSha256,
+      wasmOpt: wasm_opt,
+      inputWasmSha256: input_wasm_sha256,
       artifact,
-      formulaGate: parseGate(
+      formulaGate: parse_gate(
         variant.formulaGate,
         `variants[${index}].formulaGate`,
         "formula",
         provenance.commit,
         artifact.sha256,
       ),
-      renderGate: parseGate(
+      renderGate: parse_gate(
         variant.renderGate,
         `variants[${index}].renderGate`,
         "render",
@@ -431,9 +433,9 @@ export function parseWasmProfileMatrix(value: unknown): WasmProfileMatrixEvidenc
   }
   for (const gate of ["formulaGate", "renderGate"] as const) {
     const fingerprints = new Set(variants.map((variant) => variant[gate].runnerFingerprint));
-    const evidenceHashes = new Set(variants.map((variant) => variant[gate].evidenceSha256));
-    const artifactPaths = new Set(variants.map((variant) => variant[gate].artifactPath));
-    if (evidenceHashes.size !== variants.length || artifactPaths.size !== variants.length) {
+    const evidence_hashes = new Set(variants.map((variant) => variant[gate].evidenceSha256));
+    const artifact_paths = new Set(variants.map((variant) => variant[gate].artifactPath));
+    if (evidence_hashes.size !== variants.length || artifact_paths.size !== variants.length) {
       throw new Error(`${gate} evidence was reused across variants`);
     }
     if (fingerprints.size !== 1) throw new Error(`${gate} runner provenance is incomparable`);
@@ -442,13 +444,13 @@ export function parseWasmProfileMatrix(value: unknown): WasmProfileMatrixEvidenc
   return {
     schemaVersion: WASM_PROFILE_MATRIX_SCHEMA_VERSION,
     protocol: WASM_PROFILE_MATRIX_PROTOCOL,
-    provenance: normalizedProvenance,
-    rustProfile,
-    postLink,
-    decisionPolicy,
-    captureOrder,
+    provenance: normalized_provenance,
+    rustProfile: rust_profile,
+    postLink: post_link,
+    decisionPolicy: decision_policy,
+    captureOrder: capture_order,
     variants,
-    storeOnlyProbe: parseStoreOnlyProbe(root.storeOnlyProbe, normalizedProvenance.commit),
+    storeOnlyProbe: parse_store_only_probe(root.storeOnlyProbe, normalized_provenance.commit),
   };
 }
 
@@ -466,7 +468,7 @@ export function decideWasmProfile(value: unknown): WasmProfileDecision {
   }
   if (failures.length > 0) return { status: "blocked", failures };
 
-  const baseline = evidence.variants.find(({ wasmOpt }) => wasmOpt === "-O3")!;
+  const baseline = evidence.variants.find(({ wasmOpt: wasm_opt }) => wasm_opt === "-O3")!;
   const selected = evidence.variants.reduce((best, candidate) =>
     candidate.artifact.brotliBytes < best.artifact.brotliBytes ? candidate : best,
   );

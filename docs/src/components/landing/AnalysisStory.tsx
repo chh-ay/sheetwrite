@@ -22,7 +22,7 @@ const ANALYSIS_MAX = 12_000;
 const PLOT = { x: 452, base: 236, height: 150, width: 34, pitch: 56 } as const;
 
 const thousands = (value: number) => value.toLocaleString("en-US");
-const regionTotal = (region: string, edited: boolean) =>
+const region_total = (region: string, edited: boolean) =>
   ORDERS.reduce(
     (total, [name, revenue], index) =>
       name === region
@@ -46,18 +46,18 @@ function Changed(props: Readonly<{ before: string; after: string; x: number; y: 
 }
 
 /** A chart bar's inline style: the bars rise in turn, except the edited one. */
-function barStyle(index: number, edited: boolean, after: number): JSX.CSSProperties {
+function bar_style(index: number, edited: boolean, after: number): JSX.CSSProperties {
   // The edited bar runs one absolute timeline (sr-bar-follow), so an inline
   // delay would shift its edit away from the cells'. It holds at its old share
   // until the edit lands.
-  if (edited) return { "--sr-from": regionTotal(EDITED_REGION, false) / after };
+  if (edited) return { "--sr-from": region_total(EDITED_REGION, false) / after };
   return { "animation-delay": secs(2.2 + index * 0.2), "--sr-from": 1 };
 }
 
 export function AnalysisStory() {
-  const rowY = (index: number) => 76 + index * 30;
+  const row_y = (index: number) => 76 + index * 30;
   const grand = (edited: boolean) =>
-    REGIONS.reduce((total, region) => total + regionTotal(region, edited), 0);
+    REGIONS.reduce((total, region) => total + region_total(region, edited), 0);
   return (
     <svg aria-hidden="true" class="sr sr-analysis" viewBox="0 0 640 330">
       <g>
@@ -75,24 +75,24 @@ export function AnalysisStory() {
                 class="sr-rule"
                 x1={28}
                 x2={208}
-                y1={rowY(index()) - 10}
-                y2={rowY(index()) - 10}
+                y1={row_y(index()) - 10}
+                y2={row_y(index()) - 10}
               />
-              <text class="sr-cell" x={36} y={rowY(index()) + 10}>
+              <text class="sr-cell" x={36} y={row_y(index()) + 10}>
                 {region}
               </text>
               {index() === EDITED_ORDER ? (
                 <g class="sr-change" data-step="order">
-                  <rect class="sr-flash" height={30} width={84} x={124} y={rowY(index()) - 10} />
+                  <rect class="sr-flash" height={30} width={84} x={124} y={row_y(index()) - 10} />
                   <Changed
                     after={thousands(EDITED_REVENUE)}
                     before={thousands(revenue)}
                     x={200}
-                    y={rowY(index()) + 10}
+                    y={row_y(index()) + 10}
                   />
                 </g>
               ) : (
-                <text class="sr-cell" data-num="" x={200} y={rowY(index()) + 10}>
+                <text class="sr-cell" data-num="" x={200} y={row_y(index()) + 10}>
                   {thousands(revenue)}
                 </text>
               )}
@@ -118,25 +118,25 @@ export function AnalysisStory() {
                 class="sr-rule"
                 x1={244}
                 x2={406}
-                y1={rowY(index()) - 10}
-                y2={rowY(index()) - 10}
+                y1={row_y(index()) - 10}
+                y2={row_y(index()) - 10}
               />
-              <text class="sr-cell" x={252} y={rowY(index()) + 10}>
+              <text class="sr-cell" x={252} y={row_y(index()) + 10}>
                 {region}
               </text>
               {region === EDITED_REGION ? (
                 <g class="sr-change" data-step="pivot">
-                  <rect class="sr-flash" height={30} width={84} x={322} y={rowY(index()) - 10} />
+                  <rect class="sr-flash" height={30} width={84} x={322} y={row_y(index()) - 10} />
                   <Changed
-                    after={thousands(regionTotal(region, true))}
-                    before={thousands(regionTotal(region, false))}
+                    after={thousands(region_total(region, true))}
+                    before={thousands(region_total(region, false))}
                     x={398}
-                    y={rowY(index()) + 10}
+                    y={row_y(index()) + 10}
                   />
                 </g>
               ) : (
-                <text class="sr-cell" data-num="" x={398} y={rowY(index()) + 10}>
-                  {thousands(regionTotal(region, false))}
+                <text class="sr-cell" data-num="" x={398} y={row_y(index()) + 10}>
+                  {thousands(region_total(region, false))}
                 </text>
               )}
             </g>
@@ -168,7 +168,7 @@ export function AnalysisStory() {
         <line class="sr-rule" x1={446} x2={608} y1={PLOT.base} y2={PLOT.base} />
         <For each={REGIONS}>
           {(region, index) => {
-            const after = regionTotal(region, true);
+            const after = region_total(region, true);
             const height = (after / ANALYSIS_MAX) * PLOT.height;
             const x = PLOT.x + index() * PLOT.pitch;
             const edited = region === EDITED_REGION;
@@ -179,7 +179,7 @@ export function AnalysisStory() {
                   data-edited={edited ? "true" : undefined}
                   height={height}
                   rx={3}
-                  style={barStyle(index(), edited, after)}
+                  style={bar_style(index(), edited, after)}
                   width={PLOT.width}
                   x={x}
                   y={PLOT.base - height}

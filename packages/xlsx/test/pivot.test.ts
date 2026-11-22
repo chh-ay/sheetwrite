@@ -31,11 +31,11 @@ const TABLE_TWO = "xl/pivotTables/pivotTable2.xml";
 const [JAN_1, JAN_3, NOV_11, NOV_13] = [44562, 44564, 44876, 44878];
 const DATA_RANGE = range("data", 0, 0, 5, 3);
 
-const cellCount = (owner: SheetSnapshot) =>
+const cell_count = (owner: SheetSnapshot) =>
   owner.cells.reduce((total, entry) => total + entry.cells.length, 0);
 
 /** The sample with `find` replaced by `replace` in both of its pivot tables. */
-async function editedSample(find: string, replace: string, parts = [TABLE_ONE, TABLE_TWO]) {
+async function edited_sample(find: string, replace: string, parts = [TABLE_ONE, TABLE_TWO]) {
   const sample = await fixture(SAMPLE);
   return editParts(
     sample,
@@ -61,7 +61,7 @@ function authored(pivots: PivotDefinition[]): WorkbookSnapshot {
   );
 }
 
-const pivotOn = (overrides: Partial<PivotDefinition>): PivotDefinition => ({
+const pivot_on = (overrides: Partial<PivotDefinition>): PivotDefinition => ({
   id: "units",
   name: "Units",
   source: { range: DATA_RANGE },
@@ -78,8 +78,8 @@ beforeAll(async () => {
 
 describe("XLSX pivot tables", () => {
   it("maps Excel's range and table pivots, hidden items and page fields to definitions", async () => {
-    const { warnings, onWarning } = collectWarnings();
-    const snapshot = await fromXlsxWorkbook(await fixture(SAMPLE), { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const snapshot = await fromXlsxWorkbook(await fixture(SAMPLE), { onWarning: on_warning });
     const source = sheetNamed(snapshot, "Tabelle1");
     const values: PivotDefinition["values"] = [
       { field: 1, aggregation: "SUM", name: "Summe von Field2" },
@@ -139,8 +139,8 @@ describe("XLSX pivot tables", () => {
       },
     ]);
     // Excel's rendered output, page filter included, belongs to the pivot now.
-    expect(cellCount(sheetNamed(snapshot, "Tabelle2"))).toBe(0);
-    expect(cellCount(sheetNamed(snapshot, "Tabelle3"))).toBe(0);
+    expect(cell_count(sheetNamed(snapshot, "Tabelle2"))).toBe(0);
+    expect(cell_count(sheetNamed(snapshot, "Tabelle3"))).toBe(0);
     expect(
       snapshot.workbook.xlsxSource?.parts.some((part) => part.name.includes("pivot")) ?? false,
     ).toBe(false);
@@ -163,7 +163,7 @@ describe("XLSX pivot tables", () => {
     expect(store.applyTransaction({ patches: [patch] }).status).toBe("applied");
     expect(store.getCell(sum).resolved).toBe(44);
     const exported = store.exportSnapshot();
-    expect(cellCount(sheetNamed(exported, "Tabelle3"))).toBe(1);
+    expect(cell_count(sheetNamed(exported, "Tabelle3"))).toBe(1);
     store.dispose();
 
     const saved = await toXlsxWorkbook(exported);
@@ -182,7 +182,7 @@ describe("XLSX pivot tables", () => {
   });
 
   it("round-trips aggregations, totals, subtotals, sorting, layout and blank or logical filters", async () => {
-    const pivot = pivotOn({
+    const pivot = pivot_on({
       name: "Units by region",
       anchor: { row: 2, col: 1 },
       columns: [1],
@@ -210,20 +210,20 @@ describe("XLSX pivot tables", () => {
   });
 
   it("keeps pivots that OOXML cannot express in Sheetwrite metadata, with a warning", async () => {
-    const distinct = pivotOn({
+    const distinct = pivot_on({
       id: "distinct",
       name: "Distinct products",
       values: [{ field: 1, aggregation: "DISTINCTCOUNT" }],
     });
-    const orphan = pivotOn({
+    const orphan = pivot_on({
       id: "orphan",
       name: "Deleted source",
       source: { range: range("gone", 0, 0, 9, 1), invalid: true },
       anchor: { row: 10, col: 0 },
       values: [{ field: 1, aggregation: "SUM" }],
     });
-    const { warnings, onWarning } = collectWarnings();
-    const saved = await toXlsxWorkbook(authored([distinct, orphan]), { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const saved = await toXlsxWorkbook(authored([distinct, orphan]), { onWarning: on_warning });
 
     expect(partNames(saved).some((part) => part.includes("pivot"))).toBe(false);
     expect(warnings.map((warning) => warning.message)).toEqual([
@@ -234,34 +234,34 @@ describe("XLSX pivot tables", () => {
   });
 
   it("restores only metadata-only pivots once another application deleted the native one", async () => {
-    const metadataOnly = pivotOn({
+    const metadata_only = pivot_on({
       id: "distinct",
       name: "Distinct",
       anchor: { row: 10, col: 0 },
       values: [{ field: 1, aggregation: "DISTINCTCOUNT" }],
     });
-    const saved = await toXlsxWorkbook(authored([pivotOn({}), metadataOnly]));
+    const saved = await toXlsxWorkbook(authored([pivot_on({}), metadata_only]));
     // Deleting the pivot in Excel removes its relationship but keeps the metadata sheet.
-    const withoutPivot = (xml: string) =>
+    const without_pivot = (xml: string) =>
       xml.replace(/<Relationship [^>]*\/pivotTable"[^>]*\/>/g, "");
     const edited = editParts(
       saved,
       Object.fromEntries(
         partNames(saved)
           .filter((part) => part.endsWith(".rels"))
-          .map((part) => [part, withoutPivot]),
+          .map((part) => [part, without_pivot]),
       ),
     );
-    expect(sheetNamed(await fromXlsxWorkbook(edited), "Report").pivots).toEqual([metadataOnly]);
+    expect(sheetNamed(await fromXlsxWorkbook(edited), "Report").pivots).toEqual([metadata_only]);
   });
 
   it("gives new pivots part names and cache ids that preserved pivots do not use", async () => {
     const imported = await fromXlsxWorkbook(
-      await editedSample('baseItem="0"/>', 'baseItem="0" showDataAs="percentOfTotal"/>'),
+      await edited_sample('baseItem="0"/>', 'baseItem="0" showDataAs="percentOfTotal"/>'),
     );
     const source = sheetNamed(imported, "Tabelle1");
     source.pivots = [
-      pivotOn({
+      pivot_on({
         id: "added",
         name: "Added",
         source: { range: range(source.id, 0, 0, 3, 2) },
@@ -271,10 +271,10 @@ describe("XLSX pivot tables", () => {
     ];
 
     const saved = await toXlsxWorkbook(imported);
-    const cacheIds = [
+    const cache_ids = [
       ...partText(saved, "xl/workbook.xml").matchAll(/<pivotCache cacheId="(\d+)"/g),
     ].map((match) => match[1]);
-    expect(new Set(cacheIds).size).toBe(3);
+    expect(new Set(cache_ids).size).toBe(3);
     expect(partText(saved, TABLE_ONE)).toContain("percentOfTotal");
     const reopened = await fromXlsxWorkbook(saved);
     expect(sheetNamed(reopened, "Tabelle1").pivots?.map((pivot) => pivot.id)).toEqual(["added"]);
@@ -316,14 +316,14 @@ describe("XLSX pivot tables", () => {
     async (_feature, find, replace) => {
       const sample = await fixture(SAMPLE);
       expect(partText(sample, TABLE_ONE)).toContain(find);
-      const { warnings, onWarning } = collectWarnings();
-      const snapshot = await fromXlsxWorkbook(await editedSample(find, replace, [TABLE_ONE]), {
-        onWarning,
+      const { warnings, onWarning: on_warning } = collectWarnings();
+      const snapshot = await fromXlsxWorkbook(await edited_sample(find, replace, [TABLE_ONE]), {
+        onWarning: on_warning,
       });
       const owner = sheetNamed(snapshot, "Tabelle2");
 
       expect(owner.pivots).toBeUndefined();
-      expect(cellCount(owner)).toBeGreaterThan(0);
+      expect(cell_count(owner)).toBeGreaterThan(0);
       expect(warnings).toContainEqual(
         expect.objectContaining({
           code: "unsupported-feature",
@@ -338,7 +338,7 @@ describe("XLSX pivot tables", () => {
   );
 
   it("keeps a saved pivot and its source blocker, and prefers output another application rendered", async () => {
-    const pivot = pivotOn({
+    const pivot = pivot_on({
       id: "blocked",
       name: "Blocked",
       anchor: { row: 2, col: 1 },
@@ -346,9 +346,9 @@ describe("XLSX pivot tables", () => {
     });
     const blocked = authored([pivot]);
     sheetNamed(blocked, "Report").cells.push(block([[7]], 2, 1));
-    const blockedBytes = await toXlsxWorkbook(blocked);
+    const blocked_bytes = await toXlsxWorkbook(blocked);
 
-    const reopened = await fromXlsxWorkbook(blockedBytes);
+    const reopened = await fromXlsxWorkbook(blocked_bytes);
     expect(sheetNamed(reopened, "Report").pivots).toEqual([pivot]);
     const store = SheetwriteStore.fromSnapshot(reopened);
     expect(store.getCell({ sheet: "report", row: 2, col: 1 }).resolved).toBe(7);
@@ -359,21 +359,21 @@ describe("XLSX pivot tables", () => {
     // pivot location change, the Sheetwrite metadata does not.
     const fresh = { rows: 2, cols: 2, cells: ["Fresh", 1, 2, 3] };
     const refreshed = await toXlsxWorkbook(authored([{ ...pivot, savedOutput: fresh }]));
-    const reportPart = "xl/worksheets/sheet2.xml";
-    expect(partText(refreshed, reportPart)).toContain("Fresh");
-    const merged = editParts(blockedBytes, {
-      [reportPart]: partText(refreshed, reportPart),
+    const report_part = "xl/worksheets/sheet2.xml";
+    expect(partText(refreshed, report_part)).toContain("Fresh");
+    const merged = editParts(blocked_bytes, {
+      [report_part]: partText(refreshed, report_part),
       [TABLE_ONE]: partText(refreshed, TABLE_ONE),
     });
     const report = sheetNamed(await fromXlsxWorkbook(merged), "Report");
     expect(report.pivots).toEqual([{ ...pivot, savedOutput: fresh }]);
-    expect(cellCount(report)).toBe(0);
+    expect(cell_count(report)).toBe(0);
   });
 });
 
 describe("XLSX pivot value number formats", () => {
   it("writes a value field's number format as its dataField numFmtId", async () => {
-    const pivot = pivotOn({
+    const pivot = pivot_on({
       values: [
         { field: 2, aggregation: "SUM", numberFormat: "$#,##0.00" },
         { field: 2, aggregation: "MAX", numberFormat: "0.00%" },
@@ -394,7 +394,7 @@ describe("XLSX pivot value number formats", () => {
   it("reads a dataField numFmtId from Excel as the value field's number format", async () => {
     const field = '<dataField name="Summe von Field2" fld="1" baseField="0" baseItem="0"';
     const snapshot = await fromXlsxWorkbook(
-      await editedSample(`${field}/>`, `${field} numFmtId="3"/>`),
+      await edited_sample(`${field}/>`, `${field} numFmtId="3"/>`),
     );
     // Built-in format 3 is #,##0.
     expect(sheetNamed(snapshot, "Tabelle2").pivots?.[0]?.values).toEqual([

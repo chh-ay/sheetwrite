@@ -136,8 +136,8 @@ interface ReleaseContext {
 }
 
 /** The release a docs path belongs to, with its neighbours in time. */
-function releaseContext(activeHref: string | undefined): ReleaseContext | undefined {
-  const index = RELEASES.findIndex((release) => releaseHref(release.version) === activeHref);
+function releaseContext(active_href: string | undefined): ReleaseContext | undefined {
+  const index = RELEASES.findIndex((release) => releaseHref(release.version) === active_href);
   if (index === -1) return undefined;
   return {
     release: RELEASES[index] as Release,

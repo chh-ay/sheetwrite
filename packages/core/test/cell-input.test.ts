@@ -61,10 +61,15 @@ describe("parseCellInput", () => {
 // https://support.microsoft.com/en-us/office/available-number-formats-in-excel-0afe8f52-97db-41f1-b972-4b46e9f1e8d2
 describe("typing into a general column", () => {
   const entry = (raw: string, locale?: string): [unknown, string | null] => {
-    const { value, numberFormat } = parseCellEntry(raw, "general", undefined, locale);
-    return [value.kind === "literal" ? value.value : value, numberFormat ?? null];
+    const { value, numberFormat: number_format } = parseCellEntry(
+      raw,
+      "general",
+      undefined,
+      locale,
+    );
+    return [value.kind === "literal" ? value.value : value, number_format ?? null];
   };
-  const thisYear = (text: string, locale?: string) => entry(text, locale)[0];
+  const this_year = (text: string, locale?: string) => entry(text, locale)[0];
 
   it.each([
     // Numbers, leading zeros, grouping, signs and scientific notation.
@@ -120,19 +125,19 @@ describe("typing into a general column", () => {
   });
 
   it("reads dates without a year in this year, and times with their formats", () => {
-    expect(entry("1/15")).toEqual([thisYear(`1/15/${year}`), "d-mmm"]);
-    expect(entry("Jan-26")).toEqual([thisYear(`1/26/${year}`), "d-mmm"]);
-    expect(entry("Jan 26")).toEqual([thisYear(`1/26/${year}`), "d-mmm"]);
-    expect(entry("15.01", "de-DE")).toEqual([thisYear(`15.01.${year}`, "de-DE"), "d-mmm"]);
+    expect(entry("1/15")).toEqual([this_year(`1/15/${year}`), "d-mmm"]);
+    expect(entry("Jan-26")).toEqual([this_year(`1/26/${year}`), "d-mmm"]);
+    expect(entry("Jan 26")).toEqual([this_year(`1/26/${year}`), "d-mmm"]);
+    expect(entry("15.01", "de-DE")).toEqual([this_year(`15.01.${year}`, "de-DE"), "d-mmm"]);
     for (const [raw, serial, format] of [
       ["9:30", 9.5 / 24, "h:mm"],
       ["9:30 PM", 21.5 / 24, "h:mm AM/PM"],
       ["9:30:15", (9.5 + 15 / 3600) / 24, "h:mm:ss"],
       ["1/15/2026 9:30", 46_037 + 9.5 / 24, "m/d/yyyy h:mm"],
     ] as const) {
-      const [value, numberFormat] = entry(raw);
+      const [value, number_format] = entry(raw);
       expect(value as number).toBeCloseTo(serial, 9);
-      expect(numberFormat).toBe(format);
+      expect(number_format).toBe(format);
     }
     expect(parseCellEntry("=A1*2", "general").value).toEqual({ kind: "formula", src: "=A1*2" });
     // The Text format still keeps what is typed.
@@ -144,10 +149,10 @@ describe("typing into a general column", () => {
     // the date-and-time form backtrack in quadratic time.
     const text = `1${" ".repeat(20_000)}x`;
     const start = performance.now();
-    const { value, numberFormat } = parseCellEntry(text, "general");
+    const { value, numberFormat: number_format } = parseCellEntry(text, "general");
     expect(performance.now() - start).toBeLessThan(50);
     expect(value).toEqual({ kind: "literal", value: text });
-    expect(numberFormat).toBeUndefined();
+    expect(number_format).toBeUndefined();
     expect(cellEditText(text, "general")).toBe(text);
   });
 

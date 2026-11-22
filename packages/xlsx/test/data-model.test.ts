@@ -35,18 +35,18 @@ const table = (
   id,
   name,
   range: range("data", 0, col, 2, col + 1),
-  columns: columns.map(([columnId, columnName]) => ({ id: columnId, name: columnName })),
+  columns: columns.map(([column_id, column_name]) => ({ id: column_id, name: column_name })),
   headerRow: true,
   totalsRow: false,
 });
 
-const ordersToCustomers: TableRelationship = {
+const orders_to_customers: TableRelationship = {
   id: "orders-customers",
   from: { table: "orders", column: "customer" },
   to: { table: "customers", column: "id" },
 };
 
-const byRegion: PivotDefinition = {
+const by_region: PivotDefinition = {
   id: "by-region",
   name: "By region",
   source: {
@@ -64,9 +64,9 @@ const byRegion: PivotDefinition = {
   values: [{ field: 1, aggregation: "SUM" }],
 };
 
-/** Orders and Customers tables on Data, with `dataModel` and `pivots` when given. */
+/** Orders and Customers tables on Data, with `data_model` and `pivots` when given. */
 function authored(
-  dataModel?: WorkbookSnapshot["workbook"]["dataModel"],
+  data_model?: WorkbookSnapshot["workbook"]["dataModel"],
   pivots: PivotDefinition[] = [],
 ): WorkbookSnapshot {
   return book(
@@ -86,22 +86,22 @@ function authored(
         ...(pivots.length > 0 ? { pivots } : {}),
       }),
     ],
-    dataModel ? { dataModel } : {},
+    data_model ? { dataModel: data_model } : {},
   );
 }
 
 it("round-trips relationships, measures and model pivots through Sheetwrite metadata", async () => {
   const measure = { id: "total", name: "Total", table: "orders", formula: "=SUM(Orders[Amount])" };
-  const { warnings, onWarning } = collectWarnings();
-  for (const dataModel of [
-    { relationships: [ordersToCustomers], measures: [measure] },
+  const { warnings, onWarning: on_warning } = collectWarnings();
+  for (const data_model of [
+    { relationships: [orders_to_customers], measures: [measure] },
     { relationships: [], measures: [measure] },
   ]) {
-    const pivots = dataModel.relationships.length > 0 ? [byRegion] : [];
+    const pivots = data_model.relationships.length > 0 ? [by_region] : [];
     const reopened = await fromXlsxWorkbook(
-      await toXlsxWorkbook(authored(dataModel, pivots), { onWarning }),
+      await toXlsxWorkbook(authored(data_model, pivots), { onWarning: on_warning }),
     );
-    expect(reopened.workbook.dataModel).toEqual(dataModel);
+    expect(reopened.workbook.dataModel).toEqual(data_model);
     expect(sheetAt(reopened).pivots).toEqual(pivots.length > 0 ? pivots : undefined);
   }
   expect(warnings.map((warning) => warning.message)).toEqual([
@@ -111,18 +111,18 @@ it("round-trips relationships, measures and model pivots through Sheetwrite meta
 
 it("writes a model pivot's current output as cells, and reopens it as the pivot", async () => {
   const pivot: PivotDefinition = {
-    ...byRegion,
+    ...by_region,
     values: [{ field: 1, aggregation: "SUM", numberFormat: "0.00" }, { measure: "share" }],
   };
   const input = authored(
     {
-      relationships: [ordersToCustomers],
+      relationships: [orders_to_customers],
       measures: [{ id: "share", name: "Share", table: "orders", formula: "=SUM(Orders[Amount])" }],
     },
     [pivot],
   );
   // What core computes for the pivot: a header row, one region and the total.
-  const pivotOutputs = [
+  const pivot_outputs = [
     {
       sheet: "data",
       items: [
@@ -142,11 +142,11 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
       ],
     },
   ];
-  const { warnings, onWarning } = collectWarnings();
+  const { warnings, onWarning: on_warning } = collectWarnings();
   const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
     input,
-    { onWarning },
-    { pivotOutputs },
+    { onWarning: on_warning },
+    { pivotOutputs: pivot_outputs },
   );
 
   const xml = partText(saved, "xl/worksheets/sheet1.xml");
@@ -178,12 +178,12 @@ it("writes a model pivot's current output as cells, and reopens it as the pivot"
 
 it("keeps a cell another application changed inside a kept pivot's output", async () => {
   const pivot: PivotDefinition = {
-    ...byRegion,
+    ...by_region,
     source: { model: { table: "orders", fields: [{ table: "orders", column: "amount" }] } },
     rows: [],
     values: [{ field: 0, aggregation: "SUM" }],
   };
-  const pivotOutputs = [
+  const pivot_outputs = [
     {
       sheet: "data",
       items: [
@@ -194,7 +194,7 @@ it("keeps a cell another application changed inside a kept pivot's output", asyn
   const saved = await sheetwriteWorkbookBackend.toXlsxWorkbook(
     authored(undefined, [pivot]),
     {},
-    { pivotOutputs },
+    { pivotOutputs: pivot_outputs },
   );
   // Excel saves 9 over the value 7.
   const edited = editParts(saved, {
@@ -230,12 +230,12 @@ it("imports Excel's active relationships between worksheet tables and reports th
         '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/></Types>',
       ),
   });
-  const { warnings, onWarning } = collectWarnings();
-  const reopened = await fromXlsxWorkbook(saved, { onWarning });
+  const { warnings, onWarning: on_warning } = collectWarnings();
+  const reopened = await fromXlsxWorkbook(saved, { onWarning: on_warning });
 
   // The model table "Clients" loads the worksheet table "Customers" through its connection.
   expect(reopened.workbook.dataModel).toEqual({
-    relationships: [{ ...ordersToCustomers, id: "excel-relationship-1" }],
+    relationships: [{ ...orders_to_customers, id: "excel-relationship-1" }],
   });
   expect(warnings.map((warning) => warning.message)).toEqual([
     "Excel data model relationship Orders[Amount] → Clients[Region] was not imported because it would join two tables a second time",

@@ -65,7 +65,7 @@ export async function startFormulasWorkbook(
   await whenStylesReady();
   if (isDisposed()) return null;
   const ledger = buildOrdersLedger();
-  let gridRef: Grid | null = null;
+  let grid_ref: Grid | null = null;
   const grid = createGrid(host, {
     workbook: createFormulasWorkbook(),
     data: ledger.data,
@@ -77,7 +77,7 @@ export async function startFormulasWorkbook(
         { action: "copy", label: "Copy result" },
         {
           label: "Follow this formula",
-          visible: context.cell !== null && Boolean(gridRef?.store.getFormula(context.cell)),
+          visible: context.cell !== null && Boolean(grid_ref?.store.getFormula(context.cell)),
           onClick(instance, cell) {
             if (!cell) return;
             const panel = FORMULA_PANELS.find(
@@ -95,11 +95,11 @@ export async function startFormulasWorkbook(
       ],
     },
   });
-  gridRef = grid;
+  grid_ref = grid;
   window.__sheetwriteFormulasGrid = grid;
   const started = performance.now();
   grid.store.applyTransaction({ patches: formulaDashboardOps() });
-  const firstRecalc: Recalc = {
+  const first_recalc: Recalc = {
     label: "First calculation of the dashboard",
     cells: ORDER_ROWS * 8,
     ms: performance.now() - started,
@@ -120,7 +120,7 @@ export async function startFormulasWorkbook(
     if (!isDisposed()) grid.replaceTheme(siteGridTheme());
   });
 
-  const describeResult = (row: number, col: number): string => {
+  const describe_result = (row: number, col: number): string => {
     const value = grid.store.getCell({ sheet: ANALYSIS_SHEET_ID, row, col }).resolved;
     if (value === null || value === undefined || value === "") return "Empty";
     return typeof value === "number" ? value.toLocaleString("en-US") : String(value);
@@ -129,8 +129,8 @@ export async function startFormulasWorkbook(
   let restore: DocumentOp[] | null = null;
   return {
     grid,
-    firstRecalc,
-    describeResult,
+    firstRecalc: first_recalc,
+    describeResult: describe_result,
     promoted: () => restore !== null,
     togglePromotion() {
       const started = performance.now();
@@ -146,7 +146,7 @@ export async function startFormulasWorkbook(
       }
       const patches = apacPromotionOps(ledger);
       const recorded: DocumentOp[] = [];
-      const stopRecording = grid.on("change", ({ changes }) => {
+      const stop_recording = grid.on("change", ({ changes }) => {
         for (const change of changes) {
           recorded.push({ op: "set", addr: change.addr, value: change.oldValue });
         }
@@ -155,7 +155,7 @@ export async function startFormulasWorkbook(
       try {
         applied = grid.applyTransaction({ patches }).status === "applied";
       } finally {
-        stopRecording();
+        stop_recording();
       }
       if (!applied) return null;
       restore = recorded;
@@ -173,7 +173,7 @@ export async function startFormulasWorkbook(
         patches: [{ op: "set", addr, value: { kind: "formula", src: source } }],
       });
       const result = {
-        result: describeResult(PLAYGROUND.row, PLAYGROUND.col),
+        result: describe_result(PLAYGROUND.row, PLAYGROUND.col),
         ms: performance.now() - started,
       };
       grid.setActiveSheet(ANALYSIS_SHEET_ID);

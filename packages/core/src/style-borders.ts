@@ -47,11 +47,11 @@ class BorderTargets {
 
   add(row: number, col: number, edge: BorderEdge): void {
     const anchor = this.deps.anchorCell(row, col);
-    const dataRow = this.deps.toDataRow(anchor.row);
-    const key = `${dataRow}:${anchor.col}`;
+    const data_row = this.deps.toDataRow(anchor.row);
+    const key = `${data_row}:${anchor.col}`;
     let target = this.cells.get(key);
     if (!target) {
-      target = { row: dataRow, col: anchor.col, border: {} };
+      target = { row: data_row, col: anchor.col, border: {} };
       this.cells.set(key, target);
     }
 
@@ -71,7 +71,7 @@ export function selectionBorderPatches(
     style: "solid",
   };
   const outside = preset === "outside" || preset === "thickOutside";
-  const edgeCount = rects.reduce(
+  const edge_count = rects.reduce(
     (count, rect) =>
       count +
       (outside || preset === "top" || preset === "bottom"
@@ -84,12 +84,12 @@ export function selectionBorderPatches(
   );
   const targets = new BorderTargets(deps, side);
 
-  return edgeCount > BORDER_EDGE_LIMIT
-    ? largeEdgeBorders(deps, rects, preset, outside, side, targets)
-    : cellBorders(deps, rects, preset, outside, targets);
+  return edge_count > BORDER_EDGE_LIMIT
+    ? large_edge_borders(deps, rects, preset, outside, side, targets)
+    : cell_borders(deps, rects, preset, outside, targets);
 }
 
-function largeEdgeBorders(
+function large_edge_borders(
   deps: BorderPatchDeps,
   rects: readonly SelRect[],
   preset: EdgePreset,
@@ -119,19 +119,19 @@ function largeEdgeBorders(
         strips = interior.r0 <= interior.r1 && interior.c0 <= interior.c1 ? [interior] : [];
       }
 
-      strips = subtractMergedEdges(deps, strips, edge, targets);
-      for (const strip of strips) appendEdgeRuns(deps, patches, strip, edge, side);
+      strips = subtract_merged_edges(deps, strips, edge, targets);
+      for (const strip of strips) append_edge_runs(deps, patches, strip, edge, side);
     }
   }
 
   for (const target of targets.cells.values()) {
-    patches.push(borderPatch(deps.activeSheet(), target));
+    patches.push(border_patch(deps.activeSheet(), target));
   }
 
   return patches;
 }
 
-function subtractMergedEdges(
+function subtract_merged_edges(
   deps: BorderPatchDeps,
   strips: SelRect[],
   edge: BorderEdge,
@@ -161,7 +161,7 @@ function subtractMergedEdges(
   return strips;
 }
 
-function appendEdgeRuns(
+function append_edge_runs(
   deps: BorderPatchDeps,
   patches: DocumentOp[],
   strip: SelRect,
@@ -192,7 +192,7 @@ function appendEdgeRuns(
   }
 }
 
-function cellBorders(
+function cell_borders(
   deps: BorderPatchDeps,
   rects: readonly SelRect[],
   preset: EdgePreset,
@@ -222,12 +222,12 @@ function cellBorders(
     },
   }));
 
-  const rows = borderRuns(sheet, merged, false);
-  const columns = borderRuns(sheet, merged, true);
+  const rows = border_runs(sheet, merged, false);
+  const columns = border_runs(sheet, merged, true);
   return rows.length <= columns.length ? rows : columns;
 }
 
-function borderPatch(
+function border_patch(
   sheet: SheetId,
   cell: BorderCell,
 ): Extract<DocumentOp, { op: "setRangeStyle" }> {
@@ -242,13 +242,13 @@ function borderPatch(
   };
 }
 
-function borderRuns(
+function border_runs(
   sheet: SheetId,
   cells: readonly BorderCell[],
-  columnWise: boolean,
+  column_wise: boolean,
 ): DocumentOp[] {
   const sorted = [...cells].sort((a, b) =>
-    columnWise ? a.col - b.col || a.row - b.row : a.row - b.row || a.col - b.col,
+    column_wise ? a.col - b.col || a.row - b.row : a.row - b.row || a.col - b.col,
   );
   const result: DocumentOp[] = [];
   let previous: BorderCell | undefined;
@@ -260,13 +260,13 @@ function borderRuns(
       previous &&
       key === signature &&
       last?.op === "setRangeStyle" &&
-      (columnWise
+      (column_wise
         ? cell.col === previous.col && cell.row === previous.row + 1
         : cell.row === previous.row && cell.col === previous.col + 1)
     ) {
       last.range.end = { row: cell.row, col: cell.col };
     } else {
-      result.push(borderPatch(sheet, cell));
+      result.push(border_patch(sheet, cell));
     }
 
     previous = cell;

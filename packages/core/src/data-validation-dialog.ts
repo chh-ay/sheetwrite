@@ -71,7 +71,7 @@ const MINUTES_PER_DAY = 24 * 60;
 const SECONDS_PER_DAY = MINUTES_PER_DAY * 60;
 
 /** A Minimum or Maximum box's label for each kind, as Excel names them. */
-function boundLabels(allow: Allow): { min: string; max: string; value: string } {
+function bound_labels(allow: Allow): { min: string; max: string; value: string } {
   if (allow === "date") return { min: "Start date", max: "End date", value: "Date" };
   if (allow === "time") return { min: "Start time", max: "End time", value: "Time" };
   if (allow === "textLength") return { min: "Minimum", max: "Maximum", value: "Length" };
@@ -79,7 +79,7 @@ function boundLabels(allow: Allow): { min: string; max: string; value: string } 
 }
 
 /** `h:mm`, `h:mm:ss` or either with AM/PM as a fraction of a day. */
-function parseTimeText(text: string): number | null {
+function parse_time_text(text: string): number | null {
   const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?$/.exec(text.trim());
   if (!match) return null;
   let hours = Number(match[1]);
@@ -93,7 +93,7 @@ function parseTimeText(text: string): number | null {
   return (hours * 3600 + minutes * 60 + seconds) / SECONDS_PER_DAY;
 }
 
-function timeText(fraction: number): string {
+function time_text(fraction: number): string {
   const total = Math.round(fraction * SECONDS_PER_DAY) % SECONDS_PER_DAY;
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
@@ -105,23 +105,23 @@ function timeText(fraction: number): string {
 }
 
 /** An operand as its box shows it: a formula as written, a date or time as Excel shows it. */
-function operandText(operand: DataValidationOperand | undefined, allow: Allow): string {
+function operand_text(operand: DataValidationOperand | undefined, allow: Allow): string {
   if (operand === undefined) return "";
   if (typeof operand === "string") return operand;
   if (allow === "date") return formatNumber(operand, "m/d/yyyy");
-  if (allow === "time") return timeText(operand);
+  if (allow === "time") return time_text(operand);
   return String(operand);
 }
 
 /** A box's text as an operand of `allow`; undefined when Excel would refuse it. */
-function parseOperand(text: string, allow: Allow): DataValidationOperand | undefined {
+function parse_operand(text: string, allow: Allow): DataValidationOperand | undefined {
   const trimmed = text.trim();
   if (trimmed.length > 1 && trimmed.startsWith("=")) return trimmed;
   if (trimmed === "") return undefined;
   if (allow === "date") return parseDateInput(trimmed) ?? undefined;
   if (allow === "time") {
     const number = Number(trimmed);
-    return Number.isFinite(number) ? number : (parseTimeText(trimmed) ?? undefined);
+    return Number.isFinite(number) ? number : (parse_time_text(trimmed) ?? undefined);
   }
   const number = Number(trimmed);
   if (!Number.isFinite(number)) return undefined;
@@ -131,7 +131,7 @@ function parseOperand(text: string, allow: Allow): DataValidationOperand | undef
 }
 
 /** The Allow choice of `condition`. */
-function allowOf(condition: DataValidationCondition | undefined): Allow {
+function allow_of(condition: DataValidationCondition | undefined): Allow {
   if (!condition) return "any";
   switch (condition.kind) {
     case "number":
@@ -144,7 +144,7 @@ function allowOf(condition: DataValidationCondition | undefined): Allow {
 }
 
 /** A condition's bounds as one comparison, as the Data box shows them. */
-function comparisonOf(condition: DataValidationCondition | undefined): DataValidationComparison {
+function comparison_of(condition: DataValidationCondition | undefined): DataValidationComparison {
   if (
     !condition ||
     (condition.kind !== "number" &&
@@ -164,7 +164,7 @@ function comparisonOf(condition: DataValidationCondition | undefined): DataValid
 }
 
 /** A list's Source box: its typed values joined with commas, or its formula. */
-function sourceText(condition: DataValidationCondition | undefined): string {
+function source_text(condition: DataValidationCondition | undefined): string {
   if (condition?.kind !== "list") return "";
   if ("source" in condition) return condition.source;
   return condition.values
@@ -172,7 +172,7 @@ function sourceText(condition: DataValidationCondition | undefined): string {
     .join(",");
 }
 
-let dialogCount = 0;
+let dialog_count = 0;
 
 function field(label: string, control: HTMLElement): HTMLLabelElement {
   const wrapper = document.createElement("label");
@@ -186,9 +186,9 @@ function field(label: string, control: HTMLElement): HTMLLabelElement {
 function select(options: readonly (readonly [string, string])[], value: string): HTMLSelectElement {
   const element = document.createElement("select");
   element.className = "sheetwrite-dialog-control";
-  for (const [optionValue, label] of options) {
+  for (const [option_value, label] of options) {
     const option = document.createElement("option");
-    option.value = optionValue;
+    option.value = option_value;
     option.textContent = label;
     element.append(option);
   }
@@ -196,14 +196,14 @@ function select(options: readonly (readonly [string, string])[], value: string):
   return element;
 }
 
-function textBox(
+function text_box(
   value: string,
-  maxLength: number,
+  max_length: number,
   multiline = false,
 ): HTMLInputElement | HTMLTextAreaElement {
   const element = document.createElement(multiline ? "textarea" : "input");
   element.className = "sheetwrite-dialog-control";
-  element.maxLength = maxLength;
+  element.maxLength = max_length;
   element.value = value;
   return element;
 }
@@ -230,18 +230,18 @@ export function dataValidationDialog(
   grid: DialogHost,
   input: DataValidationInput,
 ): { readonly result: Promise<DataValidationChange | null>; close(): void } {
-  const id = `sheetwrite-data-validation-${++dialogCount}`;
+  const id = `sheetwrite-data-validation-${++dialog_count}`;
   const start = input.settings;
   const body = document.createElement("div");
   body.className = "sheetwrite-data-validation";
 
-  const tabList = document.createElement("div");
-  tabList.setAttribute("role", "tablist");
-  tabList.setAttribute("aria-label", "Data Validation");
-  tabList.className = "sheetwrite-data-validation-tabs";
+  const tab_list = document.createElement("div");
+  tab_list.setAttribute("role", "tablist");
+  tab_list.setAttribute("aria-label", "Data Validation");
+  tab_list.className = "sheetwrite-data-validation-tabs";
   const tabs: HTMLButtonElement[] = [];
   const panels: HTMLDivElement[] = [];
-  const showTab = (index: number, focus = false): void => {
+  const show_tab = (index: number, focus = false): void => {
     for (const [at, tab] of tabs.entries()) {
       const selected = at === index;
       tab.setAttribute("aria-selected", String(selected));
@@ -251,7 +251,7 @@ export function dataValidationDialog(
     }
     if (focus) tabs[index]?.focus();
   };
-  const addTab = (label: string): HTMLDivElement => {
+  const add_tab = (label: string): HTMLDivElement => {
     const index = tabs.length;
     const tab = document.createElement("button");
     tab.type = "button";
@@ -265,13 +265,13 @@ export function dataValidationDialog(
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-labelledby", tab.id);
     tab.setAttribute("aria-controls", panel.id);
-    tab.addEventListener("click", () => showTab(index));
+    tab.addEventListener("click", () => show_tab(index));
     tabs.push(tab);
     panels.push(panel);
-    tabList.append(tab);
+    tab_list.append(tab);
     return panel;
   };
-  tabList.addEventListener("keydown", (event) => {
+  tab_list.addEventListener("keydown", (event) => {
     const current = tabs.findIndex((tab) => tab === event.target);
     if (current < 0) return;
     const last = tabs.length - 1;
@@ -284,131 +284,131 @@ export function dataValidationDialog(
     const next = moves[event.key];
     if (next === undefined) return;
     event.preventDefault();
-    showTab(next, true);
+    show_tab(next, true);
   });
 
   // Settings.
-  const settingsPanel = addTab("Settings");
-  const allow = select(ALLOW, allowOf(start?.condition));
+  const settings_panel = add_tab("Settings");
+  const allow = select(ALLOW, allow_of(start?.condition));
   const blank = checkbox("Ignore blank", start?.allowBlank ?? true);
-  const startComparison = comparisonOf(start?.condition);
-  const operator = select(OPERATORS, startComparison.operator);
-  const startAllow = allowOf(start?.condition);
-  const min = textBox(
-    "value" in startComparison ? "" : operandText(startComparison.min, startAllow),
+  const start_comparison = comparison_of(start?.condition);
+  const operator = select(OPERATORS, start_comparison.operator);
+  const start_allow = allow_of(start?.condition);
+  const min = text_box(
+    "value" in start_comparison ? "" : operand_text(start_comparison.min, start_allow),
     MAX_MESSAGE,
   );
-  const max = textBox(
-    "value" in startComparison ? "" : operandText(startComparison.max, startAllow),
+  const max = text_box(
+    "value" in start_comparison ? "" : operand_text(start_comparison.max, start_allow),
     MAX_MESSAGE,
   );
-  const value = textBox(
-    "value" in startComparison ? operandText(startComparison.value, startAllow) : "",
+  const value = text_box(
+    "value" in start_comparison ? operand_text(start_comparison.value, start_allow) : "",
     MAX_MESSAGE,
   );
-  const source = textBox(sourceText(start?.condition), MAX_MESSAGE);
+  const source = text_box(source_text(start?.condition), MAX_MESSAGE);
   const dropdown = checkbox("In-cell dropdown", start?.inCellDropdown ?? true);
-  const formula = textBox(
+  const formula = text_box(
     start?.condition.kind === "custom" ? start.condition.formula : "",
     MAX_MESSAGE,
   );
-  const applyToAll = checkbox(
+  const apply_to_all = checkbox(
     "Apply these changes to all other cells with the same settings",
     false,
   );
-  applyToAll.input.disabled = !input.canApplyToAll;
-  const operatorField = field("Data", operator);
-  const minField = field("Minimum", min);
-  const maxField = field("Maximum", max);
-  const valueField = field("Value", value);
-  const sourceField = field("Source", source);
-  const formulaField = field("Formula", formula);
-  const labelOf = (wrapper: HTMLLabelElement): HTMLElement | null => wrapper.querySelector("span");
-  const syncSettings = (): void => {
+  apply_to_all.input.disabled = !input.canApplyToAll;
+  const operator_field = field("Data", operator);
+  const min_field = field("Minimum", min);
+  const max_field = field("Maximum", max);
+  const value_field = field("Value", value);
+  const source_field = field("Source", source);
+  const formula_field = field("Formula", formula);
+  const label_of = (wrapper: HTMLLabelElement): HTMLElement | null => wrapper.querySelector("span");
+  const sync_settings = (): void => {
     const kind = allow.value as Allow;
     const bounded = kind !== "any" && kind !== "list" && kind !== "custom";
     const interval = operator.value === "between" || operator.value === "notBetween";
-    const labels = boundLabels(kind);
-    operatorField.hidden = !bounded;
-    minField.hidden = maxField.hidden = !bounded || !interval;
-    valueField.hidden = !bounded || interval;
-    const minLabel = labelOf(minField);
-    const maxLabel = labelOf(maxField);
-    const valueLabel = labelOf(valueField);
-    if (minLabel) minLabel.textContent = labels.min;
-    if (maxLabel) maxLabel.textContent = labels.max;
-    if (valueLabel) valueLabel.textContent = labels.value;
-    sourceField.hidden = dropdown.wrapper.hidden = kind !== "list";
-    formulaField.hidden = kind !== "custom";
+    const labels = bound_labels(kind);
+    operator_field.hidden = !bounded;
+    min_field.hidden = max_field.hidden = !bounded || !interval;
+    value_field.hidden = !bounded || interval;
+    const min_label = label_of(min_field);
+    const max_label = label_of(max_field);
+    const value_label = label_of(value_field);
+    if (min_label) min_label.textContent = labels.min;
+    if (max_label) max_label.textContent = labels.max;
+    if (value_label) value_label.textContent = labels.value;
+    source_field.hidden = dropdown.wrapper.hidden = kind !== "list";
+    formula_field.hidden = kind !== "custom";
     blank.wrapper.hidden = kind === "any";
   };
-  allow.addEventListener("change", syncSettings);
-  operator.addEventListener("change", syncSettings);
-  settingsPanel.append(
+  allow.addEventListener("change", sync_settings);
+  operator.addEventListener("change", sync_settings);
+  settings_panel.append(
     field("Allow", allow),
     blank.wrapper,
-    operatorField,
-    minField,
-    maxField,
-    valueField,
-    sourceField,
+    operator_field,
+    min_field,
+    max_field,
+    value_field,
+    source_field,
     dropdown.wrapper,
-    formulaField,
-    applyToAll.wrapper,
+    formula_field,
+    apply_to_all.wrapper,
   );
 
   // Input Message.
-  const inputPanel = addTab("Input Message");
-  const showInput = checkbox(
+  const input_panel = add_tab("Input Message");
+  const show_input = checkbox(
     "Show input message when cell is selected",
     start?.showInputMessage ?? true,
   );
-  const inputTitle = textBox(start?.inputTitle ?? "", MAX_TITLE);
-  const inputMessage = textBox(start?.inputMessage ?? "", MAX_MESSAGE, true);
-  inputPanel.append(
-    showInput.wrapper,
-    field("Title", inputTitle),
-    field("Input message", inputMessage),
+  const input_title = text_box(start?.inputTitle ?? "", MAX_TITLE);
+  const input_message = text_box(start?.inputMessage ?? "", MAX_MESSAGE, true);
+  input_panel.append(
+    show_input.wrapper,
+    field("Title", input_title),
+    field("Input message", input_message),
   );
 
   // Error Alert.
-  const errorPanel = addTab("Error Alert");
-  const showError = checkbox(
+  const error_panel = add_tab("Error Alert");
+  const show_error = checkbox(
     "Show error alert after invalid data is entered",
     start ? start.policy !== "allow" : true,
   );
   const style = select(STYLES, start ? validationErrorStyle(start) : "stop");
-  const errorTitle = textBox(start?.errorTitle ?? "", MAX_TITLE);
-  const errorMessage = textBox(start?.helpText ?? "", MAX_MESSAGE, true);
-  errorPanel.append(
-    showError.wrapper,
+  const error_title = text_box(start?.errorTitle ?? "", MAX_TITLE);
+  const error_message = text_box(start?.helpText ?? "", MAX_MESSAGE, true);
+  error_panel.append(
+    show_error.wrapper,
     field("Style", style),
-    field("Title", errorTitle),
-    field("Error message", errorMessage),
+    field("Title", error_title),
+    field("Error message", error_message),
   );
 
   const status = document.createElement("p");
   status.className = "sheetwrite-dialog-message";
   status.setAttribute("role", "alert");
-  body.append(tabList, ...panels, status);
-  showTab(0);
-  syncSettings();
+  body.append(tab_list, ...panels, status);
+  show_tab(0);
+  sync_settings();
 
   // Clear All: the fields of a cell without a rule.
-  const clearAll = (): void => {
+  const clear_all = (): void => {
     allow.value = "any";
     blank.input.checked = true;
     operator.value = "between";
-    for (const box of [min, max, value, source, formula, inputTitle, inputMessage, errorTitle]) {
+    for (const box of [min, max, value, source, formula, input_title, input_message, error_title]) {
       box.value = "";
     }
-    errorMessage.value = "";
+    error_message.value = "";
     dropdown.input.checked = true;
-    showInput.input.checked = true;
-    showError.input.checked = true;
+    show_input.input.checked = true;
+    show_error.input.checked = true;
     style.value = "stop";
     status.textContent = "";
-    syncSettings();
+    sync_settings();
   };
 
   /** The condition the Settings tab describes, or the message Excel shows for a box it refuses. */
@@ -427,20 +427,20 @@ export function dataValidationDialog(
       return { kind: "list", values: source.value.split(",") };
     }
     const op = operator.value as Operator;
-    const labels = boundLabels(kind);
+    const labels = bound_labels(kind);
     const refusal = (label: string): string => `The ${label} you entered is not valid.`;
     let comparison: DataValidationComparison;
     if (op === "between" || op === "notBetween") {
-      const low = parseOperand(min.value, kind);
+      const low = parse_operand(min.value, kind);
       if (low === undefined) return refusal(labels.min);
-      const high = parseOperand(max.value, kind);
+      const high = parse_operand(max.value, kind);
       if (high === undefined) return refusal(labels.max);
       if (typeof low === "number" && typeof high === "number" && low > high) {
         return `The ${labels.max} must be greater than or equal to the ${labels.min}.`;
       }
       comparison = { operator: op, min: low, max: high };
     } else {
-      const bound = parseOperand(value.value, kind);
+      const bound = parse_operand(value.value, kind);
       if (bound === undefined) return refusal(labels.value);
       comparison = { operator: op, value: bound };
     }
@@ -452,23 +452,25 @@ export function dataValidationDialog(
   const settings = (): ValidationSettings | null | string => {
     const built = condition();
     if (typeof built === "string") return built;
-    const errorStyle = style.value as ValidationErrorStyle;
-    const policy = !showError.input.checked ? "allow" : errorStyle === "stop" ? "reject" : "warn";
+    const error_style = style.value as ValidationErrorStyle;
+    const policy = !show_error.input.checked ? "allow" : error_style === "stop" ? "reject" : "warn";
     const result: ValidationSettings = {
       condition: built,
       policy,
       ...(blank.input.checked ? {} : { allowBlank: false }),
       ...(built.kind === "list" && !dropdown.input.checked ? { inCellDropdown: false } : {}),
       // The style the policy implies stays unwritten, as XLSX import leaves it.
-      ...(errorStyle === (policy === "warn" ? "warning" : "stop") ? {} : { errorStyle }),
-      ...(errorTitle.value ? { errorTitle: errorTitle.value } : {}),
-      ...(errorMessage.value ? { helpText: errorMessage.value } : {}),
-      ...(showInput.input.checked ? {} : { showInputMessage: false }),
-      ...(inputTitle.value ? { inputTitle: inputTitle.value } : {}),
-      ...(inputMessage.value ? { inputMessage: inputMessage.value } : {}),
+      ...(error_style === (policy === "warn" ? "warning" : "stop")
+        ? {}
+        : { errorStyle: error_style }),
+      ...(error_title.value ? { errorTitle: error_title.value } : {}),
+      ...(error_message.value ? { helpText: error_message.value } : {}),
+      ...(show_input.input.checked ? {} : { showInputMessage: false }),
+      ...(input_title.value ? { inputTitle: input_title.value } : {}),
+      ...(input_message.value ? { inputMessage: input_message.value } : {}),
     };
     // Any value with no input message is no rule at all, as in Excel.
-    const empty = built.kind === "any" && !inputTitle.value && !inputMessage.value;
+    const empty = built.kind === "any" && !input_title.value && !input_message.value;
     return empty ? null : result;
   };
 
@@ -485,13 +487,13 @@ export function dataValidationDialog(
     initialFocus: allow,
     accept: (choice) => {
       if (choice === "clear") {
-        clearAll();
+        clear_all();
         return false;
       }
       const built = settings();
       if (typeof built === "string") {
         status.textContent = built;
-        showTab(0);
+        show_tab(0);
         return false;
       }
       accepted = built;
@@ -501,7 +503,7 @@ export function dataValidationDialog(
   dialog.element.classList.add("sheetwrite-data-validation-dialog");
   return {
     result: dialog.result.then((choice) =>
-      choice === "ok" ? { settings: accepted, applyToAll: applyToAll.input.checked } : null,
+      choice === "ok" ? { settings: accepted, applyToAll: apply_to_all.input.checked } : null,
     ),
     close: () => dialog.close(),
   };

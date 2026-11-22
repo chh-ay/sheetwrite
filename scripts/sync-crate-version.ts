@@ -13,32 +13,32 @@ export async function syncCrateVersion(): Promise<string> {
   const { version } = JSON.parse(await readFile(resolve(crate, "package.json"), "utf8")) as {
     version: string;
   };
-  await replaceVersion(
+  await replace_version(
     resolve(crate, "Cargo.toml"),
     /(\[package\]\nname = "sheetwrite-wasm"\nversion = ")[^"]+"/,
     version,
   );
-  await replaceVersion(
+  await replace_version(
     resolve(crate, "Cargo.lock"),
     /(name = "sheetwrite-wasm"\nversion = ")[^"]+"/,
     version,
   );
-  await replaceVersion(
+  await replace_version(
     resolve(crate, "history/Cargo.toml"),
     /(\[package\]\nname = "sheetwrite-history"\nversion = ")[^"]+"/,
     version,
   );
-  await replaceVersion(
+  await replace_version(
     resolve(crate, "history/Cargo.lock"),
     /(name = "sheetwrite-history"\nversion = ")[^"]+"/,
     version,
   );
-  await replaceVersion(
+  await replace_version(
     resolve(root, "packages/queries/engine/Cargo.toml"),
     /(\[package\]\nname = "sheetwrite-queries"\nversion = ")[^"]+"/,
     version,
   );
-  await replaceVersion(
+  await replace_version(
     resolve(root, "packages/queries/engine/Cargo.lock"),
     /(name = "sheetwrite-queries"\nversion = ")[^"]+"/,
     version,
@@ -46,7 +46,7 @@ export async function syncCrateVersion(): Promise<string> {
   return version;
 }
 
-async function replaceVersion(path: string, pattern: RegExp, version: string): Promise<void> {
+async function replace_version(path: string, pattern: RegExp, version: string): Promise<void> {
   const source = await readFile(path, "utf8");
   if (!pattern.test(source)) throw new Error(`${path} has no crate version`);
   await writeFile(path, source.replace(pattern, `$1${version}"`));

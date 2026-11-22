@@ -8,7 +8,7 @@ import type { DocumentOp } from "./types/document.js";
  * descriptors so no getter runs. Undefined when `value` is anything else; the
  * caller then keeps the original and validation reports the exact issue.
  */
-function copyDataRecord(value: unknown): Record<string, unknown> | undefined {
+function copy_data_record(value: unknown): Record<string, unknown> | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
   if (Object.getPrototypeOf(value) !== Object.prototype) return undefined;
   if (Object.getOwnPropertySymbols(value).length > 0) return undefined;
@@ -25,7 +25,7 @@ function copyDataRecord(value: unknown): Record<string, unknown> | undefined {
  * Whether `Array.prototype` or `Object.prototype` has an index key, so that
  * reading a hole by index would return its value instead of `undefined`.
  */
-function prototypesFillHoles(): boolean {
+function prototypes_fill_holes(): boolean {
   return [Array.prototype, Object.prototype].some((prototype) =>
     Reflect.ownKeys(prototype).some(
       (key) => typeof key === "string" && CANONICAL_ARRAY_INDEX.test(key),
@@ -41,15 +41,15 @@ function prototypesFillHoles(): boolean {
  * each index checked as an own property, because that check costs more than
  * the copy.
  */
-function readEntriesOnce(value: unknown): unknown[] | undefined {
+function read_entries_once(value: unknown): unknown[] | undefined {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
   const length = value.length;
-  const checkOwnIndexes = prototypesFillHoles();
+  const check_own_indexes = prototypes_fill_holes();
   const entries: unknown[] = [];
   let index = 0;
   try {
     for (; index < length; index++) {
-      if (checkOwnIndexes && !Object.hasOwn(value, index)) return undefined;
+      if (check_own_indexes && !Object.hasOwn(value, index)) return undefined;
       const entry: unknown = value[index];
       if (entry === undefined) return undefined;
       entries.push(entry);
@@ -67,7 +67,7 @@ function readEntriesOnce(value: unknown): unknown[] | undefined {
 }
 
 /** A field read through its descriptor, so no getter runs. */
-function ownDataField(value: unknown, key: string): unknown {
+function own_data_field(value: unknown, key: string): unknown {
   if (value === null || typeof value !== "object") return undefined;
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
   return descriptor && "value" in descriptor ? descriptor.value : undefined;
@@ -80,27 +80,27 @@ function ownDataField(value: unknown, key: string): unknown {
  * field it is made of is not plain data (validation then judges the original
  * exactly as before).
  */
-function withOwnedBlockArrays(operation: DocumentOp): DocumentOp {
-  if (ownDataField(operation, "op") !== "setBlock") return operation;
-  const sourceBlock = ownDataField(operation, "block");
-  const sourceStyleIds = ownDataField(sourceBlock, "styleIds");
+function with_owned_block_arrays(operation: DocumentOp): DocumentOp {
+  if (own_data_field(operation, "op") !== "setBlock") return operation;
+  const source_block = own_data_field(operation, "block");
+  const source_style_ids = own_data_field(source_block, "styleIds");
   if (
-    isOwnedArray(ownDataField(sourceBlock, "values")) &&
-    (sourceStyleIds === undefined || isOwnedArray(sourceStyleIds))
+    isOwnedArray(own_data_field(source_block, "values")) &&
+    (source_style_ids === undefined || isOwnedArray(source_style_ids))
   ) {
     return operation;
   }
 
-  const copy = copyDataRecord(operation);
-  const block = copyDataRecord(copy?.block);
+  const copy = copy_data_record(operation);
+  const block = copy_data_record(copy?.block);
   if (!copy || !block) return operation;
-  const values = readEntriesOnce(block.values);
+  const values = read_entries_once(block.values);
   if (!values) return operation;
   block.values = values;
   if (block.styleIds !== undefined) {
-    const styleIds = readEntriesOnce(block.styleIds);
-    if (!styleIds) return operation;
-    block.styleIds = styleIds;
+    const style_ids = read_entries_once(block.styleIds);
+    if (!style_ids) return operation;
+    block.styleIds = style_ids;
   }
   copy.block = block;
   // The copy has exactly the caller's fields; validation judges it as it would the original.
@@ -120,7 +120,7 @@ function withOwnedBlockArrays(operation: DocumentOp): DocumentOp {
  * keeps its operations and any measurement recorded for them.
  */
 export function readBlockArraysOnce(operations: readonly DocumentOp[]): DocumentOp[] | undefined {
-  const owned = operations.map(withOwnedBlockArrays);
+  const owned = operations.map(with_owned_block_arrays);
   if (owned.every((operation, index) => operation === operations[index])) return undefined;
   return isAtomicBatch(operations) ? markAtomicBatch(owned) : owned;
 }

@@ -59,7 +59,7 @@ const UTF16_LE_BOM = [0xff, 0xfe] as const;
 const UTF16_BE_BOM = [0xfe, 0xff] as const;
 
 const utf8 = new TextEncoder();
-const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+const utf8_decoder = new TextDecoder("utf-8", { fatal: true });
 
 // --- Reading -----------------------------------------------------------------
 
@@ -75,15 +75,16 @@ interface Mashup {
   readonly digest?: string;
 }
 
-function startsWith(bytes: Uint8Array, prefix: readonly number[]): boolean {
+function starts_with(bytes: Uint8Array, prefix: readonly number[]): boolean {
   return prefix.every((byte, index) => bytes[index] === byte);
 }
 
 /** Excel writes the item as UTF-16; the XML reader takes UTF-8 without a declaration. */
-function itemXml(bytes: Uint8Array): Uint8Array {
+function item_xml(bytes: Uint8Array): Uint8Array {
   let text: string;
-  if (startsWith(bytes, UTF16_LE_BOM)) text = new TextDecoder("utf-16le").decode(bytes.subarray(2));
-  else if (startsWith(bytes, UTF16_BE_BOM))
+  if (starts_with(bytes, UTF16_LE_BOM))
+    text = new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  else if (starts_with(bytes, UTF16_BE_BOM))
     text = new TextDecoder("utf-16be").decode(bytes.subarray(2));
   else return bytes;
 
@@ -115,7 +116,7 @@ function streams(binary: Uint8Array): Uint8Array[] {
   return output;
 }
 
-function decodeBase64(text: string): Uint8Array {
+function decode_base64(text: string): Uint8Array {
   const compact = text.replace(/\s+/gu, "");
   if ((compact.length * 3) / 4 > MAX_MASHUP_BYTES) throw new RangeError("DataMashup is too large");
 
@@ -125,11 +126,11 @@ function decodeBase64(text: string): Uint8Array {
   return bytes;
 }
 
-function stripBom(text: string): string {
+function strip_bom(text: string): string {
   return text.startsWith("\uFEFF") ? text.slice(1) : text;
 }
 
-function readMetadata(
+function read_metadata(
   stream: Uint8Array,
   context: XlsxCodecContext,
 ): { members: Map<string, MemberMetadata>; digest?: string } {
@@ -138,7 +139,7 @@ function readMetadata(
   const length = uint32(view, UINT32_BYTES);
   const xml = stream.subarray(2 * UINT32_BYTES, 2 * UINT32_BYTES + length);
   const root = parseXml(
-    utf8.encode(stripBom(utf8Decoder.decode(xml))),
+    utf8.encode(strip_bom(utf8_decoder.decode(xml))),
     "DataMashup metadata",
     context,
   );
@@ -175,35 +176,35 @@ function readMetadata(
   return { members, ...(digest ? { digest } : {}) };
 }
 
-function parseMashup(
+function parse_mashup(
   item: Uint8Array,
   part: string,
   context: XlsxCodecContext,
 ): Mashup | undefined {
-  const root = parseXml(itemXml(item), part, context);
+  const root = parseXml(item_xml(item), part, context);
   if (root.name.split(":").pop() !== "DataMashup") return undefined;
 
-  const [packageParts, , metadata] = streams(decodeBase64(root.text));
-  if (!packageParts || !metadata) throw new RangeError("Truncated DataMashup stream");
+  const [package_parts, , metadata] = streams(decode_base64(root.text));
+  if (!package_parts || !metadata) throw new RangeError("Truncated DataMashup stream");
 
-  let tooLarge = false;
-  const files = unzipSync(packageParts, {
+  let too_large = false;
+  const files = unzipSync(package_parts, {
     filter: (file) => {
       if (file.name !== "Formulas/Section1.m") return false;
-      tooLarge = file.originalSize > MAX_SECTION_BYTES;
-      return !tooLarge;
+      too_large = file.originalSize > MAX_SECTION_BYTES;
+      return !too_large;
     },
   });
-  const sectionBytes = files["Formulas/Section1.m"];
-  if (tooLarge || !sectionBytes) throw new RangeError("DataMashup has no readable Section1.m");
+  const section_bytes = files["Formulas/Section1.m"];
+  if (too_large || !section_bytes) throw new RangeError("DataMashup has no readable Section1.m");
 
   return {
-    section: stripBom(utf8Decoder.decode(sectionBytes)),
-    ...readMetadata(metadata, context),
+    section: strip_bom(utf8_decoder.decode(section_bytes)),
+    ...read_metadata(metadata, context),
   };
 }
 
-function workbookTables(
+function workbook_tables(
   snapshot: WorkbookSnapshot,
 ): Array<{ sheet: string; table: WorkbookTable }> {
   return snapshot.sheets.flatMap((sheet) =>
@@ -241,20 +242,20 @@ export async function readPowerQuery(
     ...packageFile.relationships(""),
   ];
   let mashup: Mashup | undefined;
-  let mashupPart: string | undefined;
+  let mashup_part: string | undefined;
 
   for (const relationship of relationships) {
     if (relationship.external || !relationshipTypeMatches(relationship.type, "customXml")) continue;
 
     try {
-      const parsed = parseMashup(
+      const parsed = parse_mashup(
         await packageFile.readBytes(relationship.target),
         relationship.target,
         context,
       );
       if (parsed) {
         mashup = parsed;
-        mashupPart = relationship.target;
+        mashup_part = relationship.target;
         break;
       }
     } catch (error) {
@@ -267,7 +268,7 @@ export async function readPowerQuery(
     }
   }
 
-  if (!mashup || !mashupPart) {
+  if (!mashup || !mashup_part) {
     // Without M parts, the hidden Sheetwrite metadata is the only copy of the definitions.
     if (sidecarQueries?.length && admissible(snapshot, [...sidecarQueries])) {
       snapshot.workbook.queries = structuredClone([...sidecarQueries]);
@@ -282,7 +283,7 @@ export async function readPowerQuery(
   } else if (context.options?.powerQuery) {
     try {
       const imported = context.options.powerQuery.decode(mashup.section);
-      const tables = workbookTables(snapshot);
+      const tables = workbook_tables(snapshot);
       queries = imported.queries.map((query) => {
         const metadata = mashup.members.get(query.name);
         const bound = metadata?.fillEnabled
@@ -316,15 +317,15 @@ export async function readPowerQuery(
         queryWarning(
           context,
           `Power Query member ${member.member} was kept as M text and does not refresh in Sheetwrite (${member.reason}${member.detail ? `: ${member.detail}` : ""})`,
-          mashupPart,
+          mashup_part,
         );
       }
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       queryWarning(
         context,
-        `Power Query section in ${mashupPart} is not a supported M document`,
-        mashupPart,
+        `Power Query section in ${mashup_part} is not a supported M document`,
+        mashup_part,
       );
     }
   }
@@ -335,7 +336,7 @@ export async function readPowerQuery(
       queryWarning(
         context,
         "Imported Power Query definitions conflict with each other and were not saved",
-        mashupPart,
+        mashup_part,
       );
   }
 
@@ -347,7 +348,7 @@ export async function readPowerQuery(
   snapshot.workbook.xlsxSource = {
     ...source,
     graphs: source.graphs.map((graph) =>
-      graph.target === mashupPart
+      graph.target === mashup_part
         ? {
             ...graph,
             queries: digest,
@@ -362,7 +363,7 @@ export async function readPowerQuery(
 
 // --- Writing -----------------------------------------------------------------
 
-function uint32Bytes(value: number): Uint8Array {
+function uint32_bytes(value: number): Uint8Array {
   const bytes = new Uint8Array(UINT32_BYTES);
   new DataView(bytes.buffer).setUint32(0, value, true);
   return bytes;
@@ -378,11 +379,11 @@ function concat(parts: readonly Uint8Array[]): Uint8Array {
   return output;
 }
 
-function lengthPrefixed(stream: Uint8Array): Uint8Array {
-  return concat([uint32Bytes(stream.length), stream]);
+function length_prefixed(stream: Uint8Array): Uint8Array {
+  return concat([uint32_bytes(stream.length), stream]);
 }
 
-function encodeBase64(bytes: Uint8Array): string {
+function encode_base64(bytes: Uint8Array): string {
   const chunk = 0x8000;
   const pieces: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += chunk) {
@@ -396,18 +397,18 @@ interface MemberEntry {
   readonly tableName?: string;
 }
 
-function metadataXml(members: readonly MemberEntry[], digest: string): string {
+function metadata_xml(members: readonly MemberEntry[], digest: string): string {
   const entry = (type: string, value: string): string =>
     `<Entry Type="${escapeXml(type)}" Value="${escapeXml(value)}"/>`;
-  const items = members.map(({ member, tableName }) => {
+  const items = members.map(({ member, tableName: table_name }) => {
     const entries = [
       entry("IsPrivate", "l0"),
       entry("ResultType", "sTable"),
-      entry("FillEnabled", tableName ? "l1" : "l0"),
+      entry("FillEnabled", table_name ? "l1" : "l0"),
       entry("FillToDataModelEnabled", "l0"),
       entry("AddedToDataModel", "l0"),
-      ...(tableName
-        ? [entry("FillTarget", `s${tableName}`), entry("FillStatus", "sComplete")]
+      ...(table_name
+        ? [entry("FillTarget", `s${table_name}`), entry("FillStatus", "sComplete")]
         : []),
     ];
     return `<Item><ItemLocation><ItemType>Formula</ItemType><ItemPath>${escapeXml(`Section1/${member}`)}</ItemPath></ItemLocation><StableEntries>${entries.join("")}</StableEntries></Item>`;
@@ -417,8 +418,8 @@ function metadataXml(members: readonly MemberEntry[], digest: string): string {
 }
 
 /** The DataMashup binary stream for one section ([MS-QDEFF] 2.2 to 2.6). */
-function mashupBinary(section: string, members: readonly MemberEntry[]): Uint8Array {
-  const packageParts = zipSync({
+function mashup_binary(section: string, members: readonly MemberEntry[]): Uint8Array {
+  const package_parts = zipSync({
     "[Content_Types].xml": utf8.encode(
       `<?xml version="1.0" encoding="utf-8"?><Types xmlns="${CONTENT_TYPES_NS}"><Default Extension="xml" ContentType="text/xml"/><Default Extension="m" ContentType="text/plain"/></Types>`,
     ),
@@ -432,19 +433,19 @@ function mashupBinary(section: string, members: readonly MemberEntry[]): Uint8Ar
     '<?xml version="1.0" encoding="utf-8"?><PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><CanEvaluateFuturePackages>false</CanEvaluateFuturePackages><FirewallEnabled>true</FirewallEnabled><WorkbookGroupType xsi:nil="true"/></PermissionList>',
   );
   const metadata = concat([
-    uint32Bytes(BINARY_VERSION),
-    lengthPrefixed(utf8.encode(metadataXml(members, textDigest(section)))),
-    uint32Bytes(0),
+    uint32_bytes(BINARY_VERSION),
+    length_prefixed(utf8.encode(metadata_xml(members, textDigest(section)))),
+    uint32_bytes(0),
   ]);
   // 2.6 allows a one-byte null binding instead of a DPAPI checksum; readers then use default permissions.
   const bindings = Uint8Array.of(0);
 
   return concat([
-    uint32Bytes(BINARY_VERSION),
-    lengthPrefixed(packageParts),
-    lengthPrefixed(permissions),
-    lengthPrefixed(metadata),
-    lengthPrefixed(bindings),
+    uint32_bytes(BINARY_VERSION),
+    length_prefixed(package_parts),
+    length_prefixed(permissions),
+    length_prefixed(metadata),
+    length_prefixed(bindings),
   ]);
 }
 
@@ -464,7 +465,7 @@ interface PowerQueryParts {
  * still valid, there are no queries, or no codec is given. Differences
  * between M and the engine are reported as warnings.
  */
-function preparePowerQuery(
+function prepare_power_query(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
 ): PowerQueryParts | undefined {
@@ -482,7 +483,7 @@ function preparePowerQuery(
           workbookRelationships: [],
           contentTypeOverrides: [],
           parts: [],
-          tables: retainedBindings(source, retained.target, queries, codec),
+          tables: retained_bindings(source, retained.target, queries, codec),
         }
       : undefined;
   }
@@ -510,37 +511,40 @@ function preparePowerQuery(
     number += 1;
 
   const tables = new Map<string, QueryTableBinding>();
-  const tableNames = new Map(
-    workbookTables(snapshot).map((entry) => [entry.table.id, entry.table.name]),
+  const table_names = new Map(
+    workbook_tables(snapshot).map((entry) => [entry.table.id, entry.table.name]),
   );
   const members: MemberEntry[] = queries.map((query, index) => {
-    const tableName = query.output ? tableNames.get(query.output.table) : undefined;
-    return { member: exported.members[index] ?? query.name, ...(tableName ? { tableName } : {}) };
+    const table_name = query.output ? table_names.get(query.output.table) : undefined;
+    return {
+      member: exported.members[index] ?? query.name,
+      ...(table_name ? { tableName: table_name } : {}),
+    };
   });
 
-  const itemPart = `customXml/item${number}.xml`;
-  const propsPart = `customXml/itemProps${number}.xml`;
-  const item = `<?xml version="1.0" encoding="utf-8"?><DataMashup xmlns="${DATA_MASHUP_NS}">${encodeBase64(mashupBinary(exported.section, members))}</DataMashup>`;
+  const item_part = `customXml/item${number}.xml`;
+  const props_part = `customXml/itemProps${number}.xml`;
+  const item = `<?xml version="1.0" encoding="utf-8"?><DataMashup xmlns="${DATA_MASHUP_NS}">${encode_base64(mashup_binary(exported.section, members))}</DataMashup>`;
   const props = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><ds:datastoreItem ds:itemID="${guid()}" xmlns:ds="${CUSTOM_XML_PROPS_NS}"><ds:schemaRefs><ds:schemaRef ds:uri="${DATA_MASHUP_NS}"/></ds:schemaRefs></ds:datastoreItem>`;
-  const itemRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="${CUSTOM_XML_PROPS_REL}" Target="itemProps${number}.xml"/></Relationships>`;
+  const item_rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="${CUSTOM_XML_PROPS_REL}" Target="itemProps${number}.xml"/></Relationships>`;
   const parts: ZipPart[] = [
-    { name: itemPart, data: utf8.encode(item) },
-    { name: propsPart, data: utf8.encode(props) },
-    { name: `customXml/_rels/item${number}.xml.rels`, data: utf8.encode(itemRels) },
+    { name: item_part, data: utf8.encode(item) },
+    { name: props_part, data: utf8.encode(props) },
+    { name: `customXml/_rels/item${number}.xml.rels`, data: utf8.encode(item_rels) },
   ];
   const overrides = [
-    { part: itemPart, contentType: XML_CONTENT },
-    { part: propsPart, contentType: CUSTOM_XML_PROPS_CONTENT },
+    { part: item_part, contentType: XML_CONTENT },
+    { part: props_part, contentType: CUSTOM_XML_PROPS_CONTENT },
     { part: `customXml/_rels/item${number}.xml.rels`, contentType: RELATIONSHIPS_CONTENT },
   ];
-  const relationships = [{ type: CUSTOM_XML_REL, target: `../${itemPart}` }];
+  const relationships = [{ type: CUSTOM_XML_REL, target: `../${item_part}` }];
 
   // A workbook has one connections part; a retained one keeps its other connections.
-  const retainedConnections = source?.graphs.some(
+  const retained_connections = source?.graphs.some(
     (graph) => graph.queries === undefined && relationshipTypeMatches(graph.type, "connections"),
   );
   const bound = members.filter((member) => member.tableName !== undefined);
-  if (retainedConnections) {
+  if (retained_connections) {
     if (bound.length > 0) {
       queryWarning(
         context,
@@ -569,7 +573,7 @@ function preparePowerQuery(
 }
 
 /** Connection ids in a retained connections part, by the query each one names. */
-function retainedBindings(
+function retained_bindings(
   source: NonNullable<WorkbookSnapshot["workbook"]["xlsxSource"]>,
   target: string,
   queries: readonly SavedQuery[],
@@ -584,7 +588,7 @@ function retainedBindings(
     part.method === 0
       ? compressed
       : inflateSync(compressed, { out: new Uint8Array(part.uncompressedSize) });
-  const text = utf8Decoder.decode(bytes);
+  const text = utf8_decoder.decode(bytes);
   const members = codec.encode(queries).members;
 
   queries.forEach((query, index) => {
@@ -616,11 +620,11 @@ export function withPowerQuery(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
 ): WorkbookWriteHook | undefined {
-  const query = preparePowerQuery(snapshot, context);
+  const query = prepare_power_query(snapshot, context);
   if (!query) return preserved;
 
-  const workbookXml = preserved?.workbookXml;
-  const ownCount = preserved?.workbookRelationships?.length ?? 0;
+  const workbook_xml = preserved?.workbookXml;
+  const own_count = preserved?.workbookRelationships?.length ?? 0;
   return {
     ...preserved,
     workbookRelationships: [
@@ -631,8 +635,8 @@ export function withPowerQuery(
       ...(preserved?.contentTypeOverrides ?? []),
       ...query.contentTypeOverrides,
     ],
-    ...(workbookXml
-      ? { workbookXml: (ids: readonly string[]) => workbookXml(ids.slice(0, ownCount)) }
+    ...(workbook_xml
+      ? { workbookXml: (ids: readonly string[]) => workbook_xml(ids.slice(0, own_count)) }
       : {}),
     *parts() {
       yield* preserved?.parts?.() ?? [];

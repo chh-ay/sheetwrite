@@ -11,15 +11,15 @@ import type {
   Workbook,
 } from "../src/types.js";
 
-const originalRaf = globalThis.requestAnimationFrame;
-let restoreStubs: () => void;
+const original_raf = globalThis.requestAnimationFrame;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs({ width: 360, height: 168 });
+  restore_stubs = installCanvasTestStubs({ width: 360, height: 168 });
   globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
     callback(0);
     return 0;
@@ -27,8 +27,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
+  restore_stubs();
+  globalThis.requestAnimationFrame = original_raf;
   document.body.replaceChildren();
 });
 
@@ -39,7 +39,7 @@ interface RendererStats {
   live: number;
 }
 
-function trackedRenderer(prefix: string, stats: RendererStats): CellRenderer {
+function tracked_renderer(prefix: string, stats: RendererStats): CellRenderer {
   const sync = (element: HTMLElement, context: CellPaintContext): void => {
     element.textContent = `${prefix}:${String(context.value ?? "")}`;
     element.dataset.width = String(context.w);
@@ -141,7 +141,7 @@ describe("retained DOM cell renderer overlay", () => {
     const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
     const { workbook, data } = fixture();
     workbook.sheets[0]!.merges = [{ r0: 20, c0: 1, r1: 60, c1: 2 }];
-    const { grid, host } = mount(workbook, data, { dom: trackedRenderer("tall", stats) });
+    const { grid, host } = mount(workbook, data, { dom: tracked_renderer("tall", stats) });
 
     expect(host.querySelector('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toBeNull();
     scroller(host).scrollTop = 35 * 28;
@@ -180,30 +180,30 @@ describe("retained DOM cell renderer overlay", () => {
     workbook.sheets[0]!.frozenRows = 0;
     workbook.sheets[0]!.frozenCols = 0;
     workbook.sheets[0]!.merges = [];
-    const { grid, host } = mount(workbook, data, { dom: trackedRenderer("initial", stats) });
+    const { grid, host } = mount(workbook, data, { dom: tracked_renderer("initial", stats) });
     const shared = document.createElement("button");
-    let sharedDestroys = 0;
-    const sharedRenderer: CellRenderer = {
+    let shared_destroys = 0;
+    const shared_renderer: CellRenderer = {
       dom() {
         return shared;
       },
       destroy() {
-        sharedDestroys += 1;
+        shared_destroys += 1;
       },
     };
 
-    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(
+    expect(() => grid.defineCellRenderer("dom", shared_renderer)).toThrow(
       expect.objectContaining({ code: "invalid-argument", operation: "render" }),
     );
-    expect(sharedDestroys).toBe(1);
+    expect(shared_destroys).toBe(1);
     expect(shared.parentNode).toBeNull();
     expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
 
-    let returnedShared = false;
+    let returned_shared = false;
     grid.defineCellRenderer("dom", {
       dom() {
-        if (!returnedShared) {
-          returnedShared = true;
+        if (!returned_shared) {
+          returned_shared = true;
           return shared;
         }
         return document.createElement("button");
@@ -226,11 +226,11 @@ describe("retained DOM cell renderer overlay", () => {
       },
     };
     const { grid, host } = mount(workbook, data, { dom: renderer });
-    const initialCalls = calls;
+    const initial_calls = calls;
     const scroll = scroller(host);
     scroll.scrollLeft = 1;
     grid.refresh();
-    expect(calls).toBe(initialCalls);
+    expect(calls).toBe(initial_calls);
 
     grid.applyTransaction({
       patches: [
@@ -241,7 +241,7 @@ describe("retained DOM cell renderer overlay", () => {
         },
       ],
     });
-    expect(calls).toBeGreaterThan(initialCalls);
+    expect(calls).toBeGreaterThan(initial_calls);
     expect(cell(host, 0, 0).textContent).toBe("legacy-edit");
     grid.destroy();
   });
@@ -254,10 +254,10 @@ describe("retained DOM cell renderer overlay", () => {
       displayName: index === 0 ? "  " : `Remote operator with a long identity ${index}`,
       color: index % 2 === 0 ? "#58c4dc" : "#e76f51",
       activeSheet: "s1",
-      ranges: Array.from({ length: 8 }, (_, rangeIndex) => ({
+      ranges: Array.from({ length: 8 }, (_, range_index) => ({
         sheet: "s1",
-        start: { row: rangeIndex % 5, col: 0 },
-        end: { row: rangeIndex % 5, col: 2 },
+        start: { row: range_index % 5, col: 0 },
+        end: { row: range_index % 5, col: 2 },
       })),
     }));
 
@@ -266,10 +266,10 @@ describe("retained DOM cell renderer overlay", () => {
     const labels = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence-label]")];
     expect(labels).toHaveLength(overlays.length);
     expect(labels.some((label) => label.dataset.presenceKind === "marker")).toBe(true);
-    const firstLabel = labels[0];
-    if (!firstLabel) throw new Error("Expected a presence label for the first actor");
-    expect(firstLabel.title).toBe("actor-0");
-    expect(firstLabel.getAttribute("aria-label")).toContain("actor-0");
+    const first_label = labels[0];
+    if (!first_label) throw new Error("Expected a presence label for the first actor");
+    expect(first_label.title).toBe("actor-0");
+    expect(first_label.getAttribute("aria-label")).toContain("actor-0");
     for (const label of labels) {
       expect(px(label.style.left)).toBeGreaterThanOrEqual(0);
       expect(px(label.style.top)).toBeGreaterThanOrEqual(0);

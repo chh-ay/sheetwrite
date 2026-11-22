@@ -72,14 +72,14 @@ export function summarizePack(name: string, result: PackResult): PackageReport {
     "runtime-source": 0,
     wasm: 0,
   };
-  let fileBytes = 0;
+  let file_bytes = 0;
   for (const file of result.files) {
     categories[classifyPackedPath(file.path)] += file.size;
-    fileBytes += file.size;
+    file_bytes += file.size;
   }
-  if (fileBytes !== result.unpackedSize) {
+  if (file_bytes !== result.unpackedSize) {
     throw new Error(
-      `${name} npm pack file bytes ${fileBytes} do not equal unpackedSize ${result.unpackedSize}`,
+      `${name} npm pack file bytes ${file_bytes} do not equal unpackedSize ${result.unpackedSize}`,
     );
   }
   return {
@@ -92,8 +92,8 @@ export function summarizePack(name: string, result: PackResult): PackageReport {
 }
 
 export async function walkLogicalBytes(root: string): Promise<{ bytes: number; files: number }> {
-  const visitedDirectories = new Set<string>();
-  const visitedFiles = new Set<string>();
+  const visited_directories = new Set<string>();
+  const visited_files = new Set<string>();
   let bytes = 0;
   let files = 0;
 
@@ -106,8 +106,8 @@ export async function walkLogicalBytes(root: string): Promise<{ bytes: number; f
     }
     if (entry.isDirectory()) {
       const canonical = await realpath(path);
-      if (visitedDirectories.has(canonical)) return;
-      visitedDirectories.add(canonical);
+      if (visited_directories.has(canonical)) return;
+      visited_directories.add(canonical);
       const entries = await readdir(path);
       entries.sort();
       for (const name of entries) await visit(join(path, name));
@@ -115,8 +115,8 @@ export async function walkLogicalBytes(root: string): Promise<{ bytes: number; f
     }
     if (!entry.isFile()) return;
     const canonical = await realpath(path);
-    if (visitedFiles.has(canonical)) return;
-    visitedFiles.add(canonical);
+    if (visited_files.has(canonical)) return;
+    visited_files.add(canonical);
     bytes += entry.size;
     files += 1;
   }
@@ -129,16 +129,16 @@ export async function runCommand(command: string[], cwd = repositoryRoot): Promi
   return captureProcess(command, {
     cwd,
     env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-    failure: ({ stdout, stderr, exitCode }) =>
-      `${command.join(" ")} failed with exit code ${exitCode}\n${stdout.trim()}\n${stderr.trim()}`,
+    failure: ({ stdout, stderr, exitCode: exit_code }) =>
+      `${command.join(" ")} failed with exit code ${exit_code}\n${stdout.trim()}\n${stderr.trim()}`,
   });
 }
 
 export async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
   const packages = await packBuiltPackages(join(temporaryRoot, "tarballs"));
-  return packages.map(({ artifact, tarballPath, pack }) => ({
+  return packages.map(({ artifact, tarballPath: tarball_path, pack }) => ({
     name: artifact.name,
-    tarballPath,
+    tarballPath: tarball_path,
     report: summarizePack(artifact.name, pack),
   }));
 }
@@ -147,25 +147,25 @@ export async function loadPackedArtifacts(
   artifactDirectory: string,
   temporaryRoot: string,
 ): Promise<PackedPackage[]> {
-  const artifactRoot = resolve(artifactDirectory);
-  const release = await verifyReleaseArtifacts(artifactRoot);
-  const extractRoot = join(temporaryRoot, "artifact-packages");
-  await mkdir(extractRoot, { recursive: true });
+  const artifact_root = resolve(artifactDirectory);
+  const release = await verifyReleaseArtifacts(artifact_root);
+  const extract_root = join(temporaryRoot, "artifact-packages");
+  await mkdir(extract_root, { recursive: true });
   const packed: PackedPackage[] = [];
   for (const artifact of release.packages) {
-    const packageRoot = join(extractRoot, artifact.name.replaceAll("/", "-"));
-    await mkdir(packageRoot, { recursive: true });
-    const tarballPath = join(artifactRoot, artifact.path);
-    await runCommand(["tar", "-xzf", tarballPath, "-C", packageRoot]);
+    const package_root = join(extract_root, artifact.name.replaceAll("/", "-"));
+    await mkdir(package_root, { recursive: true });
+    const tarball_path = join(artifact_root, artifact.path);
+    await runCommand(["tar", "-xzf", tarball_path, "-C", package_root]);
     const files = await Promise.all(
       artifact.files.map(async (path) => ({
         path,
-        size: (await stat(join(packageRoot, "package", path))).size,
+        size: (await stat(join(package_root, "package", path))).size,
       })),
     );
     packed.push({
       name: artifact.name,
-      tarballPath,
+      tarballPath: tarball_path,
       report: summarizePack(artifact.name, {
         filename: artifact.path,
         size: artifact.bytes,
@@ -177,7 +177,7 @@ export async function loadPackedArtifacts(
   return packed;
 }
 
-async function sumPackageFiles(packageRoot: string): Promise<number> {
+async function sum_package_files(package_root: string): Promise<number> {
   let bytes = 0;
   async function visit(directory: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -189,7 +189,7 @@ async function sumPackageFiles(packageRoot: string): Promise<number> {
       else if (entry.isFile()) bytes += (await stat(path)).size;
     }
   }
-  await visit(packageRoot);
+  await visit(package_root);
   return bytes;
 }
 
@@ -200,64 +200,69 @@ export async function measureClosure(
   temporaryRoot: string,
   sequence: number,
 ): Promise<ClosureReport> {
-  const consumerRoot = join(temporaryRoot, `closure-${name}-${sequence}`);
-  await cp(join(repositoryRoot, "test/release-locks", name), consumerRoot, { recursive: true });
-  const artifactRoot = join(consumerRoot, "artifacts");
-  await mkdir(artifactRoot, { recursive: true });
+  const consumer_root = join(temporaryRoot, `closure-${name}-${sequence}`);
+  await cp(join(repositoryRoot, "test/release-locks", name), consumer_root, { recursive: true });
+  const artifact_root = join(consumer_root, "artifacts");
+  await mkdir(artifact_root, { recursive: true });
 
-  const closureTarballs = new Map<string, string>();
-  for (const packageName of dependencyNames) {
-    const tarball = packed.get(packageName);
-    if (tarball === undefined) throw new Error(`No packed tarball for ${packageName}`);
-    closureTarballs.set(packageName, tarball);
-    await cp(tarball, join(artifactRoot, basename(tarball)));
+  const closure_tarballs = new Map<string, string>();
+  for (const package_name of dependencyNames) {
+    const tarball = packed.get(package_name);
+    if (tarball === undefined) throw new Error(`No packed tarball for ${package_name}`);
+    closure_tarballs.set(package_name, tarball);
+    await cp(tarball, join(artifact_root, basename(tarball)));
   }
 
-  await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), closureTarballs);
+  await bindCanonicalTarballIntegrities(join(consumer_root, "package-lock.json"), closure_tarballs);
   await runCommand(
     ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
-    consumerRoot,
+    consumer_root,
   );
 
   const lock = await readJson<{ packages?: Record<string, unknown> }>(
-    join(consumerRoot, "package-lock.json"),
+    join(consumer_root, "package-lock.json"),
   );
   if (lock.packages === undefined)
     throw new Error(`${name} committed lockfile has no package graph`);
 
-  const packagePaths = Object.keys(lock.packages)
+  const package_paths = Object.keys(lock.packages)
     .filter((path) => /(?:^|\/)node_modules\//.test(path))
     .sort();
 
   const seen = new Set<string>();
-  const packageNames: string[] = [];
-  let logicalBytes = 0;
-  for (const lockPath of packagePaths) {
-    const packageRoot = join(consumerRoot, lockPath);
-    const canonical = await realpath(packageRoot);
+  const package_names: string[] = [];
+  let logical_bytes = 0;
+  for (const lock_path of package_paths) {
+    const package_root = join(consumer_root, lock_path);
+    const canonical = await realpath(package_root);
     if (seen.has(canonical)) continue;
 
     seen.add(canonical);
     const manifest = await readJson<{ name?: unknown; version?: unknown }>(
-      join(packageRoot, "package.json"),
+      join(package_root, "package.json"),
     );
     if (typeof manifest.name !== "string" || typeof manifest.version !== "string") {
-      throw new Error(`${name} installed package at ${lockPath} has malformed identity`);
+      throw new Error(`${name} installed package at ${lock_path} has malformed identity`);
     }
-    packageNames.push(`${manifest.name}@${manifest.version}`);
-    logicalBytes += await sumPackageFiles(packageRoot);
+    package_names.push(`${manifest.name}@${manifest.version}`);
+    logical_bytes += await sum_package_files(package_root);
   }
 
-  packageNames.sort();
+  package_names.sort();
 
   for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
     if (name === optional.closure) continue;
 
-    const leaked = packageNames.filter((identity) =>
+    const leaked = package_names.filter((identity) =>
       identity.startsWith(`${optional.packageName}@`),
     );
     if (leaked.length > 0) throw new Error(`${name} runtime closure contains ${leaked.join(", ")}`);
   }
 
-  return { name, packageCount: packageNames.length, logicalBytes, packages: packageNames };
+  return {
+    name,
+    packageCount: package_names.length,
+    logicalBytes: logical_bytes,
+    packages: package_names,
+  };
 }

@@ -94,7 +94,7 @@ class PageReports {
   }
 }
 
-async function measureRun(browser: Browser, options: RunOptions): Promise<ScenarioRun> {
+async function measure_run(browser: Browser, options: RunOptions): Promise<ScenarioRun> {
   const page = await browser.newPage({ viewport: { width: 1_280, height: 800 } });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -137,7 +137,7 @@ async function measureRun(browser: Browser, options: RunOptions): Promise<Scenar
   };
 }
 
-function queryParams(values: readonly string[]): URLSearchParams {
+function query_params(values: readonly string[]): URLSearchParams {
   const query = new URLSearchParams();
   for (const entry of values) {
     const [key, value] = entry.split("=", 2);
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
     }
   }
   const runs = Number(values.runs);
-  const query = queryParams(values.param ?? []);
+  const query = query_params(values.param ?? []);
   query.set("samples", values.samples);
   query.set("warmups", values.warmups);
 
@@ -192,7 +192,7 @@ async function main(): Promise<void> {
         // A fresh browser per scenario and run: no compiled code or heap carries over.
         const browser = await chromium.launch({ headless: true });
         try {
-          const result = await measureRun(browser, {
+          const result = await measure_run(browser, {
             baseUrl: `http://${server.hostname}:${server.port}/`,
             scenario,
             run,

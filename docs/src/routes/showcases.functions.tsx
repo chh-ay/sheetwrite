@@ -33,7 +33,7 @@ export const Route = createFileRoute("/showcases/functions")({
 });
 
 /** What the panel shows of a family. */
-function familyChoice(family: (typeof FAMILIES)[number]) {
+function family_choice(family: (typeof FAMILIES)[number]) {
   return {
     id: family.id,
     label: family.label,
@@ -87,8 +87,8 @@ function FunctionsShowcase() {
             component={FunctionsStage}
             name="showcase-functions"
             props={{
-              families: FAMILIES.map(familyChoice),
-              firstFamily: familyChoice(FAMILIES[0]),
+              families: FAMILIES.map(family_choice),
+              firstFamily: family_choice(FAMILIES[0]),
               rowsUsed: FAMILY_ROWS_USED,
             }}
           />

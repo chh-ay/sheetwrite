@@ -95,16 +95,16 @@ const DEFAULT_PRESENCE_RANGES_PER_ACTOR = 8;
 export class PresenceCoordinator {
   private readonly listeners = new Set<PresenceListener>();
   private readonly remote = new Map<string, ReceivedPresence>();
-  private readonly abortController = new AbortController();
-  private readonly disposeSelection: () => void;
-  private readonly disposeActiveSheet: () => void;
-  private readonly disposeTransport?: () => void;
+  private readonly abort_controller = new AbortController();
+  private readonly dispose_selection: () => void;
+  private readonly dispose_active_sheet: () => void;
+  private readonly dispose_transport?: () => void;
   private readonly now: () => number;
-  private readonly heartbeatMs: number;
-  private readonly timeoutMs: number;
-  private readonly maxActors: number;
-  private readonly maxRanges: number;
-  private heartbeatTimer?: number;
+  private readonly heartbeat_ms: number;
+  private readonly timeout_ms: number;
+  private readonly max_actors: number;
+  private readonly max_ranges: number;
+  private heartbeat_timer?: number;
   private destroyed = false;
 
   /**
@@ -121,23 +121,23 @@ export class PresenceCoordinator {
       throw new SheetwriteError("invalid-argument", "presence", "Presence actor ID is required");
     }
     this.now = options.now ?? Date.now;
-    this.heartbeatMs = options.heartbeatMs ?? DEFAULT_PRESENCE_HEARTBEAT_MS;
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_PRESENCE_TIMEOUT_MS;
-    this.maxActors = Math.max(1, options.maxActors ?? DEFAULT_PRESENCE_ACTORS);
-    this.maxRanges = Math.max(1, options.maxRangesPerActor ?? DEFAULT_PRESENCE_RANGES_PER_ACTOR);
-    this.disposeSelection = grid.on("selection", () => this.queuePublish());
-    this.disposeActiveSheet = grid.on("active-sheet", () => this.queuePublish());
-    this.disposeTransport = transport.subscribe(
+    this.heartbeat_ms = options.heartbeatMs ?? DEFAULT_PRESENCE_HEARTBEAT_MS;
+    this.timeout_ms = options.timeoutMs ?? DEFAULT_PRESENCE_TIMEOUT_MS;
+    this.max_actors = Math.max(1, options.maxActors ?? DEFAULT_PRESENCE_ACTORS);
+    this.max_ranges = Math.max(1, options.maxRangesPerActor ?? DEFAULT_PRESENCE_RANGES_PER_ACTOR);
+    this.dispose_selection = grid.on("selection", () => this.queue_publish());
+    this.dispose_active_sheet = grid.on("active-sheet", () => this.queue_publish());
+    this.dispose_transport = transport.subscribe(
       (message) => this.receive(message),
-      this.abortController.signal,
+      this.abort_controller.signal,
     );
-    if (this.heartbeatMs > 0 && typeof window !== "undefined") {
-      this.heartbeatTimer = window.setInterval(() => {
+    if (this.heartbeat_ms > 0 && typeof window !== "undefined") {
+      this.heartbeat_timer = window.setInterval(() => {
         this.pruneStale();
-        this.queuePublish();
-      }, this.heartbeatMs);
+        this.queue_publish();
+      }, this.heartbeat_ms);
     }
-    this.queuePublish();
+    this.queue_publish();
   }
 
   /** Calls `listener` on each presence event; returns a function that removes it. */
@@ -148,7 +148,7 @@ export class PresenceCoordinator {
 
   /** The latest message of each collaborator that has not expired. */
   remotePresence(): readonly PresenceMessage[] {
-    return [...this.remote.values()].map(({ message }) => clonePresenceMessage(message));
+    return [...this.remote.values()].map(({ message }) => clone_presence_message(message));
   }
 
   /** Sends this user's presence at once; a failure is reported as an `error` event. */
@@ -163,18 +163,19 @@ export class PresenceCoordinator {
           : { displayName: this.options.actor.displayName }),
         ...(this.options.actor.color ? { color: this.options.actor.color } : {}),
       };
-      const sheet = this.activeSheet();
+      const sheet = this.active_sheet();
       const message: PresenceMessage = {
         actor,
         activeSheet: sheet.id,
         selections:
           privacy?.shareSelection === false
             ? []
-            : selectionRanges(this.grid.getSelection(), sheet).slice(0, this.maxRanges),
+            : selection_ranges(this.grid.getSelection(), sheet).slice(0, this.max_ranges),
         sentAt: this.now(),
       };
-      await this.transport.publish(clonePresenceMessage(message), this.abortController.signal);
-      if (!this.destroyed) this.emit({ type: "published", message: clonePresenceMessage(message) });
+      await this.transport.publish(clone_presence_message(message), this.abort_controller.signal);
+      if (!this.destroyed)
+        this.emit({ type: "published", message: clone_presence_message(message) });
     } catch (error) {
       if (!this.destroyed) {
         this.emit({
@@ -187,30 +188,30 @@ export class PresenceCoordinator {
     }
   }
 
-  /** Removes collaborators silent for longer than `timeoutMs`; the heartbeat also calls it. */
+  /** Removes collaborators silent for longer than `timeout_ms`; the heartbeat also calls it. */
   pruneStale(): void {
     if (this.destroyed) return;
-    const cutoff = this.now() - this.timeoutMs;
+    const cutoff = this.now() - this.timeout_ms;
     let changed = false;
-    for (const [actorId, entry] of this.remote) {
+    for (const [actor_id, entry] of this.remote) {
       if (entry.receivedAt > cutoff) continue;
-      this.remote.delete(actorId);
+      this.remote.delete(actor_id);
       changed = true;
-      this.emit({ type: "expired", actorId });
+      this.emit({ type: "expired", actorId: actor_id });
     }
-    if (changed) this.paintPresence();
+    if (changed) this.paint_presence();
   }
 
   /** Stops sharing, removes other collaborators' selections from the grid, and drops listeners. */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.abortController.abort();
-    this.disposeSelection();
-    this.disposeActiveSheet();
-    this.disposeTransport?.();
-    if (this.heartbeatTimer !== undefined && typeof window !== "undefined") {
-      window.clearInterval(this.heartbeatTimer);
+    this.abort_controller.abort();
+    this.dispose_selection();
+    this.dispose_active_sheet();
+    this.dispose_transport?.();
+    if (this.heartbeat_timer !== undefined && typeof window !== "undefined") {
+      window.clearInterval(this.heartbeat_timer);
     }
     this.remote.clear();
     this.grid.setPresenceOverlays(null);
@@ -219,26 +220,26 @@ export class PresenceCoordinator {
 
   private receive(input: PresenceMessage): void {
     if (this.destroyed || this.options.privacy?.receivePresence === false) return;
-    const message = normalizePresenceMessage(input, this.maxRanges);
+    const message = normalize_presence_message(input, this.max_ranges);
     if (!message || message.actor.id === this.options.actor.id) return;
     if (this.options.privacy?.allowActor && !this.options.privacy.allowActor(message.actor)) return;
 
-    if (!this.remote.has(message.actor.id) && this.remote.size >= this.maxActors) {
-      let oldestId: string | undefined;
-      let oldestAt = Number.POSITIVE_INFINITY;
-      for (const [actorId, entry] of this.remote) {
-        if (entry.receivedAt >= oldestAt) continue;
-        oldestId = actorId;
-        oldestAt = entry.receivedAt;
+    if (!this.remote.has(message.actor.id) && this.remote.size >= this.max_actors) {
+      let oldest_id: string | undefined;
+      let oldest_at = Number.POSITIVE_INFINITY;
+      for (const [actor_id, entry] of this.remote) {
+        if (entry.receivedAt >= oldest_at) continue;
+        oldest_id = actor_id;
+        oldest_at = entry.receivedAt;
       }
-      if (oldestId) this.remote.delete(oldestId);
+      if (oldest_id) this.remote.delete(oldest_id);
     }
     this.remote.set(message.actor.id, { message, receivedAt: this.now() });
-    this.paintPresence();
+    this.paint_presence();
     this.emit({ type: "updated", actorId: message.actor.id });
   }
 
-  private activeSheet(): Sheet {
+  private active_sheet(): Sheet {
     const workbook = this.grid.store.getWorkbook();
     const active = this.grid.getActiveSheet();
     const sheet = workbook.sheets.find((candidate) => candidate.id === active);
@@ -246,7 +247,7 @@ export class PresenceCoordinator {
     return sheet;
   }
 
-  private paintPresence(): void {
+  private paint_presence(): void {
     const overlays: PresenceOverlay[] = [];
     for (const { message } of this.remote.values()) {
       overlays.push({
@@ -260,7 +261,7 @@ export class PresenceCoordinator {
     this.grid.setPresenceOverlays(overlays);
   }
 
-  private queuePublish(): void {
+  private queue_publish(): void {
     void this.publishNow();
   }
 
@@ -407,10 +408,10 @@ type CommentListener = (event: CommentCoordinatorEvent) => void;
 
 /** Transport/auth-neutral comment state with server-owned author and timestamp fields. */
 export class CommentCoordinator {
-  private readonly abortController = new AbortController();
+  private readonly abort_controller = new AbortController();
   private readonly listeners = new Set<CommentListener>();
   private readonly threads = new Map<string, CommentThread>();
-  private readonly disposeRemote?: () => void;
+  private readonly dispose_remote?: () => void;
   private version: number;
   private destroyed = false;
 
@@ -420,10 +421,10 @@ export class CommentCoordinator {
     private readonly options: CommentCoordinatorOptions,
   ) {
     this.version = options.serverVersion ?? 0;
-    this.disposeRemote = adapter.subscribeComments?.(
+    this.dispose_remote = adapter.subscribeComments?.(
       options.documentId,
-      (event) => this.applyVersionedEvent(event),
-      this.abortController.signal,
+      (event) => this.apply_versioned_event(event),
+      this.abort_controller.signal,
     );
   }
 
@@ -440,7 +441,7 @@ export class CommentCoordinator {
 
   /** Copies of the current threads. */
   commentThreads(): readonly CommentThread[] {
-    return [...this.threads.values()].map(cloneCommentThread);
+    return [...this.threads.values()].map(clone_comment_thread);
   }
 
   /**
@@ -450,16 +451,16 @@ export class CommentCoordinator {
    */
   async load(signal?: AbortSignal): Promise<readonly CommentThread[]> {
     signal = signal
-      ? AbortSignal.any([signal, this.abortController.signal])
-      : this.abortController.signal;
+      ? AbortSignal.any([signal, this.abort_controller.signal])
+      : this.abort_controller.signal;
     try {
       signal.throwIfAborted();
       const result = await this.adapter.listComments(this.options.documentId, signal);
       signal.throwIfAborted();
-      validateAdapterVersion(result.version);
+      validate_adapter_version(result.version);
       const next = new Map<string, CommentThread>();
       for (const input of result.threads) {
-        const thread = validateCommentThread(input, this.options.documentId);
+        const thread = validate_comment_thread(input, this.options.documentId);
         next.set(thread.id, thread);
       }
       if (this.destroyed || result.version < this.version) return this.commentThreads();
@@ -528,8 +529,8 @@ export class CommentCoordinator {
     signal?: AbortSignal,
   ): Promise<CommentMutationResponse> {
     signal = signal
-      ? AbortSignal.any([signal, this.abortController.signal])
-      : this.abortController.signal;
+      ? AbortSignal.any([signal, this.abort_controller.signal])
+      : this.abort_controller.signal;
     try {
       signal.throwIfAborted();
       const response = await this.adapter.mutateComment({
@@ -541,15 +542,15 @@ export class CommentCoordinator {
       });
       signal.throwIfAborted();
       if (response.status === "conflict") {
-        validateAdapterVersion(response.currentVersion);
+        validate_adapter_version(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
         this.emit({ type: "conflict", currentVersion: this.version });
         return response;
       }
 
-      validateAdapterVersion(response.version);
+      validate_adapter_version(response.version);
       if (response.status === "applied") {
-        const thread = validateCommentThread(response.thread, this.options.documentId);
+        const thread = validate_comment_thread(response.thread, this.options.documentId);
         if (thread.id !== mutation.threadId) {
           throw new Error("Comment response changed the stable thread ID");
         }
@@ -559,7 +560,7 @@ export class CommentCoordinator {
           this.emit({
             type: "changed",
             version: response.version,
-            thread: cloneCommentThread(thread),
+            thread: clone_comment_thread(thread),
           });
         }
       } else {
@@ -581,13 +582,13 @@ export class CommentCoordinator {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.abortController.abort();
-    this.disposeRemote?.();
+    this.abort_controller.abort();
+    this.dispose_remote?.();
     this.threads.clear();
     this.listeners.clear();
   }
 
-  private applyVersionedEvent(event: VersionedCommentEvent): void {
+  private apply_versioned_event(event: VersionedCommentEvent): void {
     if (this.destroyed) return;
     if (event.version <= this.version) return;
     if (event.version !== this.version + 1) {
@@ -599,10 +600,10 @@ export class CommentCoordinator {
       return;
     }
     try {
-      const thread = validateCommentThread(event.thread, this.options.documentId);
+      const thread = validate_comment_thread(event.thread, this.options.documentId);
       this.threads.set(thread.id, thread);
       this.version = event.version;
-      this.emit({ type: "changed", version: event.version, thread: cloneCommentThread(thread) });
+      this.emit({ type: "changed", version: event.version, thread: clone_comment_thread(thread) });
     } catch (error) {
       this.emit({
         type: "error",
@@ -618,7 +619,7 @@ export class CommentCoordinator {
   }
 }
 
-function selectionRanges(selection: Selection | null, sheet: Sheet): Range[] {
+function selection_ranges(selection: Selection | null, sheet: Sheet): Range[] {
   if (!selection) return [];
   switch (selection.kind) {
     case "cell":
@@ -650,9 +651,9 @@ function selectionRanges(selection: Selection | null, sheet: Sheet): Range[] {
   }
 }
 
-function normalizePresenceMessage(
+function normalize_presence_message(
   input: PresenceMessage,
-  maxRanges: number,
+  max_ranges: number,
 ): PresenceMessage | null {
   if (
     !input ||
@@ -673,7 +674,7 @@ function normalizePresenceMessage(
         Number.isFinite(range.end?.row) &&
         Number.isFinite(range.end?.col),
     )
-    .slice(0, maxRanges)
+    .slice(0, max_ranges)
     .map((range) => cloneJsonValue(range));
   return {
     actor: {
@@ -687,20 +688,20 @@ function normalizePresenceMessage(
   };
 }
 
-function clonePresenceMessage(message: PresenceMessage): PresenceMessage {
+function clone_presence_message(message: PresenceMessage): PresenceMessage {
   return cloneJsonValue(message);
 }
 
-function validateAdapterVersion(version: number): void {
+function validate_adapter_version(version: number): void {
   if (!Number.isSafeInteger(version) || version < 0) {
     throw new Error("Collaboration adapter returned an invalid version");
   }
 }
 
-function validateCommentThread(input: CommentThread, documentId: string): CommentThread {
+function validate_comment_thread(input: CommentThread, document_id: string): CommentThread {
   if (
     !input?.id ||
-    input.documentId !== documentId ||
+    input.documentId !== document_id ||
     !Number.isInteger(input.version) ||
     !Array.isArray(input.messages) ||
     input.messages.length === 0
@@ -720,9 +721,9 @@ function validateCommentThread(input: CommentThread, documentId: string): Commen
   if (input.resolved && (!input.resolvedBy?.id || !input.resolvedAt)) {
     throw new Error("Resolved comments require server-owned resolver and timestamp metadata");
   }
-  return cloneCommentThread(input);
+  return clone_comment_thread(input);
 }
 
-function cloneCommentThread(thread: CommentThread): CommentThread {
+function clone_comment_thread(thread: CommentThread): CommentThread {
   return cloneJsonValue(thread);
 }

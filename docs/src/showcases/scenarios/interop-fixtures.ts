@@ -38,7 +38,7 @@ const FIXTURE_URLS: Record<string, string> = {
   "corrupt-deflate.xlsx": corruptDeflateUrl,
 };
 
-function fixtureUrl(file: string): string {
+function fixture_url(file: string): string {
   const url = FIXTURE_URLS[file];
   if (url === undefined) {
     throw new Error(`Interoperability scenario is missing bytes for manifest fixture ${file}`);
@@ -51,7 +51,7 @@ export const POSITIVE_FIXTURES: readonly InteropFixture[] = fixtureManifest.posi
   (entry) => ({
     id: entry.file.replace(/\.xlsx$/, ""),
     file: entry.file,
-    url: fixtureUrl(entry.file),
+    url: fixture_url(entry.file),
     sha256: entry.sha256,
     producer: `${entry.producer.name} ${entry.producer.version}`,
     kind: "positive",
@@ -65,7 +65,7 @@ export const ADVERSARIAL_FIXTURES: readonly InteropFixture[] = fixtureManifest.a
   (entry) => ({
     id: entry.file.replace(/\.xlsx$/, ""),
     file: entry.file,
-    url: fixtureUrl(entry.file),
+    url: fixture_url(entry.file),
     sha256: entry.sha256,
     producer: fixtureManifest.adversarialProvenance.producer,
     kind: "adversarial",

@@ -5,11 +5,11 @@ import { join } from "node:path";
 
 import { assertGeneratedOutputsAbsent, validateExportTargets } from "./verify-clean-build.js";
 
-const fixtureRoots: string[] = [];
+const fixture_roots: string[] = [];
 
-async function exportFixture(): Promise<string> {
+async function export_fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-clean-exports-"));
-  fixtureRoots.push(root);
+  fixture_roots.push(root);
   await mkdir(join(root, "packages/core/dist"), { recursive: true });
   await writeFile(
     join(root, "packages/core/package.json"),
@@ -31,13 +31,13 @@ async function exportFixture(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    fixtureRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+    fixture_roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
   );
 });
 
 describe("clean-build export validation", () => {
   it("fails when a generated declaration target is absent and passes when the build recreates it", async () => {
-    const root = await exportFixture();
+    const root = await export_fixture();
     expect(() => validateExportTargets(root)).toThrow("@sheetwrite/core:./dist/index.d.ts");
     await writeFile(
       join(root, "packages/core/dist/index.d.ts"),
@@ -61,7 +61,7 @@ describe("clean-build export validation", () => {
   });
 
   it("refuses a workspace that already contains generated output", async () => {
-    const root = await exportFixture();
+    const root = await export_fixture();
     expect(() => assertGeneratedOutputsAbsent(root)).toThrow("packages/core/dist");
     await rm(join(root, "packages/core/dist"), { recursive: true });
     expect(() => assertGeneratedOutputsAbsent(root)).not.toThrow();

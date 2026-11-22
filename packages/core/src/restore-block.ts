@@ -17,14 +17,14 @@ export { MAX_RESTORE_BLOCK_DECODED_BYTES };
 
 type RestoreBlock = Extract<DocumentOp, { op: "restoreBlock" }>;
 
-function assertBlock(range: Range, block: PackedCellBlock): void {
+function assert_block(range: Range, block: PackedCellBlock): void {
   assertRestoreBlockFits(range, block);
   if (validateDocumentOperationShape({ op: "setBlock", range, block }).length)
     invalidRestoreBlock();
 }
 
 export function encodeRestoreBlock(range: Range, block: PackedCellBlock): RestoreBlock {
-  assertBlock(range, block);
+  assert_block(range, block);
   // Inspect before stringify so a rejected block cannot allocate an oversized JSON string.
   try {
     boundedJsonByteLength(block, MAX_RESTORE_BLOCK_DECODED_BYTES, {
@@ -73,8 +73,8 @@ type NativeBase64Encoder = (this: Uint8Array) => string;
 
 function base64(bytes: Uint8Array): string {
   // Native since Chromium 140, Firefox 133 and Safari 18.2; older hosts build a binary string.
-  const toBase64: NativeBase64Encoder | undefined = Reflect.get(Uint8Array.prototype, "toBase64");
-  if (typeof toBase64 === "function") return toBase64.call(bytes);
+  const to_base64: NativeBase64Encoder | undefined = Reflect.get(Uint8Array.prototype, "toBase64");
+  if (typeof to_base64 === "function") return to_base64.call(bytes);
   let binary = "";
   for (let at = 0; at < bytes.length; at += BINARY_STRING_CHUNK) {
     binary += String.fromCharCode(...bytes.subarray(at, at + BINARY_STRING_CHUNK));
@@ -94,22 +94,22 @@ const BASE64_EXPANSION = 4 / 3;
  * estimate cannot fit their byte limit.
  */
 export function estimateRestoreBlockBytes(block: PackedCellBlock): number {
-  const sampleRows = Math.max(
+  const sample_rows = Math.max(
     1,
     Math.min(block.rowCount, Math.floor(ESTIMATE_SAMPLE_CELLS / Math.max(1, block.colCount))),
   );
-  const sampleCells = sampleRows * block.colCount;
+  const sample_cells = sample_rows * block.colCount;
   const sample = new TextEncoder().encode(
     JSON.stringify({
-      rowCount: sampleRows,
+      rowCount: sample_rows,
       colCount: block.colCount,
-      values: block.values.slice(0, sampleCells),
+      values: block.values.slice(0, sample_cells),
       styleTable: block.styleTable,
-      styleIds: block.styleIds?.slice(0, sampleCells),
+      styleIds: block.styleIds?.slice(0, sample_cells),
     }),
   );
   const compressed = deflateSync(sample, { level: 1 }).length;
-  return Math.ceil(((compressed * block.rowCount) / sampleRows) * BASE64_EXPANSION);
+  return Math.ceil(((compressed * block.rowCount) / sample_rows) * BASE64_EXPANSION);
 }
 
 export function restoreBlockFacts(operation: RestoreBlock) {

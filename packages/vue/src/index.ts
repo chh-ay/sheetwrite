@@ -178,7 +178,7 @@ export type SheetwriteComponentConstructor<Props, Emits, Expose = object> = new 
       };
   };
 
-const gridProps = {
+const grid_props = {
   /** Live workbook schema adopted by the Grid. */
   workbook: { type: Object as PropType<Workbook>, required: true as const },
   /** Eager column-major values for the active sheet. */
@@ -248,7 +248,7 @@ const gridProps = {
   fill: { type: Boolean, default: undefined },
 };
 
-const gridEmits = {
+const grid_emits = {
   "grid-change": (_event: ChangeEvent) => true,
   "row-delta": (_projection: Parameters<RowBridgeHandler>[0]) => true,
   "selection-change": (_selection: Selection | null) => true,
@@ -270,17 +270,17 @@ const gridEmits = {
 const SheetwriteGridComponent = defineComponent({
   name: "SheetwriteGrid",
   inheritAttrs: false,
-  props: gridProps,
-  emits: gridEmits,
+  props: grid_props,
+  emits: grid_emits,
   setup(props, { attrs, emit, expose, slots }) {
     const host = ref<HTMLDivElement | null>(null);
-    const exposedGrid = shallowRef<Grid | null>(null);
+    const exposed_grid = shallowRef<Grid | null>(null);
 
     const instance = getCurrentInstance();
-    let readyOnceDelivered = false;
-    const forwardCommandStateChange: NonNullable<GridControllerHandlers["onCommandStateChange"]> = (
-      event,
-    ) => {
+    let ready_once_delivered = false;
+    const forward_command_state_change: NonNullable<
+      GridControllerHandlers["onCommandStateChange"]
+    > = (event) => {
       emit("command-state-change", event);
     };
     const handlers: GridAdapterEventHandlers = {
@@ -297,12 +297,12 @@ const SheetwriteGridComponent = defineComponent({
       // unreadable listener table keeps the subscription instead of risking a
       // dropped event.
       get onCommandStateChange() {
-        const listenerProps = instance?.vnode.props;
-        if (!listenerProps) return forwardCommandStateChange;
-        return listenerProps.onCommandStateChange === undefined &&
-          listenerProps["onCommand-state-change"] === undefined
+        const listener_props = instance?.vnode.props;
+        if (!listener_props) return forward_command_state_change;
+        return listener_props.onCommandStateChange === undefined &&
+          listener_props["onCommand-state-change"] === undefined
           ? undefined
-          : forwardCommandStateChange;
+          : forward_command_state_change;
       },
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
       onMutationRejected: (event) => emit("mutation-rejected", event),
@@ -314,17 +314,21 @@ const SheetwriteGridComponent = defineComponent({
         // Vue's emit catches listener exceptions before the lifetime can retire
         // the Grid. Readiness is a publication transaction, so deliver it here.
         const listeners = instance?.vnode.props;
-        const readyListeners: unknown = listeners?.onReady;
+        const ready_listeners: unknown = listeners?.onReady;
 
-        for (const listener of Array.isArray(readyListeners) ? readyListeners : [readyListeners]) {
+        for (const listener of Array.isArray(ready_listeners)
+          ? ready_listeners
+          : [ready_listeners]) {
           if (typeof listener === "function") listener(event);
         }
 
-        if (!readyOnceDelivered) {
-          readyOnceDelivered = true;
-          const onceListeners: unknown = listeners?.onReadyOnce;
+        if (!ready_once_delivered) {
+          ready_once_delivered = true;
+          const once_listeners: unknown = listeners?.onReadyOnce;
 
-          for (const listener of Array.isArray(onceListeners) ? onceListeners : [onceListeners]) {
+          for (const listener of Array.isArray(once_listeners)
+            ? once_listeners
+            : [once_listeners]) {
             if (typeof listener === "function") listener(event);
           }
         }
@@ -334,7 +338,7 @@ const SheetwriteGridComponent = defineComponent({
 
     const lifetime = createAdapterGridController(handlers, {
       publish(grid) {
-        exposedGrid.value = grid;
+        exposed_grid.value = grid;
         if (grid) return nextTick();
       },
       setInitializationState() {
@@ -363,7 +367,7 @@ const SheetwriteGridComponent = defineComponent({
       (input) => lifetime.update(input),
     );
 
-    expose({ grid: exposedGrid });
+    expose({ grid: exposed_grid });
 
     return () => {
       const style = [
@@ -373,7 +377,7 @@ const SheetwriteGridComponent = defineComponent({
       return h(
         "div",
         { ...attrs, ref: host, class: ["sheetwrite", attrs.class], style },
-        exposedGrid.value ? undefined : slots.fallback?.(),
+        exposed_grid.value ? undefined : slots.fallback?.(),
       );
     };
   },
@@ -436,43 +440,49 @@ const SheetwriteSimpleComponent = defineComponent({
   },
   setup(props, { attrs, slots }) {
     let input: SimpleGridInput | null = null;
-    let inputColumns: typeof props.columns | null = null;
-    let inputRows: typeof props.defaultRows | null = null;
-    let inputSheetName: string | undefined;
-    let rowBridge: RowBridge | undefined;
-    let inputGetRowId: typeof props.getRowId;
-    let inputCreateRowId: typeof props.createRowId;
+    let input_columns: typeof props.columns | null = null;
+    let input_rows: typeof props.defaultRows | null = null;
+    let input_sheet_name: string | undefined;
+    let row_bridge: RowBridge | undefined;
+    let input_get_row_id: typeof props.getRowId;
+    let input_create_row_id: typeof props.createRowId;
 
     return () => {
       assertGridSize({ height: props.height, fill: props.fill || undefined });
       if (
         input === null ||
-        inputColumns !== props.columns ||
-        inputRows !== props.defaultRows ||
-        inputSheetName !== props.sheetName ||
-        inputGetRowId !== props.getRowId ||
-        inputCreateRowId !== props.createRowId
+        input_columns !== props.columns ||
+        input_rows !== props.defaultRows ||
+        input_sheet_name !== props.sheetName ||
+        input_get_row_id !== props.getRowId ||
+        input_create_row_id !== props.createRowId
       ) {
         input = createSimpleGridInput({
           columns: props.columns,
           defaultRows: props.defaultRows,
           sheetName: props.sheetName,
         });
-        rowBridge = createSimpleRowBridge({
+        row_bridge = createSimpleRowBridge({
           columns: props.columns,
           defaultRows: props.defaultRows,
           ...(props.getRowId === undefined ? {} : { getRowId: props.getRowId }),
           ...(props.createRowId === undefined ? {} : { createRowId: props.createRowId }),
         });
-        inputColumns = props.columns;
-        inputRows = props.defaultRows;
-        inputSheetName = props.sheetName;
-        inputGetRowId = props.getRowId;
-        inputCreateRowId = props.createRowId;
+        input_columns = props.columns;
+        input_rows = props.defaultRows;
+        input_sheet_name = props.sheetName;
+        input_get_row_id = props.getRowId;
+        input_create_row_id = props.createRowId;
       }
       return h(
         SheetwriteGrid,
-        { ...attrs, height: props.height, fill: props.fill || undefined, ...input, rowBridge },
+        {
+          ...attrs,
+          height: props.height,
+          fill: props.fill || undefined,
+          ...input,
+          rowBridge: row_bridge,
+        },
         slots,
       );
     };

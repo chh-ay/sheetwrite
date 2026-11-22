@@ -49,26 +49,26 @@ function text(bytes: Uint8Array, offsets: Uint32Array, index: number): string {
 }
 
 /** Unix-epoch days to a 1900-system worksheet serial. */
-function dateSerial(days: number): number {
+function date_serial(days: number): number {
   return days + SERIAL_OF_EPOCH_BEFORE_LEAP_BUG + (days >= FIRST_DAY_AFTER_LEAP_BUG ? 1 : 0);
 }
 
-function dateTimeSerial(micros: bigint): number {
+function date_time_serial(micros: bigint): number {
   const value = Number(micros);
   const days = Math.floor(value / MICROS_PER_DAY);
 
-  return dateSerial(days) + (value - days * MICROS_PER_DAY) / MICROS_PER_DAY;
+  return date_serial(days) + (value - days * MICROS_PER_DAY) / MICROS_PER_DAY;
 }
 
 /**
- * Writes the cell at `row` of a mixed column into `values` and `styleIds` at
+ * Writes the cell at `row` of a mixed column into `values` and `style_ids` at
  * `offset`, and returns the error code of an error cell.
  */
-function writeMixedCell(
+function write_mixed_cell(
   column: Extract<QueryColumn, { type: "mixed" }>,
   row: number,
   values: CellScalar[],
-  styleIds: number[],
+  style_ids: number[],
   offset: number,
 ): string | undefined {
   const index = column.indexes[row] ?? 0;
@@ -84,12 +84,12 @@ function writeMixedCell(
       values[offset] = text(column.text, column.offsets, index);
       return undefined;
     case TAG_DATE:
-      values[offset] = dateSerial(column.dates[index] ?? 0);
-      styleIds[offset] = STYLE_DATE;
+      values[offset] = date_serial(column.dates[index] ?? 0);
+      style_ids[offset] = STYLE_DATE;
       return undefined;
     case TAG_DATE_TIME:
-      values[offset] = dateTimeSerial(column.dateTimes[index] ?? 0n);
-      styleIds[offset] = STYLE_DATE_TIME;
+      values[offset] = date_time_serial(column.dateTimes[index] ?? 0n);
+      style_ids[offset] = STYLE_DATE_TIME;
       return undefined;
     case TAG_ERROR:
       return column.errorPool[index] ?? "";
@@ -98,12 +98,12 @@ function writeMixedCell(
   }
 }
 
-/** Writes the valid cell at `row` of a typed column into `values` and `styleIds` at `offset`. */
-function writeTypedCell(
+/** Writes the valid cell at `row` of a typed column into `values` and `style_ids` at `offset`. */
+function write_typed_cell(
   column: Exclude<QueryColumn, { type: "mixed" }>,
   row: number,
   values: CellScalar[],
-  styleIds: number[],
+  style_ids: number[],
   offset: number,
 ): void {
   switch (column.type) {
@@ -117,12 +117,12 @@ function writeTypedCell(
       values[offset] = text(column.bytes, column.offsets, row);
       return;
     case "date":
-      values[offset] = dateSerial(column.values[row] ?? 0);
-      styleIds[offset] = STYLE_DATE;
+      values[offset] = date_serial(column.values[row] ?? 0);
+      style_ids[offset] = STYLE_DATE;
       return;
     case "dateTime":
-      values[offset] = dateTimeSerial(column.values[row] ?? 0n);
-      styleIds[offset] = STYLE_DATE_TIME;
+      values[offset] = date_time_serial(column.values[row] ?? 0n);
+      style_ids[offset] = STYLE_DATE_TIME;
   }
 }
 
@@ -133,30 +133,30 @@ function writeTypedCell(
  * table keeps its identity.
  */
 export function packOutput(batch: QueryBatch): PackedCellBlock {
-  const colCount = batch.columns.length;
-  const dataRows = Math.max(batch.rowCount, 1);
-  const rowCount = dataRows + 1;
-  const values: CellScalar[] = new Array(rowCount * colCount).fill(null);
-  const styleIds: number[] = new Array(rowCount * colCount).fill(STYLE_PLAIN);
+  const col_count = batch.columns.length;
+  const data_rows = Math.max(batch.rowCount, 1);
+  const row_count = data_rows + 1;
+  const values: CellScalar[] = new Array(row_count * col_count).fill(null);
+  const style_ids: number[] = new Array(row_count * col_count).fill(STYLE_PLAIN);
   const formulas: Array<[number, string]> = [];
 
   batch.columns.forEach((column, col) => {
     values[col] = column.name;
 
     // Error rows are sorted, so one cursor walks them beside the row loop.
-    let nextError = 0;
+    let next_error = 0;
 
     for (let row = 0; row < batch.rowCount; row += 1) {
-      const offset = (row + 1) * colCount + col;
+      const offset = (row + 1) * col_count + col;
       let error: string | undefined;
 
       if (column.type === "mixed") {
-        error = writeMixedCell(column, row, values, styleIds, offset);
-      } else if (column.errorRows[nextError] === row) {
-        error = column.errorPool[column.errorCodes[nextError] ?? 0] ?? "";
-        nextError += 1;
+        error = write_mixed_cell(column, row, values, style_ids, offset);
+      } else if (column.errorRows[next_error] === row) {
+        error = column.errorPool[column.errorCodes[next_error] ?? 0] ?? "";
+        next_error += 1;
       } else if (bit(column.validity, row)) {
-        writeTypedCell(column, row, values, styleIds, offset);
+        write_typed_cell(column, row, values, style_ids, offset);
       }
 
       if (error !== undefined) {
@@ -166,11 +166,11 @@ export function packOutput(batch: QueryBatch): PackedCellBlock {
   });
 
   return {
-    rowCount,
-    colCount,
+    rowCount: row_count,
+    colCount: col_count,
     values,
     ...(formulas.length > 0 ? { formulas } : {}),
     styleTable: STYLE_TABLE,
-    styleIds,
+    styleIds: style_ids,
   };
 }

@@ -27,14 +27,14 @@ const TICK_INDEX_TOLERANCE = 1e-9;
 
 /**
  * The smallest rounded step (1, 2, 2.5 or 5 × 10^n) that covers `span` in at
- * most `maxTicks` steps, and the decimal places that show its multiples exactly.
+ * most `max_ticks` steps, and the decimal places that show its multiples exactly.
  */
-function roundedStep(span: number, maxTicks: number): { step: number; decimals: number } {
-  const rawStep = span / Math.max(1, maxTicks);
-  let exponent = Math.floor(Math.log10(rawStep));
+function rounded_step(span: number, max_ticks: number): { step: number; decimals: number } {
+  const raw_step = span / Math.max(1, max_ticks);
+  let exponent = Math.floor(Math.log10(raw_step));
   // The last mantissa, 10, always covers the raw step, so the fallback never applies.
   let mantissa: number =
-    STEP_MANTISSAS.find((candidate) => candidate * 10 ** exponent >= rawStep) ?? 10;
+    STEP_MANTISSAS.find((candidate) => candidate * 10 ** exponent >= raw_step) ?? 10;
   if (mantissa === 10) {
     mantissa = 1;
     exponent += 1;
@@ -80,7 +80,7 @@ export function tickScale(
     }
   }
 
-  const { step, decimals } = roundedStep(high - low, maxTicks);
+  const { step, decimals } = rounded_step(high - low, maxTicks);
   const first = Math.floor(low / step + TICK_INDEX_TOLERANCE);
   const last = Math.ceil(high / step - TICK_INDEX_TOLERANCE);
   const ticks: number[] = [];

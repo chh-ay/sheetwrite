@@ -9,7 +9,7 @@ import { makeColumnarData, makeWorkbook, mountHost, range } from "./fixtures.js"
 // their result right after the call. Without `ask`, they apply as Excel's
 // macros do with DisplayAlerts = False: no dialog opens.
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let grid: Grid;
 
 beforeAll(async () => {
@@ -17,7 +17,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   // Rows 0-9 hold "Customer <row>", <row> * 10 + 0.5 and a city, in columns A to C.
   grid = createGrid(mountHost(), {
     workbook: makeWorkbook(10),
@@ -28,7 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
   grid.destroy();
-  restoreStubs();
+  restore_stubs();
   document.body.innerHTML = "";
 });
 

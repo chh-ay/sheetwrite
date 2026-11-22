@@ -300,15 +300,15 @@ export function expectedMatrixKeys(config: RenderRunConfig, rounds: number): str
   for (let round = 1; round <= rounds; round++) {
     for (const engine of config.engines) {
       for (const rows of config.rows) {
-        for (const scenarioId of config.scenarios) {
+        for (const scenario_id of config.scenarios) {
           keys.push(
             renderMatrixKey({
               runId: "expected",
               round,
               engine,
               rows,
-              scenarioId,
-              group: scenarioGroup(scenarioId),
+              scenarioId: scenario_id,
+              group: scenarioGroup(scenario_id),
             }),
           );
         }
@@ -323,32 +323,32 @@ export function summarizeCompleteness(
   rounds: number,
   results: readonly ScenarioResult[],
 ): CompletenessSummary {
-  const expectedKeys = expectedMatrixKeys(config, rounds);
-  const expectedSet = new Set(expectedKeys);
-  const observedKeys = results.map(renderMatrixKey).sort();
+  const expected_keys = expectedMatrixKeys(config, rounds);
+  const expected_set = new Set(expected_keys);
+  const observed_keys = results.map(renderMatrixKey).sort();
   const counts = new Map<string, number>();
-  for (const key of observedKeys) counts.set(key, (counts.get(key) ?? 0) + 1);
-  const missingKeys = expectedKeys.filter((key) => !counts.has(key));
-  const duplicateKeys = [...counts]
+  for (const key of observed_keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  const missing_keys = expected_keys.filter((key) => !counts.has(key));
+  const duplicate_keys = [...counts]
     .filter(([, count]) => count > 1)
     .map(([key]) => key)
     .sort();
-  const unexpectedKeys = [...counts.keys()].filter((key) => !expectedSet.has(key)).sort();
-  const failedKeys = results
+  const unexpected_keys = [...counts.keys()].filter((key) => !expected_set.has(key)).sort();
+  const failed_keys = results
     .filter((result): result is FailedScenario => result.status === "failed")
     .map(renderMatrixKey)
     .sort();
   const complete =
-    missingKeys.length === 0 && duplicateKeys.length === 0 && unexpectedKeys.length === 0;
+    missing_keys.length === 0 && duplicate_keys.length === 0 && unexpected_keys.length === 0;
   return {
-    expectedKeys,
-    observedKeys,
-    missingKeys,
-    duplicateKeys,
-    unexpectedKeys,
-    failedKeys,
+    expectedKeys: expected_keys,
+    observedKeys: observed_keys,
+    missingKeys: missing_keys,
+    duplicateKeys: duplicate_keys,
+    unexpectedKeys: unexpected_keys,
+    failedKeys: failed_keys,
     complete,
-    successful: complete && failedKeys.length === 0,
+    successful: complete && failed_keys.length === 0,
   };
 }
 
@@ -370,9 +370,9 @@ function array(value: unknown, path: string): unknown[] {
   return value;
 }
 
-function text(value: unknown, path: string, allowEmpty = false): string {
-  if (typeof value !== "string" || (!allowEmpty && value.length === 0)) {
-    throw new TypeError(`${path} must be ${allowEmpty ? "a string" : "a non-empty string"}`);
+function text(value: unknown, path: string, allow_empty = false): string {
+  if (typeof value !== "string" || (!allow_empty && value.length === 0)) {
+    throw new TypeError(`${path} must be ${allow_empty ? "a string" : "a non-empty string"}`);
   }
   return value;
 }
@@ -395,22 +395,22 @@ function bool(value: unknown, path: string): boolean {
   return value;
 }
 
-function nullableFinite(value: unknown, path: string): number | null {
+function nullable_finite(value: unknown, path: string): number | null {
   return value === null ? null : finite(value, path);
 }
 
-function enumValue<T extends string>(value: unknown, allowed: readonly T[], path: string): T {
+function enum_value<T extends string>(value: unknown, allowed: readonly T[], path: string): T {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
     throw new TypeError(`${path} must be one of: ${allowed.join(", ")}`);
   }
   return value as T;
 }
 
-function stringArray(value: unknown, path: string): string[] {
+function string_array(value: unknown, path: string): string[] {
   return array(value, path).map((entry, index) => text(entry, `${path}[${index}]`, true));
 }
 
-function parseObservation(value: unknown, path: string): ValidationObservation {
+function parse_observation(value: unknown, path: string): ValidationObservation {
   const input = record(value, path);
   return {
     checkpoint: text(input.checkpoint, `${path}.checkpoint`),
@@ -420,22 +420,24 @@ function parseObservation(value: unknown, path: string): ValidationObservation {
   };
 }
 
-function parseMemory(value: unknown, path: string): MemoryDelta {
+function parse_memory(value: unknown, path: string): MemoryDelta {
   const input = record(value, path);
-  const beforeBytes = nullableFinite(input.beforeBytes, `${path}.beforeBytes`);
-  const afterBytes = nullableFinite(input.afterBytes, `${path}.afterBytes`);
-  const deltaBytes = nullableFinite(input.deltaBytes, `${path}.deltaBytes`);
-  const nullValues = [beforeBytes, afterBytes, deltaBytes].filter((entry) => entry === null).length;
-  if (nullValues !== 0 && nullValues !== 3) {
+  const before_bytes = nullable_finite(input.beforeBytes, `${path}.beforeBytes`);
+  const after_bytes = nullable_finite(input.afterBytes, `${path}.afterBytes`);
+  const delta_bytes = nullable_finite(input.deltaBytes, `${path}.deltaBytes`);
+  const null_values = [before_bytes, after_bytes, delta_bytes].filter(
+    (entry) => entry === null,
+  ).length;
+  if (null_values !== 0 && null_values !== 3) {
     throw new TypeError(`${path} must contain either three numeric values or three null values`);
   }
-  if (beforeBytes !== null && afterBytes !== null && deltaBytes !== afterBytes - beforeBytes) {
+  if (before_bytes !== null && after_bytes !== null && delta_bytes !== after_bytes - before_bytes) {
     throw new TypeError(`${path}.deltaBytes does not match before/after values`);
   }
-  return { beforeBytes, afterBytes, deltaBytes };
+  return { beforeBytes: before_bytes, afterBytes: after_bytes, deltaBytes: delta_bytes };
 }
 
-function parseResources(value: unknown, path: string): RenderResourceMetrics {
+function parse_resources(value: unknown, path: string): RenderResourceMetrics {
   const input = record(value, path);
   return {
     compiledFormats: integer(input.compiledFormats, `${path}.compiledFormats`, 0),
@@ -455,7 +457,7 @@ function parseResources(value: unknown, path: string): RenderResourceMetrics {
   };
 }
 
-function parseMergeResources(value: unknown, path: string): MergeIndexResourceMetrics {
+function parse_merge_resources(value: unknown, path: string): MergeIndexResourceMetrics {
   const input = record(value, path);
   return {
     indexConstructions: integer(input.indexConstructions, `${path}.indexConstructions`, 0),
@@ -463,7 +465,7 @@ function parseMergeResources(value: unknown, path: string): MergeIndexResourceMe
   };
 }
 
-function parseWindowTransferMetrics(value: unknown, path: string): WindowTransferMetrics {
+function parse_window_transfer_metrics(value: unknown, path: string): WindowTransferMetrics {
   const input = record(value, path);
   const counters = {
     logicalFrames: integer(input.logicalFrames, `${path}.logicalFrames`, 1),
@@ -488,11 +490,11 @@ function parseWindowTransferMetrics(value: unknown, path: string): WindowTransfe
       `${path}.outputAllocationEventsPerLogicalFrame`,
       0,
     ),
-    copiedBytesPerLogicalRead: nullableFinite(
+    copiedBytesPerLogicalRead: nullable_finite(
       input.copiedBytesPerLogicalRead,
       `${path}.copiedBytesPerLogicalRead`,
     ),
-    outputAllocationEventsPerLogicalRead: nullableFinite(
+    outputAllocationEventsPerLogicalRead: nullable_finite(
       input.outputAllocationEventsPerLogicalRead,
       `${path}.outputAllocationEventsPerLogicalRead`,
     ),
@@ -510,24 +512,27 @@ function parseWindowTransferMetrics(value: unknown, path: string): WindowTransfe
   return expected;
 }
 
-function parseSample(value: unknown, path: string): MeasuredSample {
+function parse_sample(value: unknown, path: string): MeasuredSample {
   const input = record(value, path);
-  const durationMs = finite(input.durationMs, `${path}.durationMs`, 0);
-  const operationCount = integer(input.operationCount, `${path}.operationCount`, 1);
-  const perOperationMs = finite(input.perOperationMs, `${path}.perOperationMs`, 0);
-  const expectedPerOperation = durationMs / operationCount;
-  if (Math.abs(perOperationMs - expectedPerOperation) > Number.EPSILON * Math.max(1, durationMs)) {
+  const duration_ms = finite(input.durationMs, `${path}.durationMs`, 0);
+  const operation_count = integer(input.operationCount, `${path}.operationCount`, 1);
+  const per_operation_ms = finite(input.perOperationMs, `${path}.perOperationMs`, 0);
+  const expected_per_operation = duration_ms / operation_count;
+  if (
+    Math.abs(per_operation_ms - expected_per_operation) >
+    Number.EPSILON * Math.max(1, duration_ms)
+  ) {
     throw new TypeError(`${path}.perOperationMs does not match durationMs / operationCount`);
   }
   return {
     index: integer(input.index, `${path}.index`, 0),
-    durationMs,
-    operationCount,
-    perOperationMs,
+    durationMs: duration_ms,
+    operationCount: operation_count,
+    perOperationMs: per_operation_ms,
     ...(input.windowTransfer === undefined
       ? {}
       : {
-          windowTransfer: parseWindowTransferMetrics(
+          windowTransfer: parse_window_transfer_metrics(
             input.windowTransfer,
             `${path}.windowTransfer`,
           ),
@@ -535,44 +540,44 @@ function parseSample(value: unknown, path: string): MeasuredSample {
   };
 }
 
-function parseIdentity(value: Record<string, unknown>, path: string): ScenarioIdentity {
-  const scenarioId = enumValue(
+function parse_identity(value: Record<string, unknown>, path: string): ScenarioIdentity {
+  const scenario_id = enum_value(
     value.scenarioId,
     ALL_RENDER_SCENARIOS.map((scenario) => scenario.id),
     `${path}.scenarioId`,
   );
-  const group = enumValue(
+  const group = enum_value(
     value.group,
     ALL_RENDER_SCENARIOS.map((scenario) => scenario.group),
     `${path}.group`,
   );
-  if (group !== scenarioGroup(scenarioId)) {
-    throw new TypeError(`${path}.group does not match scenario ${scenarioId}`);
+  if (group !== scenarioGroup(scenario_id)) {
+    throw new TypeError(`${path}.group does not match scenario ${scenario_id}`);
   }
-  const expectedDataValidity = scenarioDataValidity(scenarioId);
-  const dataValidity =
+  const expected_data_validity = scenarioDataValidity(scenario_id);
+  const data_validity =
     value.dataValidity === undefined
       ? undefined
-      : enumValue(
+      : enum_value(
           value.dataValidity,
           ["product-valid", "pixel-data-invalid"],
           `${path}.dataValidity`,
         );
-  if (dataValidity !== expectedDataValidity) {
+  if (data_validity !== expected_data_validity) {
     throw new TypeError(
-      expectedDataValidity === undefined
+      expected_data_validity === undefined
         ? `${path}.dataValidity is reserved for window-transfer diagnostics`
-        : `${path}.dataValidity must be ${expectedDataValidity} for ${scenarioId}`,
+        : `${path}.dataValidity must be ${expected_data_validity} for ${scenario_id}`,
     );
   }
   return {
     runId: text(value.runId, `${path}.runId`),
     round: integer(value.round, `${path}.round`, 1),
-    engine: enumValue(value.engine, ENGINE_IDS, `${path}.engine`),
+    engine: enum_value(value.engine, ENGINE_IDS, `${path}.engine`),
     rows: integer(value.rows, `${path}.rows`, 1),
-    scenarioId,
+    scenarioId: scenario_id,
     group,
-    ...(dataValidity === undefined ? {} : { dataValidity }),
+    ...(data_validity === undefined ? {} : { dataValidity: data_validity }),
   };
 }
 
@@ -583,18 +588,18 @@ export function parseScenarioResult(
   path = "result",
 ): ScenarioResult {
   const input = record(value, path);
-  const identity = parseIdentity(input, path);
-  const status = enumValue(input.status, ["success", "failed"], `${path}.status`);
+  const identity = parse_identity(input, path);
+  const status = enum_value(input.status, ["success", "failed"], `${path}.status`);
   const validation = array(input.validation, `${path}.validation`).map((entry, index) =>
-    parseObservation(entry, `${path}.validation[${index}]`),
+    parse_observation(entry, `${path}.validation[${index}]`),
   );
-  const memory = parseMemory(input.memory, `${path}.memory`);
+  const memory = parse_memory(input.memory, `${path}.memory`);
 
   if (status === "failed") {
     return {
       ...identity,
       status,
-      stage: enumValue(
+      stage: enum_value(
         input.stage,
         ["build", "launch", "mount", "warmup", "measure", "validate", "teardown"],
         `${path}.stage`,
@@ -603,23 +608,23 @@ export function parseScenarioResult(
       message: text(input.message, `${path}.message`),
       timeout: bool(input.timeout, `${path}.timeout`),
       crash: bool(input.crash, `${path}.crash`),
-      consoleErrors: stringArray(input.consoleErrors, `${path}.consoleErrors`),
-      pageErrors: stringArray(input.pageErrors, `${path}.pageErrors`),
+      consoleErrors: string_array(input.consoleErrors, `${path}.consoleErrors`),
+      pageErrors: string_array(input.pageErrors, `${path}.pageErrors`),
       partialSamples: array(input.partialSamples, `${path}.partialSamples`).map((entry, index) =>
-        parseSample(entry, `${path}.partialSamples[${index}]`),
+        parse_sample(entry, `${path}.partialSamples[${index}]`),
       ),
       validation,
       memory,
     };
   }
 
-  const rawSamples = array(input.rawSamples, `${path}.rawSamples`).map((entry, index) =>
-    parseSample(entry, `${path}.rawSamples[${index}]`),
+  const raw_samples = array(input.rawSamples, `${path}.rawSamples`).map((entry, index) =>
+    parse_sample(entry, `${path}.rawSamples[${index}]`),
   );
-  if (rawSamples.length !== measuredSamples) {
+  if (raw_samples.length !== measuredSamples) {
     throw new TypeError(`${path}.rawSamples must contain ${measuredSamples} samples`);
   }
-  for (const [index, sample] of rawSamples.entries()) {
+  for (const [index, sample] of raw_samples.entries()) {
     if (sample.index !== index)
       throw new TypeError(`${path}.rawSamples indices must be contiguous`);
     if (sample.durationMs < minimumSampleDurationMs) {
@@ -631,15 +636,15 @@ export function parseScenarioResult(
   if (validation.length === 0 || validation.some((observation) => !observation.passed)) {
     throw new TypeError(`${path}.validation must contain only passing checkpoints for success`);
   }
-  const summary = summarizeFinite(rawSamples.map((sample) => sample.perOperationMs));
-  const operationCount = rawSamples.reduce((total, sample) => total + sample.operationCount, 0);
-  const isWindowTransferDiagnostic = identity.dataValidity !== undefined;
-  let windowTransfer: WindowTransferMetrics | undefined;
-  if (isWindowTransferDiagnostic) {
+  const summary = summarizeFinite(raw_samples.map((sample) => sample.perOperationMs));
+  const operation_count = raw_samples.reduce((total, sample) => total + sample.operationCount, 0);
+  const is_window_transfer_diagnostic = identity.dataValidity !== undefined;
+  let window_transfer: WindowTransferMetrics | undefined;
+  if (is_window_transfer_diagnostic) {
     if (identity.engine !== "sheetwrite") {
       throw new TypeError(`${path} window-transfer diagnostics require the sheetwrite engine`);
     }
-    const sampleMetrics = rawSamples.map((sample, index) => {
+    const sample_metrics = raw_samples.map((sample, index) => {
       const metrics = sample.windowTransfer;
       if (!metrics) {
         throw new TypeError(`${path}.rawSamples[${index}].windowTransfer is required`);
@@ -673,105 +678,105 @@ export function parseScenarioResult(
       }
       return metrics;
     });
-    const expectedWindowTransfer = createWindowTransferMetrics({
-      logicalFrames: sampleMetrics.reduce((sum, metrics) => sum + metrics.logicalFrames, 0),
-      windowReadRequests: sampleMetrics.reduce(
+    const expected_window_transfer = createWindowTransferMetrics({
+      logicalFrames: sample_metrics.reduce((sum, metrics) => sum + metrics.logicalFrames, 0),
+      windowReadRequests: sample_metrics.reduce(
         (sum, metrics) => sum + metrics.windowReadRequests,
         0,
       ),
-      logicalWindowReads: sampleMetrics.reduce(
+      logicalWindowReads: sample_metrics.reduce(
         (sum, metrics) => sum + metrics.logicalWindowReads,
         0,
       ),
-      copiedBytes: sampleMetrics.reduce((sum, metrics) => sum + metrics.copiedBytes, 0),
-      outputAllocationEvents: sampleMetrics.reduce(
+      copiedBytes: sample_metrics.reduce((sum, metrics) => sum + metrics.copiedBytes, 0),
+      outputAllocationEvents: sample_metrics.reduce(
         (sum, metrics) => sum + metrics.outputAllocationEvents,
         0,
       ),
     });
-    windowTransfer = parseWindowTransferMetrics(input.windowTransfer, `${path}.windowTransfer`);
-    for (const field of Object.keys(expectedWindowTransfer) as (keyof WindowTransferMetrics)[]) {
-      if (windowTransfer[field] !== expectedWindowTransfer[field]) {
+    window_transfer = parse_window_transfer_metrics(input.windowTransfer, `${path}.windowTransfer`);
+    for (const field of Object.keys(expected_window_transfer) as (keyof WindowTransferMetrics)[]) {
+      if (window_transfer[field] !== expected_window_transfer[field]) {
         throw new TypeError(`${path}.windowTransfer does not match its raw samples`);
       }
     }
   } else if (
     input.windowTransfer !== undefined ||
-    rawSamples.some((sample) => sample.windowTransfer !== undefined)
+    raw_samples.some((sample) => sample.windowTransfer !== undefined)
   ) {
     throw new TypeError(`${path}.windowTransfer is reserved for the controlled diagnostic pair`);
   }
-  const medianMs = finite(input.medianMs, `${path}.medianMs`, 0);
-  const p95Ms = finite(input.p95Ms, `${path}.p95Ms`, 0);
-  const madMs = finite(input.madMs, `${path}.madMs`, 0);
+  const median_ms = finite(input.medianMs, `${path}.medianMs`, 0);
+  const p95_ms = finite(input.p95Ms, `${path}.p95Ms`, 0);
+  const mad_ms = finite(input.madMs, `${path}.madMs`, 0);
   if (
-    input.operationCount !== operationCount ||
-    medianMs !== summary.median ||
-    p95Ms !== summary.p95 ||
-    madMs !== summary.mad
+    input.operationCount !== operation_count ||
+    median_ms !== summary.median ||
+    p95_ms !== summary.p95 ||
+    mad_ms !== summary.mad
   ) {
     throw new TypeError(`${path} summary does not match its raw samples`);
   }
   return {
     ...identity,
     status,
-    operationCount,
-    rawSamples,
-    medianMs,
-    p95Ms,
-    madMs,
+    operationCount: operation_count,
+    rawSamples: raw_samples,
+    medianMs: median_ms,
+    p95Ms: p95_ms,
+    madMs: mad_ms,
     validation,
     memory,
     ...(input.resources === undefined
       ? {}
-      : { resources: parseResources(input.resources, `${path}.resources`) }),
+      : { resources: parse_resources(input.resources, `${path}.resources`) }),
     ...(input.mergeResources === undefined
       ? {}
       : {
-          mergeResources: parseMergeResources(input.mergeResources, `${path}.mergeResources`),
+          mergeResources: parse_merge_resources(input.mergeResources, `${path}.mergeResources`),
         }),
-    ...(windowTransfer === undefined ? {} : { windowTransfer }),
+    ...(window_transfer === undefined ? {} : { windowTransfer: window_transfer }),
   };
 }
 
-function parseLaunchAttempt(value: unknown, path: string): BrowserLaunchAttempt {
+function parse_launch_attempt(value: unknown, path: string): BrowserLaunchAttempt {
   const input = record(value, path);
   const success = bool(input.success, `${path}.success`);
-  const errorClass =
+  const error_class =
     input.errorClass === null ? null : text(input.errorClass, `${path}.errorClass`);
   const message = input.message === null ? null : text(input.message, `${path}.message`);
-  if (success !== (errorClass === null && message === null)) {
+  if (success !== (error_class === null && message === null)) {
     throw new TypeError(`${path} success/error fields are inconsistent`);
   }
   return {
     round: integer(input.round, `${path}.round`, 1),
-    engine: enumValue(input.engine, ENGINE_IDS, `${path}.engine`),
+    engine: enum_value(input.engine, ENGINE_IDS, `${path}.engine`),
     rows: integer(input.rows, `${path}.rows`, 1),
     attempt: integer(input.attempt, `${path}.attempt`, 1),
     success,
-    errorClass,
+    errorClass: error_class,
     message,
   };
 }
 
-function parseMetadata(value: unknown, path: string): RenderRunMetadata {
+function parse_metadata(value: unknown, path: string): RenderRunMetadata {
   const input = record(value, path);
-  const engineVersions = record(input.engineVersions, `${path}.engineVersions`);
-  validateEngineVersions(engineVersions, ENGINE_IDS);
+  const engine_versions = record(input.engineVersions, `${path}.engineVersions`);
+  validateEngineVersions(engine_versions, ENGINE_IDS);
   const hashes = record(input.datasetHashes, `${path}.datasetHashes`);
   const viewport = record(input.viewport, `${path}.viewport`);
-  const engineOrder = array(input.engineOrder, `${path}.engineOrder`).map((entry, round) =>
+  const engine_order = array(input.engineOrder, `${path}.engineOrder`).map((entry, round) =>
     array(entry, `${path}.engineOrder[${round}]`).map((engine, index) =>
-      enumValue(engine, ENGINE_IDS, `${path}.engineOrder[${round}][${index}]`),
+      enum_value(engine, ENGINE_IDS, `${path}.engineOrder[${round}][${index}]`),
     ),
   );
-  const windowTransferScenarioOrder =
+  const window_transfer_scenario_order =
     input.windowTransferScenarioOrder === undefined
       ? undefined
       : array(input.windowTransferScenarioOrder, `${path}.windowTransferScenarioOrder`).map(
           (entry, round) =>
             array(entry, `${path}.windowTransferScenarioOrder[${round}]`).map((scenario, index) =>
-              enumValue(
+              enum_value(
                 scenario,
                 WINDOW_TRANSFER_SCENARIO_IDS,
                 `${path}.windowTransferScenarioOrder[${round}][${index}]`,
@@ -789,8 +794,8 @@ function parseMetadata(value: unknown, path: string): RenderRunMetadata {
     arch: text(input.arch, `${path}.arch`),
     cpu: text(input.cpu, `${path}.cpu`),
     engineVersions: {
-      sheetwrite: text(engineVersions.sheetwrite, `${path}.engineVersions.sheetwrite`),
-      handsontable: text(engineVersions.handsontable, `${path}.engineVersions.handsontable`),
+      sheetwrite: text(engine_versions.sheetwrite, `${path}.engineVersions.sheetwrite`),
+      handsontable: text(engine_versions.handsontable, `${path}.engineVersions.handsontable`),
     },
     datasetSeed: integer(input.datasetSeed, `${path}.datasetSeed`),
     datasetHashes: Object.fromEntries(
@@ -812,11 +817,13 @@ function parseMetadata(value: unknown, path: string): RenderRunMetadata {
     ),
     rounds: integer(input.rounds, `${path}.rounds`, 1),
     orderSeed: integer(input.orderSeed, `${path}.orderSeed`),
-    engineOrder,
+    engineOrder: engine_order,
     launchAttempts: array(input.launchAttempts, `${path}.launchAttempts`).map((entry, index) =>
-      parseLaunchAttempt(entry, `${path}.launchAttempts[${index}]`),
+      parse_launch_attempt(entry, `${path}.launchAttempts[${index}]`),
     ),
-    ...(windowTransferScenarioOrder === undefined ? {} : { windowTransferScenarioOrder }),
+    ...(window_transfer_scenario_order === undefined
+      ? {}
+      : { windowTransferScenarioOrder: window_transfer_scenario_order }),
   };
   if (!Number.isFinite(Date.parse(metadata.timestamp))) {
     throw new TypeError(`${path}.timestamp must be an ISO timestamp`);
@@ -827,16 +834,16 @@ function parseMetadata(value: unknown, path: string): RenderRunMetadata {
   return metadata;
 }
 
-function parseConfig(value: unknown, path: string): RenderRunConfig {
+function parse_config(value: unknown, path: string): RenderRunConfig {
   const input = record(value, path);
   const engines = array(input.engines, `${path}.engines`).map((engine, index) =>
-    enumValue(engine, ENGINE_IDS, `${path}.engines[${index}]`),
+    enum_value(engine, ENGINE_IDS, `${path}.engines[${index}]`),
   );
   const rows = array(input.rows, `${path}.rows`).map((count, index) =>
     integer(count, `${path}.rows[${index}]`, 1),
   );
   const scenarios = array(input.scenarios, `${path}.scenarios`).map((scenario, index) =>
-    enumValue(
+    enum_value(
       scenario,
       ALL_RENDER_SCENARIOS.map((entry) => entry.id),
       `${path}.scenarios[${index}]`,
@@ -854,21 +861,21 @@ function parseConfig(value: unknown, path: string): RenderRunConfig {
   return { engines, rows, scenarios };
 }
 
-function parseCompleteness(value: unknown, path: string): CompletenessSummary {
+function parse_completeness(value: unknown, path: string): CompletenessSummary {
   const input = record(value, path);
   return {
-    expectedKeys: stringArray(input.expectedKeys, `${path}.expectedKeys`),
-    observedKeys: stringArray(input.observedKeys, `${path}.observedKeys`),
-    missingKeys: stringArray(input.missingKeys, `${path}.missingKeys`),
-    duplicateKeys: stringArray(input.duplicateKeys, `${path}.duplicateKeys`),
-    unexpectedKeys: stringArray(input.unexpectedKeys, `${path}.unexpectedKeys`),
-    failedKeys: stringArray(input.failedKeys, `${path}.failedKeys`),
+    expectedKeys: string_array(input.expectedKeys, `${path}.expectedKeys`),
+    observedKeys: string_array(input.observedKeys, `${path}.observedKeys`),
+    missingKeys: string_array(input.missingKeys, `${path}.missingKeys`),
+    duplicateKeys: string_array(input.duplicateKeys, `${path}.duplicateKeys`),
+    unexpectedKeys: string_array(input.unexpectedKeys, `${path}.unexpectedKeys`),
+    failedKeys: string_array(input.failedKeys, `${path}.failedKeys`),
     complete: bool(input.complete, `${path}.complete`),
     successful: bool(input.successful, `${path}.successful`),
   };
 }
 
-function equalStringArrays(left: readonly string[], right: readonly string[]): boolean {
+function equal_string_arrays(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
@@ -894,13 +901,13 @@ export function summarizeWindowTransferComparisons(
     return [];
   }
   return artifact.config.rows.map((rows) => {
-    const repetitionMedians = (scenarioId: WindowTransferScenarioId): number[] => {
+    const repetition_medians = (scenario_id: WindowTransferScenarioId): number[] => {
       const matching = artifact.results
         .filter(
           (result): result is SuccessfulScenario =>
             result.rows === rows &&
             result.engine === "sheetwrite" &&
-            result.scenarioId === scenarioId &&
+            result.scenarioId === scenario_id &&
             result.status === "success",
         )
         .sort((left, right) => left.round - right.round);
@@ -914,28 +921,29 @@ export function summarizeWindowTransferComparisons(
       }
       return matching.map((result) => result.medianMs);
     };
-    const baselineRepetitionMediansMs = repetitionMedians(WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
-    const upperBoundRepetitionMediansMs = repetitionMedians(
+    const baseline_repetition_medians_ms = repetition_medians(WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
+    const upper_bound_repetition_medians_ms = repetition_medians(
       WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
     );
-    const baselineMedianMs = summarizeFinite(baselineRepetitionMediansMs).median;
-    const upperBoundMedianMs = summarizeFinite(upperBoundRepetitionMediansMs).median;
-    const maximumWithinVariantSpreadMs = Math.max(
-      Math.max(...baselineRepetitionMediansMs) - Math.min(...baselineRepetitionMediansMs),
-      Math.max(...upperBoundRepetitionMediansMs) - Math.min(...upperBoundRepetitionMediansMs),
+    const baseline_median_ms = summarizeFinite(baseline_repetition_medians_ms).median;
+    const upper_bound_median_ms = summarizeFinite(upper_bound_repetition_medians_ms).median;
+    const maximum_within_variant_spread_ms = Math.max(
+      Math.max(...baseline_repetition_medians_ms) - Math.min(...baseline_repetition_medians_ms),
+      Math.max(...upper_bound_repetition_medians_ms) -
+        Math.min(...upper_bound_repetition_medians_ms),
     );
-    const estimatedWindowTransferCostMs = baselineMedianMs - upperBoundMedianMs;
-    const crossVariantSpreadMs = Math.abs(estimatedWindowTransferCostMs);
+    const estimated_window_transfer_cost_ms = baseline_median_ms - upper_bound_median_ms;
+    const cross_variant_spread_ms = Math.abs(estimated_window_transfer_cost_ms);
     return {
       rows,
-      baselineRepetitionMediansMs,
-      upperBoundRepetitionMediansMs,
-      baselineMedianMs,
-      upperBoundMedianMs,
-      estimatedWindowTransferCostMs,
-      crossVariantSpreadMs,
-      maximumWithinVariantSpreadMs,
-      resolved: crossVariantSpreadMs > maximumWithinVariantSpreadMs,
+      baselineRepetitionMediansMs: baseline_repetition_medians_ms,
+      upperBoundRepetitionMediansMs: upper_bound_repetition_medians_ms,
+      baselineMedianMs: baseline_median_ms,
+      upperBoundMedianMs: upper_bound_median_ms,
+      estimatedWindowTransferCostMs: estimated_window_transfer_cost_ms,
+      crossVariantSpreadMs: cross_variant_spread_ms,
+      maximumWithinVariantSpreadMs: maximum_within_variant_spread_ms,
+      resolved: cross_variant_spread_ms > maximum_within_variant_spread_ms,
     };
   });
 }
@@ -945,28 +953,28 @@ export function parseRenderArtifact(
   options: ParseRenderOptions = {},
 ): RenderBenchmarkArtifact {
   const input = record(value, "artifact");
-  const protocolVersion = integer(input.protocolVersion, "artifact.protocolVersion", 1);
-  if (protocolVersion !== RENDER_PROTOCOL_VERSION) {
-    throw new TypeError(`unsupported render protocol version: ${protocolVersion}`);
+  const protocol_version = integer(input.protocolVersion, "artifact.protocolVersion", 1);
+  if (protocol_version !== RENDER_PROTOCOL_VERSION) {
+    throw new TypeError(`unsupported render protocol version: ${protocol_version}`);
   }
-  const runId = text(input.runId, "artifact.runId");
-  if (options.expectedRunId !== undefined && runId !== options.expectedRunId) {
+  const run_id = text(input.runId, "artifact.runId");
+  if (options.expectedRunId !== undefined && run_id !== options.expectedRunId) {
     throw new TypeError(
-      `stale render result: expected run ${options.expectedRunId}, observed ${runId}`,
+      `stale render result: expected run ${options.expectedRunId}, observed ${run_id}`,
     );
   }
-  const metadata = parseMetadata(input.metadata, "artifact.metadata");
+  const metadata = parse_metadata(input.metadata, "artifact.metadata");
   if (options.maxAgeMs !== undefined) {
-    const nowMs = options.nowMs ?? Date.now();
-    if (nowMs - Date.parse(metadata.timestamp) > options.maxAgeMs) {
+    const now_ms = options.nowMs ?? Date.now();
+    if (now_ms - Date.parse(metadata.timestamp) > options.maxAgeMs) {
       throw new TypeError(`stale render result timestamp: ${metadata.timestamp}`);
     }
   }
-  const config = parseConfig(input.config, "artifact.config");
-  const configuredWindowTransferScenarios = config.scenarios.filter((scenario) =>
+  const config = parse_config(input.config, "artifact.config");
+  const configured_window_transfer_scenarios = config.scenarios.filter((scenario) =>
     WINDOW_TRANSFER_SCENARIO_IDS.includes(scenario as WindowTransferScenarioId),
   );
-  if (configuredWindowTransferScenarios.length === 0) {
+  if (configured_window_transfer_scenarios.length === 0) {
     if (metadata.windowTransferScenarioOrder !== undefined) {
       throw new TypeError(
         "artifact.metadata.windowTransferScenarioOrder is reserved for the diagnostic pair",
@@ -974,9 +982,9 @@ export function parseRenderArtifact(
     }
   } else {
     if (
-      configuredWindowTransferScenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
+      configured_window_transfer_scenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
       !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) =>
-        configuredWindowTransferScenarios.includes(scenario),
+        configured_window_transfer_scenarios.includes(scenario),
       )
     ) {
       throw new TypeError("window-transfer baseline and upper-bound scenarios must run together");
@@ -984,18 +992,18 @@ export function parseRenderArtifact(
     if (config.engines.length !== 1 || config.engines[0] !== "sheetwrite") {
       throw new TypeError("window-transfer diagnostics support only the sheetwrite engine");
     }
-    const expectedOrder = counterbalancedOrder(
+    const expected_order = counterbalancedOrder(
       WINDOW_TRANSFER_SCENARIO_IDS,
       metadata.rounds,
       WINDOW_TRANSFER_ORDER_SEED,
     );
     if (
       metadata.windowTransferScenarioOrder === undefined ||
-      metadata.windowTransferScenarioOrder.length !== expectedOrder.length ||
+      metadata.windowTransferScenarioOrder.length !== expected_order.length ||
       metadata.windowTransferScenarioOrder.some(
         (order, round) =>
-          order.length !== expectedOrder[round]!.length ||
-          order.some((scenario, index) => scenario !== expectedOrder[round]![index]),
+          order.length !== expected_order[round]!.length ||
+          order.some((scenario, index) => scenario !== expected_order[round]![index]),
       )
     ) {
       throw new TypeError(
@@ -1023,7 +1031,7 @@ export function parseRenderArtifact(
       `artifact.results[${index}]`,
     ),
   );
-  if (results.some((result) => result.runId !== runId)) {
+  if (results.some((result) => result.runId !== run_id)) {
     throw new TypeError("artifact contains a stale scenario run ID");
   }
   for (let round = 1; round <= metadata.rounds; round++) {
@@ -1062,8 +1070,8 @@ export function parseRenderArtifact(
       }
     }
   }
-  const completeness = parseCompleteness(input.completeness, "artifact.completeness");
-  const actualCompleteness = summarizeCompleteness(config, metadata.rounds, results);
+  const completeness = parse_completeness(input.completeness, "artifact.completeness");
+  const actual_completeness = summarizeCompleteness(config, metadata.rounds, results);
   for (const field of [
     "expectedKeys",
     "observedKeys",
@@ -1072,13 +1080,13 @@ export function parseRenderArtifact(
     "unexpectedKeys",
     "failedKeys",
   ] as const) {
-    if (!equalStringArrays(completeness[field], actualCompleteness[field])) {
+    if (!equal_string_arrays(completeness[field], actual_completeness[field])) {
       throw new TypeError(`artifact.completeness.${field} does not match results`);
     }
   }
   if (
-    completeness.complete !== actualCompleteness.complete ||
-    completeness.successful !== actualCompleteness.successful
+    completeness.complete !== actual_completeness.complete ||
+    completeness.successful !== actual_completeness.successful
   ) {
     throw new TypeError("artifact.completeness flags do not match results");
   }
@@ -1087,14 +1095,14 @@ export function parseRenderArtifact(
   }
   const artifact: RenderBenchmarkArtifact = {
     protocolVersion: RENDER_PROTOCOL_VERSION,
-    runId,
+    runId: run_id,
     metadata,
     config,
     results,
     completeness,
-    reproductionCommands: stringArray(input.reproductionCommands, "artifact.reproductionCommands"),
+    reproductionCommands: string_array(input.reproductionCommands, "artifact.reproductionCommands"),
   };
-  if (completeness.successful && configuredWindowTransferScenarios.length > 0) {
+  if (completeness.successful && configured_window_transfer_scenarios.length > 0) {
     summarizeWindowTransferComparisons(artifact);
   }
   return artifact;
@@ -1107,11 +1115,11 @@ export function parseRenderArtifactJson(
   return parseRenderArtifact(JSON.parse(json) as unknown, options);
 }
 
-function escapeMarkdown(value: string): string {
+function escape_markdown(value: string): string {
   return value.replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
-function formatMs(value: number): string {
+function format_ms(value: number): string {
   if (value >= 100) return value.toFixed(1);
   if (value >= 1) return value.toFixed(3);
   return value.toFixed(5);
@@ -1138,13 +1146,13 @@ export function renderBenchmarkMarkdown(value: RenderBenchmarkArtifact): string 
     "",
     "| Field | Value |",
     "|:--|:--|",
-    `| Commit | \`${escapeMarkdown(artifact.metadata.commit)}\` (${artifact.metadata.dirty ? "dirty" : "clean"}) |`,
+    `| Commit | \`${escape_markdown(artifact.metadata.commit)}\` (${artifact.metadata.dirty ? "dirty" : "clean"}) |`,
     `| Timestamp | ${artifact.metadata.timestamp} |`,
-    `| Runtime | Bun ${escapeMarkdown(artifact.metadata.bunVersion)}; Node ${escapeMarkdown(artifact.metadata.nodeVersion)} |`,
-    `| Browser | ${escapeMarkdown(artifact.metadata.browserVersion)} |`,
-    `| OS / arch | ${escapeMarkdown(artifact.metadata.os)} / ${escapeMarkdown(artifact.metadata.arch)} |`,
-    `| CPU | ${escapeMarkdown(artifact.metadata.cpu)} |`,
-    `| Engines | Sheetwrite ${escapeMarkdown(artifact.metadata.engineVersions.sheetwrite)}; Handsontable ${escapeMarkdown(artifact.metadata.engineVersions.handsontable)} |`,
+    `| Runtime | Bun ${escape_markdown(artifact.metadata.bunVersion)}; Node ${escape_markdown(artifact.metadata.nodeVersion)} |`,
+    `| Browser | ${escape_markdown(artifact.metadata.browserVersion)} |`,
+    `| OS / arch | ${escape_markdown(artifact.metadata.os)} / ${escape_markdown(artifact.metadata.arch)} |`,
+    `| CPU | ${escape_markdown(artifact.metadata.cpu)} |`,
+    `| Engines | Sheetwrite ${escape_markdown(artifact.metadata.engineVersions.sheetwrite)}; Handsontable ${escape_markdown(artifact.metadata.engineVersions.handsontable)} |`,
     `| Dataset | seed ${artifact.metadata.datasetSeed}; ${Object.entries(
       artifact.metadata.datasetHashes,
     )
@@ -1165,34 +1173,34 @@ export function renderBenchmarkMarkdown(value: RenderBenchmarkArtifact): string 
     "|---:|---:|:--|:--|:--|",
   );
 
-  const byKey = new Map(artifact.results.map((result) => [renderMatrixKey(result), result]));
+  const by_key = new Map(artifact.results.map((result) => [renderMatrixKey(result), result]));
   for (let round = 1; round <= artifact.metadata.rounds; round++) {
     for (const rows of artifact.config.rows) {
-      for (const scenarioId of artifact.config.scenarios) {
+      for (const scenario_id of artifact.config.scenarios) {
         const cells = artifact.config.engines.map((engine) => {
           const identity: ScenarioIdentity = {
             runId: artifact.runId,
             round,
             engine,
             rows,
-            scenarioId,
-            group: scenarioGroup(scenarioId),
+            scenarioId: scenario_id,
+            group: scenarioGroup(scenario_id),
           };
-          const result = byKey.get(renderMatrixKey(identity));
+          const result = by_key.get(renderMatrixKey(identity));
           if (!result) return "**INCOMPLETE — missing cell**";
           if (result.status === "failed") {
-            return `**FAILED (${result.stage})** — ${escapeMarkdown(result.errorClass)}: ${escapeMarkdown(result.message)}`;
+            return `**FAILED (${result.stage})** — ${escape_markdown(result.errorClass)}: ${escape_markdown(result.message)}`;
           }
           const transfer = result.windowTransfer;
-          const transferEvidence =
+          const transfer_evidence =
             transfer === undefined
               ? ""
               : `; validity ${result.dataValidity}; copied/frame ${transfer.copiedBytesPerLogicalFrame.toFixed(3)} B; allocations/frame ${transfer.outputAllocationEventsPerLogicalFrame.toFixed(3)}; copied/read ${transfer.copiedBytesPerLogicalRead === null ? "n/a" : `${transfer.copiedBytesPerLogicalRead.toFixed(3)} B`}; allocations/read ${transfer.outputAllocationEventsPerLogicalRead === null ? "n/a" : transfer.outputAllocationEventsPerLogicalRead.toFixed(3)}`;
-          return `median ${formatMs(result.medianMs)} ms; p95 ${formatMs(result.p95Ms)}; MAD ${formatMs(result.madMs)}; ${result.rawSamples.length} samples / ${result.operationCount} ops${transferEvidence}`;
+          return `median ${format_ms(result.medianMs)} ms; p95 ${format_ms(result.p95Ms)}; MAD ${format_ms(result.madMs)}; ${result.rawSamples.length} samples / ${result.operationCount} ops${transfer_evidence}`;
         });
-        const identityLabel = `r${round}-${rows}-${scenarioId}`;
+        const identity_label = `r${round}-${rows}-${scenario_id}`;
         lines.push(
-          `| ${round} | ${rows.toLocaleString("en-US")} | [\`${escapeMarkdown(identityLabel)}\`](./render-results.json) | ${cells.join(" | ")} |`,
+          `| ${round} | ${rows.toLocaleString("en-US")} | [\`${escape_markdown(identity_label)}\`](./render-results.json) | ${cells.join(" | ")} |`,
         );
       }
     }
@@ -1217,7 +1225,7 @@ export function renderBenchmarkMarkdown(value: RenderBenchmarkArtifact): string 
     );
     for (const comparison of summarizeWindowTransferComparisons(artifact)) {
       lines.push(
-        `| ${comparison.rows.toLocaleString("en-US")} | ${comparison.baselineRepetitionMediansMs.map(formatMs).join(", ")} ms | ${comparison.upperBoundRepetitionMediansMs.map(formatMs).join(", ")} ms | ${formatMs(comparison.estimatedWindowTransferCostMs)} ms | ${formatMs(comparison.crossVariantSpreadMs)} ms | ${formatMs(comparison.maximumWithinVariantSpreadMs)} ms | ${comparison.resolved ? "resolved" : "unresolved"} |`,
+        `| ${comparison.rows.toLocaleString("en-US")} | ${comparison.baselineRepetitionMediansMs.map(format_ms).join(", ")} ms | ${comparison.upperBoundRepetitionMediansMs.map(format_ms).join(", ")} ms | ${format_ms(comparison.estimatedWindowTransferCostMs)} ms | ${format_ms(comparison.crossVariantSpreadMs)} ms | ${format_ms(comparison.maximumWithinVariantSpreadMs)} ms | ${comparison.resolved ? "resolved" : "unresolved"} |`,
       );
     }
   }

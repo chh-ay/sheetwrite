@@ -26,9 +26,9 @@ let restore: () => void;
 const grids: GridImpl[] = [];
 const saved = new Map<string, PropertyDescriptor | undefined>();
 
-function setNavigator(platform: string, userAgent: string): void {
+function set_navigator(platform: string, user_agent: string): void {
   Object.defineProperty(navigator, "platform", { configurable: true, value: platform });
-  Object.defineProperty(navigator, "userAgent", { configurable: true, value: userAgent });
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: user_agent });
 }
 
 beforeAll(async () => {
@@ -40,7 +40,7 @@ beforeEach(() => {
   for (const property of ["platform", "userAgent"]) {
     saved.set(property, Object.getOwnPropertyDescriptor(navigator, property));
   }
-  setNavigator("Linux x86_64", CHROME_LINUX);
+  set_navigator("Linux x86_64", CHROME_LINUX);
 });
 afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
@@ -90,7 +90,7 @@ function dialog(host: HTMLElement): HTMLElement {
   return element;
 }
 
-function byLabel<T extends HTMLElement = HTMLButtonElement>(root: HTMLElement, label: string): T {
+function by_label<T extends HTMLElement = HTMLButtonElement>(root: HTMLElement, label: string): T {
   const element = root.querySelector<T>(`[aria-label="${label}"]`);
   if (element === null) throw new Error(`no control labelled "${label}"`);
   return element;
@@ -114,7 +114,7 @@ function status(panel: HTMLElement): string {
   return panel.querySelector('[role="status"]')?.textContent ?? "";
 }
 
-function shownCommands(panel: HTMLElement): string[] {
+function shown_commands(panel: HTMLElement): string[] {
   return [...panel.querySelectorAll<HTMLElement>("tr[data-action]")]
     .filter((row) => !row.hidden)
     .map((row) => row.dataset.action ?? "");
@@ -122,7 +122,7 @@ function shownCommands(panel: HTMLElement): string[] {
 
 /** Change the first keys of `label` to the keys `init` presses. */
 function record(panel: HTMLElement, change: string, key: string, init: KeyboardEventInit) {
-  const field = byLabel(panel, change);
+  const field = by_label(panel, change);
   field.click();
   return press(field, key, init);
 }
@@ -148,15 +148,15 @@ describe("opening the panel", () => {
     const title = host.querySelector(`#${panel.getAttribute("aria-labelledby")}`);
     expect(title?.textContent).toBe("Keyboard shortcuts");
     // Every command with keys, so a new one cannot miss the panel.
-    expect(shownCommands(panel).toSorted()).toEqual(Object.keys(DEFAULT_BINDINGS).toSorted());
-    const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
-    expect(pasteSpecial.querySelector("th")?.textContent).toBe("Paste Special");
+    expect(shown_commands(panel).toSorted()).toEqual(Object.keys(DEFAULT_BINDINGS).toSorted());
+    const paste_special = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
+    expect(paste_special.querySelector("th")?.textContent).toBe("Paste Special");
     const bold = panel.querySelector<HTMLElement>('tr[data-action="bold"]')!;
     expect(bold.querySelector("th")?.textContent).toBe("Bold");
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");
-    expect(byLabel(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
+    expect(by_label(panel, "Change Ctrl+B for Bold").textContent).toBe("Ctrl+B");
     // The search box has focus, so typing searches at once.
-    expectSame(document.activeElement, byLabel(panel, "Search commands or press keys"));
+    expectSame(document.activeElement, by_label(panel, "Search commands or press keys"));
   });
 });
 
@@ -174,18 +174,18 @@ describe("Excel's defaults on each platform", () => {
     ["MacIntel", SAFARI_MAC, "⌘⌥V, ⌃⌘V", "pasteSpecial"],
   ] as const)(
     "gives %s only Paste Special keys the page receives",
-    async (platform, agent, label, ctrlCmdV) => {
-      setNavigator(platform, agent);
+    async (platform, agent, label, ctrl_cmd_v) => {
+      set_navigator(platform, agent);
       const { grid, host } = setup();
       const panel = await open(grid, host);
 
-      const pasteSpecial = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
-      expect(pasteSpecial.querySelector("[data-default]")?.textContent).toBe(label);
+      const paste_special = panel.querySelector<HTMLElement>('tr[data-action="pasteSpecial"]')!;
+      expect(paste_special.querySelector("[data-default]")?.textContent).toBe(label);
       // Firefox reserves no default; Safari keeps ⌘⇧3 for Date.
-      const warned = platform === "MacIntel" ? pasteSpecial : panel;
+      const warned = platform === "MacIntel" ? paste_special : panel;
       expectSame(warned.querySelector(".sheetwrite-keys-warning"), null);
       const event = new KeyboardEvent("keydown", { key: "v", ctrlKey: true, metaKey: true });
-      expect(new Keymap().action(event)).toBe(ctrlCmdV);
+      expect(new Keymap().action(event)).toBe(ctrl_cmd_v);
     },
   );
 });
@@ -195,7 +195,7 @@ describe("recording keys", () => {
     const { grid, host, events } = setup();
     const panel = await open(grid, host);
 
-    const field = byLabel(panel, "Change Ctrl+B for Bold");
+    const field = by_label(panel, "Change Ctrl+B for Bold");
     field.click();
     expect(status(panel)).toBe("Recording keys for Bold. Press the new keys, or Escape to cancel.");
     // A modifier alone only shows what is held so far.
@@ -210,7 +210,7 @@ describe("recording keys", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(events).toEqual([{ bold: ["Mod+Shift+B", "Mod+2"] }]);
     expect(grid.getShortcutLabel("bold")).toBe("Ctrl+Shift+B");
-    expect(byLabel(panel, "Change Ctrl+Shift+B for Bold").textContent).toBe("Ctrl+Shift+B");
+    expect(by_label(panel, "Change Ctrl+Shift+B for Bold").textContent).toBe("Ctrl+Shift+B");
     expect(status(panel)).toContain("Bold now uses Ctrl+Shift+B, Ctrl+2.");
     // Excel's default stays beside it.
     expect(panel.querySelector('tr[data-action="bold"] [data-default]')?.textContent).toBe(
@@ -225,11 +225,11 @@ describe("recording keys", () => {
     opener.focus();
     const panel = await open(grid, host);
 
-    byLabel(panel, "Change Ctrl+I for Italic").click();
+    by_label(panel, "Change Ctrl+I for Italic").click();
     press(document.activeElement as HTMLElement, "Escape");
     expect(status(panel)).toBe("Stopped recording. Italic keeps Ctrl+I, Ctrl+3.");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).not.toBeNull();
-    expectSame(document.activeElement, byLabel(panel, "Change Ctrl+I for Italic"));
+    expectSame(document.activeElement, by_label(panel, "Change Ctrl+I for Italic"));
 
     press(document.activeElement as HTMLElement, "Escape");
     expect(host.querySelector(".sheetwrite-keyboard-settings")).toBeNull();
@@ -263,7 +263,7 @@ describe("recording keys", () => {
   });
 
   it("refuses macOS's screenshot keys in Safari", async () => {
-    setNavigator("MacIntel", SAFARI_MAC);
+    set_navigator("MacIntel", SAFARI_MAC);
     const { grid, host, events } = setup();
     const panel = await open(grid, host);
 
@@ -337,7 +337,7 @@ describe("undo, reset, import and export", () => {
     expect(events.at(-1)).toEqual({ copy: ["Mod+Shift+C"], paste: ["Mod+Shift+P"] });
     expect(grid.getShortcutLabel("bold")).toBe("Ctrl+B");
 
-    byLabel(panel, "Reset Copy").click();
+    by_label(panel, "Reset Copy").click();
     expect(events.at(-1)).toEqual({ paste: ["Mod+Shift+P"] });
     expect(grid.getShortcutLabel("copy")).toBe("Ctrl+C");
 
@@ -378,11 +378,12 @@ describe("undo, reset, import and export", () => {
   });
 
   it("exports the changed bindings as JSON that imports back", async () => {
-    const { exportBindings, importBindings } = await import("../src/keyboard-settings-model.js");
+    const { exportBindings: export_bindings, importBindings: import_bindings } =
+      await import("../src/keyboard-settings-model.js");
     const bindings: Bindings = { bold: ["Mod+J"], find: null };
-    const text = exportBindings(bindings);
+    const text = export_bindings(bindings);
     expect(JSON.parse(text)).toEqual({ sheetwrite: "keyboard-shortcuts", version: 1, bindings });
-    expect(importBindings(text, {}, new Set())).toEqual({ bindings });
+    expect(import_bindings(text, {}, new Set())).toEqual({ bindings });
   });
 });
 
@@ -393,28 +394,28 @@ describe("finding commands", () => {
       keyboard: { bindings: { copy: "Mod+Shift+C" } },
     });
     const panel = await open(grid, host);
-    const search = byLabel<HTMLInputElement>(panel, "Search commands or press keys");
+    const search = by_label<HTMLInputElement>(panel, "Search commands or press keys");
     const type = (text: string) => {
       search.value = text;
       search.dispatchEvent(new Event("input", { bubbles: true }));
     };
 
     type("fill");
-    expect(shownCommands(panel)).toEqual(["fillDown", "fillRight"]);
+    expect(shown_commands(panel)).toEqual(["fillDown", "fillRight"]);
     type("ctrl+shift+l");
-    expect(shownCommands(panel)).toEqual(["toggleFilter"]);
+    expect(shown_commands(panel)).toEqual(["toggleFilter"]);
 
     // Pressing keys in the box finds the command that owns them.
     const event = press(search, "L", { ctrlKey: true, shiftKey: true, code: "KeyL" });
     expect(event.defaultPrevented).toBe(true);
     expect(search.value).toBe("Ctrl+Shift+L");
-    expect(shownCommands(panel)).toEqual(["toggleFilter"]);
+    expect(shown_commands(panel)).toEqual(["toggleFilter"]);
     // Ctrl+A still selects the search text.
     expect(press(search, "a", { ctrlKey: true, code: "KeyA" }).defaultPrevented).toBe(false);
 
     type("");
-    byLabel<HTMLInputElement>(panel, "Show changed only").click();
-    expect(shownCommands(panel)).toEqual(["copy"]);
+    by_label<HTMLInputElement>(panel, "Show changed only").click();
+    expect(shown_commands(panel)).toEqual(["copy"]);
   });
 });
 

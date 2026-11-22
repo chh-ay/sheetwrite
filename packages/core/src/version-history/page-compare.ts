@@ -86,12 +86,12 @@ export interface PageSelection {
   later: ReadonlyArray<ReadonlySet<string>>;
 }
 
-function pageKey(row: number, col: number): string {
+function page_key(row: number, col: number): string {
   return `${row}:${col}`;
 }
 
 /** The sheet ID of a manifest sheet. */
-function sheetId(sheet: CheckpointSheet): SheetId {
+function sheet_id(sheet: CheckpointSheet): SheetId {
   const { id } = sheet.fields;
   if (typeof id !== "string") {
     throw new HistoryError("integrity", "Invalid history sheet manifest");
@@ -103,7 +103,7 @@ function sheetId(sheet: CheckpointSheet): SheetId {
 /** The sheets of a checkpoint whose log tail keeps every sheet's size, as the diff kernel sees them. */
 export function manifestShapes(manifest: CheckpointManifest): SheetShape[] {
   return manifest.sheets.map((sheet) => ({
-    id: sheetId(sheet),
+    id: sheet_id(sheet),
     rowCount: sheet.rowCount,
     colCount: sheet.colCount,
   }));
@@ -155,7 +155,7 @@ class PageGrid {
     const keys = new Set<string>();
     for (const [row, col] of this.sheet.pages) {
       if (positions.has(this.at(row, col))) {
-        keys.add(pageKey(row, col));
+        keys.add(page_key(row, col));
       }
     }
 
@@ -189,19 +189,19 @@ function pairing(piece: Piece): Pairing {
     r1: piece.row + piece.rows - 1,
     c1: piece.col + piece.cols - 1,
   };
-  const rowShift = piece.beforeRow - piece.row;
-  const colShift = piece.beforeCol - piece.col;
+  const row_shift = piece.beforeRow - piece.row;
+  const col_shift = piece.beforeCol - piece.col;
 
   return {
     later,
     earlier: {
-      r0: later.r0 + rowShift,
-      c0: later.c0 + colShift,
-      r1: later.r1 + rowShift,
-      c1: later.c1 + colShift,
+      r0: later.r0 + row_shift,
+      c0: later.c0 + col_shift,
+      r1: later.r1 + row_shift,
+      c1: later.c1 + col_shift,
     },
-    rowShift,
-    colShift,
+    rowShift: row_shift,
+    colShift: col_shift,
   };
 }
 
@@ -241,7 +241,7 @@ class SheetSelection {
       const cells = pairing(piece).later;
       for (const position of laterGrid.overlapping(cells)) {
         const seen = shifts.get(position);
-        shifts.set(position, seen === undefined || sameShift(seen, shift) ? shift : "mixed");
+        shifts.set(position, seen === undefined || same_shift(seen, shift) ? shift : "mixed");
       }
     }
 
@@ -324,7 +324,7 @@ class SheetSelection {
   }
 }
 
-function sameShift(left: PageShift, right: PageShift): boolean {
+function same_shift(left: PageShift, right: PageShift): boolean {
   if (typeof left === "string" || typeof right === "string") {
     return left === right && left === "unpaired";
   }
@@ -332,12 +332,12 @@ function sameShift(left: PageShift, right: PageShift): boolean {
   return left.rowShift === right.rowShift && left.colShift === right.colShift;
 }
 
-function storedPages(manifest: CheckpointManifest): number {
+function stored_pages(manifest: CheckpointManifest): number {
   return manifest.sheets.reduce((total, sheet) => total + sheet.pages.length, 0);
 }
 
-function everyPage(sheet: CheckpointSheet): Set<string> {
-  return new Set(sheet.pages.map(([row, col]) => pageKey(row, col)));
+function every_page(sheet: CheckpointSheet): Set<string> {
+  return new Set(sheet.pages.map(([row, col]) => page_key(row, col)));
 }
 
 /**
@@ -359,17 +359,17 @@ export function selectPages(
   laterWrites: TailWrites,
 ): PageSelection | undefined {
   const budget = {
-    pages: Math.floor((storedPages(earlier) + storedPages(later)) * MAX_PAGE_SHARE),
+    pages: Math.floor((stored_pages(earlier) + stored_pages(later)) * MAX_PAGE_SHARE),
   };
-  const earlierIndex = new Map(earlier.sheets.map((sheet, index) => [sheetId(sheet), index]));
-  const earlierPages: Array<Set<string>> = earlier.sheets.map(() => new Set());
-  const laterPages: Array<Set<string>> = [];
+  const earlier_index = new Map(earlier.sheets.map((sheet, index) => [sheet_id(sheet), index]));
+  const earlier_pages: Array<Set<string>> = earlier.sheets.map(() => new Set());
+  const later_pages: Array<Set<string>> = [];
 
   for (const sheet of later.sheets) {
-    const id = sheetId(sheet);
-    const index = earlierIndex.get(id);
+    const id = sheet_id(sheet);
+    const index = earlier_index.get(id);
     const before = index === undefined ? undefined : earlier.sheets[index];
-    const laterShape = { id, rowCount: sheet.rowCount, colCount: sheet.colCount };
+    const later_shape = { id, rowCount: sheet.rowCount, colCount: sheet.colCount };
 
     // A sheet new in the later version, or whose columns changed, is read whole.
     if (
@@ -377,11 +377,11 @@ export function selectPages(
       !before ||
       JSON.stringify(before.fields.columns) !== JSON.stringify(sheet.fields.columns)
     ) {
-      const whole = everyPage(sheet);
-      laterPages.push(whole);
+      const whole = every_page(sheet);
+      later_pages.push(whole);
       budget.pages -= whole.size;
       if (index !== undefined && before) {
-        earlierPages[index] = everyPage(before);
+        earlier_pages[index] = every_page(before);
         budget.pages -= before.pages.length;
       }
       if (budget.pages < 0) {
@@ -391,24 +391,24 @@ export function selectPages(
       continue;
     }
 
-    const earlierShape = { id, rowCount: before.rowCount, colCount: before.colCount };
-    const laterGrid = new PageGrid(sheet);
-    const earlierGrid = new PageGrid(before);
+    const earlier_shape = { id, rowCount: before.rowCount, colCount: before.colCount };
+    const later_grid = new PageGrid(sheet);
+    const earlier_grid = new PageGrid(before);
     const selection = new SheetSelection(
-      laterGrid,
-      earlierGrid,
-      comparedPieces(state, laterShape, earlierShape),
+      later_grid,
+      earlier_grid,
+      comparedPieces(state, later_shape, earlier_shape),
       budget,
     );
 
     for (const rect of laterWrites.get(id) ?? []) {
-      for (const position of laterGrid.overlapping(rect)) {
+      for (const position of later_grid.overlapping(rect)) {
         selection.markLater(position);
       }
     }
 
     for (const rect of earlierWrites.get(id) ?? []) {
-      for (const position of earlierGrid.overlapping(rect)) {
+      for (const position of earlier_grid.overlapping(rect)) {
         selection.markEarlier(position);
       }
     }
@@ -417,18 +417,18 @@ export function selectPages(
       return undefined;
     }
 
-    laterPages.push(laterGrid.stored(selection.later));
-    earlierPages[index] = earlierGrid.stored(selection.earlier);
+    later_pages.push(later_grid.stored(selection.later));
+    earlier_pages[index] = earlier_grid.stored(selection.earlier);
   }
 
-  return { earlier: earlierPages, later: laterPages };
+  return { earlier: earlier_pages, later: later_pages };
 }
 
 /** `readCheckpointCells` filter for the pages of one side of a selection. */
 export function selectedPages(
   pages: ReadonlyArray<ReadonlySet<string>>,
 ): (sheet: number, page: CheckpointPage) => boolean {
-  return (sheet, [row, col]) => pages[sheet]?.has(pageKey(row, col)) ?? false;
+  return (sheet, [row, col]) => pages[sheet]?.has(page_key(row, col)) ?? false;
 }
 
 /** A detail of a page whose cell on one side needs the whole version for its calculated value. */
@@ -455,7 +455,7 @@ export function calculatedDetails(
   }
 
   const { cells } = page;
-  const bySheet = new Map<SheetId, CalculatedDetail[]>();
+  const by_sheet = new Map<SheetId, CalculatedDetail[]>();
   page.details.forEach((detail, at) => {
     const sheet = page.sheetIds[cells.sheet[at] ?? 0];
     const row = (side === "after" ? cells.row : cells.beforeRow)[at] ?? HISTORY_DIFF_NONE;
@@ -464,13 +464,13 @@ export function calculatedDetails(
       return;
     }
 
-    const list = bySheet.get(sheet) ?? [];
+    const list = by_sheet.get(sheet) ?? [];
     list.push({ detail, sheet, row, col });
-    bySheet.set(sheet, list);
+    by_sheet.set(sheet, list);
   });
 
   const calculated: CalculatedDetail[] = [];
-  for (const [sheet, list] of bySheet) {
+  for (const [sheet, list] of by_sheet) {
     const sources = engine.captureCells(
       sheet,
       list.map(({ row, col }) => ({ row, col })),
@@ -512,13 +512,13 @@ export function selectRestorePages(
     return undefined;
   }
 
-  const heads = new Map(head.sheets.map((sheet) => [sheetId(sheet), sheet]));
-  let budget = Math.floor(storedPages(version) * MAX_PAGE_SHARE);
+  const heads = new Map(head.sheets.map((sheet) => [sheet_id(sheet), sheet]));
+  let budget = Math.floor(stored_pages(version) * MAX_PAGE_SHARE);
   const read: Array<Set<string>> = [];
   const changed = new Map<SheetId, Rect[]>();
 
   for (const sheet of version.sheets) {
-    const id = sheetId(sheet);
+    const id = sheet_id(sheet);
     const current = heads.get(id);
     const reshaped =
       !current ||
@@ -529,10 +529,10 @@ export function selectRestorePages(
     }
 
     const grid = new PageGrid(sheet);
-    const currentIds = new PageGrid(current).ids;
+    const current_ids = new PageGrid(current).ids;
     const positions = new Set<number>();
-    for (const position of new Set([...grid.ids.keys(), ...currentIds.keys()])) {
-      if (grid.ids.get(position) !== currentIds.get(position)) {
+    for (const position of new Set([...grid.ids.keys(), ...current_ids.keys()])) {
+      if (grid.ids.get(position) !== current_ids.get(position)) {
         positions.add(position);
       }
     }

@@ -25,11 +25,11 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
 const columns = (count: number): Column[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -39,7 +39,7 @@ const columns = (count: number): Column[] =>
     type: "text" as const,
   }));
 
-const salesTable = (): WorkbookTable => ({
+const sales_table = (): WorkbookTable => ({
   id: "t-sales",
   name: "Sales",
   range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 4, col: 2 } },
@@ -53,7 +53,7 @@ const salesTable = (): WorkbookTable => ({
 });
 
 /** A pivot on "report" summarizing data!A1:C6 (header row 0). */
-const rangePivot = (overrides: Partial<PivotDefinition> = {}): PivotDefinition => ({
+const range_pivot = (overrides: Partial<PivotDefinition> = {}): PivotDefinition => ({
   id: "p-range",
   name: "By region",
   source: { range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: 5, col: 2 } } },
@@ -68,7 +68,7 @@ const rangePivot = (overrides: Partial<PivotDefinition> = {}): PivotDefinition =
   ...overrides,
 });
 
-const tablePivot = (): PivotDefinition => ({
+const table_pivot = (): PivotDefinition => ({
   id: "p-table",
   name: "Table pivot",
   source: { table: "t-sales" },
@@ -82,11 +82,11 @@ const workbook = (pivots: PivotDefinition[] = []): Workbook => ({
   activeSheet: "report",
   sheets: [
     { id: "report", name: "Report", rowCount: 20, columns: columns(6), pivots },
-    { id: "data", name: "Data", rowCount: 10, columns: columns(4), tables: [salesTable()] },
+    { id: "data", name: "Data", rowCount: 10, columns: columns(4), tables: [sales_table()] },
   ],
 });
 
-const snapshot = (pivots: PivotDefinition[] = [rangePivot()]): WorkbookSnapshot => ({
+const snapshot = (pivots: PivotDefinition[] = [range_pivot()]): WorkbookSnapshot => ({
   schemaVersion: 1,
   workbook: { activeSheet: "report" },
   // The report sheet comes first, so its pivot refers forward to "data".
@@ -103,7 +103,7 @@ const snapshot = (pivots: PivotDefinition[] = [rangePivot()]): WorkbookSnapshot 
 });
 
 const grids: Grid[] = [];
-const mountGrid = (pivots: PivotDefinition[]): Grid => {
+const mount_grid = (pivots: PivotDefinition[]): Grid => {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGrid(host, { workbook: structuredClone(workbook(pivots)) });
@@ -114,7 +114,7 @@ afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
 });
 
-const onlyPivot = (grid: Grid, id: string): PivotDefinition => {
+const only_pivot = (grid: Grid, id: string): PivotDefinition => {
   const pivot = grid.getPivots().find((candidate) => candidate.id === id);
   if (!pivot) throw new Error(`pivot ${id} is missing`);
   return pivot;
@@ -122,7 +122,7 @@ const onlyPivot = (grid: Grid, id: string): PivotDefinition => {
 
 describe("pivot definitions in snapshots", () => {
   it("round-trips forward cross-sheet, table and invalid sources through a store snapshot", () => {
-    const invalid = rangePivot({
+    const invalid = range_pivot({
       id: "p-invalid",
       anchor: { row: 15, col: 0 },
       source: {
@@ -130,7 +130,7 @@ describe("pivot definitions in snapshots", () => {
         invalid: true,
       },
     });
-    const input = snapshot([rangePivot(), tablePivot(), invalid]);
+    const input = snapshot([range_pivot(), table_pivot(), invalid]);
 
     const checked = validateWorkbookSnapshot(input);
     expect(checked.ok).toBe(true);
@@ -140,10 +140,10 @@ describe("pivot definitions in snapshots", () => {
       const exported = store.exportSnapshot();
       const reloaded = validateWorkbookSnapshot(exported);
       if (!reloaded.ok) throw new Error("exported snapshot must validate");
-      const byId = (pivots: readonly PivotDefinition[] = []) =>
+      const by_id = (pivots: readonly PivotDefinition[] = []) =>
         [...pivots].sort((left, right) => left.id.localeCompare(right.id));
-      expect(byId(reloaded.value.sheets[0]?.pivots)).toEqual(
-        byId([rangePivot(), tablePivot(), invalid]),
+      expect(by_id(reloaded.value.sheets[0]?.pivots)).toEqual(
+        by_id([range_pivot(), table_pivot(), invalid]),
       );
     } finally {
       store.dispose();
@@ -156,7 +156,7 @@ describe("pivot definitions in snapshots", () => {
       (input: WorkbookSnapshot) => {
         const data = input.sheets[1];
         if (!data) throw new Error("data sheet");
-        data.pivots = [rangePivot({ anchor: { row: 8, col: 3 } })];
+        data.pivots = [range_pivot({ anchor: { row: 8, col: 3 } })];
       },
       "sheets[1].pivots[0].id",
       "duplicate-id",
@@ -165,7 +165,7 @@ describe("pivot definitions in snapshots", () => {
       "a source sheet that does not exist",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
-          rangePivot({
+          range_pivot({
             source: {
               range: { sheet: "gone", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
             },
@@ -178,7 +178,7 @@ describe("pivot definitions in snapshots", () => {
     [
       "a source table that does not exist",
       (input: WorkbookSnapshot) => {
-        input.sheets[0]!.pivots = [{ ...tablePivot(), source: { table: "t-gone" } }];
+        input.sheets[0]!.pivots = [{ ...table_pivot(), source: { table: "t-gone" } }];
       },
       "sheets[0].pivots[0].source.table",
       "missing-reference",
@@ -186,7 +186,7 @@ describe("pivot definitions in snapshots", () => {
     [
       "a field beyond the source width",
       (input: WorkbookSnapshot) => {
-        input.sheets[0]!.pivots = [rangePivot({ values: [{ field: 3, aggregation: "SUM" }] })];
+        input.sheets[0]!.pivots = [range_pivot({ values: [{ field: 3, aggregation: "SUM" }] })];
       },
       "sheets[0].pivots[0]",
       "out-of-bounds",
@@ -194,7 +194,7 @@ describe("pivot definitions in snapshots", () => {
     [
       "an anchor outside its sheet",
       (input: WorkbookSnapshot) => {
-        input.sheets[0]!.pivots = [rangePivot({ anchor: { row: 20, col: 0 } })];
+        input.sheets[0]!.pivots = [range_pivot({ anchor: { row: 20, col: 0 } })];
       },
       "sheets[0].pivots[0].anchor",
       "out-of-bounds",
@@ -202,7 +202,7 @@ describe("pivot definitions in snapshots", () => {
     [
       "an unknown aggregation",
       (input: WorkbookSnapshot) => {
-        const pivot = rangePivot();
+        const pivot = range_pivot();
         Object.assign(pivot.values[0]!, { aggregation: "MEDIAN" });
         input.sheets[0]!.pivots = [pivot];
       },
@@ -212,7 +212,7 @@ describe("pivot definitions in snapshots", () => {
     [
       "a field on both rows and columns",
       (input: WorkbookSnapshot) => {
-        input.sheets[0]!.pivots = [rangePivot({ rows: [0], columns: [0] })];
+        input.sheets[0]!.pivots = [range_pivot({ rows: [0], columns: [0] })];
       },
       "sheets[0].pivots[0].columns[0]",
       "invalid-value",
@@ -221,7 +221,7 @@ describe("pivot definitions in snapshots", () => {
       "an empty value number format",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
-          rangePivot({ values: [{ field: 1, aggregation: "SUM", numberFormat: "" }] }),
+          range_pivot({ values: [{ field: 1, aggregation: "SUM", numberFormat: "" }] }),
         ];
       },
       "sheets[0].pivots[0].values[0].numberFormat",
@@ -231,7 +231,9 @@ describe("pivot definitions in snapshots", () => {
       "a value number format longer than a cell format",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
-          rangePivot({ values: [{ field: 1, aggregation: "SUM", numberFormat: "0".repeat(256) }] }),
+          range_pivot({
+            values: [{ field: 1, aggregation: "SUM", numberFormat: "0".repeat(256) }],
+          }),
         ];
       },
       "sheets[0].pivots[0].values[0].numberFormat",
@@ -241,7 +243,7 @@ describe("pivot definitions in snapshots", () => {
       "more filter values than the limit",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
-          rangePivot({
+          range_pivot({
             filters: [{ field: 0, values: Array.from({ length: 10_001 }, (_, index) => index) }],
           }),
         ];
@@ -260,21 +262,21 @@ describe("pivot definitions in snapshots", () => {
 
 describe("pivot document operations", () => {
   it("keeps one undo entry per change and refuses references the workbook does not hold", () => {
-    const grid = mountGrid([]);
-    expect(grid.setPivot(rangePivot()).status).toBe("applied");
-    expect(grid.setPivot(rangePivot({ name: "Renamed" })).status).toBe("applied");
-    expect(onlyPivot(grid, "p-range").name).toBe("Renamed");
-    expect(grid.setPivot(rangePivot({ id: "p-second" })).status).not.toBe("applied");
+    const grid = mount_grid([]);
+    expect(grid.setPivot(range_pivot()).status).toBe("applied");
+    expect(grid.setPivot(range_pivot({ name: "Renamed" })).status).toBe("applied");
+    expect(only_pivot(grid, "p-range").name).toBe("Renamed");
+    expect(grid.setPivot(range_pivot({ id: "p-second" })).status).not.toBe("applied");
 
     // The same ID on another sheet, a missing table and an out-of-range field change nothing.
-    expect(grid.setPivot(rangePivot({ anchor: { row: 8, col: 3 } }), "data").status).not.toBe(
+    expect(grid.setPivot(range_pivot({ anchor: { row: 8, col: 3 } }), "data").status).not.toBe(
       "applied",
     );
-    expect(grid.setPivot({ ...tablePivot(), source: { table: "t-gone" } }).status).not.toBe(
+    expect(grid.setPivot({ ...table_pivot(), source: { table: "t-gone" } }).status).not.toBe(
       "applied",
     );
     expect(
-      grid.setPivot(rangePivot({ id: "p-wide", values: [{ field: 3, aggregation: "MAX" }] }))
+      grid.setPivot(range_pivot({ id: "p-wide", values: [{ field: 3, aggregation: "MAX" }] }))
         .status,
     ).not.toBe("applied");
     expect(grid.getPivots().map((pivot) => pivot.id)).toEqual(["p-range"]);
@@ -282,30 +284,30 @@ describe("pivot document operations", () => {
     expect(grid.removePivot("p-range").status).toBe("applied");
     expect(grid.getPivots()).toEqual([]);
     grid.undo();
-    expect(onlyPivot(grid, "p-range").name).toBe("Renamed");
+    expect(only_pivot(grid, "p-range").name).toBe("Renamed");
     grid.undo();
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
     grid.undo();
     expect(grid.getPivots()).toEqual([]);
     grid.redo();
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
   });
 
   it("checks anchor ownership in document-operation order", () => {
-    const grid = mountGrid([]);
+    const grid = mount_grid([]);
     grid.applyTransaction({
       patches: [
-        { op: "setPivot", sheet: "report", pivot: rangePivot() },
-        { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
+        { op: "setPivot", sheet: "report", pivot: range_pivot() },
+        { op: "setPivot", sheet: "report", pivot: range_pivot({ id: "second" }) },
       ],
     });
     expect(grid.getPivots()).toEqual([]);
-    expect(grid.setPivot(rangePivot()).status).toBe("applied");
+    expect(grid.setPivot(range_pivot()).status).toBe("applied");
     expect(
       grid.applyTransaction({
         patches: [
           { op: "removePivot", sheet: "report", id: "p-range" },
-          { op: "setPivot", sheet: "report", pivot: rangePivot({ id: "second" }) },
+          { op: "setPivot", sheet: "report", pivot: range_pivot({ id: "second" }) },
         ],
       }).status,
     ).toBe("applied");
@@ -321,14 +323,14 @@ describe("pivot structural rewrites", () => {
   ] as const)(
     "keeps the pivot when its anchor %s is deleted, and undo restores the exact definition",
     (_name, operation, anchor) => {
-      const grid = mountGrid([rangePivot()]);
+      const grid = mount_grid([range_pivot()]);
       expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor }));
+      expect(only_pivot(grid, "p-range")).toEqual(range_pivot({ anchor }));
 
       grid.undo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+      expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
       grid.redo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor }));
+      expect(only_pivot(grid, "p-range")).toEqual(range_pivot({ anchor }));
     },
   );
 
@@ -387,49 +389,49 @@ describe("pivot structural rewrites", () => {
       {},
     ],
   ])("rewrites the source for %s", (_name, operation, range, fields) => {
-    const grid = mountGrid([rangePivot()]);
+    const grid = mount_grid([range_pivot()]);
     expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
-    expect(onlyPivot(grid, "p-range")).toEqual(
-      rangePivot({ source: { range: { sheet: "data", ...range } }, ...fields }),
+    expect(only_pivot(grid, "p-range")).toEqual(
+      range_pivot({ source: { range: { sheet: "data", ...range } }, ...fields }),
     );
     grid.undo();
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
   });
 
   it.each([
     ["every source row is deleted", { op: "removeRows", sheet: "data", at: 0, count: 6 }],
     ["the source sheet is removed", { op: "removeSheet", sheet: "data" }],
   ] as const)("marks a range source invalid when %s, and undo clears it", (_name, operation) => {
-    const grid = mountGrid([rangePivot()]);
+    const grid = mount_grid([range_pivot()]);
     expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
     // The reference stays verbatim, so the engine can show #REF! for it.
-    expect(onlyPivot(grid, "p-range").source).toEqual({ ...rangePivot().source, invalid: true });
+    expect(only_pivot(grid, "p-range").source).toEqual({ ...range_pivot().source, invalid: true });
     grid.undo();
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+    expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
   });
 
   it("marks a table source invalid when the table is removed, and undo clears it", () => {
-    const grid = mountGrid([tablePivot()]);
+    const grid = mount_grid([table_pivot()]);
     expect(
       grid.applyTransaction({
         patches: [{ op: "removeTable", sheet: "data", tableId: "t-sales" }],
       }).status,
     ).toBe("applied");
-    expect(onlyPivot(grid, "p-table").source).toEqual({ table: "t-sales", invalid: true });
+    expect(only_pivot(grid, "p-table").source).toEqual({ table: "t-sales", invalid: true });
     grid.undo();
-    expect(onlyPivot(grid, "p-table")).toEqual(tablePivot());
+    expect(only_pivot(grid, "p-table")).toEqual(table_pivot());
   });
 
   it("moves a recorded undo with the pivot when a peer inserts rows above it", () => {
-    const grid = mountGrid([]);
-    grid.setPivot(rangePivot());
-    grid.setPivot(rangePivot({ name: "Renamed" }));
+    const grid = mount_grid([]);
+    grid.setPivot(range_pivot());
+    grid.setPivot(range_pivot({ name: "Renamed" }));
     grid.applyRemoteOperations([{ op: "addRows", sheet: "report", at: 0, count: 4 }]);
-    expect(onlyPivot(grid, "p-range").anchor).toEqual({ row: 6, col: 1 });
+    expect(only_pivot(grid, "p-range").anchor).toEqual({ row: 6, col: 1 });
 
     // The undo was recorded with the anchor at row 2; it must follow the insert.
     grid.undo();
-    expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor: { row: 6, col: 1 } }));
+    expect(only_pivot(grid, "p-range")).toEqual(range_pivot({ anchor: { row: 6, col: 1 } }));
   });
 
   it.each([
@@ -438,18 +440,18 @@ describe("pivot structural rewrites", () => {
   ] as const)(
     "restores an older pivot undo after the trailing %s holding its anchor are deleted and restored",
     (_name, operation) => {
-      const grid = mountGrid([]);
-      grid.setPivot(rangePivot());
-      grid.setPivot(rangePivot({ name: "Renamed" }));
+      const grid = mount_grid([]);
+      grid.setPivot(range_pivot());
+      grid.setPivot(range_pivot({ name: "Renamed" }));
       expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
 
       grid.undo();
       const report = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "report");
       expect([report?.rowCount, report?.columns.length]).toEqual([20, 6]);
-      expect(onlyPivot(grid, "p-range").name).toBe("Renamed");
+      expect(only_pivot(grid, "p-range").name).toBe("Renamed");
 
       grid.undo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot());
+      expect(only_pivot(grid, "p-range")).toEqual(range_pivot());
     },
   );
 
@@ -468,21 +470,21 @@ describe("pivot structural rewrites", () => {
   ])(
     "keeps an older pivot undo applicable after a peer deletes the trailing %s holding its anchor",
     (_name, operations, anchor) => {
-      const grid = mountGrid([]);
-      grid.setPivot(rangePivot());
-      grid.setPivot(rangePivot({ name: "Renamed" }));
+      const grid = mount_grid([]);
+      grid.setPivot(range_pivot());
+      grid.setPivot(range_pivot({ name: "Renamed" }));
       expect(grid.applyRemoteOperations(operations).status).toBe("applied");
 
       // The recorded anchor fell back inside the shrunken sheet, so the undo still applies.
       grid.undo();
-      expect(onlyPivot(grid, "p-range")).toEqual(rangePivot({ anchor }));
+      expect(only_pivot(grid, "p-range")).toEqual(range_pivot({ anchor }));
     },
   );
 });
 
 describe("pivot collaboration", () => {
   it("rebases a pending pivot past a remote insert and conflicts on the same pivot ID", () => {
-    const local: DocumentOp[] = [{ op: "setPivot", sheet: "report", pivot: rangePivot() }];
+    const local: DocumentOp[] = [{ op: "setPivot", sheet: "report", pivot: range_pivot() }];
 
     const shifted = rebaseDocumentOperations(local, [
       { op: "addRows", sheet: "report", at: 0, count: 3 },
@@ -493,7 +495,7 @@ describe("pivot collaboration", () => {
       {
         op: "setPivot",
         sheet: "report",
-        pivot: rangePivot({
+        pivot: range_pivot({
           anchor: { row: 5, col: 1 },
           source: { range: { sheet: "data", start: { row: 1, col: 0 }, end: { row: 6, col: 2 } } },
         }),
@@ -518,14 +520,14 @@ describe("pivot collaboration", () => {
     const peer = createGridFromSnapshot(hosts[1]!, structuredClone(base));
     grids.push(sender, peer);
     const options = { documentId: "pivot-doc", serverVersion: 0 };
-    const senderSync = new SyncCoordinator(sender, adapter, options);
-    const peerSync = new SyncCoordinator(peer, adapter, options);
+    const sender_sync = new SyncCoordinator(sender, adapter, options);
+    const peer_sync = new SyncCoordinator(peer, adapter, options);
     try {
-      const pivot = rangePivot({ savedOutput: { rows: 1, cols: 2, cells: ["Excel", 44] } });
+      const pivot = range_pivot({ savedOutput: { rows: 1, cols: 2, cells: ["Excel", 44] } });
       expect(
         sender.applyTransaction({ patches: [{ op: "setPivot", sheet: "report", pivot }] }).status,
       ).toBe("applied");
-      expect(await senderSync.sendNext()).toMatchObject({ status: "applied", version: 1 });
+      expect(await sender_sync.sendNext()).toMatchObject({ status: "applied", version: 1 });
 
       const tail = await adapter.commit({
         documentId: "pivot-doc",
@@ -537,20 +539,20 @@ describe("pivot collaboration", () => {
         throw new Error("the adapter must return the committed version");
       }
       for (const version of tail.operationsSinceBase) {
-        await peerSync.applyVersionedOperation(version);
+        await peer_sync.applyVersionedOperation(version);
       }
       expect(peer.getPivots()).toEqual([pivot]);
       expect(peer.getPivotResult("report", pivot.id)?.cells).toEqual(["Excel", 44]);
     } finally {
-      senderSync.destroy();
-      peerSync.destroy();
+      sender_sync.destroy();
+      peer_sync.destroy();
     }
   });
 });
 
 describe("pivot engine boundary on the default engine", () => {
   it("installs saved values as read-only calculated output and re-syncs them after transfer", async () => {
-    const pivot = rangePivot({
+    const pivot = range_pivot({
       savedOutput: { rows: 2, cols: 2, cells: ["Excel 🧮", true, 20, 30] },
     });
     const store = new SheetwriteStore(structuredClone(workbook([pivot])));
@@ -603,7 +605,7 @@ describe("pivot engine boundary on the default engine", () => {
   });
 
   it("reports a saved output collision and retries when its source blocker is cleared", () => {
-    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
+    const pivot = range_pivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
     const input = structuredClone(workbook([pivot]));
     const store = new SheetwriteStore(input);
     const addr = { sheet: "report", row: 3, col: 2 };
@@ -646,7 +648,7 @@ describe("pivot engine boundary on the default engine", () => {
   });
 
   it("validates saved scalar counts, resource limits and sheet bounds", () => {
-    for (const [savedOutput, path, code] of [
+    for (const [saved_output, path, code] of [
       [{ rows: 2, cols: 2, cells: [1] }, "cells", "invalid-value"],
       [{ rows: 1_000_001, cols: 1, cells: [] }, "", "resource-limit"],
       [{ rows: 1, cols: 1, cells: [Infinity] }, "cells[0]", "non-serializable"],
@@ -654,8 +656,8 @@ describe("pivot engine boundary on the default engine", () => {
     ] as const) {
       const checked = validateWorkbookSnapshot(
         snapshot([
-          rangePivot({
-            savedOutput: { ...savedOutput, cells: [...savedOutput.cells] },
+          range_pivot({
+            savedOutput: { ...saved_output, cells: [...saved_output.cells] },
           }),
         ]),
       );
@@ -670,7 +672,7 @@ describe("pivot engine boundary on the default engine", () => {
     expect(
       validateWorkbookSnapshot(
         snapshot([
-          rangePivot({
+          range_pivot({
             savedOutput: { rows: 2, cols: 2, cells: ["Excel", null, true, 30] },
           }),
         ]),
@@ -679,12 +681,12 @@ describe("pivot engine boundary on the default engine", () => {
   });
 
   it("keeps definitions across engine memory release and reports results as unavailable", async () => {
-    const store = new SheetwriteStore(structuredClone(workbook([rangePivot()])));
+    const store = new SheetwriteStore(structuredClone(workbook([range_pivot()])));
     try {
       const before = store.exportSnapshot();
       await releaseEngineMemory();
       expect(store.exportSnapshot()).toEqual(before);
-      expect(store.getPivots("report")).toEqual([rangePivot()]);
+      expect(store.getPivots("report")).toEqual([range_pivot()]);
 
       expect(store.getPivotResult("report", "p-range")).toEqual({
         status: "unavailable",
@@ -707,7 +709,7 @@ describe("pivot engine boundary on the default engine", () => {
   });
 
   it("accepts a write into a pivot's output when an earlier patch in the batch removes it", () => {
-    const pivot = rangePivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
+    const pivot = range_pivot({ savedOutput: { rows: 2, cols: 2, cells: ["Excel", 10, 20, 30] } });
     const store = new SheetwriteStore(structuredClone(workbook([pivot])));
     const addr = { sheet: "report", row: 3, col: 2 };
     try {
@@ -738,10 +740,10 @@ it("preserves full-engine pivot output through structural undo, transfer and wri
     ],
     { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
   );
-  const [exitCode, stdout, stderr] = await Promise.all([
+  const [exit_code, stdout, stderr] = await Promise.all([
     probe.exited,
     new Response(probe.stdout).text(),
     new Response(probe.stderr).text(),
   ]);
-  expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+  expect({ exitCode: exit_code, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
 });

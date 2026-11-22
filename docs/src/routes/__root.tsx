@@ -90,7 +90,7 @@ const stylesheet = (href: string) => ({ rel: "stylesheet", href });
  * script (islands/page-scripts.ts), which keeps it only where the page's
  * markup uses its classes.
  */
-const featureStylesheet = (href: string) => ({ rel: "stylesheet", href, "data-feature": "" });
+const feature_stylesheet = (href: string) => ({ rel: "stylesheet", href, "data-feature": "" });
 
 export const Route = createRootRoute({
   head: ({ matches }) => {
@@ -102,16 +102,16 @@ export const Route = createRootRoute({
         { ...FONT_PRELOAD, href: bodyFont },
         // Head links are render-blocking; link order is the cascade (site.css's order).
         stylesheet(siteCoreStylesheet),
-        featureStylesheet(apiReferenceStylesheet),
-        featureStylesheet(performanceStylesheet),
-        featureStylesheet(upgradeGuideStylesheet),
-        featureStylesheet(formulaReferenceStylesheet),
+        feature_stylesheet(apiReferenceStylesheet),
+        feature_stylesheet(performanceStylesheet),
+        feature_stylesheet(upgradeGuideStylesheet),
+        feature_stylesheet(formulaReferenceStylesheet),
         stylesheet(siteMidStylesheet),
-        featureStylesheet(playgroundStylesheet),
+        feature_stylesheet(playgroundStylesheet),
         stylesheet(siteTailStylesheet),
         // The site chrome outside the docs (the 404 page).
-        featureStylesheet(showcaseStylesheet),
-        featureStylesheet(docsFiguresStylesheet),
+        feature_stylesheet(showcaseStylesheet),
+        feature_stylesheet(docsFiguresStylesheet),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
         // The changelog feed, written by the docs build (scripts/docs-feed.ts).

@@ -24,7 +24,7 @@ const ENTITIES: Readonly<Record<string, string>> = {
 const DECIMAL = 10;
 const HEXADECIMAL = 16;
 
-function unescapeXml(text: string): string {
+function unescape_xml(text: string): string {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (entity: string, name: string) => {
     if (name.startsWith("#x"))
       return String.fromCodePoint(Number.parseInt(name.slice(2), HEXADECIMAL));
@@ -33,7 +33,7 @@ function unescapeXml(text: string): string {
   });
 }
 
-const localName = (name: string) => name.slice(name.indexOf(":") + 1);
+const local_name = (name: string) => name.slice(name.indexOf(":") + 1);
 
 /** Parse XML into elements; declarations, comments and processing instructions are skipped. */
 export function parseXml(xml: string): XmlNode {
@@ -42,22 +42,22 @@ export function parseXml(xml: string): XmlNode {
   const token =
     /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!\[CDATA\[([\s\S]*?)\]\]>|<(\/?)([^\s/>]+)([^>]*?)(\/?)>|([^<]+)/g;
   for (const match of xml.matchAll(token)) {
-    const [, cdata, closing, name, attributeText, selfClosing, text] = match;
+    const [, cdata, closing, name, attribute_text, self_closing, text] = match;
     const parent = open[open.length - 1];
     if (!parent) throw new Error("XML closes more elements than it opens");
     if (cdata !== undefined) parent.text += cdata;
-    else if (text !== undefined) parent.text += unescapeXml(text);
+    else if (text !== undefined) parent.text += unescape_xml(text);
     else if (name === undefined) continue;
     else if (closing) open.pop();
     else {
       const attributes: Record<string, string> = {};
-      for (const [, key, value] of (attributeText ?? "").matchAll(/([^\s=]+)\s*=\s*"([^"]*)"/g)) {
+      for (const [, key, value] of (attribute_text ?? "").matchAll(/([^\s=]+)\s*=\s*"([^"]*)"/g)) {
         if (key !== undefined && value !== undefined)
-          attributes[localName(key)] = unescapeXml(value);
+          attributes[local_name(key)] = unescape_xml(value);
       }
-      const element: XmlNode = { name: localName(name), attributes, children: [], text: "" };
+      const element: XmlNode = { name: local_name(name), attributes, children: [], text: "" };
       parent.children.push(element);
-      if (!selfClosing) open.push(element);
+      if (!self_closing) open.push(element);
     }
   }
   return root;
@@ -97,7 +97,7 @@ interface Relationship {
   readonly external: boolean;
 }
 
-function joinPath(base: string, target: string): string {
+function join_path(base: string, target: string): string {
   if (target.startsWith("/")) return target.slice(1);
   const parts = base.split("/").slice(0, -1);
   for (const part of target.split("/")) {
@@ -133,24 +133,24 @@ function unzip(bytes: Uint8Array): Map<string, Uint8Array> {
     if (view.getUint32(offset, true) !== CENTRAL_HEADER)
       throw new Error("Broken ZIP central directory");
     const method = view.getUint16(offset + 10, true);
-    const compressedSize = view.getUint32(offset + 20, true);
-    const nameLength = view.getUint16(offset + 28, true);
-    const extraLength = view.getUint16(offset + 30, true);
-    const commentLength = view.getUint16(offset + 32, true);
+    const compressed_size = view.getUint32(offset + 20, true);
+    const name_length = view.getUint16(offset + 28, true);
+    const extra_length = view.getUint16(offset + 30, true);
+    const comment_length = view.getUint16(offset + 32, true);
     const local = view.getUint32(offset + 42, true);
     const name = names.decode(
-      bytes.subarray(offset + CENTRAL_HEADER_SIZE, offset + CENTRAL_HEADER_SIZE + nameLength),
+      bytes.subarray(offset + CENTRAL_HEADER_SIZE, offset + CENTRAL_HEADER_SIZE + name_length),
     );
-    const dataStart =
+    const data_start =
       local +
       LOCAL_HEADER_SIZE +
       view.getUint16(local + 26, true) +
       view.getUint16(local + 28, true);
-    const data = bytes.subarray(dataStart, dataStart + compressedSize);
+    const data = bytes.subarray(data_start, data_start + compressed_size);
     if (method === STORED) entries.set(name, data);
     else if (method === DEFLATED) entries.set(name, new Uint8Array(inflateRawSync(data)));
     else throw new Error(`ZIP entry ${name} uses compression method ${method}`);
-    offset += CENTRAL_HEADER_SIZE + nameLength + extraLength + commentLength;
+    offset += CENTRAL_HEADER_SIZE + name_length + extra_length + comment_length;
   }
   return entries;
 }
@@ -158,7 +158,7 @@ function unzip(bytes: Uint8Array): Map<string, Uint8Array> {
 /** An XLSX package, read once. */
 export class XlsxPackage {
   private readonly files: Map<string, Uint8Array>;
-  private sharedStrings: string[] | undefined;
+  private shared_strings: string[] | undefined;
 
   constructor(bytes: Uint8Array) {
     this.files = unzip(bytes);
@@ -181,13 +181,13 @@ export class XlsxPackage {
   /** The relationships of `path`, by ID, with targets resolved to package paths. */
   relationships(path: string): Map<string, Relationship> {
     const slash = path.lastIndexOf("/");
-    const relsPath = `${path.slice(0, slash + 1)}_rels/${path.slice(slash + 1)}.rels`;
+    const rels_path = `${path.slice(0, slash + 1)}_rels/${path.slice(slash + 1)}.rels`;
     const map = new Map<string, Relationship>();
-    for (const rel of descendants(this.xml(relsPath), "Relationship")) {
+    for (const rel of descendants(this.xml(rels_path), "Relationship")) {
       const { Id: id, Target: target = "", Type: type = "", TargetMode: mode } = rel.attributes;
       if (id === undefined) continue;
       const external = mode === "External";
-      map.set(id, { target: external ? target : joinPath(path, target), type, external });
+      map.set(id, { target: external ? target : join_path(path, target), type, external });
     }
     return map;
   }
@@ -210,7 +210,7 @@ export class XlsxPackage {
 
   private strings(): string[] {
     // A string item is one <t>, or rich text runs <r><t>; phonetic runs <rPh> are not shown.
-    this.sharedStrings ??= childrenOf(childOf(this.xml("xl/sharedStrings.xml"), "sst"), "si").map(
+    this.shared_strings ??= childrenOf(childOf(this.xml("xl/sharedStrings.xml"), "sst"), "si").map(
       (item) =>
         item.children
           .map((part) =>
@@ -222,7 +222,7 @@ export class XlsxPackage {
           )
           .join(""),
     );
-    return this.sharedStrings;
+    return this.shared_strings;
   }
 
   /** The cells of sheet `name` by A1 reference. */

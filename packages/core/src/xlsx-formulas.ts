@@ -24,7 +24,7 @@ export interface XlsxFormulaEngine {
 }
 
 /** The formulas as one string and the UTF-16 end of each, as the engine's batch calls take them. */
-function joinedSources(formulas: string[]): { joined: string; ends: Uint32Array } {
+function joined_sources(formulas: string[]): { joined: string; ends: Uint32Array } {
   const ends = new Uint32Array(formulas.length);
   let length = 0;
   let position = 0;
@@ -39,21 +39,21 @@ function joinedSources(formulas: string[]): { joined: string; ends: Uint32Array 
 }
 
 /** Adapt the engine's sparse joined batch without round-tripping unchanged strings through WASM. */
-function convertSources(
+function convert_sources(
   engine: EngineInstance,
   formulas: string[],
   direction: "import" | "export",
 ): string[] {
   if (formulas.length === 0) return [];
 
-  const { joined, ends } = joinedSources(formulas);
+  const { joined, ends } = joined_sources(formulas);
   const indices = new Uint32Array(formulas.length);
   const converted = engine.convertXlsxFormulas(joined, ends, direction === "export", indices);
 
   const results = formulas.slice();
-  let indexPosition = 0;
+  let index_position = 0;
   for (const source of converted) {
-    const index = indices[indexPosition++];
+    const index = indices[index_position++];
     if (index === undefined || index >= results.length) {
       throw new Error("Sheetwrite: XLSX formula change has no input source");
     }
@@ -74,14 +74,15 @@ function convertSources(
 export function withXlsxFormulaEngine<T>(use: (formulas: XlsxFormulaEngine) => T): Promise<T> {
   return lendEngine((engine) =>
     use({
-      convert: (formulas, direction) => convertSources(engine, formulas, direction),
+      convert: (formulas, direction) => convert_sources(engine, formulas, direction),
       arrayFormulas: (formulas) => {
         if (formulas.length === 0) return new Uint32Array();
-        const { joined, ends } = joinedSources(formulas);
+        const { joined, ends } = joined_sources(formulas);
         return engine.xlsxArrayFormulas(joined, ends);
       },
       lexes: (formula) => formulaLexes(engine, formula),
-      copy: (formula, rowDelta, colDelta) => engine.translateFormula(formula, rowDelta, colDelta),
+      copy: (formula, row_delta, col_delta) =>
+        engine.translateFormula(formula, row_delta, col_delta),
     }),
   );
 }

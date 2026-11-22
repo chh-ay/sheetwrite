@@ -27,7 +27,7 @@ const DEFAULT_CANDIDATE_PATH = resolve(
 const DEFAULT_RAW_PATH = resolve(BENCH_ROOT, "results/candidates/render-baseline-raw.json");
 const DEFAULT_APPROVED_PATH = resolve(BENCH_ROOT, "results/render-baseline.json");
 
-function gitOutput(args: readonly string[]): string {
+function git_output(args: readonly string[]): string {
   const result = Bun.spawnSync(["git", ...args], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
@@ -39,7 +39,7 @@ function gitOutput(args: readonly string[]): string {
   return result.stdout.toString().trim();
 }
 
-function runCommand(command: readonly string[]): void {
+function run_command(command: readonly string[]): void {
   const result = Bun.spawnSync([...command], {
     cwd: BENCH_ROOT,
     stdout: "inherit",
@@ -50,12 +50,12 @@ function runCommand(command: readonly string[]): void {
   }
 }
 
-function runnerFromArtifact(
+function runner_from_artifact(
   artifact: RenderBenchmarkArtifact,
-  powerMode: string,
+  power_mode: string,
   concurrency: number,
 ): ControlledRunnerFingerprint {
-  if (powerMode.length === 0) throw new Error("--power-mode is required");
+  if (power_mode.length === 0) throw new Error("--power-mode is required");
   if (!Number.isInteger(concurrency) || concurrency <= 0) {
     throw new Error("--concurrency must be a positive integer");
   }
@@ -66,15 +66,15 @@ function runnerFromArtifact(
     bun: artifact.metadata.bunVersion,
     node: artifact.metadata.nodeVersion,
     browser: artifact.metadata.browserVersion,
-    powerMode,
+    powerMode: power_mode,
     concurrency,
   };
 }
 
 export async function generateBaseline(args: readonly string[]): Promise<string> {
   const diagnostic = args.includes("--diagnostic");
-  const writeBaseline = args.includes("--write-baseline");
-  if (diagnostic && writeBaseline) {
+  const write_baseline = args.includes("--write-baseline");
+  if (diagnostic && write_baseline) {
     throw new Error("--diagnostic can produce review candidates only, not an approved baseline");
   }
   const dirty = sourceTreeDirty(true);
@@ -83,56 +83,56 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
       "baseline generation refuses a dirty tree; use --diagnostic for a non-approved candidate",
     );
   }
-  if (dirty && writeBaseline) {
+  if (dirty && write_baseline) {
     throw new Error("an approved baseline cannot be written from a dirty tree");
   }
 
-  const approvedPath = resolve(optionValue(args, "--approved") ?? DEFAULT_APPROVED_PATH);
-  const candidatePath = resolve(optionValue(args, "--output") ?? DEFAULT_CANDIDATE_PATH);
-  const targetPath = writeBaseline ? approvedPath : candidatePath;
-  if (!writeBaseline && targetPath === approvedPath) {
+  const approved_path = resolve(optionValue(args, "--approved") ?? DEFAULT_APPROVED_PATH);
+  const candidate_path = resolve(optionValue(args, "--output") ?? DEFAULT_CANDIDATE_PATH);
+  const target_path = write_baseline ? approved_path : candidate_path;
+  if (!write_baseline && target_path === approved_path) {
     throw new Error("refusing to overwrite the approved baseline without --write-baseline");
   }
-  const powerMode = optionValue(args, "--power-mode") ?? "";
+  const power_mode = optionValue(args, "--power-mode") ?? "";
   const concurrency = Number(optionValue(args, "--concurrency") ?? Number.NaN);
-  const inputArgument = optionValue(args, "--input");
-  let rawPath: string;
+  const input_argument = optionValue(args, "--input");
+  let raw_path: string;
 
-  if (inputArgument) {
-    rawPath = resolve(inputArgument);
+  if (input_argument) {
+    raw_path = resolve(input_argument);
   } else {
-    rawPath = resolve(optionValue(args, "--raw-output") ?? DEFAULT_RAW_PATH);
-    const markdownPath = rawPath.replace(/\.json$/u, ".md");
-    runCommand(["bun", "run", "bench:render:prepare"]);
-    runCommand([
+    raw_path = resolve(optionValue(args, "--raw-output") ?? DEFAULT_RAW_PATH);
+    const markdown_path = raw_path.replace(/\.json$/u, ".md");
+    run_command(["bun", "run", "bench:render:prepare"]);
+    run_command([
       "bun",
       "run",
       "src/render-driver.ts",
       "--rounds",
       String(CONTROLLED_BASELINE_MINIMUM_ROUNDS),
       "--output",
-      rawPath,
+      raw_path,
       "--markdown-output",
-      markdownPath,
+      markdown_path,
     ]);
   }
 
-  if (!existsSync(rawPath)) throw new Error(`raw controlled artifact does not exist: ${rawPath}`);
-  const rawBytes = readFileSync(rawPath);
-  const rawArtifact = relative(REPOSITORY_ROOT, rawPath);
-  if (rawArtifact === ".." || rawArtifact.startsWith("../")) {
+  if (!existsSync(raw_path)) throw new Error(`raw controlled artifact does not exist: ${raw_path}`);
+  const raw_bytes = readFileSync(raw_path);
+  const raw_artifact = relative(REPOSITORY_ROOT, raw_path);
+  if (raw_artifact === ".." || raw_artifact.startsWith("../")) {
     throw new Error("raw controlled artifact must be stored inside the repository");
   }
-  const rawSha256 = createHash("sha256").update(rawBytes).digest("hex");
-  const artifact = parseRenderArtifact(JSON.parse(rawBytes.toString("utf8")) as unknown);
+  const raw_sha256 = createHash("sha256").update(raw_bytes).digest("hex");
+  const artifact = parseRenderArtifact(JSON.parse(raw_bytes.toString("utf8")) as unknown);
   if (artifact.metadata.dirty && !diagnostic) {
     throw new Error("raw controlled artifact was recorded from a dirty tree");
   }
-  if (artifact.metadata.dirty && writeBaseline) {
+  if (artifact.metadata.dirty && write_baseline) {
     throw new Error("an approved baseline cannot use a dirty raw artifact");
   }
   if (!diagnostic) {
-    const head = gitOutput(["rev-parse", "HEAD"]);
+    const head = git_output(["rev-parse", "HEAD"]);
     if (artifact.metadata.commit !== head) {
       throw new Error(
         `stale controlled raw artifact commit: expected ${head}, observed ${artifact.metadata.commit}`,
@@ -146,19 +146,19 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
   const baseline = buildControlledBaseline(
     artifact,
     harness,
-    runnerFromArtifact(artifact, powerMode, concurrency),
-    rawArtifact,
-    rawSha256,
+    runner_from_artifact(artifact, power_mode, concurrency),
+    raw_artifact,
+    raw_sha256,
   );
-  await Bun.write(targetPath, stableBaselineJson(baseline));
-  if (!writeBaseline && existsSync(approvedPath)) {
-    process.stderr.write(`approved baseline left unchanged: ${approvedPath}\n`);
+  await Bun.write(target_path, stableBaselineJson(baseline));
+  if (!write_baseline && existsSync(approved_path)) {
+    process.stderr.write(`approved baseline left unchanged: ${approved_path}\n`);
   }
   process.stderr.write(
-    `${writeBaseline ? "wrote approved baseline" : "wrote review candidate"}: ${targetPath}\n` +
-      `raw rounds retained: ${rawPath}\n`,
+    `${write_baseline ? "wrote approved baseline" : "wrote review candidate"}: ${target_path}\n` +
+      `raw rounds retained: ${raw_path}\n`,
   );
-  return targetPath;
+  return target_path;
 }
 
 if (import.meta.main) {

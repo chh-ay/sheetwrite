@@ -112,7 +112,7 @@ export function frontmatter(
   kind?: string,
   symbols?: number,
 ): string {
-  const kindLine = kind === undefined ? "" : `kind: ${JSON.stringify(kind)}\n`;
-  const symbolsLine = symbols === undefined ? "" : `symbols: ${symbols}\n`;
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${kindLine}${symbolsLine}---\n\n`;
+  const kind_line = kind === undefined ? "" : `kind: ${JSON.stringify(kind)}\n`;
+  const symbols_line = symbols === undefined ? "" : `symbols: ${symbols}\n`;
+  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${kind_line}${symbols_line}---\n\n`;
 }

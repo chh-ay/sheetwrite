@@ -12,26 +12,26 @@ type Artifact = DeepMutable<ResourceBenchmarkArtifact>;
 const RECORDED: ResourceBenchmarkArtifact = await Bun.file(
   new URL("../results/resource-results.json", import.meta.url),
 ).json();
-const fullArtifact = () => mutableCopy(RECORDED);
+const full_artifact = () => mutableCopy(RECORDED);
 const validate = (artifact: Artifact) => validateResourceBenchmark(artifact, "full");
 
-const scenarioOf = (artifact: Artifact, id: ResourceScenarioId) =>
+const scenario_of = (artifact: Artifact, id: ResourceScenarioId) =>
   must(
     artifact.scenarios.find((entry) => entry.id === id),
     id,
   );
-const formulaPeak = (artifact: Artifact) =>
-  must(scenarioOf(artifact, "formula-recompute").transientPeaks[0], "transient peak");
+const formula_peak = (artifact: Artifact) =>
+  must(scenario_of(artifact, "formula-recompute").transientPeaks[0], "transient peak");
 const optimization = (artifact: Artifact) => must(artifact.optimizations[0], "optimization");
 
 it("keeps transient peaks out of the retained totals", () => {
-  const artifact = fullArtifact();
-  formulaPeak(artifact).peakBytes = Number.MAX_SAFE_INTEGER;
+  const artifact = full_artifact();
+  formula_peak(artifact).peakBytes = Number.MAX_SAFE_INTEGER;
   expect(() => validate(artifact)).not.toThrow();
 });
 
 it("fails closed on drifted scenarios, owner accounting and optimization evidence", () => {
-  expectRejections(fullArtifact, validate, [
+  expectRejections(full_artifact, validate, [
     [(artifact) => artifact.scenarios.shift(), "missing resource scenario"],
     [
       (artifact) =>
@@ -40,7 +40,7 @@ it("fails closed on drifted scenarios, owner accounting and optimization evidenc
     ],
     [
       (artifact) => {
-        const before = must(scenarioOf(artifact, "dense-ingest").phases.before, "before phase");
+        const before = must(scenario_of(artifact, "dense-ingest").phases.before, "before phase");
         before.jsOwners = [
           {
             owner: "wasm.dense.kinds",
@@ -55,8 +55,8 @@ it("fails closed on drifted scenarios, owner accounting and optimization evidenc
     ],
     [
       (artifact) =>
-        scenarioOf(artifact, "formula-recompute").transientPeaks.push(
-          structuredClone(formulaPeak(artifact)),
+        scenario_of(artifact, "formula-recompute").transientPeaks.push(
+          structuredClone(formula_peak(artifact)),
         ),
       "invalid transient resource accounting",
     ],

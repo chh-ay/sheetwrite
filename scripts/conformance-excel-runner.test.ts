@@ -60,14 +60,14 @@ beforeAll(() => {
   });
 });
 
-function valueTypeOf(cell: FakeCell): ExcelScript.RangeValueType {
+function value_type_of(cell: FakeCell): ExcelScript.RangeValueType {
   return RANGE_VALUE_TYPE[cell.valueType] as unknown as ExcelScript.RangeValueType;
 }
 
-function cellRange(cells: FakeCell[][], formula = ""): ExcelScript.Range {
-  const firstRow = cells[0];
-  const first = firstRow?.[0];
-  if (!firstRow || !first) throw new Error("A fake range needs at least one cell");
+function cell_range(cells: FakeCell[][], formula = ""): ExcelScript.Range {
+  const first_row = cells[0];
+  const first = first_row?.[0];
+  if (!first_row || !first) throw new Error("A fake range needs at least one cell");
 
   return {
     setValue: () => undefined,
@@ -75,12 +75,12 @@ function cellRange(cells: FakeCell[][], formula = ""): ExcelScript.Range {
     setNumberFormat: () => undefined,
     getValue: () => first.value,
     getValues: () => cells.map((line) => line.map((cell) => cell.value)),
-    getValueType: () => valueTypeOf(first),
-    getValueTypes: () => cells.map((line) => line.map(valueTypeOf)),
+    getValueType: () => value_type_of(first),
+    getValueTypes: () => cells.map((line) => line.map(value_type_of)),
     getText: () => first.text,
     getFormula: () => formula,
     getRowCount: () => cells.length,
-    getColumnCount: () => firstRow.length,
+    getColumnCount: () => first_row.length,
     getSpillingToRange: () => undefined,
   };
 }
@@ -89,45 +89,45 @@ function cellRange(cells: FakeCell[][], formula = ""): ExcelScript.Range {
  * A workbook that offers only the documented Office Scripts methods. Each
  * formula's result comes from `results` once the script asks for a full rebuild.
  */
-function fakeWorkbook(
+function fake_workbook(
   results: Record<string, FakeResult>,
   options: FakeOptions,
 ): { workbook: ExcelScript.Workbook } & HostCalls {
   const sheets: ExcelScript.Worksheet[] = [];
   const formulas = new Map<string, string>();
-  const numberFormats = new Map<string, unknown>();
+  const number_formats = new Map<string, unknown>();
   const calculations: unknown[] = [];
   const iteration = { enabled: false, maxIteration: 100, maxChange: 0.001 };
   let calculated = false;
 
-  const rangeAt = (key: string): ExcelScript.Range => {
+  const range_at = (key: string): ExcelScript.Range => {
     const formula = formulas.get(key);
     const result = formula === undefined ? undefined : results[formula];
     if (!calculated || formula === undefined || !result) {
       return {
-        ...cellRange([[EMPTY_CELL]]),
+        ...cell_range([[EMPTY_CELL]]),
         setFormula: (source: string) => {
           formulas.set(key, source);
         },
         setNumberFormat: (format: unknown) => {
-          numberFormats.set(key, format);
+          number_formats.set(key, format);
         },
       };
     }
     const spill = result.spill;
     return {
-      ...cellRange([[result.anchor]], formula),
-      getSpillingToRange: () => (spill ? cellRange(spill) : undefined),
+      ...cell_range([[result.anchor]], formula),
+      getSpillingToRange: () => (spill ? cell_range(spill) : undefined),
     };
   };
 
-  const addWorksheet = (name = `Sheet${sheets.length + 1}`): ExcelScript.Worksheet => {
+  const add_worksheet = (name = `Sheet${sheets.length + 1}`): ExcelScript.Worksheet => {
     const sheet: ExcelScript.Worksheet = {
       getName: () => name,
       delete: () => {
         sheets.splice(sheets.indexOf(sheet), 1);
       },
-      getRange: (address = "A1") => rangeAt(`${name}!${address}`),
+      getRange: (address = "A1") => range_at(`${name}!${address}`),
     };
     sheets.push(sheet);
     return sheet;
@@ -135,9 +135,9 @@ function fakeWorkbook(
   const workbook: ExcelScript.Workbook = {
     getWorksheets: () =>
       options.collectionMethods
-        ? Object.assign([...sheets], { getItems: () => [...sheets], add: addWorksheet })
+        ? Object.assign([...sheets], { getItems: () => [...sheets], add: add_worksheet })
         : [...sheets],
-    addWorksheet,
+    addWorksheet: add_worksheet,
     getApplication: () => ({
       calculate: (type) => {
         calculations.push(type);
@@ -150,23 +150,23 @@ function fakeWorkbook(
         setEnabled: (enabled) => {
           iteration.enabled = enabled;
         },
-        setMaxChange: (maxChange) => {
-          iteration.maxChange = maxChange;
+        setMaxChange: (max_change) => {
+          iteration.maxChange = max_change;
         },
-        setMaxIteration: (maxIteration) => {
-          iteration.maxIteration = maxIteration;
+        setMaxIteration: (max_iteration) => {
+          iteration.maxIteration = max_iteration;
         },
       }),
     }),
   };
-  return { workbook, numberFormats, calculations };
+  return { workbook, numberFormats: number_formats, calculations };
 }
 
 function capture(
   results: Record<string, FakeResult>,
   options: FakeOptions = { collectionMethods: true },
 ): CaptureOutput & HostCalls {
-  const { workbook, ...calls } = fakeWorkbook(results, options);
+  const { workbook, ...calls } = fake_workbook(results, options);
   const payload = {
     protocol: 1,
     producerVersion: "16.0",

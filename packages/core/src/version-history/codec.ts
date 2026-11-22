@@ -229,7 +229,7 @@ export async function checkRecord(
   record: HistoryStoredRecord,
   limits: Readonly<HistoryLimits>,
 ): Promise<void> {
-  const validEnvelope =
+  const valid_envelope =
     record.schemaVersion === RECORD_SCHEMA_VERSION &&
     validId(record.id) &&
     integer(record.decodedBytes) &&
@@ -243,16 +243,16 @@ export async function checkRecord(
     RECORD_KINDS.includes(record.kind) &&
     RECORD_ENCODINGS.includes(record.encoding);
 
-  if (!validEnvelope) {
+  if (!valid_envelope) {
     throw new HistoryError("integrity", "Invalid history record envelope");
   }
 
-  const oversizedSegment =
+  const oversized_segment =
     record.kind === "segment" &&
     (record.bytes.length > limits.maxSegmentBytes + SEGMENT_DEFLATE_SLACK_BYTES ||
       record.decodedBytes > limits.maxSegmentBytes);
 
-  if (oversizedSegment) {
+  if (oversized_segment) {
     throw new HistoryError("capacity", "History segment exceeds its byte ceiling");
   }
 

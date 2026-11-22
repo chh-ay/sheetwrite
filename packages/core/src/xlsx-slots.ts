@@ -10,37 +10,37 @@ import { setXlsxSourceVerifier } from "./xlsx-source.js";
  * free of codec code, so installing an add-on at startup does not pull the
  * XLSX bridge into the first chunk; the bridge reads these slots per call.
  */
-let tableExportBackend: XlsxTableExportBackend | null = null;
-let tableImportBackend: XlsxTableImportBackend | null = null;
-let workbookBackend: XlsxWorkbookBackend | null = null;
+let table_export_backend: XlsxTableExportBackend | null = null;
+let table_import_backend: XlsxTableImportBackend | null = null;
+let workbook_backend: XlsxWorkbookBackend | null = null;
 
 /** Sets the table XLSX export implementation; `null` clears it. */
 export function setXlsxTableExportBackend(next: XlsxTableExportBackend | null): void {
-  tableExportBackend = next;
+  table_export_backend = next;
 }
 
 /** Sets the table XLSX import implementation; `null` clears it. */
 export function setXlsxTableImportBackend(next: XlsxTableImportBackend | null): void {
-  tableImportBackend = next;
+  table_import_backend = next;
 }
 
 /** Sets the workbook XLSX implementation and its source verifier; `null` clears both. */
 export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend | null): void {
-  workbookBackend = next;
+  workbook_backend = next;
   setXlsxSourceVerifier(next?.verifySource?.bind(next));
 }
 
 /** The installed table export backend, or `null`. */
 export function xlsxTableExportBackend(): XlsxTableExportBackend | null {
-  return tableExportBackend;
+  return table_export_backend;
 }
 
 /** The installed table import backend, or `null`. */
 export function xlsxTableImportBackend(): XlsxTableImportBackend | null {
-  return tableImportBackend;
+  return table_import_backend;
 }
 
 /** The installed workbook backend, or `null`. */
 export function xlsxWorkbookBackend(): XlsxWorkbookBackend | null {
-  return workbookBackend;
+  return workbook_backend;
 }

@@ -34,7 +34,7 @@ const BAND_FILL_RATIO = 7 / 8;
 
 type SetBlockOperation = Extract<DocumentOp, { op: "setBlock" }>;
 
-const atomicBatches = new WeakSet<readonly DocumentOp[]>();
+const atomic_batches = new WeakSet<readonly DocumentOp[]>();
 
 /**
  * Mark an engine-built operation array as one atomic batch. Only internal undo,
@@ -42,12 +42,12 @@ const atomicBatches = new WeakSet<readonly DocumentOp[]>();
  * host transaction can never claim the larger ceilings.
  */
 export function markAtomicBatch<T extends readonly DocumentOp[]>(operations: T): T {
-  atomicBatches.add(operations);
+  atomic_batches.add(operations);
   return operations;
 }
 
 export function isAtomicBatch(operations: readonly DocumentOp[]): boolean {
-  return atomicBatches.has(operations);
+  return atomic_batches.has(operations);
 }
 
 /**
@@ -160,16 +160,16 @@ export function partitionVersionOperations(
   let count = 0;
   let bytes = ARRAY_ENVELOPE_BYTES;
 
-  for (const operationBytes of sizes) {
-    if (ARRAY_ENVELOPE_BYTES + operationBytes > maxEncodedBytes) return null;
+  for (const operation_bytes of sizes) {
+    if (ARRAY_ENVELOPE_BYTES + operation_bytes > maxEncodedBytes) return null;
 
-    if (count > 0 && (count === maxOperations || bytes + 1 + operationBytes > maxEncodedBytes)) {
+    if (count > 0 && (count === maxOperations || bytes + 1 + operation_bytes > maxEncodedBytes)) {
       counts.push(count);
       count = 0;
       bytes = ARRAY_ENVELOPE_BYTES;
     }
 
-    bytes += (count > 0 ? 1 : 0) + operationBytes;
+    bytes += (count > 0 ? 1 : 0) + operation_bytes;
     count += 1;
   }
 
@@ -195,7 +195,7 @@ export function splitOversizedBlocks(
   operations: readonly DocumentOp[],
   limits: Readonly<TransactionResourceLimits>,
 ): { operations: DocumentOp[]; encodedBytes: number } | null {
-  const pieceLimits: PieceLimits = {
+  const piece_limits: PieceLimits = {
     pieceBytes: Math.max(1, Math.floor(limits.maxEncodedBytes / PIECES_PER_VERSION)),
     versionBytes: limits.maxEncodedBytes - ARRAY_ENVELOPE_BYTES,
   };
@@ -203,16 +203,16 @@ export function splitOversizedBlocks(
   const sizes: number[] = [];
   for (const operation of operations) {
     if (operation.op === "setBlock") {
-      const bytes = measureOperation(operation, pieceLimits.pieceBytes);
+      const bytes = measure_operation(operation, piece_limits.pieceBytes);
       if (bytes !== null) {
         pieces.push(operation);
         sizes.push(bytes);
-      } else if (!splitBlock(operation, pieceLimits, pieces, sizes)) {
+      } else if (!split_block(operation, piece_limits, pieces, sizes)) {
         return null;
       }
       continue;
     }
-    const bytes = measureOperation(operation, pieceLimits.versionBytes);
+    const bytes = measure_operation(operation, piece_limits.versionBytes);
     if (bytes === null) return null;
     pieces.push(operation);
     sizes.push(bytes);
@@ -225,31 +225,34 @@ export function splitOversizedBlocks(
  * once against the piece target; a band above the target is retried with
  * half the lines, and a single line above it is cut into column bands.
  */
-function splitBlock(
+function split_block(
   operation: SetBlockOperation,
   limits: PieceLimits,
   pieces: DocumentOp[],
   sizes: number[],
 ): boolean {
   const { block } = operation;
-  const alongRows = block.rowCount > 1;
-  const length = alongRows ? block.rowCount : block.colCount;
-  const lineCells = alongRows ? block.colCount : 1;
-  let bandLength = Math.max(1, Math.floor(limits.pieceBytes / (FIRST_BAND_CELL_BYTES * lineCells)));
+  const along_rows = block.rowCount > 1;
+  const length = along_rows ? block.rowCount : block.colCount;
+  const line_cells = along_rows ? block.colCount : 1;
+  let band_length = Math.max(
+    1,
+    Math.floor(limits.pieceBytes / (FIRST_BAND_CELL_BYTES * line_cells)),
+  );
 
   for (let start = 0; start < length;) {
-    const lines = Math.min(bandLength, length - start);
-    const band = alongRows
-      ? sliceBlock(operation, start, lines, 0, block.colCount)
-      : sliceBlock(operation, 0, 1, start, lines);
-    const bytes = measureOperation(band, limits.pieceBytes);
+    const lines = Math.min(band_length, length - start);
+    const band = along_rows
+      ? slice_block(operation, start, lines, 0, block.colCount)
+      : slice_block(operation, 0, 1, start, lines);
+    const bytes = measure_operation(band, limits.pieceBytes);
 
     if (bytes !== null) {
       pieces.push(band);
       sizes.push(bytes);
       start += lines;
       // Size the next band from the measured bytes per line of this one.
-      bandLength = Math.max(
+      band_length = Math.max(
         1,
         Math.floor((lines * limits.pieceBytes * BAND_FILL_RATIO) / Math.max(1, bytes)),
       );
@@ -257,17 +260,17 @@ function splitBlock(
     }
 
     if (lines > 1) {
-      bandLength = Math.max(1, lines >> 1);
+      band_length = Math.max(1, lines >> 1);
       continue;
     }
 
-    if (alongRows && block.colCount > 1) {
-      if (!splitBlock(band, limits, pieces, sizes)) return false;
+    if (along_rows && block.colCount > 1) {
+      if (!split_block(band, limits, pieces, sizes)) return false;
     } else {
-      const cellBytes = measureOperation(band, limits.versionBytes);
-      if (cellBytes === null) return false;
+      const cell_bytes = measure_operation(band, limits.versionBytes);
+      if (cell_bytes === null) return false;
       pieces.push(band);
-      sizes.push(cellBytes);
+      sizes.push(cell_bytes);
     }
 
     start += 1;
@@ -276,79 +279,83 @@ function splitBlock(
   return true;
 }
 
-function sliceBlock(
+function slice_block(
   operation: SetBlockOperation,
-  rowOffset: number,
-  rowCount: number,
-  colOffset: number,
-  colCount: number,
+  row_offset: number,
+  row_count: number,
+  col_offset: number,
+  col_count: number,
 ): SetBlockOperation {
   const { block, range } = operation;
-  const startRow = Math.min(range.start.row, range.end.row) + rowOffset;
-  const startCol = Math.min(range.start.col, range.end.col) + colOffset;
-  const values: PackedCellBlock["values"] = new Array(rowCount * colCount);
-  const sourceStyles = block.styleIds;
-  const styleIds: number[] | undefined = sourceStyles ? new Array(rowCount * colCount) : undefined;
-  const styleTable: CellStyle[] = [];
-  const styleIndex = new Map<number, number>();
-  for (let row = 0; row < rowCount; row++) {
-    const sourceRow = (rowOffset + row) * block.colCount + colOffset;
-    for (let col = 0; col < colCount; col++) {
-      const target = row * colCount + col;
-      values[target] = block.values[sourceRow + col] ?? null;
-      if (!sourceStyles || !styleIds) continue;
-      const sourceStyle = sourceStyles[sourceRow + col] ?? 0;
-      let style = styleIndex.get(sourceStyle);
+  const start_row = Math.min(range.start.row, range.end.row) + row_offset;
+  const start_col = Math.min(range.start.col, range.end.col) + col_offset;
+  const values: PackedCellBlock["values"] = new Array(row_count * col_count);
+  const source_styles = block.styleIds;
+  const style_ids: number[] | undefined = source_styles
+    ? new Array(row_count * col_count)
+    : undefined;
+  const style_table: CellStyle[] = [];
+  const style_index = new Map<number, number>();
+  for (let row = 0; row < row_count; row++) {
+    const source_row = (row_offset + row) * block.colCount + col_offset;
+    for (let col = 0; col < col_count; col++) {
+      const target = row * col_count + col;
+      values[target] = block.values[source_row + col] ?? null;
+      if (!source_styles || !style_ids) continue;
+      const source_style = source_styles[source_row + col] ?? 0;
+      let style = style_index.get(source_style);
       if (style === undefined) {
-        style = styleTable.length;
-        styleIndex.set(sourceStyle, style);
-        styleTable.push(block.styleTable?.[sourceStyle] ?? {});
+        style = style_table.length;
+        style_index.set(source_style, style);
+        style_table.push(block.styleTable?.[source_style] ?? {});
       }
 
-      styleIds[target] = style;
+      style_ids[target] = style;
     }
   }
 
-  const inBand = (offset: number): number | null => {
-    const row = Math.floor(offset / block.colCount) - rowOffset;
-    const col = (offset % block.colCount) - colOffset;
-    return row >= 0 && row < rowCount && col >= 0 && col < colCount ? row * colCount + col : null;
+  const in_band = (offset: number): number | null => {
+    const row = Math.floor(offset / block.colCount) - row_offset;
+    const col = (offset % block.colCount) - col_offset;
+    return row >= 0 && row < row_count && col >= 0 && col < col_count
+      ? row * col_count + col
+      : null;
   };
 
   const formulas: Array<[number, string]> = [];
   for (const [offset, source] of block.formulas ?? []) {
-    const target = inBand(offset);
+    const target = in_band(offset);
     if (target !== null) formulas.push([target, source]);
   }
 
   const refs: Array<[number, CellAddress]> = [];
   for (const [offset, address] of block.refs ?? []) {
-    const target = inBand(offset);
+    const target = in_band(offset);
     if (target !== null) refs.push([target, address]);
   }
 
-  const bandRange: Range = {
+  const band_range: Range = {
     sheet: range.sheet,
-    start: { row: startRow, col: startCol },
-    end: { row: startRow + rowCount - 1, col: startCol + colCount - 1 },
+    start: { row: start_row, col: start_col },
+    end: { row: start_row + row_count - 1, col: start_col + col_count - 1 },
   };
 
   return {
     op: "setBlock",
-    range: bandRange,
+    range: band_range,
     block: {
-      rowCount,
-      colCount,
+      rowCount: row_count,
+      colCount: col_count,
       values,
       ...(formulas.length > 0 ? { formulas } : {}),
       ...(refs.length > 0 ? { refs } : {}),
-      ...(styleIds ? { styleTable, styleIds } : {}),
+      ...(style_ids ? { styleTable: style_table, styleIds: style_ids } : {}),
     },
   };
 }
 
 /** Exact JSON bytes of one operation, or `null` above `limit`. */
-function measureOperation(operation: DocumentOp, limit: number): number | null {
+function measure_operation(operation: DocumentOp, limit: number): number | null {
   try {
     return boundedJsonByteLength(operation, limit, { omitUndefinedProperties: true });
   } catch (error) {

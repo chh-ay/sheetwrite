@@ -102,11 +102,11 @@ function wrap(offset: number, size: number): number {
   return ((offset % size) + size) % size;
 }
 
-function isFiniteNumber(v: CellScalar): v is number {
+function is_finite_number(v: CellScalar): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
-function tilingSeries(length: number): FillSeries {
+function tiling_series(length: number): FillSeries {
   const n = Math.max(1, length);
   return {
     stepAt: (p) => ({ kind: "tile", sourceIndex: wrap(p, n) }),
@@ -114,13 +114,13 @@ function tilingSeries(length: number): FillSeries {
 }
 
 /** The constant step of `values`, or null when the steps differ. */
-function constantStep(values: readonly number[]): number | null {
+function constant_step(values: readonly number[]): number | null {
   const first = values[0];
   const second = values[1];
   if (first === undefined || second === undefined) return null;
-  let maxAbs = 0;
-  for (const value of values) maxAbs = Math.max(maxAbs, Math.abs(value));
-  const tolerance = DELTA_EPSILON * Math.max(1, maxAbs);
+  let max_abs = 0;
+  for (const value of values) max_abs = Math.max(max_abs, Math.abs(value));
+  const tolerance = DELTA_EPSILON * Math.max(1, max_abs);
   const delta = second - first;
   for (let i = 2; i < values.length; i++) {
     const current = values[i] ?? 0;
@@ -131,35 +131,35 @@ function constantStep(values: readonly number[]): number | null {
 }
 
 /** Least-squares line through (index, value), as Excel's linear trend fill computes. */
-function linearTrend(values: readonly number[]): { base: number; slope: number } {
+function linear_trend(values: readonly number[]): { base: number; slope: number } {
   const n = values.length;
-  const meanX = (n - 1) / 2;
-  let meanY = 0;
-  for (const value of values) meanY += value / n;
+  const mean_x = (n - 1) / 2;
+  let mean_y = 0;
+  for (const value of values) mean_y += value / n;
   let covariance = 0;
   let variance = 0;
   values.forEach((value, x) => {
-    covariance += (x - meanX) * (value - meanY);
-    variance += (x - meanX) ** 2;
+    covariance += (x - mean_x) * (value - mean_y);
+    variance += (x - mean_x) ** 2;
   });
   const slope = variance === 0 ? 0 : covariance / variance;
-  return { base: meanY - slope * meanX, slope };
+  return { base: mean_y - slope * mean_x, slope };
 }
 
-function daysInMonth(year: number, month: number): number {
+function days_in_month(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 /** The serial of `day` (clamped, or the month's last day) in month `index` counted from year 0. */
-function monthSerial(index: number, day: number | "last"): number {
+function month_serial(index: number, day: number | "last"): number {
   const year = Math.floor(index / 12);
   const month = wrap(index, 12);
-  const last = daysInMonth(year, month);
+  const last = days_in_month(year, month);
   return dateToSerial(new Date(Date.UTC(year, month, day === "last" ? last : Math.min(day, last))));
 }
 
 /** One unit per cell from `base`, keeping its time of day; weekdays skip Saturday and Sunday. */
-function dateUnitSeries(base: number, unit: FillDateUnit): FillSeries {
+function date_unit_series(base: number, unit: FillDateUnit): FillSeries {
   const whole = Math.floor(base);
   const time = base - whole;
   if (unit === "day") return { stepAt: (p) => ({ kind: "value", value: base + p }) };
@@ -189,7 +189,7 @@ function dateUnitSeries(base: number, unit: FillDateUnit): FillSeries {
   const day = date.getUTCDate();
   const months = unit === "month" ? 1 : 12;
   return {
-    stepAt: (p) => ({ kind: "value", value: monthSerial(first + months * p, day) + time }),
+    stepAt: (p) => ({ kind: "value", value: month_serial(first + months * p, day) + time }),
   };
 }
 
@@ -198,32 +198,32 @@ function dateUnitSeries(base: number, unit: FillDateUnit): FillSeries {
  * day of its month (`31-Jan, 28-Feb`), step by whole months or years as in
  * Excel; other dates step by days.
  */
-function monthSeries(values: readonly number[]): FillSeries | null {
+function month_series(values: readonly number[]): FillSeries | null {
   const months: number[] = [];
   let day: number | null = null;
-  let sameDay = true;
-  let lastDays = true;
+  let same_day = true;
+  let last_days = true;
   for (const value of values) {
     if (!Number.isInteger(value) || value === FICTIONAL_LEAP_DAY_SERIAL) return null;
     const date = serialToDate(value);
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
-    const dayOfMonth = date.getUTCDate();
+    const day_of_month = date.getUTCDate();
     months.push(year * 12 + month);
-    day ??= dayOfMonth;
-    sameDay &&= dayOfMonth === day;
-    lastDays &&= dayOfMonth === daysInMonth(year, month);
+    day ??= day_of_month;
+    same_day &&= day_of_month === day;
+    last_days &&= day_of_month === days_in_month(year, month);
   }
-  const step = constantStep(months);
-  if (step === null || step === 0 || day === null || !(sameDay || lastDays)) return null;
+  const step = constant_step(months);
+  if (step === null || step === 0 || day === null || !(same_day || last_days)) return null;
   const first = months[0] ?? 0;
-  const target = sameDay ? day : "last";
+  const target = same_day ? day : "last";
   return {
-    stepAt: (p) => ({ kind: "value", value: monthSerial(first + step * p, target) }),
+    stepAt: (p) => ({ kind: "value", value: month_serial(first + step * p, target) }),
   };
 }
 
-function numericSeries(
+function numeric_series(
   cells: readonly FillSourceCell[],
   values: number[],
   swap: boolean,
@@ -237,19 +237,19 @@ function numericSeries(
     const base = values[0] ?? 0;
     return counts
       ? { stepAt: (p) => ({ kind: "value", value: base + unit * p }) }
-      : tilingSeries(1);
+      : tiling_series(1);
   }
-  if (swap) return tilingSeries(values.length);
+  if (swap) return tiling_series(values.length);
   if (cells.every((cell) => cell.isDate === true)) {
-    const months = monthSeries(values);
+    const months = month_series(values);
     if (months !== null) return months;
   }
-  const delta = constantStep(values);
+  const delta = constant_step(values);
   if (delta !== null) {
     const base = values[0] ?? 0;
     return { stepAt: (p) => ({ kind: "value", value: base + delta * p }) };
   }
-  const { base, slope } = linearTrend(values);
+  const { base, slope } = linear_trend(values);
   return { stepAt: (p) => ({ kind: "value", value: base + slope * p }) };
 }
 
@@ -263,7 +263,7 @@ interface CountedText {
 }
 
 /** `st`, `nd`, `rd` or `th` for a whole number, in upper case when `upper`. */
-function ordinalSuffix(number: number, upper: boolean): string {
+function ordinal_suffix(number: number, upper: boolean): string {
   const tens = number % 100;
   const units = number % 10;
   const suffix =
@@ -284,75 +284,75 @@ function quarter(number: number): number {
   return wrap(number - 1, 4) + 1;
 }
 
-function countedText(text: string): CountedText | null {
-  const quarterMatch = QUARTER.exec(text);
-  if (quarterMatch !== null) {
-    const [, label = "", space = "", digit = ""] = quarterMatch;
+function counted_text(text: string): CountedText | null {
+  const quarter_match = QUARTER.exec(text);
+  if (quarter_match !== null) {
+    const [, label = "", space = "", digit = ""] = quarter_match;
     return {
       key: `q${label}${space}`,
       number: Number(digit),
       write: (number) => `${label}${space}${quarter(number)}`,
     };
   }
-  const ordinalQuarter = ORDINAL_QUARTER.exec(text);
-  if (ordinalQuarter !== null) {
-    const [, digit = "", suffix = "", space = "", label = ""] = ordinalQuarter;
+  const ordinal_quarter = ORDINAL_QUARTER.exec(text);
+  if (ordinal_quarter !== null) {
+    const [, digit = "", suffix = "", space = "", label = ""] = ordinal_quarter;
     const upper = suffix === suffix.toUpperCase();
     return {
       key: `r${upper}${space}${label}`,
       number: Number(digit),
       write: (number) => {
         const q = quarter(number);
-        return `${q}${ordinalSuffix(q, upper)}${space}${label}`;
+        return `${q}${ordinal_suffix(q, upper)}${space}${label}`;
       },
     };
   }
   const ordinal = ORDINAL.exec(text);
   const [, digits = "", suffix = "", rest = ""] = ordinal ?? [];
   const upper = suffix === suffix.toUpperCase();
-  if (ordinal !== null && suffix === ordinalSuffix(Number(digits), upper)) {
+  if (ordinal !== null && suffix === ordinal_suffix(Number(digits), upper)) {
     return {
       key: `o${upper}${rest}`,
       number: Number(digits),
       write: (number) => {
         const whole = Math.abs(number);
-        return `${whole}${ordinalSuffix(whole, upper)}${rest}`;
+        return `${whole}${ordinal_suffix(whole, upper)}${rest}`;
       },
     };
   }
   const trailing = TRAILING_NUMBER.exec(text);
   if (trailing === null) return null;
-  const [, prefix = "", trailingDigits = ""] = trailing;
-  const width = trailingDigits.startsWith("0") ? trailingDigits.length : 0;
+  const [, prefix = "", trailing_digits = ""] = trailing;
+  const width = trailing_digits.startsWith("0") ? trailing_digits.length : 0;
   return {
     key: `t${prefix}`,
-    number: Number(trailingDigits),
+    number: Number(trailing_digits),
     write: (number) => `${prefix}${String(Math.abs(number)).padStart(width, "0")}`,
   };
 }
 
 /** Write `name` in the letter case of `sample`: `MON`, `mon` or `Mon`. */
-function matchCase(name: string, sample: string): string {
+function match_case(name: string, sample: string): string {
   if (sample === sample.toUpperCase() && sample !== sample.toLowerCase()) return name.toUpperCase();
   if (sample === sample.toLowerCase()) return name.toLowerCase();
   return name;
 }
 
-function listSeries(texts: readonly string[]): FillSeries | null {
+function list_series(texts: readonly string[]): FillSeries | null {
   for (const list of NAME_LISTS) {
     const positions = texts.map((text) =>
       list.findIndex((name) => name.toLowerCase() === text.toLowerCase()),
     );
     if (positions.some((position) => position < 0)) continue;
     const first = positions[0] ?? 0;
-    const step = positions.length > 1 ? constantStep(positions) : 1;
+    const step = positions.length > 1 ? constant_step(positions) : 1;
     if (step === null) return null;
     const sample = texts[0] ?? "";
     const size = list.length;
     return {
       stepAt: (p) => {
         const index = (((first + step * p) % size) + size) % size;
-        return { kind: "value", value: matchCase(list[index] ?? "", sample) };
+        return { kind: "value", value: match_case(list[index] ?? "", sample) };
       },
     };
   }
@@ -363,40 +363,40 @@ function listSeries(texts: readonly string[]): FillSeries | null {
  * The source repeats, and each text with a number counts up by one per
  * repeat, as Excel fills `text1, textA` with `text2, textA, text3, textA`.
  */
-function repeatingSeries(cells: readonly FillSourceCell[]): FillSeries {
+function repeating_series(cells: readonly FillSourceCell[]): FillSeries {
   const n = cells.length;
   const counted = cells.map((cell) =>
-    typeof cell.value === "string" ? countedText(cell.value) : null,
+    typeof cell.value === "string" ? counted_text(cell.value) : null,
   );
-  if (counted.every((text) => text === null)) return tilingSeries(n);
+  if (counted.every((text) => text === null)) return tiling_series(n);
   return {
     stepAt: (p) => {
-      const sourceIndex = wrap(p, n);
-      const text = counted[sourceIndex];
-      if (!text) return { kind: "tile", sourceIndex };
+      const source_index = wrap(p, n);
+      const text = counted[source_index];
+      if (!text) return { kind: "tile", sourceIndex: source_index };
       return { kind: "value", value: text.write(text.number + Math.floor(p / n)) };
     },
   };
 }
 
-function textSeries(
+function text_series(
   cells: readonly FillSourceCell[],
   texts: readonly string[],
   swap: boolean,
 ): FillSeries {
-  if (swap) return tilingSeries(texts.length);
-  const listed = listSeries(texts);
+  if (swap) return tiling_series(texts.length);
+  const listed = list_series(texts);
   if (listed !== null) return listed;
-  const counted = texts.map(countedText);
+  const counted = texts.map(counted_text);
   const first = counted[0];
   if (first && counted.every((text) => text?.key === first.key)) {
     const numbers = counted.map((text) => text?.number ?? 0);
-    const step = numbers.length > 1 ? constantStep(numbers) : 1;
+    const step = numbers.length > 1 ? constant_step(numbers) : 1;
     if (step !== null) {
       return { stepAt: (p) => ({ kind: "value", value: first.write(first.number + step * p) }) };
     }
   }
-  return repeatingSeries(cells);
+  return repeating_series(cells);
 }
 
 /**
@@ -418,22 +418,22 @@ export function detectFillSeries(
 ): FillSeries {
   const n = source.length;
   if (n === 0 || options.copy === true || source.some((cell) => cell.isFormula)) {
-    return tilingSeries(n);
+    return tiling_series(n);
   }
   const first = source[0];
-  if (options.unit !== undefined && first && isFiniteNumber(first.value)) {
-    return dateUnitSeries(first.value, options.unit);
+  if (options.unit !== undefined && first && is_finite_number(first.value)) {
+    return date_unit_series(first.value, options.unit);
   }
-  const plainNumber = n === 1 && first?.isDate !== true && first?.isTime !== true;
-  const swap = options.series === true ? plainNumber : options.swap === true;
+  const plain_number = n === 1 && first?.isDate !== true && first?.isTime !== true;
+  const swap = options.series === true ? plain_number : options.swap === true;
 
   const numbers: number[] = [];
   const texts: string[] = [];
   for (const cell of source) {
-    if (isFiniteNumber(cell.value)) numbers.push(cell.value);
+    if (is_finite_number(cell.value)) numbers.push(cell.value);
     else if (typeof cell.value === "string" && cell.value !== "") texts.push(cell.value);
   }
-  if (numbers.length === n) return numericSeries(source, numbers, swap);
-  if (texts.length === n) return textSeries(source, texts, swap);
-  return swap ? tilingSeries(n) : repeatingSeries(source);
+  if (numbers.length === n) return numeric_series(source, numbers, swap);
+  if (texts.length === n) return text_series(source, texts, swap);
+  return swap ? tiling_series(n) : repeating_series(source);
 }

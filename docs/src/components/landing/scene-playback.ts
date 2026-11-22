@@ -18,10 +18,10 @@ export interface SceneHandle {
  * selected story).
  */
 export function playScene(root: HTMLElement): SceneHandle {
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const reduced_motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let visible = false;
   const apply = (): void => {
-    const play = visible && !reducedMotion.matches;
+    const play = visible && !reduced_motion.matches;
     const animations = root.getAnimations({ subtree: true });
     for (const animation of animations) {
       // Pause only running animations and resume only paused ones: play()
@@ -41,17 +41,17 @@ export function playScene(root: HTMLElement): SceneHandle {
   );
   // A changed motion preference adds or removes the CSS animations at the
   // next style pass, so the decision waits for that frame.
-  const onPreference = (): void => {
+  const on_preference = (): void => {
     requestAnimationFrame(apply);
   };
   observer.observe(root);
-  reducedMotion.addEventListener("change", onPreference);
+  reduced_motion.addEventListener("change", on_preference);
   apply();
   return {
     sync: apply,
     stop: () => {
       observer.disconnect();
-      reducedMotion.removeEventListener("change", onPreference);
+      reduced_motion.removeEventListener("change", on_preference);
     },
   };
 }

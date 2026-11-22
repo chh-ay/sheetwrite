@@ -62,7 +62,7 @@ const MAX_WORKER_TEXT_LENGTH = 256;
 /** Why the paint worker stopped; `context.failure` of its `renderer-fallback` error. */
 type WorkerFailure = "spawn" | "crash" | "protocol" | "timeout" | "fatal";
 
-function workerFailure(failure: WorkerFailure, message: string, cause?: unknown): SheetwriteError {
+function worker_failure(failure: WorkerFailure, message: string, cause?: unknown): SheetwriteError {
   return new SheetwriteError("renderer-fallback", "renderer-worker", message, {
     cause,
     context: { requested: "worker", failure },
@@ -73,49 +73,49 @@ function align(offset: number, alignment: number): number {
   return (offset + alignment - 1) & ~(alignment - 1);
 }
 
-function sharedPackedLayout(cellCount: number, stringUpdateCount: number): SharedPackedLayout {
+function shared_packed_layout(cell_count: number, string_update_count: number): SharedPackedLayout {
   let offset = SHARED_HEADER_BYTES;
 
-  const valueKinds = offset;
-  offset += cellCount * Uint8Array.BYTES_PER_ELEMENT;
+  const value_kinds = offset;
+  offset += cell_count * Uint8Array.BYTES_PER_ELEMENT;
 
   offset = align(offset, Float64Array.BYTES_PER_ELEMENT);
-  const numberValues = offset;
-  offset += cellCount * Float64Array.BYTES_PER_ELEMENT;
+  const number_values = offset;
+  offset += cell_count * Float64Array.BYTES_PER_ELEMENT;
 
   offset = align(offset, Uint32Array.BYTES_PER_ELEMENT);
-  const stringPoolIds = offset;
-  offset += cellCount * Uint32Array.BYTES_PER_ELEMENT;
+  const string_pool_ids = offset;
+  offset += cell_count * Uint32Array.BYTES_PER_ELEMENT;
 
   offset = align(offset, Int32Array.BYTES_PER_ELEMENT);
-  const stringLocalIds = offset;
-  offset += cellCount * Int32Array.BYTES_PER_ELEMENT;
+  const string_local_ids = offset;
+  offset += cell_count * Int32Array.BYTES_PER_ELEMENT;
 
   offset = align(offset, Uint32Array.BYTES_PER_ELEMENT);
-  const styleIds = offset;
-  offset += cellCount * Uint32Array.BYTES_PER_ELEMENT;
+  const style_ids = offset;
+  offset += cell_count * Uint32Array.BYTES_PER_ELEMENT;
 
   offset = align(offset, Uint32Array.BYTES_PER_ELEMENT);
-  const stringPoolUpdateIds = offset;
-  offset += stringUpdateCount * Uint32Array.BYTES_PER_ELEMENT;
+  const string_pool_update_ids = offset;
+  offset += string_update_count * Uint32Array.BYTES_PER_ELEMENT;
 
   return {
     totalBytes: offset,
     offsets: {
-      valueKinds,
-      numberValues,
-      stringPoolIds,
-      stringLocalIds,
-      styleIds,
-      stringPoolUpdateIds,
+      valueKinds: value_kinds,
+      numberValues: number_values,
+      stringPoolIds: string_pool_ids,
+      stringLocalIds: string_local_ids,
+      styleIds: style_ids,
+      stringPoolUpdateIds: string_pool_update_ids,
     },
     lengths: {
-      valueKinds: cellCount,
-      numberValues: cellCount,
-      stringPoolIds: cellCount,
-      stringLocalIds: cellCount,
-      styleIds: cellCount,
-      stringPoolUpdateIds: stringUpdateCount,
+      valueKinds: cell_count,
+      numberValues: cell_count,
+      stringPoolIds: cell_count,
+      stringLocalIds: cell_count,
+      styleIds: cell_count,
+      stringPoolUpdateIds: string_update_count,
     },
   };
 }
@@ -129,11 +129,11 @@ function sharedPackedLayout(cellCount: number, stringUpdateCount: number): Share
 export class WorkerRenderer implements Renderer {
   private canvas: HTMLCanvasElement | null = null;
   private worker: Worker | null = null;
-  private sharedCursor = 0;
-  private readonly sharedRegions: Array<SharedRegion | undefined> = new Array(SHARED_REGION_COUNT);
+  private shared_cursor = 0;
+  private readonly shared_regions: Array<SharedRegion | undefined> = new Array(SHARED_REGION_COUNT);
   private failed = false;
-  private frameGeneration = 0;
-  private readinessTimeout: number | undefined;
+  private frame_generation = 0;
+  private readiness_timeout: number | undefined;
 
   constructor(
     private readonly workerUrl?: string | URL,
@@ -155,13 +155,13 @@ export class WorkerRenderer implements Renderer {
           ? new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
           : new Worker(this.workerUrl, { type: "module" });
     } catch (error) {
-      throw workerFailure("spawn", "Sheetwrite: paint worker could not start", error);
+      throw worker_failure("spawn", "Sheetwrite: paint worker could not start", error);
     }
 
     this.worker = worker;
-    worker.addEventListener("error", this.onWorkerError);
-    worker.addEventListener("message", this.onWorkerMessage);
-    worker.addEventListener("messageerror", this.onWorkerMessageError);
+    worker.addEventListener("error", this.on_worker_error);
+    worker.addEventListener("message", this.on_worker_message);
+    worker.addEventListener("messageerror", this.on_worker_message_error);
 
     const canvas = document.createElement("canvas");
     canvas.className = "sheetwrite-canvas";
@@ -173,15 +173,15 @@ export class WorkerRenderer implements Renderer {
 
     try {
       const offscreen = canvas.transferControlToOffscreen();
-      this.readinessTimeout = window.setTimeout(() => {
-        this.fail(workerFailure("timeout", "Sheetwrite: paint worker did not become ready"));
+      this.readiness_timeout = window.setTimeout(() => {
+        this.fail(worker_failure("timeout", "Sheetwrite: paint worker did not become ready"));
       }, WORKER_READY_TIMEOUT_MS);
       worker.postMessage({ type: "init", canvas: offscreen, theme }, [offscreen]);
       host.appendChild(canvas);
       this.canvas = canvas;
     } catch (error) {
       this.destroy();
-      throw workerFailure("spawn", "Sheetwrite: paint worker could not take the canvas", error);
+      throw worker_failure("spawn", "Sheetwrite: paint worker could not take the canvas", error);
     }
   }
 
@@ -207,26 +207,26 @@ export class WorkerRenderer implements Renderer {
 
   paint(view: VisibleWindowView): void {
     const {
-      valueKinds,
-      numberValues,
-      stringPoolIds,
-      stringLocalIds,
-      stringPoolUpdateIds,
-      stringPoolUpdateValues,
-      localStrings,
+      valueKinds: value_kinds,
+      numberValues: number_values,
+      stringPoolIds: string_pool_ids,
+      stringLocalIds: string_local_ids,
+      stringPoolUpdateIds: string_pool_update_ids,
+      stringPoolUpdateValues: string_pool_update_values,
+      localStrings: local_strings,
     } = view;
-    if (valueKinds && numberValues && stringPoolIds && stringLocalIds) {
+    if (value_kinds && number_values && string_pool_ids && string_local_ids) {
       if (
-        this.canUseSharedMemory() &&
-        this.postSharedPackedView(
+        this.can_use_shared_memory() &&
+        this.post_shared_packed_view(
           view,
-          valueKinds,
-          numberValues,
-          stringPoolIds,
-          stringLocalIds,
-          stringPoolUpdateIds,
-          stringPoolUpdateValues,
-          localStrings,
+          value_kinds,
+          number_values,
+          string_pool_ids,
+          string_local_ids,
+          string_pool_update_ids,
+          string_pool_update_values,
+          local_strings,
         )
       ) {
         return;
@@ -234,21 +234,21 @@ export class WorkerRenderer implements Renderer {
 
       // The renderer transfers only buffers it allocated: the view reuses its
       // own buffers across repaints.
-      const ownedValueKinds = valueKinds.slice();
-      const ownedNumberValues = numberValues.slice();
-      const ownedStringPoolIds = stringPoolIds.slice();
-      const ownedStringLocalIds = stringLocalIds.slice();
-      const ownedStyleIds = view.styleIds.slice();
-      const ownedStringPoolUpdateIds = stringPoolUpdateIds?.slice();
+      const owned_value_kinds = value_kinds.slice();
+      const owned_number_values = number_values.slice();
+      const owned_string_pool_ids = string_pool_ids.slice();
+      const owned_string_local_ids = string_local_ids.slice();
+      const owned_style_ids = view.styleIds.slice();
+      const owned_string_pool_update_ids = string_pool_update_ids?.slice();
       const transfers: Transferable[] = [
-        ownedValueKinds.buffer as ArrayBuffer,
-        ownedNumberValues.buffer as ArrayBuffer,
-        ownedStringPoolIds.buffer as ArrayBuffer,
-        ownedStringLocalIds.buffer as ArrayBuffer,
-        ownedStyleIds.buffer as ArrayBuffer,
+        owned_value_kinds.buffer as ArrayBuffer,
+        owned_number_values.buffer as ArrayBuffer,
+        owned_string_pool_ids.buffer as ArrayBuffer,
+        owned_string_local_ids.buffer as ArrayBuffer,
+        owned_style_ids.buffer as ArrayBuffer,
       ];
-      if (ownedStringPoolUpdateIds) {
-        transfers.push(ownedStringPoolUpdateIds.buffer as ArrayBuffer);
+      if (owned_string_pool_update_ids) {
+        transfers.push(owned_string_pool_update_ids.buffer as ArrayBuffer);
       }
       this.worker?.postMessage(
         {
@@ -258,14 +258,14 @@ export class WorkerRenderer implements Renderer {
           rows: view.rows,
           cols: view.cols,
           styles: view.styles,
-          styleIds: ownedStyleIds,
-          valueKinds: ownedValueKinds,
-          numberValues: ownedNumberValues,
-          stringPoolIds: ownedStringPoolIds,
-          stringLocalIds: ownedStringLocalIds,
-          stringPoolUpdateIds: ownedStringPoolUpdateIds,
-          stringPoolUpdateValues,
-          localStrings,
+          styleIds: owned_style_ids,
+          valueKinds: owned_value_kinds,
+          numberValues: owned_number_values,
+          stringPoolIds: owned_string_pool_ids,
+          stringLocalIds: owned_string_local_ids,
+          stringPoolUpdateIds: owned_string_pool_update_ids,
+          stringPoolUpdateValues: string_pool_update_values,
+          localStrings: local_strings,
         },
         transfers,
       );
@@ -274,8 +274,10 @@ export class WorkerRenderer implements Renderer {
 
     // Custom Store implementations may not expose raw arrays; keep the
     // compatibility path while preserving ownership of their style IDs.
-    const styleIds = view.styleIds.slice();
-    this.worker?.postMessage({ type: "paint", view: { ...view, styleIds } }, [styleIds.buffer]);
+    const style_ids = view.styleIds.slice();
+    this.worker?.postMessage({ type: "paint", view: { ...view, styleIds: style_ids } }, [
+      style_ids.buffer,
+    ]);
   }
 
   paintPanes(panes: readonly PanePaint[], divider: { x: number | null; y: number | null }): void {
@@ -288,9 +290,15 @@ export class WorkerRenderer implements Renderer {
     const transfers: Transferable[] = [];
     const payload = panes.map((pane) => {
       const { view } = pane;
-      const { valueKinds, numberValues, stringPoolIds, stringLocalIds, stringPoolUpdateIds } = view;
+      const {
+        valueKinds: value_kinds,
+        numberValues: number_values,
+        stringPoolIds: string_pool_ids,
+        stringLocalIds: string_local_ids,
+        stringPoolUpdateIds: string_pool_update_ids,
+      } = view;
       const packed =
-        valueKinds && numberValues && stringPoolIds && stringLocalIds
+        value_kinds && number_values && string_pool_ids && string_local_ids
           ? {
               sheet: view.sheet,
               stringPoolEpoch: view.stringPoolEpoch,
@@ -298,11 +306,11 @@ export class WorkerRenderer implements Renderer {
               cols: view.cols,
               styles: view.styles,
               styleIds: view.styleIds.slice(),
-              valueKinds: valueKinds.slice(),
-              numberValues: numberValues.slice(),
-              stringPoolIds: stringPoolIds.slice(),
-              stringLocalIds: stringLocalIds.slice(),
-              stringPoolUpdateIds: stringPoolUpdateIds?.slice(),
+              valueKinds: value_kinds.slice(),
+              numberValues: number_values.slice(),
+              stringPoolIds: string_pool_ids.slice(),
+              stringLocalIds: string_local_ids.slice(),
+              stringPoolUpdateIds: string_pool_update_ids?.slice(),
               stringPoolUpdateValues: view.stringPoolUpdateValues,
               localStrings: view.localStrings,
             }
@@ -346,32 +354,32 @@ export class WorkerRenderer implements Renderer {
    */
   trimMemory(): void {
     this.worker?.postMessage({ type: "trim" });
-    this.sharedRegions.fill(undefined);
+    this.shared_regions.fill(undefined);
   }
 
   destroy(): void {
-    window.clearTimeout(this.readinessTimeout);
-    this.readinessTimeout = undefined;
+    window.clearTimeout(this.readiness_timeout);
+    this.readiness_timeout = undefined;
     const worker = this.worker;
     if (worker) {
-      worker.removeEventListener("error", this.onWorkerError);
-      worker.removeEventListener("message", this.onWorkerMessage);
-      worker.removeEventListener("messageerror", this.onWorkerMessageError);
+      worker.removeEventListener("error", this.on_worker_error);
+      worker.removeEventListener("message", this.on_worker_message);
+      worker.removeEventListener("messageerror", this.on_worker_message_error);
       worker.postMessage({ type: "destroy" });
       worker.terminate();
     }
     this.worker = null;
     this.canvas?.remove();
     this.canvas = null;
-    this.sharedRegions.fill(undefined);
+    this.shared_regions.fill(undefined);
   }
 
-  private readonly onWorkerError = (event: ErrorEvent): void => {
+  private readonly on_worker_error = (event: ErrorEvent): void => {
     event.preventDefault();
     // Before `ready`, an error event means the script did not load or start.
-    const failure = this.readinessTimeout === undefined ? "crash" : "spawn";
+    const failure = this.readiness_timeout === undefined ? "crash" : "spawn";
     this.fail(
-      workerFailure(
+      worker_failure(
         failure,
         event.message
           ? event.message.slice(0, MAX_WORKER_TEXT_LENGTH)
@@ -382,24 +390,24 @@ export class WorkerRenderer implements Renderer {
   };
 
   /** A reply that cannot be deserialized means the two sides disagree on the protocol. */
-  private readonly onWorkerMessageError = (): void => {
+  private readonly on_worker_message_error = (): void => {
     this.fail(
-      workerFailure("protocol", "Sheetwrite: paint worker sent a reply that cannot be read"),
+      worker_failure("protocol", "Sheetwrite: paint worker sent a reply that cannot be read"),
     );
   };
 
-  private readonly onWorkerMessage = (event: MessageEvent<unknown>): void => {
+  private readonly on_worker_message = (event: MessageEvent<unknown>): void => {
     const data = event.data;
     const reply = data !== null && typeof data === "object" ? data : {};
     switch ("type" in reply ? reply.type : undefined) {
       case "ready":
-        window.clearTimeout(this.readinessTimeout);
-        this.readinessTimeout = undefined;
+        window.clearTimeout(this.readiness_timeout);
+        this.readiness_timeout = undefined;
         break;
       case "fatal": {
         const reason = "reason" in reply ? reply.reason : undefined;
         this.fail(
-          workerFailure(
+          worker_failure(
             "fatal",
             typeof reason === "string"
               ? reason.slice(0, MAX_WORKER_TEXT_LENGTH)
@@ -409,48 +417,48 @@ export class WorkerRenderer implements Renderer {
         break;
       }
       case "painted":
-        this.frameGeneration++;
-        if (this.canvas) this.canvas.dataset.workerFrame = String(this.frameGeneration);
+        this.frame_generation++;
+        if (this.canvas) this.canvas.dataset.workerFrame = String(this.frame_generation);
         break;
       default:
         // A worker from another release (a stale `workerUrl` copy) can send
         // replies this renderer does not know; painting on would be guesswork.
-        this.fail(workerFailure("protocol", "Sheetwrite: paint worker sent an unknown reply"));
+        this.fail(worker_failure("protocol", "Sheetwrite: paint worker sent an unknown reply"));
     }
   };
 
   private fail(error: SheetwriteError): void {
     if (this.failed) return;
     this.failed = true;
-    const onFailure = this.onFailure;
+    const on_failure = this.onFailure;
     this.destroy();
-    onFailure?.(error);
+    on_failure?.(error);
   }
 
-  private canUseSharedMemory(): boolean {
+  private can_use_shared_memory(): boolean {
     return (
       typeof SharedArrayBuffer === "function" &&
       (this.options.sharedMemory === true || globalThis.crossOriginIsolated === true)
     );
   }
 
-  private postSharedPackedView(
+  private post_shared_packed_view(
     view: VisibleWindowView,
-    valueKinds: Uint8Array,
-    numberValues: Float64Array,
-    stringPoolIds: Uint32Array,
-    stringLocalIds: Int32Array,
-    stringPoolUpdateIds: Uint32Array | undefined,
-    stringPoolUpdateValues: readonly string[] | undefined,
-    localStrings: readonly string[] | undefined,
+    value_kinds: Uint8Array,
+    number_values: Float64Array,
+    string_pool_ids: Uint32Array,
+    string_local_ids: Int32Array,
+    string_pool_update_ids: Uint32Array | undefined,
+    string_pool_update_values: readonly string[] | undefined,
+    local_strings: readonly string[] | undefined,
   ): boolean {
     const worker = this.worker;
     if (!worker) return false;
 
-    const layout = sharedPackedLayout(valueKinds.length, stringPoolUpdateIds?.length ?? 0);
+    const layout = shared_packed_layout(value_kinds.length, string_pool_update_ids?.length ?? 0);
     for (let attempt = 0; attempt < SHARED_REGION_COUNT; attempt++) {
-      const regionIndex = (this.sharedCursor + attempt) % SHARED_REGION_COUNT;
-      const region = this.sharedRegion(regionIndex, layout.totalBytes);
+      const region_index = (this.shared_cursor + attempt) % SHARED_REGION_COUNT;
+      const region = this.shared_region(region_index, layout.totalBytes);
       if (
         Atomics.compareExchange(region.header, SHARED_STATE_SLOT, SHARED_FREE, SHARED_BUSY) !==
         SHARED_FREE
@@ -461,18 +469,18 @@ export class WorkerRenderer implements Renderer {
       region.generation = (region.generation + 1) | 0;
       if (region.generation === 0) region.generation = 1;
       Atomics.store(region.header, SHARED_GENERATION_SLOT, region.generation);
-      this.copyPackedView(
+      this.copy_packed_view(
         region.buffer,
         layout,
-        valueKinds,
-        numberValues,
-        stringPoolIds,
-        stringLocalIds,
+        value_kinds,
+        number_values,
+        string_pool_ids,
+        string_local_ids,
         view.styleIds,
-        stringPoolUpdateIds,
+        string_pool_update_ids,
       );
 
-      this.sharedCursor = (regionIndex + 1) % SHARED_REGION_COUNT;
+      this.shared_cursor = (region_index + 1) % SHARED_REGION_COUNT;
       worker.postMessage({
         type: "paintPackedShared",
         sheet: view.sheet,
@@ -480,8 +488,8 @@ export class WorkerRenderer implements Renderer {
         rows: view.rows,
         cols: view.cols,
         styles: view.styles,
-        stringPoolUpdateValues,
-        localStrings,
+        stringPoolUpdateValues: string_pool_update_values,
+        localStrings: local_strings,
         shared: {
           buffer: region.buffer,
           generation: region.generation,
@@ -495,40 +503,40 @@ export class WorkerRenderer implements Renderer {
     return false;
   }
 
-  private sharedRegion(index: number, byteLength: number): SharedRegion {
-    let region = this.sharedRegions[index];
-    if (!region || region.byteLength < byteLength) {
-      const buffer = new SharedArrayBuffer(byteLength);
+  private shared_region(index: number, byte_length: number): SharedRegion {
+    let region = this.shared_regions[index];
+    if (!region || region.byteLength < byte_length) {
+      const buffer = new SharedArrayBuffer(byte_length);
       region = {
         buffer,
         header: new Int32Array(buffer, 0, SHARED_HEADER_INTS),
-        byteLength,
+        byteLength: byte_length,
         generation: 0,
       };
-      this.sharedRegions[index] = region;
+      this.shared_regions[index] = region;
     }
     return region;
   }
 
-  private copyPackedView(
+  private copy_packed_view(
     buffer: SharedArrayBuffer,
     layout: SharedPackedLayout,
-    valueKinds: Uint8Array,
-    numberValues: Float64Array,
-    stringPoolIds: Uint32Array,
-    stringLocalIds: Int32Array,
-    styleIds: Uint32Array,
-    stringPoolUpdateIds: Uint32Array | undefined,
+    value_kinds: Uint8Array,
+    number_values: Float64Array,
+    string_pool_ids: Uint32Array,
+    string_local_ids: Int32Array,
+    style_ids: Uint32Array,
+    string_pool_update_ids: Uint32Array | undefined,
   ): void {
     const { offsets, lengths } = layout;
-    new Uint8Array(buffer, offsets.valueKinds, lengths.valueKinds).set(valueKinds);
-    new Float64Array(buffer, offsets.numberValues, lengths.numberValues).set(numberValues);
-    new Uint32Array(buffer, offsets.stringPoolIds, lengths.stringPoolIds).set(stringPoolIds);
-    new Int32Array(buffer, offsets.stringLocalIds, lengths.stringLocalIds).set(stringLocalIds);
-    new Uint32Array(buffer, offsets.styleIds, lengths.styleIds).set(styleIds);
-    if (stringPoolUpdateIds && lengths.stringPoolUpdateIds > 0) {
+    new Uint8Array(buffer, offsets.valueKinds, lengths.valueKinds).set(value_kinds);
+    new Float64Array(buffer, offsets.numberValues, lengths.numberValues).set(number_values);
+    new Uint32Array(buffer, offsets.stringPoolIds, lengths.stringPoolIds).set(string_pool_ids);
+    new Int32Array(buffer, offsets.stringLocalIds, lengths.stringLocalIds).set(string_local_ids);
+    new Uint32Array(buffer, offsets.styleIds, lengths.styleIds).set(style_ids);
+    if (string_pool_update_ids && lengths.stringPoolUpdateIds > 0) {
       new Uint32Array(buffer, offsets.stringPoolUpdateIds, lengths.stringPoolUpdateIds).set(
-        stringPoolUpdateIds,
+        string_pool_update_ids,
       );
     }
   }

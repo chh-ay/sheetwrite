@@ -23,7 +23,7 @@ export interface PivotOutputRead {
 }
 
 /** Text of a header cell; blanks are empty. */
-function labelText(value: CellScalar | undefined): string {
+function label_text(value: CellScalar | undefined): string {
   if (value === null || value === undefined) return "";
   return String(value);
 }
@@ -36,19 +36,19 @@ function labelText(value: CellScalar | undefined): string {
  * leaves a repeated outer label blank, so each label column carries its last
  * label down; a group also starts where an outer group starts.
  */
-function categoriesOf(
+function categories_of(
   output: PivotOutputRead,
-  rowCount: number,
+  row_count: number,
 ): { categories: CellScalar[]; categoryLevels: ChartCategoryLevel[] } {
-  const outerCount = Math.max(0, output.labelCols - 1);
+  const outer_count = Math.max(0, output.labelCols - 1);
   const carried: CellScalar[] = Array.from({ length: output.labelCols }, () => null);
   const categories: CellScalar[] = [];
-  const categoryLevels: ChartCategoryLevel[] = Array.from({ length: outerCount }, () => ({
+  const category_levels: ChartCategoryLevel[] = Array.from({ length: outer_count }, () => ({
     labels: [],
     formats: [],
   }));
 
-  for (let index = 0; index < rowCount; index += 1) {
+  for (let index = 0; index < row_count; index += 1) {
     const row = output.headerRows + index;
     let starts = index === 0;
     for (let col = 0; col < output.labelCols; col += 1) {
@@ -58,21 +58,21 @@ function categoriesOf(
         starts = true;
       }
 
-      const level = categoryLevels[col];
+      const level = category_levels[col];
       if (level === undefined) continue;
       level.labels.push(starts ? (carried[col] ?? null) : null);
       level.formats.push(null);
     }
-    categories.push(carried[outerCount] ?? null);
+    categories.push(carried[outer_count] ?? null);
   }
-  return { categories, categoryLevels };
+  return { categories, categoryLevels: category_levels };
 }
 
 /** The series name of data column `col`: its header cells, joined from the top. */
-function seriesNameOf(output: PivotOutputRead, col: number): string {
+function series_name_of(output: PivotOutputRead, col: number): string {
   const parts: string[] = [];
   for (let row = 0; row < output.headerRows; row += 1) {
-    const text = labelText(output.cells[row * output.cols + col]);
+    const text = label_text(output.cells[row * output.cols + col]);
     if (text !== "") parts.push(text);
   }
   return parts.join(" / ");
@@ -91,9 +91,9 @@ export function pivotChartView(
 ): ChartView {
   if (output === null || output.rows <= output.headerRows) return { chart, series: [] };
 
-  const dataRows = output.rows - output.headerRows;
-  const rowCount = Math.min(dataRows, MAX_CHART_POINTS);
-  const { categories, categoryLevels } = categoriesOf(output, rowCount);
+  const data_rows = output.rows - output.headerRows;
+  const row_count = Math.min(data_rows, MAX_CHART_POINTS);
+  const { categories, categoryLevels: category_levels } = categories_of(output, row_count);
   const plotted = chart.pivotValues;
   const series: ChartSeriesView[] = [];
   for (let index = 0; index < output.cols - output.labelCols; index += 1) {
@@ -102,20 +102,20 @@ export function pivotChartView(
     if (plotted !== undefined && !plotted.includes(slot)) continue;
     const col = output.labelCols + index;
     const values: Array<number | null> = [];
-    for (let row = output.headerRows; row < output.headerRows + rowCount; row += 1) {
+    for (let row = output.headerRows; row < output.headerRows + row_count; row += 1) {
       const value = output.cells[row * output.cols + col];
       values.push(typeof value === "number" ? value : null);
     }
     const format = formats[slot];
     series.push({
-      name: seriesNameOf(output, col),
+      name: series_name_of(output, col),
       values,
       categories,
-      categoryLevels,
+      categoryLevels: category_levels,
       numberFormats: values.map(() => format ?? null),
       categoryFormats: categories.map(() => null),
       numberLocale: null,
-      truncated: dataRows > rowCount,
+      truncated: data_rows > row_count,
       referenceError: false,
     });
   }

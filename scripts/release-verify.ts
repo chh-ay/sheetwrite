@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { optionValue } from "../bench/src/cli-options.js";
 import { buildReleaseArtifacts, verifyReleaseArtifacts } from "./release-artifacts.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const defaultArtifactRoot = resolve(repositoryRoot, "test-results/release-artifacts");
+const repository_root = resolve(import.meta.dir, "..");
+const default_artifact_root = resolve(repository_root, "test-results/release-artifacts");
 
 export function releaseConsumerCommands(
   artifactRoot: string,
@@ -34,7 +34,7 @@ export interface ReleaseVerificationRunner {
   ): Promise<void>;
 }
 
-const defaultRunner: ReleaseVerificationRunner = {
+const default_runner: ReleaseVerificationRunner = {
   buildArtifacts: buildReleaseArtifacts,
   verifyArtifacts: verifyReleaseArtifacts,
   async runConsumer(command, context): Promise<void> {
@@ -44,15 +44,15 @@ const defaultRunner: ReleaseVerificationRunner = {
       stdout: "inherit",
       stderr: "inherit",
     });
-    const exitCode = await child.exited;
-    if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+    const exit_code = await child.exited;
+    if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
   },
 };
 
 export async function runReleaseVerification(
   artifactRoot: string,
   artifactOnly: boolean,
-  runner: ReleaseVerificationRunner = defaultRunner,
+  runner: ReleaseVerificationRunner = default_runner,
 ): Promise<string> {
   const root = resolve(artifactRoot);
   if (artifactOnly) await runner.verifyArtifacts(root);
@@ -61,7 +61,7 @@ export async function runReleaseVerification(
   const context: ReleaseCommandContext = {
     artifactRoot: root,
     artifactOnly: true,
-    cwd: repositoryRoot,
+    cwd: repository_root,
     env: {
       ...process.env,
       SHEETWRITE_ARTIFACT_ONLY: "1",
@@ -76,12 +76,12 @@ export async function runReleaseVerification(
 }
 
 async function cli(): Promise<void> {
-  const suppliedArtifacts = optionValue(process.argv, "--artifacts");
-  const artifactRoot = await runReleaseVerification(
-    suppliedArtifacts ?? defaultArtifactRoot,
-    suppliedArtifacts !== undefined,
+  const supplied_artifacts = optionValue(process.argv, "--artifacts");
+  const artifact_root = await runReleaseVerification(
+    supplied_artifacts ?? default_artifact_root,
+    supplied_artifacts !== undefined,
   );
-  console.log(`Canonical release verification passed for ${artifactRoot}`);
+  console.log(`Canonical release verification passed for ${artifact_root}`);
 }
 
 if (import.meta.main) await cli();

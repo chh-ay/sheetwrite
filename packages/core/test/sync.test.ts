@@ -30,14 +30,14 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 const teardown: Array<() => void> = [];
 afterEach(() => {
   for (const dispose of teardown.splice(0)) dispose();
-  restoreStubs();
+  restore_stubs();
 });
 
 class ControlledAdapter implements PersistenceAdapter {
@@ -91,7 +91,7 @@ function snapshot(): WorkbookSnapshot {
   };
 }
 
-function localSet(value: number) {
+function local_set(value: number) {
   return {
     op: "set" as const,
     addr: { sheet: "s1", row: 0, col: 0 },
@@ -120,11 +120,11 @@ function harness(ids = ["m1", "m2", "m3"], options: Partial<SyncCoordinatorOptio
   return { grid, adapter, coordinator, events };
 }
 
-function applied(version: number, clientMutationId: string): PersistenceCommitResponse {
-  return { status: "applied", version, clientMutationId };
+function applied(version: number, client_mutation_id: string): PersistenceCommitResponse {
+  return { status: "applied", version, clientMutationId: client_mutation_id };
 }
 
-function expectSyncError(events: readonly SyncCoordinatorEvent[], code: string): void {
+function expect_sync_error(events: readonly SyncCoordinatorEvent[], code: string): void {
   expect(
     events.some(
       (event) =>
@@ -158,35 +158,35 @@ describe("sync coordinator", () => {
         ]),
       ),
     };
-    const firstHost = document.createElement("div");
-    const secondHost = document.createElement("div");
-    document.body.append(firstHost, secondHost);
-    const first = createGrid(firstHost, { workbook: structuredClone(workbook), data: columnar });
-    const second = createGrid(secondHost, { workbook: structuredClone(workbook), data: columnar });
+    const first_host = document.createElement("div");
+    const second_host = document.createElement("div");
+    document.body.append(first_host, second_host);
+    const first = createGrid(first_host, { workbook: structuredClone(workbook), data: columnar });
+    const second = createGrid(second_host, { workbook: structuredClone(workbook), data: columnar });
     const server = new SheetwriteStore(structuredClone(workbook), columnar);
-    let serverVersion = 0;
+    let server_version = 0;
     const committed: VersionedOperation[] = [];
     const adapter: PersistenceAdapter = {
       async load() {
-        return { ...server.exportSnapshot(), documentId: "large-undo", version: serverVersion };
+        return { ...server.exportSnapshot(), documentId: "large-undo", version: server_version };
       },
       async commit(request) {
-        if (request.baseVersion !== serverVersion) {
-          return { status: "conflict", currentVersion: serverVersion };
+        if (request.baseVersion !== server_version) {
+          return { status: "conflict", currentVersion: server_version };
         }
         // Cross the JSON transport boundary, then apply to a real server store.
         const operations: DocumentOp[] = JSON.parse(JSON.stringify(request.operations));
         const outcome = server.applyTransaction({ patches: operations }, { source: "remote" });
         if (outcome.status !== "applied") throw new Error(`Server rejected ${outcome.status}`);
-        serverVersion += 1;
+        server_version += 1;
         committed.push({
-          version: serverVersion,
+          version: server_version,
           operations,
           clientMutationId: request.clientMutationId,
         });
         return {
           status: "applied",
-          version: serverVersion,
+          version: server_version,
           clientMutationId: request.clientMutationId,
         };
       },
@@ -219,21 +219,21 @@ describe("sync coordinator", () => {
         }).status,
       ).toBe("applied");
       await sender.sendNext();
-      const clearVersion = committed.at(-1);
-      if (!clearVersion) throw new Error("Clear did not reach the server");
-      await receiver.applyVersionedOperation(clearVersion);
+      const clear_version = committed.at(-1);
+      if (!clear_version) throw new Error("Clear did not reach the server");
+      await receiver.applyVersionedOperation(clear_version);
       expect(second.store.getCell({ sheet: "s1", row: 999, col: 999 }).resolved).toBeNull();
 
       first.undo();
       expect(sender.pendingCount).toBe(1);
       await sender.sendNext();
       expect(committed).toHaveLength(2);
-      const undoVersion = committed.at(-1);
-      if (!undoVersion) throw new Error("Undo did not reach the server");
+      const undo_version = committed.at(-1);
+      if (!undo_version) throw new Error("Undo did not reach the server");
       expect(
-        new TextEncoder().encode(JSON.stringify(undoVersion.operations)).byteLength,
+        new TextEncoder().encode(JSON.stringify(undo_version.operations)).byteLength,
       ).toBeLessThanOrEqual(8 * 1024 * 1024);
-      await receiver.applyVersionedOperation(undoVersion);
+      await receiver.applyVersionedOperation(undo_version);
       for (const store of [first.store, server, second.store]) {
         const restored = store.getVisibleWindow(
           "s1",
@@ -259,24 +259,24 @@ describe("sync coordinator", () => {
   }, 60_000);
   it("commits a split local step atomically and publishes one peer change", async () => {
     const adapter = new MemoryPersistenceAdapter(snapshot());
-    const senderHost = document.createElement("div");
-    const peerHost = document.createElement("div");
-    document.body.append(senderHost, peerHost);
-    const senderGrid = createGridFromSnapshot(senderHost, snapshot());
-    const peerGrid = createGridFromSnapshot(peerHost, snapshot());
+    const sender_host = document.createElement("div");
+    const peer_host = document.createElement("div");
+    document.body.append(sender_host, peer_host);
+    const sender_grid = createGridFromSnapshot(sender_host, snapshot());
+    const peer_grid = createGridFromSnapshot(peer_host, snapshot());
     const options = {
       documentId: "sync-doc",
       serverVersion: 7,
       limits: { maxOperationsPerVersion: 1 },
     };
-    const sender = new SyncCoordinator(senderGrid, adapter, options);
-    const peer = new SyncCoordinator(peerGrid, adapter, options);
+    const sender = new SyncCoordinator(sender_grid, adapter, options);
+    const peer = new SyncCoordinator(peer_grid, adapter, options);
     const changes: ChangeEvent[] = [];
-    peerGrid.on("change", (event) => changes.push(event));
+    peer_grid.on("change", (event) => changes.push(event));
     try {
-      const outcome = senderGrid.applyTransaction({
+      const outcome = sender_grid.applyTransaction({
         patches: [
-          localSet(12),
+          local_set(12),
           {
             op: "set",
             addr: { sheet: "s1", row: 1, col: 0 },
@@ -297,24 +297,24 @@ describe("sync coordinator", () => {
         throw new Error("The adapter must return the committed batch");
       const versions = conflict.operationsSinceBase;
       expect(versions).toHaveLength(2);
-      const firstVersion = versions[0];
-      const lastVersion = versions[1];
-      if (!firstVersion || !lastVersion) throw new Error("The batch needs two versions");
-      await peer.applyVersionedOperation(firstVersion);
-      expect(peerGrid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+      const first_version = versions[0];
+      const last_version = versions[1];
+      if (!first_version || !last_version) throw new Error("The batch needs two versions");
+      await peer.applyVersionedOperation(first_version);
+      expect(peer_grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
       expect(peer.serverVersion).toBe(7);
       expect(changes).toHaveLength(0);
-      await peer.applyVersionedOperation(lastVersion);
-      expect(peerGrid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(12);
-      expect(peerGrid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(34);
+      await peer.applyVersionedOperation(last_version);
+      expect(peer_grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(12);
+      expect(peer_grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(34);
       expect(peer.serverVersion).toBe(9);
       expect(changes).toHaveLength(1);
       expect((await adapter.load("sync-doc")).version).toBe(9);
     } finally {
       sender.destroy();
       peer.destroy();
-      senderGrid.destroy();
-      peerGrid.destroy();
+      sender_grid.destroy();
+      peer_grid.destroy();
     }
   });
 
@@ -324,7 +324,7 @@ describe("sync coordinator", () => {
     grid.on("change", (event) => changes.push(event));
     await coordinator.applyVersionedOperation({
       version: 8,
-      operations: [localSet(12)],
+      operations: [local_set(12)],
       batch: { index: 0, count: 2 },
     });
     await coordinator.applyVersionedOperation({
@@ -341,7 +341,7 @@ describe("sync coordinator", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
     expect(coordinator.serverVersion).toBe(7);
     expect(changes).toHaveLength(0);
-    expectSyncError(events, "remote-operations-rejected");
+    expect_sync_error(events, "remote-operations-rejected");
   });
 
   it("keeps the per-version byte limit for remote batch members", async () => {
@@ -352,7 +352,7 @@ describe("sync coordinator", () => {
     grid.on("change", (event) => changes.push(event));
     await coordinator.applyVersionedOperation({
       version: 8,
-      operations: [localSet(12)],
+      operations: [local_set(12)],
       batch: { index: 0, count: 2 },
     });
     await coordinator.applyVersionedOperation({
@@ -370,61 +370,65 @@ describe("sync coordinator", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
     expect(coordinator.serverVersion).toBe(7);
     expect(changes).toHaveLength(0);
-    expectSyncError(events, "payload-limit");
+    expect_sync_error(events, "payload-limit");
   });
 
   it("syncs a split undo as one local history step and one peer change", async () => {
-    const rowCount = 80;
-    const versionBytes = 2048;
-    let randomState = 17;
-    const values = Array.from({ length: rowCount }, () =>
+    const row_count = 80;
+    const version_bytes = 2048;
+    let random_state = 17;
+    const values = Array.from({ length: row_count }, () =>
       Array.from({ length: 80 }, () => {
-        randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
-        return String.fromCharCode(33 + ((randomState >>> 16) % 90));
+        random_state = (Math.imul(random_state, 1664525) + 1013904223) >>> 0;
+        return String.fromCharCode(33 + ((random_state >>> 16) % 90));
       }).join(""),
     );
     const initial = snapshot();
     const sheet = initial.sheets[0];
     if (!sheet) throw new Error("The test snapshot needs a sheet");
-    sheet.rowCount = rowCount;
+    sheet.rowCount = row_count;
     sheet.cells = [
       {
         startRow: 0,
         startCol: 0,
-        rowCount,
+        rowCount: row_count,
         colCount: 1,
-        cells: values.map((value, rowOffset) => ({
-          rowOffset,
+        cells: values.map((value, row_offset) => ({
+          rowOffset: row_offset,
           colOffset: 0,
           value: { kind: "literal", value },
         })),
       },
     ];
-    const firstHost = document.createElement("div");
-    const peerHost = document.createElement("div");
-    document.body.append(firstHost, peerHost);
-    const gridOptions = { transactionResourceLimits: { maxEncodedBytes: versionBytes } };
-    const first = createGridFromSnapshot(firstHost, initial, gridOptions);
-    const second = createGridFromSnapshot(peerHost, initial, gridOptions);
+    const first_host = document.createElement("div");
+    const peer_host = document.createElement("div");
+    document.body.append(first_host, peer_host);
+    const grid_options = { transactionResourceLimits: { maxEncodedBytes: version_bytes } };
+    const first = createGridFromSnapshot(first_host, initial, grid_options);
+    const second = createGridFromSnapshot(peer_host, initial, grid_options);
     const adapter = new MemoryPersistenceAdapter(initial);
-    const syncOptions = {
+    const sync_options = {
       documentId: "sync-doc",
       serverVersion: 7,
-      limits: { maxVersionPayloadBytes: versionBytes },
+      limits: { maxVersionPayloadBytes: version_bytes },
     };
-    const sender = new SyncCoordinator(first, adapter, syncOptions);
-    const peer = new SyncCoordinator(second, adapter, syncOptions);
-    const localChanges: ChangeEvent[] = [];
-    const peerChanges: ChangeEvent[] = [];
-    first.on("change", (event) => localChanges.push(event));
-    second.on("change", (event) => peerChanges.push(event));
+    const sender = new SyncCoordinator(first, adapter, sync_options);
+    const peer = new SyncCoordinator(second, adapter, sync_options);
+    const local_changes: ChangeEvent[] = [];
+    const peer_changes: ChangeEvent[] = [];
+    first.on("change", (event) => local_changes.push(event));
+    second.on("change", (event) => peer_changes.push(event));
     try {
       expect(
         first.applyTransaction({
           patches: [
             {
               op: "clearRange",
-              range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 0 } },
+              range: {
+                sheet: "s1",
+                start: { row: 0, col: 0 },
+                end: { row: row_count - 1, col: 0 },
+              },
               contents: true,
               style: false,
             },
@@ -448,20 +452,20 @@ describe("sync coordinator", () => {
       for (const version of tail.operationsSinceBase) {
         expect(
           new TextEncoder().encode(JSON.stringify(version.operations)).length,
-        ).toBeLessThanOrEqual(versionBytes);
+        ).toBeLessThanOrEqual(version_bytes);
         await peer.applyVersionedOperation(version);
       }
-      for (let row = 0; row < rowCount; row++) {
+      for (let row = 0; row < row_count; row++) {
         const expected = values[row];
         if (expected === undefined) throw new Error("The source value is missing");
         expect(first.store.getCell({ sheet: "s1", row, col: 0 }).resolved).toBe(expected);
         expect(second.store.getCell({ sheet: "s1", row, col: 0 }).resolved).toBe(expected);
       }
-      expect(localChanges.map((event) => event.commitReason)).toEqual(["api", "undo"]);
-      expect(peerChanges).toHaveLength(2);
+      expect(local_changes.map((event) => event.commitReason)).toEqual(["api", "undo"]);
+      expect(peer_changes).toHaveLength(2);
       first.redo();
-      expect(first.store.getCell({ sheet: "s1", row: rowCount - 1, col: 0 }).resolved).toBeNull();
-      expect(localChanges.map((event) => event.commitReason)).toEqual(["api", "undo", "redo"]);
+      expect(first.store.getCell({ sheet: "s1", row: row_count - 1, col: 0 }).resolved).toBeNull();
+      expect(local_changes.map((event) => event.commitReason)).toEqual(["api", "undo", "redo"]);
     } finally {
       sender.destroy();
       peer.destroy();
@@ -489,7 +493,7 @@ describe("sync coordinator", () => {
 
   it("queues immutable local mutations and acknowledges only the matching ID", async () => {
     const { grid, adapter, coordinator, events } = harness();
-    const patch = localSet(2);
+    const patch = local_set(2);
 
     grid.applyTransaction({ patches: [patch] });
     patch.value.value = 99;
@@ -500,7 +504,7 @@ describe("sync coordinator", () => {
         documentId: "sync-doc",
         baseVersion: 7,
         clientMutationId: "m1",
-        operations: [localSet(2)],
+        operations: [local_set(2)],
         status: "pending",
       },
     ]);
@@ -511,7 +515,7 @@ describe("sync coordinator", () => {
       documentId: "sync-doc",
       baseVersion: 7,
       clientMutationId: "m1",
-      operations: [localSet(2)],
+      operations: [local_set(2)],
     });
     adapter.responses[0]!.resolve(applied(8, "m1"));
     await sending;
@@ -520,7 +524,7 @@ describe("sync coordinator", () => {
     expect(coordinator.serverVersion).toBe(8);
     expect(events.some((event) => event.type === "acknowledged")).toBe(true);
     coordinator.destroy();
-    grid.applyTransaction({ patches: [localSet(3)] });
+    grid.applyTransaction({ patches: [local_set(3)] });
     expect(coordinator.pendingCount).toBe(0);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
     grid.destroy();
@@ -528,8 +532,8 @@ describe("sync coordinator", () => {
 
   it("refuses non-head sends and advances the durable queue serially", async () => {
     const { grid, adapter, coordinator, events } = harness();
-    grid.applyTransaction({ patches: [localSet(2)] });
-    grid.applyTransaction({ patches: [localSet(3)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
+    grid.applyTransaction({ patches: [local_set(3)] });
 
     const first = coordinator.send("m1");
     expect(await coordinator.send("m2")).toBeNull();
@@ -551,7 +555,7 @@ describe("sync coordinator", () => {
 
   it("rejects a response mutation ID mismatch before queue or version mutation", async () => {
     const { grid, adapter, coordinator, events } = harness();
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
     const sending = coordinator.sendNext();
     adapter.responses[0]!.resolve(applied(8, "wrong-id"));
 
@@ -565,7 +569,7 @@ describe("sync coordinator", () => {
 
   it("retains conflicted work and exposes deterministic reload/reapply state", async () => {
     const { grid, adapter, coordinator, events } = harness();
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
 
     const sending = coordinator.sendNext();
     adapter.responses[0]!.resolve({
@@ -599,9 +603,9 @@ describe("sync coordinator", () => {
       addr: { sheet: "s1", row, col: 0 },
       value: { kind: "literal" as const, value },
     });
-    const remoteChanges: ChangeEvent[] = [];
+    const remote_changes: ChangeEvent[] = [];
     grid.on("change", (event) => {
-      if (event.source === "remote") remoteChanges.push(event);
+      if (event.source === "remote") remote_changes.push(event);
     });
     grid.applyTransaction({ patches: [set(0, 2)] });
     const sending = coordinator.sendNext();
@@ -631,13 +635,15 @@ describe("sync coordinator", () => {
     expect(await coordinator.recoverConflict()).toEqual({ status: "recovered", serverVersion: 9 });
     // Same Grid, no reload: the missed batch applied as one transaction.
     expect([cell(0), cell(1), cell(2)]).toEqual([3, 81, 92]);
-    expect(remoteChanges).toHaveLength(1);
+    expect(remote_changes).toHaveLength(1);
     expect(
-      coordinator.pendingCommits().map(({ clientMutationId, baseVersion, status }) => ({
-        clientMutationId,
-        baseVersion,
-        status,
-      })),
+      coordinator
+        .pendingCommits()
+        .map(({ clientMutationId: client_mutation_id, baseVersion: base_version, status }) => ({
+          clientMutationId: client_mutation_id,
+          baseVersion: base_version,
+          status,
+        })),
     ).toEqual([
       { clientMutationId: "m1", baseVersion: 9, status: "pending" },
       { clientMutationId: "m2", baseVersion: 10, status: "pending" },
@@ -653,22 +659,22 @@ describe("sync coordinator", () => {
   it("keeps durable queue bases when a missed version is rejected during recovery", async () => {
     const replacements: string[][] = [];
     const records = new Map<string, PendingCommit>();
-    const pendingStorage: PendingCommitStorage = {
+    const pending_storage: PendingCommitStorage = {
       load: async () => [],
       put: async (commit) => {
         records.set(commit.clientMutationId, structuredClone(commit));
       },
-      remove: async (_documentId, clientMutationId) => {
-        records.delete(clientMutationId);
+      remove: async (_document_id, client_mutation_id) => {
+        records.delete(client_mutation_id);
       },
-      replace: async (_documentId, expected, commits) => {
+      replace: async (_document_id, expected, commits) => {
         replacements.push([...expected]);
         for (const commit of commits) records.set(commit.clientMutationId, structuredClone(commit));
       },
     };
-    const { grid, coordinator } = harness(["m1"], { pendingStorage });
+    const { grid, coordinator } = harness(["m1"], { pendingStorage: pending_storage });
     await coordinator.ready();
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
     await coordinator.ready();
     await coordinator.handleResponse(
       {
@@ -707,7 +713,7 @@ describe("sync coordinator", () => {
       serverVersion: 7,
     });
     coordinator.setOnline(false);
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
 
     const dispose = coordinator.subscribe({ subscribe: () => () => {} });
     // `flush` shares a running flush, so it shows whether `subscribe` started one.
@@ -729,17 +735,17 @@ describe("sync coordinator", () => {
       for (const page of ["first-page", "second-page"]) {
         // A fresh module instance stands in for a new page load: the module
         // state starts again, as it does in a reloaded browser tab.
-        const pageModule: typeof SyncModule = await import(`../src/sync.js?${page}`);
+        const page_module: typeof SyncModule = await import(`../src/sync.js?${page}`);
         const host = document.createElement("div");
         document.body.appendChild(host);
         const grid = createGridFromSnapshot(host, snapshot());
         const adapter = new ControlledAdapter(snapshot());
-        const coordinator = new pageModule.SyncCoordinator(grid, adapter, {
+        const coordinator = new page_module.SyncCoordinator(grid, adapter, {
           documentId: "sync-doc",
           serverVersion: 7,
           initialConnection: "offline",
         });
-        grid.applyTransaction({ patches: [localSet(2)] });
+        grid.applyTransaction({ patches: [local_set(2)] });
         const id = coordinator.pendingCommits()[0]?.clientMutationId;
         if (id === undefined) throw new Error("default mutation ID missing");
         ids.push(id);
@@ -805,18 +811,18 @@ describe("sync coordinator", () => {
         reason: "missing-operations",
       },
     ];
-    for (const testCase of cases) {
+    for (const test_case of cases) {
       const { grid, coordinator } = harness(["m1", "m2"]);
       const column = () =>
         [0, 1, 2].map((row) => grid.store.getCell({ sheet: "s1", row, col: 0 }).resolved);
       grid.applyTransaction({ patches: [set(0, 2)] });
-      await coordinator.handleResponse(testCase.response, "m1");
-      if (testCase.afterConflict) grid.applyTransaction({ patches: [testCase.afterConflict] });
+      await coordinator.handleResponse(test_case.response, "m1");
+      if (test_case.afterConflict) grid.applyTransaction({ patches: [test_case.afterConflict] });
       const before = column();
       const result = await coordinator.recoverConflict();
-      expect({ name: testCase.name, result }).toMatchObject({
-        name: testCase.name,
-        result: { status: "reload-required", reason: testCase.reason },
+      expect({ name: test_case.name, result }).toMatchObject({
+        name: test_case.name,
+        result: { status: "reload-required", reason: test_case.reason },
       });
       // Nothing changed: the host reloads exactly as before.
       expect(column()).toEqual(before);
@@ -837,7 +843,7 @@ describe("sync coordinator", () => {
         response: {
           status: "conflict",
           currentVersion: 9,
-          operationsSinceBase: [{ version: 9, operations: [localSet(9)] }],
+          operationsSinceBase: [{ version: 9, operations: [local_set(9)] }],
         },
         code: "invalid-version",
       },
@@ -846,8 +852,8 @@ describe("sync coordinator", () => {
           status: "conflict",
           currentVersion: 9,
           operationsSinceBase: [
-            { version: 8, operations: [localSet(8)] },
-            { version: 9, operations: [localSet(9)] },
+            { version: 8, operations: [local_set(8)] },
+            { version: 9, operations: [local_set(9)] },
           ],
         },
         limits: { maxBufferedVersions: 1 },
@@ -857,7 +863,7 @@ describe("sync coordinator", () => {
         response: {
           status: "conflict",
           currentVersion: 8,
-          operationsSinceBase: [{ version: 8, operations: [localSet(8)] }],
+          operationsSinceBase: [{ version: 8, operations: [local_set(8)] }],
         },
         limits: { maxBufferedBytes: 64 },
         code: "buffer-byte-limit",
@@ -872,13 +878,13 @@ describe("sync coordinator", () => {
       },
     ];
 
-    for (const testCase of cases) {
+    for (const test_case of cases) {
       const { grid, coordinator, events } = harness(["m1"], {
-        ...(testCase.limits ? { limits: testCase.limits } : {}),
+        ...(test_case.limits ? { limits: test_case.limits } : {}),
       });
-      grid.applyTransaction({ patches: [localSet(2)] });
-      await expect(coordinator.handleResponse(testCase.response, "m1")).rejects.toMatchObject({
-        code: testCase.code,
+      grid.applyTransaction({ patches: [local_set(2)] });
+      await expect(coordinator.handleResponse(test_case.response, "m1")).rejects.toMatchObject({
+        code: test_case.code,
       });
       expect(coordinator.serverVersion).toBe(7);
       expect(coordinator.pendingCommits()[0]?.status).toBe("pending");
@@ -888,9 +894,9 @@ describe("sync coordinator", () => {
 
   it("applies host-rebased conflicted work without duplicating the outgoing mutation", async () => {
     const { grid, coordinator } = harness();
-    const remoteEvents: ChangeEvent[] = [];
+    const remote_events: ChangeEvent[] = [];
     grid.on("change", (event) => {
-      if (event.source === "remote") remoteEvents.push(event);
+      if (event.source === "remote") remote_events.push(event);
     });
     const local = {
       op: "set" as const,
@@ -911,7 +917,7 @@ describe("sync coordinator", () => {
     grid.applyRemoteOperations(rebased.operations);
 
     expect(
-      remoteEvents.some((event) =>
+      remote_events.some((event) =>
         event.transaction.patches.some((patch) => patch.op === "addRows"),
       ),
     ).toBe(true);
@@ -929,17 +935,17 @@ describe("sync coordinator", () => {
 
   it("rejects canonical response operations and applies later remote operations", async () => {
     const { grid, coordinator, events } = harness();
-    const remoteEvents: ChangeEvent[] = [];
+    const remote_events: ChangeEvent[] = [];
     grid.on("change", (event) => {
-      if (event.source === "remote") remoteEvents.push(event);
+      if (event.source === "remote") remote_events.push(event);
     });
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
     await expect(
       coordinator.handleResponse({
         status: "applied",
         version: 8,
         clientMutationId: "m1",
-        canonicalOperations: [localSet(10)],
+        canonicalOperations: [local_set(10)],
       } as PersistenceCommitResponse),
     ).rejects.toMatchObject({ code: "invalid-operations" });
     expect(coordinator.pendingCount).toBe(1);
@@ -948,18 +954,18 @@ describe("sync coordinator", () => {
 
     await coordinator.handleResponse(applied(8, "m1"));
     expect(coordinator.pendingCount).toBe(0);
-    await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(11)] });
+    await coordinator.applyVersionedOperation({ version: 9, operations: [local_set(11)] });
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(11);
-    await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(99)] });
+    await coordinator.applyVersionedOperation({ version: 9, operations: [local_set(99)] });
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(11);
 
-    await coordinator.applyVersionedOperation({ version: 11, operations: [localSet(12)] });
+    await coordinator.applyVersionedOperation({ version: 11, operations: [local_set(12)] });
     expect(events.at(-1)).toEqual({
       type: "reload-required",
       expectedVersion: 10,
       receivedVersion: 11,
     });
-    expect(remoteEvents).toHaveLength(1);
+    expect(remote_events).toHaveLength(1);
   });
 
   it("recovers missing versions in order and drains the buffered operation", async () => {
@@ -975,19 +981,19 @@ describe("sync coordinator", () => {
       },
     });
     const drained = Promise.withResolvers<void>();
-    const disposeDrain = coordinator.on((event) => {
+    const dispose_drain = coordinator.on((event) => {
       if (event.type === "remote-applied" && event.operation.version === 10) {
         drained.resolve(undefined);
       }
     });
 
-    await coordinator.applyVersionedOperation({ version: 10, operations: [localSet(10)] });
+    await coordinator.applyVersionedOperation({ version: 10, operations: [local_set(10)] });
     recovery.resolve([
-      { version: 9, operations: [localSet(9)] },
-      { version: 8, operations: [localSet(8)] },
+      { version: 9, operations: [local_set(9)] },
+      { version: 8, operations: [local_set(8)] },
     ]);
     await drained.promise;
-    disposeDrain();
+    dispose_drain();
 
     expect(requests).toEqual([{ expectedVersion: 8, receivedVersion: 10 }]);
     expect(coordinator.serverVersion).toBe(10);
@@ -1009,7 +1015,7 @@ describe("sync coordinator", () => {
 
     await failed.coordinator.applyVersionedOperation({
       version: 8,
-      operations: [localSet(10)],
+      operations: [local_set(10)],
     });
 
     expect(failed.coordinator.serverVersion).toBe(7);
@@ -1038,18 +1044,18 @@ describe("sync coordinator", () => {
 
     await coordinator.applyVersionedOperation({ version: 9, operations: [malformed] });
     await coordinator.applyVersionedOperation({ version: 8, operations: [] });
-    await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(9)] });
+    await coordinator.applyVersionedOperation({ version: 9, operations: [local_set(9)] });
 
-    expectSyncError(events, "invalid-operations");
+    expect_sync_error(events, "invalid-operations");
     expect(coordinator.serverVersion).toBe(9);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
   });
 
   it("wraps a duplicate local mutation ID as sync-failed with the action", () => {
     const { grid, events } = harness(["m1", "m1"]);
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
     try {
-      grid.applyTransaction({ patches: [localSet(3)] });
+      grid.applyTransaction({ patches: [local_set(3)] });
     } catch (error) {
       // The reservation failure may also reach the caller; the event is the contract.
       expect(error).toMatchObject({ code: "sync-failed" });
@@ -1066,13 +1072,13 @@ describe("sync coordinator", () => {
 
   it("keeps the JSON failure as the cause of a rejected remote payload", async () => {
     const { coordinator, events } = harness();
-    const notJson = {
+    const not_json = {
       op: "set",
       addr: { sheet: "s1", row: 0, col: 0 },
       value: { kind: "literal", value: Number.NaN },
     } as DocumentOp;
 
-    await coordinator.applyVersionedOperation({ version: 8, operations: [notJson] });
+    await coordinator.applyVersionedOperation({ version: 8, operations: [not_json] });
 
     const failure = events.find((event) => event.type === "error");
     expect(failure?.type === "error" && failure.error).toMatchObject({
@@ -1089,25 +1095,25 @@ describe("sync coordinator", () => {
     const { grid, coordinator, events } = harness(["m1", "m2", "m3"], {
       limits: { maxRecentAcknowledgements: 2 },
     });
-    grid.applyTransaction({ patches: [localSet(2)] });
-    grid.applyTransaction({ patches: [localSet(3)] });
-    grid.applyTransaction({ patches: [localSet(4)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
+    grid.applyTransaction({ patches: [local_set(3)] });
+    grid.applyTransaction({ patches: [local_set(4)] });
     await coordinator.handleResponse(applied(8, "m1"));
     await coordinator.handleResponse(applied(9, "m2"));
     await coordinator.handleResponse(applied(10, "m3"));
 
-    const reloadsBefore = events.filter((event) => event.type === "reload-required").length;
+    const reloads_before = events.filter((event) => event.type === "reload-required").length;
     await coordinator.applyVersionedOperation({
       version: 9,
       clientMutationId: "m2",
-      operations: [localSet(98)],
+      operations: [local_set(98)],
     });
-    expect(events.filter((event) => event.type === "reload-required")).toHaveLength(reloadsBefore);
+    expect(events.filter((event) => event.type === "reload-required")).toHaveLength(reloads_before);
 
     await coordinator.applyVersionedOperation({
       version: 8,
       clientMutationId: "m1",
-      operations: [localSet(99)],
+      operations: [local_set(99)],
     });
     expect(coordinator.serverVersion).toBe(10);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(4);
@@ -1116,7 +1122,7 @@ describe("sync coordinator", () => {
       expectedVersion: 11,
       receivedVersion: 8,
     });
-    expectSyncError(events, "late-echo");
+    expect_sync_error(events, "late-echo");
   });
 
   it("bounds callback intake when a source ignores listener backpressure", async () => {
@@ -1125,28 +1131,28 @@ describe("sync coordinator", () => {
     });
     let listener: ((operation: VersionedOperation) => void | Promise<void>) | undefined;
     coordinator.subscribe({
-      subscribe(remoteListener) {
-        listener = remoteListener;
+      subscribe(remote_listener) {
+        listener = remote_listener;
       },
     });
 
-    const first = listener?.({ version: 8, operations: [localSet(2)] });
-    const overflow = listener?.({ version: 9, operations: [localSet(3)] });
+    const first = listener?.({ version: 8, operations: [local_set(2)] });
+    const overflow = listener?.({ version: 9, operations: [local_set(3)] });
     await Promise.all([first, overflow]);
 
     expect(coordinator.serverVersion).toBe(8);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
-    expectSyncError(events, "buffer-count-limit");
+    expect_sync_error(events, "buffer-count-limit");
   });
 
   it("deduplicates remote echoes by mutation ID", async () => {
     const { grid, coordinator } = harness();
-    grid.applyTransaction({ patches: [localSet(2)] });
+    grid.applyTransaction({ patches: [local_set(2)] });
 
     await coordinator.applyVersionedOperation({
       version: 8,
       clientMutationId: "m1",
-      operations: [localSet(99)],
+      operations: [local_set(99)],
     });
 
     expect(coordinator.pendingCount).toBe(0);
@@ -1159,14 +1165,14 @@ describe("sync coordinator", () => {
       limits: { maxPendingCommits: 1 },
     });
     const changes: ChangeEvent[] = [];
-    let rejectionEvents = 0;
+    let rejection_events = 0;
     grid.on("change", (event) => changes.push(event));
     grid.on("mutation-rejected", () => {
-      rejectionEvents += 1;
+      rejection_events += 1;
     });
 
-    expect(grid.applyTransaction({ patches: [localSet(2)] }).status).toBe("applied");
-    const rejected = grid.applyTransaction({ patches: [localSet(3)] });
+    expect(grid.applyTransaction({ patches: [local_set(2)] }).status).toBe("applied");
+    const rejected = grid.applyTransaction({ patches: [local_set(3)] });
     expect(rejected).toMatchObject({
       status: "rejected",
       issues: [{ kind: "resource-limit", resource: "pending-commits", actual: 2, max: 1 }],
@@ -1180,7 +1186,7 @@ describe("sync coordinator", () => {
 
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
     expect(changes).toHaveLength(1);
-    expect(rejectionEvents).toBe(3);
+    expect(rejection_events).toBe(3);
     expect(coordinator.state).toMatchObject({ pendingCount: 1, pendingCapacity: "full" });
     expect(
       events.filter(
@@ -1204,11 +1210,11 @@ describe("sync coordinator", () => {
     const grid = createGridFromSnapshot(host, snapshot());
     const adapter = new ControlledAdapter(snapshot());
     let nested = false;
-    let nestedOutcome: ApplyTransactionResult | undefined;
+    let nested_outcome: ApplyTransactionResult | undefined;
     grid.on("change", (event) => {
       if (event.source !== "local" || nested) return;
       nested = true;
-      nestedOutcome = grid.applyTransaction({ patches: [localSet(3)] });
+      nested_outcome = grid.applyTransaction({ patches: [local_set(3)] });
     });
     const coordinator = new SyncCoordinator(grid, adapter, {
       documentId: "sync-doc",
@@ -1217,17 +1223,17 @@ describe("sync coordinator", () => {
       limits: { maxPendingCommits: 1 },
     });
 
-    expect(grid.applyTransaction({ patches: [localSet(2)] }).status).toBe("applied");
-    expect(nestedOutcome).toMatchObject({
+    expect(grid.applyTransaction({ patches: [local_set(2)] }).status).toBe("applied");
+    expect(nested_outcome).toMatchObject({
       status: "rejected",
       issues: [{ resource: "pending-commits" }],
     });
     expect(coordinator.pendingCommits()).toMatchObject([
-      { clientMutationId: "reentrant-m1", operations: [localSet(2)] },
+      { clientMutationId: "reentrant-m1", operations: [local_set(2)] },
     ]);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
 
-    expect(grid.applyRemoteOperations([localSet(9)]).status).toBe("applied");
+    expect(grid.applyRemoteOperations([local_set(9)]).status).toBe("applied");
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
     expect(coordinator.pendingCount).toBe(1);
     coordinator.destroy();
@@ -1237,7 +1243,7 @@ describe("sync coordinator", () => {
       pendingEncodedBytes: 0,
       pendingCapacity: "destroyed",
     });
-    expect(grid.applyTransaction({ patches: [localSet(10)] }).status).toBe("applied");
+    expect(grid.applyTransaction({ patches: [local_set(10)] }).status).toBe("applied");
     expect(coordinator.pendingCount).toBe(0);
     grid.destroy();
   });

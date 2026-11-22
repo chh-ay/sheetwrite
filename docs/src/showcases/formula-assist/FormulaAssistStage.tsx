@@ -57,7 +57,10 @@ function Progress(props: { readonly snapshot: FormulaAssistSnapshot; readonly op
 /** The formula assist showcase's island: the budget, the open cells and the keys. */
 export function FormulaAssistStage(props: FormulaAssistStageProps) {
   const live = createLiveScenario<FormulaAssistScenario, FormulaAssistSnapshot>(() =>
-    import("./boot.js").then(({ createFormulaAssistScenario }) => createFormulaAssistScenario),
+    import("./boot.js").then(
+      ({ createFormulaAssistScenario: create_formula_assist_scenario }) =>
+        create_formula_assist_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
 

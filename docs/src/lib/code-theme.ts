@@ -88,28 +88,28 @@ const ROLE_SCOPES: Readonly<Record<CodeRole, readonly string[]>> = {
   ],
 };
 
-function codeColour(tokens: ReadonlyMap<string, string>, role: string): string {
+function code_colour(tokens: ReadonlyMap<string, string>, role: string): string {
   return tokenColour(tokens, `--sw-code-${role}`);
 }
 
-function buildTheme(theme: SiteTheme): ExpressiveCodeTheme {
+function build_theme(theme: SiteTheme): ExpressiveCodeTheme {
   const tokens = themeTokens(theme);
-  const background = codeColour(tokens, "bg");
-  const foreground = codeColour(tokens, "fg");
+  const background = code_colour(tokens, "bg");
+  const foreground = code_colour(tokens, "fg");
   return new ExpressiveCodeTheme({
     name: `sheetwrite-${theme}`,
     type: theme,
     colors: {
       "editor.background": background,
       "editor.foreground": foreground,
-      "editor.selectionBackground": codeColour(tokens, "line-highlight"),
+      "editor.selectionBackground": code_colour(tokens, "line-highlight"),
     },
     settings: [
       { settings: { foreground, background } },
       ...CODE_ROLES.map((role) => ({
         name: role,
         scope: [...ROLE_SCOPES[role]],
-        settings: { foreground: codeColour(tokens, role) },
+        settings: { foreground: code_colour(tokens, role) },
       })),
     ],
   });
@@ -117,7 +117,7 @@ function buildTheme(theme: SiteTheme): ExpressiveCodeTheme {
 
 /** The light and dark variants of the site's code theme. */
 export function siteCodeThemes(): ExpressiveCodeTheme[] {
-  return [buildTheme("light"), buildTheme("dark")];
+  return [build_theme("light"), build_theme("dark")];
 }
 
 /** A cell or range reference: `A1`, `$B$2`, `A1:C9`, `A:A`, `1:1`, `A2#`. */
@@ -216,7 +216,7 @@ const SHIKI_DEPENDENCY_CHAIN = [
   "shiki",
 ];
 
-function bundledTypeScriptGrammarUrl(): string {
+function bundled_type_script_grammar_url(): string {
   let resolved = createRequire(import.meta.url).resolve(SHIKI_DEPENDENCY_CHAIN[0] ?? "");
   for (const next of SHIKI_DEPENDENCY_CHAIN.slice(1)) {
     resolved = createRequire(resolved).resolve(next);
@@ -232,10 +232,10 @@ function bundledTypeScriptGrammarUrl(): string {
  * Loaded with the TypeScript grammar it builds on.
  */
 export function tsMemberLanguage(): ShikiLanguageInput {
-  const typescriptUrl = bundledTypeScriptGrammarUrl();
+  const typescript_url = bundled_type_script_grammar_url();
   return async () => {
     // The grammar is not a docs dependency; its path is resolved through Shiki at run time.
-    const typescript: { default: ShikiLanguage[] } = await import(typescriptUrl);
+    const typescript: { default: ShikiLanguage[] } = await import(typescript_url);
     return [...typescript.default, TS_MEMBER_GRAMMAR];
   };
 }

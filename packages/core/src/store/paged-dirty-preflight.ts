@@ -43,11 +43,11 @@ interface PagedDirtyPreflightState {
   sparseProbes: number;
 }
 
-function cellKey(addr: CellAddress): string {
+function cell_key(addr: CellAddress): string {
   return JSON.stringify([addr.sheet, addr.row, addr.col]);
 }
 
-function parseCellKey(key: string): CellAddress {
+function parse_cell_key(key: string): CellAddress {
   const [sheet, row, col] = JSON.parse(key) as [SheetId, number, number];
   return { sheet, row, col };
 }
@@ -68,7 +68,7 @@ export class PagedDirtyPreflight {
     this.wasm = wasm;
   }
 
-  private noteRangeMutationFfi(operation: RuntimeResourceOperation | null): void {
+  private note_range_mutation_ffi(operation: RuntimeResourceOperation | null): void {
     this.stats.ffiCalls += 1;
     this.boundaryAccounting.record(operation ?? "edit", "js-to-wasm", 0, "scalar");
   }
@@ -78,40 +78,40 @@ export class PagedDirtyPreflight {
     resourceOperation: RuntimeResourceOperation | null,
   ): MutationIssue | null {
     const limit = this.dirtyCellLimit;
-    const referenceSimulationLimit = this.referenceSimulationLimit;
-    const wasmIndexLimit = 0xffff_ffff;
+    const reference_simulation_limit = this.referenceSimulationLimit;
+    const wasm_index_limit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
-    const sheetLifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
-    const referenceLifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
-    const applicableRemove = patches.map((patch) => {
-      const lifecycle = applySheetLifecycleOperation(referenceLifecycle, patch);
+    const sheet_lifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
+    const reference_lifecycle = createSheetLifecycleState(this.sheets.workbook.sheets);
+    const applicable_remove = patches.map((patch) => {
+      const lifecycle = applySheetLifecycleOperation(reference_lifecycle, patch);
       return patch.op === "removeSheet" && lifecycle?.ok === true;
     });
 
-    const removeAfter = new Array<boolean>(patches.length);
-    let laterRemove = false;
+    const remove_after = new Array<boolean>(patches.length);
+    let later_remove = false;
 
     for (let index = patches.length - 1; index >= 0; index--) {
-      removeAfter[index] = laterRemove;
-      if (applicableRemove[index]) laterRemove = true;
+      remove_after[index] = later_remove;
+      if (applicable_remove[index]) later_remove = true;
     }
 
-    let trackVirtualRefs = false;
-    let referenceSimulationExceeded = false;
-    let referenceSimulationActual = 0;
-    let virtualRefs: Map<string, CellAddress> | null = null;
-    const referenceSimulationIssue = (): MutationIssue => ({
+    let track_virtual_refs = false;
+    let reference_simulation_exceeded = false;
+    let reference_simulation_actual = 0;
+    let virtual_refs: Map<string, CellAddress> | null = null;
+    const reference_simulation_issue = (): MutationIssue => ({
       kind: "resource-limit",
       severity: "error",
       resource: "paged-reference-simulation",
-      actual: referenceSimulationActual,
-      max: referenceSimulationLimit,
-      message: `Paged reference simulation exceeds the ${referenceSimulationLimit} entry limit`,
+      actual: reference_simulation_actual,
+      max: reference_simulation_limit,
+      message: `Paged reference simulation exceeds the ${reference_simulation_limit} entry limit`,
     });
 
-    const materializeVirtualRefs = (force = false): Map<string, CellAddress> | null => {
-      if (!trackVirtualRefs && !force) return null;
-      if (virtualRefs) return virtualRefs;
+    const materialize_virtual_refs = (force = false): Map<string, CellAddress> | null => {
+      if (!track_virtual_refs && !force) return null;
+      if (virtual_refs) return virtual_refs;
 
       const refs = new Map<string, CellAddress>();
       for (const sheet of this.sheets.workbook.sheets) {
@@ -123,23 +123,23 @@ export class PagedDirtyPreflight {
           continue;
         }
 
-        this.noteRangeMutationFfi(resourceOperation);
+        this.note_range_mutation_ffi(resourceOperation);
         const snapshot = this.wasm.captureReferences(
           this.sheets.handleOf(sheet.id),
-          referenceSimulationLimit - refs.size,
+          reference_simulation_limit - refs.size,
         );
         if (!snapshot) {
-          referenceSimulationActual = referenceSimulationLimit + 1;
-          referenceSimulationExceeded = true;
+          reference_simulation_actual = reference_simulation_limit + 1;
+          reference_simulation_exceeded = true;
           return null;
         }
 
         const projection = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
         for (const [offset, target] of projection.references()) {
-          referenceSimulationActual++;
+          reference_simulation_actual++;
           this.stats.admissionReferenceEntriesScanned++;
-          if (referenceSimulationActual > referenceSimulationLimit) {
-            referenceSimulationExceeded = true;
+          if (reference_simulation_actual > reference_simulation_limit) {
+            reference_simulation_exceeded = true;
             return null;
           }
 
@@ -149,25 +149,25 @@ export class PagedDirtyPreflight {
             col: offset % sheet.columns.length,
           };
 
-          refs.set(cellKey(source), target);
+          refs.set(cell_key(source), target);
         }
       }
 
-      virtualRefs = refs;
+      virtual_refs = refs;
       this.stats.admissionReferenceMapsMaterialized++;
-      return virtualRefs;
+      return virtual_refs;
     };
 
-    const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
-      const refs = materializeVirtualRefs();
+    const set_virtual_ref = (source: CellAddress, target: CellAddress | null): void => {
+      const refs = materialize_virtual_refs();
       if (!refs) return;
 
-      const key = cellKey(source);
+      const key = cell_key(source);
       const replaced = refs.delete(key);
       if (target) {
-        if (!replaced && refs.size >= referenceSimulationLimit) {
-          referenceSimulationActual = refs.size + 1;
-          referenceSimulationExceeded = true;
+        if (!replaced && refs.size >= reference_simulation_limit) {
+          reference_simulation_actual = refs.size + 1;
+          reference_simulation_exceeded = true;
           return;
         }
 
@@ -175,68 +175,73 @@ export class PagedDirtyPreflight {
       }
     };
 
-    const rebaseVirtualRefs = (
+    const rebase_virtual_refs = (
       sheet: SheetId,
-      rowAt: (row: number) => number | null,
-      colAt: (col: number) => number | null,
+      row_at: (row: number) => number | null,
+      col_at: (col: number) => number | null,
     ): void => {
-      const refs = materializeVirtualRefs();
+      const refs = materialize_virtual_refs();
       if (!refs) return;
 
       this.stats.admissionReferenceMapsMaterialized++;
       const rebased = new Map<string, CellAddress>();
-      for (const [sourceKey, target] of refs) {
-        const source = parseCellKey(sourceKey);
-        const sourceRow = source.sheet === sheet ? rowAt(source.row) : source.row;
-        const sourceCol = source.sheet === sheet ? colAt(source.col) : source.col;
-        const targetRow = target.sheet === sheet ? rowAt(target.row) : target.row;
-        const targetCol = target.sheet === sheet ? colAt(target.col) : target.col;
-        if (sourceRow === null || sourceCol === null || targetRow === null || targetCol === null) {
+      for (const [source_key, target] of refs) {
+        const source = parse_cell_key(source_key);
+        const source_row = source.sheet === sheet ? row_at(source.row) : source.row;
+        const source_col = source.sheet === sheet ? col_at(source.col) : source.col;
+        const target_row = target.sheet === sheet ? row_at(target.row) : target.row;
+        const target_col = target.sheet === sheet ? col_at(target.col) : target.col;
+        if (
+          source_row === null ||
+          source_col === null ||
+          target_row === null ||
+          target_col === null
+        ) {
           continue;
         }
 
-        const nextSource = { sheet: source.sheet, row: sourceRow, col: sourceCol };
-        rebased.set(cellKey(nextSource), {
+        const next_source = { sheet: source.sheet, row: source_row, col: source_col };
+        rebased.set(cell_key(next_source), {
           sheet: target.sheet,
-          row: targetRow,
-          col: targetCol,
+          row: target_row,
+          col: target_col,
         });
       }
 
-      virtualRefs = rebased;
-      if (rebased.size > referenceSimulationLimit) {
-        referenceSimulationActual = rebased.size;
-        referenceSimulationExceeded = true;
+      virtual_refs = rebased;
+      if (rebased.size > reference_simulation_limit) {
+        reference_simulation_actual = rebased.size;
+        reference_simulation_exceeded = true;
       }
     };
 
-    const clearVirtualRefs = (
+    const clear_virtual_refs = (
       sheet: SheetId,
-      startRow: number,
-      startCol: number,
+      start_row: number,
+      start_col: number,
       rows: number,
       cols: number,
     ): void => {
-      const refs = materializeVirtualRefs();
+      const refs = materialize_virtual_refs();
       if (!refs) return;
 
-      for (const sourceKey of refs.keys()) {
-        const source = parseCellKey(sourceKey);
+      for (const source_key of refs.keys()) {
+        const source = parse_cell_key(source_key);
         if (
           source.sheet === sheet &&
-          source.row >= startRow &&
-          source.row < startRow + rows &&
-          source.col >= startCol &&
-          source.col < startCol + cols
+          source.row >= start_row &&
+          source.row < start_row + rows &&
+          source.col >= start_col &&
+          source.col < start_col + cols
         ) {
-          refs.delete(sourceKey);
+          refs.delete(source_key);
         }
       }
     };
 
-    const keyOf = (row: number, col: number) => `${row}:${col}`;
+    const key_of = (row: number, col: number) => `${row}:${col}`;
 
-    const stateFor = (sheet: SheetId) => {
+    const state_for = (sheet: SheetId) => {
       const existing = states.get(sheet);
       if (existing) return existing;
       if (!this.sheets.handles.has(sheet)) return undefined;
@@ -268,10 +273,10 @@ export class PagedDirtyPreflight {
       message: `Paged dirty cells exceed the ${limit} cell limit`,
     });
 
-    const invalid = (operationIndex: number, message: string): MutationIssue => ({
+    const invalid = (operation_index: number, message: string): MutationIssue => ({
       kind: "invalid-operation",
       severity: "error",
-      operationIndex,
+      operationIndex: operation_index,
       message,
     });
 
@@ -282,13 +287,13 @@ export class PagedDirtyPreflight {
       return null;
     };
 
-    const materializeExisting = (state: PagedDirtyPreflightState): Set<string> => {
+    const materialize_existing = (state: PagedDirtyPreflightState): Set<string> => {
       if (state.existing) return state.existing;
       const existing = new Set<string>();
       if (state.handle !== null) {
         const coordinates = this.wasm.pagedDirtyCoordinates(state.handle);
         for (let index = 0; index + 1 < coordinates.length; index += 2) {
-          existing.add(keyOf(coordinates[index]!, coordinates[index + 1]!));
+          existing.add(key_of(coordinates[index]!, coordinates[index + 1]!));
         }
       }
 
@@ -297,40 +302,40 @@ export class PagedDirtyPreflight {
       return existing;
     };
 
-    const rebaseSet = (
+    const rebase_set = (
       source: ReadonlySet<string>,
-      rowAt: (row: number) => number | null,
-      colAt: (col: number) => number | null,
+      row_at: (row: number) => number | null,
+      col_at: (col: number) => number | null,
     ) => {
       const rebased = new Set<string>();
       for (const encoded of source) {
         const separator = encoded.indexOf(":");
         const row = Number(encoded.slice(0, separator));
         const col = Number(encoded.slice(separator + 1));
-        const nextRow = rowAt(row);
-        const nextCol = colAt(col);
-        if (nextRow !== null && nextCol !== null) rebased.add(keyOf(nextRow, nextCol));
+        const next_row = row_at(row);
+        const next_col = col_at(col);
+        if (next_row !== null && next_col !== null) rebased.add(key_of(next_row, next_col));
       }
 
       return rebased;
     };
 
-    const rebaseState = (
+    const rebase_state = (
       state: PagedDirtyPreflightState,
-      rowAt: (row: number) => number | null,
-      colAt: (col: number) => number | null,
+      row_at: (row: number) => number | null,
+      col_at: (col: number) => number | null,
     ) => {
-      state.existing = rebaseSet(materializeExisting(state), rowAt, colAt);
-      state.seen = rebaseSet(state.seen, rowAt, colAt);
+      state.existing = rebase_set(materialize_existing(state), row_at, col_at);
+      state.seen = rebase_set(state.seen, row_at, col_at);
       state.dirty = state.existing.size;
       state.additional = state.seen.size;
     };
 
-    const addSparse = (sheet: SheetId, row: number, col: number): MutationIssue | null => {
-      const state = stateFor(sheet);
+    const add_sparse = (sheet: SheetId, row: number, col: number): MutationIssue | null => {
+      const state = state_for(sheet);
       if (!state || row < 0 || col < 0 || row >= state.rows || col >= state.cols) return null;
 
-      const key = keyOf(row, col);
+      const key = key_of(row, col);
       if (state.seen.has(key)) return null;
 
       state.sparseProbes += 1;
@@ -339,7 +344,7 @@ export class PagedDirtyPreflight {
         state.sparseProbes >=
           Math.max(SPARSE_BULK_MIN_PROBES, state.dirty * SPARSE_BULK_DIRTY_RATIO)
       ) {
-        materializeExisting(state);
+        materialize_existing(state);
       }
 
       if (
@@ -356,44 +361,44 @@ export class PagedDirtyPreflight {
       return rejection;
     };
 
-    const cellApplies = (sheet: SheetId, row: number, col: number): boolean => {
-      const state = stateFor(sheet);
+    const cell_applies = (sheet: SheetId, row: number, col: number): boolean => {
+      const state = state_for(sheet);
       return Boolean(state && row >= 0 && col >= 0 && row < state.rows && col < state.cols);
     };
 
-    const rectangleApplies = (
+    const rectangle_applies = (
       sheet: SheetId,
-      startRow: number,
-      startCol: number,
+      start_row: number,
+      start_col: number,
       rows: number,
       cols: number,
     ): boolean => {
-      const state = stateFor(sheet);
+      const state = state_for(sheet);
       return Boolean(
         state &&
-        startRow >= 0 &&
-        startCol >= 0 &&
+        start_row >= 0 &&
+        start_col >= 0 &&
         Number.isSafeInteger(rows) &&
         Number.isSafeInteger(cols) &&
         rows > 0 &&
         cols > 0 &&
-        rows <= state.rows - startRow &&
-        cols <= state.cols - startCol,
+        rows <= state.rows - start_row &&
+        cols <= state.cols - start_col,
       );
     };
 
-    const addRectangle = (
+    const add_rectangle = (
       sheet: SheetId,
-      startRow: number,
-      startCol: number,
+      start_row: number,
+      start_col: number,
       rows: number,
       cols: number,
     ): MutationIssue | null => {
-      if (rows === 1 && cols === 1) return addSparse(sheet, startRow, startCol);
+      if (rows === 1 && cols === 1) return add_sparse(sheet, start_row, start_col);
 
-      const state = stateFor(sheet);
+      const state = state_for(sheet);
       if (!state) return null;
-      if (startRow < 0 || startCol < 0) return null;
+      if (start_row < 0 || start_col < 0) return null;
       if (
         !Number.isSafeInteger(rows) ||
         !Number.isSafeInteger(cols) ||
@@ -404,15 +409,15 @@ export class PagedDirtyPreflight {
         return issue(Number.MAX_SAFE_INTEGER);
       }
 
-      if (rows > state.rows - startRow || cols > state.cols - startCol) {
+      if (rows > state.rows - start_row || cols > state.cols - start_col) {
         const actual = state.dirty + state.additional + rows * cols;
         return actual > limit ? issue(actual) : null;
       }
 
-      const existing = materializeExisting(state);
-      for (let row = startRow; row < startRow + rows; row++) {
-        for (let col = startCol; col < startCol + cols; col++) {
-          const key = keyOf(row, col);
+      const existing = materialize_existing(state);
+      for (let row = start_row; row < start_row + rows; row++) {
+        for (let col = start_col; col < start_col + cols; col++) {
+          const key = key_of(row, col);
           if (existing.has(key) || state.seen.has(key)) continue;
           const rejection = consume(state);
           if (rejection) return rejection;
@@ -423,12 +428,12 @@ export class PagedDirtyPreflight {
       return null;
     };
 
-    for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
-      const patch = patches[operationIndex]!;
-      trackVirtualRefs = removeAfter[operationIndex] ?? false;
+    for (let operation_index = 0; operation_index < patches.length; operation_index++) {
+      const patch = patches[operation_index]!;
+      track_virtual_refs = remove_after[operation_index] ?? false;
 
       if (patch.op === "addSheet") {
-        if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
+        if (applySheetLifecycleOperation(sheet_lifecycle, patch)?.ok !== true) continue;
         const snapshot = patch.sheet;
         const state: PagedDirtyPreflightState = {
           handle: null,
@@ -445,14 +450,14 @@ export class PagedDirtyPreflight {
         states.set(snapshot.id, state);
         for (const block of snapshot.cells) {
           for (const cell of block.cells) {
-            const rejection = addSparse(
+            const rejection = add_sparse(
               snapshot.id,
               block.startRow + cell.rowOffset,
               block.startCol + cell.colOffset,
             );
             if (rejection) return rejection;
             if (cell.value.kind === "ref") {
-              setVirtualRef(
+              set_virtual_ref(
                 {
                   sheet: snapshot.id,
                   row: block.startRow + cell.rowOffset,
@@ -460,34 +465,34 @@ export class PagedDirtyPreflight {
                 },
                 cell.value.target,
               );
-              if (referenceSimulationExceeded) return referenceSimulationIssue();
+              if (reference_simulation_exceeded) return reference_simulation_issue();
             }
           }
         }
 
-        if (referenceSimulationExceeded) return referenceSimulationIssue();
+        if (reference_simulation_exceeded) return reference_simulation_issue();
         continue;
       }
 
       if (patch.op === "removeSheet") {
-        if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
-        if (referenceSimulationExceeded) return referenceSimulationIssue();
-        if (!trackVirtualRefs && virtualRefs === null) {
-          this.noteRangeMutationFfi(resourceOperation);
+        if (applySheetLifecycleOperation(sheet_lifecycle, patch)?.ok !== true) continue;
+        if (reference_simulation_exceeded) return reference_simulation_issue();
+        if (!track_virtual_refs && virtual_refs === null) {
+          this.note_range_mutation_ffi(resourceOperation);
           const sources = this.wasm.referencesTargeting(
             this.sheets.handleOf(patch.sheet),
-            referenceSimulationLimit,
+            reference_simulation_limit,
           );
           if (!sources) {
-            referenceSimulationActual = referenceSimulationLimit + 1;
-            return referenceSimulationIssue();
+            reference_simulation_actual = reference_simulation_limit + 1;
+            return reference_simulation_issue();
           }
 
           this.stats.admissionReferenceEntriesScanned += sources.length / 3;
           for (let index = 0; index < sources.length; index += 3) {
-            const sourceSheet = this.sheetIdsByHandle[sources[index]!];
-            if (sourceSheet === undefined || sourceSheet === patch.sheet) continue;
-            const rejection = addSparse(sourceSheet, sources[index + 1]!, sources[index + 2]!);
+            const source_sheet = this.sheetIdsByHandle[sources[index]!];
+            if (source_sheet === undefined || source_sheet === patch.sheet) continue;
+            const rejection = add_sparse(source_sheet, sources[index + 1]!, sources[index + 2]!);
             if (rejection) return rejection;
           }
 
@@ -495,27 +500,27 @@ export class PagedDirtyPreflight {
           continue;
         }
 
-        const materializedRefs = materializeVirtualRefs(true);
-        if (!materializedRefs) return referenceSimulationIssue();
+        const materialized_refs = materialize_virtual_refs(true);
+        if (!materialized_refs) return reference_simulation_issue();
         const entries = (function* (): IterableIterator<[CellAddress, CellAddress]> {
-          for (const [sourceKey, target] of materializedRefs) {
-            yield [parseCellKey(sourceKey), target];
+          for (const [source_key, target] of materialized_refs) {
+            yield [parse_cell_key(source_key), target];
           }
         })();
 
-        const remaining = trackVirtualRefs ? new Map<string, CellAddress>() : null;
+        const remaining = track_virtual_refs ? new Map<string, CellAddress>() : null;
         for (const [source, target] of entries) {
           if (source.sheet !== patch.sheet && target.sheet === patch.sheet) {
-            const rejection = addSparse(source.sheet, source.row, source.col);
+            const rejection = add_sparse(source.sheet, source.row, source.col);
             if (rejection) return rejection;
           }
 
           if (remaining && source.sheet !== patch.sheet && target.sheet !== patch.sheet) {
-            remaining.set(cellKey(source), { ...target });
+            remaining.set(cell_key(source), { ...target });
           }
         }
 
-        virtualRefs = remaining;
+        virtual_refs = remaining;
         states.delete(patch.sheet);
         continue;
       }
@@ -525,7 +530,7 @@ export class PagedDirtyPreflight {
         patch.op === "moveSheet" ||
         patch.op === "setSheetVisibility"
       ) {
-        applySheetLifecycleOperation(sheetLifecycle, patch);
+        applySheetLifecycleOperation(sheet_lifecycle, patch);
         continue;
       }
 
@@ -539,29 +544,29 @@ export class PagedDirtyPreflight {
           patch.op === "removeColumns" ||
           patch.op === "moveColumns")
       ) {
-        const state = stateFor(sheet);
+        const state = state_for(sheet);
         if (!state) continue;
         const keep = (index: number) => index;
-        const rebaseAxes = (
-          rowAt: (row: number) => number | null,
-          colAt: (col: number) => number | null,
+        const rebase_axes = (
+          row_at: (row: number) => number | null,
+          col_at: (col: number) => number | null,
         ): void => {
-          rebaseState(state, rowAt, colAt);
-          rebaseVirtualRefs(sheet, rowAt, colAt);
+          rebase_state(state, row_at, col_at);
+          rebase_virtual_refs(sheet, row_at, col_at);
         };
         if (patch.op === "addRows") {
-          if (patch.at > state.rows || patch.count > wasmIndexLimit - state.rows) {
-            return invalid(operationIndex, "addRows exceeds the current sheet bounds");
+          if (patch.at > state.rows || patch.count > wasm_index_limit - state.rows) {
+            return invalid(operation_index, "addRows exceeds the current sheet bounds");
           }
 
-          rebaseAxes(insertRemap(patch.at, patch.count), keep);
+          rebase_axes(insertRemap(patch.at, patch.count), keep);
           state.rows += patch.count;
         } else if (patch.op === "removeRows") {
           if (patch.at > state.rows || patch.count > state.rows - patch.at) {
-            return invalid(operationIndex, "removeRows exceeds the current sheet bounds");
+            return invalid(operation_index, "removeRows exceeds the current sheet bounds");
           }
 
-          rebaseAxes(deleteRemap(patch.at, patch.count), keep);
+          rebase_axes(deleteRemap(patch.at, patch.count), keep);
           state.rows -= patch.count;
         } else if (patch.op === "moveRows") {
           if (
@@ -569,35 +574,35 @@ export class PagedDirtyPreflight {
             patch.count > state.rows - patch.from ||
             patch.to > state.rows - patch.count
           ) {
-            return invalid(operationIndex, "moveRows exceeds the current sheet bounds");
+            return invalid(operation_index, "moveRows exceeds the current sheet bounds");
           }
 
-          rebaseAxes(moveRemap(patch.from, patch.count, patch.to), keep);
+          rebase_axes(moveRemap(patch.from, patch.count, patch.to), keep);
         } else if (patch.op === "addColumns") {
-          const insertedKeys = patch.columns.map((column) => column.key);
+          const inserted_keys = patch.columns.map((column) => column.key);
           if (
             patch.at > state.cols ||
-            insertedKeys.length === 0 ||
-            insertedKeys.length > wasmIndexLimit - state.cols ||
-            new Set([...state.columnKeys, ...insertedKeys]).size !==
-              state.columnKeys.length + insertedKeys.length
+            inserted_keys.length === 0 ||
+            inserted_keys.length > wasm_index_limit - state.cols ||
+            new Set([...state.columnKeys, ...inserted_keys]).size !==
+              state.columnKeys.length + inserted_keys.length
           ) {
-            return invalid(operationIndex, "addColumns exceeds the current sheet bounds");
+            return invalid(operation_index, "addColumns exceeds the current sheet bounds");
           }
 
-          rebaseAxes(keep, insertRemap(patch.at, patch.columns.length));
+          rebase_axes(keep, insertRemap(patch.at, patch.columns.length));
           state.cols += patch.columns.length;
-          state.columnKeys.splice(patch.at, 0, ...insertedKeys);
+          state.columnKeys.splice(patch.at, 0, ...inserted_keys);
         } else if (patch.op === "removeColumns") {
           if (
             patch.at > state.cols ||
             patch.count > state.cols - patch.at ||
             patch.count === state.cols
           ) {
-            return invalid(operationIndex, "removeColumns exceeds the current sheet bounds");
+            return invalid(operation_index, "removeColumns exceeds the current sheet bounds");
           }
 
-          rebaseAxes(keep, deleteRemap(patch.at, patch.count));
+          rebase_axes(keep, deleteRemap(patch.at, patch.count));
           state.cols -= patch.count;
           state.columnKeys.splice(patch.at, patch.count);
         } else {
@@ -606,31 +611,31 @@ export class PagedDirtyPreflight {
             patch.count > state.cols - patch.from ||
             patch.to > state.cols - patch.count
           ) {
-            return invalid(operationIndex, "moveColumns exceeds the current sheet bounds");
+            return invalid(operation_index, "moveColumns exceeds the current sheet bounds");
           }
 
-          rebaseAxes(keep, moveRemap(patch.from, patch.count, patch.to));
-          const movedKeys = state.columnKeys.splice(patch.from, patch.count);
-          state.columnKeys.splice(patch.to, 0, ...movedKeys);
+          rebase_axes(keep, moveRemap(patch.from, patch.count, patch.to));
+          const moved_keys = state.columnKeys.splice(patch.from, patch.count);
+          state.columnKeys.splice(patch.to, 0, ...moved_keys);
         }
 
-        if (referenceSimulationExceeded) return referenceSimulationIssue();
+        if (reference_simulation_exceeded) return reference_simulation_issue();
         continue;
       }
 
       let rejection: MutationIssue | null = null;
       if (patch.op === "set") {
-        if (!cellApplies(patch.addr.sheet, patch.addr.row, patch.addr.col)) continue;
-        rejection = addSparse(patch.addr.sheet, patch.addr.row, patch.addr.col);
+        if (!cell_applies(patch.addr.sheet, patch.addr.row, patch.addr.col)) continue;
+        rejection = add_sparse(patch.addr.sheet, patch.addr.row, patch.addr.col);
         if (!rejection) {
-          setVirtualRef(patch.addr, patch.value.kind === "ref" ? patch.value.target : null);
+          set_virtual_ref(patch.addr, patch.value.kind === "ref" ? patch.value.target : null);
         }
       } else if (patch.op === "setRange") {
         const range = normalizedRange(patch.range);
         const rows = range.end.row - range.start.row + 1;
         const cols = range.end.col - range.start.col + 1;
         if (
-          !rectangleApplies(range.sheet, range.start.row, range.start.col, rows, cols) ||
+          !rectangle_applies(range.sheet, range.start.row, range.start.col, rows, cols) ||
           patch.cells.some(
             (cell) =>
               !integerAt(cell.rowOffset) ||
@@ -643,7 +648,7 @@ export class PagedDirtyPreflight {
         }
 
         for (const cell of patch.cells) {
-          rejection = addSparse(
+          rejection = add_sparse(
             range.sheet,
             range.start.row + cell.rowOffset,
             range.start.col + cell.colOffset,
@@ -655,15 +660,15 @@ export class PagedDirtyPreflight {
             col: range.start.col + cell.colOffset,
           };
 
-          setVirtualRef(source, cell.value.kind === "ref" ? cell.value.target : null);
-          if (referenceSimulationExceeded) return referenceSimulationIssue();
+          set_virtual_ref(source, cell.value.kind === "ref" ? cell.value.target : null);
+          if (reference_simulation_exceeded) return reference_simulation_issue();
         }
       } else if (patch.op === "setBlock" || patch.op === "restoreBlock") {
-        const { block, range: sourceRange } =
+        const { block, range: source_range } =
           patch.op === "restoreBlock" ? restoreBlockFacts(patch) : patch;
-        const range = patch.op === "restoreBlock" ? sourceRange : normalizedRange(sourceRange);
+        const range = patch.op === "restoreBlock" ? source_range : normalizedRange(source_range);
 
-        rejection = addRectangle(
+        rejection = add_rectangle(
           range.sheet,
           range.start.row,
           range.start.col,
@@ -675,7 +680,7 @@ export class PagedDirtyPreflight {
           !rejection &&
           block.rowCount === range.end.row - range.start.row + 1 &&
           block.colCount === range.end.col - range.start.col + 1 &&
-          rectangleApplies(
+          rectangle_applies(
             range.sheet,
             range.start.row,
             range.start.col,
@@ -683,22 +688,22 @@ export class PagedDirtyPreflight {
             block.colCount,
           )
         ) {
-          for (let rowOffset = 0; rowOffset < block.rowCount; rowOffset++) {
-            for (let colOffset = 0; colOffset < block.colCount; colOffset++) {
-              setVirtualRef(
+          for (let row_offset = 0; row_offset < block.rowCount; row_offset++) {
+            for (let col_offset = 0; col_offset < block.colCount; col_offset++) {
+              set_virtual_ref(
                 {
                   sheet: range.sheet,
-                  row: range.start.row + rowOffset,
-                  col: range.start.col + colOffset,
+                  row: range.start.row + row_offset,
+                  col: range.start.col + col_offset,
                 },
                 null,
               );
-              if (referenceSimulationExceeded) return referenceSimulationIssue();
+              if (reference_simulation_exceeded) return reference_simulation_issue();
             }
           }
 
           for (const [offset, target] of block.refs ?? []) {
-            setVirtualRef(
+            set_virtual_ref(
               {
                 sheet: range.sheet,
                 row: range.start.row + Math.floor(offset / block.colCount),
@@ -706,7 +711,7 @@ export class PagedDirtyPreflight {
               },
               target,
             );
-            if (referenceSimulationExceeded) return referenceSimulationIssue();
+            if (reference_simulation_exceeded) return reference_simulation_issue();
           }
         }
       } else if (
@@ -716,7 +721,7 @@ export class PagedDirtyPreflight {
       ) {
         const range = normalizedRange(patch.range);
 
-        rejection = addRectangle(
+        rejection = add_rectangle(
           range.sheet,
           range.start.row,
           range.start.col,
@@ -728,7 +733,7 @@ export class PagedDirtyPreflight {
           !rejection &&
           patch.op === "clearRange" &&
           (patch.contents ?? true) &&
-          rectangleApplies(
+          rectangle_applies(
             range.sheet,
             range.start.row,
             range.start.col,
@@ -736,7 +741,7 @@ export class PagedDirtyPreflight {
             range.end.col - range.start.col + 1,
           )
         ) {
-          clearVirtualRefs(
+          clear_virtual_refs(
             range.sheet,
             range.start.row,
             range.start.col,
@@ -747,7 +752,7 @@ export class PagedDirtyPreflight {
       } else if (patch.op === "moveCells") {
         // A block move writes the cells it leaves and the cells it lands on.
         for (const block of movedCellBounds(patch)) {
-          rejection ??= addRectangle(
+          rejection ??= add_rectangle(
             block.sheet,
             block.start.row,
             block.start.col,
@@ -757,7 +762,7 @@ export class PagedDirtyPreflight {
         }
       }
 
-      if (referenceSimulationExceeded) return referenceSimulationIssue();
+      if (reference_simulation_exceeded) return reference_simulation_issue();
       if (rejection) return rejection;
     }
 

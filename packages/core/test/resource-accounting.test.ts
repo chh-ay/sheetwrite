@@ -13,7 +13,7 @@ import {
 } from "../src/resource-accounting.js";
 import type { ResourceOwnerBytes } from "../src/types/store.js";
 
-function encodedStoreMemory(
+function encoded_store_memory(
   overrides: Partial<Record<(typeof WASM_MEMORY_OWNERS)[number], [number, number, number]>> = {},
 ) {
   const encoded: number[] = [
@@ -33,35 +33,35 @@ function encodedStoreMemory(
   return encoded;
 }
 
-function jsOwner(
+function js_owner(
   owner: string,
-  logicalBytes: number,
-  allocatedBytes = logicalBytes,
+  logical_bytes: number,
+  allocated_bytes = logical_bytes,
 ): ResourceOwnerBytes {
   return {
     owner,
-    logicalBytes,
-    allocatedBytes,
-    entries: logicalBytes === 0 ? 0 : 1,
+    logicalBytes: logical_bytes,
+    allocatedBytes: allocated_bytes,
+    entries: logical_bytes === 0 ? 0 : 1,
     measurement: "typed-array-byte-length",
   };
 }
 
 describe("runtime resource accounting", () => {
   it("fails closed on protocol drift, negatives, capacity inversion, and unaccounted bytes", () => {
-    const badVersion = encodedStoreMemory();
-    badVersion[0] = STORE_MEMORY_PROTOCOL_VERSION + 1;
-    expect(() => decodeStoreMemoryStats(badVersion, null)).toThrow(Error);
+    const bad_version = encoded_store_memory();
+    bad_version[0] = STORE_MEMORY_PROTOCOL_VERSION + 1;
+    expect(() => decodeStoreMemoryStats(bad_version, null)).toThrow(Error);
 
-    const negative = encodedStoreMemory();
+    const negative = encoded_store_memory();
     negative[3] = -1;
     negative[negative.length - 2] = -1;
     expect(() => decodeStoreMemoryStats(negative, null)).toThrow(Error);
 
-    const inverted = encodedStoreMemory({ "wasm.dense.kinds": [2, 1, 2] });
+    const inverted = encoded_store_memory({ "wasm.dense.kinds": [2, 1, 2] });
     expect(() => decodeStoreMemoryStats(inverted, null)).toThrow(Error);
 
-    const wasm = decodeStoreMemoryStats(encodedStoreMemory(), null);
+    const wasm = decodeStoreMemoryStats(encoded_store_memory(), null);
     const snapshot = createRuntimeResourceSnapshot({
       operation: "ingest",
       phase: "settled",
@@ -103,7 +103,7 @@ describe("runtime resource accounting", () => {
   });
 
   it("reports owner and runtime phase deltas without mutating either snapshot", () => {
-    const wasm = decodeStoreMemoryStats(encodedStoreMemory(), null);
+    const wasm = decodeStoreMemoryStats(encoded_store_memory(), null);
     const before = createRuntimeResourceSnapshot({
       operation: "edit",
       phase: "before",
@@ -119,7 +119,7 @@ describe("runtime resource accounting", () => {
       operation: "edit",
       phase: "settled",
       wasm,
-      jsOwners: [jsOwner("js.history.snapshots", 64, 80)],
+      jsOwners: [js_owner("js.history.snapshots", 64, 80)],
       runtime: {
         usedJSHeapSize: 180,
         arrayBufferBytes: 44,

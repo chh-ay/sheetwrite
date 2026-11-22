@@ -12,7 +12,7 @@ import { panelSection, rejectionMessage } from "./panel-dom.js";
 const SLICER_BOX = { w: 3, h: 6 } as const;
 
 /** Slicer items for `columns` on `sheet`, each in the first place still free. */
-function slicerItems(
+function slicer_items(
   grid: Grid,
   sheet: SheetId,
   columns: readonly { table: string; column: string }[],
@@ -84,7 +84,7 @@ export function slicerPanel(grid: Grid, sheet: SheetId): GridPanel {
           status.textContent = "Check the columns to slice by.";
           return;
         }
-        const patches = slicerItems(grid, sheet, columns).map((item) => ({
+        const patches = slicer_items(grid, sheet, columns).map((item) => ({
           op: "setDashboardItem" as const,
           sheet,
           item,

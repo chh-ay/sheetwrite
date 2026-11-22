@@ -162,13 +162,13 @@ interface FormulaWorkload {
   readonly rangeSize?: number;
 }
 
-function formulaWorkloads(
+function formula_workloads(
   smoke: boolean,
-  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+  engine_package: FormulaEnginePackage = ENGINE_PACKAGE,
 ): FormulaWorkload[] {
   const workloads: FormulaWorkload[] = [];
-  const add = (id: string, size: number, rangeSize?: number) =>
-    workloads.push({ id, size, ...(rangeSize === undefined ? {} : { rangeSize }) });
+  const add = (id: string, size: number, range_size?: number) =>
+    workloads.push({ id, size, ...(range_size === undefined ? {} : { rangeSize: range_size }) });
   for (const size of smoke ? ([1_000] as const) : FORMULA_SIZES) {
     add("independent-parse-load", size);
     add("independent-first-recompute", size);
@@ -179,7 +179,7 @@ function formulaWorkloads(
 
   const large = smoke ? 1_000 : 100_000;
   const range = smoke ? 10_000 : 100_000;
-  const lookupFormulas = smoke ? 500 : 1_000;
+  const lookup_formulas = smoke ? 500 : 1_000;
   const topology = smoke ? 1_000 : 10_000;
   add("wide-fan-out-edit", 1_000);
   if (!smoke) add("wide-fan-out-edit", large);
@@ -202,8 +202,8 @@ function formulaWorkloads(
     add("xlookup-mixed-exact", size);
   }
   for (const id of LOOKUP_ROW_IDS) {
-    add(id, lookupFormulas);
-    add(`${id}${LOOKUP_EDIT_SUFFIX}`, lookupFormulas);
+    add(id, lookup_formulas);
+    add(`${id}${LOOKUP_EDIT_SUFFIX}`, lookup_formulas);
   }
   add("spill-filter-resize", range);
   add("spill-filter-same-range", range);
@@ -237,15 +237,15 @@ function formulaWorkloads(
   add("iterative-finance", 1_000);
   add("incremental-dependency-closure-edit", range);
   add("paged-cell-reads", range);
-  const pagedRows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
-  add("paged-insert-row", pagedRows);
-  add("paged-range-loaded", pagedRows);
-  const evictionPages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
-  add("paged-eviction", evictionPages);
-  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
-  add("index-match-many", indexMatchFormulas, range);
-  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
-  add("rank-many", rankManySize);
+  const paged_rows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
+  add("paged-insert-row", paged_rows);
+  add("paged-range-loaded", paged_rows);
+  const eviction_pages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
+  add("paged-eviction", eviction_pages);
+  const index_match_formulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", index_match_formulas, range);
+  const rank_many_size = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rank_many_size);
   add("sort-unique-filter", range);
   add("subtotal-filtered", range);
   for (const size of smoke ? [1_000] : SORT_MIXED_BLANKS_SIZES) {
@@ -256,7 +256,7 @@ function formulaWorkloads(
   add("sparse-page-write", range);
   add("spill-sequence-admission", large);
   add("history-diff", HISTORY_CELLS);
-  if (enginePackage === "formulas") {
+  if (engine_package === "formulas") {
     for (const row of FULL_ENGINE_ROWS) {
       const size = smoke ? row.smokeSize : row.size;
       add(row.id, size);
@@ -274,7 +274,7 @@ export function expectedFormulaWorkloadKeys(
   mode: BenchmarkMode,
   enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
 ): string[] {
-  return formulaWorkloads(mode === "smoke", enginePackage).map(formulaWorkloadKey);
+  return formula_workloads(mode === "smoke", enginePackage).map(formulaWorkloadKey);
 }
 
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
@@ -355,7 +355,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "measure-pivot",
 ]);
 
-function legacyFormulaBaselineWorkloadKeys(): string[] {
+function legacy_formula_baseline_workload_keys(): string[] {
   return expectedFormulaWorkloadKeys("full", "wasm").filter((key) => {
     const id = key.slice("workload=".length, key.indexOf(";size="));
     return !EXPANDED_FORMULA_WORKLOAD_IDS.has(id);
@@ -370,7 +370,7 @@ export function expectedFormulaMemoryKeys(mode: BenchmarkMode): string[] {
 /** The rows above, as the artifact checks read them. */
 const FORMULA_MATRIX: FormulaArtifactMatrix = {
   workloadKeys: expectedFormulaWorkloadKeys,
-  legacyWorkloadKeys: legacyFormulaBaselineWorkloadKeys,
+  legacyWorkloadKeys: legacy_formula_baseline_workload_keys,
   memoryKeys: expectedFormulaMemoryKeys,
   shapeRowIds: SHAPE_ROW_IDS,
 };
@@ -406,21 +406,21 @@ const BASELINE_CONTEXT =
     ? undefined
     : captureEngineBaselineContext(protocolCaptureMeta().commit, [ENGINE_PACKAGE]);
 
-function allocationAt(store: CellStore): FormulaAllocationSample {
+function allocation_at(store: CellStore): FormulaAllocationSample {
   const memory = Array.from(store.memoryStats());
-  const ownerCount = memory[1];
+  const owner_count = memory[1];
   assert(
     memory[0] === STORE_MEMORY_SCHEMA &&
-      Number.isInteger(ownerCount) &&
-      ownerCount! > 0 &&
-      memory.length === 5 + ownerCount! * 3,
+      Number.isInteger(owner_count) &&
+      owner_count! > 0 &&
+      memory.length === 5 + owner_count! * 3,
     "store memory stats schema",
   );
-  const retainedBytes = memory.at(-1)!;
+  const retained_bytes = memory.at(-1)!;
   const transient = Array.from(store.formulaMatrixResourceStats());
   assert(transient.length === 3, "formula matrix resource stats schema");
   const sample = {
-    retainedBytes,
+    retainedBytes: retained_bytes,
     peakTransientBytes: transient[1]!,
     transientAllocations: transient[2]!,
   };
@@ -430,7 +430,7 @@ function allocationAt(store: CellStore): FormulaAllocationSample {
   return sample;
 }
 
-function summarizeAllocations(samples: readonly FormulaAllocationSample[]): FormulaAllocationStat {
+function summarize_allocations(samples: readonly FormulaAllocationSample[]): FormulaAllocationStat {
   return {
     retainedBytes: summarize(samples.map((sample) => sample.retainedBytes)),
     peakTransientBytes: summarize(samples.map((sample) => sample.peakTransientBytes)),
@@ -472,34 +472,34 @@ export interface AggregatedWorkloadSample extends CompleteFormulaWorkloadResult 
 
 /**
  * Run and check the untimed warm-up fixtures, then keep running unchecked
- * warm-ups until they add up to `minimumWarmupMs`. A restorable fixture is
+ * warm-ups until they add up to `minimum_warmup_ms`. A restorable fixture is
  * returned restored, ready for the timed loop.
  */
-function warmUpFixtures(
+function warm_up_fixtures(
   id: string,
   factory: FixtureFactory,
-  warmupFixtures: number,
-  minimumWarmupMs: number,
+  warmup_fixtures: number,
+  minimum_warmup_ms: number,
   expected: FormulaOutput,
 ): TimedFixture | undefined {
-  if (!Number.isInteger(warmupFixtures) || warmupFixtures < 1) {
+  if (!Number.isInteger(warmup_fixtures) || warmup_fixtures < 1) {
     throw new RangeError("warmupFixtures must be a positive integer");
   }
-  if (!Number.isFinite(minimumWarmupMs) || minimumWarmupMs < 0) {
+  if (!Number.isFinite(minimum_warmup_ms) || minimum_warmup_ms < 0) {
     throw new RangeError("minimumWarmupMs must be a non-negative number");
   }
   let fixture: TimedFixture | undefined;
   const started = now();
-  for (let index = 0; index < warmupFixtures || now() - started < minimumWarmupMs; index += 1) {
+  for (let index = 0; index < warmup_fixtures || now() - started < minimum_warmup_ms; index += 1) {
     if (index >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
-      throw new RangeError(`${id} did not finish its ${minimumWarmupMs} ms warm-up`);
+      throw new RangeError(`${id} did not finish its ${minimum_warmup_ms} ms warm-up`);
     }
     fixture ??= factory();
     fixture.store.resetFormulaMatrixResourceStats();
     fixture.run();
-    if (index < warmupFixtures) {
+    if (index < warmup_fixtures) {
       assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
-      allocationAt(fixture.store);
+      allocation_at(fixture.store);
     }
     if (fixture.restore === undefined) {
       fixture.dispose();
@@ -536,26 +536,26 @@ export function collectAggregatedSample(
   }
   const expected = expectedOutput ?? expectedFormulaOutput(id, size);
   let fixture =
-    warmUpFixtures(id, factory, options.warmupFixtures, options.minimumWarmupMs ?? 0, expected) ??
+    warm_up_fixtures(id, factory, options.warmupFixtures, options.minimumWarmupMs ?? 0, expected) ??
     factory();
 
   // One forced GC brackets the whole sample: a per-iteration GC would dominate
   // the cheap workloads the aggregate exists to measure.
   forceGc();
-  let totalMs = 0;
+  let total_ms = 0;
   let iterations = 0;
   let allocation: FormulaAllocationSample | undefined;
   for (;;) {
     fixture.store.resetFormulaMatrixResourceStats();
     const started = now();
     fixture.run();
-    totalMs += now() - started;
+    total_ms += now() - started;
     iterations += 1;
     if (allocation === undefined) {
-      allocation = allocationAt(fixture.store);
+      allocation = allocation_at(fixture.store);
       assert(outputsEqual(fixture.check(), expected), `${id} first measured output`);
     }
-    if (totalMs >= options.minimumSampleDurationMs) break;
+    if (total_ms >= options.minimumSampleDurationMs) break;
     if (iterations >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
       throw new RangeError(
         `${id} did not reach ${options.minimumSampleDurationMs} ms within ${AGGREGATED_SAMPLE_MAX_ITERATIONS} fixture runs`,
@@ -573,19 +573,19 @@ export function collectAggregatedSample(
   assert(allocation !== undefined, `${id} first measured allocation`);
   assert(outputsEqual(fixture.check(), expected), `${id} last measured output`);
   fixture.dispose();
-  assert(Number.isFinite(totalMs), `${id} measured duration`);
+  assert(Number.isFinite(total_ms), `${id} measured duration`);
 
-  const perIterationMs = totalMs / iterations;
+  const per_iteration_ms = total_ms / iterations;
   return {
     id,
     size,
-    samplesMs: [perIterationMs],
-    stat: summarize([perIterationMs]),
+    samplesMs: [per_iteration_ms],
+    stat: summarize([per_iteration_ms]),
     allocationSamples: [allocation],
-    allocationStat: summarizeAllocations([allocation]),
+    allocationStat: summarize_allocations([allocation]),
     output: expected,
     iterations,
-    totalMs,
+    totalMs: total_ms,
     warmupFixtures: options.warmupFixtures,
   };
 }
@@ -602,11 +602,11 @@ export function collectFixture(
   warm.store.resetFormulaMatrixResourceStats();
   warm.run();
   assert(outputsEqual(warm.check(), expected), `${id} warmup output`);
-  allocationAt(warm.store);
+  allocation_at(warm.store);
   warm.dispose();
 
   const raw = new Array<number>(samples);
-  const allocationSamples = new Array<FormulaAllocationSample>(samples);
+  const allocation_samples = new Array<FormulaAllocationSample>(samples);
   let output = expected;
   for (let index = 0; index < samples; index++) {
     const fixture = factory();
@@ -615,7 +615,7 @@ export function collectFixture(
     const started = now();
     fixture.run();
     raw[index] = now() - started;
-    allocationSamples[index] = allocationAt(fixture.store);
+    allocation_samples[index] = allocation_at(fixture.store);
     output = fixture.check();
     assert(outputsEqual(output, expected), `${id} measured output`);
     fixture.dispose();
@@ -625,8 +625,8 @@ export function collectFixture(
     size,
     samplesMs: raw,
     stat: summarize(raw),
-    allocationSamples,
-    allocationStat: summarizeAllocations(allocationSamples),
+    allocationSamples: allocation_samples,
+    allocationStat: summarize_allocations(allocation_samples),
     output,
   };
 }
@@ -638,13 +638,13 @@ export function collectFixture(
  * the release comparison shows it as new in the candidate. Every engine must
  * run the core rows.
  */
-function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
+function run_workloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
   const samples = smoke ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
   const results: CompleteFormulaWorkloadResult[] = [];
-  for (const { id, size, rangeSize } of formulaWorkloads(smoke)) {
+  for (const { id, size, rangeSize: range_size } of formula_workloads(smoke)) {
     try {
       results.push(
-        collectFixture(id, size, () => createFormulaFixture(id, size, rangeSize), samples),
+        collectFixture(id, size, () => createFormulaFixture(id, size, range_size), samples),
       );
     } catch (error) {
       if (BASELINE_CONTEXT === undefined || !EXPANDED_FORMULA_WORKLOAD_IDS.has(id)) throw error;
@@ -673,7 +673,7 @@ export interface FormulaGateCapture {
  */
 const MISSING_METHOD = /\.(\w+) is not a function/u;
 
-function missingCellStoreMethod(error: unknown): string | undefined {
+function missing_cell_store_method(error: unknown): string | undefined {
   if (!(error instanceof TypeError)) return undefined;
   const method = MISSING_METHOD.exec(error.message)?.[1];
   return method !== undefined && !(method in CellStore.prototype) ? method : undefined;
@@ -728,24 +728,24 @@ const GATE_TIER_UP_WARMUP_MS: Readonly<Record<string, number>> = {
  * sample of at least `SAMPLE_AGGREGATE_MS`, so 1-3 ms rows average dozens of
  * runs instead of resting on a single cold run.
  */
-function captureGateSide(): FormulaGateCapture {
+function capture_gate_side(): FormulaGateCapture {
   const capture: FormulaGateCapture = {
     engineDigest: sha256(Buffer.concat([readFileSync(ENGINE_GLUE_PATH), readFileSync(WASM_PATH)])),
     timings: {},
     bytes: {},
     skipped: {},
   };
-  for (const { id, size, rangeSize } of formulaWorkloads(false)) {
+  for (const { id, size, rangeSize: range_size } of formula_workloads(false)) {
     const key = formulaWorkloadKey({ id, size });
     let sample: AggregatedWorkloadSample;
     try {
-      sample = collectAggregatedSample(id, size, () => createFormulaFixture(id, size, rangeSize), {
+      sample = collectAggregatedSample(id, size, () => createFormulaFixture(id, size, range_size), {
         warmupFixtures: SAMPLE_WARMUP_FIXTURES,
         minimumWarmupMs: GATE_TIER_UP_WARMUP_MS[key] ?? 0,
         minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,
       });
     } catch (error) {
-      const method = missingCellStoreMethod(error);
+      const method = missing_cell_store_method(error);
       if (method === undefined) throw error;
       capture.skipped[key] = `CellStore.${method} is missing from this engine`;
       continue;
@@ -761,13 +761,15 @@ function captureGateSide(): FormulaGateCapture {
       capture.bytes[`${key}.allocation.${field}`] = value;
     }
   }
-  for (const { formulas: count, wasmDeltaBytes } of FORMULA_SIZES.map(probeMemory)) {
-    capture.bytes[`memory=formulas=${count}.wasmDeltaBytes`] = wasmDeltaBytes;
+  for (const { formulas: count, wasmDeltaBytes: wasm_delta_bytes } of FORMULA_SIZES.map(
+    probe_memory,
+  )) {
+    capture.bytes[`memory=formulas=${count}.wasmDeltaBytes`] = wasm_delta_bytes;
   }
   return capture;
 }
 
-function probeMemory(formulas: number): FormulaMemoryResult {
+function probe_memory(formulas: number): FormulaMemoryResult {
   const process = Bun.spawnSync(["bun", "run", import.meta.path, "--memory", String(formulas)], {
     cwd: new URL("..", import.meta.url).pathname,
     stdout: "pipe",
@@ -795,7 +797,7 @@ function probeMemory(formulas: number): FormulaMemoryResult {
   return { formulas, wasmDeltaBytes: value.wasmDeltaBytes };
 }
 
-function runMemoryMode(formulas: number): FormulaMemoryResult {
+function run_memory_mode(formulas: number): FormulaMemoryResult {
   const wasm = initSync({ module: readFileSync(WASM_PATH) });
   forceGc();
   const before = wasm.memory.buffer.byteLength;
@@ -842,17 +844,17 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
   return lines.join("\n");
 }
 
-async function runBenchmark(
+async function run_benchmark(
   smoke: boolean,
-  captureKind: FormulaCaptureKind,
-  outputPath?: string,
+  capture_kind: FormulaCaptureKind,
+  output_path?: string,
 ): Promise<void> {
-  if (captureKind === "output" && outputPath === undefined) {
+  if (capture_kind === "output" && output_path === undefined) {
     throw new Error("an output capture requires a path");
   }
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
-  if (captureKind === "gated") {
+  if (capture_kind === "gated") {
     baseline = readBaseline(FORMULA_MATRIX);
   }
 
@@ -862,18 +864,18 @@ async function runBenchmark(
   await engine.load();
 
   const capture = protocolCaptureMeta();
-  const workloads = runWorkloads(smoke);
-  const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
-  const baselineIdentity = baseline ? formulaRegressionBaselineIdentity(baseline) : undefined;
-  const regression: PassedRegressionGate | BlockedRegressionGate = baselineIdentity
+  const workloads = run_workloads(smoke);
+  const memory = smoke ? [probe_memory(1_000)] : FORMULA_SIZES.map(probe_memory);
+  const baseline_identity = baseline ? formulaRegressionBaselineIdentity(baseline) : undefined;
+  const regression: PassedRegressionGate | BlockedRegressionGate = baseline_identity
     ? {
         status: "passed",
-        baselineCommit: baselineIdentity.commit,
-        baselineSourceDigest: baselineIdentity.sourceDigest,
+        baselineCommit: baseline_identity.commit,
+        baselineSourceDigest: baseline_identity.sourceDigest,
       }
     : {
         status: "blocked",
-        blocker: captureKind === "output" ? OUTPUT_CAPTURE_BLOCKER : PRELIMINARY_BLOCKER,
+        blocker: capture_kind === "output" ? OUTPUT_CAPTURE_BLOCKER : PRELIMINARY_BLOCKER,
       };
   const result: CompleteFormulaBenchmarkResult = {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
@@ -886,7 +888,7 @@ async function runBenchmark(
       arch: process.arch,
       ...capture,
     },
-    runner: currentRunnerProvenance(mode, captureKind, outputPath),
+    runner: currentRunnerProvenance(mode, capture_kind, output_path),
     source: currentFormulaSourceProvenance(capture.commit),
     methodology: {
       warmupSamples: 1,
@@ -904,17 +906,17 @@ async function runBenchmark(
       regression,
     },
   };
-  validateCurrentCaptureProvenance(result, captureKind, outputPath);
+  validateCurrentCaptureProvenance(result, capture_kind, output_path);
   validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
-  if (outputPath === "-") {
+  if (output_path === "-") {
     // Standard output carries the capture alone, so a caller can parse or save it as JSON.
     process.stdout.write(serialized);
     process.stderr.write(`${markdown(result)}\n`);
     return;
   }
-  if (outputPath !== undefined) {
-    await Bun.write(outputPath, serialized);
+  if (output_path !== undefined) {
+    await Bun.write(output_path, serialized);
   } else if (!smoke) {
     await Bun.write(new URL("../results/formula-results.json", import.meta.url), serialized);
   }
@@ -923,7 +925,7 @@ async function runBenchmark(
 }
 
 if (import.meta.main) {
-  const sampleIndex = process.argv.indexOf("--sample");
+  const sample_index = process.argv.indexOf("--sample");
   if (process.argv.includes("--grid-constant-edit")) {
     await initSheetwrite({ engine: engine });
     process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
@@ -931,14 +933,14 @@ if (import.meta.main) {
   }
   if (process.argv.includes("--gate-capture")) {
     await engine.load();
-    process.stdout.write(`${JSON.stringify(captureGateSide())}\n`);
+    process.stdout.write(`${JSON.stringify(capture_gate_side())}\n`);
     process.exit(0);
   }
-  if (sampleIndex >= 0) {
-    const id = process.argv[sampleIndex + 1];
-    const size = Number(process.argv[sampleIndex + 2]);
+  if (sample_index >= 0) {
+    const id = process.argv[sample_index + 1];
+    const size = Number(process.argv[sample_index + 2]);
     assert(Number.isInteger(size) && size > 0, "invalid sample size");
-    const sampleIds = [
+    const sample_ids = [
       "independent-parse-load",
       "independent-first-recompute",
       "linear-chain",
@@ -948,17 +950,19 @@ if (import.meta.main) {
       "vlookup-many",
     ];
     const factories = Object.fromEntries(
-      sampleIds.map((sampleId) => [sampleId, () => createFormulaFixture(sampleId, size)]),
+      sample_ids.map((sample_id) => [sample_id, () => createFormulaFixture(sample_id, size)]),
     );
     const factory = id === undefined ? undefined : factories[id];
     assert(id !== undefined && factory, "unknown single-sample workload");
-    const aggregateText = optionValue(process.argv, "--aggregate-ms");
-    const aggregateMs = aggregateText === undefined ? SAMPLE_AGGREGATE_MS : Number(aggregateText);
-    assert(Number.isFinite(aggregateMs) && aggregateMs > 0, "invalid sample aggregation floor");
-    const warmupText = optionValue(process.argv, "--warmup-fixtures");
-    const warmupFixtures = warmupText === undefined ? SAMPLE_WARMUP_FIXTURES : Number(warmupText);
+    const aggregate_text = optionValue(process.argv, "--aggregate-ms");
+    const aggregate_ms =
+      aggregate_text === undefined ? SAMPLE_AGGREGATE_MS : Number(aggregate_text);
+    assert(Number.isFinite(aggregate_ms) && aggregate_ms > 0, "invalid sample aggregation floor");
+    const warmup_text = optionValue(process.argv, "--warmup-fixtures");
+    const warmup_fixtures =
+      warmup_text === undefined ? SAMPLE_WARMUP_FIXTURES : Number(warmup_text);
     assert(
-      Number.isInteger(warmupFixtures) && warmupFixtures > 0,
+      Number.isInteger(warmup_fixtures) && warmup_fixtures > 0,
       "invalid sample warm-up fixture count",
     );
 
@@ -967,26 +971,26 @@ if (import.meta.main) {
     process.stdout.write(
       `${JSON.stringify(
         collectAggregatedSample(id, size, factory, {
-          warmupFixtures,
-          minimumSampleDurationMs: aggregateMs,
+          warmupFixtures: warmup_fixtures,
+          minimumSampleDurationMs: aggregate_ms,
         }),
       )}\n`,
     );
   } else {
-    const memoryText = optionValue(process.argv, "--memory");
-    if (memoryText !== undefined) {
-      const formulas = Number(memoryText);
+    const memory_text = optionValue(process.argv, "--memory");
+    if (memory_text !== undefined) {
+      const formulas = Number(memory_text);
       assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
-      console.log(JSON.stringify(runMemoryMode(formulas)));
+      console.log(JSON.stringify(run_memory_mode(formulas)));
     } else {
       const args = process.argv.slice(2).filter((argument) => argument !== "--");
-      const outputPath = optionValue(args, "--output");
+      const output_path = optionValue(args, "--output");
       // A capture written outside the tracked results file is recorded as an output capture; it
       // skips the baseline comparison too, so the gate stays blocked.
-      let captureKind: FormulaCaptureKind = "gated";
-      if (outputPath !== undefined) captureKind = "output";
-      else if (args.includes("--preliminary")) captureKind = "preliminary";
-      await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
+      let capture_kind: FormulaCaptureKind = "gated";
+      if (output_path !== undefined) capture_kind = "output";
+      else if (args.includes("--preliminary")) capture_kind = "preliminary";
+      await run_benchmark(args.includes("--smoke"), capture_kind, output_path);
     }
   }
 }

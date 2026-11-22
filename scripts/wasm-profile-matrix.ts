@@ -65,7 +65,7 @@ interface GateCaptureManifest {
   readonly captures: readonly GateCapture[];
 }
 
-function gateEvidence(capture: GateCapture): MatrixGateEvidence {
+function gate_evidence(capture: GateCapture): MatrixGateEvidence {
   return {
     status: capture.status,
     commands: capture.commands,
@@ -91,7 +91,7 @@ function run(command: readonly string[], cwd = ROOT): CommandResult {
   };
 }
 
-function successfulOutput(command: readonly string[], cwd = ROOT): string {
+function successful_output(command: readonly string[], cwd = ROOT): string {
   const result = run(command, cwd);
   if (result.exitCode !== 0) {
     throw new Error(
@@ -101,12 +101,12 @@ function successfulOutput(command: readonly string[], cwd = ROOT): string {
   return Buffer.from(result.stdout).toString("utf8").trim();
 }
 
-function writeJson(path: string, value: unknown): void {
+function write_json(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function assertControlledCargoProfile(): void {
+function assert_controlled_cargo_profile(): void {
   const cargo = readFileSync(resolve(WASM_CRATE, "Cargo.toml"), "utf8");
   const release = cargo.match(/\[profile\.release\]([\s\S]*?)(?=\n\[|$)/u)?.[1] ?? "";
   if (
@@ -118,16 +118,16 @@ function assertControlledCargoProfile(): void {
   }
 }
 
-function assertCleanTree(): string {
-  const commit = successfulOutput(["git", "rev-parse", "HEAD"]);
+function assert_clean_tree(): string {
+  const commit = successful_output(["git", "rev-parse", "HEAD"]);
   if (!/^[0-9a-f]{40}$/u.test(commit)) throw new Error("git returned a non-full commit hash");
   assertCleanMatrixCapture(
-    successfulOutput(["git", "status", "--porcelain", "--untracked-files=all"]),
+    successful_output(["git", "status", "--porcelain", "--untracked-files=all"]),
   );
   return commit;
 }
 
-function compressedSizes(data: Uint8Array): {
+function compressed_sizes(data: Uint8Array): {
   rawBytes: number;
   gzipBytes: number;
   brotliBytes: number;
@@ -145,32 +145,32 @@ function compressedSizes(data: Uint8Array): {
   };
 }
 
-function postLink(
-  wasmOptPath: string,
-  inputPath: string,
-  outputDirectory: string,
-  outputRoot: string,
+function post_link(
+  wasm_opt_path: string,
+  input_path: string,
+  output_directory: string,
+  output_root: string,
 ): BuildVariant[] {
-  const input = readFileSync(inputPath);
-  const inputWasmSha256 = sha256(input);
+  const input = readFileSync(input_path);
+  const input_wasm_sha256 = sha256(input);
   const variants: BuildVariant[] = [];
-  for (const wasmOpt of WASM_OPT_PROFILES) {
-    const label = wasmOpt.slice(1).toLowerCase();
-    const temporaryOutput = resolve(outputDirectory, `sheetwrite-${label}.wasm`);
-    const result = run([wasmOptPath, inputPath, wasmOpt, "-o", temporaryOutput]);
+  for (const wasm_opt of WASM_OPT_PROFILES) {
+    const label = wasm_opt.slice(1).toLowerCase();
+    const temporary_output = resolve(output_directory, `sheetwrite-${label}.wasm`);
+    const result = run([wasm_opt_path, input_path, wasm_opt, "-o", temporary_output]);
     if (result.exitCode !== 0) {
-      throw new Error(`${wasmOpt} failed: ${Buffer.from(result.stderr).toString("utf8").trim()}`);
+      throw new Error(`${wasm_opt} failed: ${Buffer.from(result.stderr).toString("utf8").trim()}`);
     }
-    const artifact = readFileSync(temporaryOutput);
-    const artifactPath = resolve(outputRoot, "artifacts", `sheetwrite-${label}.wasm`);
-    mkdirSync(dirname(artifactPath), { recursive: true });
-    copyFileSync(temporaryOutput, artifactPath);
+    const artifact = readFileSync(temporary_output);
+    const artifact_path = resolve(output_root, "artifacts", `sheetwrite-${label}.wasm`);
+    mkdirSync(dirname(artifact_path), { recursive: true });
+    copyFileSync(temporary_output, artifact_path);
     variants.push({
-      wasmOpt,
-      inputWasmSha256,
-      artifactPath,
+      wasmOpt: wasm_opt,
+      inputWasmSha256: input_wasm_sha256,
+      artifactPath: artifact_path,
       artifact: {
-        ...compressedSizes(artifact),
+        ...compressed_sizes(artifact),
         sha256: sha256(artifact),
       },
     });
@@ -178,15 +178,15 @@ function postLink(
   return variants;
 }
 
-function captureBuild(args: readonly string[]): void {
-  assertControlledCargoProfile();
-  const commit = assertCleanTree();
-  const wasmOptPath = resolve(requiredOption(args, "--wasm-opt"));
+function capture_build(args: readonly string[]): void {
+  assert_controlled_cargo_profile();
+  const commit = assert_clean_tree();
+  const wasm_opt_path = resolve(requiredOption(args, "--wasm-opt"));
   const output = resolve(requiredOption(args, "--output"));
-  const outputRoot = dirname(output);
+  const output_root = dirname(output);
   const temporary = mkdtempSync(join(tmpdir(), "sheetwrite-wasm-profile-"));
   try {
-    const buildDirectory = resolve(temporary, "unoptimized");
+    const build_directory = resolve(temporary, "unoptimized");
     const build = run(
       [
         "wasm-pack",
@@ -196,7 +196,7 @@ function captureBuild(args: readonly string[]): void {
         "--release",
         "--no-opt",
         "--out-dir",
-        buildDirectory,
+        build_directory,
       ],
       WASM_CRATE,
     );
@@ -205,9 +205,9 @@ function captureBuild(args: readonly string[]): void {
         `wasm-pack build failed: ${Buffer.from(build.stderr).toString("utf8").trim()}`,
       );
     }
-    const inputPath = resolve(buildDirectory, "sheetwrite_wasm_bg.wasm");
-    const variants = postLink(wasmOptPath, inputPath, temporary, outputRoot);
-    const wasmOptBytes = readFileSync(wasmOptPath);
+    const input_path = resolve(build_directory, "sheetwrite_wasm_bg.wasm");
+    const variants = post_link(wasm_opt_path, input_path, temporary, output_root);
+    const wasm_opt_bytes = readFileSync(wasm_opt_path);
     const capture = {
       schemaVersion: 1,
       protocol: "wasm-post-link-build-capture-v1",
@@ -216,11 +216,11 @@ function captureBuild(args: readonly string[]): void {
         dirty: false,
         timestamp: new Date().toISOString(),
         host: hostname(),
-        rustc: successfulOutput(["rustc", "--version"]),
-        cargo: successfulOutput(["cargo", "--version"]),
-        wasmPack: successfulOutput(["wasm-pack", "--version"]),
-        wasmOptVersion: successfulOutput([wasmOptPath, "--version"]),
-        wasmOptSha256: sha256(wasmOptBytes),
+        rustc: successful_output(["rustc", "--version"]),
+        cargo: successful_output(["cargo", "--version"]),
+        wasmPack: successful_output(["wasm-pack", "--version"]),
+        wasmOptVersion: successful_output([wasm_opt_path, "--version"]),
+        wasmOptSha256: sha256(wasm_opt_bytes),
         bun: Bun.version,
       },
       rustProfile: { optLevel: 3, lto: "fat", codegenUnits: 1 },
@@ -234,24 +234,24 @@ function captureBuild(args: readonly string[]): void {
         required: ["formulaGate", "renderGate", "storeOnlyProbe"],
       },
     };
-    writeJson(output, capture);
+    write_json(output, capture);
     process.stdout.write(`${output}\n`);
   } finally {
     rmSync(temporary, { force: true, recursive: true });
   }
 }
 
-function captureStoreOnlyProbe(args: readonly string[]): void {
-  const commit = assertCleanTree();
+function capture_store_only_probe(args: readonly string[]): void {
+  const commit = assert_clean_tree();
   const output = resolve(requiredOption(args, "--output"));
   const result = run(STORE_ONLY_COMMAND, WASM_CRATE);
-  const stdoutText = Buffer.from(result.stdout).toString("utf8");
-  const stderrText = Buffer.from(result.stderr).toString("utf8");
-  const recognizedBlock =
-    result.exitCode !== 0 && `${stdoutText}\n${stderrText}`.includes(STORE_ONLY_SENTINEL);
+  const stdout_text = Buffer.from(result.stdout).toString("utf8");
+  const stderr_text = Buffer.from(result.stderr).toString("utf8");
+  const recognized_block =
+    result.exitCode !== 0 && `${stdout_text}\n${stderr_text}`.includes(STORE_ONLY_SENTINEL);
   const outcome: StoreOnlyProbe["outcome"] =
-    result.exitCode === 0 ? "compiled" : recognizedBlock ? "blocked" : "failed";
-  const blockers: StoreOnlyProbe["blockers"] = recognizedBlock
+    result.exitCode === 0 ? "compiled" : recognized_block ? "blocked" : "failed";
+  const blockers: StoreOnlyProbe["blockers"] = recognized_block
     ? [
         {
           id: "formula-entry-ast",
@@ -282,33 +282,39 @@ function captureStoreOnlyProbe(args: readonly string[]): void {
     stderrSha256: sha256(result.stderr),
     blockers,
   };
-  writeJson(output, probe);
+  write_json(output, probe);
   process.stdout.write(`${output}: ${outcome}\n`);
   if (outcome === "failed") process.exitCode = 1;
 }
 
-function readGateManifest(path: string, expectedGate: "formula" | "render"): GateCaptureManifest {
+function read_gate_manifest(
+  path: string,
+  expected_gate: "formula" | "render",
+): GateCaptureManifest {
   const manifest = JSON.parse(readFileSync(path, "utf8")) as GateCaptureManifest;
   if (
     manifest.schemaVersion !== 1 ||
     manifest.protocol !== "wasm-post-link-gate-capture-v1" ||
-    manifest.gate !== expectedGate ||
+    manifest.gate !== expected_gate ||
     !Array.isArray(manifest.captures)
   ) {
-    throw new Error(`${expectedGate} gate manifest has the wrong protocol or gate kind`);
+    throw new Error(`${expected_gate} gate manifest has the wrong protocol or gate kind`);
   }
-  const modes = manifest.captures.map(({ wasmOpt }) => wasmOpt);
+  const modes = manifest.captures.map(({ wasmOpt: wasm_opt }) => wasm_opt);
   if (
     modes.length !== WASM_OPT_PROFILES.length ||
     new Set(modes).size !== WASM_OPT_PROFILES.length ||
     !WASM_OPT_PROFILES.every((profile) => modes.includes(profile))
   ) {
-    throw new Error(`${expectedGate} gate manifest must capture -O3, -Os, and -Oz exactly once`);
+    throw new Error(`${expected_gate} gate manifest must capture -O3, -Os, and -Oz exactly once`);
   }
   return manifest;
 }
 
-function assertCaptureFiles(build: BuildCapture, manifests: readonly GateCaptureManifest[]): void {
+function assert_capture_files(
+  build: BuildCapture,
+  manifests: readonly GateCaptureManifest[],
+): void {
   for (const variant of build.variants) {
     const actual = sha256(readFileSync(resolve(ROOT, variant.artifactPath)));
     if (actual !== variant.artifact.sha256) {
@@ -338,20 +344,20 @@ function assemble(args: readonly string[]): void {
   ) {
     throw new Error("build input is not a WASM post-link build capture");
   }
-  const formula = readGateManifest(resolve(requiredOption(args, "--formula-gates")), "formula");
-  const render = readGateManifest(resolve(requiredOption(args, "--render-gates")), "render");
-  const storeOnlyProbe = JSON.parse(
+  const formula = read_gate_manifest(resolve(requiredOption(args, "--formula-gates")), "formula");
+  const render = read_gate_manifest(resolve(requiredOption(args, "--render-gates")), "render");
+  const store_only_probe = JSON.parse(
     readFileSync(resolve(requiredOption(args, "--store-probe")), "utf8"),
   ) as StoreOnlyProbe;
   if (
-    storeOnlyProbe.provenance.dirty !== false ||
-    storeOnlyProbe.provenance.commit !== build.provenance.commit
+    store_only_probe.provenance.dirty !== false ||
+    store_only_probe.provenance.commit !== build.provenance.commit
   ) {
     throw new Error("store-only probe must come from the clean build capture commit");
   }
-  assertCaptureFiles(build, [formula, render]);
-  const formulaByProfile = new Map(formula.captures.map((capture) => [capture.wasmOpt, capture]));
-  const renderByProfile = new Map(render.captures.map((capture) => [capture.wasmOpt, capture]));
+  assert_capture_files(build, [formula, render]);
+  const formula_by_profile = new Map(formula.captures.map((capture) => [capture.wasmOpt, capture]));
+  const render_by_profile = new Map(render.captures.map((capture) => [capture.wasmOpt, capture]));
   const matrix = {
     schemaVersion: 1,
     protocol: "wasm-post-link-profile-matrix-v1",
@@ -364,30 +370,30 @@ function assemble(args: readonly string[]): void {
       requireRenderGate: true,
     },
     captureOrder: {
-      formula: formula.captures.map(({ wasmOpt }) => wasmOpt),
-      render: render.captures.map(({ wasmOpt }) => wasmOpt),
+      formula: formula.captures.map(({ wasmOpt: wasm_opt }) => wasm_opt),
+      render: render.captures.map(({ wasmOpt: wasm_opt }) => wasm_opt),
     },
     variants: build.variants.map((variant) => {
-      const formulaCapture = formulaByProfile.get(variant.wasmOpt);
-      const renderCapture = renderByProfile.get(variant.wasmOpt);
-      if (!formulaCapture || !renderCapture) {
+      const formula_capture = formula_by_profile.get(variant.wasmOpt);
+      const render_capture = render_by_profile.get(variant.wasmOpt);
+      if (!formula_capture || !render_capture) {
         throw new Error(`${variant.wasmOpt} is missing gate evidence`);
       }
-      const formulaGate = gateEvidence(formulaCapture);
-      const renderGate = gateEvidence(renderCapture);
+      const formula_gate = gate_evidence(formula_capture);
+      const render_gate = gate_evidence(render_capture);
       return {
         wasmOpt: variant.wasmOpt,
         inputWasmSha256: variant.inputWasmSha256,
         artifact: variant.artifact,
-        formulaGate,
-        renderGate,
+        formulaGate: formula_gate,
+        renderGate: render_gate,
       };
     }),
-    storeOnlyProbe,
+    storeOnlyProbe: store_only_probe,
   };
   const parsed = parseWasmProfileMatrix(matrix);
   const output = resolve(requiredOption(args, "--output"));
-  writeJson(output, parsed);
+  write_json(output, parsed);
   const decision = decideWasmProfile(parsed);
   process.stdout.write(`${output}\n${JSON.stringify(decision, null, 2)}\n`);
   if (decision.status === "blocked") process.exitCode = 1;
@@ -399,14 +405,14 @@ function decide(args: readonly string[]): void {
   const evidence = parseWasmProfileMatrix(raw);
   const decision = decideWasmProfile(evidence);
   const output = optionValue(args, "--output");
-  if (output) writeJson(resolve(output), decision);
+  if (output) write_json(resolve(output), decision);
   process.stdout.write(`${JSON.stringify(decision, null, 2)}\n`);
   if (decision.status === "blocked") process.exitCode = 1;
 }
 
 const [command, ...args] = process.argv.slice(2);
-if (command === "build") captureBuild(args);
-else if (command === "probe-store") captureStoreOnlyProbe(args);
+if (command === "build") capture_build(args);
+else if (command === "probe-store") capture_store_only_probe(args);
 else if (command === "assemble") assemble(args);
 else if (command === "decide") decide(args);
 else {

@@ -71,18 +71,18 @@ export function visibleSheetNeighbor(
   source: SheetId,
   removedIndex?: number,
 ): SheetId | null {
-  const sourceIndex = sheets.findIndex((sheet) => sheet.id === source);
-  const rightStart =
-    sourceIndex >= 0
-      ? sourceIndex + 1
+  const source_index = sheets.findIndex((sheet) => sheet.id === source);
+  const right_start =
+    source_index >= 0
+      ? source_index + 1
       : Math.max(0, Math.min(removedIndex ?? sheets.length, sheets.length));
-  for (let index = rightStart; index < sheets.length; index++) {
+  for (let index = right_start; index < sheets.length; index++) {
     const sheet = sheets[index]!;
     if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
   }
-  const leftStart =
-    sourceIndex >= 0 ? sourceIndex - 1 : Math.min(rightStart - 1, sheets.length - 1);
-  for (let index = leftStart; index >= 0; index--) {
+  const left_start =
+    source_index >= 0 ? source_index - 1 : Math.min(right_start - 1, sheets.length - 1);
+  for (let index = left_start; index >= 0; index--) {
     const sheet = sheets[index]!;
     if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
   }
@@ -138,35 +138,35 @@ export function sameMerge(left: MergeRange, right: MergeRange): boolean {
 }
 
 export function mergeCrossesFreeze(sheet: Sheet, merge: MergeRange): boolean {
-  const frozenRows = sheet.frozenRows ?? 0;
-  const frozenCols = sheet.frozenCols ?? 0;
+  const frozen_rows = sheet.frozenRows ?? 0;
+  const frozen_cols = sheet.frozenCols ?? 0;
   return (
-    (merge.r0 < frozenRows && merge.r1 >= frozenRows) ||
-    (merge.c0 < frozenCols && merge.c1 >= frozenCols)
+    (merge.r0 < frozen_rows && merge.r1 >= frozen_rows) ||
+    (merge.c0 < frozen_cols && merge.c1 >= frozen_cols)
   );
 }
 
 /** Whether `value` is a validation formula: text with its leading `=` and something after it. */
-function isValidationFormula(value: unknown): value is string {
+function is_validation_formula(value: unknown): value is string {
   return typeof value === "string" && value.length > 1 && value.startsWith("=");
 }
 
-function validValidationComparison(value: unknown, textLength: boolean): boolean {
+function valid_validation_comparison(value: unknown, text_length: boolean): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const comparison = value as Record<string, unknown>;
   const operator = comparison.operator;
   // A formula bound is checked when a value is, in its cell.
-  const validOperand = (operand: unknown): boolean =>
-    isValidationFormula(operand) ||
-    (textLength
+  const valid_operand = (operand: unknown): boolean =>
+    is_validation_formula(operand) ||
+    (text_length
       ? typeof operand === "number" && Number.isSafeInteger(operand) && operand >= 0
       : typeof operand === "number" && Number.isFinite(operand));
 
   if (operator === "between" || operator === "notBetween") {
     const { min, max } = comparison;
     return (
-      validOperand(min) &&
-      validOperand(max) &&
+      valid_operand(min) &&
+      valid_operand(max) &&
       (typeof min !== "number" || typeof max !== "number" || min <= max) &&
       comparison.value === undefined
     );
@@ -184,7 +184,7 @@ function validValidationComparison(value: unknown, textLength: boolean): boolean
     return false;
   }
   return (
-    validOperand(comparison.value) && comparison.min === undefined && comparison.max === undefined
+    valid_operand(comparison.value) && comparison.min === undefined && comparison.max === undefined
   );
 }
 
@@ -214,7 +214,7 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
     if (condition.kind === "list") {
       const valid =
         "source" in condition
-          ? isValidationFormula(condition.source)
+          ? is_validation_formula(condition.source)
           : Array.isArray(condition.values) && condition.values.length > 0;
       if (!valid) {
         return false;
@@ -233,7 +233,7 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
         (condition.comparison !== undefined &&
           (condition.min !== undefined ||
             condition.max !== undefined ||
-            !validValidationComparison(condition.comparison, false)))
+            !valid_validation_comparison(condition.comparison, false)))
       ) {
         return false;
       }
@@ -249,12 +249,12 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
         (condition.comparison !== undefined &&
           (condition.min !== undefined ||
             condition.max !== undefined ||
-            !validValidationComparison(condition.comparison, true)))
+            !valid_validation_comparison(condition.comparison, true)))
       ) {
         return false;
       }
     } else if (condition.kind === "custom") {
-      if (!isValidationFormula(condition.formula)) return false;
+      if (!is_validation_formula(condition.formula)) return false;
     } else if (condition.kind !== "checkbox" && condition.kind !== "any") {
       return false;
     }
@@ -264,11 +264,11 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
 
 export function validProtectedRanges(sheet: Sheet, ranges: readonly ProtectedRange[]): boolean {
   const ids = new Set<string>();
-  for (const protectedRange of ranges) {
-    const range = normalizedRange(protectedRange.range);
+  for (const protected_range of ranges) {
+    const range = normalizedRange(protected_range.range);
     if (
-      !protectedRange.id ||
-      ids.has(protectedRange.id) ||
+      !protected_range.id ||
+      ids.has(protected_range.id) ||
       range.sheet !== sheet.id ||
       !integerAt(range.start.row) ||
       !integerAt(range.start.col) ||
@@ -277,7 +277,7 @@ export function validProtectedRanges(sheet: Sheet, ranges: readonly ProtectedRan
     ) {
       return false;
     }
-    ids.add(protectedRange.id);
+    ids.add(protected_range.id);
   }
   return true;
 }
@@ -317,12 +317,12 @@ export function validSortAndFilters(
   for (const [col, filter] of filters) {
     if (!integerAt(col) || col >= sheet.columns.length || filtered.has(col)) return false;
     filtered.add(col);
-    if (!validColumnFilter(filter)) return false;
+    if (!valid_column_filter(filter)) return false;
   }
   return true;
 }
 
-function validColumnFilter(filter: ColumnFilter): boolean {
+function valid_column_filter(filter: ColumnFilter): boolean {
   switch (filter.kind) {
     case "values":
       return Array.isArray(filter.values);
@@ -515,13 +515,13 @@ export function rebaseSheetAutoFilter(
   axis: SheetAxis,
   remap: (index: number) => number | null,
 ): void {
-  const autoFilter = sheet.autoFilter;
-  if (!autoFilter) return;
+  const auto_filter = sheet.autoFilter;
+  if (!auto_filter) return;
 
   const range =
-    axis === "row" && remap(autoFilter.range.start.row) === null
+    axis === "row" && remap(auto_filter.range.start.row) === null
       ? null
-      : rebaseRangeSpan(autoFilter.range, axis, remap);
+      : rebaseRangeSpan(auto_filter.range, axis, remap);
   if (range) sheet.autoFilter = { range };
   else delete sheet.autoFilter;
 }
@@ -561,24 +561,24 @@ export function remapSpan(
 ): [number, number] | null {
   const low = Math.min(start, end);
   const high = Math.max(start, end);
-  let mappedStart: number | null = null;
+  let mapped_start: number | null = null;
   for (let index = low; index <= high; index++) {
     const mapped = remap(index);
     if (mapped !== null) {
-      mappedStart = mapped;
+      mapped_start = mapped;
       break;
     }
   }
-  if (mappedStart === null) return null;
-  let mappedEnd = mappedStart;
+  if (mapped_start === null) return null;
+  let mapped_end = mapped_start;
   for (let index = high; index >= low; index--) {
     const mapped = remap(index);
     if (mapped !== null) {
-      mappedEnd = mapped;
+      mapped_end = mapped;
       break;
     }
   }
-  return [Math.min(mappedStart, mappedEnd), Math.max(mappedStart, mappedEnd)];
+  return [Math.min(mapped_start, mapped_end), Math.max(mapped_start, mapped_end)];
 }
 
 /** Old-to-new index map of an insert of `count` indexes at `at`. */
@@ -611,7 +611,7 @@ export function moveIndex(index: number, from: number, count: number, to: number
  * lands after its first index and at or before its last. The engine applies
  * the same rule to formula references (`moved_span`).
  */
-function movedSpan(
+function moved_span(
   start: number,
   end: number,
   from: number,
@@ -626,7 +626,7 @@ function movedSpan(
 
 /**
  * `range` after the move of `move.count` rows or columns along `axis` from
- * `move.from` to `move.to` (see `movedSpan`). A range on another sheet, or
+ * `move.from` to `move.to` (see `moved_span`). A range on another sheet, or
  * one the move does not change, is returned as it is; a range that keeps no
  * index keeps its place.
  */
@@ -643,7 +643,7 @@ export function rebaseMovedRange(
   if (range.sheet !== move.sheet) return range;
 
   const key = axis === "row" ? "row" : "col";
-  const span = movedSpan(range.start[key], range.end[key], move.from, move.count, move.to);
+  const span = moved_span(range.start[key], range.end[key], move.from, move.count, move.to);
   if (!span || (span[0] === range.start[key] && span[1] === range.end[key])) return range;
 
   return {

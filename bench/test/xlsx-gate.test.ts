@@ -56,7 +56,7 @@ function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
     samples,
     (value) => `${value.engine}:${value.operation}:${value.scenario}`,
   );
-  const withMax = (values: number[]) => ({ ...summarizeFinite(values), max: Math.max(...values) });
+  const with_max = (values: number[]) => ({ ...summarizeFinite(values), max: Math.max(...values) });
   const growth = (before: number, after: number) => Math.max(0, after - before);
   return [...groups.entries()]
     .toSorted(([left], [right]) => left.localeCompare(right))
@@ -68,15 +68,15 @@ function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
         scenario,
         durationMs: summarizeFinite(values.map((value) => value.durationMs)),
         processWallMs: summarizeFinite(values.map((value) => value.processWallMs)),
-        maxRssBytes: withMax(values.map((value) => value.maxRssBytes)),
-        returnAllocationDeltaBytes: withMax(
+        maxRssBytes: with_max(values.map((value) => value.maxRssBytes)),
+        returnAllocationDeltaBytes: with_max(
           values.map(
             (value) =>
               growth(value.heapBeforeBytes, value.heapAfterBytes) +
               growth(value.arrayBuffersBeforeBytes, value.arrayBuffersAfterBytes),
           ),
         ),
-        retainedAfterGcDeltaBytes: withMax(
+        retainedAfterGcDeltaBytes: with_max(
           values.map(
             (value) =>
               growth(value.heapBeforeBytes, value.heapRetainedBytes) +
@@ -88,10 +88,10 @@ function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
 }
 
 /** A full artifact comparing the current codec with the old backend; only import's ratio varies. */
-function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
+function compared_artifact(import_ratio = 1): XlsxBenchmarkArtifact {
   const current = SCENARIOS.map(([operation, scenario]) => ({
     ...sample(operation, scenario),
-    durationMs: operation === "import" ? importRatio : 1,
+    durationMs: operation === "import" ? import_ratio : 1,
   }));
   const baseline = current
     .filter((value) => value.operation !== "reject")
@@ -135,7 +135,7 @@ function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
             {
               operation,
               scenario,
-              medianWallRatio: operation === "import" ? importRatio : 1,
+              medianWallRatio: operation === "import" ? import_ratio : 1,
               peakRssRatio: 1,
             },
           ],
@@ -144,11 +144,11 @@ function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
 }
 
 it("accepts a complete comparison and rejects drifted versions, summaries, outputs and wall time", () => {
-  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact())).not.toThrow();
-  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact(2))).toThrow(
+  expect(() => validateXlsxBenchmarkArtifact(compared_artifact())).not.toThrow();
+  expect(() => validateXlsxBenchmarkArtifact(compared_artifact(2))).toThrow(
     "import:combined regressed",
   );
-  expectRejections(() => mutableCopy(comparedArtifact()), validateXlsxBenchmarkArtifact, [
+  expectRejections(() => mutableCopy(compared_artifact()), validateXlsxBenchmarkArtifact, [
     [
       (artifact) => Reflect.set(artifact.metadata.engineVersions, "exceljs", "^4.4.0"),
       "engineVersions.exceljs",
@@ -166,13 +166,13 @@ it("accepts a complete comparison and rejects drifted versions, summaries, outpu
     ],
     [
       (artifact) => {
-        const secondRound = artifact.samples.map((value) => ({
+        const second_round = artifact.samples.map((value) => ({
           ...value,
           round: 1,
           checksum: value.scenario === "scalar" ? "b".repeat(64) : value.checksum,
         }));
         artifact.rounds = 2;
-        artifact.samples = [...artifact.samples, ...secondRound];
+        artifact.samples = [...artifact.samples, ...second_round];
         artifact.summaries = mutableCopy(summaries(artifact.samples));
       },
       "is not deterministic",

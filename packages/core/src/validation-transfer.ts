@@ -99,7 +99,7 @@ function reanchored(
 }
 
 /** `rule` over `range`, a part of its own range, with its formulas written for the part's top-left. */
-function cutTo(rule: DataValidationRule, id: string, range: Range): DataValidationRule {
+function cut_to(rule: DataValidationRule, id: string, range: Range): DataValidationRule {
   return { ...reanchored(rule, normalizedRange(range).start), id, range };
 }
 
@@ -149,11 +149,11 @@ export function clearedValidationPatches(
     const [kept, ...split] = subtractRanges(rule.range, areas);
     patches.push(
       kept
-        ? { op: "setValidationRule", sheet, rule: cutTo(rule, rule.id, kept) }
+        ? { op: "setValidationRule", sheet, rule: cut_to(rule, rule.id, kept) }
         : { op: "removeValidationRule", sheet, id: rule.id },
     );
     for (const range of split) {
-      patches.push({ op: "setValidationRule", sheet, rule: cutTo(rule, newId(), range) });
+      patches.push({ op: "setValidationRule", sheet, rule: cut_to(rule, newId(), range) });
     }
   }
   return patches;
@@ -175,28 +175,28 @@ export function validationPastePatches(
   options: { readonly transpose?: boolean } = {},
 ): DocumentOp[] {
   const transpose = options.transpose === true;
-  const blockRows = transpose ? block.cols : block.rows;
-  const blockCols = transpose ? block.rows : block.cols;
-  if (blockRows <= 0 || blockCols <= 0) return [];
+  const block_rows = transpose ? block.cols : block.rows;
+  const block_cols = transpose ? block.rows : block.cols;
+  if (block_rows <= 0 || block_cols <= 0) return [];
   const tiles =
-    target.rows % blockRows === 0 && target.cols % blockCols === 0
-      ? { rows: target.rows / blockRows, cols: target.cols / blockCols }
+    target.rows % block_rows === 0 && target.cols % block_cols === 0
+      ? { rows: target.rows / block_rows, cols: target.cols / block_cols }
       : { rows: 1, cols: 1 };
   const pasted: Range = {
     sheet: sheet.id,
     start: { row: target.row, col: target.col },
     end: {
-      row: target.row + blockRows * tiles.rows - 1,
-      col: target.col + blockCols * tiles.cols - 1,
+      row: target.row + block_rows * tiles.rows - 1,
+      col: target.col + block_cols * tiles.cols - 1,
     },
   };
   const rules = sheet.validationRules ?? [];
-  const newId = validationIdSource(rules);
-  const patches = clearedValidationPatches(sheet.id, rules, [pasted], newId);
-  for (let tileRow = 0; tileRow < tiles.rows; tileRow++) {
-    for (let tileCol = 0; tileCol < tiles.cols; tileCol++) {
-      const top = target.row + tileRow * blockRows;
-      const left = target.col + tileCol * blockCols;
+  const new_id = validationIdSource(rules);
+  const patches = clearedValidationPatches(sheet.id, rules, [pasted], new_id);
+  for (let tile_row = 0; tile_row < tiles.rows; tile_row++) {
+    for (let tile_col = 0; tile_col < tiles.cols; tile_col++) {
+      const top = target.row + tile_row * block_rows;
+      const left = target.col + tile_col * block_cols;
       for (const piece of pieces) {
         const [r0, r1] = transpose ? piece.cols : piece.rows;
         const [c0, c1] = transpose ? piece.rows : piece.cols;
@@ -210,7 +210,7 @@ export function validationPastePatches(
           sheet: sheet.id,
           rule: {
             ...shifted(piece.rule, range.start.row - piece.at[0], range.start.col - piece.at[1]),
-            id: newId(),
+            id: new_id(),
             range,
           },
         });

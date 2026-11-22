@@ -28,7 +28,7 @@ export interface DataModelStageProps {
 }
 
 /** What a relationship's key check means for the reader, and how loudly to say it. */
-function keyStatus(status: RelationshipStatus): { tone: ShowcaseStatusTone; text: string } {
+function key_status(status: RelationshipStatus): { tone: ShowcaseStatusTone; text: string } {
   switch (status.status) {
     case "ok":
       return status.unmatched === 0
@@ -49,7 +49,9 @@ function keyStatus(status: RelationshipStatus): { tone: ShowcaseStatusTone; text
 /** The data model showcase's island: three related tables, their pivot and its reads. */
 export function DataModelStage(props: DataModelStageProps) {
   const live = createLiveScenario<DataModelScenario, DataModelSnapshot>(() =>
-    import("./boot.js").then(({ createDataModelScenario }) => createDataModelScenario),
+    import("./boot.js").then(
+      ({ createDataModelScenario: create_data_model_scenario }) => create_data_model_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
   const snapshot = () => live.snapshot() ?? props.pending;
@@ -67,8 +69,8 @@ export function DataModelStage(props: DataModelStageProps) {
                 {(reading) => (
                   <li data-testid={`model-relationship-${reading.id}`}>
                     <code>{reading.label}</code>
-                    <ShowcaseStatus tone={keyStatus(reading.status).tone}>
-                      {keyStatus(reading.status).text}
+                    <ShowcaseStatus tone={key_status(reading.status).tone}>
+                      {key_status(reading.status).text}
                     </ShowcaseStatus>
                   </li>
                 )}

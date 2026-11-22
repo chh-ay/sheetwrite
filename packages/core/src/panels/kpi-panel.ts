@@ -11,7 +11,7 @@ import { rejectionMessage } from "./panel-dom.js";
 const KPI_BOX = { w: 3, h: 3 } as const;
 
 /** A KPI card for measure `measure` on `sheet`, in the first place still free. */
-function kpiItem(grid: Grid, sheet: SheetId, measure: string): DashboardItem {
+function kpi_item(grid: Grid, sheet: SheetId, measure: string): DashboardItem {
   const items =
     grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
     [];
@@ -54,7 +54,7 @@ export function kpiPanel(grid: Grid, sheet: SheetId): GridPanel {
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const item = kpiItem(grid, sheet, select.value);
+        const item = kpi_item(grid, sheet, select.value);
         const message = rejectionMessage(
           grid.applyTransaction({ patches: [{ op: "setDashboardItem", sheet, item }] }),
         );

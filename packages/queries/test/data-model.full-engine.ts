@@ -20,11 +20,11 @@ beforeAll(async () => {
   await initSheetwrite({ engine: formulas, addons: [queriesAddon()] });
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
 const text = (row: number, col: number, value: string) => ({
   rowOffset: row,
@@ -97,13 +97,13 @@ const sales: SavedQuery = {
   output: { table: "sales-table", tableName: "Sales", anchor: { sheet: "data", row: 0, col: 0 } },
 };
 
-const salesToRegions: TableRelationship = {
+const sales_to_regions: TableRelationship = {
   id: "sales-regions",
   from: { table: "sales-table", column: "region" },
   to: { table: "regions", column: "region" },
 };
 
-const byManager: PivotDefinition = {
+const by_manager: PivotDefinition = {
   id: "by-manager",
   name: "By manager",
   source: {
@@ -123,7 +123,7 @@ const byManager: PivotDefinition = {
 
 /** Manager and total pairs of the pivot body, without its header and grand total rows. */
 function totals(grid: Grid): [unknown, unknown][] {
-  const result = grid.getPivotResult("data", byManager.id);
+  const result = grid.getPivotResult("data", by_manager.id);
   if (result?.status !== "ok") throw new Error(`pivot status ${result?.status} ${result?.error}`);
   const pairs: [unknown, unknown][] = [];
   for (let row = result.headerRows; row < result.rows - 1; row++) {
@@ -149,9 +149,9 @@ it("keeps a query output table's relationship through a refresh that updates the
   try {
     session.define(sales);
     expect((await session.refresh("sales")).status).toBe("applied");
-    const relate = { op: "setRelationship" as const, relationship: salesToRegions };
+    const relate = { op: "setRelationship" as const, relationship: sales_to_regions };
     expect(grid.applyTransaction({ patches: [relate] }).status).toBe("applied");
-    expect(grid.setPivot(byManager, "data").status).toBe("applied");
+    expect(grid.setPivot(by_manager, "data").status).toBe("applied");
     expect(totals(grid)).toEqual([
       ["Ann", 5],
       ["Bo", 7],
@@ -160,14 +160,14 @@ it("keeps a query output table's relationship through a refresh that updates the
     // The refresh replaces the table's rows; its ID and column IDs stay, so the relationship holds.
     feed = "Region,Total\nNorth,5\nSouth,7\nnorth,4\n";
     expect((await session.refresh("sales")).status).toBe("applied");
-    expect(relationships(grid)).toEqual([salesToRegions]);
+    expect(relationships(grid)).toEqual([sales_to_regions]);
     expect(totals(grid)).toEqual([
       ["Ann", 9],
       ["Bo", 7],
     ]);
 
     grid.undo();
-    expect(relationships(grid)).toEqual([salesToRegions]);
+    expect(relationships(grid)).toEqual([sales_to_regions]);
     expect(totals(grid)).toEqual([
       ["Ann", 5],
       ["Bo", 7],

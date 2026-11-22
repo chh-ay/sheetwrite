@@ -24,25 +24,25 @@ const OPERATORS: Readonly<Record<"eq" | "neq" | "gt" | "gte" | "lt" | "lte", str
 
 const attribute = (value: string): string => escapeXml(encodeXstring(value));
 
-function customFilter(op: keyof typeof OPERATORS, val: string): string {
+function custom_filter(op: keyof typeof OPERATORS, val: string): string {
   const operator = op === "eq" ? "" : ` operator="${OPERATORS[op]}"`;
   return `<customFilter${operator} val="${attribute(val)}"/>`;
 }
 
 /** A condition as Excel's dialog writes it: "begins with ab" is `equal ab*`. */
-function conditionXml(condition: FilterCondition): string {
+function condition_xml(condition: FilterCondition): string {
   const value = String(condition.value);
   switch (condition.op) {
     case "beginsWith":
-      return customFilter("eq", `${value}*`);
+      return custom_filter("eq", `${value}*`);
     case "endsWith":
-      return customFilter("eq", `*${value}`);
+      return custom_filter("eq", `*${value}`);
     case "contains":
-      return customFilter("eq", `*${value}*`);
+      return custom_filter("eq", `*${value}*`);
     case "notContains":
-      return customFilter("neq", `*${value}*`);
+      return custom_filter("neq", `*${value}*`);
     default:
-      return customFilter(condition.op, value);
+      return custom_filter(condition.op, value);
   }
 }
 
@@ -50,7 +50,7 @@ function conditionXml(condition: FilterCondition): string {
  * The text a value shows in its cells, which Excel's value lists name it by:
  * a number in the format of its first cell in the list, else the column's.
  */
-function valueText(
+function value_text(
   value: Exclude<CellScalar, null>,
   formats: ReadonlyMap<number, string | undefined>,
   column: Column | undefined,
@@ -61,7 +61,7 @@ function valueText(
 }
 
 /** The number format of the first body cell in `col` that holds each number. */
-function cellFormats(
+function cell_formats(
   sheet: SheetSnapshot,
   col: number,
   body: { readonly start: number; readonly end: number },
@@ -80,7 +80,7 @@ function cellFormats(
   return formats;
 }
 
-function filterXml(
+function filter_xml(
   filter: ColumnFilter,
   formats: ReadonlyMap<number, string | undefined>,
   column: Column | undefined,
@@ -90,21 +90,21 @@ function filterXml(
       const blank = filter.values.includes(null) ? ' blank="1"' : "";
       const values = filter.values
         .filter((value): value is Exclude<CellScalar, null> => value !== null)
-        .map((value) => `<filter val="${attribute(valueText(value, formats, column))}"/>`);
+        .map((value) => `<filter val="${attribute(value_text(value, formats, column))}"/>`);
       return `<filters${blank}>${values.join("")}</filters>`;
     }
     case "contains":
-      return `<customFilters>${customFilter("eq", `*${filter.text}*`)}</customFilters>`;
+      return `<customFilters>${custom_filter("eq", `*${filter.text}*`)}</customFilters>`;
     case "compare":
-      return `<customFilters>${customFilter(filter.op, String(filter.value))}</customFilters>`;
+      return `<customFilters>${custom_filter(filter.op, String(filter.value))}</customFilters>`;
     case "empty":
       return '<filters blank="1"/>';
     case "nonEmpty":
       // Excel writes "non blanks" this way.
-      return `<customFilters>${customFilter("neq", " ")}</customFilters>`;
+      return `<customFilters>${custom_filter("neq", " ")}</customFilters>`;
     case "custom": {
       const and = filter.join === "and" && filter.conditions.length > 1 ? ' and="1"' : "";
-      return `<customFilters${and}>${filter.conditions.map(conditionXml).join("")}</customFilters>`;
+      return `<customFilters${and}>${filter.conditions.map(condition_xml).join("")}</customFilters>`;
     }
     case "dynamic":
       return `<dynamicFilter type="${filter.type}"/>`;
@@ -121,9 +121,9 @@ export function autoFilterXml(sheet: SheetSnapshot, autoFilter: AutoFilter): str
       // Only a value list names numbers by their text, so only it reads cells.
       const formats =
         filter.kind === "values"
-          ? cellFormats(sheet, col, { start: start.row + 1, end: end.row })
+          ? cell_formats(sheet, col, { start: start.row + 1, end: end.row })
           : new Map<number, string | undefined>();
-      const xml = filterXml(filter, formats, sheet.columns[col]);
+      const xml = filter_xml(filter, formats, sheet.columns[col]);
       return `<filterColumn colId="${col - start.col}">${xml}</filterColumn>`;
     });
   const ref = `${cellA1(start.row, start.col)}:${cellA1(end.row, end.col)}`;

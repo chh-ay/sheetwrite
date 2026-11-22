@@ -128,11 +128,11 @@ function combine(
   operation: Exclude<PasteSpecialOperation, "none">,
   target: TargetCell,
   copied: CellValue,
-  copiedValue: CellScalar,
+  copied_value: CellScalar,
 ): CellValue | null {
   const left =
     target.value.kind === "formula" ? `(${target.value.src.slice(1)})` : operand(target.resolved);
-  const right = copied.kind === "formula" ? `(${copied.src.slice(1)})` : operand(copiedValue);
+  const right = copied.kind === "formula" ? `(${copied.src.slice(1)})` : operand(copied_value);
   if (left === null || right === null) return null;
   const sign = SIGNS[operation];
   if (typeof left === "number" && typeof right === "number") {
@@ -151,12 +151,12 @@ function combine(
   return { kind: "formula", src: `=${left}${sign}${right}` };
 }
 
-function isBlank(cell: ClipboardCell): boolean {
+function is_blank(cell: ClipboardCell): boolean {
   return cell.value.kind === "literal" && (cell.value.value === null || cell.value.value === "");
 }
 
 /** A cell reference to copied cell (`row`, `col`): absolute for a one-cell copy, as Excel's Paste Link. */
-function linkFormula(link: NonNullable<PasteOrigin["link"]>, row: number, col: number): string {
+function link_formula(link: NonNullable<PasteOrigin["link"]>, row: number, col: number): string {
   const { start, end } = link.range;
   const single = start.row === end.row && start.col === end.col;
   const r = Math.min(start.row, end.row) + row;
@@ -166,7 +166,7 @@ function linkFormula(link: NonNullable<PasteOrigin["link"]>, row: number, col: n
 }
 
 /** The style a pasted cell gets: the copied cell's, the target's, or a mix. */
-function styleOf(parts: PasteParts, copied: CellStyle, target: () => TargetCell): CellStyle {
+function style_of(parts: PasteParts, copied: CellStyle, target: () => TargetCell): CellStyle {
   switch (parts.style) {
     case "all":
       return copied;
@@ -204,17 +204,17 @@ export function planPasteSpecial(
     parts: link ? { ...NOTHING, content: "formulas" } : parts,
     height: transpose ? source.width : source.height,
     width: transpose ? source.height : source.width,
-    cellAt(row, col, targetCol, repeat, target) {
-      const [sourceRow, sourceCol] = transpose ? [col, row] : [row, col];
-      const cell = source.cellAt(sourceRow, sourceCol, targetCol) ?? {
+    cellAt(row, col, target_col, repeat, target) {
+      const [source_row, source_col] = transpose ? [col, row] : [row, col];
+      const cell = source.cellAt(source_row, source_col, target_col) ?? {
         value: { kind: "literal", value: null },
         resolved: null,
         style: {},
       };
-      if (options.skipBlanks === true && isBlank(cell)) return null;
+      if (options.skipBlanks === true && is_blank(cell)) return null;
       if (link) {
         return {
-          value: { kind: "formula", src: linkFormula(link, sourceRow, sourceCol) },
+          value: { kind: "formula", src: link_formula(link, source_row, source_col) },
           style: target().style,
         };
       }
@@ -225,16 +225,16 @@ export function planPasteSpecial(
           cell.value.kind === "formula" ? { kind: "literal", value: cell.resolved } : cell.value;
       } else if (cell.value.kind === "formula") {
         // Each copy shifts by its own offset; a transposed cell by its own move.
-        const dRow = origin.delta.row + repeat.row + row - sourceRow;
-        const dCol = origin.delta.col + repeat.col + col - sourceCol;
-        value = { kind: "formula", src: shiftA1Refs(cell.value.src, dRow, dCol) };
+        const d_row = origin.delta.row + repeat.row + row - source_row;
+        const d_col = origin.delta.col + repeat.col + col - source_col;
+        value = { kind: "formula", src: shiftA1Refs(cell.value.src, d_row, d_col) };
       } else value = cell.value;
       if (operation !== "none" && parts.content !== null) {
         const combined = combine(operation, target(), value, cell.resolved);
         if (combined === null) return null;
         value = combined;
       }
-      return { value, style: styleOf(parts, cell.style, target) };
+      return { value, style: style_of(parts, cell.style, target) };
     },
   };
 }
@@ -271,7 +271,7 @@ const OWN_COPY_ONLY: ReadonlySet<PasteSpecialKind> = new Set([
 ]);
 
 /** A label with its access key underlined, as Excel's dialog shows it. */
-function accessLabel(text: string, key: string): HTMLElement {
+function access_label(text: string, key: string): HTMLElement {
   const label = document.createElement("span");
   const at = text.toLowerCase().indexOf(key);
   const underline = document.createElement("u");
@@ -280,8 +280,8 @@ function accessLabel(text: string, key: string): HTMLElement {
   return label;
 }
 
-function choiceGroup(
-  legendText: string,
+function choice_group(
+  legend_text: string,
   name: string,
   choices: readonly (readonly [string, string, string])[],
   keys: Map<string, HTMLInputElement>,
@@ -289,7 +289,7 @@ function choiceGroup(
   const group = document.createElement("fieldset");
   group.className = "sheetwrite-paste-special-group";
   const legend = document.createElement("legend");
-  legend.textContent = legendText;
+  legend.textContent = legend_text;
   group.append(legend);
   const radios: HTMLInputElement[] = [];
   for (const [value, text, key] of choices) {
@@ -300,7 +300,7 @@ function choiceGroup(
     radio.name = name;
     radio.value = value;
     radio.accessKey = key;
-    label.append(radio, accessLabel(text, key));
+    label.append(radio, access_label(text, key));
     group.append(label);
     radios.push(radio);
     keys.set(key, radio);
@@ -325,8 +325,8 @@ export async function pasteSpecialDialog(
   const keys = new Map<string, HTMLInputElement>();
   const form = document.createElement("div");
   form.className = "sheetwrite-paste-special";
-  const paste = choiceGroup("Paste", `sheetwrite-paste-${id}`, PASTE_CHOICES, keys);
-  const operation = choiceGroup(
+  const paste = choice_group("Paste", `sheetwrite-paste-${id}`, PASTE_CHOICES, keys);
+  const operation = choice_group(
     "Operation",
     `sheetwrite-paste-operation-${id}`,
     OPERATION_CHOICES,
@@ -340,12 +340,12 @@ export async function pasteSpecialDialog(
     const box = document.createElement("input");
     box.type = "checkbox";
     box.accessKey = key;
-    label.append(box, accessLabel(text, key));
+    label.append(box, access_label(text, key));
     checks.append(label);
     keys.set(key, box);
     return box;
   };
-  const skipBlanks = checkbox("Skip blanks", "b");
+  const skip_blanks = checkbox("Skip blanks", "b");
   const transpose = checkbox("Transpose", "e");
   form.append(paste.group, operation.group, checks);
 
@@ -410,7 +410,7 @@ export async function pasteSpecialDialog(
   const options: PasteSpecialOptions = {
     paste: chosen(paste.radios) as PasteSpecialKind,
     operation: chosen(operation.radios) as PasteSpecialOperation,
-    skipBlanks: skipBlanks.checked,
+    skipBlanks: skip_blanks.checked,
     transpose: transpose.checked,
   };
   return answer === "link" ? { ...options, link: true } : options;

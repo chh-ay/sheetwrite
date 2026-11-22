@@ -60,7 +60,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
     return { x: left, y: top, width: right - left, height: bottom - top };
   };
   /** How far apart two boxes are; negative when they overlap. */
-  const gapBetween = (a: Box, b: Box) =>
+  const gap_between = (a: Box, b: Box) =>
     Math.max(
       b.x - (a.x + a.width),
       a.x - (b.x + b.width),
@@ -72,22 +72,22 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
     inner.y >= outer.y &&
     inner.x + inner.width <= outer.x + outer.width &&
     inner.y + inner.height <= outer.y + outer.height;
-  const screenBox = (element: Element): Box => {
+  const screen_box = (element: Element): Box => {
     const rect = element.getBoundingClientRect();
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   };
   /** An element's box in its picture's units (the viewBox), through any transforms between them. */
-  const userBox = (svg: SVGSVGElement, element: SVGGraphicsElement): Box => {
+  const user_box = (svg: SVGSVGElement, element: SVGGraphicsElement): Box => {
     const local = element.getBBox();
-    const toPicture = svg
+    const to_picture = svg
       .getScreenCTM()
       ?.inverse()
       .multiply(element.getScreenCTM() ?? new DOMMatrix());
-    if (toPicture === undefined) return local;
+    if (to_picture === undefined) return local;
     const corners = [
       new DOMPoint(local.x, local.y),
       new DOMPoint(local.x + local.width, local.y + local.height),
-    ].map((corner) => corner.matrixTransform(toPicture));
+    ].map((corner) => corner.matrixTransform(to_picture));
     const [a, b] = corners as [DOMPoint, DOMPoint];
     return {
       x: Math.min(a.x, b.x),
@@ -97,7 +97,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
     };
   };
 
-  function nameOf(svg: SVGSVGElement): string {
+  function name_of(svg: SVGSVGElement): string {
     const title = svg.querySelector("title")?.textContent;
     if (title) return title;
     const holder = svg.closest(".sw-card, a, section, header, article");
@@ -107,11 +107,11 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
     return `the ${heading ?? "unnamed"} picture`;
   }
 
-  function checkBlueprint(svg: SVGSVGElement, defects: FitDefect[]) {
-    const picture = nameOf(svg);
+  function check_blueprint(svg: SVGSVGElement, defects: FitDefect[]) {
+    const picture = name_of(svg);
     const report = (problem: string) => defects.push({ picture, problem });
     const limits = svg.classList.contains("sw-blueprint--card") ? CARD : DIAGRAM;
-    const frame = screenBox(svg);
+    const frame = screen_box(svg);
     const nodes = [...svg.querySelectorAll<SVGGElement>(".bp-node")];
     const boxes = nodes.map((node) => ({
       node,
@@ -128,7 +128,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
 
     // Inside the picture, with padding, and centred.
     for (const element of drawn) {
-      const box = screenBox(element);
+      const box = screen_box(element);
       const room = Math.min(
         box.x - frame.x,
         box.y - frame.y,
@@ -140,7 +140,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
       }
     }
     const drawing = union(
-      drawn.filter((element) => !element.classList.contains("bp-edge__label")).map(screenBox),
+      drawn.filter((element) => !element.classList.contains("bp-edge__label")).map(screen_box),
     );
     if (drawing !== undefined) {
       const left = drawing.x - frame.x;
@@ -156,12 +156,12 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
 
     // Each box's text centred in it, inset from its border.
     const { inset } = limits;
-    for (const { node, element, isLane } of boxes) {
-      if (element === null || isLane) continue;
-      const box = userBox(svg, element);
+    for (const { node, element, isLane: is_lane } of boxes) {
+      if (element === null || is_lane) continue;
+      const box = user_box(svg, element);
       const texts = [...node.querySelectorAll<SVGTextElement>(":scope > text")];
       const content = [...texts, ...node.querySelectorAll<SVGGElement>(":scope > .bp-sheet")];
-      const block = union(content.map((each) => userBox(svg, each)));
+      const block = union(content.map((each) => user_box(svg, each)));
       if (block === undefined) continue;
       const name = texts[0]?.textContent ?? "a box";
       const room = {
@@ -177,8 +177,8 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
       }
       // Sheets are laid out on a grid, not centred as text; the centring check is for text.
       if (content.length !== texts.length || texts.length === 0) continue;
-      const text = union(texts.map(screenBox));
-      const shown = screenBox(element);
+      const text = union(texts.map(screen_box));
+      const shown = screen_box(element);
       if (text === undefined) continue;
       const dx = text.x + text.width / 2 - (shown.x + shown.width / 2);
       const dy = text.y + text.height / 2 - (shown.y + shown.height / 2);
@@ -191,15 +191,15 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
 
     // Boxes apart; labels clear of boxes.
     const solid = boxes
-      .filter(({ element, isLane }) => element !== null && !isLane)
+      .filter(({ element, isLane: is_lane }) => element !== null && !is_lane)
       .map(({ node, element }) => ({
         name: node.querySelector("text")?.textContent ?? "a box",
-        box: userBox(svg, element as SVGRectElement),
+        box: user_box(svg, element as SVGRectElement),
       }));
     solid.forEach((a, index) => {
       for (const b of solid.slice(index + 1)) {
         if (contains(a.box, b.box) || contains(b.box, a.box)) continue;
-        const gap = gapBetween(a.box, b.box);
+        const gap = gap_between(a.box, b.box);
         if (gap < limits.gap) {
           report(
             gap < 0
@@ -210,16 +210,16 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
       }
     });
     for (const text of svg.querySelectorAll<SVGTextElement>(".bp-edge__label")) {
-      const box = userBox(svg, text);
+      const box = user_box(svg, text);
       for (const { name, box: node } of solid) {
-        if (gapBetween(box, node) < 0)
+        if (gap_between(box, node) < 0)
           report(`the label "${text.textContent}" covers the box "${name}"`);
       }
     }
   }
 
   /** A section card illustration, drawn into a probe as art-geometry.ts does. */
-  function checkIllustration(probe: SVGSVGElement, file: string, defects: FitDefect[]) {
+  function check_illustration(probe: SVGSVGElement, file: string, defects: FitDefect[]) {
     const report = (problem: string) => defects.push({ picture: file, problem });
     const view = probe.viewBox.baseVal;
     const dots = (element: Element) =>
@@ -231,7 +231,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
       ),
     ]
       .filter((element) => !dots(element))
-      .map((element) => ({ element, box: userBox(probe, element) }))
+      .map((element) => ({ element, box: user_box(probe, element) }))
       .filter(({ box }) => box.width > 0 || box.height > 0);
     const drawing = union(shapes.map(({ box }) => box));
     if (drawing === undefined) return;
@@ -254,7 +254,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
     boxes.forEach((a, index) => {
       for (const b of boxes.slice(index + 1)) {
         if (contains(a.box, b.box) || contains(b.box, a.box)) continue;
-        const gap = gapBetween(a.box, b.box);
+        const gap = gap_between(a.box, b.box);
         if (gap < ILLUSTRATION.gap) {
           report(
             `boxes at (${round(a.box.x)}, ${round(a.box.y)}) and (${round(b.box.x)}, ${round(b.box.y)}) are ${round(gap)} apart`,
@@ -267,7 +267,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
   const defects: FitDefect[] = [];
   const visible = (element: Element) => element.getBoundingClientRect().width > 0;
   for (const svg of document.querySelectorAll<SVGSVGElement>("svg.sw-blueprint")) {
-    if (visible(svg)) checkBlueprint(svg, defects);
+    if (visible(svg)) check_blueprint(svg, defects);
   }
   const files = new Map<string, SVGUseElement>();
   for (const use of document.querySelectorAll<SVGUseElement>("svg use")) {
@@ -287,7 +287,7 @@ export async function findFigureFitDefects(): Promise<FitDefect[]> {
       "position:absolute;left:0;top:0;width:320px;height:160px;visibility:hidden";
     for (const child of [...symbol.childNodes]) probe.append(document.importNode(child, true));
     shown.after(probe);
-    checkIllustration(probe, file, defects);
+    check_illustration(probe, file, defects);
     probe.remove();
   }
   return defects;

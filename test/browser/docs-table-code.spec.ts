@@ -11,8 +11,8 @@ const WIDTHS = [1440, 834, 390] as const;
 /** The widest table that must fit a phone without scrolling. */
 const PHONE_COLUMNS = 3;
 
-/** Each break inside a word of a table's inline code, and each table of `maxColumns` or fewer that scrolls. */
-function tableDefects(maxColumns: number): string[] {
+/** Each break inside a word of a table's inline code, and each table of `max_columns` or fewer that scrolls. */
+function table_defects(max_columns: number): string[] {
   const found: string[] = [];
   const range = document.createRange();
   for (const code of document.querySelectorAll<HTMLElement>(".sw-table-frame :not(pre) > code")) {
@@ -29,8 +29,8 @@ function tableDefects(maxColumns: number): string[] {
         if (rect === undefined) continue;
         const char = text[index] ?? "";
         const broke = previous !== undefined && rect.top > previous.top + rect.height / 2;
-        const betweenWords = previous?.node !== node && index === 0;
-        if (broke && !betweenWords && !/\s/.test(char) && !/\s/.test(previous?.char ?? " ")) {
+        const between_words = previous?.node !== node && index === 0;
+        if (broke && !between_words && !/\s/.test(char) && !/\s/.test(previous?.char ?? " ")) {
           found.push(`"${code.textContent}" breaks inside a word, before "${text.slice(index)}"`);
         }
         previous = { top: rect.top, char, node };
@@ -40,7 +40,7 @@ function tableDefects(maxColumns: number): string[] {
   for (const frame of document.querySelectorAll<HTMLElement>(".sw-table-frame")) {
     const columns = frame.querySelector("tr")?.children.length ?? 0;
     const overflow = frame.scrollWidth - frame.clientWidth;
-    if (frame.clientWidth > 0 && columns <= maxColumns && overflow > 1) {
+    if (frame.clientWidth > 0 && columns <= max_columns && overflow > 1) {
       const head = frame.querySelector("tr")?.textContent?.trim().replace(/\s+/g, " ");
       found.push(`the ${columns}-column table "${head}" scrolls ${overflow} px sideways`);
     }
@@ -62,7 +62,7 @@ for (const width of WIDTHS) {
       const page = await context.newPage();
       await page.goto(path, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
-      const defects = await page.evaluate(tableDefects, width <= 390 ? PHONE_COLUMNS : 0);
+      const defects = await page.evaluate(table_defects, width <= 390 ? PHONE_COLUMNS : 0);
       for (const defect of defects) found.push(`${path}: ${defect}`);
       await page.close();
     }

@@ -16,15 +16,15 @@ export interface RowMove {
   readonly targets: Uint32Array;
 }
 
-function insideColumns(move: RowMove, startCol: number, endCol: number): boolean {
-  return startCol >= move.bounds.start.col && endCol <= move.bounds.end.col;
+function inside_columns(move: RowMove, start_col: number, end_col: number): boolean {
+  return start_col >= move.bounds.start.col && end_col <= move.bounds.end.col;
 }
 
-function insideRows(move: RowMove, startRow: number, endRow: number): boolean {
-  return startRow >= move.bounds.start.row && endRow <= move.bounds.end.row;
+function inside_rows(move: RowMove, start_row: number, end_row: number): boolean {
+  return start_row >= move.bounds.start.row && end_row <= move.bounds.end.row;
 }
 
-function movedRow(move: RowMove, row: number): number {
+function moved_row(move: RowMove, row: number): number {
   const offset = row - move.bounds.start.row;
   return move.bounds.start.row + (move.targets[offset] ?? offset);
 }
@@ -35,13 +35,13 @@ export function permutedNotes(notes: readonly CellNote[], move: RowMove): CellNo
     const { row, col } = note.addr;
     if (
       note.addr.sheet !== move.bounds.sheet ||
-      !insideRows(move, row, row) ||
-      !insideColumns(move, col, col)
+      !inside_rows(move, row, row) ||
+      !inside_columns(move, col, col)
     ) {
       return note;
     }
 
-    return { ...note, addr: { ...note.addr, row: movedRow(move, row) } };
+    return { ...note, addr: { ...note.addr, row: moved_row(move, row) } };
   });
 }
 
@@ -59,13 +59,13 @@ export function permutedHyperlinks(
     if (
       range.sheet !== move.bounds.sheet ||
       range.end.row !== row ||
-      !insideRows(move, row, row) ||
-      !insideColumns(move, range.start.col, range.end.col)
+      !inside_rows(move, row, row) ||
+      !inside_columns(move, range.start.col, range.end.col)
     ) {
       return hyperlink;
     }
 
-    const target = movedRow(move, row);
+    const target = moved_row(move, row);
     return {
       ...hyperlink,
       range: {
@@ -88,20 +88,20 @@ export function permutedMerges(merges: readonly MergeRange[], move: RowMove): Me
   const moved: MergeRange[] = [];
 
   for (const merge of merges) {
-    const crossesRows = merge.r0 <= end.row && merge.r1 >= start.row;
-    const crossesCols = merge.c0 <= end.col && merge.c1 >= start.col;
-    if (!crossesRows || !crossesCols) {
+    const crosses_rows = merge.r0 <= end.row && merge.r1 >= start.row;
+    const crosses_cols = merge.c0 <= end.col && merge.c1 >= start.col;
+    if (!crosses_rows || !crosses_cols) {
       moved.push(merge);
       continue;
     }
 
-    if (!insideRows(move, merge.r0, merge.r1) || !insideColumns(move, merge.c0, merge.c1)) {
+    if (!inside_rows(move, merge.r0, merge.r1) || !inside_columns(move, merge.c0, merge.c1)) {
       return null;
     }
 
-    const top = movedRow(move, merge.r0);
+    const top = moved_row(move, merge.r0);
     for (let row = merge.r0 + 1; row <= merge.r1; row++) {
-      if (movedRow(move, row) !== top + (row - merge.r0)) return null;
+      if (moved_row(move, row) !== top + (row - merge.r0)) return null;
     }
 
     moved.push({ ...merge, r0: top, r1: top + (merge.r1 - merge.r0) });
@@ -120,8 +120,8 @@ export function permutedMerges(merges: readonly MergeRange[], move: RowMove): Me
 export function tablesAllowRowMove(tables: readonly WorkbookTable[], bounds: Range): boolean {
   return tables.every((table) => {
     const { range } = table;
-    const bodyStart = range.start.row + (table.headerRow ? 1 : 0);
-    const bodyEnd = range.end.row - (table.totalsRow ? 1 : 0);
+    const body_start = range.start.row + (table.headerRow ? 1 : 0);
+    const body_end = range.end.row - (table.totalsRow ? 1 : 0);
     const crosses =
       range.sheet === bounds.sheet &&
       range.start.row <= bounds.end.row &&
@@ -131,8 +131,8 @@ export function tablesAllowRowMove(tables: readonly WorkbookTable[], bounds: Ran
     if (!crosses) return true;
 
     return (
-      bounds.start.row === bodyStart &&
-      bounds.end.row === bodyEnd &&
+      bounds.start.row === body_start &&
+      bounds.end.row === body_end &&
       bounds.start.col === range.start.col &&
       bounds.end.col === range.end.col
     );
@@ -155,12 +155,12 @@ export function tableWithBody(
   range: Range,
 ): WorkbookTable | undefined {
   return tables.find((table) => {
-    const bodyStart = table.range.start.row + (table.headerRow ? 1 : 0);
-    const bodyEnd = table.range.end.row - (table.totalsRow ? 1 : 0);
+    const body_start = table.range.start.row + (table.headerRow ? 1 : 0);
+    const body_end = table.range.end.row - (table.totalsRow ? 1 : 0);
     return (
       table.range.sheet === range.sheet &&
-      range.start.row === bodyStart &&
-      range.end.row === bodyEnd &&
+      range.start.row === body_start &&
+      range.end.row === body_end &&
       range.start.col === table.range.start.col &&
       range.end.col === table.range.end.col
     );
@@ -173,8 +173,8 @@ export function tableWithBody(
  * the table's current range.
  */
 export function tableSortState(body: Range, keys: readonly SortKey[]): WorkbookTableXmlElement {
-  const firstRow = body.start.row + 1;
-  const lastRow = body.end.row + 1;
+  const first_row = body.start.row + 1;
+  const last_row = body.end.row + 1;
   return {
     name: "sortState",
     attributes: { ref: rangeA1(body.start, body.end) },
@@ -182,7 +182,7 @@ export function tableSortState(body: Range, keys: readonly SortKey[]): WorkbookT
     children: keys.map((key) => ({
       name: "sortCondition",
       attributes: {
-        ref: `${colToA1(key.col)}${firstRow}:${colToA1(key.col)}${lastRow}`,
+        ref: `${colToA1(key.col)}${first_row}:${colToA1(key.col)}${last_row}`,
         ...(key.ascending ? {} : { descending: "1" }),
       },
       text: "",

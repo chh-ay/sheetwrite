@@ -116,9 +116,9 @@ interface WorkerRuntimeState {
   lastSidewaysSafe: boolean;
 }
 
-function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
-  const updateIds = msg.stringPoolUpdateIds;
-  const updateValues = msg.stringPoolUpdateValues;
+function unpack_packed_view(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
+  const update_ids = msg.stringPoolUpdateIds;
+  const update_values = msg.stringPoolUpdateValues;
 
   if (state.stringPoolEpoch !== msg.stringPoolEpoch) {
     state.stringCache.clear();
@@ -127,26 +127,26 @@ function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): Visi
   // Cap the pool-id→string cache before this frame's updates are folded in; the
   // just-swept window re-warms from the update payload below.
   if (state.stringCache.size >= STRING_CACHE_CAP) state.stringCache.clear();
-  if (updateIds && updateValues) {
-    for (let i = 0; i < updateIds.length; i++) {
-      state.stringCache.set(updateIds[i] ?? NO_STRING, updateValues[i] ?? "");
+  if (update_ids && update_values) {
+    for (let i = 0; i < update_ids.length; i++) {
+      state.stringCache.set(update_ids[i] ?? NO_STRING, update_values[i] ?? "");
     }
   }
 
   if (state.valuesScratch.length !== msg.valueKinds.length) {
     state.valuesScratch = new Array(msg.valueKinds.length);
   }
-  const localStrings = msg.localStrings ?? [];
+  const local_strings = msg.localStrings ?? [];
   for (let i = 0; i < msg.valueKinds.length; i++) {
     if (msg.valueKinds[i] === KIND_NUMBER) {
       state.valuesScratch[i] = msg.numberValues[i] ?? null;
     } else if (msg.valueKinds[i] === KIND_STRING) {
-      const poolId = msg.stringPoolIds[i] ?? NO_STRING;
-      if (poolId !== NO_STRING) {
-        state.valuesScratch[i] = state.stringCache.get(poolId) ?? null;
+      const pool_id = msg.stringPoolIds[i] ?? NO_STRING;
+      if (pool_id !== NO_STRING) {
+        state.valuesScratch[i] = state.stringCache.get(pool_id) ?? null;
       } else {
-        const localId = msg.stringLocalIds[i] ?? -1;
-        state.valuesScratch[i] = localId >= 0 ? (localStrings[localId] ?? null) : null;
+        const local_id = msg.stringLocalIds[i] ?? -1;
+        state.valuesScratch[i] = local_id >= 0 ? (local_strings[local_id] ?? null) : null;
       }
     } else {
       state.valuesScratch[i] = null;
@@ -164,7 +164,7 @@ function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): Visi
   };
 }
 
-function unpackSharedPackedView(
+function unpack_shared_packed_view(
   msg: SharedPackedMessage,
   state: WorkerRuntimeState,
 ): VisibleWindowView {
@@ -188,19 +188,19 @@ function unpackSharedPackedView(
     stringPoolUpdateValues: msg.stringPoolUpdateValues,
     localStrings: msg.localStrings,
   };
-  return unpackPackedView(packed, state);
+  return unpack_packed_view(packed, state);
 }
 
-function releaseSharedPackedView(msg: SharedPackedMessage): void {
+function release_shared_packed_view(msg: SharedPackedMessage): void {
   Atomics.store(new Int32Array(msg.shared.buffer, 0, 2), 0, 0);
 }
 
-function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean {
+function paint_view(state: WorkerRuntimeState, view: VisibleWindowView): boolean {
   if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
   const round = Math.round;
   state.viewport.scrollTop = round(state.viewport.scrollTop * state.dpr) / state.dpr;
   state.viewport.scrollLeft = round(state.viewport.scrollLeft * state.dpr) / state.dpr;
-  const sidewaysSafe = sidewaysBlitSafe(view, state.layout);
+  const sideways_safe = sidewaysBlitSafe(view, state.layout);
   const damage = blitScroll(
     state.ctx,
     state.canvas,
@@ -209,7 +209,7 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
     state.viewport,
     state.dpr,
     state.lastDpr,
-    state.lastSidewaysSafe && sidewaysSafe,
+    state.lastSidewaysSafe && sideways_safe,
   );
   paintFrame(
     state.ctx,
@@ -223,19 +223,19 @@ function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean 
   );
   state.lastViewport = { ...state.viewport };
   state.lastDpr = state.dpr;
-  state.lastSidewaysSafe = sidewaysSafe;
+  state.lastSidewaysSafe = sideways_safe;
   return true;
 }
 
 /** Paint one frame as clipped frozen panes; pane frames never blit. */
-function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean {
+function paint_panes_frame(state: WorkerRuntimeState, msg: PanesMessage): boolean {
   if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
   state.lastViewport = null;
 
   for (const pane of msg.panes) {
-    const view = pane.packed ? unpackPackedView(pane.packed, state) : pane.view;
+    const view = pane.packed ? unpack_packed_view(pane.packed, state) : pane.view;
     if (!view) continue;
-    const paneViewport: Viewport = {
+    const pane_viewport: Viewport = {
       scrollTop: pane.scrollTop,
       scrollLeft: pane.scrollLeft,
       width: state.viewport.width,
@@ -251,7 +251,7 @@ function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean 
       view,
       state.layout,
       state.theme,
-      paneViewport,
+      pane_viewport,
       state.dpr,
       NO_RENDERERS,
       undefined,
@@ -295,12 +295,12 @@ export function createWorkerMessageHandler(
     lastSidewaysSafe: false,
   };
 
-  const acknowledgeFrame = (painted: boolean): void => {
+  const acknowledge_frame = (painted: boolean): void => {
     if (painted) postAcknowledgement({ type: "painted" });
   };
 
   let fatal = false;
-  const reportFatal = (reason: string): void => {
+  const report_fatal = (reason: string): void => {
     if (fatal) return;
     fatal = true;
     postAcknowledgement({ type: "fatal", reason });
@@ -308,7 +308,7 @@ export function createWorkerMessageHandler(
 
   return (input: unknown): void => {
     if (input === null || typeof input !== "object" || !("type" in input)) {
-      reportFatal("Sheetwrite: paint worker received a request it cannot read");
+      report_fatal("Sheetwrite: paint worker received a request it cannot read");
       return;
     }
 
@@ -320,7 +320,7 @@ export function createWorkerMessageHandler(
         state.theme = msg.theme;
         state.lastViewport = null;
         if (!state.ctx) {
-          reportFatal("Sheetwrite: Paint worker could not acquire a 2D context");
+          report_fatal("Sheetwrite: Paint worker could not acquire a 2D context");
           break;
         }
 
@@ -328,7 +328,7 @@ export function createWorkerMessageHandler(
         // falling back is safer than attempting restoration from stale pixels.
         state.canvas.addEventListener(
           "contextlost",
-          () => reportFatal("Sheetwrite: Paint worker lost its 2D context"),
+          () => report_fatal("Sheetwrite: Paint worker lost its 2D context"),
           { once: true },
         );
         postAcknowledgement({ type: "ready" });
@@ -361,26 +361,26 @@ export function createWorkerMessageHandler(
         break;
 
       case "paint":
-        acknowledgeFrame(paintView(state, msg.view));
+        acknowledge_frame(paint_view(state, msg.view));
         break;
 
       case "paintPacked":
-        acknowledgeFrame(paintView(state, unpackPackedView(msg, state)));
+        acknowledge_frame(paint_view(state, unpack_packed_view(msg, state)));
         break;
 
       case "paintPanes":
-        acknowledgeFrame(paintPanesFrame(state, msg));
+        acknowledge_frame(paint_panes_frame(state, msg));
         break;
 
       case "paintPackedShared": {
         let painted = false;
         try {
-          painted = paintView(state, unpackSharedPackedView(msg, state));
+          painted = paint_view(state, unpack_shared_packed_view(msg, state));
         } finally {
-          releaseSharedPackedView(msg);
+          release_shared_packed_view(msg);
         }
 
-        acknowledgeFrame(painted);
+        acknowledge_frame(painted);
         break;
       }
 
@@ -400,16 +400,16 @@ export function createWorkerMessageHandler(
       default:
         // A renderer from another release (a stale `workerUrl` copy) can send
         // requests this worker does not know; painting on would be guesswork.
-        reportFatal("Sheetwrite: paint worker received an unknown request");
+        report_fatal("Sheetwrite: paint worker received an unknown request");
     }
   };
 }
 
-const handleWorkerMessage = createWorkerMessageHandler((message) => postMessage(message));
+const handle_worker_message = createWorkerMessageHandler((message) => postMessage(message));
 addEventListener("message", (event: MessageEvent) => {
-  handleWorkerMessage(event.data);
+  handle_worker_message(event.data);
 });
 // A request that cannot be deserialized takes the unreadable-request path.
 addEventListener("messageerror", () => {
-  handleWorkerMessage(null);
+  handle_worker_message(null);
 });

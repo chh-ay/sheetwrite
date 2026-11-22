@@ -26,35 +26,35 @@ interface HistoryBlock {
   readonly restore: (range: Range) => boolean;
 }
 
-const historyBlocks = new WeakMap<PackedCellBlock, HistoryBlock>();
+const history_blocks = new WeakMap<PackedCellBlock, HistoryBlock>();
 
 /** Available only during the synchronous history application that owns the block. */
 export function preparedHistoryBlock(block: PackedCellBlock): HistoryBlock | undefined {
-  return historyBlocks.get(block);
+  return history_blocks.get(block);
 }
 
 /**
  * Exact JSON bytes of an engine-built scalar array, or undefined when a value
  * is not JSON-safe; the caller then leaves the block to the full validating walk.
  */
-function scalarArrayBytes(
+function scalar_array_bytes(
   values: readonly (string | number | boolean | null)[],
 ): number | undefined {
   let bytes = 2 + Math.max(0, values.length - 1);
   // Restored ranges repeat text in runs, so one cached measurement covers each run.
-  let previousText: string | undefined;
-  let previousTextBytes = 0;
+  let previous_text: string | undefined;
+  let previous_text_bytes = 0;
 
   for (const value of values) {
     if (typeof value === "number") {
       if (!Number.isFinite(value)) return undefined;
       bytes += jsonNumberLength(value);
     } else if (typeof value === "string") {
-      if (value !== previousText) {
-        previousText = value;
-        previousTextBytes = boundedJsonByteLength(value, Number.MAX_SAFE_INTEGER);
+      if (value !== previous_text) {
+        previous_text = value;
+        previous_text_bytes = boundedJsonByteLength(value, Number.MAX_SAFE_INTEGER);
       }
-      bytes += previousTextBytes;
+      bytes += previous_text_bytes;
     } else bytes += value === null ? 4 : value ? 4 : 5;
   }
   return bytes;
@@ -99,7 +99,7 @@ function prepare(
 export class TransactionPreparation {
   private readonly entries = new Map<Restore, PreparedRestore>();
   private readonly previous = new Map<Restore, TransactionPreparation | undefined>();
-  private readonly historyBlocks = new Set<PackedCellBlock>();
+  private readonly history_blocks = new Set<PackedCellBlock>();
 
   /**
    * The engine built these plain arrays from a validated snapshot. Measure
@@ -110,32 +110,39 @@ export class TransactionPreparation {
     restore: (range: Range) => boolean,
   ): void {
     const block = operation.block;
-    const valueBytes = scalarArrayBytes(block.values);
-    const styleBytes = block.styleIds === undefined ? 0 : scalarArrayBytes(block.styleIds);
-    if (valueBytes === undefined || styleBytes === undefined) return;
+    const value_bytes = scalar_array_bytes(block.values);
+    const style_bytes = block.styleIds === undefined ? 0 : scalar_array_bytes(block.styleIds);
+    if (value_bytes === undefined || style_bytes === undefined) return;
 
     // Measure the small envelope once with empty arrays, then add the exact
     // array contents minus the two `[]` bytes each empty array already counted.
-    const emptyBlock = {
+    const empty_block = {
       ...block,
       values: [],
       ...(block.styleIds === undefined ? {} : { styleIds: [] }),
     };
-    const arrayBytes = valueBytes - 2 + (block.styleIds === undefined ? 0 : styleBytes - 2);
+    const array_bytes = value_bytes - 2 + (block.styleIds === undefined ? 0 : style_bytes - 2);
     const options = { omitUndefinedProperties: true };
-    const blockBytes =
-      boundedJsonByteLength(emptyBlock, Number.MAX_SAFE_INTEGER, options) + arrayBytes;
-    const operationBytes =
-      boundedJsonByteLength({ ...operation, block: emptyBlock }, Number.MAX_SAFE_INTEGER, options) +
-      arrayBytes;
-    historyBlocks.set(block, { blockBytes, operationBytes, restore });
-    this.historyBlocks.add(block);
+    const block_bytes =
+      boundedJsonByteLength(empty_block, Number.MAX_SAFE_INTEGER, options) + array_bytes;
+    const operation_bytes =
+      boundedJsonByteLength(
+        { ...operation, block: empty_block },
+        Number.MAX_SAFE_INTEGER,
+        options,
+      ) + array_bytes;
+    history_blocks.set(block, {
+      blockBytes: block_bytes,
+      operationBytes: operation_bytes,
+      restore,
+    });
+    this.history_blocks.add(block);
   }
 
   measure(operations: readonly DocumentOp[]): number {
     let bytes = 2 + Math.max(0, operations.length - 1);
     for (const operation of operations) {
-      const history = operation.op === "setBlock" ? historyBlocks.get(operation.block) : undefined;
+      const history = operation.op === "setBlock" ? history_blocks.get(operation.block) : undefined;
       bytes +=
         history?.operationBytes ??
         boundedJsonByteLength(operation, Number.MAX_SAFE_INTEGER, {
@@ -167,7 +174,7 @@ export class TransactionPreparation {
     this.bind([operation]);
     const prepared = prepare(operation, stamp(operation), block);
     prepared.errors = [];
-    recordBlockFacts(prepared);
+    record_block_facts(prepared);
     this.entries.set(operation, prepared);
   }
 
@@ -183,8 +190,8 @@ export class TransactionPreparation {
   }
 
   dispose(): void {
-    for (const block of this.historyBlocks) historyBlocks.delete(block);
-    this.historyBlocks.clear();
+    for (const block of this.history_blocks) history_blocks.delete(block);
+    this.history_blocks.clear();
     for (const [operation, previous] of this.previous) {
       if (previous) owners.set(operation, previous);
       else owners.delete(operation);
@@ -194,7 +201,7 @@ export class TransactionPreparation {
   }
 }
 
-function recordBlockFacts(prepared: PreparedRestore): void {
+function record_block_facts(prepared: PreparedRestore): void {
   prepared.requiredSheets = [
     ...new Set((prepared.block.refs ?? []).map(([, target]) => target.sheet)),
   ];
@@ -209,7 +216,7 @@ export function preparedRestore<E>(
   const prepared = owners.get(operation)?.restore(operation) ?? prepare(operation);
   if (!prepared.errors) {
     prepared.errors = validate({ op: "setBlock", range: operation.range, block: prepared.block });
-    if (prepared.errors.length === 0) recordBlockFacts(prepared);
+    if (prepared.errors.length === 0) record_block_facts(prepared);
   }
   return prepared as Omit<PreparedRestore, "errors"> & { errors: readonly E[] };
 }

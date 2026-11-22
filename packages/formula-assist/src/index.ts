@@ -20,7 +20,7 @@ type PredictorModule = typeof PredictorChunk;
 let loading: Promise<PredictorModule> | null = null;
 
 /** Load the predictor once; a failed load is not kept, so the next edit tries again. */
-function loadPredictor(): Promise<PredictorModule> {
+function load_predictor(): Promise<PredictorModule> {
   loading ??= import("./predictor.js").catch((error: unknown) => {
     loading = null;
     throw error;
@@ -29,7 +29,7 @@ function loadPredictor(): Promise<PredictorModule> {
 }
 
 /** Without the predictor the bar keeps Excel's behaviour; the next edit loads it again. */
-function reportLoadFailure(error: unknown): void {
+function report_load_failure(error: unknown): void {
   console.warn("Sheetwrite: formula assist could not load its predictor", error);
 }
 
@@ -40,12 +40,12 @@ type Attach = (module: PredictorModule) => PredictorChunk.Predictor | null;
  * The session of an edit that started before the predictor loaded: it
  * suggests nothing until the chunk arrives, then forwards to the real one.
  */
-function pendingSession(edit: FormulaEdit, attach: Attach): FormulaSuggestionSession {
+function pending_session(edit: FormulaEdit, attach: Attach): FormulaSuggestionSession {
   let session: PredictorChunk.PredictionSession | null = null;
   let closed = false;
-  loadPredictor().then((module) => {
+  load_predictor().then((module) => {
     if (!closed) session = attach(module)?.open(edit) ?? null;
-  }, reportLoadFailure);
+  }, report_load_failure);
   return {
     suggest: (text, analysis) => session?.suggest(text, analysis) ?? null,
     feedback: (event) => session?.feedback(event),
@@ -57,7 +57,7 @@ function pendingSession(edit: FormulaEdit, attach: Attach): FormulaSuggestionSes
 }
 
 /** The suggester of one grid, and what removes its predictor when the grid goes. */
-function gridSuggester(store: Store): { suggester: FormulaSuggester; dispose(): void } {
+function grid_suggester(store: Store): { suggester: FormulaSuggester; dispose(): void } {
   let predictor: PredictorChunk.Predictor | null = null;
   let disposed = false;
   const attach: Attach = (module) => {
@@ -66,9 +66,9 @@ function gridSuggester(store: Store): { suggester: FormulaSuggester; dispose(): 
   };
   // An edit that opens before the chunk arrives suggests nothing until the next key, so
   // fetch it now. A failed load is reported, and the first edit loads it again.
-  loadPredictor().then(attach, reportLoadFailure);
+  load_predictor().then(attach, report_load_failure);
   return {
-    suggester: { open: (edit) => predictor?.open(edit) ?? pendingSession(edit, attach) },
+    suggester: { open: (edit) => predictor?.open(edit) ?? pending_session(edit, attach) },
     dispose: () => {
       disposed = true;
       predictor?.dispose();
@@ -100,9 +100,9 @@ function gridSuggester(store: Store): { suggester: FormulaSuggester; dispose(): 
 export function formulaAssistAddon(): SheetwriteAddon {
   return {
     name: "formulaAssist",
-    grid: ({ grid, formulaSuggestions }) => {
-      const { suggester, dispose } = gridSuggester(grid.store);
-      const remove = formulaSuggestions(suggester);
+    grid: ({ grid, formulaSuggestions: formula_suggestions }) => {
+      const { suggester, dispose } = grid_suggester(grid.store);
+      const remove = formula_suggestions(suggester);
       return () => {
         remove();
         dispose();

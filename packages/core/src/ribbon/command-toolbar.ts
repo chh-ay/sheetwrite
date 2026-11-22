@@ -96,13 +96,13 @@ type ToolbarEntry =
       readonly spec?: RibbonControlSpec;
     };
 
-function registryCommand(id: string): RibbonControlSpec | undefined {
+function registry_command(id: string): RibbonControlSpec | undefined {
   return commandGroups(RIBBON_TABS)
     .flat()
     .find((spec) => spec.id === id);
 }
 
-function defaultEntries(flags: CommandFlags): ToolbarEntry[] {
+function default_entries(flags: CommandFlags): ToolbarEntry[] {
   const entries: ToolbarEntry[] = [];
   for (const group of commandGroups(shownTabs(RIBBON_TABS, flags))) {
     if (entries.length > 0) entries.push({ kind: "separator" });
@@ -112,7 +112,7 @@ function defaultEntries(flags: CommandFlags): ToolbarEntry[] {
   return entries;
 }
 
-function customEntries(items: readonly ToolbarItem[]): ToolbarEntry[] {
+function custom_entries(items: readonly ToolbarItem[]): ToolbarEntry[] {
   const entries: ToolbarEntry[] = [];
   const placed = new Set<string>();
   for (const item of items) {
@@ -121,22 +121,22 @@ function customEntries(items: readonly ToolbarItem[]): ToolbarEntry[] {
       continue;
     }
 
-    const oneClick = item.action === undefined ? undefined : ONE_CLICK_ACTIONS[item.action];
+    const one_click = item.action === undefined ? undefined : ONE_CLICK_ACTIONS[item.action];
     const spec =
-      item.action === undefined ? undefined : registryCommand(oneClick?.command ?? item.action);
-    const onClick = item.onClick ?? oneClick?.run;
-    if (onClick !== undefined) {
+      item.action === undefined ? undefined : registry_command(one_click?.command ?? item.action);
+    const on_click = item.onClick ?? one_click?.run;
+    if (on_click !== undefined) {
       // A one-click action keeps its own name and glyph unless the item overrides them.
       const named =
-        oneClick === undefined ? item : { ...item, title: item.title ?? oneClick.label };
+        one_click === undefined ? item : { ...item, title: item.title ?? one_click.label };
       const shown =
-        spec !== undefined && oneClick !== undefined && spec.kind !== "zoom"
-          ? { ...spec, icon: oneClick.icon }
+        spec !== undefined && one_click !== undefined && spec.kind !== "zoom"
+          ? { ...spec, icon: one_click.icon }
           : spec;
       entries.push(
         shown === undefined
-          ? { kind: "custom", item: named, onClick }
-          : { kind: "custom", item: named, onClick, spec: shown },
+          ? { kind: "custom", item: named, onClick: on_click }
+          : { kind: "custom", item: named, onClick: on_click, spec: shown },
       );
       continue;
     }
@@ -150,7 +150,7 @@ function customEntries(items: readonly ToolbarItem[]): ToolbarEntry[] {
 }
 
 /** Item `title` and `icon` replace the command's label and glyph in this toolbar only. */
-function withItemOverrides(
+function with_item_overrides(
   spec: RibbonControlSpec,
   item: ToolbarItem | undefined,
   context: RibbonContext,
@@ -164,11 +164,11 @@ function withItemOverrides(
 }
 
 /** A host callback button, in the same look as the commands around it. */
-function renderCustom(
+function render_custom(
   entry: Extract<ToolbarEntry, { kind: "custom" }>,
   context: RibbonContext,
 ): RibbonControlView {
-  const { item, onClick, spec } = entry;
+  const { item, onClick: on_click, spec } = entry;
   const label = item.title ?? (spec !== undefined && "label" in spec ? spec.label : "");
   const button = document.createElement("button");
   button.type = "button";
@@ -188,7 +188,7 @@ function renderCustom(
 
   button.addEventListener("mousedown", (event) => event.preventDefault());
   button.addEventListener("click", () =>
-    context.run(`custom:${label || spec?.id || "item"}`, () => onClick(context.grid), button),
+    context.run(`custom:${label || spec?.id || "item"}`, () => on_click(context.grid), button),
   );
 
   const availability: RibbonAvailability =
@@ -228,9 +228,9 @@ export class CommandToolbar {
   /** The toolbar's listeners, observer and pending fit frame; `destroy` closes it. */
   private readonly lifetime = new Scope();
   /** Index of the first item moved to the overflow; `items.length` when all fit. */
-  private overflowStart: number;
-  private fitFrame = 0;
-  private fittedWidth = -1;
+  private overflow_start: number;
+  private fit_frame = 0;
+  private fitted_width = -1;
 
   constructor(host: HTMLElement, grid: Grid, options: CommandToolbarOptions) {
     this.grid = grid;
@@ -251,9 +251,9 @@ export class CommandToolbar {
     this.row = document.createElement("div");
     this.row.className = "sheetwrite-command-toolbar-row";
     const entries =
-      options.items === undefined ? defaultEntries(options.flags) : customEntries(options.items);
-    for (const entry of entries) this.row.appendChild(this.renderEntry(entry));
-    this.overflowStart = this.items.length;
+      options.items === undefined ? default_entries(options.flags) : custom_entries(options.items);
+    for (const entry of entries) this.row.appendChild(this.render_entry(entry));
+    this.overflow_start = this.items.length;
 
     this.more = document.createElement("button");
     this.more.type = "button";
@@ -268,10 +268,10 @@ export class CommandToolbar {
     caret.setAttribute("aria-hidden", "true");
     this.more.appendChild(caret);
     this.more.addEventListener("mousedown", (event) => event.preventDefault());
-    this.more.addEventListener("click", (event) => this.openOverflow(event.detail === 0));
+    this.more.addEventListener("click", (event) => this.open_overflow(event.detail === 0));
 
     this.element.append(this.row, this.more);
-    this.element.addEventListener("keydown", this.onKeydown);
+    this.element.addEventListener("keydown", this.on_keydown);
     host.appendChild(this.element);
     checkStylePart(this.element, "ribbon", "The toolbar");
     checkIconStyles(this.element, "The toolbar");
@@ -294,27 +294,27 @@ export class CommandToolbar {
     );
     // Absent in some test environments; every command then stays on the row.
     if (typeof ResizeObserver === "function") {
-      const resizeObserver = new ResizeObserver(() => this.scheduleFit());
-      resizeObserver.observe(this.element);
-      this.lifetime.add(() => resizeObserver.disconnect());
+      const resize_observer = new ResizeObserver(() => this.schedule_fit());
+      resize_observer.observe(this.element);
+      this.lifetime.add(() => resize_observer.disconnect());
     }
-    this.lifetime.add(() => cancelAnimationFrame(this.fitFrame));
-    this.scheduleFit();
+    this.lifetime.add(() => cancelAnimationFrame(this.fit_frame));
+    this.schedule_fit();
   }
 
   destroy(): void {
     this.lifetime.close();
   }
 
-  private renderEntry(entry: ToolbarEntry): HTMLElement {
+  private render_entry(entry: ToolbarEntry): HTMLElement {
     let element: HTMLElement;
     if (entry.kind === "separator") {
       element = separator();
     } else {
       const view =
         entry.kind === "custom"
-          ? renderCustom(entry, this.context)
-          : renderControl(...withItemOverrides(entry.spec, entry.item, this.context));
+          ? render_custom(entry, this.context)
+          : renderControl(...with_item_overrides(entry.spec, entry.item, this.context));
       this.controls.push(view);
       element = view.element;
       if (entry.kind === "command" && entry.spec.available !== undefined) {
@@ -344,7 +344,7 @@ export class CommandToolbar {
     // Fit now rather than on the next frame, so the row the browser paints
     // first has no separator an unavailable command leaves behind.
     if (changed) {
-      this.fittedWidth = -1;
+      this.fitted_width = -1;
       this.fit();
     }
 
@@ -352,11 +352,11 @@ export class CommandToolbar {
   }
 
   /** Resize bursts arrive many times a frame; fit at most once per frame. */
-  private scheduleFit(): void {
-    if (this.fitFrame !== 0 || this.lifetime.closed) return;
+  private schedule_fit(): void {
+    if (this.fit_frame !== 0 || this.lifetime.closed) return;
 
-    this.fitFrame = requestAnimationFrame(() => {
-      this.fitFrame = 0;
+    this.fit_frame = requestAnimationFrame(() => {
+      this.fit_frame = 0;
       this.fit();
     });
   }
@@ -366,24 +366,24 @@ export class CommandToolbar {
     const width = this.element.clientWidth;
     // ResizeObserver can deliver another fit after the overflow has opened.
     // Its borrowed controls must stay in the popup when the width is unchanged.
-    if (width === this.fittedWidth) return;
-    this.fittedWidth = width;
+    if (width === this.fitted_width) return;
+    this.fitted_width = width;
     this.popup.closeAll(false);
-    this.showAvailable();
+    this.show_available();
     this.more.hidden = true;
-    this.overflowStart = this.items.length;
+    this.overflow_start = this.items.length;
     const fits = (): boolean => this.row.scrollWidth <= this.row.clientWidth;
     if (fits()) return;
 
     this.more.hidden = false;
-    while (this.overflowStart > 0 && !fits()) {
-      this.overflowStart -= 1;
-      const item = this.items[this.overflowStart];
+    while (this.overflow_start > 0 && !fits()) {
+      this.overflow_start -= 1;
+      const item = this.items[this.overflow_start];
       if (item !== undefined) item.hidden = true;
     }
 
     // A separator never ends the visible row; skip unavailable commands to find it.
-    let end = this.overflowStart - 1;
+    let end = this.overflow_start - 1;
     while (end >= 0 && this.items[end]?.hidden === true) end -= 1;
     const last = this.items[end];
     if (last?.getAttribute("role") === "separator") last.hidden = true;
@@ -393,17 +393,17 @@ export class CommandToolbar {
    * Show every item but the unavailable commands, and drop the separators
    * they leave without a command on both sides.
    */
-  private showAvailable(): void {
+  private show_available(): void {
     let separator: HTMLElement | null = null;
-    let commandShown = false;
+    let command_shown = false;
     for (const item of this.items) {
       item.hidden = this.unavailable.has(item);
       if (item.hidden) continue;
 
       if (item.getAttribute("role") !== "separator") {
         separator = null;
-        commandShown = true;
-      } else if (!commandShown || separator !== null) {
+        command_shown = true;
+      } else if (!command_shown || separator !== null) {
         item.hidden = true;
       } else {
         separator = item;
@@ -413,14 +413,14 @@ export class CommandToolbar {
   }
 
   /** Lend the hidden items' live controls to a popup, then put them back. */
-  private openOverflow(keyboard: boolean): void {
+  private open_overflow(keyboard: boolean): void {
     if (this.popup.isOpen(this.more)) {
       this.popup.closeFrom(this.more, keyboard);
       return;
     }
 
     const lent = this.items
-      .slice(this.overflowStart)
+      .slice(this.overflow_start)
       .filter((item) => item.getAttribute("role") !== "separator" && !this.unavailable.has(item));
     const surface = document.createElement("div");
     surface.className = "sheetwrite-command-toolbar-overflow";
@@ -435,7 +435,7 @@ export class CommandToolbar {
       focus: keyboard,
       onClose: () => {
         // Hidden items are a suffix of the row, so appending restores the order.
-        for (const item of this.items.slice(this.overflowStart)) {
+        for (const item of this.items.slice(this.overflow_start)) {
           item.hidden = true;
           this.row.appendChild(item);
         }
@@ -443,7 +443,7 @@ export class CommandToolbar {
     });
   }
 
-  private readonly onKeydown = (event: KeyboardEvent): void => {
+  private readonly on_keydown = (event: KeyboardEvent): void => {
     // The toolbar sits inside the grid host, whose handler treats Enter, Space
     // and arrows as cell navigation. Keep plain keys here; Ctrl/Cmd shortcuts
     // (undo, copy) still reach the grid, as they do from the ribbon.

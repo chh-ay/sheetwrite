@@ -8,15 +8,15 @@ const FULL_ENGINE_SUITES_TIMEOUT_MS = 30_000;
 const OWN_PROCESS = new Set(["packages/core/test/custom-functions.full-engine.ts"]);
 
 /** Runs `suites` with `bun test` in a new process and returns its failures. */
-async function failuresOf(root: string, suites: readonly string[]) {
+async function failures_of(root: string, suites: readonly string[]) {
   const probe = Bun.spawn([process.execPath, "test", ...suites.map((suite) => `./${suite}`)], {
     cwd: root,
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
+  const [exit_code, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
 
-  return { suites, exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] };
+  return { suites, exitCode: exit_code, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] };
 }
 
 // The `*.full-engine.ts` files select the full engine (`@sheetwrite/formulas`).
@@ -34,7 +34,7 @@ it(
     ];
     expect(shared.length).toBeGreaterThan(0);
 
-    const results = await Promise.all(groups.map((group) => failuresOf(root, group)));
+    const results = await Promise.all(groups.map((group) => failures_of(root, group)));
 
     expect(results).toEqual(groups.map((group) => ({ suites: group, exitCode: 0, failures: [] })));
   },

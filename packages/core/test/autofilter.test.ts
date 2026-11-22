@@ -12,7 +12,7 @@ import type {
   WorkbookSnapshot,
 } from "../src/types.js";
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 const disposers: (() => void)[] = [];
 
 beforeAll(async () => {
@@ -20,12 +20,12 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
   for (const dispose of disposers.splice(0).reverse()) dispose();
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -61,11 +61,17 @@ function snapshot(): WorkbookSnapshot {
             startCol: 0,
             rowCount: ROWS.length,
             colCount: 2,
-            cells: ROWS.flatMap((row, rowOffset) =>
-              row.flatMap((value, colOffset) =>
+            cells: ROWS.flatMap((row, row_offset) =>
+              row.flatMap((value, col_offset) =>
                 value === null
                   ? []
-                  : [{ rowOffset, colOffset, value: { kind: "literal" as const, value } }],
+                  : [
+                      {
+                        rowOffset: row_offset,
+                        colOffset: col_offset,
+                        value: { kind: "literal" as const, value },
+                      },
+                    ],
               ),
             ),
           },
@@ -93,8 +99,8 @@ function mount(): { grid: GridImpl; store: SheetwriteStore } {
 
 /** The first-column text of every shown row, top to bottom. */
 function shown(store: SheetwriteStore): CellScalar[] {
-  return Array.from({ length: store.viewRowCount("s1") }, (_unused, viewRow) => {
-    const row = store.dataRowAt("s1", viewRow);
+  return Array.from({ length: store.viewRowCount("s1") }, (_unused, view_row) => {
+    const row = store.dataRowAt("s1", view_row);
     return store.getCell({ sheet: "s1", row, col: 0 }).resolved;
   });
 }
@@ -210,10 +216,10 @@ describe("AutoFilter", () => {
       range: { sheet: "s1", start: { row: 6, col: 1 }, end: { row: 1, col: 0 } },
     };
     expect(validateWorkbookSnapshot(reversed).ok).toBe(false);
-    const badCondition = structuredClone(saved);
-    badCondition.sheets[0]!.filters = [
+    const bad_condition = structuredClone(saved);
+    bad_condition.sheets[0]!.filters = [
       [0, { kind: "custom", join: "and", conditions: [{ op: "contains", value: 3 }] }],
     ];
-    expect(validateWorkbookSnapshot(badCondition).ok).toBe(false);
+    expect(validateWorkbookSnapshot(bad_condition).ok).toBe(false);
   });
 });

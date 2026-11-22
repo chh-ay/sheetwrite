@@ -40,7 +40,7 @@ function attribute(source: string, name: string): string | undefined {
   const value = new RegExp(`${name}="([^"]*)"`).exec(source)?.[1];
   return value?.replace(
     /&(quot|apos|amp|lt|gt|#\d+|#x[\da-f]+);/gi,
-    (entity, entityName: string) => {
+    (entity, entity_name: string) => {
       const named: Readonly<Record<string, string>> = {
         quot: '"',
         apos: "'",
@@ -48,7 +48,7 @@ function attribute(source: string, name: string): string | undefined {
         lt: "<",
         gt: ">",
       };
-      const normalized = entityName.toLowerCase();
+      const normalized = entity_name.toLowerCase();
       if (normalized.startsWith("#")) {
         const code = normalized.startsWith("#x")
           ? Number.parseInt(normalized.slice(2), 16)
@@ -84,7 +84,7 @@ export function formatTokens(markdown: string): string {
   );
 }
 
-function classNames(node: HastNode): string[] {
+function class_names(node: HastNode): string[] {
   const value = node.properties?.className;
   return Array.isArray(value)
     ? value.map(String)
@@ -93,12 +93,12 @@ function classNames(node: HastNode): string[] {
       : [];
 }
 
-function elements(node: HastNode, tagName: string): HastNode[] {
-  return (node.children ?? []).filter((child) => child.tagName === tagName);
+function elements(node: HastNode, tag_name: string): HastNode[] {
+  return (node.children ?? []).filter((child) => child.tagName === tag_name);
 }
 
-function textContent(node: HastNode): string {
-  return node.value ?? (node.children ?? []).map(textContent).join("");
+function text_content(node: HastNode): string {
+  return node.value ?? (node.children ?? []).map(text_content).join("");
 }
 
 interface SheetSize {
@@ -110,7 +110,7 @@ interface SheetSize {
  * Expands `B1:B3` or `A2` into 0-based `[row, col]` cells. A reference outside
  * the authored table is an authoring mistake, so it fails the build.
  */
-function referencedCells(reference: string, size: SheetSize): Array<[number, number]> {
+function referenced_cells(reference: string, size: SheetSize): Array<[number, number]> {
   const corners = reference.split(":").map((part) => {
     const match = CELL_REFERENCE.exec(part);
     if (match === null) throw new Error(`${RESULT_CLASS}: "${reference}" is not an A1 reference`);
@@ -140,35 +140,35 @@ function references(value: unknown): string[] {
 }
 
 /** Cell attributes keyed by `row:col`, from the result div's marker attributes. */
-function cellMarkers(
+function cell_markers(
   properties: Record<string, unknown>,
   size: SheetSize,
 ): Map<string, Record<string, string>> {
   const markers = new Map<string, Record<string, string>>();
-  const mark = ([row, col]: [number, number], cellAttribute: string) => {
+  const mark = ([row, col]: [number, number], cell_attribute: string) => {
     const key = `${row}:${col}`;
-    markers.set(key, { ...markers.get(key), [cellAttribute]: "true" });
+    markers.set(key, { ...markers.get(key), [cell_attribute]: "true" });
   };
-  for (const [divAttribute, cellAttribute] of CELL_MARKERS) {
-    for (const reference of references(properties[divAttribute])) {
-      for (const cell of referencedCells(reference, size)) mark(cell, cellAttribute);
+  for (const [div_attribute, cell_attribute] of CELL_MARKERS) {
+    for (const reference of references(properties[div_attribute])) {
+      for (const cell of referenced_cells(reference, size)) mark(cell, cell_attribute);
     }
   }
 
   // The grid's active cell is the anchor of the selection: its first cell.
   const [anchor] = references(properties.dataSelected);
-  const [activeCell] = anchor === undefined ? [] : referencedCells(anchor, size);
-  if (activeCell !== undefined) mark(activeCell, "dataActive");
+  const [active_cell] = anchor === undefined ? [] : referenced_cells(anchor, size);
+  if (active_cell !== undefined) mark(active_cell, "dataActive");
   return markers;
 }
 
-function rowHeader(index: number, rowId: string | undefined): HastNode {
+function row_header(index: number, row_id: string | undefined): HastNode {
   const number: HastNode = { type: "text", value: String(index + 1) };
   return element(
     "th",
-    rowId === undefined
+    row_id === undefined
       ? [number]
-      : [number, element("span", [{ type: "text", value: rowId }], { className: [ROW_ID_CLASS] })],
+      : [number, element("span", [{ type: "text", value: row_id }], { className: [ROW_ID_CLASS] })],
     { scope: "row" },
   );
 }
@@ -184,7 +184,7 @@ const DATE_TEXT = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/;
  */
 function alignment(cell: HastNode): Record<string, string> {
   if (cell.properties?.align !== undefined) return {};
-  const value = textContent(cell).trim();
+  const value = text_content(cell).trim();
   return NUMBER_TEXT.test(value) || DATE_TEXT.test(value) ? { dataType: "number" } : {};
 }
 
@@ -197,7 +197,7 @@ function edge(): Record<string, unknown> {
   return { className: ["sw-grid-result__edge"], ariaHidden: "true" };
 }
 
-function sheetTable(table: HastNode, properties: Record<string, unknown>): HastNode {
+function sheet_table(table: HastNode, properties: Record<string, unknown>): HastNode {
   const rows = [
     ...elements(table, "thead").flatMap((part) => elements(part, "tr")),
     ...elements(table, "tbody").flatMap((part) => elements(part, "tr")),
@@ -206,10 +206,10 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
     0,
     ...rows.map((row) => elements(row, "th").length + elements(row, "td").length),
   );
-  const markers = cellMarkers(properties, { rows: rows.length, width });
-  const rowIds = references(properties.dataRowIds);
-  if (rowIds.length > 0 && rowIds.length !== rows.length) {
-    throw new Error(`${RESULT_CLASS}: ${rowIds.length} row IDs for ${rows.length} rows`);
+  const markers = cell_markers(properties, { rows: rows.length, width });
+  const row_ids = references(properties.dataRowIds);
+  if (row_ids.length > 0 && row_ids.length !== rows.length) {
+    throw new Error(`${RESULT_CLASS}: ${row_ids.length} row IDs for ${rows.length} rows`);
   }
 
   const letters = element("tr", [
@@ -219,24 +219,24 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
     ),
     element("th", [{ type: "text", value: colToA1(width) }], edge()),
   ]);
-  const body = rows.map((row, rowIndex) =>
+  const body = rows.map((row, row_index) =>
     element("tr", [
-      rowHeader(rowIndex, rowIds[rowIndex]),
+      row_header(row_index, row_ids[row_index]),
       ...(row.children ?? [])
         .filter((cell) => cell.tagName === "th" || cell.tagName === "td")
-        .map((cell, colIndex) => ({
+        .map((cell, col_index) => ({
           ...cell,
           tagName: "td",
           properties: {
             ...cell.properties,
             ...alignment(cell),
-            ...markers.get(`${rowIndex}:${colIndex}`),
+            ...markers.get(`${row_index}:${col_index}`),
           },
         })),
       element("td", [], edge()),
     ]),
   );
-  const edgeRow = element(
+  const edge_row = element(
     "tr",
     [
       element("th", [{ type: "text", value: String(rows.length + 1) }]),
@@ -244,7 +244,7 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
     ],
     edge(),
   );
-  return element("table", [element("thead", [letters]), element("tbody", [...body, edgeRow])], {
+  return element("table", [element("thead", [letters]), element("tbody", [...body, edge_row])], {
     className: ["sw-grid-result__sheet"],
   });
 }
@@ -254,9 +254,9 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
  * first stays above the sheet, a legend or menu after it goes under. A `<dl>`
  * becomes the legend.
  */
-function extraBlocks(div: HastNode, table: HastNode): { before: HastNode[]; after: HastNode[] } {
+function extra_blocks(div: HastNode, table: HastNode): { before: HastNode[]; after: HastNode[] } {
   const parts = div.children ?? [];
-  const tableIndex = parts.indexOf(table);
+  const table_index = parts.indexOf(table);
   const blocks = (range: HastNode[]) =>
     range
       .filter((part) => part.type === "element" && part.tagName !== "figcaption")
@@ -265,7 +265,10 @@ function extraBlocks(div: HastNode, table: HastNode): { before: HastNode[]; afte
           ? { ...part, properties: { ...part.properties, className: [LEGEND_CLASS] } }
           : part,
       );
-  return { before: blocks(parts.slice(0, tableIndex)), after: blocks(parts.slice(tableIndex + 1)) };
+  return {
+    before: blocks(parts.slice(0, table_index)),
+    after: blocks(parts.slice(table_index + 1)),
+  };
 }
 
 function caption(div: HastNode): HastNode | undefined {
@@ -292,18 +295,18 @@ function transform(node: HastNode): void {
       };
       continue;
     }
-    if (child.tagName === "div" && classNames(child).includes(RESULT_CLASS)) {
+    if (child.tagName === "div" && class_names(child).includes(RESULT_CLASS)) {
       const table = (child.children ?? []).find((part) => part.tagName === "table");
       if (table === undefined) throw new Error(`${RESULT_CLASS}: must contain a Markdown table`);
       // Legends and captions can contain the same format tokens as sheet cells.
       transform(child);
       const figcaption = caption(child);
-      const { before, after } = extraBlocks(child, table);
+      const { before, after } = extra_blocks(child, table);
       children[index] = element(
         "figure",
         [
           ...before,
-          element("div", [sheetTable(table, child.properties ?? {})], {
+          element("div", [sheet_table(table, child.properties ?? {})], {
             className: ["sw-grid-result__frame"],
           }),
           ...after,
@@ -311,7 +314,7 @@ function transform(node: HastNode): void {
         ],
         {
           className: [RESULT_CLASS],
-          ariaLabel: figcaption === undefined ? "Result" : textContent(figcaption),
+          ariaLabel: figcaption === undefined ? "Result" : text_content(figcaption),
         },
       );
       continue;

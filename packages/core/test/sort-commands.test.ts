@@ -113,16 +113,16 @@ it("the Sort panel sorts the cells, or only the view", () => {
   const cleanup = sortPanel(grid).render(body);
   const form = body.querySelector("form");
   const order = body.querySelector<HTMLSelectElement>('[data-focus-key="sort-order-0"]');
-  const viewOnly = body.querySelector<HTMLInputElement>('[data-focus-key="sort-view-only"]');
-  if (!form || !order || !viewOnly) throw new Error("The Sort panel did not render its form");
+  const view_only = body.querySelector<HTMLInputElement>('[data-focus-key="sort-view-only"]');
+  if (!form || !order || !view_only) throw new Error("The Sort panel did not render its form");
 
   order.value = "descending";
   order.dispatchEvent(new Event("change"));
   form.requestSubmit();
   expect(column(0)).toEqual(["Name", "pear", "fig", "apple"]);
 
-  viewOnly.checked = true;
-  viewOnly.dispatchEvent(new Event("change"));
+  view_only.checked = true;
+  view_only.dispatchEvent(new Event("change"));
   order.value = "ascending";
   order.dispatchEvent(new Event("change"));
   form.requestSubmit();

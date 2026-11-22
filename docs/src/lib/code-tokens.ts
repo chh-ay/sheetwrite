@@ -89,27 +89,28 @@ const RULES: Readonly<Record<RuntimeCodeLanguage, readonly TokenRule[]>> = {
 export function tokenizeCode(source: string, language: RuntimeCodeLanguage): CodeToken[] {
   const rules = RULES[language];
   const tokens: CodeToken[] = [];
-  let plainStart = 0;
+  let plain_start = 0;
   let index = 0;
-  const flushPlain = () => {
-    if (index > plainStart) tokens.push({ text: source.slice(plainStart, index), role: undefined });
+  const flush_plain = () => {
+    if (index > plain_start)
+      tokens.push({ text: source.slice(plain_start, index), role: undefined });
   };
   while (index < source.length) {
-    const matched = matchRule(rules, source, index);
+    const matched = match_rule(rules, source, index);
     if (matched === undefined) {
       index += 1;
       continue;
     }
-    flushPlain();
+    flush_plain();
     tokens.push({ text: matched.text, role: matched.role });
     index += matched.text.length;
-    plainStart = index;
+    plain_start = index;
   }
-  flushPlain();
+  flush_plain();
   return tokens;
 }
 
-function matchRule(
+function match_rule(
   rules: readonly TokenRule[],
   source: string,
   index: number,

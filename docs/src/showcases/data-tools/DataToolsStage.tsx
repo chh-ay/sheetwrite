@@ -31,7 +31,7 @@ export interface DataToolsStageProps {
   readonly rules: readonly DataRuleProbe[];
 }
 
-function probeText(result: ProbeResult | null): string {
+function probe_text(result: ProbeResult | null): string {
   if (result === null) return "Not tried yet.";
   if (result.outcome === "rejected") return `Rejected. Still ${result.stored}.`;
   if (result.outcome === "warned") return `Saved with a warning: ${result.stored}.`;
@@ -165,7 +165,7 @@ function RuleControls(props: {
                   data-stored={result()?.stored}
                   data-testid={`data-probe-${rule.key}`}
                 >
-                  {probeText(result())}
+                  {probe_text(result())}
                 </output>
               </li>
             );
@@ -201,10 +201,12 @@ function RuleControls(props: {
 /** The data tools showcase's island: the dispatch queue and its filters, groups and rules. */
 export function DataToolsStage(props: DataToolsStageProps) {
   const live = createLiveScenario<DataToolsScenario, DataSnapshot>(() =>
-    import("./boot.js").then(({ createDataToolsScenario }) => createDataToolsScenario),
+    import("./boot.js").then(
+      ({ createDataToolsScenario: create_data_tools_scenario }) => create_data_tools_scenario,
+    ),
   );
-  const [region, setRegion] = createSignal(ALL_REGIONS);
-  const [customer, setCustomer] = createSignal("");
+  const [region, set_region] = createSignal(ALL_REGIONS);
+  const [customer, set_customer] = createSignal("");
   const action = useAction();
   createEffect(() => setDataSnapshot(live.snapshot()));
 
@@ -218,17 +220,17 @@ export function DataToolsStage(props: DataToolsStageProps) {
       () => live.scenario()?.probe(key),
       (cause) => `Probe failed: ${String(cause)}`,
     );
-  const filter = (nextRegion: string, nextCustomer: string) => {
-    setRegion(nextRegion);
-    setCustomer(nextCustomer);
+  const filter = (next_region: string, next_customer: string) => {
+    set_region(next_region);
+    set_customer(next_customer);
     void action.run(
-      () => live.scenario()?.filter(nextRegion, nextCustomer),
+      () => live.scenario()?.filter(next_region, next_customer),
       (cause) => `Filter failed: ${String(cause)}`,
     );
   };
   const clear = () => {
-    setRegion(ALL_REGIONS);
-    setCustomer("");
+    set_region(ALL_REGIONS);
+    set_customer("");
     run("clear");
   };
   const disabled = () => !live.snapshot()?.ready;

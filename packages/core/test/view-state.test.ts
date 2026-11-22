@@ -5,7 +5,7 @@ import { StoreViewState } from "../src/store/view-state.js";
 import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
 import type { Workbook } from "../src/types.js";
 
-function sheetRegistry(
+function sheet_registry(
   document: Workbook,
   handles: ReadonlyArray<[string, number]>,
 ): SheetRegistry {
@@ -14,14 +14,14 @@ function sheetRegistry(
   return sheets;
 }
 
-function workbook(rowCount: number): Workbook {
+function workbook(row_count: number): Workbook {
   return {
     activeSheet: "s1",
     sheets: [
       {
         id: "s1",
         name: "Sheet 1",
-        rowCount,
+        rowCount: row_count,
         columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
         sortKeys: [{ col: 0, ascending: true }],
       },
@@ -29,20 +29,20 @@ function workbook(rowCount: number): Workbook {
   };
 }
 
-function sortedView(
-  rowCount: number,
-  initialOrder: readonly number[],
+function sorted_view(
+  row_count: number,
+  initial_order: readonly number[],
 ): {
   readonly workbook: Workbook;
   readonly view: StoreViewState;
   setOrder(order: readonly number[]): void;
 } {
-  const document = workbook(rowCount);
-  let order = Uint32Array.from(initialOrder);
+  const document = workbook(row_count);
+  let order = Uint32Array.from(initial_order);
   const wasm = {
     sortRowsMulti: () => order,
   } as unknown as RecomputingCellStore;
-  const view = new StoreViewState(wasm, sheetRegistry(document, [["s1", 0]]));
+  const view = new StoreViewState(wasm, sheet_registry(document, [["s1", 0]]));
   view.metadataChanged("s1");
   return {
     workbook: document,
@@ -56,7 +56,7 @@ function sortedView(
 
 describe("StoreViewState packed inverse index", () => {
   it("attributes exact packed order and inverse-index byte lengths", () => {
-    const { view } = sortedView(6, [5, 1, 3]);
+    const { view } = sorted_view(6, [5, 1, 3]);
     const order = view.resourceOwners().find((owner) => owner.owner === "js.view.order")!;
     expect(order).toMatchObject({ logicalBytes: 12, allocatedBytes: 12, entries: 3 });
     expect(
@@ -84,7 +84,7 @@ describe("StoreViewState packed inverse index", () => {
     sheet.rowGroups = [{ start: 2, end: 4, collapsed: true }];
     const view = new StoreViewState(
       {} as RecomputingCellStore,
-      sheetRegistry(document, [["s1", 0]]),
+      sheet_registry(document, [["s1", 0]]),
     );
     view.metadataChanged("s1");
 
@@ -94,20 +94,20 @@ describe("StoreViewState packed inverse index", () => {
     expect(view.viewRowOf("s1", 2)).toBeNull();
     expect(view.viewRowOf("s1", 4)).toBeNull();
 
-    const oversized = sortedView(0x1_0000_0000, [0]);
+    const oversized = sorted_view(0x1_0000_0000, [0]);
     expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(
       expect.objectContaining({ code: "resource-limit", operation: "store" }),
     );
   });
 
   it("rejects out-of-bounds and duplicate view rows instead of creating coordinate aliases", () => {
-    const outOfBounds = sortedView(3, [0, 3]);
-    expect(() => outOfBounds.view.viewRowOf("s1", 0)).toThrow(RangeError);
+    const out_of_bounds = sorted_view(3, [0, 3]);
+    expect(() => out_of_bounds.view.viewRowOf("s1", 0)).toThrow(RangeError);
 
-    const denseDuplicate = sortedView(3, [0, 1, 1]);
-    expect(() => denseDuplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
+    const dense_duplicate = sorted_view(3, [0, 1, 1]);
+    expect(() => dense_duplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
 
-    const sparseDuplicate = sortedView(1_000_000, [0, 8, 0]);
-    expect(() => sparseDuplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
+    const sparse_duplicate = sorted_view(1_000_000, [0, 8, 0]);
+    expect(() => sparse_duplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
   });
 });

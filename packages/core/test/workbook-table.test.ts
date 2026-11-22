@@ -82,22 +82,22 @@ beforeAll(async () => {
 
 describe("canonical workbook tables", () => {
   it("rejects case-insensitive table/defined-name collisions in both creation orders", () => {
-    const namedFirst = workbook();
-    namedFirst.namedRanges = [
+    const named_first = workbook();
+    named_first.namedRanges = [
       {
         name: "sales",
         range: { sheet: "data", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
       },
     ];
-    const firstStore = new SheetwriteStore(namedFirst);
+    const first_store = new SheetwriteStore(named_first);
     expect(
-      firstStore.applyTransaction({ patches: [{ op: "addTable", table: table("Sales") }] }).status,
+      first_store.applyTransaction({ patches: [{ op: "addTable", table: table("Sales") }] }).status,
     ).not.toBe("applied");
-    firstStore.dispose();
+    first_store.dispose();
 
-    const secondStore = new SheetwriteStore(workbook([table("CAFÉ")]));
+    const second_store = new SheetwriteStore(workbook([table("CAFÉ")]));
     expect(
-      secondStore.applyTransaction({
+      second_store.applyTransaction({
         patches: [
           {
             op: "setNamedRange",
@@ -109,16 +109,16 @@ describe("canonical workbook tables", () => {
         ],
       }).status,
     ).not.toBe("applied");
-    secondStore.dispose();
+    second_store.dispose();
   });
 
   it("requires NFC names and rejects namespace-conflicting snapshots before allocation", () => {
-    const nonCanonical = snapshot([table("Cafe\u0301")]);
-    expect(validateWorkbookSnapshot(nonCanonical).ok).toBe(false);
+    const non_canonical = snapshot([table("Cafe\u0301")]);
+    expect(validateWorkbookSnapshot(non_canonical).ok).toBe(false);
 
-    const duplicateColumnIds = snapshot([table()]);
-    duplicateColumnIds.sheets[0]!.tables![0]!.columns[1]!.id = "AMOUNT-ID";
-    expect(validateWorkbookSnapshot(duplicateColumnIds).ok).toBe(false);
+    const duplicate_column_ids = snapshot([table()]);
+    duplicate_column_ids.sheets[0]!.tables![0]!.columns[1]!.id = "AMOUNT-ID";
+    expect(validateWorkbookSnapshot(duplicate_column_ids).ok).toBe(false);
 
     const collision = snapshot([table("Sales")]);
     collision.workbook.namedRanges = [
@@ -157,8 +157,8 @@ describe("canonical workbook tables", () => {
     ],
     ["XML control characters", xml("autoFilter", { ref: "A1:B4" }, [], "\u0000")],
     ["oversized text", xml("autoFilter", { ref: "A1:B4" }, [], "x".repeat(1_048_577))],
-  ])("rejects unsafe table-rule %s before snapshot allocation", (_name, autoFilter) => {
-    const candidate = { ...table(), autoFilter };
+  ])("rejects unsafe table-rule %s before snapshot allocation", (_name, auto_filter) => {
+    const candidate = { ...table(), autoFilter: auto_filter };
     expect(validateWorkbookSnapshot(snapshot([candidate])).ok).toBe(false);
     expect(() => assertWorkbookTables(workbook([candidate]).sheets)).toThrow(SheetwriteError);
   });
@@ -184,8 +184,8 @@ describe("canonical workbook tables", () => {
       [],
       "[@Quantity]*2",
     );
-    const autoFilter = xml("autoFilter", { ref: "A1:B4" });
-    const sortState = xml("sortState", { ref: "A2:B4", caseSensitive: "1" }, [
+    const auto_filter = xml("autoFilter", { ref: "A1:B4" });
+    const sort_state = xml("sortState", { ref: "A2:B4", caseSensitive: "1" }, [
       xml("sortCondition", { ref: "A2:A4", descending: "1" }),
     ]);
     const store = new SheetwriteStore(workbook([candidate]));
@@ -196,12 +196,15 @@ describe("canonical workbook tables", () => {
             op: "updateTable",
             sheet: "data",
             tableId: candidate.id,
-            patch: { autoFilter, sortState },
+            patch: { autoFilter: auto_filter, sortState: sort_state },
           },
         ],
       }).status,
     ).toBe("applied");
-    expect(store.getWorkbook().sheets[0]?.tables?.[0]).toMatchObject({ autoFilter, sortState });
+    expect(store.getWorkbook().sheets[0]?.tables?.[0]).toMatchObject({
+      autoFilter: auto_filter,
+      sortState: sort_state,
+    });
     expect(
       store.applyTransaction({
         patches: [
@@ -232,7 +235,7 @@ describe("canonical workbook tables", () => {
     };
     const store = new SheetwriteStore(workbook([candidate]));
     const current = (): WorkbookTable | undefined => store.getWorkbook().sheets[0]?.tables?.[0];
-    const filterColumns = (): (string | undefined)[] | undefined =>
+    const filter_columns = (): (string | undefined)[] | undefined =>
       current()?.autoFilter?.children.map((child) => child.attributes.colId);
 
     store.applyTransaction({
@@ -245,17 +248,17 @@ describe("canonical workbook tables", () => {
         },
       ],
     });
-    expect(filterColumns()).toEqual(["0", "2"]);
+    expect(filter_columns()).toEqual(["0", "2"]);
     expect(current()?.autoFilter?.attributes.ref).toBe("A1:C4");
     expect(current()?.sortState?.attributes.ref).toBe("A2:C4");
     expect(current()?.sortState?.children[0]?.attributes.ref).toBe("C2:C4");
 
     store.applyTransaction({ patches: [{ op: "removeColumns", sheet: "data", at: 0, count: 1 }] });
-    expect(filterColumns()).toEqual(["1"]);
+    expect(filter_columns()).toEqual(["1"]);
     expect(current()?.sortState?.children[0]?.attributes.ref).toBe("B2:B4");
 
     store.applyTransaction({ patches: [{ op: "removeColumns", sheet: "data", at: 1, count: 1 }] });
-    expect(filterColumns()).toEqual([]);
+    expect(filter_columns()).toEqual([]);
     expect(current()?.sortState).toBeUndefined();
     store.dispose();
   });
@@ -357,13 +360,13 @@ describe("canonical workbook tables", () => {
   });
 
   it("rebases table ranges through structure and conflicts on one stable identity", () => {
-    const rebasedTable = table();
-    rebasedTable.range = {
+    const rebased_table = table();
+    rebased_table.range = {
       sheet: "data",
       start: { row: 2, col: 0 },
       end: { row: 5, col: 1 },
     };
-    const local: DocumentOp[] = [{ op: "addTable", table: rebasedTable }];
+    const local: DocumentOp[] = [{ op: "addTable", table: rebased_table }];
     expect(
       rebaseDocumentOperations(local, [{ op: "addRows", sheet: "data", at: 0, count: 2 }]),
     ).toEqual({
@@ -373,7 +376,7 @@ describe("canonical workbook tables", () => {
           op: "addTable",
           table: {
             ...table(),
-            ...rebasedTable,
+            ...rebased_table,
             range: {
               sheet: "data",
               start: { row: 4, col: 0 },

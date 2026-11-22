@@ -34,23 +34,23 @@ export function createLiveScenario<Scenario extends StartedScenario, Snapshot = 
     readonly onDispose?: () => void;
   } = {},
 ): LiveScenarioState<Snapshot, Scenario> {
-  let hostElement: HTMLElement | undefined;
-  const [scenario, setScenario] = createSignal<Scenario | null>(null);
-  const [snapshot, setSnapshot] = createSignal<Snapshot | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
+  let host_element: HTMLElement | undefined;
+  const [scenario, set_scenario] = createSignal<Scenario | null>(null);
+  const [snapshot, set_snapshot] = createSignal<Snapshot | null>(null);
+  const [error, set_error] = createSignal<string | null>(null);
 
   onMount(() => {
-    const host = hostElement;
+    const host = host_element;
     if (host === undefined) return;
     let disposed = false;
     let stop: (() => void) | undefined;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       load()
         .then((create) => {
           if (disposed) return;
           const instance = create(host);
           const live = instance as Scenario & Partial<LiveScenario<Snapshot>>;
-          const unsubscribe = live.subscribe?.(() => setSnapshot(() => live.snapshot?.() ?? null));
+          const unsubscribe = live.subscribe?.(() => set_snapshot(() => live.snapshot?.() ?? null));
           stop = () => {
             unsubscribe?.();
             instance.dispose();
@@ -58,26 +58,26 @@ export function createLiveScenario<Scenario extends StartedScenario, Snapshot = 
           };
           return instance.ready.then(() => {
             if (disposed) return;
-            if (live.snapshot) setSnapshot(() => live.snapshot?.() ?? null);
-            setScenario(() => instance);
+            if (live.snapshot) set_snapshot(() => live.snapshot?.() ?? null);
+            set_scenario(() => instance);
             options.onReady?.(instance);
           });
         })
         .catch((cause: unknown) => {
-          if (!disposed) setError(errorText(cause));
+          if (!disposed) set_error(errorText(cause));
         });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       stop?.();
-      setScenario(null);
+      set_scenario(null);
     });
   });
 
   return {
     host: (element) => {
-      hostElement = element;
+      host_element = element;
     },
     scenario,
     snapshot,

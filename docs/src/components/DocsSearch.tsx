@@ -26,7 +26,7 @@ interface PagefindModule {
   search(query: string): Promise<PagefindResponse>;
 }
 
-let pagefindModule: Promise<PagefindModule> | undefined;
+let pagefind_module: Promise<PagefindModule> | undefined;
 
 /**
  * Loads Pagefind once and keeps it on the main thread. Its worker resolves
@@ -34,23 +34,23 @@ let pagefindModule: Promise<PagefindModule> | undefined;
  * runs workers from `blob:` URLs; the docs index is small, so main-thread
  * search costs little and works everywhere.
  */
-function loadPagefind(): Promise<PagefindModule> {
-  pagefindModule ??= (async () => {
+function load_pagefind(): Promise<PagefindModule> {
+  pagefind_module ??= (async () => {
     // Pagefind writes this module after the site build, so no static import exists.
-    const pagefindPath = "/pagefind/pagefind.js";
-    const pagefind = (await import(/* @vite-ignore */ pagefindPath)) as PagefindModule;
+    const pagefind_path = "/pagefind/pagefind.js";
+    const pagefind = (await import(/* @vite-ignore */ pagefind_path)) as PagefindModule;
     await pagefind.options({ noWorker: true });
     return pagefind;
   })();
   // A failed load (offline, index not built) may succeed on the next query.
-  pagefindModule.catch(() => {
-    pagefindModule = undefined;
+  pagefind_module.catch(() => {
+    pagefind_module = undefined;
   });
-  return pagefindModule;
+  return pagefind_module;
 }
 
 /** The key cap: lib/search-opener.ts writes the platform's shortcut into the page. */
-function shortcutLabel(): string {
+function shortcut_label(): string {
   if (isServer) return "⌘K";
   return document.querySelector(".sw-search-button kbd")?.textContent ?? "⌘K";
 }
@@ -59,56 +59,56 @@ export function DocsSearch() {
   let dialog: HTMLDialogElement | undefined;
   let field: HTMLInputElement | undefined;
   let list: HTMLDivElement | undefined;
-  const listId = createUniqueId();
-  const optionId = (index: number): string => `${listId}-${index}`;
-  const [query, setQuery] = createSignal("");
-  const [results, setResults] = createSignal<SearchEntry[]>([]);
-  const [active, setActive] = createSignal(0);
-  const [status, setStatus] = createSignal("");
-  const [error, setError] = createSignal("");
+  const list_id = createUniqueId();
+  const option_id = (index: number): string => `${list_id}-${index}`;
+  const [query, set_query] = createSignal("");
+  const [results, set_results] = createSignal<SearchEntry[]>([]);
+  const [active, set_active] = createSignal(0);
+  const [status, set_status] = createSignal("");
+  const [error, set_error] = createSignal("");
 
   createEffect(() => {
     const current = query();
-    setError("");
+    set_error("");
     if (current.trim().length < 2) {
-      setResults([]);
-      setStatus("");
+      set_results([]);
+      set_status("");
       return;
     }
     const controller = new AbortController();
     onCleanup(() => controller.abort());
     const search = async (): Promise<void> => {
       try {
-        setStatus("Searching…");
-        const pagefind = await loadPagefind();
+        set_status("Searching…");
+        const pagefind = await load_pagefind();
         const response = await pagefind.search(searchTerms(current));
         const pages = await Promise.all(
           response.results.slice(0, RANKED_PAGES).map((result) => result.data()),
         );
         if (controller.signal.aborted) return;
         const entries = rankEntries(pages, current);
-        setResults(entries);
-        setActive(0);
-        setStatus(entries.length === 0 ? `No results for “${current.trim()}”.` : "");
-      } catch (searchError) {
+        set_results(entries);
+        set_active(0);
+        set_status(entries.length === 0 ? `No results for “${current.trim()}”.` : "");
+      } catch (search_error) {
         if (controller.signal.aborted) return;
-        console.error("Documentation search failed", searchError);
-        setResults([]);
-        setStatus("");
+        console.error("Documentation search failed", search_error);
+        set_results([]);
+        set_status("");
         try {
           const index = await fetch("/pagefind/pagefind-entry.json", {
             signal: controller.signal,
           });
           if (controller.signal.aborted) return;
           if (index.status === 404) {
-            setStatus("Search becomes available after the static index is built.");
+            set_status("Search becomes available after the static index is built.");
             return;
           }
-        } catch (indexError) {
+        } catch (index_error) {
           if (controller.signal.aborted) return;
-          console.error("Cannot check the documentation search index", indexError);
+          console.error("Cannot check the documentation search index", index_error);
         }
-        setError("Search failed; check your connection and change the query to try again.");
+        set_error("Search failed; check your connection and change the query to try again.");
       }
     };
     void search();
@@ -119,13 +119,13 @@ export function DocsSearch() {
     list?.children[active()]?.scrollIntoView({ block: "nearest" });
   });
 
-  const onFieldKeyDown = (event: KeyboardEvent): void => {
+  const on_field_key_down = (event: KeyboardEvent): void => {
     const count = results().length;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (count === 0) return;
       event.preventDefault();
       const step = event.key === "ArrowDown" ? 1 : -1;
-      setActive((index) => (index + step + count) % count);
+      set_active((index) => (index + step + count) % count);
     } else if (event.key === "Enter" && !event.isComposing) {
       // The form closes the dialog on submit; Enter opens a result instead.
       event.preventDefault();
@@ -152,7 +152,7 @@ export function DocsSearch() {
       >
         <Icon name="search" />
         <span>Search docs</span>
-        <kbd>{shortcutLabel()}</kbd>
+        <kbd>{shortcut_label()}</kbd>
       </button>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- only a backdrop click closes the dialog; Escape is the keyboard path. */}
       <dialog
@@ -175,19 +175,19 @@ export function DocsSearch() {
             <span class="sw-visually-hidden">Search documentation</span>
             <Icon name="search" size="md" />
             <input
-              aria-activedescendant={results().length > 0 ? optionId(active()) : undefined}
+              aria-activedescendant={results().length > 0 ? option_id(active()) : undefined}
               aria-autocomplete="list"
-              aria-controls={listId}
+              aria-controls={list_id}
               aria-expanded={results().length > 0}
               autocomplete="off"
-              onInput={(event) => setQuery(event.currentTarget.value)}
-              onKeyDown={onFieldKeyDown}
+              onInput={(event) => set_query(event.currentTarget.value)}
+              onKeyDown={on_field_key_down}
               placeholder="Search APIs, guides, and examples"
               ref={(element) => {
                 field = element;
                 // Text typed before the island hydrated: lib/search-opener.ts
                 // opened the dialog and focused this field at once.
-                if (element.value !== "") setQuery(element.value);
+                if (element.value !== "") set_query(element.value);
               }}
               role="combobox"
               type="search"
@@ -206,7 +206,7 @@ export function DocsSearch() {
         <div
           aria-label="Search results"
           class="sw-search-results"
-          id={listId}
+          id={list_id}
           ref={(element) => {
             list = element;
           }}
@@ -217,8 +217,8 @@ export function DocsSearch() {
               <a
                 aria-selected={index() === active()}
                 href={result.url}
-                id={optionId(index())}
-                onPointerMove={() => setActive(index())}
+                id={option_id(index())}
+                onPointerMove={() => set_active(index())}
                 role="option"
               >
                 <strong>

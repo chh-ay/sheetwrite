@@ -66,7 +66,7 @@ export function documentStructuredData(page: {
   const url = new URL(page.href, SITE_URL).href;
   // Search engines need a URL on every breadcrumb except the last, so a section
   // without its own page stays in the visible trail but not in the list.
-  const linkedTrail = page.trail.flatMap((crumb, index) => {
+  const linked_trail = page.trail.flatMap((crumb, index) => {
     if (index === page.trail.length - 1) return [{ name: crumb.label, item: url }];
 
     return crumb.href === undefined
@@ -86,7 +86,7 @@ export function documentStructuredData(page: {
     },
     {
       "@type": "BreadcrumbList",
-      itemListElement: linkedTrail.map((crumb, index) => ({
+      itemListElement: linked_trail.map((crumb, index) => ({
         "@type": "ListItem",
         position: index + 1,
         ...crumb,

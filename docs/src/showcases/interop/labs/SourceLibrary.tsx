@@ -102,7 +102,7 @@ export function SourceLibrary() {
   const verified = () =>
     POSITIVE_FIXTURES.filter((fixture) => digests[fixture.id]?.state === "verified").length;
   const live = PRODUCER_MATRIX.filter((entry) => entry.status === "verified-live");
-  const notOpened = PRODUCER_MATRIX.filter((entry) => entry.status !== "verified-live");
+  const not_opened = PRODUCER_MATRIX.filter((entry) => entry.status !== "verified-live");
   return (
     <div class="sw-lab-body" data-testid="interop-fixtures-lab">
       <LabAnswer
@@ -111,7 +111,7 @@ export function SourceLibrary() {
             Yes for the {nf(POSITIVE_FIXTURES.length)} {PRODUCER} workbooks here. The page checks
             each file's SHA-256 hash against{" "}
             <a href={repositorySourceUrl(MANIFEST)}>the committed manifest</a>, then opens it in
-            your browser. {notOpened.map((entry) => entry.producer).join(" and ")} files aren't
+            your browser. {not_opened.map((entry) => entry.producer).join(" and ")} files aren't
             opened on this page yet.
           </>
         }

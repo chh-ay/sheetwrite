@@ -67,27 +67,33 @@ export function validateExactMatrix(
   expected: readonly string[],
   observed: readonly string[],
 ): MatrixValidation {
-  const expectedKeys = sorted(expected);
-  const observedKeys = sorted(observed);
-  const expectedSet = new Set(expectedKeys);
-  if (expectedSet.size !== expectedKeys.length) {
+  const expected_keys = sorted(expected);
+  const observed_keys = sorted(observed);
+  const expected_set = new Set(expected_keys);
+  if (expected_set.size !== expected_keys.length) {
     throw new Error(`${family} expected matrix contains duplicate keys`);
   }
 
   const counts = new Map<string, number>();
-  for (const key of observedKeys) counts.set(key, (counts.get(key) ?? 0) + 1);
-  const missingKeys = expectedKeys.filter((key) => !counts.has(key));
-  const duplicateKeys = sorted([...counts].filter(([, count]) => count > 1).map(([key]) => key));
-  const unexpectedKeys = sorted([...counts.keys()].filter((key) => !expectedSet.has(key)));
+  for (const key of observed_keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  const missing_keys = expected_keys.filter((key) => !counts.has(key));
+  const duplicate_keys = sorted([...counts].filter(([, count]) => count > 1).map(([key]) => key));
+  const unexpected_keys = sorted([...counts.keys()].filter((key) => !expected_set.has(key)));
   const diagnostics = [
-    ...missingKeys.map((key) => `missing ${key}`),
-    ...duplicateKeys.map((key) => `duplicate ${key}`),
-    ...unexpectedKeys.map((key) => `unexpected ${key}`),
+    ...missing_keys.map((key) => `missing ${key}`),
+    ...duplicate_keys.map((key) => `duplicate ${key}`),
+    ...unexpected_keys.map((key) => `unexpected ${key}`),
   ];
   if (diagnostics.length > 0) {
     throw new Error(`${family} matrix is not exact: ${diagnostics.join("; ")}`);
   }
-  return { expectedKeys, observedKeys, missingKeys, duplicateKeys, unexpectedKeys };
+  return {
+    expectedKeys: expected_keys,
+    observedKeys: observed_keys,
+    missingKeys: missing_keys,
+    duplicateKeys: duplicate_keys,
+    unexpectedKeys: unexpected_keys,
+  };
 }
 
 export function assertGateIdentity(
@@ -95,20 +101,20 @@ export function assertGateIdentity(
   mode: BenchmarkMode,
   value: GateIdentity<typeof PERFORMANCE_GATE_PROTOCOL_VERSION | typeof DATA_GATE_PROTOCOL_VERSION>,
 ): void {
-  const protocolVersion =
+  const protocol_version =
     family === "data" ? DATA_GATE_PROTOCOL_VERSION : PERFORMANCE_GATE_PROTOCOL_VERSION;
-  if (value.protocolVersion !== protocolVersion) {
+  if (value.protocolVersion !== protocol_version) {
     throw new Error(
-      `${family} stale protocol: expected ${protocolVersion}, observed ${String(value.protocolVersion)}`,
+      `${family} stale protocol: expected ${protocol_version}, observed ${String(value.protocolVersion)}`,
     );
   }
   if (value.mode !== mode) {
     throw new Error(`${family} mode mismatch: expected ${mode}, observed ${String(value.mode)}`);
   }
-  const matrixId = MATRIX_IDS[family][mode];
-  if (value.matrixId !== matrixId) {
+  const matrix_id = MATRIX_IDS[family][mode];
+  if (value.matrixId !== matrix_id) {
     throw new Error(
-      `${family} stale matrix: expected ${matrixId}, observed ${String(value.matrixId)}`,
+      `${family} stale matrix: expected ${matrix_id}, observed ${String(value.matrixId)}`,
     );
   }
 }
@@ -197,7 +203,7 @@ function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function dependencyFingerprint(value: unknown, field: string): Record<string, string> {
+function dependency_fingerprint(value: unknown, field: string): Record<string, string> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(`bench/package.json ${field} must be an object`);
   }
@@ -217,20 +223,20 @@ export function fingerprintRenderHarnessManifest(manifest: unknown): string {
   if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new TypeError("bench/package.json must be an object");
   }
-  const packageManifest = manifest as {
+  const package_manifest = manifest as {
     readonly scripts?: Readonly<Record<string, unknown>>;
     readonly dependencies?: unknown;
     readonly devDependencies?: unknown;
   };
-  const prepare = packageManifest.scripts?.["bench:render:prepare"];
+  const prepare = package_manifest.scripts?.["bench:render:prepare"];
   if (typeof prepare !== "string") {
     throw new TypeError("bench/package.json scripts.bench:render:prepare must be a string");
   }
   return sha256(
     JSON.stringify({
       scripts: { "bench:render:prepare": prepare },
-      dependencies: dependencyFingerprint(packageManifest.dependencies, "dependencies"),
-      devDependencies: dependencyFingerprint(packageManifest.devDependencies, "devDependencies"),
+      dependencies: dependency_fingerprint(package_manifest.dependencies, "dependencies"),
+      devDependencies: dependency_fingerprint(package_manifest.devDependencies, "devDependencies"),
     }),
   );
 }
@@ -241,10 +247,10 @@ export function computeHarnessFingerprint(
   root = REPOSITORY_ROOT,
 ): HarnessFingerprint {
   const sources: Record<string, string> = {};
-  for (const relativePath of HARNESS_SOURCE_FILES) {
-    const bytes = readFileSync(resolve(root, relativePath));
-    sources[relativePath] =
-      relativePath === "bench/package.json"
+  for (const relative_path of HARNESS_SOURCE_FILES) {
+    const bytes = readFileSync(resolve(root, relative_path));
+    sources[relative_path] =
+      relative_path === "bench/package.json"
         ? fingerprintRenderHarnessManifest(JSON.parse(bytes.toString("utf8")) as unknown)
         : sha256(bytes);
   }
@@ -276,10 +282,10 @@ export function currentRunnerFingerprint(
   };
 }
 
-function flattenFingerprint(value: unknown, path: string, output: Record<string, unknown>): void {
+function flatten_fingerprint(value: unknown, path: string, output: Record<string, unknown>): void {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     for (const [key, nested] of Object.entries(value)) {
-      flattenFingerprint(nested, `${path}.${key}`, output);
+      flatten_fingerprint(nested, `${path}.${key}`, output);
     }
     return;
   }
@@ -293,8 +299,8 @@ export function fingerprintMismatches<T extends object>(
 ): string[] {
   const left: Record<string, unknown> = {};
   const right: Record<string, unknown> = {};
-  flattenFingerprint(expected, prefix, left);
-  flattenFingerprint(observed, prefix, right);
+  flatten_fingerprint(expected, prefix, left);
+  flatten_fingerprint(observed, prefix, right);
   const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
   return sorted(
     [...keys]
@@ -366,14 +372,14 @@ export function validateEngineBaselineContext(
   )
     throw new Error("Invalid baseline engine provenance");
 
-  const runtimePaths = packages.flatMap((name) =>
+  const runtime_paths = packages.flatMap((name) =>
     ENGINE_RUNTIME_FILES.map((path) => `packages/${name}/${path}`),
   );
-  const wasmPaths = packages.map((name) => `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`);
-  validateExactMatrix("baseline engine files", runtimePaths, Object.keys(context.engineFiles));
+  const wasm_paths = packages.map((name) => `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`);
+  validateExactMatrix("baseline engine files", runtime_paths, Object.keys(context.engineFiles));
   validateExactMatrix(
     "baseline current WASM files",
-    wasmPaths,
+    wasm_paths,
     Object.keys(context.currentWasmFiles),
   );
   for (const digest of [
@@ -382,7 +388,7 @@ export function validateEngineBaselineContext(
   ]) {
     if (!/^[0-9a-f]{64}$/u.test(digest)) throw new Error("Invalid baseline file digest");
   }
-  for (const path of wasmPaths) {
+  for (const path of wasm_paths) {
     if (context.engineFiles[path] === context.currentWasmFiles[path]) {
       throw new Error(`Baseline loaded the current WASM: ${path}`);
     }
@@ -394,12 +400,12 @@ export function captureEngineBaselineContext(
   packages: readonly BenchmarkEnginePackage[],
 ): EngineBaselineContext | undefined {
   const root = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
-  const baselineVersion = process.env[BASELINE_VERSION_VARIABLE];
+  const baseline_version = process.env[BASELINE_VERSION_VARIABLE];
   // The paired gate also points the root at this checkout; that side is the candidate, not a baseline.
-  if (root === undefined || resolve(root) === REPOSITORY_ROOT || baselineVersion === undefined) {
+  if (root === undefined || resolve(root) === REPOSITORY_ROOT || baseline_version === undefined) {
     return undefined;
   }
-  const versionOf = (checkout: string, name: string): unknown => {
+  const version_of = (checkout: string, name: string): unknown => {
     const manifest: unknown = JSON.parse(
       readFileSync(resolve(checkout, `packages/${name}/package.json`), "utf8"),
     );
@@ -407,11 +413,11 @@ export function captureEngineBaselineContext(
       ? manifest.version
       : undefined;
   };
-  if (packages.some((name) => versionOf(root, name) !== baselineVersion)) {
-    throw new Error(`Baseline engine packages are not version ${baselineVersion}`);
+  if (packages.some((name) => version_of(root, name) !== baseline_version)) {
+    throw new Error(`Baseline engine packages are not version ${baseline_version}`);
   }
-  const harnessRelease = RELEASE_VERSION.exec(String(versionOf(REPOSITORY_ROOT, "core")));
-  if (harnessRelease === null) throw new Error("Cannot read the harness release version");
+  const harness_release = RELEASE_VERSION.exec(String(version_of(REPOSITORY_ROOT, "core")));
+  if (harness_release === null) throw new Error("Cannot read the harness release version");
 
   const ref = process.env.SHEETWRITE_BENCH_ENGINE_REF ?? "HEAD";
   const commit = Bun.spawnSync(["git", "rev-parse", "--verify", `${ref}^{commit}`], {
@@ -420,18 +426,21 @@ export function captureEngineBaselineContext(
     stderr: "pipe",
   });
   if (commit.exitCode !== 0) throw new Error("Cannot identify baseline engine commit");
-  const engineCommit = commit.stdout.toString().trim();
+  const engine_commit = commit.stdout.toString().trim();
   // A bench-only patch may change HEAD, but must not change the claimed engine code.
-  const engineDiff = Bun.spawnSync(["git", "diff", "--exit-code", engineCommit, "--", "packages"], {
-    cwd: root,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (engineDiff.exitCode !== 0)
+  const engine_diff = Bun.spawnSync(
+    ["git", "diff", "--exit-code", engine_commit, "--", "packages"],
+    {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  if (engine_diff.exitCode !== 0)
     throw new Error("Baseline packages differ from the claimed engine ref");
   const context: EngineBaselineContext = {
-    label: `${baselineVersion} engine (WASM) under ${harnessRelease[1]}.${harnessRelease[2]} core and harness`,
-    engineCommit,
+    label: `${baseline_version} engine (WASM) under ${harness_release[1]}.${harness_release[2]} core and harness`,
+    engineCommit: engine_commit,
     harnessCommit,
     engineFiles: Object.fromEntries(
       packages.flatMap((name) =>

@@ -20,8 +20,8 @@ interface SentRuns {
  * engine call, not one per row.
  */
 export class EngineHiddenRows {
-  private readonly filteredBySheet = new Map<SheetId, Uint32Array>();
-  private readonly sentBySheet = new Map<SheetId, SentRuns>();
+  private readonly filtered_by_sheet = new Map<SheetId, Uint32Array>();
+  private readonly sent_by_sheet = new Map<SheetId, SentRuns>();
   private readonly pending = new Set<SheetId>();
 
   constructor(
@@ -49,8 +49,9 @@ export class EngineHiddenRows {
    * filter is active.
    */
   viewChanged(sheet: SheetId, filterSurvivors: Uint32Array | null, rowCount: number): void {
-    if (filterSurvivors) this.filteredBySheet.set(sheet, missingRowRuns(filterSurvivors, rowCount));
-    else this.filteredBySheet.delete(sheet);
+    if (filterSurvivors)
+      this.filtered_by_sheet.set(sheet, missing_row_runs(filterSurvivors, rowCount));
+    else this.filtered_by_sheet.delete(sheet);
 
     this.pending.add(sheet);
   }
@@ -65,31 +66,31 @@ export class EngineHiddenRows {
       if (!meta || handle === undefined) continue;
 
       const next: SentRuns = {
-        manual: manualRowRuns(meta.hiddenRows, meta.rowGroups),
-        filtered: this.filteredBySheet.get(sheet) ?? EMPTY_RUNS,
+        manual: manual_row_runs(meta.hiddenRows, meta.rowGroups),
+        filtered: this.filtered_by_sheet.get(sheet) ?? EMPTY_RUNS,
       };
-      const sent = this.sentBySheet.get(sheet) ?? NOTHING_HIDDEN;
-      if (sameRuns(sent.manual, next.manual) && sameRuns(sent.filtered, next.filtered)) continue;
+      const sent = this.sent_by_sheet.get(sheet) ?? NOTHING_HIDDEN;
+      if (same_runs(sent.manual, next.manual) && same_runs(sent.filtered, next.filtered)) continue;
 
       if (!this.wasm.setHiddenRows(handle, next.manual, next.filtered)) {
         throw new RangeError(`invalid hidden rows for sheet: ${sheet}`);
       }
-      if (next.manual.length === 0 && next.filtered.length === 0) this.sentBySheet.delete(sheet);
-      else this.sentBySheet.set(sheet, next);
+      if (next.manual.length === 0 && next.filtered.length === 0) this.sent_by_sheet.delete(sheet);
+      else this.sent_by_sheet.set(sheet, next);
     }
 
     this.pending.clear();
   }
 
   removeSheet(sheet: SheetId): void {
-    this.filteredBySheet.delete(sheet);
-    this.sentBySheet.delete(sheet);
+    this.filtered_by_sheet.delete(sheet);
+    this.sent_by_sheet.delete(sheet);
     this.pending.delete(sheet);
   }
 
   dispose(): void {
-    this.filteredBySheet.clear();
-    this.sentBySheet.clear();
+    this.filtered_by_sheet.clear();
+    this.sent_by_sheet.clear();
     this.pending.clear();
   }
 }
@@ -98,12 +99,12 @@ export class EngineHiddenRows {
  * Runs of the rows hidden by hand or by a collapsed group. Groups count as
  * one interval each, so a collapsed group costs nothing per row.
  */
-function manualRowRuns(
-  hiddenRows: ReadonlySet<number> | undefined,
+function manual_row_runs(
+  hidden_rows: ReadonlySet<number> | undefined,
   groups: readonly RowGroup[] | undefined,
 ): Uint32Array {
   const intervals: Array<readonly [number, number]> = [];
-  for (const row of hiddenRows ?? []) intervals.push([row, row]);
+  for (const row of hidden_rows ?? []) intervals.push([row, row]);
   for (const group of groups ?? []) {
     if (group.collapsed) intervals.push([group.start, group.end]);
   }
@@ -112,35 +113,35 @@ function manualRowRuns(
   intervals.sort((left, right) => left[0] - right[0]);
   const runs: number[] = [];
   let [start, end] = intervals[0] ?? [0, 0];
-  for (const [nextStart, nextEnd] of intervals) {
-    if (nextStart <= end + 1) {
-      end = Math.max(end, nextEnd);
+  for (const [next_start, next_end] of intervals) {
+    if (next_start <= end + 1) {
+      end = Math.max(end, next_end);
       continue;
     }
 
     runs.push(start, end);
-    start = nextStart;
-    end = nextEnd;
+    start = next_start;
+    end = next_end;
   }
   runs.push(start, end);
 
   return Uint32Array.from(runs);
 }
 
-/** Runs of the rows in `[0, rowCount)` that the ascending `present` rows leave out. */
-function missingRowRuns(present: Uint32Array, rowCount: number): Uint32Array {
+/** Runs of the rows in `[0, row_count)` that the ascending `present` rows leave out. */
+function missing_row_runs(present: Uint32Array, row_count: number): Uint32Array {
   const runs: number[] = [];
   let next = 0;
   for (const row of present) {
     if (row > next) runs.push(next, row - 1);
     next = row + 1;
   }
-  if (next < rowCount) runs.push(next, rowCount - 1);
+  if (next < row_count) runs.push(next, row_count - 1);
 
   return runs.length === 0 ? EMPTY_RUNS : Uint32Array.from(runs);
 }
 
-function sameRuns(left: Uint32Array, right: Uint32Array): boolean {
+function same_runs(left: Uint32Array, right: Uint32Array): boolean {
   if (left.length !== right.length) return false;
 
   for (let i = 0; i < left.length; i++) {

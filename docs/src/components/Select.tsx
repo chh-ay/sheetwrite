@@ -33,37 +33,37 @@ const PAGE_STEP = 10;
 const LIST_GAP_PX = 4;
 
 export function Select(props: SelectProps) {
-  const [open, setOpen] = createSignal(false);
-  const [active, setActive] = createSignal(0);
-  const [above, setAbove] = createSignal(false);
+  const [open, set_open] = createSignal(false);
+  const [active, set_active] = createSignal(0);
+  const [above, set_above] = createSignal(false);
   let root: HTMLDivElement | undefined;
   let combobox: HTMLDivElement | undefined;
   let list: HTMLDivElement | undefined;
   let typed = "";
-  let typedAt = 0;
+  let typed_at = 0;
 
-  const selectedIndex = () =>
+  const selected_index = () =>
     Math.max(
       0,
       props.options.findIndex((option) => option.value === props.value),
     );
-  const optionId = (index: number) => `${props.id}-option-${index}`;
+  const option_id = (index: number) => `${props.id}-option-${index}`;
   const last = () => props.options.length - 1;
 
   const show = (index: number): void => {
-    setActive(Math.min(Math.max(index, 0), last()));
+    set_active(Math.min(Math.max(index, 0), last()));
     if (open()) return;
-    setOpen(true);
+    set_open(true);
     // Below the field unless only the space above holds the list.
     if (combobox && list) {
       const field = combobox.getBoundingClientRect();
       const needed = list.offsetHeight + LIST_GAP_PX;
       const below = window.innerHeight - field.bottom;
-      setAbove(below < needed && field.top > below);
+      set_above(below < needed && field.top > below);
     }
   };
   const close = (): void => {
-    setOpen(false);
+    set_open(false);
   };
   const choose = (index: number): void => {
     const option = props.options[index];
@@ -74,13 +74,13 @@ export function Select(props: SelectProps) {
   /** The next option whose label starts with what the reader typed, from the active one on. */
   const typeahead = (character: string): number | undefined => {
     const now = Date.now();
-    typed = now - typedAt > TYPEAHEAD_MS ? character : typed + character;
-    typedAt = now;
+    typed = now - typed_at > TYPEAHEAD_MS ? character : typed + character;
+    typed_at = now;
     const labels = props.options.map((option) => option.label.toLowerCase());
     // Repeating one letter cycles through the options that start with it.
     const repeated = typed.length > 1 && [...typed].every((letter) => letter === typed[0]);
     const search = repeated ? typed[0]! : typed;
-    const start = open() ? active() + (typed.length === 1 || repeated ? 1 : 0) : selectedIndex();
+    const start = open() ? active() + (typed.length === 1 || repeated ? 1 : 0) : selected_index();
     for (let step = 0; step < labels.length; step++) {
       const index = (start + step) % labels.length;
       if (labels[index]!.startsWith(search.toLowerCase())) return index;
@@ -88,16 +88,16 @@ export function Select(props: SelectProps) {
     return undefined;
   };
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const isCharacter = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
+  const on_key_down = (event: KeyboardEvent): void => {
+    const is_character = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
     // A space continues a typeahead search instead of choosing.
-    const continuing = typed !== "" && Date.now() - typedAt < TYPEAHEAD_MS;
-    const searching = isCharacter && (event.key !== " " || continuing);
+    const continuing = typed !== "" && Date.now() - typed_at < TYPEAHEAD_MS;
+    const searching = is_character && (event.key !== " " || continuing);
     if (searching && !event.altKey) {
       event.preventDefault();
       const match = typeahead(event.key);
       if (match !== undefined) show(match);
-      else if (!open()) show(selectedIndex());
+      else if (!open()) show(selected_index());
       return;
     }
     // Any other key ends the search.
@@ -109,7 +109,7 @@ export function Select(props: SelectProps) {
         case "Enter":
         case " ":
           event.preventDefault();
-          show(selectedIndex());
+          show(selected_index());
           return;
         case "Home":
           event.preventDefault();
@@ -167,17 +167,17 @@ export function Select(props: SelectProps) {
   // The active option stays in view while the reader moves through a long list.
   createEffect(() => {
     if (!open()) return;
-    document.getElementById(optionId(active()))?.scrollIntoView({ block: "nearest" });
+    document.getElementById(option_id(active()))?.scrollIntoView({ block: "nearest" });
   });
 
   // A press outside the control closes the list without choosing.
-  const onOutsidePointer = (event: PointerEvent): void => {
+  const on_outside_pointer = (event: PointerEvent): void => {
     if (open() && root && !root.contains(event.target as Node)) close();
   };
   createEffect(() => {
     if (!open()) return;
-    document.addEventListener("pointerdown", onOutsidePointer, true);
-    onCleanup(() => document.removeEventListener("pointerdown", onOutsidePointer, true));
+    document.addEventListener("pointerdown", on_outside_pointer, true);
+    onCleanup(() => document.removeEventListener("pointerdown", on_outside_pointer, true));
   });
 
   return (
@@ -192,7 +192,7 @@ export function Select(props: SelectProps) {
       </span>
       <div class="sw-select__anchor">
         <div
-          aria-activedescendant={open() ? optionId(active()) : undefined}
+          aria-activedescendant={open() ? option_id(active()) : undefined}
           aria-controls={`${props.id}-listbox`}
           aria-expanded={open() ? "true" : "false"}
           aria-haspopup="listbox"
@@ -203,19 +203,19 @@ export function Select(props: SelectProps) {
             // A replayed click (islands/client.tsx) arrives without the press that focuses.
             combobox?.focus();
             if (open()) close();
-            else show(selectedIndex());
+            else show(selected_index());
           }}
           onFocusOut={(event) => {
             if (!root?.contains(event.relatedTarget as Node | null)) close();
           }}
-          onKeyDown={onKeyDown}
+          onKeyDown={on_key_down}
           ref={(element) => {
             combobox = element;
           }}
           role="combobox"
           tabIndex={0}
         >
-          <span class="sw-select__value">{props.options[selectedIndex()]?.label}</span>
+          <span class="sw-select__value">{props.options[selected_index()]?.label}</span>
           <Icon class="sw-select__icon" name="chevron-down" />
         </div>
         {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- a select-only combobox keeps focus on the field; the list's active option is aria-activedescendant. */}
@@ -238,15 +238,15 @@ export function Select(props: SelectProps) {
             {(option, index) => (
               // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- options are chosen with keys on the focused field (Enter, Space); a click is the pointer path.
               <div
-                aria-selected={index() === selectedIndex() ? "true" : "false"}
+                aria-selected={index() === selected_index() ? "true" : "false"}
                 class="sw-select__option"
                 data-active={open() && index() === active() ? "" : undefined}
-                id={optionId(index())}
+                id={option_id(index())}
                 // A listener on the option itself, not Solid's delegated one on
                 // the document: WebKit turns a tap into a click only on an
                 // element that listens for clicks (or takes focus).
                 on:click={() => choose(index())}
-                onPointerMove={() => setActive(index())}
+                onPointerMove={() => set_active(index())}
                 role="option"
               >
                 <Icon class="sw-select__check" name="check" />

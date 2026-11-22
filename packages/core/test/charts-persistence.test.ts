@@ -27,12 +27,12 @@ afterEach(() => {
 const ROWS = 10;
 
 /** Values in B1:B4 and categories in A1:A4 of `source`, anchored at D3 of its owner. */
-function chart(id: string, source = "data", anchorRow = 2): ChartDefinition {
+function chart(id: string, source = "data", anchor_row = 2): ChartDefinition {
   return {
     id,
     kind: "column",
     title: "Sales",
-    anchor: { row: anchorRow, col: 3, offsetX: 4, offsetY: 2, width: 400, height: 300 },
+    anchor: { row: anchor_row, col: 3, offsetX: 4, offsetY: 2, width: 400, height: 300 },
     series: [{ values: range(source, 0, 1, 3, 1), categories: range(source, 0, 0, 3, 0) }],
   };
 }
@@ -63,12 +63,16 @@ function setup(source: Workbook = workbook()) {
   return { store, controller };
 }
 
-function chartsOf(store: SheetwriteStore, sheetId: string): ChartDefinition[] | undefined {
-  return store.getWorkbook().sheets.find((candidate) => candidate.id === sheetId)?.charts;
+function charts_of(store: SheetwriteStore, sheet_id: string): ChartDefinition[] | undefined {
+  return store.getWorkbook().sheets.find((candidate) => candidate.id === sheet_id)?.charts;
 }
 
-function chartOf(store: SheetwriteStore, sheetId: string, id: string): ChartDefinition | undefined {
-  return chartsOf(store, sheetId)?.find((candidate) => candidate.id === id);
+function chart_of(
+  store: SheetwriteStore,
+  sheet_id: string,
+  id: string,
+): ChartDefinition | undefined {
+  return charts_of(store, sheet_id)?.find((candidate) => candidate.id === id);
 }
 
 function commit(controller: DocumentController, patches: DocumentOp[]): void {
@@ -82,11 +86,11 @@ function sources(definition: ChartDefinition | undefined): ChartRange[] {
   ]);
 }
 
-function snapshotWith(charts: unknown[], rowCount = ROWS): unknown {
+function snapshot_with(charts: unknown[], row_count = ROWS): unknown {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "data" },
-    sheets: [{ ...sheet("data", rowCount), order: 0, charts, cells: [] }],
+    sheets: [{ ...sheet("data", row_count), order: 0, charts, cells: [] }],
   };
 }
 
@@ -106,20 +110,20 @@ describe("chart persistence", () => {
     const reopened = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(exported)));
     stores.push(reopened);
 
-    expect(chartsOf(reopened, "data")).toEqual(owner.charts);
-    expect(chartsOf(reopened, "other")).toEqual([chart("cross")]);
+    expect(charts_of(reopened, "data")).toEqual(owner.charts);
+    expect(charts_of(reopened, "other")).toEqual([chart("cross")]);
     expect(reopened.exportSnapshot().sheets).toEqual(exported.sheets);
   });
 
   it("rejects over-limit and malformed charts in snapshots and operations", () => {
-    const oversizedSeries = {
+    const oversized_series = {
       ...chart("wide"),
       series: Array.from({ length: MAX_CHART_SERIES + 1 }, () => chart("wide").series[0]),
     };
     const cases: Array<[label: string, input: unknown, path: string, code: string]> = [
       [
         "too many charts",
-        snapshotWith(
+        snapshot_with(
           Array.from({ length: MAX_CHARTS_PER_SHEET + 1 }, (_, index) => chart(`c${index}`)),
         ),
         "sheets[0].charts",
@@ -127,31 +131,31 @@ describe("chart persistence", () => {
       ],
       [
         "too many series",
-        snapshotWith([oversizedSeries]),
+        snapshot_with([oversized_series]),
         "sheets[0].charts[0].series",
         "resource-limit",
       ],
       [
         "source below the sheet",
-        snapshotWith([{ ...chart("low"), series: [{ values: range("data", 0, 1, ROWS, 1) }] }]),
+        snapshot_with([{ ...chart("low"), series: [{ values: range("data", 0, 1, ROWS, 1) }] }]),
         "sheets[0].charts",
         "out-of-bounds",
       ],
       [
         "source on a missing sheet",
-        snapshotWith([chart("ghost", "missing")]),
+        snapshot_with([chart("ghost", "missing")]),
         "sheets[0].charts",
         "out-of-bounds",
       ],
       [
         "duplicate ids",
-        snapshotWith([chart("same"), chart("same")]),
+        snapshot_with([chart("same"), chart("same")]),
         "sheets[0].charts",
         "out-of-bounds",
       ],
       [
         "unknown kind",
-        snapshotWith([{ ...chart("radar"), kind: "radar" }]),
+        snapshot_with([{ ...chart("radar"), kind: "radar" }]),
         "sheets[0].charts[0]",
         "invalid-value",
       ],
@@ -164,7 +168,7 @@ describe("chart persistence", () => {
     }
 
     expect(
-      validateDocumentOperationShape({ op: "setChart", sheet: "data", chart: oversizedSeries }),
+      validateDocumentOperationShape({ op: "setChart", sheet: "data", chart: oversized_series }),
     ).toContainEqual(
       expect.objectContaining({ path: "operation.chart.series", code: "resource-limit" }),
     );
@@ -199,17 +203,17 @@ describe("chart persistence", () => {
         .status,
     ).toBe("applied");
 
-    const missingSheet = store.applyTransaction({
+    const missing_sheet = store.applyTransaction({
       patches: [{ op: "setChart", sheet: "data", chart: chart("ghost", "missing") }],
     });
-    expect(missingSheet.status).toBe("rejected");
-    if (missingSheet.status === "rejected") {
-      expect(missingSheet.issues).toContainEqual(
+    expect(missing_sheet.status).toBe("rejected");
+    if (missing_sheet.status === "rejected") {
+      expect(missing_sheet.issues).toContainEqual(
         expect.objectContaining({ kind: "invalid-operation", operationIndex: 0 }),
       );
     }
 
-    const outOfBounds = store.applyTransaction({
+    const out_of_bounds = store.applyTransaction({
       patches: [
         {
           op: "setChart",
@@ -219,9 +223,9 @@ describe("chart persistence", () => {
       ],
     });
     // Bounds failures are no-ops, unlike the missing-sheet admission rejection.
-    expect(outOfBounds).toMatchObject({ status: "noop", reason: "out-of-bounds" });
+    expect(out_of_bounds).toMatchObject({ status: "noop", reason: "out-of-bounds" });
 
-    expect(chartsOf(store, "data")?.map((candidate) => candidate.id)).toEqual(["own"]);
+    expect(charts_of(store, "data")?.map((candidate) => candidate.id)).toEqual(["own"]);
   });
 
   it("shifts sources and the anchor when rows and columns are inserted", () => {
@@ -229,16 +233,16 @@ describe("chart persistence", () => {
 
     store.applyTransaction({ patches: [{ op: "addRows", sheet: "data", at: 1, count: 2 }] });
     // Inserting inside a source widens it; the owner's anchor below the insert moves down.
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
+    expect(sources(chart_of(store, "data", "own"))).toEqual([
       range("data", 0, 1, 5, 1),
       range("data", 0, 0, 5, 0),
     ]);
-    expect(chartOf(store, "data", "own")?.anchor.row).toBe(4);
+    expect(chart_of(store, "data", "own")?.anchor.row).toBe(4);
     // A chart on another sheet follows its sources but keeps its own anchor.
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(
-      sources(chartOf(store, "data", "own")),
+    expect(sources(chart_of(store, "other", "cross"))).toEqual(
+      sources(chart_of(store, "data", "own")),
     );
-    expect(chartOf(store, "other", "cross")?.anchor.row).toBe(2);
+    expect(chart_of(store, "other", "cross")?.anchor.row).toBe(2);
 
     store.applyTransaction({
       patches: [
@@ -250,30 +254,33 @@ describe("chart persistence", () => {
         },
       ],
     });
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
+    expect(sources(chart_of(store, "data", "own"))).toEqual([
       range("data", 0, 2, 5, 2),
       range("data", 0, 1, 5, 1),
     ]);
-    expect(chartOf(store, "data", "own")?.anchor.col).toBe(4);
+    expect(chart_of(store, "data", "own")?.anchor.col).toBe(4);
   });
 
   it("shrinks partly deleted sources and turns fully deleted ones into #REF!", () => {
     const { store } = setup();
 
     store.applyTransaction({ patches: [{ op: "removeRows", sheet: "data", at: 0, count: 2 }] });
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
+    expect(sources(chart_of(store, "data", "own"))).toEqual([
       range("data", 0, 1, 1, 1),
       range("data", 0, 0, 1, 0),
     ]);
-    expect(chartOf(store, "data", "own")?.anchor.row).toBe(0);
+    expect(chart_of(store, "data", "own")?.anchor.row).toBe(0);
 
     store.applyTransaction({ patches: [{ op: "removeColumns", sheet: "data", at: 1, count: 1 }] });
-    expect(sources(chartOf(store, "data", "own"))).toEqual(["#REF!", range("data", 0, 0, 1, 0)]);
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(["#REF!", range("data", 0, 0, 1, 0)]);
-    expect(chartOf(store, "data", "own")?.anchor.col).toBe(2);
+    expect(sources(chart_of(store, "data", "own"))).toEqual(["#REF!", range("data", 0, 0, 1, 0)]);
+    expect(sources(chart_of(store, "other", "cross"))).toEqual([
+      "#REF!",
+      range("data", 0, 0, 1, 0),
+    ]);
+    expect(chart_of(store, "data", "own")?.anchor.col).toBe(2);
 
     store.applyTransaction({ patches: [{ op: "removeRows", sheet: "data", at: 0, count: 2 }] });
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(["#REF!", "#REF!"]);
+    expect(sources(chart_of(store, "other", "cross"))).toEqual(["#REF!", "#REF!"]);
   });
 
   it("pins a chart whose anchor rows were deleted at the end of the sheet inside the sheet", () => {
@@ -286,7 +293,7 @@ describe("chart persistence", () => {
       patches: [{ op: "removeRows", sheet: "data", at: ROWS - 2, count: 2 }],
     });
 
-    expect(chartOf(store, "data", "bottom")?.anchor.row).toBe(ROWS - 3);
+    expect(chart_of(store, "data", "bottom")?.anchor.row).toBe(ROWS - 3);
     expect(validateWorkbookSnapshot(store.exportSnapshot()).ok).toBe(true);
   });
 
@@ -297,23 +304,23 @@ describe("chart persistence", () => {
       patches: [{ op: "moveRows", sheet: "data", from: 0, count: 4, to: 5 }],
     });
     // The whole source moved; a remove-then-add without restoring would leave #REF!.
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
+    expect(sources(chart_of(store, "data", "own"))).toEqual([
       range("data", 5, 1, 8, 1),
       range("data", 5, 0, 8, 0),
     ]);
-    expect(chartOf(store, "data", "own")?.anchor.row).toBe(7);
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(
-      sources(chartOf(store, "data", "own")),
+    expect(chart_of(store, "data", "own")?.anchor.row).toBe(7);
+    expect(sources(chart_of(store, "other", "cross"))).toEqual(
+      sources(chart_of(store, "data", "own")),
     );
 
     store.applyTransaction({
       patches: [{ op: "moveColumns", sheet: "data", from: 1, count: 1, to: 3 }],
     });
-    expect(sources(chartOf(store, "data", "own"))).toEqual([
+    expect(sources(chart_of(store, "data", "own"))).toEqual([
       range("data", 5, 3, 8, 3),
       range("data", 5, 0, 8, 0),
     ]);
-    expect(chartOf(store, "data", "own")?.anchor.col).toBe(2);
+    expect(chart_of(store, "data", "own")?.anchor.col).toBe(2);
   });
 
   it("undo of row, column and move edits restores every touched chart exactly", () => {
@@ -327,11 +334,11 @@ describe("chart persistence", () => {
       const { store, controller } = setup();
 
       commit(controller, [edit]);
-      expect(chartOf(store, "data", "own"), edit.op).not.toEqual(chart("own"));
+      expect(chart_of(store, "data", "own"), edit.op).not.toEqual(chart("own"));
       controller.undo();
 
-      expect(chartsOf(store, "data"), edit.op).toEqual([chart("own")]);
-      expect(chartsOf(store, "other"), edit.op).toEqual([chart("cross")]);
+      expect(charts_of(store, "data"), edit.op).toEqual([chart("own")]);
+      expect(charts_of(store, "other"), edit.op).toEqual([chart("cross")]);
     }
   });
 
@@ -342,22 +349,22 @@ describe("chart persistence", () => {
     commit(controller, [{ op: "setChart", sheet: "data", chart: replaced }]);
     commit(controller, [{ op: "removeRows", sheet: "data", at: 0, count: 4 }]);
     controller.undo();
-    expect(chartOf(store, "data", "own")).toEqual(replaced);
+    expect(chart_of(store, "data", "own")).toEqual(replaced);
     controller.undo();
 
-    expect(chartOf(store, "data", "own")).toEqual(chart("own"));
+    expect(chart_of(store, "data", "own")).toEqual(chart("own"));
   });
 
   it("turns sources on a removed sheet into #REF! and restores them on undo", () => {
     const { store, controller } = setup();
 
     commit(controller, [{ op: "removeSheet", sheet: "data" }]);
-    expect(sources(chartOf(store, "other", "cross"))).toEqual(["#REF!", "#REF!"]);
+    expect(sources(chart_of(store, "other", "cross"))).toEqual(["#REF!", "#REF!"]);
     expect(validateWorkbookSnapshot(store.exportSnapshot()).ok).toBe(true);
 
     controller.undo();
-    expect(chartsOf(store, "data")).toEqual([chart("own")]);
-    expect(chartsOf(store, "other")).toEqual([chart("cross")]);
+    expect(charts_of(store, "data")).toEqual([chart("own")]);
+    expect(charts_of(store, "other")).toEqual([chart("cross")]);
   });
 
   it("rebases pending charts across row inserts and conflicts on replacement or source deletion", () => {

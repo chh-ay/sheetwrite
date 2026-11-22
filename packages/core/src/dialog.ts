@@ -61,7 +61,7 @@ export interface DialogHost {
 
 const FOCUSABLE = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
 
-let dialogCount = 0;
+let dialog_count = 0;
 
 /**
  * Open a modal dialog, centred in the window as Excel's are, whatever the
@@ -76,7 +76,7 @@ let dialogCount = 0;
 export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   const { host } = grid;
   seedWidgetTheme(host, grid.theme());
-  const id = `sheetwrite-dialog-${++dialogCount}`;
+  const id = `sheetwrite-dialog-${++dialog_count}`;
 
   // The dialog stays in the grid root, so it inherits the widget variables.
   const element = document.createElement("dialog");
@@ -119,7 +119,7 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
 
   const row = document.createElement("div");
   row.className = "sheetwrite-dialog-buttons";
-  let defaultButton: HTMLButtonElement | null = null;
+  let default_button: HTMLButtonElement | null = null;
   for (const spec of options.buttons) {
     const button = document.createElement("button");
     button.type = "button";
@@ -127,7 +127,7 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
     button.textContent = spec.label;
     if (spec.default) {
       button.classList.add("sheetwrite-dialog-default");
-      defaultButton = button;
+      default_button = button;
     }
     button.addEventListener("click", () => {
       if (spec.value !== options.cancel && options.accept?.(spec.value) === false) return;
@@ -146,9 +146,9 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
     } else if (event.key === "Enter") {
       const target = event.target;
       if (target instanceof HTMLButtonElement || target instanceof HTMLTextAreaElement) return;
-      if (defaultButton === null) return;
+      if (default_button === null) return;
       event.preventDefault();
-      defaultButton.click();
+      default_button.click();
     } else if (event.key === "Tab") {
       const focusable = [...element.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
         (candidate) =>
@@ -180,7 +180,11 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   host.append(element);
   element.showModal();
   checkStylePart(element, "grid", "The dialog");
-  (options.initialFocus ?? defaultButton ?? element.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+  (
+    options.initialFocus ??
+    default_button ??
+    element.querySelector<HTMLElement>(FOCUSABLE)
+  )?.focus();
   grid.adopt(() => close());
 
   return { element, result, close };
@@ -236,13 +240,13 @@ export async function alertDialog(grid: DialogHost, options: AlertOptions): Prom
   }).result;
 }
 
-/** One option of {@link choiceDialog}. */
+/** One option of {@link choice_dialog}. */
 interface DialogChoice {
   readonly value: string;
   readonly label: string;
 }
 
-/** What {@link choiceDialog} offers. */
+/** What {@link choice_dialog} offers. */
 interface ChoiceOptions {
   readonly title: string;
   readonly choices: readonly DialogChoice[];
@@ -256,7 +260,7 @@ interface ChoiceOptions {
  * between the choices. `result` resolves to the chosen value on OK, and to
  * `null` for Cancel, Escape or close.
  */
-function choiceDialog(
+function choice_dialog(
   grid: DialogHost,
   options: ChoiceOptions,
 ): { readonly result: Promise<string | null>; close(): void } {
@@ -266,7 +270,7 @@ function choiceDialog(
   legend.className = "sheetwrite-dialog-legend";
   legend.textContent = options.title;
   group.append(legend);
-  const name = `sheetwrite-dialog-choice-${++dialogCount}`;
+  const name = `sheetwrite-dialog-choice-${++dialog_count}`;
   const radios: HTMLInputElement[] = [];
   for (const choice of options.choices) {
     const label = document.createElement("label");
@@ -319,5 +323,5 @@ export function insertDeleteDialog(
     { value: "column", label: "Entire column" },
   ];
   const initial = wide ? "shiftDown" : "shiftRight";
-  return choiceDialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
+  return choice_dialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
 }

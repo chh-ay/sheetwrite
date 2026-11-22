@@ -46,7 +46,7 @@ interface SharedFormulaMaster {
 }
 
 /** Group each sheet's shared-formula cells under their master. */
-function sharedFormulaGroups(
+function shared_formula_groups(
   pending: readonly PendingSharedFormula[],
   masters: ReadonlyMap<string, SharedFormulaMaster>,
   sheet: string,
@@ -98,191 +98,198 @@ export async function ingestWorksheetRows(
 ): Promise<WorksheetRows> {
   const target = reference.relationship.target;
   const cells: SnapshotCell[] = [];
-  const cellStyles = new CellStyleIndices();
-  const columnCells = new Map<number, ColumnCells>();
-  const pendingSharedFormulas: PendingSharedFormula[] = [];
-  const sharedMasters = new Map<string, SharedFormulaMaster>();
-  let inferredRow = 0;
-  let maxRow = -1;
-  let maxCol = -1;
-  const rowMeta: NonNullable<SheetSnapshot["rowMeta"]> = [];
-  const outlineLevels = new Map<number, number>();
-  const collapsedRows = new Set<number>();
-  let internalMetadata = false;
-  const inheritedColumnStyles = new Map<number, string>();
+  const cell_styles = new CellStyleIndices();
+  const column_cells = new Map<number, ColumnCells>();
+  const pending_shared_formulas: PendingSharedFormula[] = [];
+  const shared_masters = new Map<string, SharedFormulaMaster>();
+  let inferred_row = 0;
+  let max_row = -1;
+  let max_col = -1;
+  const row_meta: NonNullable<SheetSnapshot["rowMeta"]> = [];
+  const outline_levels = new Map<number, number>();
+  const collapsed_rows = new Set<number>();
+  let internal_metadata = false;
+  const inherited_column_styles = new Map<number, string>();
   // The areas of the dynamic arrays read so far that reach the current row:
   // Sheetwrite computes the values Excel saved in their covered cells.
-  let spillAreas: SpillAreas | undefined;
-  let columnStylesRead = false;
-  let columnsPrecedeRows = false;
-  const cellsBeforeSheet = usage.cells;
-  const rowContext: XlsxCodecContext =
+  let spill_areas: SpillAreas | undefined;
+  let column_styles_read = false;
+  let columns_precede_rows = false;
+  const cells_before_sheet = usage.cells;
+  const row_context: XlsxCodecContext =
     columnSource && context.options
       ? { ...context, options: { ...context.options, onWarning: undefined } }
       : context;
 
-  const readColumnStyles = (root: XmlElement): void => {
-    if (columnStylesRead) return;
-    columnStylesRead = true;
-    const columnCollection = xmlChild(root, "cols");
-    columnsPrecedeRows = columnCollection !== undefined;
+  const read_column_styles = (root: XmlElement): void => {
+    if (column_styles_read) return;
+    column_styles_read = true;
+    const column_collection = xmlChild(root, "cols");
+    columns_precede_rows = column_collection !== undefined;
     const spans: number[] = [];
-    const columnStyles: string[] = [];
-    for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
-      const style = xmlAttribute(columnElement, "style");
+    const column_styles: string[] = [];
+    for (const column_element of column_collection ? xmlChildren(column_collection, "col") : []) {
+      const style = xmlAttribute(column_element, "style");
       if (style === undefined) continue;
-      const min = parseUnsigned(xmlAttribute(columnElement, "min"), "column minimum");
-      const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
+      const min = parseUnsigned(xmlAttribute(column_element, "min"), "column minimum");
+      const max = parseUnsigned(xmlAttribute(column_element, "max"), "column maximum");
       if (min < 1 || max < min) readerFailure("column range is invalid");
       assertResource(context, "maxColumnsPerSheet", max);
       spans.push(min - 1, max - 1);
-      columnStyles.push(style);
+      column_styles.push(style);
     }
 
     lastColumnDeclarations(spans).forEach((declaration, col) => {
-      const style = columnStyles[declaration];
-      if (style !== undefined) inheritedColumnStyles.set(col, style);
+      const style = column_styles[declaration];
+      if (style !== undefined) inherited_column_styles.set(col, style);
     });
   };
-  if (columnSource) readColumnStyles(columnSource);
+  if (columnSource) read_column_styles(columnSource);
 
-  const processRow = (rowElement: XmlElement, root: XmlElement): void => {
-    if (!columnStylesRead) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-    readColumnStyles(root);
+  const process_row = (row_element: XmlElement, root: XmlElement): void => {
+    if (!column_styles_read) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
+    read_column_styles(root);
     const row =
-      xmlAttribute(rowElement, "r") === undefined
-        ? inferredRow
-        : parseUnsigned(xmlAttribute(rowElement, "r"), "row number") - 1;
+      xmlAttribute(row_element, "r") === undefined
+        ? inferred_row
+        : parseUnsigned(xmlAttribute(row_element, "r"), "row number") - 1;
     if (row < 0) readerFailure(`row number in ${reference.name} is invalid`);
     assertResource(context, "maxRowsPerSheet", row + 1);
-    inferredRow = row + 1;
-    maxRow = Math.max(maxRow, row);
-    const heightPoints = Number(xmlAttribute(rowElement, "ht"));
-    const hasFixedHeight =
-      xmlBoolean(xmlAttribute(rowElement, "customHeight")) &&
-      Number.isFinite(heightPoints) &&
-      heightPoints > 0;
-    const hidden = xmlBoolean(xmlAttribute(rowElement, "hidden"));
-    const outlineLevel = Number(xmlAttribute(rowElement, "outlineLevel") ?? 0);
-    if (!Number.isInteger(outlineLevel) || outlineLevel < 0 || outlineLevel > 7) {
+    inferred_row = row + 1;
+    max_row = Math.max(max_row, row);
+    const height_points = Number(xmlAttribute(row_element, "ht"));
+    const has_fixed_height =
+      xmlBoolean(xmlAttribute(row_element, "customHeight")) &&
+      Number.isFinite(height_points) &&
+      height_points > 0;
+    const hidden = xmlBoolean(xmlAttribute(row_element, "hidden"));
+    const outline_level = Number(xmlAttribute(row_element, "outlineLevel") ?? 0);
+    if (!Number.isInteger(outline_level) || outline_level < 0 || outline_level > 7) {
       readerFailure(`row outline level in ${reference.name} is invalid`);
     }
-    if (outlineLevel > 0) outlineLevels.set(row, outlineLevel);
-    if (xmlBoolean(xmlAttribute(rowElement, "collapsed"))) collapsedRows.add(row);
-    if (hasFixedHeight || hidden) {
-      rowMeta.push([
+    if (outline_level > 0) outline_levels.set(row, outline_level);
+    if (xmlBoolean(xmlAttribute(row_element, "collapsed"))) collapsed_rows.add(row);
+    if (has_fixed_height || hidden) {
+      row_meta.push([
         row,
         {
-          ...(hasFixedHeight ? { height: (heightPoints * 96) / 72 } : {}),
+          ...(has_fixed_height ? { height: (height_points * 96) / 72 } : {}),
           ...(hidden ? { hidden: true } : {}),
         },
       ]);
     }
-    const rowStyle = xmlBoolean(xmlAttribute(rowElement, "customFormat"))
-      ? xmlAttribute(rowElement, "s")
+    const row_style = xmlBoolean(xmlAttribute(row_element, "customFormat"))
+      ? xmlAttribute(row_element, "s")
       : undefined;
-    spillAreas?.expire(row);
-    let inferredCol = 0;
-    for (const cellElement of xmlChildren(rowElement, "c")) {
-      const addressText = xmlAttribute(cellElement, "r") ?? cellA1(row, inferredCol);
+    spill_areas?.expire(row);
+    let inferred_col = 0;
+    for (const cell_element of xmlChildren(row_element, "c")) {
+      const address_text = xmlAttribute(cell_element, "r") ?? cellA1(row, inferred_col);
       const address =
-        parseCellReference(addressText) ??
-        readerFailure(`cell reference ${addressText} is invalid`);
-      if (address.row !== row) readerFailure(`cell ${addressText} is outside its row`);
-      inferredCol = address.col + 1;
+        parseCellReference(address_text) ??
+        readerFailure(`cell reference ${address_text} is invalid`);
+      if (address.row !== row) readerFailure(`cell ${address_text} is outside its row`);
+      inferred_col = address.col + 1;
       assertResource(context, "maxColumnsPerSheet", address.col + 1);
-      maxCol = Math.max(maxCol, address.col);
-      const styleIndex = parseUnsigned(
-        xmlAttribute(cellElement, "s") ?? rowStyle ?? inheritedColumnStyles.get(address.col) ?? "0",
-        `style index at ${addressText}`,
+      max_col = Math.max(max_col, address.col);
+      const style_index = parseUnsigned(
+        xmlAttribute(cell_element, "s") ??
+          row_style ??
+          inherited_column_styles.get(address.col) ??
+          "0",
+        `style index at ${address_text}`,
       );
-      const styleRecord = styles.at(styleIndex);
-      const formulaElement = xmlChild(cellElement, "f");
+      const style_record = styles.at(style_index);
+      const formula_element = xmlChild(cell_element, "f");
       let value: CellValue | null;
-      let sharedFormula: string | undefined;
-      let ownSharedFormula: string | undefined;
-      if (formulaElement) {
-        const formulaText = decodeXstring(formulaElement.text);
-        const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
-        const cellMetadata = xmlAttribute(cellElement, "cm");
-        const dynamicArray =
-          formulaType === "array" &&
-          cellMetadata !== undefined &&
-          context.dynamicArrayMetadata?.has(cellMetadata) === true;
-        const spillArea = dynamicArray
-          ? parseCellRect(xmlAttribute(formulaElement, "ref") ?? "")
+      let shared_formula: string | undefined;
+      let own_shared_formula: string | undefined;
+      if (formula_element) {
+        const formula_text = decodeXstring(formula_element.text);
+        const formula_type = xmlAttribute(formula_element, "t") ?? "normal";
+        const cell_metadata = xmlAttribute(cell_element, "cm");
+        const dynamic_array =
+          formula_type === "array" &&
+          cell_metadata !== undefined &&
+          context.dynamicArrayMetadata?.has(cell_metadata) === true;
+        const spill_area = dynamic_array
+          ? parseCellRect(xmlAttribute(formula_element, "ref") ?? "")
           : undefined;
         // Excel writes a spill's area from its formula's cell; another area
         // is not this formula's, and its covered cells keep their values.
-        if (spillArea && spillArea.r0 === address.row && spillArea.c0 === address.col) {
-          spillAreas ??= new SpillAreas(context.limits.maxColumnsPerSheet);
-          const admitted = spillAreas.add({
-            ...spillArea,
-            r1: Math.min(spillArea.r1, context.limits.maxRowsPerSheet - 1),
-            c1: Math.min(spillArea.c1, context.limits.maxColumnsPerSheet - 1),
+        if (spill_area && spill_area.r0 === address.row && spill_area.c0 === address.col) {
+          spill_areas ??= new SpillAreas(context.limits.maxColumnsPerSheet);
+          const admitted = spill_areas.add({
+            ...spill_area,
+            r1: Math.min(spill_area.r1, context.limits.maxRowsPerSheet - 1),
+            c1: Math.min(spill_area.c1, context.limits.maxColumnsPerSheet - 1),
           });
           if (!admitted) {
-            emitWarning(rowContext, {
+            emitWarning(row_context, {
               code: "unsupported-feature",
               message:
                 "Dynamic array overlaps another spill; the values saved in its cells were kept",
               sheet: reference.name,
-              cell: addressText,
+              cell: address_text,
             });
           }
         }
-        if (formulaType === "shared") {
-          sharedFormula = xmlAttribute(formulaElement, "si");
-          if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
-          if (formulaText) {
-            ownSharedFormula = formulaText;
-            const authoritative = xmlAttribute(formulaElement, "ref") !== undefined;
-            const existing = sharedMasters.get(sharedFormula);
+        if (formula_type === "shared") {
+          shared_formula = xmlAttribute(formula_element, "si");
+          if (!shared_formula) readerFailure(`shared formula at ${address_text} has no index`);
+          if (formula_text) {
+            own_shared_formula = formula_text;
+            const authoritative = xmlAttribute(formula_element, "ref") !== undefined;
+            const existing = shared_masters.get(shared_formula);
             if (authoritative || !existing) {
-              sharedMasters.set(sharedFormula, { formula: formulaText, ...address, authoritative });
+              shared_masters.set(shared_formula, {
+                formula: formula_text,
+                ...address,
+                authoritative,
+              });
             }
           }
           value = null;
-        } else if (formulaType !== "normal" && !dynamicArray) {
+        } else if (formula_type !== "normal" && !dynamic_array) {
           // A legacy array formula (Ctrl+Shift+Enter) has no Sheetwrite equivalent.
-          emitWarning(rowContext, {
+          emitWarning(row_context, {
             code: "unsupported-feature",
-            message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
+            message: `Excel ${formula_type} formula was neutralized because its range semantics are unsupported`,
             sheet: reference.name,
-            cell: addressText,
+            cell: address_text,
           });
-          value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
-        } else if (formulaContainsExternalReference(formulaText)) {
-          const linked = linkedFormula(formulaText, context.externalBooks);
+          value = formula_text ? { kind: "literal", value: `=${formula_text}` } : null;
+        } else if (formulaContainsExternalReference(formula_text)) {
+          const linked = linkedFormula(formula_text, context.externalBooks);
           if (linked === undefined) {
-            emitWarning(rowContext, {
+            emitWarning(row_context, {
               code: "external-formula",
               message: "External-data formula was neutralized as inert text",
               sheet: reference.name,
-              cell: addressText,
+              cell: address_text,
             });
-            value = { kind: "literal", value: `=${formulaText}` };
+            value = { kind: "literal", value: `=${formula_text}` };
           } else {
             value = { kind: "formula", src: `=${linked}` };
           }
         } else {
-          value = formulaText ? { kind: "formula", src: `=${formulaText}` } : null;
+          value = formula_text ? { kind: "formula", src: `=${formula_text}` } : null;
         }
-      } else if (spillAreas?.covers(address.row, address.col)) {
+      } else if (spill_areas?.covers(address.row, address.col)) {
         value = null;
       } else {
         value = literalFromCell(
-          cellElement,
-          xmlAttribute(cellElement, "t"),
+          cell_element,
+          xmlAttribute(cell_element, "t"),
           sharedStrings,
-          styleRecord,
-          rowContext,
+          style_record,
+          row_context,
           reference.name,
-          addressText,
+          address_text,
           date1904,
         );
       }
-      if (value || styleRecord.style || sharedFormula) {
+      if (value || style_record.style || shared_formula) {
         if (
           cells.length === 0 &&
           reference.name.startsWith(META_STEM) &&
@@ -291,9 +298,9 @@ export async function ingestWorksheetRows(
           value?.kind === "literal" &&
           value.value === META_MARKER
         ) {
-          internalMetadata = true;
+          internal_metadata = true;
         }
-        if (!internalMetadata) {
+        if (!internal_metadata) {
           usage.cells += 1;
           assertResource(context, "maxCells", usage.cells);
         }
@@ -303,19 +310,19 @@ export async function ingestWorksheetRows(
           value: value ?? { kind: "literal", value: null },
         };
         cells.push(cell);
-        cellStyles.push(styleIndex);
-        let column = columnCells.get(address.col);
+        cell_styles.push(style_index);
+        let column = column_cells.get(address.col);
         if (!column) {
           column = { styleIndices: new Set() };
-          columnCells.set(address.col, column);
+          column_cells.set(address.col, column);
         }
-        column.styleIndices.add(styleIndex);
-        if (sharedFormula) {
-          pendingSharedFormulas.push({
+        column.styleIndices.add(style_index);
+        if (shared_formula) {
+          pending_shared_formulas.push({
             cell,
-            index: sharedFormula,
-            address: addressText,
-            ownFormula: ownSharedFormula,
+            index: shared_formula,
+            address: address_text,
+            ownFormula: own_shared_formula,
           });
         }
       }
@@ -323,12 +330,12 @@ export async function ingestWorksheetRows(
   };
 
   const part = normalizePartName(target);
-  const rowStream: XmlChildStream = {
+  const row_stream: XmlChildStream = {
     parent: "sheetData",
     parentIsRoot: false,
     // The tree path read only `row` children; other children are skipped alike.
-    child: (rowElement, rootElement) => {
-      if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
+    child: (row_element, root_element) => {
+      if (xmlLocalName(row_element.name) === "row") process_row(row_element, root_element);
     },
   };
   const entry = packageFile.archive.entries.get(part);
@@ -336,26 +343,26 @@ export async function ingestWorksheetRows(
   // apply the same XML limits, and the declared size is checked against the inflated bytes.
   const root =
     entry && entry.uncompressedSize <= BUFFERED_WORKSHEET_XML_BYTES
-      ? parseXml(await packageFile.archive.read(part), part, context, rowStream)
-      : await parseXmlChunks(packageFile.archive.chunks(part), part, context, rowStream);
+      ? parseXml(await packageFile.archive.read(part), part, context, row_stream)
+      : await parseXmlChunks(packageFile.archive.chunks(part), part, context, row_stream);
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-  const lateColumns = xmlChild(root, "cols");
+  const late_columns = xmlChild(root, "cols");
   if (
-    columnStylesRead &&
-    !columnsPrecedeRows &&
-    lateColumns &&
-    xmlChildren(lateColumns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
+    column_styles_read &&
+    !columns_precede_rows &&
+    late_columns &&
+    xmlChildren(late_columns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
   ) {
     // Column styles apply to every row, including rows already streamed; a
     // second streamed pass is cheaper than retaining the worksheet document.
-    usage.cells = cellsBeforeSheet;
+    usage.cells = cells_before_sheet;
     // This frame stays alive until the second pass returns; drop its cells so
     // the worksheet is not resident twice.
     cells.length = 0;
-    cellStyles.clear();
-    columnCells.clear();
-    pendingSharedFormulas.length = 0;
-    sharedMasters.clear();
+    cell_styles.clear();
+    column_cells.clear();
+    pending_shared_formulas.length = 0;
+    shared_masters.clear();
     return ingestWorksheetRows(
       packageFile,
       reference,
@@ -367,18 +374,22 @@ export async function ingestWorksheetRows(
       root,
     );
   }
-  readColumnStyles(root);
-  const sharedFormulas = sharedFormulaGroups(pendingSharedFormulas, sharedMasters, reference.name);
+  read_column_styles(root);
+  const shared_formulas = shared_formula_groups(
+    pending_shared_formulas,
+    shared_masters,
+    reference.name,
+  );
   return {
     root,
     cells,
-    cellStyles,
-    columnCells,
-    sharedFormulas,
-    rowMeta,
-    outlineLevels,
-    collapsedRows,
-    maxRow,
-    maxCol,
+    cellStyles: cell_styles,
+    columnCells: column_cells,
+    sharedFormulas: shared_formulas,
+    rowMeta: row_meta,
+    outlineLevels: outline_levels,
+    collapsedRows: collapsed_rows,
+    maxRow: max_row,
+    maxCol: max_col,
   };
 }

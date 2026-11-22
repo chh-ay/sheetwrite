@@ -16,14 +16,14 @@ type Artifact = DeepMutable<RenderBenchmarkArtifact>;
 
 const GIB = 1024 * 1024 * 1024;
 
-function firstCellMemory(
-  beforeBytes: number | null,
-  afterBytes: number | null,
-  deltaBytes: number | null,
+function first_cell_memory(
+  before_bytes: number | null,
+  after_bytes: number | null,
+  delta_bytes: number | null,
 ) {
   return (artifact: Artifact) => {
     const first = must(artifact.results[0], "first cell");
-    first.memory = { beforeBytes, afterBytes, deltaBytes };
+    first.memory = { beforeBytes: before_bytes, afterBytes: after_bytes, deltaBytes: delta_bytes };
   };
 }
 
@@ -65,9 +65,9 @@ test("rejects corrupt run metadata, missing cells and unbounded renderer memory"
         },
         "matrix is incomplete",
       ],
-      [firstCellMemory(null, null, null), ".memory is missing"],
-      [firstCellMemory(-1, 0, 1), "finite non-negative integer heap samples"],
-      [firstCellMemory(0, 4 * GIB, 4 * GIB), "broad renderer heap safety ceiling"],
+      [first_cell_memory(null, null, null), ".memory is missing"],
+      [first_cell_memory(-1, 0, 1), "finite non-negative integer heap samples"],
+      [first_cell_memory(0, 4 * GIB, 4 * GIB), "broad renderer heap safety ceiling"],
     ],
   );
 });

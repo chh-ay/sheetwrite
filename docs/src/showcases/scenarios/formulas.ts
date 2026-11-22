@@ -336,7 +336,7 @@ export function formulaDashboardOps(): DocumentOp[] {
     style: { bold: true, align: "left" },
   }));
   // A spill can put text in a numeric column; keep those cells left-aligned.
-  const textStyles = LEFT_ALIGNED_TEXT.flatMap((entry): DocumentOp[] => {
+  const text_styles = LEFT_ALIGNED_TEXT.flatMap((entry): DocumentOp[] => {
     const panel = FORMULA_PANELS.find((candidate) => candidate.id === entry.panel);
     if (!panel) return [];
     const col = panel.col + entry.col;
@@ -357,7 +357,7 @@ export function formulaDashboardOps(): DocumentOp[] {
     addr: { sheet: ANALYSIS_SHEET_ID, row: panel.row, col: panel.col },
     value: { kind: "formula", src: panel.formula },
   }));
-  return [...titles, ...styles, ...textStyles, ...formulas];
+  return [...titles, ...styles, ...text_styles, ...formulas];
 }
 
 /**

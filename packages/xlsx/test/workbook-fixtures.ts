@@ -14,7 +14,7 @@ import { FIXED_ZIP_TIME } from "./raw-opc.js";
 /** A grid cell: a primitive is a literal, a `CellValue` is used as is, `undefined` or `null` is empty. */
 export type GridCell = string | number | boolean | null | undefined | CellValue;
 
-function cellValue(cell: Exclude<GridCell, null | undefined>): CellValue {
+function cell_value(cell: Exclude<GridCell, null | undefined>): CellValue {
   return typeof cell === "object" ? cell : { kind: "literal", value: cell };
 }
 
@@ -26,9 +26,11 @@ export function block(
   startRow = 0,
   startCol = 0,
 ): CellBlock {
-  const cells: SnapshotCell[] = rows.flatMap((row, rowOffset) =>
-    row.flatMap((cell, colOffset) =>
-      cell === undefined || cell === null ? [] : [{ rowOffset, colOffset, value: cellValue(cell) }],
+  const cells: SnapshotCell[] = rows.flatMap((row, row_offset) =>
+    row.flatMap((cell, col_offset) =>
+      cell === undefined || cell === null
+        ? []
+        : [{ rowOffset: row_offset, colOffset: col_offset, value: cell_value(cell) }],
     ),
   );
   return {
@@ -211,9 +213,9 @@ export function patchEntries(
   const count = view.getUint16(eocd + EOCD_ENTRY_COUNT, true);
   let central = view.getUint32(eocd + EOCD_CENTRAL_OFFSET, true);
   for (let index = 0; index < count; index++) {
-    const nameLength = view.getUint16(central + CENTRAL_NAME_LENGTH, true);
-    const nameStart = central + CENTRAL_HEADER_BYTES;
-    const name = strFromU8(bytes.subarray(nameStart, nameStart + nameLength));
+    const name_length = view.getUint16(central + CENTRAL_NAME_LENGTH, true);
+    const name_start = central + CENTRAL_HEADER_BYTES;
+    const name = strFromU8(bytes.subarray(name_start, name_start + name_length));
     patch({
       view,
       central,
@@ -223,7 +225,7 @@ export function patchEntries(
     });
     central +=
       CENTRAL_HEADER_BYTES +
-      nameLength +
+      name_length +
       view.getUint16(central + CENTRAL_EXTRA_LENGTH, true) +
       view.getUint16(central + CENTRAL_COMMENT_LENGTH, true);
   }

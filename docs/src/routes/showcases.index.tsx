@@ -100,7 +100,7 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 type HubOwner = (typeof CAPABILITY_OWNERS)[number];
 
-function ownerGroup(owner: HubOwner): HubGroup {
+function owner_group(owner: HubOwner): HubGroup {
   if (owner.kind === "framework") return "framework";
   if (
     owner.id === "formulas" ||
@@ -127,26 +127,26 @@ function CardArt(props: Readonly<{ id: string }>) {
 }
 
 function HubCard(props: Readonly<{ owner: HubOwner }>) {
-  const isFramework = () => props.owner.kind === "framework";
+  const is_framework = () => props.owner.kind === "framework";
   return (
     <li
-      data-group={ownerGroup(props.owner)}
+      data-group={owner_group(props.owner)}
       data-kind={props.owner.kind}
       data-owner={props.owner.id}
     >
       <a
-        class={`sw-hub-launch${isFramework() ? " sw-hub-launch--framework" : ""}`}
+        class={`sw-hub-launch${is_framework() ? " sw-hub-launch--framework" : ""}`}
         data-owner={props.owner.id}
         href={props.owner.href}
       >
         <CardArt id={props.owner.id} />
         <span class="sw-hub-launch__body">
           <span class="sw-hub-launch__meta">
-            {HUB_GROUPS.find((item) => item.id === ownerGroup(props.owner))?.label}
+            {HUB_GROUPS.find((item) => item.id === owner_group(props.owner))?.label}
           </span>
           <strong>{props.owner.label}</strong>
           <span class="sw-hub-launch__summary">
-            {isFramework()
+            {is_framework()
               ? FRAMEWORK_SUMMARY[props.owner.id]
               : SCENE_SUMMARY[props.owner.id as SceneOwnerId]}
           </span>

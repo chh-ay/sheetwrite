@@ -22,14 +22,14 @@ export function popupPosition(
   size: Pick<DOMRectReadOnly, "width" | "height">,
   placement: PopupPlacement,
 ): { left: number; top: number } {
-  const { clientWidth, clientHeight } = document.documentElement;
-  const maxLeft = clientWidth - size.width - POPUP_VIEWPORT_MARGIN;
-  const left = Math.max(POPUP_VIEWPORT_MARGIN, Math.min(anchor.left, maxLeft));
+  const { clientWidth: client_width, clientHeight: client_height } = document.documentElement;
+  const max_left = client_width - size.width - POPUP_VIEWPORT_MARGIN;
+  const left = Math.max(POPUP_VIEWPORT_MARGIN, Math.min(anchor.left, max_left));
   const below = anchor.bottom + placement.gap;
   const above = anchor.top - size.height - placement.gap;
-  const fitsBelow = below + size.height <= clientHeight - POPUP_VIEWPORT_MARGIN;
-  const fitsAbove = above >= POPUP_VIEWPORT_MARGIN;
-  const preferBelow =
-    placement.side === "below" ? fitsBelow || !fitsAbove : !fitsAbove && fitsBelow;
-  return { left, top: Math.max(POPUP_VIEWPORT_MARGIN, preferBelow ? below : above) };
+  const fits_below = below + size.height <= client_height - POPUP_VIEWPORT_MARGIN;
+  const fits_above = above >= POPUP_VIEWPORT_MARGIN;
+  const prefer_below =
+    placement.side === "below" ? fits_below || !fits_above : !fits_above && fits_below;
+  return { left, top: Math.max(POPUP_VIEWPORT_MARGIN, prefer_below ? below : above) };
 }

@@ -217,7 +217,7 @@ const QUERY_SCENARIO_ROWS: Partial<Record<QueryScenario, readonly number[]>> = {
   "autocomplete-first-key": [100_000],
 };
 
-function measuresQueryScenario(
+function measures_query_scenario(
   scenario: QueryScenario,
   rows: number,
   mode: BenchmarkMode,
@@ -273,15 +273,15 @@ interface IterationPlan extends Pick<MeasureOptions, "warmup" | "iters"> {
 }
 
 function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
-  const atScale = rows >= 500_000;
+  const at_scale = rows >= 500_000;
   switch (workload) {
     case "ingest":
     case "ingest-numeric-only":
-      return atScale ? { workload, warmup: 1, iters: 3 } : { workload, warmup: 1, iters: 7 };
+      return at_scale ? { workload, warmup: 1, iters: 3 } : { workload, warmup: 1, iters: 7 };
     case "windowRead":
       return { workload, warmup: 50, iters: 300 };
     case "edit":
-      return atScale ? { workload, warmup: 1, iters: 5 } : { workload, warmup: 1, iters: 15 };
+      return at_scale ? { workload, warmup: 1, iters: 5 } : { workload, warmup: 1, iters: 15 };
     case "sort":
     case "filter":
     case "multiFilter":
@@ -294,7 +294,7 @@ function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
     case "autofilter-dropdown":
     case "autofilter-apply-values":
     case "autocomplete-first-key":
-      return atScale
+      return at_scale
         ? { workload, warmup: 1, iters: 5 }
         : { workload, warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
     case "filter-value-set-50000":
@@ -334,18 +334,18 @@ interface HeapTrace {
 const KIB = 1024;
 
 /** Present only when `--heap-trace` asks for the diagnostic trace. */
-let heapTrace: HeapTrace | undefined;
+let heap_trace: HeapTrace | undefined;
 
-function recordHeap(workload: HeapTracePoint["workload"], completedSamples: number): void {
-  if (!heapTrace) return;
-  const scope = heapTrace.scope;
+function record_heap(workload: HeapTracePoint["workload"], completed_samples: number): void {
+  if (!heap_trace) return;
+  const scope = heap_trace.scope;
   if (!scope) throw new Error(`heap trace has no engine scope for ${workload}`);
 
   const memory = process.memoryUsage();
-  heapTrace.points.push({
+  heap_trace.points.push({
     ...scope,
     workload,
-    completedSamples,
+    completedSamples: completed_samples,
     heapUsedBytes: memory.heapUsed,
     rssBytes: memory.rss,
     maxRssBytes: process.resourceUsage().maxRSS * KIB,
@@ -363,9 +363,9 @@ function measure(
   fn: () => void,
   opts: IterationPlan & Pick<MeasureOptions, "before" | "after">,
 ): DataStat {
-  const collectAndRecord = (completedSamples: number): void => {
+  const collect_and_record = (completed_samples: number): void => {
     forceGc();
-    recordHeap(opts.workload, completedSamples);
+    record_heap(opts.workload, completed_samples);
   };
 
   let setups = 0;
@@ -377,7 +377,7 @@ function measure(
       opts.before?.();
 
       // Without a warm-up no teardown precedes the first sample, so its GC runs here.
-      if (setups === 0 && opts.warmup === 0) collectAndRecord(0);
+      if (setups === 0 && opts.warmup === 0) collect_and_record(0);
       setups += 1;
     },
     after: () => {
@@ -385,30 +385,30 @@ function measure(
 
       // collect() runs warm-up rounds through the same hook first. The last
       // warm-up's GC prepares the first sample; earlier warm-ups need none.
-      const completedSamples = teardowns + 1 - opts.warmup;
+      const completed_samples = teardowns + 1 - opts.warmup;
       teardowns += 1;
-      if (completedSamples >= 0) collectAndRecord(completedSamples);
+      if (completed_samples >= 0) collect_and_record(completed_samples);
     },
   });
   return { ...summarize(samples), samples };
 }
 
 /** Only ingests own the entire DOM; read/edit workloads keep their live grid. */
-async function measureIngest(
+async function measure_ingest(
   fn: () => void,
   opts: IterationPlan & Pick<MeasureOptions, "before" | "after">,
 ): Promise<DataStat> {
   const samples = new Array<number>(opts.iters);
-  let previousDocument: WeakRef<Document> | undefined;
+  let previous_document: WeakRef<Document> | undefined;
   for (let iteration = 0; iteration < opts.warmup + opts.iters; iteration++) {
-    if (previousDocument?.deref() === document) {
+    if (previous_document?.deref() === document) {
       throw new Error("An ingest reused the previous sample document");
     }
-    previousDocument = new WeakRef(document);
+    previous_document = new WeakRef(document);
     opts.before?.();
     if (iteration === 0 && opts.warmup === 0) {
       forceGc();
-      recordHeap(opts.workload, 0);
+      record_heap(opts.workload, 0);
     }
     try {
       if (iteration < opts.warmup) {
@@ -423,20 +423,20 @@ async function measureIngest(
         opts.after?.();
       } finally {
         // Closing the old global Window drops happy-dom's document-owned selector caches.
-        hotContainer = undefined;
+        hot_container = undefined;
         await resetBenchmarkDocument();
       }
     }
-    const completedSamples = iteration + 1 - opts.warmup;
-    if (completedSamples >= 0) {
+    const completed_samples = iteration + 1 - opts.warmup;
+    if (completed_samples >= 0) {
       forceGc();
-      recordHeap(opts.workload, completedSamples);
+      record_heap(opts.workload, completed_samples);
     }
   }
   return { ...summarize(samples), samples };
 }
 
-function perOperation(stat: DataStat, batch: number): DataStat {
+function per_operation(stat: DataStat, batch: number): DataStat {
   return {
     median: stat.median / batch,
     p95: stat.p95 / batch,
@@ -449,8 +449,8 @@ function perOperation(stat: DataStat, batch: number): DataStat {
   };
 }
 
-function measureBatched(fn: () => void, opts: IterationPlan, batch: number): DataStat {
-  return perOperation(
+function measure_batched(fn: () => void, opts: IterationPlan, batch: number): DataStat {
+  return per_operation(
     measure(() => {
       for (let i = 0; i < batch; i++) fn();
     }, opts),
@@ -531,8 +531,8 @@ export function expectedDataMatrixKeys(mode: BenchmarkMode): string[] {
           ["sheetwrite", SHEETWRITE_ROWS],
           ["handsontable", HANDSONTABLE_ROWS],
         ];
-  for (const [engine, rowsList] of engines) {
-    for (const rows of rowsList) {
+  for (const [engine, rows_list] of engines) {
+    for (const rows of rows_list) {
       for (const workload of WORKLOADS) keys.push(dataMatrixKey(engine, rows, workload));
       keys.push(dataMatrixKey(engine, rows, "memory"));
     }
@@ -547,7 +547,7 @@ export function expectedDataMatrixKeys(mode: BenchmarkMode): string[] {
  * query engine must report none. Rows recorded before the section existed omit
  * it and skip these checks.
  */
-function validateEngineQueries(
+function validate_engine_queries(
   engine: EngineId,
   rows: number,
   row: EngineResult,
@@ -572,10 +572,10 @@ function validateEngineQueries(
     const key = dataMatrixKey(engine, rows, scenario);
     const stat = queries[scenario];
     if (stat === undefined) {
-      if (measuresQueryScenario(scenario, rows, mode)) throw new Error(`${key} is missing`);
+      if (measures_query_scenario(scenario, rows, mode)) throw new Error(`${key} is missing`);
       continue;
     }
-    if (!measuresQueryScenario(scenario, rows, mode)) {
+    if (!measures_query_scenario(scenario, rows, mode)) {
       throw new Error(
         `data sheetwrite ${rows} reported query scenario ${scenario} outside its declared rows`,
       );
@@ -606,37 +606,37 @@ export function validateDataBenchmark(
   if (result.meta.freshDocumentBetweenIngestSamples !== true) {
     throw new Error("data metadata.freshDocumentBetweenIngestSamples must be true");
   }
-  const expectedSheetwriteRows = expectedMode === "smoke" ? [1_000] : [...SHEETWRITE_ROWS];
-  const expectedHandsontableRows = expectedMode === "smoke" ? [] : [...HANDSONTABLE_ROWS];
+  const expected_sheetwrite_rows = expectedMode === "smoke" ? [1_000] : [...SHEETWRITE_ROWS];
+  const expected_handsontable_rows = expectedMode === "smoke" ? [] : [...HANDSONTABLE_ROWS];
   if (
-    JSON.stringify(result.meta.sheetwriteRows) !== JSON.stringify(expectedSheetwriteRows) ||
-    JSON.stringify(result.meta.handsontableRows) !== JSON.stringify(expectedHandsontableRows)
+    JSON.stringify(result.meta.sheetwriteRows) !== JSON.stringify(expected_sheetwrite_rows) ||
+    JSON.stringify(result.meta.handsontableRows) !== JSON.stringify(expected_handsontable_rows)
   ) {
     throw new Error(`data ${expectedMode} metadata does not match its declared row matrices`);
   }
 
-  const resultFamilies = [
+  const result_families = [
     ["sheetwrite", result.sheetwrite],
     ["handsontable", result.handsontable],
   ] as const;
-  const observedKeys: string[] = [];
-  for (const [engine, records] of resultFamilies) {
-    for (const [rowsText, row] of Object.entries(records)) {
-      const rows = Number(rowsText);
+  const observed_keys: string[] = [];
+  for (const [engine, records] of result_families) {
+    for (const [rows_text, row] of Object.entries(records)) {
+      const rows = Number(rows_text);
       if (!Number.isInteger(rows) || rows <= 0 || row.rows !== rows) {
-        throw new Error(`data ${engine} row identity is malformed: ${rowsText}`);
+        throw new Error(`data ${engine} row identity is malformed: ${rows_text}`);
       }
       for (const workload of Object.keys(row.stats)) {
-        observedKeys.push(dataMatrixKey(engine, rows, workload as Workload));
+        observed_keys.push(dataMatrixKey(engine, rows, workload as Workload));
       }
-      if (row.memory !== undefined) observedKeys.push(dataMatrixKey(engine, rows, "memory"));
+      if (row.memory !== undefined) observed_keys.push(dataMatrixKey(engine, rows, "memory"));
     }
   }
-  validateExactMatrix("data", expectedDataMatrixKeys(expectedMode), observedKeys);
+  validateExactMatrix("data", expectedDataMatrixKeys(expectedMode), observed_keys);
 
-  for (const [engine, records] of resultFamilies) {
-    for (const [rowsText, row] of Object.entries(records)) {
-      const rows = Number(rowsText);
+  for (const [engine, records] of result_families) {
+    for (const [rows_text, row] of Object.entries(records)) {
+      const rows = Number(rows_text);
       for (const workload of WORKLOADS) {
         const key = dataMatrixKey(engine, rows, workload);
         const stat = row.stats[workload];
@@ -669,22 +669,22 @@ export function validateDataBenchmark(
       } else if (row.queryResources !== null) {
         throw new Error(`${engine} ${rows} queryResources must be null`);
       }
-      validateEngineQueries(engine, rows, row, expectedMode);
-      const memoryKey = dataMatrixKey(engine, rows, "memory");
-      assertFiniteNonNegative(row.memory.heapDeltaBytes, `${memoryKey}.heapDeltaBytes`);
+      validate_engine_queries(engine, rows, row, expectedMode);
+      const memory_key = dataMatrixKey(engine, rows, "memory");
+      assertFiniteNonNegative(row.memory.heapDeltaBytes, `${memory_key}.heapDeltaBytes`);
       if (row.memory.heapDeltaBytes >= 2 * 1024 * 1024 * 1024) {
-        throw new Error(`${memoryKey} exceeded the 2 GiB heap safety ceiling`);
+        throw new Error(`${memory_key} exceeded the 2 GiB heap safety ceiling`);
       }
       if (engine === "sheetwrite") {
         if (row.memory.wasmDeltaBytes === null) {
-          throw new Error(`${memoryKey}.wasmDeltaBytes is missing`);
+          throw new Error(`${memory_key}.wasmDeltaBytes is missing`);
         }
-        assertFiniteNonNegative(row.memory.wasmDeltaBytes, `${memoryKey}.wasmDeltaBytes`);
+        assertFiniteNonNegative(row.memory.wasmDeltaBytes, `${memory_key}.wasmDeltaBytes`);
         if (row.memory.wasmDeltaBytes >= 1024 * 1024 * 1024) {
-          throw new Error(`${memoryKey} exceeded the 1 GiB WASM safety ceiling`);
+          throw new Error(`${memory_key} exceeded the 1 GiB WASM safety ceiling`);
         }
       } else if (row.memory.wasmDeltaBytes !== null) {
-        throw new Error(`${memoryKey}.wasmDeltaBytes must be null for handsontable`);
+        throw new Error(`${memory_key}.wasmDeltaBytes must be null for handsontable`);
       }
     }
   }
@@ -700,14 +700,14 @@ const AUTO_FILTER_LIST_LIMIT = 10_000;
  * header), applying a value filter to city, and opening city's dropdown while
  * that filter is on, which lists the column's values and the kept ones.
  */
-function measureAutoFilter(
-  queryStore: SheetwriteStore,
+function measure_auto_filter(
+  query_store: SheetwriteStore,
   ds: ColumnarDataset,
   rows: number,
   queries: Partial<Record<QueryScenario, DataStat>>,
   measures: (scenario: QueryScenario) => boolean,
 ): void {
-  const engine = storeEngine(queryStore);
+  const engine = storeEngine(query_store);
   if (!engine) throw new Error("autofilter: the query store has no engine");
   const range = {
     sheet: SHEET,
@@ -715,31 +715,31 @@ function measureAutoFilter(
     end: { row: rows - 1, col: COLUMNS.length - 1 },
   };
   const filter = { kind: "values" as const, values: AUTO_FILTER_CITIES };
-  const keptRows = ds.city.slice(1).filter((city) => AUTO_FILTER_CITIES.includes(city)).length;
-  const listedCities = new Set(ds.city.slice(1)).size;
-  queryStore.applyTransaction({
+  const kept_rows = ds.city.slice(1).filter((city) => AUTO_FILTER_CITIES.includes(city)).length;
+  const listed_cities = new Set(ds.city.slice(1)).size;
+  query_store.applyTransaction({
     patches: [{ op: "setSheetMeta", sheet: SHEET, patch: { autoFilter: { range }, filters: [] } }],
   });
 
   if (measures("autofilter-apply-values")) {
     queries["autofilter-apply-values"] = measure(
-      () => queryStore.setColumnFilter(SHEET, COL.city, filter),
+      () => query_store.setColumnFilter(SHEET, COL.city, filter),
       {
         ...plan("autofilter-apply-values", rows),
-        after: () => queryStore.setColumnFilter(SHEET, COL.city, null),
+        after: () => query_store.setColumnFilter(SHEET, COL.city, null),
       },
     );
   }
 
-  queryStore.setColumnFilter(SHEET, COL.city, filter);
+  query_store.setColumnFilter(SHEET, COL.city, filter);
   // The header row stays; the body keeps the three cities' rows.
-  if (queryStore.viewRowCount(SHEET) !== 1 + keptRows) {
-    throw new Error(`autofilter ${rows}: ${queryStore.viewRowCount(SHEET)} rows shown`);
+  if (query_store.viewRowCount(SHEET) !== 1 + kept_rows) {
+    throw new Error(`autofilter ${rows}: ${query_store.viewRowCount(SHEET)} rows shown`);
   }
 
   if (measures("autofilter-dropdown")) {
     // What a dropdown lists, from the sheet as the grid holds it.
-    const sheet = queryStore.getWorkbook().sheets.find((candidate) => candidate.id === SHEET);
+    const sheet = query_store.getWorkbook().sheets.find((candidate) => candidate.id === SHEET);
     if (!sheet) throw new Error(`autofilter ${rows}: no ${SHEET} sheet`);
     let listed: ReturnType<typeof autoFilterValues> | undefined;
     queries["autofilter-dropdown"] = measure(
@@ -748,24 +748,27 @@ function measureAutoFilter(
       },
       plan("autofilter-dropdown", rows),
     );
-    if (listed?.values.length !== listedCities || listed.kept?.length !== 3) {
+    if (listed?.values.length !== listed_cities || listed.kept?.length !== 3) {
       throw new Error(`autofilter ${rows}: the dropdown listed the wrong values`);
     }
   }
 
-  queryStore.applyTransaction({
+  query_store.applyTransaction({
     patches: [{ op: "setSheetMeta", sheet: SHEET, patch: { autoFilter: null, filters: [] } }],
   });
 }
 
-function makeWorkbook(rowCount: number): Workbook {
+function make_workbook(row_count: number): Workbook {
   const columns: Column[] = COLUMNS.map((c) => ({
     key: c.key,
     header: c.header,
     width: c.width,
     type: c.type,
   }));
-  return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+  return {
+    activeSheet: SHEET,
+    sheets: [{ id: SHEET, name: "Bench", rowCount: row_count, columns }],
+  };
 }
 
 /**
@@ -773,7 +776,7 @@ function makeWorkbook(rowCount: number): Workbook {
  * of the row index, so the read-back check can recompute the expected value at
  * any row instead of keeping a second copy of the data.
  */
-function numericIngestValue(column: number, row: number): number {
+function numeric_ingest_value(column: number, row: number): number {
   switch (column) {
     case 0:
       return row + 1;
@@ -789,25 +792,28 @@ function numericIngestValue(column: number, row: number): number {
 }
 
 /** Workbook for the all-numeric ingest: five number columns, no text at all. */
-function makeNumericIngestWorkbook(rowCount: number): Workbook {
+function make_numeric_ingest_workbook(row_count: number): Workbook {
   const columns: Column[] = NUMERIC_INGEST_KEYS.map((key, index) => ({
     key,
     header: `N${index + 1}`,
     width: NUMERIC_COLUMN_WIDTH,
     type: "number",
   }));
-  return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+  return {
+    activeSheet: SHEET,
+    sheets: [{ id: SHEET, name: "Bench", rowCount: row_count, columns }],
+  };
 }
 
-/** Five dense number columns built from {@link numericIngestValue}. */
-function makeNumericIngestData(rowCount: number): ColumnarData {
+/** Five dense number columns built from {@link numeric_ingest_value}. */
+function make_numeric_ingest_data(row_count: number): ColumnarData {
   const columns: Record<string, Float64Array> = {};
   for (const [index, key] of NUMERIC_INGEST_KEYS.entries()) {
-    const values = new Float64Array(rowCount);
-    for (let row = 0; row < rowCount; row++) values[row] = numericIngestValue(index, row);
+    const values = new Float64Array(row_count);
+    for (let row = 0; row < row_count; row++) values[row] = numeric_ingest_value(index, row);
     columns[key] = values;
   }
-  return { rowCount, columns };
+  return { rowCount: row_count, columns };
 }
 
 /**
@@ -824,11 +830,11 @@ interface GroupedCustomerFixture {
   readonly date: string[];
 }
 
-function makeGroupedCustomerFixture(rowCount: number): GroupedCustomerFixture {
-  const customer = new Array<string>(rowCount);
-  const amount = new Float64Array(rowCount);
-  const date = new Array<string>(rowCount);
-  for (let row = 0; row < rowCount; row++) {
+function make_grouped_customer_fixture(row_count: number): GroupedCustomerFixture {
+  const customer = new Array<string>(row_count);
+  const amount = new Float64Array(row_count);
+  const date = new Array<string>(row_count);
+  for (let row = 0; row < row_count; row++) {
     const occurrence = Math.floor(row / MULTI_KEY_GROUP_COUNT);
     const group = (row % MULTI_KEY_GROUP_COUNT) + 1;
     customer[row] = `Customer ${String(group).padStart(CUSTOMER_KEY_DIGITS, "0")}`;
@@ -842,11 +848,11 @@ function makeGroupedCustomerFixture(rowCount: number): GroupedCustomerFixture {
 }
 
 /** Store over the grouped-customer fixture, with the seeded id and city. */
-function makeGroupedCustomerStore(
+function make_grouped_customer_store(
   ds: ColumnarDataset,
   fixture: GroupedCustomerFixture,
 ): SheetwriteStore {
-  return new SheetwriteStore(makeWorkbook(ds.rowCount), {
+  return new SheetwriteStore(make_workbook(ds.rowCount), {
     rowCount: ds.rowCount,
     columns: {
       id: ds.id,
@@ -863,11 +869,11 @@ function makeGroupedCustomerStore(
  * has its amount cells rewritten by the edit workload, so an expectation read
  * from the dataset would no longer describe it.
  */
-function makeSeededQueryStore(ds: ColumnarDataset): SheetwriteStore {
-  return new SheetwriteStore(makeWorkbook(ds.rowCount), toSheetwriteColumnar(ds));
+function make_seeded_query_store(ds: ColumnarDataset): SheetwriteStore {
+  return new SheetwriteStore(make_workbook(ds.rowCount), toSheetwriteColumnar(ds));
 }
 
-function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
+function probe_query_resources(ds: ColumnarDataset): QueryResourceMetrics {
   const store = new (getEngine().CellStore)();
 
   try {
@@ -890,8 +896,8 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
     );
     const low = store.distinctValues(sheet, 0, 0);
     const high = store.distinctValues(sheet, 1, 0);
-    const lowDistinctCount = low.takeKinds().length;
-    const highDistinctCount = high.takeKinds().length;
+    const low_distinct_count = low.takeKinds().length;
+    const high_distinct_count = high.takeKinds().length;
     low.free();
     high.free();
 
@@ -900,8 +906,8 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
     return {
       composedFilterMatches: matched.length,
       containsCacheConstructions: stats[0] ?? 0,
-      lowDistinctCount,
-      highDistinctCount,
+      lowDistinctCount: low_distinct_count,
+      highDistinctCount: high_distinct_count,
       ownedDistinctStrings: stats[1] ?? 0,
     };
   } finally {
@@ -909,7 +915,7 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   }
 }
 
-async function benchSheetwrite(
+async function bench_sheetwrite(
   ds: ColumnarDataset,
   columnar: SheetwriteColumnar,
   mode: BenchmarkMode,
@@ -918,10 +924,10 @@ async function benchSheetwrite(
   const stats = {} as Record<Workload, DataStat>;
 
   // (a) ingest — a fresh store per timed iteration loads all columns into WASM.
-  let storeSink: SheetwriteStore | undefined;
-  stats.ingest = await measureIngest(
+  let store_sink: SheetwriteStore | undefined;
+  stats.ingest = await measure_ingest(
     () => {
-      storeSink = new SheetwriteStore(makeWorkbook(rows), columnar);
+      store_sink = new SheetwriteStore(make_workbook(rows), columnar);
     },
     {
       ...plan("ingest", rows),
@@ -929,23 +935,23 @@ async function benchSheetwrite(
         // Free this iteration's store before the GC that follows it: its WASM
         // allocations are reclaimed deterministically instead of accumulating
         // across iterations/rounds. The shared linear memory remains reusable.
-        storeSink?.dispose();
-        storeSink = undefined;
+        store_sink?.dispose();
+        store_sink = undefined;
       },
     },
   );
 
   // One persistent store backs the remaining read/mutate workloads.
-  const store = new SheetwriteStore(makeWorkbook(rows), columnar);
+  const store = new SheetwriteStore(make_workbook(rows), columnar);
 
   // (b) windowRead — rotate the start offset by a coprime stride to defeat any
   // per-window caching and sweep the whole sheet.
-  const maxStart = Math.max(0, rows - WINDOW_ROWS);
+  const max_start = Math.max(0, rows - WINDOW_ROWS);
   let off = 0;
-  stats.windowRead = measureBatched(
+  stats.windowRead = measure_batched(
     () => {
       const start = off;
-      off = off + 977 > maxStart ? 0 : off + 977;
+      off = off + 977 > max_start ? 0 : off + 977;
       store.getVisibleWindow(SHEET, { start, end: start + WINDOW_ROWS }, ALL_COLS);
     },
     plan("windowRead", rows),
@@ -993,33 +999,33 @@ async function benchSheetwrite(
   );
   store.clearView(SHEET);
 
-  let distinctSink = 0;
+  let distinct_sink = 0;
   stats.distinctLow = measure(
     () => {
-      distinctSink = store.distinctValues(SHEET, COL.city, 0).length;
+      distinct_sink = store.distinctValues(SHEET, COL.city, 0).length;
     },
     plan("distinctLow", rows),
   );
   stats.distinctHigh = measure(
     () => {
-      distinctSink = store.distinctValues(SHEET, COL.customer, 0).length;
+      distinct_sink = store.distinctValues(SHEET, COL.customer, 0).length;
     },
     plan("distinctHigh", rows),
   );
 
-  const queryResources = probeQueryResources(ds);
+  const query_resources = probe_query_resources(ds);
   store.clearView(SHEET);
-  void distinctSink;
+  void distinct_sink;
   // (f) aggregate — WASM column sum.
-  let aggSink = 0;
-  stats.aggregate = measureBatched(
+  let agg_sink = 0;
+  stats.aggregate = measure_batched(
     () => {
-      aggSink = store.aggregate(SHEET, AGG_COL, "sum");
+      agg_sink = store.aggregate(SHEET, AGG_COL, "sum");
     },
     plan("aggregate", rows),
     rows <= 10_000 ? SMALL_AGGREGATE_BATCH : 1,
   );
-  void aggSink;
+  void agg_sink;
 
   // (g) Query scenarios. Each one measures a fixture store built from the
   // pristine seeded rows and re-reads its complete result through the public
@@ -1028,75 +1034,75 @@ async function benchSheetwrite(
   // Scenarios without a declared row list run at every size.
   const queries = {} as Record<QueryScenario, DataStat>;
   const measures = (scenario: QueryScenario): boolean =>
-    measuresQueryScenario(scenario, rows, mode);
-  const queryStore = makeSeededQueryStore(ds);
+    measures_query_scenario(scenario, rows, mode);
+  const query_store = make_seeded_query_store(ds);
 
   if (measures("sort-multi-key")) {
     // The seeded rows have unique customers, so their order never reaches the
     // second sort key. The grouped fixture repeats the leading key on purpose.
-    const fixture = makeGroupedCustomerFixture(rows);
-    const groupedStore = makeGroupedCustomerStore(ds, fixture);
-    queries["sort-multi-key"] = measure(() => groupedStore.setViewSort(SHEET, MULTI_KEY_SORT), {
+    const fixture = make_grouped_customer_fixture(rows);
+    const grouped_store = make_grouped_customer_store(ds, fixture);
+    queries["sort-multi-key"] = measure(() => grouped_store.setViewSort(SHEET, MULTI_KEY_SORT), {
       ...plan("sort-multi-key", rows),
-      after: () => groupedStore.setViewSort(SHEET, []),
+      after: () => grouped_store.setViewSort(SHEET, []),
     });
-    groupedStore.setViewSort(SHEET, MULTI_KEY_SORT);
-    assertViewMatchesRows(
+    grouped_store.setViewSort(SHEET, MULTI_KEY_SORT);
+    assert_view_matches_rows(
       `sort-multi-key ${rows}`,
-      groupedStore,
+      grouped_store,
       MULTI_KEY_VIEW_COLS,
-      expectedGroupedSortOrder(ds, fixture),
-      groupedRowSource(ds, fixture),
+      expected_grouped_sort_order(ds, fixture),
+      grouped_row_source(ds, fixture),
     );
-    groupedStore.dispose();
+    grouped_store.dispose();
   }
 
   // One key over the candidate rows a city filter leaves behind.
   if (measures("sort-with-candidates")) {
-    queryStore.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
+    query_store.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
     queries["sort-with-candidates"] = measure(
-      () => queryStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]),
+      () => query_store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]),
       {
         ...plan("sort-with-candidates", rows),
-        after: () => queryStore.setViewSort(SHEET, []),
+        after: () => query_store.setViewSort(SHEET, []),
       },
     );
-    queryStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
-    assertViewMatchesRows(
+    query_store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
+    assert_view_matches_rows(
       `sort-with-candidates ${rows}`,
-      queryStore,
+      query_store,
       CANDIDATE_CHECK_COLS,
-      expectedCandidateSortOrder(ds),
-      seededRowSource(ds),
+      expected_candidate_sort_order(ds),
+      seeded_row_source(ds),
     );
-    queryStore.clearView(SHEET);
+    query_store.clearView(SHEET);
   }
 
   for (const scenario of VALUE_SET_SCENARIOS) {
     if (!measures(scenario)) continue;
-    const pickedCount = Math.min(VALUE_SET_PICK_COUNTS[scenario], rows);
+    const picked_count = Math.min(VALUE_SET_PICK_COUNTS[scenario], rows);
     // The customer column is unique per row, so each pick matches exactly once.
-    const picked = ds.customer.slice(0, pickedCount);
+    const picked = ds.customer.slice(0, picked_count);
     queries[scenario] = measure(
-      () => queryStore.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked }),
+      () => query_store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked }),
       {
         ...plan(scenario, rows),
-        after: () => queryStore.setColumnFilter(SHEET, COL.customer, null),
+        after: () => query_store.setColumnFilter(SHEET, COL.customer, null),
       },
     );
-    queryStore.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked });
-    assertViewMatchesRows(
+    query_store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked });
+    assert_view_matches_rows(
       `filter ${scenario} ${rows}`,
-      queryStore,
+      query_store,
       [COL.customer],
-      expectedPickedRowIds(pickedCount),
-      seededRowSource(ds),
+      expected_picked_row_ids(picked_count),
+      seeded_row_source(ds),
     );
-    queryStore.clearView(SHEET);
+    query_store.clearView(SHEET);
   }
 
   if (measures("autofilter-dropdown") || measures("autofilter-apply-values")) {
-    measureAutoFilter(queryStore, ds, rows, queries, measures);
+    measure_auto_filter(query_store, ds, rows, queries, measures);
   }
 
   if (measures("autocomplete-first-key")) {
@@ -1105,18 +1111,18 @@ async function benchSheetwrite(
     // the first letter. Every customer is distinct and begins with "C", the
     // worst case: all 100,000 entries match, so nothing is completed. A later
     // key of the same edit then completes the last row's entry.
-    const engine = storeEngine(queryStore);
+    const engine = storeEngine(query_store);
     if (!engine) throw new Error("autocomplete: the query store has no engine");
     const sheet = {
       engine,
       sheet: SHEET,
-      sorted: queryStore.hasView(SHEET),
+      sorted: query_store.hasView(SHEET),
       rowCount: rows,
-      toDataRow: (viewRow: number) => viewRow,
-      filled: (viewRow: number, col: number) =>
-        queryStore.getCell({ sheet: SHEET, row: viewRow, col }).resolved !== null,
-      dataEdge: (viewRow: number, col: number, dRow: number, dCol: number) =>
-        queryStore.dataEdge(SHEET, viewRow, col, dRow, dCol),
+      toDataRow: (view_row: number) => view_row,
+      filled: (view_row: number, col: number) =>
+        query_store.getCell({ sheet: SHEET, row: view_row, col }).resolved !== null,
+      dataEdge: (view_row: number, col: number, d_row: number, d_col: number) =>
+        query_store.dataEdge(SHEET, view_row, col, d_row, d_col),
     };
     let completed: string | null = "";
     queries["autocomplete-first-key"] = measure(
@@ -1135,46 +1141,46 @@ async function benchSheetwrite(
   }
 
   if (measures("ingest-numeric-only")) {
-    const numericData = makeNumericIngestData(rows);
-    let numericSink: SheetwriteStore | undefined;
-    queries["ingest-numeric-only"] = await measureIngest(
+    const numeric_data = make_numeric_ingest_data(rows);
+    let numeric_sink: SheetwriteStore | undefined;
+    queries["ingest-numeric-only"] = await measure_ingest(
       () => {
-        numericSink = new SheetwriteStore(makeNumericIngestWorkbook(rows), numericData);
+        numeric_sink = new SheetwriteStore(make_numeric_ingest_workbook(rows), numeric_data);
       },
       {
         ...plan("ingest-numeric-only", rows),
         after: () => {
           // Check each loaded store before it is released for the next GC.
-          if (!numericSink) throw new Error(`ingest-numeric-only ${rows} built no store`);
-          assertNumericIngest(`ingest-numeric-only ${rows}`, numericSink, rows);
-          numericSink.dispose();
-          numericSink = undefined;
+          if (!numeric_sink) throw new Error(`ingest-numeric-only ${rows} built no store`);
+          assert_numeric_ingest(`ingest-numeric-only ${rows}`, numeric_sink, rows);
+          numeric_sink.dispose();
+          numeric_sink = undefined;
         },
       },
     );
   }
 
-  queryStore.dispose();
+  query_store.dispose();
   store.dispose();
-  return { rows, stats, notes: {}, queryResources, queries };
+  return { rows, stats, notes: {}, queryResources: query_resources, queries };
 }
 
 /** Source value of one fixture cell, addressed by workbook column and data row. */
 type RowSource = (column: number, dataRow: number) => CellScalar;
 
-function seededRowSource(ds: ColumnarDataset): RowSource {
-  return (column, dataRow) => {
+function seeded_row_source(ds: ColumnarDataset): RowSource {
+  return (column, data_row) => {
     switch (column) {
       case COL.id:
-        return dataRow + 1;
+        return data_row + 1;
       case COL.date:
-        return ds.date[dataRow] ?? null;
+        return ds.date[data_row] ?? null;
       case COL.customer:
-        return ds.customer[dataRow] ?? null;
+        return ds.customer[data_row] ?? null;
       case COL.city:
-        return ds.city[dataRow] ?? null;
+        return ds.city[data_row] ?? null;
       case COL.amount:
-        return ds.amount[dataRow] ?? null;
+        return ds.amount[data_row] ?? null;
       default:
         throw new Error(`no seeded source value for column ${column}`);
     }
@@ -1182,18 +1188,18 @@ function seededRowSource(ds: ColumnarDataset): RowSource {
 }
 
 /** Seeded rows with the fixture's customer, amount and date columns. */
-function groupedRowSource(ds: ColumnarDataset, fixture: GroupedCustomerFixture): RowSource {
-  const seeded = seededRowSource(ds);
-  return (column, dataRow) => {
+function grouped_row_source(ds: ColumnarDataset, fixture: GroupedCustomerFixture): RowSource {
+  const seeded = seeded_row_source(ds);
+  return (column, data_row) => {
     switch (column) {
       case COL.customer:
-        return fixture.customer[dataRow] ?? null;
+        return fixture.customer[data_row] ?? null;
       case COL.amount:
-        return fixture.amount[dataRow] ?? null;
+        return fixture.amount[data_row] ?? null;
       case COL.date:
-        return fixture.date[dataRow] ?? null;
+        return fixture.date[data_row] ?? null;
       default:
-        return seeded(column, dataRow);
+        return seeded(column, data_row);
     }
   };
 }
@@ -1203,18 +1209,21 @@ function groupedRowSource(ds: ColumnarDataset, fixture: GroupedCustomerFixture):
  * by the engine under test: customer ascending, amount descending, date
  * ascending, then row id.
  */
-function expectedGroupedSortOrder(ds: ColumnarDataset, fixture: GroupedCustomerFixture): number[] {
+function expected_grouped_sort_order(
+  ds: ColumnarDataset,
+  fixture: GroupedCustomerFixture,
+): number[] {
   const rows = Array.from({ length: ds.rowCount }, (_, row) => row);
   rows.sort((left, right) => {
-    const leftCustomer = fixture.customer[left] ?? "";
-    const rightCustomer = fixture.customer[right] ?? "";
-    if (leftCustomer !== rightCustomer) return leftCustomer < rightCustomer ? -1 : 1;
-    const leftAmount = fixture.amount[left] ?? 0;
-    const rightAmount = fixture.amount[right] ?? 0;
-    if (leftAmount !== rightAmount) return rightAmount < leftAmount ? -1 : 1;
-    const leftDate = fixture.date[left] ?? "";
-    const rightDate = fixture.date[right] ?? "";
-    if (leftDate !== rightDate) return leftDate < rightDate ? -1 : 1;
+    const left_customer = fixture.customer[left] ?? "";
+    const right_customer = fixture.customer[right] ?? "";
+    if (left_customer !== right_customer) return left_customer < right_customer ? -1 : 1;
+    const left_amount = fixture.amount[left] ?? 0;
+    const right_amount = fixture.amount[right] ?? 0;
+    if (left_amount !== right_amount) return right_amount < left_amount ? -1 : 1;
+    const left_date = fixture.date[left] ?? "";
+    const right_date = fixture.date[right] ?? "";
+    if (left_date !== right_date) return left_date < right_date ? -1 : 1;
     return left - right;
   });
   return rows.map((row) => row + 1);
@@ -1224,14 +1233,14 @@ function expectedGroupedSortOrder(ds: ColumnarDataset, fixture: GroupedCustomerF
  * Expected candidate sort order: the city-filter rows by amount ascending, then
  * row id — again computed here, not by the engine under test.
  */
-function expectedCandidateSortOrder(ds: ColumnarDataset): number[] {
+function expected_candidate_sort_order(ds: ColumnarDataset): number[] {
   const rows = Array.from({ length: ds.rowCount }, (_, row) => row).filter(
     (row) => ds.city[row] === FILTER_NEEDLE,
   );
   rows.sort((left, right) => {
-    const leftAmount = ds.amount[left] ?? 0;
-    const rightAmount = ds.amount[right] ?? 0;
-    if (leftAmount !== rightAmount) return leftAmount < rightAmount ? -1 : 1;
+    const left_amount = ds.amount[left] ?? 0;
+    const right_amount = ds.amount[right] ?? 0;
+    if (left_amount !== right_amount) return left_amount < right_amount ? -1 : 1;
     return left - right;
   });
   return rows.map((row) => row + 1);
@@ -1241,8 +1250,8 @@ function expectedCandidateSortOrder(ds: ColumnarDataset): number[] {
  * The value-set filter picks the first rows' customers, one distinct value per
  * row, so exactly those rows must survive, in ascending row order.
  */
-function expectedPickedRowIds(pickedCount: number): number[] {
-  return Array.from({ length: pickedCount }, (_, row) => row + 1);
+function expected_picked_row_ids(picked_count: number): number[] {
+  return Array.from({ length: picked_count }, (_, row) => row + 1);
 }
 
 /**
@@ -1252,34 +1261,34 @@ function expectedPickedRowIds(pickedCount: number): number[] {
  * subset, a wrong order, or a wrong value therefore fails. The seeded `id`
  * column doubles as the data-row identity (`id = row + 1`).
  */
-function assertViewMatchesRows(
+function assert_view_matches_rows(
   label: string,
   store: SheetwriteStore,
-  checkCols: readonly number[],
-  expectedIds: readonly number[],
-  sourceValue: RowSource,
+  check_cols: readonly number[],
+  expected_ids: readonly number[],
+  source_value: RowSource,
 ): void {
   const total = store.viewRowCount(SHEET);
-  if (total !== expectedIds.length) {
-    throw new Error(`${label}: the view holds ${total} rows, expected ${expectedIds.length}`);
+  if (total !== expected_ids.length) {
+    throw new Error(`${label}: the view holds ${total} rows, expected ${expected_ids.length}`);
   }
-  const cols = [COL.id, ...checkCols];
+  const cols = [COL.id, ...check_cols];
   for (let start = 0; start < total; start += VIEW_CHECK_WINDOW_ROWS) {
     const end = Math.min(start + VIEW_CHECK_WINDOW_ROWS, total);
     const view = store.getVisibleWindow(SHEET, { start, end }, cols);
     for (let position = start; position < end; position++) {
       const base = (position - start) * cols.length;
-      const observedId = Number(view.values[base] ?? Number.NaN);
-      const expectedId = expectedIds[position] ?? Number.NaN;
-      if (observedId !== expectedId) {
+      const observed_id = Number(view.values[base] ?? Number.NaN);
+      const expected_id = expected_ids[position] ?? Number.NaN;
+      if (observed_id !== expected_id) {
         throw new Error(
-          `${label}: view row ${position} holds id ${observedId}, expected ${expectedId}`,
+          `${label}: view row ${position} holds id ${observed_id}, expected ${expected_id}`,
         );
       }
-      const dataRow = observedId - 1;
-      for (const [offset, column] of checkCols.entries()) {
+      const data_row = observed_id - 1;
+      for (const [offset, column] of check_cols.entries()) {
         const observed = view.values[base + offset + 1] ?? null;
-        const expected = sourceValue(column, dataRow);
+        const expected = source_value(column, data_row);
         if (observed !== expected) {
           throw new Error(
             `${label}: view row ${position} column ${column} holds ${String(observed)}, expected ${String(expected)}`,
@@ -1291,17 +1300,17 @@ function assertViewMatchesRows(
 }
 
 /** Reads the ingested numbers back and compares them with their source formula. */
-function assertNumericIngest(label: string, store: SheetwriteStore, rows: number): void {
-  const lastRow = rows - 1;
-  const middleRow = Math.floor(lastRow / 2);
-  const sampledRows = middleRow > 0 ? [0, middleRow, lastRow] : [0, lastRow];
-  for (const row of sampledRows) {
+function assert_numeric_ingest(label: string, store: SheetwriteStore, rows: number): void {
+  const last_row = rows - 1;
+  const middle_row = Math.floor(last_row / 2);
+  const sampled_rows = middle_row > 0 ? [0, middle_row, last_row] : [0, last_row];
+  for (const row of sampled_rows) {
     const view = store.getVisibleWindow(SHEET, { start: row, end: row + 1 }, ALL_COLS);
     if (view.values.length !== NUMERIC_INGEST_KEYS.length) {
       throw new Error(`${label}: row ${row} read back ${view.values.length} columns`);
     }
     for (let col = 0; col < NUMERIC_INGEST_KEYS.length; col++) {
-      const expected = numericIngestValue(col, row);
+      const expected = numeric_ingest_value(col, row);
       const observed = view.values[col];
       if (typeof observed !== "number" || observed !== expected) {
         throw new Error(
@@ -1311,17 +1320,17 @@ function assertNumericIngest(label: string, store: SheetwriteStore, rows: number
     }
   }
 }
-function warmSheetwriteDataPath(): void {
+function warm_sheetwrite_data_path(): void {
   const rows = 10_000;
   const ds = makeColumnar(rows);
   const columnar = toSheetwriteColumnar(ds);
 
   // Warm constructor/load and JS↔WASM call paths before recording sub-ms medians.
   for (let i = 0; i < 3; i++) {
-    new SheetwriteStore(makeWorkbook(rows), columnar).dispose();
+    new SheetwriteStore(make_workbook(rows), columnar).dispose();
   }
 
-  const store = new SheetwriteStore(makeWorkbook(rows), columnar);
+  const store = new SheetwriteStore(make_workbook(rows), columnar);
   for (let i = 0; i < 100; i++) {
     const start = (i * 97) % (rows - WINDOW_ROWS);
     store.getVisibleWindow(SHEET, { start, end: start + WINDOW_ROWS }, ALL_COLS);
@@ -1342,20 +1351,23 @@ function warmSheetwriteDataPath(): void {
 
   store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
   store.clearView(SHEET);
-  const smallRows = 1_000;
-  const smallDs = makeColumnar(smallRows);
-  const smallStore = new SheetwriteStore(makeWorkbook(smallRows), toSheetwriteColumnar(smallDs));
-  smallStore.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
-  smallStore.setViewSort(SHEET, MULTI_KEY_SORT);
-  smallStore.setColumnFilter(SHEET, COL.customer, {
+  const small_rows = 1_000;
+  const small_ds = makeColumnar(small_rows);
+  const small_store = new SheetwriteStore(
+    make_workbook(small_rows),
+    toSheetwriteColumnar(small_ds),
+  );
+  small_store.setViewSort(SHEET, [{ col: SORT_COL, ascending: true }]);
+  small_store.setViewSort(SHEET, MULTI_KEY_SORT);
+  small_store.setColumnFilter(SHEET, COL.customer, {
     kind: "values",
-    values: smallDs.customer.slice(0, 8),
+    values: small_ds.customer.slice(0, 8),
   });
-  smallStore.clearView(SHEET);
-  smallStore.dispose();
+  small_store.clearView(SHEET);
+  small_store.dispose();
   new SheetwriteStore(
-    makeNumericIngestWorkbook(smallRows),
-    makeNumericIngestData(smallRows),
+    make_numeric_ingest_workbook(small_rows),
+    make_numeric_ingest_data(small_rows),
   ).dispose();
 
   store.filterBy(SHEET, FILTER_COL, FILTER_NEEDLE);
@@ -1365,7 +1377,7 @@ function warmSheetwriteDataPath(): void {
 }
 
 /** Equivalent Handsontable config: same columns, virtualization on, plugins enabled. */
-function hotOptions(data: CellValue[][]): GridSettings {
+function hot_options(data: CellValue[][]): GridSettings {
   return {
     data,
     columns: COLUMNS.map((c, i) => ({ data: i, type: c.type === "number" ? "numeric" : "text" })),
@@ -1382,18 +1394,18 @@ function hotOptions(data: CellValue[][]): GridSettings {
   };
 }
 
-let hotContainer: HTMLElement | undefined;
+let hot_container: HTMLElement | undefined;
 function container(): HTMLElement {
-  if (!hotContainer) {
-    hotContainer = document.createElement("div");
-    hotContainer.style.width = "900px";
-    hotContainer.style.height = "480px";
-    document.body.appendChild(hotContainer);
+  if (!hot_container) {
+    hot_container = document.createElement("div");
+    hot_container.style.width = "900px";
+    hot_container.style.height = "480px";
+    document.body.appendChild(hot_container);
   }
-  return hotContainer;
+  return hot_container;
 }
 
-async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult, "memory">> {
+async function bench_handsontable(ds: ColumnarDataset): Promise<Omit<EngineResult, "memory">> {
   const rows = ds.rowCount;
   const stats = {} as Record<Workload, DataStat>;
   const notes: Partial<Record<Workload, string>> = {};
@@ -1410,29 +1422,29 @@ async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult
   // (a) ingest — a fresh instance per timed iteration; construction builds the
   // data map + index and renders the viewport (all rows, headless). Destroyed
   // in the untimed teardown.
-  let ingestHot: HotInstance | undefined;
-  let ingestHost: HTMLElement | undefined;
+  let ingest_hot: HotInstance | undefined;
+  let ingest_host: HTMLElement | undefined;
   try {
-    stats.ingest = await measureIngest(
+    stats.ingest = await measure_ingest(
       () => {
-        if (!ingestHost) throw new Error("Handsontable ingest has no sample host");
-        ingestHot = createHandsontable(ingestHost, hotOptions(toAoA(ds)));
+        if (!ingest_host) throw new Error("Handsontable ingest has no sample host");
+        ingest_hot = createHandsontable(ingest_host, hot_options(toAoA(ds)));
       },
       {
         ...plan("ingest", rows),
         before: () => {
-          ingestHost = container();
+          ingest_host = container();
         },
         after: () => {
           try {
-            if (ingestHot && ingestHot.rootElement.ownerDocument !== document) {
+            if (ingest_hot && ingest_hot.rootElement.ownerDocument !== document) {
               throw new Error("Handsontable ingest used a stale benchmark document");
             }
           } finally {
-            ingestHot?.destroy();
-            ingestHot = undefined;
+            ingest_hot?.destroy();
+            ingest_hot = undefined;
             // The host also owns its old document; drop it before reset and GC.
-            ingestHost = undefined;
+            ingest_host = undefined;
           }
         },
       },
@@ -1441,21 +1453,21 @@ async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult
     notes.ingest = `headless limitation: ${(err as Error).message}`;
     stats.ingest = { ...summarize([]), samples: [] };
   } finally {
-    ingestHot?.destroy();
+    ingest_hot?.destroy();
   }
 
   // Persistent instance for the remaining workloads.
   const host = container();
-  const hot = createHandsontable(host, hotOptions(toAoA(ds)));
+  const hot = createHandsontable(host, hot_options(toAoA(ds)));
 
   // (b) windowRead — read the same 50×5 range via getData at rotating offsets.
-  const maxStart = Math.max(0, rows - WINDOW_ROWS);
+  const max_start = Math.max(0, rows - WINDOW_ROWS);
   let off = 0;
   stats.windowRead = guard("windowRead", () =>
     measure(
       () => {
         const start = off;
-        off = off + 977 > maxStart ? 0 : off + 977;
+        off = off + 977 > max_start ? 0 : off + 977;
         hot.getData(start, 0, start + WINDOW_ROWS - 1, 4);
       },
       plan("windowRead", rows),
@@ -1525,11 +1537,11 @@ async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult
       },
     ),
   );
-  let distinctSink = 0;
+  let distinct_sink = 0;
   stats.distinctLow = guard("distinctLow", () =>
     measure(
       () => {
-        distinctSink = new Set(hot.getSourceDataAtCol(COL.city)).size;
+        distinct_sink = new Set(hot.getSourceDataAtCol(COL.city)).size;
       },
       plan("distinctLow", rows),
     ),
@@ -1537,28 +1549,28 @@ async function benchHandsontable(ds: ColumnarDataset): Promise<Omit<EngineResult
   stats.distinctHigh = guard("distinctHigh", () =>
     measure(
       () => {
-        distinctSink = new Set(hot.getSourceDataAtCol(COL.customer)).size;
+        distinct_sink = new Set(hot.getSourceDataAtCol(COL.customer)).size;
       },
       plan("distinctHigh", rows),
     ),
   );
-  void distinctSink;
+  void distinct_sink;
 
   // (f) aggregate — no native column aggregate; sum the source column in JS.
   notes.aggregate = "no native aggregate API — summed in plain JS over getSourceDataAtCol";
-  let aggSink = 0;
+  let agg_sink = 0;
   stats.aggregate = guard("aggregate", () =>
     measure(
       () => {
         const col = hot.getSourceDataAtCol(AGG_COL);
         let sum = 0;
         for (let i = 0; i < col.length; i++) sum += Number(col[i]);
-        aggSink = sum;
+        agg_sink = sum;
       },
       plan("aggregate", rows),
     ),
   );
-  void aggSink;
+  void agg_sink;
 
   hot.destroy();
   return { rows, stats, notes, queryResources: null, queries: {} };
@@ -1572,12 +1584,12 @@ const retain: unknown[] = [];
  * returns — leaving only the store's retained JS state for the caller to weigh.
  * The store copies all cell data into WASM, so it does not retain the inputs.
  */
-function buildSheetwriteStore(rows: number): SheetwriteStore {
+function build_sheetwrite_store(rows: number): SheetwriteStore {
   const columnar = toSheetwriteColumnar(makeColumnar(rows));
-  return new SheetwriteStore(makeWorkbook(rows), columnar);
+  return new SheetwriteStore(make_workbook(rows), columnar);
 }
 
-function probeSheetwriteMemory(rows: number): MemoryProfile {
+function probe_sheetwrite_memory(rows: number): MemoryProfile {
   const memory = getEngine().getMemory();
   forceGc();
 
@@ -1586,7 +1598,7 @@ function probeSheetwriteMemory(rows: number): MemoryProfile {
   const heap0 = process.memoryUsage().heapUsed;
   const wasm0 = memory.buffer.byteLength;
 
-  const store = buildSheetwriteStore(rows);
+  const store = build_sheetwrite_store(rows);
   store.aggregate(SHEET, AGG_COL, "sum"); // touch so the load is not elided
   retain.push(store);
   forceGc();
@@ -1597,12 +1609,12 @@ function probeSheetwriteMemory(rows: number): MemoryProfile {
   return { heapDeltaBytes: Math.max(0, heap1 - heap0), wasmDeltaBytes: wasm1 - wasm0 };
 }
 
-function probeHandsontableMemory(rows: number): MemoryProfile {
+function probe_handsontable_memory(rows: number): MemoryProfile {
   const host = container();
   const data = toAoA(makeColumnar(rows));
   forceGc();
   const heap0 = process.memoryUsage().heapUsed;
-  const hot = createHandsontable(host, hotOptions(data));
+  const hot = createHandsontable(host, hot_options(data));
   hot.getData(0, 0, 0, 4); // touch
   retain.push(hot);
   forceGc();
@@ -1611,7 +1623,7 @@ function probeHandsontableMemory(rows: number): MemoryProfile {
 }
 
 /** Spawn this file in `--mem` mode and parse the JSON memory profile it prints. */
-function probeMemory(engine: EngineId, rows: number): MemoryProfile {
+function probe_memory(engine: EngineId, rows: number): MemoryProfile {
   const proc = Bun.spawnSync(["bun", "run", import.meta.path, "--mem", engine, String(rows)], {
     cwd: new URL("..", import.meta.url).pathname,
     stdout: "pipe",
@@ -1644,14 +1656,14 @@ function probeMemory(engine: EngineId, rows: number): MemoryProfile {
   };
 }
 
-async function runMemMode(): Promise<void> {
+async function run_mem_mode(): Promise<void> {
   const engine = process.argv[3];
   const rows = Number(process.argv[4]);
   if (engine === "sheetwrite") {
     await initSheetwrite({ source: readFileSync(WASM_PATH) });
-    console.log(JSON.stringify(probeSheetwriteMemory(rows)));
+    console.log(JSON.stringify(probe_sheetwrite_memory(rows)));
   } else {
-    console.log(JSON.stringify(probeHandsontableMemory(rows)));
+    console.log(JSON.stringify(probe_handsontable_memory(rows)));
   }
 }
 
@@ -1663,7 +1675,7 @@ function verdict(sw: Stat, hot: Stat): string {
   return ratio >= 1 ? `**${ratio.toFixed(1)}× faster**` : `${(1 / ratio).toFixed(1)}× slower`;
 }
 
-function headToHeadTable(
+function head_to_head_table(
   workload: Workload,
   sw: Map<number, EngineResult>,
   hot: Map<number, EngineResult>,
@@ -1684,7 +1696,7 @@ function headToHeadTable(
   return lines.join("\n");
 }
 
-function scalingTable(sw: Map<number, EngineResult>): string {
+function scaling_table(sw: Map<number, EngineResult>): string {
   const lines: string[] = [];
   lines.push(`| rows | ${WORKLOADS.map((w) => WORKLOAD_LABELS[w]).join(" | ")} |`);
   lines.push(`|---:${"|---:".repeat(WORKLOADS.length)}|`);
@@ -1697,7 +1709,7 @@ function scalingTable(sw: Map<number, EngineResult>): string {
   return lines.join("\n");
 }
 
-function queryScalingTable(sw: Map<number, EngineResult>): string {
+function query_scaling_table(sw: Map<number, EngineResult>): string {
   const lines: string[] = [];
   lines.push(`| rows | ${QUERY_SCENARIOS.map((scenario) => QUERY_LABELS[scenario]).join(" | ")} |`);
   lines.push(`|---:${"|---:".repeat(QUERY_SCENARIOS.length)}|`);
@@ -1713,15 +1725,15 @@ function queryScalingTable(sw: Map<number, EngineResult>): string {
   return lines.join("\n");
 }
 
-function memoryTable(sw: Map<number, EngineResult>): string {
+function memory_table(sw: Map<number, EngineResult>): string {
   const lines: string[] = [];
   lines.push("| rows | Sheetwrite data (WASM columnar store) | bytes/row |");
   lines.push("|---:|---:|---:|");
   for (const rows of SHEETWRITE_ROWS) {
     const s = sw.get(rows);
     if (!s || s.memory.wasmDeltaBytes === null) continue;
-    const perRow = (s.memory.wasmDeltaBytes / rows).toFixed(0);
-    lines.push(`| ${N(rows)} | ${mib(s.memory.wasmDeltaBytes)} | ${perRow} B |`);
+    const per_row = (s.memory.wasmDeltaBytes / rows).toFixed(0);
+    lines.push(`| ${N(rows)} | ${mib(s.memory.wasmDeltaBytes)} | ${per_row} B |`);
   }
   return lines.join("\n");
 }
@@ -1752,7 +1764,7 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
     );
     out.push("");
     for (const workload of WORKLOADS) {
-      out.push(headToHeadTable(workload, sw, hot));
+      out.push(head_to_head_table(workload, sw, hot));
       out.push("");
     }
   }
@@ -1762,7 +1774,7 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
     "Handsontable is omitted at 100k–1M (headless render-all infeasible); the at-scale comparison is the browser render benchmark.",
   );
   out.push("");
-  out.push(scalingTable(sw));
+  out.push(scaling_table(sw));
   out.push("");
   if (SHEETWRITE_ROWS.some((rows) => sw.get(rows)?.queries !== undefined)) {
     out.push("### Sheetwrite query scenarios — median (p95) ms");
@@ -1771,7 +1783,7 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
       "Measured on the Sheetwrite engine only: multi-key sorts, value-set filters and an all-numeric ingest exercise its Rust query engine and its columnar ingest, which no other engine here implements. A pick count larger than the sheet saturates at the row count. The 50,000-pick filter is measured at 100,000 rows only: it compares every row with every picked value today, so a larger sheet would need minutes for a single sample.",
     );
     out.push("");
-    out.push(queryScalingTable(sw));
+    out.push(query_scaling_table(sw));
     out.push("");
     const fixtures = result.meta.queryFixtures;
     if (fixtures) {
@@ -1787,17 +1799,17 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
     "Sheetwrite's exact data footprint — the WASM linear-memory growth for a single ingest, sampled in a clean isolated process. The whole columnar store (id/date/customer/city/amount) lives here; JS-side retained state is O(columns + unique styles + active view), never O(cells).",
   );
   out.push("");
-  out.push(memoryTable(sw));
+  out.push(memory_table(sw));
   out.push("");
   out.push("**Notes**");
-  const noteSet = new Set<string>();
+  const note_set = new Set<string>();
   for (const rows of HANDSONTABLE_ROWS) {
     const row = hot.get(rows);
     if (!row) continue;
     for (const workload of WORKLOADS) {
       const note = row.notes[workload];
-      if (note && !noteSet.has(note)) {
-        noteSet.add(note);
+      if (note && !note_set.has(note)) {
+        note_set.add(note);
         out.push(`- Handsontable ${workload}: ${note}`);
       }
     }
@@ -1815,17 +1827,17 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
 }
 
 /** Labels the heap-trace points of the engine run that starts now. */
-function beginEngineRun(engine: EngineId, rows: number): void {
-  if (heapTrace) heapTrace.scope = { engine, rows };
+function begin_engine_run(engine: EngineId, rows: number): void {
+  if (heap_trace) heap_trace.scope = { engine, rows };
 }
 
 /**
  * Collects everything an engine run left behind once its stores and instances
  * are released, so the next engine or row size starts from a clean heap.
  */
-function endEngineRun(): void {
+function end_engine_run(): void {
   forceGc();
-  recordHeap(ENGINE_BOUNDARY, 0);
+  record_heap(ENGINE_BOUNDARY, 0);
 }
 
 export async function runSheetwriteDataBench(
@@ -1833,20 +1845,20 @@ export async function runSheetwriteDataBench(
   mode: BenchmarkMode = "full",
 ): Promise<Map<number, TimedEngineResult>> {
   await initSheetwrite({ source: readFileSync(WASM_PATH) });
-  warmSheetwriteDataPath();
+  warm_sheetwrite_data_path();
 
   const results = new Map<number, TimedEngineResult>();
   for (const rows of rowsList) {
     process.stderr.write(`\n▶ Sheetwrite ${N(rows)} rows …\n`);
     const ds = makeColumnar(rows);
-    beginEngineRun("sheetwrite", rows);
-    results.set(rows, await benchSheetwrite(ds, toSheetwriteColumnar(ds), mode));
-    endEngineRun();
+    begin_engine_run("sheetwrite", rows);
+    results.set(rows, await bench_sheetwrite(ds, toSheetwriteColumnar(ds), mode));
+    end_engine_run();
   }
   return results;
 }
 
-function dataResult(
+function data_result(
   mode: BenchmarkMode,
   sheetwrite: ReadonlyMap<number, EngineResult>,
   handsontable: ReadonlyMap<number, EngineResult>,
@@ -1875,18 +1887,18 @@ function dataResult(
   };
 }
 
-async function runSmokeBench(outputPath: string | undefined): Promise<void> {
+async function run_smoke_bench(output_path: string | undefined): Promise<void> {
   const timed = await runSheetwriteDataBench([1_000], "smoke");
   const sheetwrite = new Map<number, EngineResult>();
   const result = timed.get(1_000);
   if (!result) throw new Error("data smoke omitted the declared 1000-row result");
-  sheetwrite.set(1_000, { ...result, memory: probeMemory("sheetwrite", 1_000) });
-  const smoke = dataResult("smoke", sheetwrite, new Map());
+  sheetwrite.set(1_000, { ...result, memory: probe_memory("sheetwrite", 1_000) });
+  const smoke = data_result("smoke", sheetwrite, new Map());
   validateDataBenchmark(smoke, "smoke");
   // verify.ts reads this line from stdout; the file copy is only for --output.
   console.log(JSON.stringify(smoke));
-  if (outputPath !== undefined) {
-    await writeDataArtifact(smoke, renderDataBenchmarkMarkdown(smoke), outputPath);
+  if (output_path !== undefined) {
+    await write_data_artifact(smoke, renderDataBenchmarkMarkdown(smoke), output_path);
   }
 }
 
@@ -1895,50 +1907,51 @@ async function runSmokeBench(outputPath: string | undefined): Promise<void> {
  * both land in the tracked `bench/results/`; with it, only the given path is
  * touched, which keeps timing runs out of the recorded results.
  */
-async function writeDataArtifact(
+async function write_data_artifact(
   result: DataBenchmarkResult,
   report: string,
-  outputPath?: string,
+  output_path?: string,
 ): Promise<void> {
-  const jsonPath = outputPath ?? new URL("../results/data-results.json", import.meta.url).pathname;
-  const markdownPath =
-    outputPath === undefined
+  const json_path =
+    output_path ?? new URL("../results/data-results.json", import.meta.url).pathname;
+  const markdown_path =
+    output_path === undefined
       ? new URL("../results/data-results.md", import.meta.url).pathname
-      : jsonPath.endsWith(".json")
-        ? `${jsonPath.slice(0, -".json".length)}.md`
-        : `${jsonPath}.md`;
-  mkdirSync(dirname(jsonPath), { recursive: true });
-  await Bun.write(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
-  await Bun.write(markdownPath, report);
-  process.stderr.write(`\n✔ wrote ${jsonPath} and ${markdownPath}\n`);
+      : json_path.endsWith(".json")
+        ? `${json_path.slice(0, -".json".length)}.md`
+        : `${json_path}.md`;
+  mkdirSync(dirname(json_path), { recursive: true });
+  await Bun.write(json_path, `${JSON.stringify(result, null, 2)}\n`);
+  await Bun.write(markdown_path, report);
+  process.stderr.write(`\n✔ wrote ${json_path} and ${markdown_path}\n`);
 }
 
-async function runFullBench(outputPath: string | undefined): Promise<void> {
-  const timedSw = await runSheetwriteDataBench();
+async function run_full_bench(output_path: string | undefined): Promise<void> {
+  const timed_sw = await runSheetwriteDataBench();
 
   const sw = new Map<number, EngineResult>();
   const hot = new Map<number, EngineResult>();
 
-  for (const [rows, timed] of timedSw) {
-    const memory = probeMemory("sheetwrite", rows);
+  for (const [rows, timed] of timed_sw) {
+    const memory = probe_memory("sheetwrite", rows);
     sw.set(rows, { ...timed, memory });
   }
 
   for (const rows of HANDSONTABLE_ROWS) {
     process.stderr.write(`\n▶ Handsontable ${N(rows)} rows …\n`);
     const ds = makeColumnar(rows);
-    beginEngineRun("handsontable", rows);
-    const timed = await benchHandsontable(ds);
-    endEngineRun();
-    const memory = probeMemory("handsontable", rows);
+    begin_engine_run("handsontable", rows);
+    const timed = await bench_handsontable(ds);
+    end_engine_run();
+    const memory = probe_memory("handsontable", rows);
     hot.set(rows, { ...timed, memory });
   }
 
-  const result = dataResult("full", sw, hot);
+  const result = data_result("full", sw, hot);
   validateDataBenchmark(result, "full");
   const report = renderDataBenchmarkMarkdown(result);
   console.log(report.trimEnd());
-  await writeDataArtifact(result, report, outputPath);
+  await write_data_artifact(result, report, output_path);
 }
 
 /**
@@ -1946,7 +1959,11 @@ async function runFullBench(outputPath: string | undefined): Promise<void> {
  * timed sample and engine run. It is never a benchmark result and is kept out
  * of the result artifact, so timing reports cannot be mistaken for it.
  */
-async function writeHeapTrace(trace: HeapTrace, path: string, mode: BenchmarkMode): Promise<void> {
+async function write_heap_trace(
+  trace: HeapTrace,
+  path: string,
+  mode: BenchmarkMode,
+): Promise<void> {
   mkdirSync(dirname(path), { recursive: true });
   const diagnostic = {
     kind: "data-heap-trace-diagnostic",
@@ -1962,26 +1979,27 @@ async function writeHeapTrace(trace: HeapTrace, path: string, mode: BenchmarkMod
 
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const outputPath = optionValue(args, "--output");
-  const heapTracePath = optionValue(args, "--heap-trace");
-  if (heapTracePath !== undefined && heapTracePath === outputPath) {
+  const output_path = optionValue(args, "--output");
+  const heap_trace_path = optionValue(args, "--heap-trace");
+  if (heap_trace_path !== undefined && heap_trace_path === output_path) {
     throw new Error("--heap-trace must not overwrite the --output result artifact");
   }
   const mode: BenchmarkMode = args.includes("--smoke") ? "smoke" : "full";
   const trace: HeapTrace | undefined =
-    heapTracePath === undefined ? undefined : { scope: undefined, points: [] };
-  heapTrace = trace;
+    heap_trace_path === undefined ? undefined : { scope: undefined, points: [] };
+  heap_trace = trace;
 
   try {
     if (args.includes("--mem")) {
-      await runMemMode();
+      await run_mem_mode();
     } else if (mode === "smoke") {
-      await runSmokeBench(outputPath);
+      await run_smoke_bench(output_path);
     } else {
-      await runFullBench(outputPath);
+      await run_full_bench(output_path);
     }
   } finally {
     // A failed run still leaves the readings taken before it failed.
-    if (trace && heapTracePath !== undefined) await writeHeapTrace(trace, heapTracePath, mode);
+    if (trace && heap_trace_path !== undefined)
+      await write_heap_trace(trace, heap_trace_path, mode);
   }
 }

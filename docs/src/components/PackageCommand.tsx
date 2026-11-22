@@ -20,7 +20,7 @@ const MANAGER_STORAGE_KEY = "sheetwrite-package-manager";
 const MANAGER_EVENT = "sheetwrite:package-manager";
 const COPIED_FEEDBACK_MS = 1600;
 
-function isManagerId(value: unknown): value is ManagerId {
+function is_manager_id(value: unknown): value is ManagerId {
   return MANAGERS.some((manager) => manager.id === value);
 }
 
@@ -37,32 +37,32 @@ interface PackageCommandProps {
  * in vite.config.ts); release pages render it for the upgrade command.
  */
 export function PackageCommand(props: Readonly<PackageCommandProps>) {
-  const [manager, setManager] = createSignal<ManagerId>("npm");
+  const [manager, set_manager] = createSignal<ManagerId>("npm");
   // The feedback names the copied text, so it shows only while that same
   // command is on screen; another manager's command is not on the clipboard.
-  const [copiedCommand, setCopiedCommand] = createSignal<string | null>(null);
-  let copiedTimer: number | undefined;
+  const [copied_command, set_copied_command] = createSignal<string | null>(null);
+  let copied_timer: number | undefined;
   const copy = useAction();
   const id = createUniqueId();
   const entry = createMemo(() => MANAGERS.find((item) => item.id === manager()) ?? MANAGERS[0]);
   const command = () => `${entry().program} ${entry().subcommand} ${props.packages}`;
-  const copied = () => copiedCommand() === command();
+  const copied = () => copied_command() === command();
 
   onMount(() => {
     const stored = readPreference(MANAGER_STORAGE_KEY);
-    if (isManagerId(stored)) setManager(stored);
-    const onChange = (event: Event) => {
-      if (event instanceof CustomEvent && isManagerId(event.detail)) setManager(event.detail);
+    if (is_manager_id(stored)) set_manager(stored);
+    const on_change = (event: Event) => {
+      if (event instanceof CustomEvent && is_manager_id(event.detail)) set_manager(event.detail);
     };
-    window.addEventListener(MANAGER_EVENT, onChange);
+    window.addEventListener(MANAGER_EVENT, on_change);
     onCleanup(() => {
-      window.removeEventListener(MANAGER_EVENT, onChange);
-      window.clearTimeout(copiedTimer);
+      window.removeEventListener(MANAGER_EVENT, on_change);
+      window.clearTimeout(copied_timer);
     });
   });
 
   const choose = (next: ManagerId) => {
-    setManager(next);
+    set_manager(next);
     writePreference(MANAGER_STORAGE_KEY, next);
     window.dispatchEvent(new CustomEvent(MANAGER_EVENT, { detail: next }));
   };
@@ -100,9 +100,12 @@ export function PackageCommand(props: Readonly<PackageCommandProps>) {
             void copy.run(
               async () => {
                 await navigator.clipboard.writeText(text);
-                setCopiedCommand(text);
-                window.clearTimeout(copiedTimer);
-                copiedTimer = window.setTimeout(() => setCopiedCommand(null), COPIED_FEEDBACK_MS);
+                set_copied_command(text);
+                window.clearTimeout(copied_timer);
+                copied_timer = window.setTimeout(
+                  () => set_copied_command(null),
+                  COPIED_FEEDBACK_MS,
+                );
               },
               () => "Cannot copy the command. Allow clipboard access and try again.",
             );

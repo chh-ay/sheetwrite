@@ -8,18 +8,18 @@ import {
   runReleaseVerification,
 } from "./release-verify.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
+const repository_root = resolve(import.meta.dir, "..");
 
 afterEach(() => {
   rmSync(resolve(import.meta.dir, "size-report-failure.json"), { force: true });
 });
 
-function guardedRun(command: readonly [string, ...string[]]): {
+function guarded_run(command: readonly [string, ...string[]]): {
   readonly exitCode: number;
   readonly output: string;
 } {
   const result = Bun.spawnSync([...command], {
-    cwd: repositoryRoot,
+    cwd: repository_root,
     env: { ...process.env, SHEETWRITE_ARTIFACT_ONLY: "1" },
     stdout: "pipe",
     stderr: "pipe",
@@ -51,36 +51,36 @@ describe("canonical artifact consumer graph", () => {
         events.push({ kind: "consumer", command, context });
       },
     };
-    const suppliedRoot = resolve(
-      repositoryRoot,
+    const supplied_root = resolve(
+      repository_root,
       "test-results",
       "..",
       "test-results",
       "release-artifact-fixture",
     );
-    const artifactRoot = await runReleaseVerification(suppliedRoot, true, runner);
+    const artifact_root = await runReleaseVerification(supplied_root, true, runner);
     const consumers = events.filter(
       (event): event is Extract<Event, { kind: "consumer" }> => event.kind === "consumer",
     );
 
-    expect(events[0]).toEqual({ kind: "verify", root: artifactRoot });
+    expect(events[0]).toEqual({ kind: "verify", root: artifact_root });
     expect(events.some((event) => event.kind === "build")).toBeFalse();
     expect(
       consumers.every((event) => {
         const index = events.indexOf(event);
         return (
           events.slice(0, index).some((candidate) => candidate.kind === "verify") &&
-          event.context.artifactRoot === artifactRoot &&
+          event.context.artifactRoot === artifact_root &&
           event.context.artifactOnly &&
           event.context.env.SHEETWRITE_ARTIFACT_ONLY === "1" &&
-          event.context.env.SHEETWRITE_RELEASE_ARTIFACTS === artifactRoot &&
-          event.command.filter((argument) => argument === artifactRoot).length === 1
+          event.context.env.SHEETWRITE_RELEASE_ARTIFACTS === artifact_root &&
+          event.command.filter((argument) => argument === artifact_root).length === 1
         );
       }),
     ).toBeTrue();
     // Each consumer is followed by a fresh verification, so a consumer cannot alter artifacts.
     for (const consumer of consumers) {
-      expect(events[events.indexOf(consumer) + 1]).toEqual({ kind: "verify", root: artifactRoot });
+      expect(events[events.indexOf(consumer) + 1]).toEqual({ kind: "verify", root: artifact_root });
     }
 
     const scripts = [
@@ -96,7 +96,7 @@ describe("canonical artifact consumer graph", () => {
 
   it("stops at the first consumer that changes the verified artifacts", async () => {
     let verifications = 0;
-    let consumerRuns = 0;
+    let consumer_runs = 0;
     const runner: ReleaseVerificationRunner = {
       async buildArtifacts() {},
       async verifyArtifacts() {
@@ -104,17 +104,17 @@ describe("canonical artifact consumer graph", () => {
         if (verifications === 2) throw new Error("artifact bytes changed");
       },
       async runConsumer() {
-        consumerRuns += 1;
+        consumer_runs += 1;
       },
     };
     await expect(
       runReleaseVerification(
-        resolve(repositoryRoot, "test-results/release-mutation"),
+        resolve(repository_root, "test-results/release-mutation"),
         true,
         runner,
       ),
     ).rejects.toThrow("artifact bytes changed");
-    expect(consumerRuns).toBe(1);
+    expect(consumer_runs).toBe(1);
   });
 
   it("forbids every consumer's standalone packing fallback in artifact-only mode", () => {
@@ -123,7 +123,7 @@ describe("canonical artifact consumer graph", () => {
       ["node", "test/bundler-fixtures/run.mjs"],
       ["bun", "scripts/size-report.ts", "report", "--reuse-bundlers"],
     ] as const) {
-      const result = guardedRun(command);
+      const result = guarded_run(command);
       expect(result.exitCode).not.toBe(0);
       expect(result.output).toContain("Artifact-only");
     }

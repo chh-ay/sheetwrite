@@ -158,31 +158,31 @@ export function assertPendingCommit(
   documentId: string,
   limits: Readonly<SyncCoordinatorLimits>,
 ): number {
-  const record = assertPlainRecord(commit, "Durable queue returned an invalid pending commit");
-  if (ownDataValue(record, "documentId") !== documentId) {
+  const record = assert_plain_record(commit, "Durable queue returned an invalid pending commit");
+  if (own_data_value(record, "documentId") !== documentId) {
     throw new SyncProtocolError(
       "invalid-id",
       "Durable queue returned a commit for the wrong document",
     );
   }
 
-  assertVersion(ownDataValue(record, "baseVersion"), "pending baseVersion");
-  assertMutationId(ownDataValue(record, "clientMutationId"), limits);
-  const authorId = optionalOwnDataValue(record, "authorId");
-  if (authorId !== undefined) assertAuthorId(authorId, limits);
-  const restore = optionalOwnDataValue(record, "restore");
-  if (restore !== undefined) assertRestoreProvenance(restore, limits);
-  const operations = ownDataValue(record, "operations");
-  const bytes = assertOperationResources(
+  assertVersion(own_data_value(record, "baseVersion"), "pending baseVersion");
+  assertMutationId(own_data_value(record, "clientMutationId"), limits);
+  const author_id = optional_own_data_value(record, "authorId");
+  if (author_id !== undefined) assertAuthorId(author_id, limits);
+  const restore = optional_own_data_value(record, "restore");
+  if (restore !== undefined) assert_restore_provenance(restore, limits);
+  const operations = own_data_value(record, "operations");
+  const bytes = assert_operation_resources(
     operations,
     limits.maxPendingOperations,
     limits.maxPendingEncodedBytes,
   );
-  const counts = optionalOwnDataValue(record, "versionOperationCounts");
+  const counts = optional_own_data_value(record, "versionOperationCounts");
   if (counts === undefined) return bytes;
-  const operationCount = (operations as readonly DocumentOp[]).length;
+  const operation_count = (operations as readonly DocumentOp[]).length;
   if (
-    !validVersionOperationCounts(counts, operationCount, limits.maxBatchVersions) ||
+    !validVersionOperationCounts(counts, operation_count, limits.maxBatchVersions) ||
     bytes > limits.maxBatchBytes
   ) {
     throw new SyncProtocolError(
@@ -199,13 +199,13 @@ export function resolveLimits(
   overrides: Partial<SyncCoordinatorLimits> | undefined,
 ): Readonly<SyncCoordinatorLimits> {
   if (overrides === undefined) return DEFAULT_SYNC_COORDINATOR_LIMITS;
-  const record = assertPlainRecord(overrides, "Sync limits must be a plain object");
+  const record = assert_plain_record(overrides, "Sync limits must be a plain object");
   const resolved: SyncCoordinatorLimits = { ...DEFAULT_SYNC_COORDINATOR_LIMITS };
   for (const key in record) {
-    if (!isLimitKey(key)) {
+    if (!is_limit_key(key)) {
       throw new SyncProtocolError("invalid-limits", `Unknown sync limit ${key}`);
     }
-    const value = ownDataValue(record, key);
+    const value = own_data_value(record, key);
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
       throw new SyncProtocolError(
         "invalid-limits",
@@ -226,7 +226,7 @@ export function resolveLimits(
   return Object.freeze(resolved);
 }
 
-function isLimitKey(key: string): key is keyof SyncCoordinatorLimits {
+function is_limit_key(key: string): key is keyof SyncCoordinatorLimits {
   return Object.hasOwn(LIMIT_KEYS, key);
 }
 
@@ -281,45 +281,45 @@ export function assertAuthorId(
   }
 }
 
-function assertRestoreProvenance(
+function assert_restore_provenance(
   value: unknown,
   limits: Readonly<SyncCoordinatorLimits>,
 ): asserts value is RestoreProvenance {
-  const record = assertPlainRecord(value, "Restore provenance must be a plain object");
-  const scope = ownDataValue(record, "scope");
+  const record = assert_plain_record(value, "Restore provenance must be a plain object");
+  const scope = own_data_value(record, "scope");
   if (scope !== "workbook" && scope !== "sheet" && scope !== "range") {
     throw new SyncProtocolError("invalid-id", "Restore scope must be workbook, sheet or range");
   }
 
-  assertAuthorId(ownDataValue(record, "versionId"), limits);
+  assertAuthorId(own_data_value(record, "versionId"), limits);
 }
 
-function assertOperations(value: unknown, limits: Readonly<SyncCoordinatorLimits>): number {
-  return assertOperationResources(
+function assert_operations(value: unknown, limits: Readonly<SyncCoordinatorLimits>): number {
+  return assert_operation_resources(
     value,
     limits.maxOperationsPerVersion,
     limits.maxVersionPayloadBytes,
   );
 }
 
-function assertOperationResources(
+function assert_operation_resources(
   value: unknown,
-  maxOperations: number,
-  maxEncodedBytes: number,
+  max_operations: number,
+  max_encoded_bytes: number,
 ): number {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new SyncProtocolError("invalid-operations", "operations must be an array");
   }
-  if (value.length > maxOperations) {
+  if (value.length > max_operations) {
     throw new SyncProtocolError(
       "operation-limit",
-      `operations exceeds the ${maxOperations} operation limit`,
+      `operations exceeds the ${max_operations} operation limit`,
     );
   }
-  const encodedBytes = jsonEncodedByteLength(value, maxEncodedBytes);
+  const encoded_bytes = json_encoded_byte_length(value, max_encoded_bytes);
   for (let index = 0; index < value.length; index++) {
     const operation = value[index];
-    assertPlainRecord(operation, "Each document operation must be a plain object");
+    assert_plain_record(operation, "Each document operation must be a plain object");
     const errors = validateDocumentOperationShape(operation, `operations[${index}]`);
     if (errors.length > 0) {
       const error = errors[0]!;
@@ -329,47 +329,47 @@ function assertOperationResources(
       );
     }
   }
-  return encodedBytes;
+  return encoded_bytes;
 }
 
 export function inspectVersionedOperation(
   value: unknown,
   limits: Readonly<SyncCoordinatorLimits>,
 ): InspectedVersionedOperation {
-  const record = assertPlainRecord(value, "Versioned operation must be a plain object");
-  const version = ownDataValue(record, "version");
+  const record = assert_plain_record(value, "Versioned operation must be a plain object");
+  const version = own_data_value(record, "version");
   assertVersion(version, "version");
-  const operations = ownDataValue(record, "operations");
-  const bytes = assertOperations(operations, limits);
-  const mutationId = optionalOwnDataValue(record, "clientMutationId");
-  if (mutationId !== undefined) assertMutationId(mutationId, limits);
-  const batchValue = optionalOwnDataValue(record, "batch");
-  const batch = batchValue === undefined ? undefined : assertBatchMember(batchValue, limits);
+  const operations = own_data_value(record, "operations");
+  const bytes = assert_operations(operations, limits);
+  const mutation_id = optional_own_data_value(record, "clientMutationId");
+  if (mutation_id !== undefined) assertMutationId(mutation_id, limits);
+  const batch_value = optional_own_data_value(record, "batch");
+  const batch = batch_value === undefined ? undefined : assert_batch_member(batch_value, limits);
 
-  const authorId = optionalOwnDataValue(record, "authorId");
-  if (authorId !== undefined) assertAuthorId(authorId, limits);
+  const author_id = optional_own_data_value(record, "authorId");
+  if (author_id !== undefined) assertAuthorId(author_id, limits);
 
-  const committedAt = optionalOwnDataValue(record, "committedAt");
-  if (committedAt !== undefined) assertVersion(committedAt, "committedAt");
+  const committed_at = optional_own_data_value(record, "committedAt");
+  if (committed_at !== undefined) assertVersion(committed_at, "committedAt");
 
   return {
     version,
     operations: operations as readonly DocumentOp[],
-    ...(mutationId !== undefined ? { clientMutationId: mutationId } : {}),
+    ...(mutation_id !== undefined ? { clientMutationId: mutation_id } : {}),
     ...(batch !== undefined ? { batch } : {}),
-    ...(authorId !== undefined ? { authorId } : {}),
-    ...(committedAt !== undefined ? { committedAt } : {}),
+    ...(author_id !== undefined ? { authorId: author_id } : {}),
+    ...(committed_at !== undefined ? { committedAt: committed_at } : {}),
     bytes,
   };
 }
 
-function assertBatchMember(
+function assert_batch_member(
   value: unknown,
   limits: Readonly<SyncCoordinatorLimits>,
 ): VersionBatchMember {
-  const record = assertPlainRecord(value, "Versioned operation batch must be a plain object");
-  const index = ownDataValue(record, "index");
-  const count = ownDataValue(record, "count");
+  const record = assert_plain_record(value, "Versioned operation batch must be a plain object");
+  const index = own_data_value(record, "index");
+  const count = own_data_value(record, "count");
   if (
     !Number.isSafeInteger(index) ||
     !Number.isSafeInteger(count) ||
@@ -401,12 +401,12 @@ export function assertCommitOperations(
 ): void {
   const counts = commit.versionOperationCounts;
   if (counts === undefined) {
-    assertOperations(commit.operations, limits);
+    assert_operations(commit.operations, limits);
     return;
   }
   let start = 0;
   for (const count of counts) {
-    assertOperations(commit.operations.slice(start, start + count), limits);
+    assert_operations(commit.operations.slice(start, start + count), limits);
     start += count;
   }
 }
@@ -415,11 +415,11 @@ export function assertPersistenceResponse(
   value: PersistenceCommitResponse,
   limits: Readonly<SyncCoordinatorLimits>,
 ): void {
-  const record = assertPlainRecord(value, "Persistence response must be a plain object");
-  const status = ownDataValue(record, "status");
+  const record = assert_plain_record(value, "Persistence response must be a plain object");
+  const status = own_data_value(record, "status");
   if (status === "conflict") {
-    assertVersion(ownDataValue(record, "currentVersion"), "currentVersion");
-    const snapshot = optionalOwnDataValue(record, "snapshot");
+    assertVersion(own_data_value(record, "currentVersion"), "currentVersion");
+    const snapshot = optional_own_data_value(record, "snapshot");
     if (snapshot !== undefined) {
       const validation = validateWorkbookSnapshot(snapshot, {
         storage: "paged",
@@ -436,36 +436,36 @@ export function assertPersistenceResponse(
       }
     }
 
-    const operationsSinceBase = optionalOwnDataValue(record, "operationsSinceBase");
-    if (operationsSinceBase === undefined) return;
+    const operations_since_base = optional_own_data_value(record, "operationsSinceBase");
+    if (operations_since_base === undefined) return;
     if (
-      !Array.isArray(operationsSinceBase) ||
-      Object.getPrototypeOf(operationsSinceBase) !== Array.prototype
+      !Array.isArray(operations_since_base) ||
+      Object.getPrototypeOf(operations_since_base) !== Array.prototype
     ) {
       throw new SyncProtocolError("invalid-operations", "operationsSinceBase must be an array");
     }
 
-    if (operationsSinceBase.length > limits.maxBufferedVersions) {
+    if (operations_since_base.length > limits.maxBufferedVersions) {
       throw new SyncProtocolError(
         "buffer-count-limit",
         "Conflict operation tail exceeds the version count limit",
       );
     }
 
-    let operationCount = 0;
-    let byteCount = 0;
-    for (const operation of operationsSinceBase) {
+    let operation_count = 0;
+    let byte_count = 0;
+    for (const operation of operations_since_base) {
       const inspected = inspectVersionedOperation(operation, limits);
-      operationCount += inspected.operations.length;
-      byteCount += inspected.bytes;
-      if (operationCount > limits.maxBufferedOperations) {
+      operation_count += inspected.operations.length;
+      byte_count += inspected.bytes;
+      if (operation_count > limits.maxBufferedOperations) {
         throw new SyncProtocolError(
           "buffer-operation-limit",
           "Conflict operation tail exceeds the operation count limit",
         );
       }
 
-      if (byteCount > limits.maxBufferedBytes) {
+      if (byte_count > limits.maxBufferedBytes) {
         throw new SyncProtocolError(
           "buffer-byte-limit",
           "Conflict operation tail exceeds the byte limit",
@@ -480,8 +480,8 @@ export function assertPersistenceResponse(
     throw new SyncProtocolError("invalid-operations", "Persistence response status is invalid");
   }
 
-  assertVersion(ownDataValue(record, "version"), "version");
-  assertMutationId(ownDataValue(record, "clientMutationId"), limits);
+  assertVersion(own_data_value(record, "version"), "version");
+  assertMutationId(own_data_value(record, "clientMutationId"), limits);
   if (Object.getOwnPropertyDescriptor(record, "canonicalOperations") !== undefined) {
     throw new SyncProtocolError(
       "invalid-operations",
@@ -524,20 +524,20 @@ export function assertConflictRecovery(
     return;
   }
 
-  let expectedVersion = incrementVersion(baseVersion);
+  let expected_version = incrementVersion(baseVersion);
   for (let index = 0; index < tail.length; index++) {
-    if (tail[index]!.version !== expectedVersion) {
+    if (tail[index]!.version !== expected_version) {
       throw new SyncProtocolError(
         "invalid-version",
         "Conflict operationsSinceBase must be contiguous from the pending baseVersion",
       );
     }
 
-    if (index + 1 < tail.length) expectedVersion = incrementVersion(expectedVersion);
+    if (index + 1 < tail.length) expected_version = incrementVersion(expected_version);
   }
 
-  // The loop proved the last entry carries `expectedVersion`.
-  if (expectedVersion !== response.currentVersion) {
+  // The loop proved the last entry carries `expected_version`.
+  if (expected_version !== response.currentVersion) {
     throw new SyncProtocolError(
       "invalid-version",
       "Conflict operationsSinceBase must end at currentVersion",
@@ -545,7 +545,7 @@ export function assertConflictRecovery(
   }
 }
 
-function assertPlainRecord(value: unknown, message: string): PlainRecord {
+function assert_plain_record(value: unknown, message: string): PlainRecord {
   if (
     value === null ||
     typeof value !== "object" ||
@@ -557,7 +557,7 @@ function assertPlainRecord(value: unknown, message: string): PlainRecord {
   return value as PlainRecord;
 }
 
-function ownDataValue(record: PlainRecord, key: string): unknown {
+function own_data_value(record: PlainRecord, key: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
   if (!descriptor?.enumerable || !("value" in descriptor)) {
     throw new SyncProtocolError("invalid-operations", `${key} must be an enumerable data field`);
@@ -565,7 +565,7 @@ function ownDataValue(record: PlainRecord, key: string): unknown {
   return descriptor.value;
 }
 
-function optionalOwnDataValue(record: PlainRecord, key: string): unknown {
+function optional_own_data_value(record: PlainRecord, key: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
   if (!descriptor) return undefined;
   if (!descriptor.enumerable || !("value" in descriptor)) {
@@ -586,7 +586,7 @@ export function asSyncProtocolError(error: unknown): SyncProtocolError {
       });
 }
 
-function jsonEncodedByteLength(value: unknown, limit: number): number {
+function json_encoded_byte_length(value: unknown, limit: number): number {
   try {
     return boundedJsonByteLength(value, limit);
   } catch (error) {

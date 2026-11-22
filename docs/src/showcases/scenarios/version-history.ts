@@ -77,7 +77,7 @@ const formula = (row: number, col: number, src: string): DocumentOp => ({
   value: { kind: "formula", src },
 });
 
-function budgetWorkbook(): Workbook {
+function budget_workbook(): Workbook {
   const widths = [120, 96, 96, 96, 96, 96, 112];
   return {
     activeSheet: BUDGET_SHEET,
@@ -99,16 +99,16 @@ function budgetWorkbook(): Workbook {
   };
 }
 
-function budgetOperations(): DocumentOp[] {
+function budget_operations(): DocumentOp[] {
   const operations: DocumentOp[] = [
     ...["Line", "Owner", ...QUARTERS, "Year"].map((header, col) => set(0, col, header)),
     set(TOTAL_ROW, 0, "Total"),
   ];
-  LINES.forEach(([line, owner, firstQuarter], index) => {
+  LINES.forEach(([line, owner, first_quarter], index) => {
     const row = index + 1;
     operations.push(set(row, 0, line), set(row, 1, owner));
     QUARTERS.forEach((_, quarter) => {
-      const amount = Math.round((firstQuarter * (1 + QUARTER_GROWTH) ** quarter) / 100) * 100;
+      const amount = Math.round((first_quarter * (1 + QUARTER_GROWTH) ** quarter) / 100) * 100;
       operations.push(set(row, FIRST_QUARTER_COL + quarter, amount));
     });
     operations.push(formula(row, TOTAL_COL, `=SUM(C${row + 1}:F${row + 1})`));
@@ -188,10 +188,10 @@ const text = (value: CellScalar | undefined): string =>
       ? value.toLocaleString("en")
       : String(value);
 
-function changeReadings(page: HistoryDiffPage): ChangeReading[] {
+function change_readings(page: HistoryDiffPage): ChangeReading[] {
   return page.details.map((detail, index) => {
-    const authorIndex = page.cells.author[index] ?? -1;
-    const author = page.authors[authorIndex];
+    const author_index = page.cells.author[index] ?? -1;
+    const author = page.authors[author_index];
     return {
       cell: cellA1(page.cells.row[index] ?? 0, page.cells.col[index] ?? 0),
       before: text(detail.before?.formula ?? detail.before?.value),
@@ -212,18 +212,18 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
   let baseline: HistoryVersion | null = null;
   let versions: VersionReading[] = [];
   let changes: ChangeReading[] | null = null;
-  let savedVersions = 0;
+  let saved_versions = 0;
   let dispose = () => {};
 
-  const requireReady = () => {
+  const require_ready = () => {
     if (!grid || !sync || !sam || !archive || !baseline) {
       throw new Error("The budget is still loading");
     }
     return { grid, sync, sam, archive, baseline };
   };
 
-  const refreshVersions = async () => {
-    const page = await requireReady().archive.listVersions({ signal: controller.signal });
+  const refresh_versions = async () => {
+    const page = await require_ready().archive.listVersions({ signal: controller.signal });
     versions = page.versions.map((version) => ({
       id: version.id,
       label: version.name ?? "Automatic version",
@@ -242,7 +242,7 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
     const shell = await mountShowcaseShell(
       host,
       {
-        workbook: budgetWorkbook(),
+        workbook: budget_workbook(),
         // Letter headers without filler columns: the grid ends with the budget's columns.
         presentation: "data-grid",
         addons: {
@@ -250,7 +250,7 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
             archive: opened,
             authorId: YOU,
             authorName,
-            sync: () => requireReady().sync,
+            sync: () => require_ready().sync,
           },
         },
       },
@@ -258,7 +258,7 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
       [historyAddon()],
     );
     if (!shell) return;
-    requireApplied(shell.grid.applyRemoteOperations(budgetOperations()), "The budget");
+    requireApplied(shell.grid.applyRemoteOperations(budget_operations()), "The budget");
     const snapshot: WorkbookSnapshot = {
       ...shell.grid.exportSnapshot(),
       documentId: DOCUMENT,
@@ -273,41 +273,41 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
     baseline = await opened.saveVersion(BASELINE_NAME, SAM, Date.now(), controller.signal);
     archive = opened;
 
-    const coordinator = (target: Grid, authorId: string) => {
+    const coordinator = (target: Grid, author_id: string) => {
       const created = new SyncCoordinator(target, adapter, {
         documentId: DOCUMENT,
         serverVersion: 0,
-        authorId,
+        authorId: author_id,
       });
       created.subscribe(journal);
       return created;
     };
     grid = shell.grid;
     sync = coordinator(grid, YOU);
-    const samGrid = createGridFromSnapshot(document.createElement("div"), snapshot);
-    sam = { grid: samGrid, sync: coordinator(samGrid, SAM) };
+    const sam_grid = createGridFromSnapshot(document.createElement("div"), snapshot);
+    sam = { grid: sam_grid, sync: coordinator(sam_grid, SAM) };
     // Each local edit in the grid is sent at once, as a connected app would.
     const yours = sync;
-    const stopChanges = grid.on("change", (event) => {
+    const stop_changes = grid.on("change", (event) => {
       if (event.source === "local") void yours.flush();
       listeners.notify();
     });
     // Acknowledgements move the document version the side panel shows.
-    const stopSync = yours.on(() => listeners.notify());
-    const samClient = sam;
+    const stop_sync = yours.on(() => listeners.notify());
+    const sam_client = sam;
     dispose = () => {
-      stopSync();
-      stopChanges();
+      stop_sync();
+      stop_changes();
       yours.destroy();
-      samClient.sync.destroy();
-      samClient.grid.destroy();
+      sam_client.sync.destroy();
+      sam_client.grid.destroy();
       shell.dispose();
     };
-    await refreshVersions();
+    await refresh_versions();
   })();
 
   /** Edit one quarter of one line on a client and send it to the authority. */
-  const editLine = async (
+  const edit_line = async (
     client: { grid: Grid; sync: SyncCoordinator },
     line: number,
     quarter: number,
@@ -329,39 +329,39 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
     snapshot: () => ({ versions, changes, serverVersion: sync?.serverVersion ?? 0 }),
     async editAsYou() {
       // Marketing in Q2: the first half, which the range restore keeps.
-      await editLine(requireReady(), 2, 1, 1.15);
+      await edit_line(require_ready(), 2, 1, 1.15);
     },
     async editAsSam() {
       // Travel in Q3 and Q4: Sam cuts the second half of the year.
-      const { sam: client } = requireReady();
-      await editLine(client, 3, 2, 0.8);
-      await editLine(client, 3, 3, 0.8);
+      const { sam: client } = require_ready();
+      await edit_line(client, 3, 2, 0.8);
+      await edit_line(client, 3, 3, 0.8);
     },
     async saveVersion() {
-      const ready = requireReady();
+      const ready = require_ready();
       await ready.sync.flush();
-      savedVersions += 1;
+      saved_versions += 1;
       await ready.archive.saveVersion(
-        `Revision ${savedVersions}`,
+        `Revision ${saved_versions}`,
         YOU,
         Date.now(),
         controller.signal,
       );
-      await refreshVersions();
+      await refresh_versions();
     },
     async compareWithBaseline() {
-      const ready = requireReady();
+      const ready = require_ready();
       await ready.sync.flush();
       const page = await ready.archive.diffVersions({
         from: ready.baseline.id,
         to: "head",
         signal: controller.signal,
       });
-      changes = changeReadings(page);
+      changes = change_readings(page);
       listeners.notify();
     },
     async restoreSecondHalf() {
-      const ready = requireReady();
+      const ready = require_ready();
       await ready.sync.flush();
       requireApplied(
         await ready.archive.restoreVersion(
@@ -374,10 +374,10 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
       );
       await ready.sync.flush();
       changes = null;
-      await refreshVersions();
+      await refresh_versions();
     },
     async restoreSheet() {
-      const ready = requireReady();
+      const ready = require_ready();
       await ready.sync.flush();
       requireApplied(
         await ready.archive.restoreVersion(
@@ -390,10 +390,10 @@ export function createVersionHistoryScenario(host: HTMLElement): HistoryScenario
       );
       await ready.sync.flush();
       changes = null;
-      await refreshVersions();
+      await refresh_versions();
     },
     openVersionHistory() {
-      requireReady().grid.actions.versionHistory();
+      require_ready().grid.actions.versionHistory();
     },
     dispose() {
       controller.abort();

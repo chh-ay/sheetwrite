@@ -15,7 +15,7 @@ interface QueryCommandState {
 
 const STATES = new WeakMap<Grid, QueryCommandState>();
 
-function stateOf(grid: Grid): QueryCommandState {
+function state_of(grid: Grid): QueryCommandState {
   let state = STATES.get(grid);
   if (state === undefined) {
     state = { commands: undefined, running: undefined, listeners: new Set() };
@@ -34,7 +34,7 @@ function notify(state: QueryCommandState): void {
  * The add-on grid context calls this for the queries add-on.
  */
 export function registerQueryCommands(grid: Grid, commands: QueryCommands): () => void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   state.commands = commands;
   notify(state);
 
@@ -57,7 +57,7 @@ export function queryRefreshRunning(grid: Grid): boolean {
 
 /** Called when a session registers or leaves, and when a refresh starts or ends. */
 export function onQueryCommandsChange(grid: Grid, listener: () => void): () => void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   state.listeners.add(listener);
   return () => state.listeners.delete(listener);
 }
@@ -76,7 +76,7 @@ export async function toggleQueryRefresh(
   grid: Grid,
   ids: readonly string[] | null,
 ): Promise<QueryRefreshOutcome> {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   if (state.running !== undefined) {
     state.running.abort();
     // The running call reports the cancellation, so this one stays silent.

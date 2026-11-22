@@ -11,10 +11,10 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 const mounted: { grid: GridImpl; store: SheetwriteStore }[] = [];
 afterEach(() => {
@@ -22,7 +22,7 @@ afterEach(() => {
     grid.destroy();
     store.dispose();
   }
-  restoreStubs();
+  restore_stubs();
 });
 
 /** A grid over a store of `workbook` (or `makeWorkbook(rows)`) after `patches`. */
@@ -229,7 +229,7 @@ describe("find", () => {
 });
 
 describe("find with Excel's wildcards and Look in", () => {
-  const cellsGrid = () =>
+  const cells_grid = () =>
     mount(6, [
       set(A(0, 0), "apple"),
       set(A(1, 0), "Apple pie"),
@@ -240,7 +240,7 @@ describe("find with Excel's wildcards and Look in", () => {
     result.matches.map((match) => match.row);
 
   it("matches `*`, `?` and `~`, and looks in formulas unless told to look in values", () => {
-    const { grid } = cellsGrid();
+    const { grid } = cells_grid();
     // A3's formula, =A1&"*", has no "e"; its value, apple*, has one.
     expect(rows(grid.search("A*e"))).toEqual([0, 1, 3]);
     expect(rows(grid.search("A*e", { lookIn: "values" }))).toEqual([0, 1, 2, 3]);
@@ -251,7 +251,7 @@ describe("find with Excel's wildcards and Look in", () => {
   });
 
   it("replaces inside formulas, as Excel's Replace does", () => {
-    const { grid, store } = cellsGrid();
+    const { grid, store } = cells_grid();
     grid.search("A1");
     expect(grid.replaceAll("A2").replaced).toBe(1);
     expect(store.getFormula(A(2, 0))).toBe('=A2&"*"');
@@ -263,7 +263,7 @@ describe("find options", () => {
   const B = (row: number, col: number) => ({ sheet: "s2", row, col });
 
   /** Sheet 1 and Sheet 2 hold "North" in different cases; a hidden Sheet 3 holds one too. */
-  function workbookGrid(): { grid: GridImpl; store: SheetwriteStore } {
+  function workbook_grid(): { grid: GridImpl; store: SheetwriteStore } {
     const base = makeWorkbook(4);
     const first = base.sheets[0]!;
     return mount(
@@ -287,7 +287,7 @@ describe("find options", () => {
   }
 
   it("searches every visible sheet in tab order and moves to a match on another sheet", () => {
-    const { grid, store } = workbookGrid();
+    const { grid, store } = workbook_grid();
 
     expect(grid.search("north", { within: "workbook" }).matches).toEqual([A(1, 0), B(0, 2)]);
     expect(grid.search("north", { within: "workbook", matchCase: true }).matches).toEqual([
@@ -311,7 +311,7 @@ describe("find options", () => {
   });
 
   it("orders matches down each column for Search: By Columns", () => {
-    const { grid } = workbookGrid();
+    const { grid } = workbook_grid();
     expect(grid.search("x").matches).toEqual([A(0, 2), A(1, 1)]);
     expect(grid.search("x", { searchBy: "columns" }).matches).toEqual([A(1, 1), A(0, 2)]);
     grid.findNext();
@@ -319,7 +319,7 @@ describe("find options", () => {
   });
 
   it("looks in notes and replaces note text", () => {
-    const { grid, store } = workbookGrid();
+    const { grid, store } = workbook_grid();
     expect(grid.search("north", { lookIn: "notes" }).matches).toEqual([A(2, 1)]);
 
     expect(grid.replaceAll("South").replaced).toBe(1);

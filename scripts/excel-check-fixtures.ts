@@ -29,7 +29,7 @@ GlobalRegistrator.register();
 const NODE_LOADER = "../packages/formulas/loader-node.mjs";
 const formulas: typeof Formulas = await import(NODE_LOADER);
 const core = await import("../packages/core/dist/index.js");
-const { xlsxAddon } = await import("../packages/xlsx/dist/index.js");
+const { xlsxAddon: xlsx_addon } = await import("../packages/xlsx/dist/index.js");
 
 const OUT = resolve(import.meta.dir, "../test/fixtures/excel-checks");
 
@@ -64,7 +64,7 @@ const columns = (count: number) =>
     type: "text" as const,
   }));
 
-const ordersTable: Table = {
+const orders_table: Table = {
   id: "orders",
   name: "Orders",
   range: { sheet: "data", start: { row: 0, col: 0 }, end: { row: ORDERS.length, col: 1 } },
@@ -76,7 +76,7 @@ const ordersTable: Table = {
   totalsRow: false,
 };
 
-const ordersCells = {
+const orders_cells = {
   startRow: 0,
   startCol: 0,
   rowCount: ORDERS.length + 1,
@@ -101,7 +101,7 @@ const MEASURES = [
   },
 ];
 
-const modelPivot = (id: string, anchorRow: number, anchorCol: number): Pivot => ({
+const model_pivot = (id: string, anchor_row: number, anchor_col: number): Pivot => ({
   id,
   name: "Revenue by region",
   source: {
@@ -113,7 +113,7 @@ const modelPivot = (id: string, anchorRow: number, anchorCol: number): Pivot => 
       ],
     },
   },
-  anchor: { row: anchorRow, col: anchorCol },
+  anchor: { row: anchor_row, col: anchor_col },
   rows: [0],
   columns: [],
   values: [
@@ -127,7 +127,7 @@ const modelPivot = (id: string, anchorRow: number, anchorCol: number): Pivot => 
  * Check 7: orders related to customers, and a model pivot at A8 with the
  * customers' regions by the sum of the order amounts.
  */
-function relatedModelWorkbook(): Snapshot {
+function related_model_workbook(): Snapshot {
   const orders: Array<[string, number]> = [
     ["c1", 10],
     ["c2", 20],
@@ -231,7 +231,7 @@ function relatedModelWorkbook(): Snapshot {
 }
 
 /** Check 10: a link with saved values, and a formula that names a book without a link. */
-function linksWorkbook(): Snapshot {
+function links_workbook(): Snapshot {
   return {
     schemaVersion: 1,
     workbook: {
@@ -283,7 +283,7 @@ function linksWorkbook(): Snapshot {
 }
 
 /** The linked workbook of check 10, with values that differ from the saved ones. */
-function budgetWorkbook(): Snapshot {
+function budget_workbook(): Snapshot {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "annual" },
@@ -309,7 +309,7 @@ function budgetWorkbook(): Snapshot {
 }
 
 /** Checks 11 and 12: the data sheet with the orders, a model pivot with measures, or none. */
-function measuresWorkbook(withPivot: boolean): Snapshot {
+function measures_workbook(with_pivot: boolean): Snapshot {
   return {
     schemaVersion: 1,
     workbook: {
@@ -323,9 +323,9 @@ function measuresWorkbook(withPivot: boolean): Snapshot {
         order: 0,
         rowCount: 20,
         columns: columns(8),
-        tables: [ordersTable],
-        ...(withPivot ? { pivots: [modelPivot("by-region", 0, 3)] } : {}),
-        cells: [ordersCells],
+        tables: [orders_table],
+        ...(with_pivot ? { pivots: [model_pivot("by-region", 0, 3)] } : {}),
+        cells: [orders_cells],
       },
     ],
   };
@@ -335,8 +335,8 @@ function measuresWorkbook(withPivot: boolean): Snapshot {
  * Check 13: a dashboard with a model pivot, a region slicer that keeps three
  * regions, a KPI card and a PivotChart of the Revenue measure.
  */
-function dashboardWorkbook(): Snapshot {
-  const measures = measuresWorkbook(false);
+function dashboard_workbook(): Snapshot {
+  const measures = measures_workbook(false);
   return {
     ...measures,
     sheets: [
@@ -363,7 +363,7 @@ function dashboardWorkbook(): Snapshot {
             { id: "chart-item", box: { x: 0, y: 7, w: 7, h: 9 }, kind: "chart", chart: "chart" },
           ],
         },
-        pivots: [modelPivot("by-region", 0, 0)],
+        pivots: [model_pivot("by-region", 0, 0)],
         charts: [
           {
             id: "chart",
@@ -387,7 +387,7 @@ function dashboardWorkbook(): Snapshot {
  * region, then segment, in compact layout with subtotals, and a column chart
  * over it.
  */
-function chartLevelsWorkbook(): Snapshot {
+function chart_levels_workbook(): Snapshot {
   const sales = [
     ["East", "Retail", 10],
     [null, "Online", 7],
@@ -563,7 +563,7 @@ function chartLevelsWorkbook(): Snapshot {
  * `TEXT(value, code)` in brackets, Sheetwrite's text in brackets, and whether
  * the two are the same.
  */
-function numberFormatWorkbook(): Snapshot {
+function number_format_workbook(): Snapshot {
   const fixture = JSON.parse(
     readFileSync(resolve(import.meta.dir, "../test/fixtures/number-format-cases.json"), "utf8"),
   ) as { cases: [value: number, code: string, shown: string, note: string][] };
@@ -611,7 +611,7 @@ function numberFormatWorkbook(): Snapshot {
 const warnings: Record<string, string[]> = {};
 
 /** Export `snapshot` through a full-engine grid, as **File › Export XLSX** does. */
-async function exportThroughGrid(name: string, snapshot: Snapshot): Promise<void> {
+async function export_through_grid(name: string, snapshot: Snapshot): Promise<void> {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = core.createGridFromSnapshot(host, snapshot);
@@ -628,18 +628,19 @@ async function exportThroughGrid(name: string, snapshot: Snapshot): Promise<void
   }
 }
 
-await core.initSheetwrite({ engine: formulas, addons: [xlsxAddon()] });
-const { installCanvasTestStubs } = await import("../packages/core/dist/testing.js");
-const restoreCanvas = installCanvasTestStubs();
+await core.initSheetwrite({ engine: formulas, addons: [xlsx_addon()] });
+const { installCanvasTestStubs: install_canvas_test_stubs } =
+  await import("../packages/core/dist/testing.js");
+const restore_canvas = install_canvas_test_stubs();
 
-await exportThroughGrid("model-sheetwrite-export.xlsx", relatedModelWorkbook());
-await exportThroughGrid("links-sheetwrite-export.xlsx", linksWorkbook());
-await exportThroughGrid("Budget.xlsx", budgetWorkbook());
-await exportThroughGrid("measures-model-pivot.xlsx", measuresWorkbook(true));
-await exportThroughGrid("measures-only-model.xlsx", measuresWorkbook(false));
-await exportThroughGrid("dashboard-sheetwrite-export.xlsx", dashboardWorkbook());
-await exportThroughGrid("chart-levels-sheetwrite-export.xlsx", chartLevelsWorkbook());
-await exportThroughGrid("number-format-unsure.xlsx", numberFormatWorkbook());
+await export_through_grid("model-sheetwrite-export.xlsx", related_model_workbook());
+await export_through_grid("links-sheetwrite-export.xlsx", links_workbook());
+await export_through_grid("Budget.xlsx", budget_workbook());
+await export_through_grid("measures-model-pivot.xlsx", measures_workbook(true));
+await export_through_grid("measures-only-model.xlsx", measures_workbook(false));
+await export_through_grid("dashboard-sheetwrite-export.xlsx", dashboard_workbook());
+await export_through_grid("chart-levels-sheetwrite-export.xlsx", chart_levels_workbook());
+await export_through_grid("number-format-unsure.xlsx", number_format_workbook());
 
-restoreCanvas();
+restore_canvas();
 console.log(JSON.stringify(warnings, null, 2));

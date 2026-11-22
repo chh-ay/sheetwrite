@@ -10,7 +10,7 @@ const RUN_TIMEOUT_MS = 30_000;
 const PLAYGROUND_SCRIPT = /RunnableCode|Playground|run-example|sucrase/i;
 
 /** The script files a page requests from now on. */
-function scriptRequests(page: Page): string[] {
+function script_requests(page: Page): string[] {
   const scripts: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "script") scripts.push(new URL(request.url()).pathname);
@@ -22,7 +22,7 @@ function scriptRequests(page: Page): string[] {
 test("Try it runs the example, reruns an edit, reports an error at its line, and resets @portability", async ({
   page,
 }) => {
-  const scripts = scriptRequests(page);
+  const scripts = script_requests(page);
   await page.goto("/docs/start/first-grid/");
   await waitForHydration(page);
   // Nothing of the playground loads before the reader asks for it.
@@ -143,7 +143,7 @@ test("page actions edit the source and report a problem; pages without an exampl
   );
 
   // A generated page has no source file to edit, and no runnable example.
-  const scripts = scriptRequests(page);
+  const scripts = script_requests(page);
   await page.goto("/docs/api/core/");
   await waitForHydration(page);
   await expect(page.getByRole("link", { name: "Report a problem" })).toBeVisible();

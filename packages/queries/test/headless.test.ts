@@ -36,12 +36,12 @@ function diagnostic(operation: () => unknown): QueryDiagnostic {
   throw new Error("Expected a query failure");
 }
 
-const numericSource: QuerySource = {
+const numeric_source: QuerySource = {
   format: "json",
   columns: [{ id: "value", name: "Value", type: "number" }],
 };
 const encoder = new TextEncoder();
-const json = (rows: string) => engine.parse(encoder.encode(rows), numericSource);
+const json = (rows: string) => engine.parse(encoder.encode(rows), numeric_source);
 const filter = (op: "gt" | "eq", value: number) =>
   ({ kind: "filter", predicate: { kind: "compare", column: "value", op, value } }) as const;
 
@@ -131,7 +131,7 @@ test("source options retain empty text, schema order and nested JSON record path
   const nested = engine.parse(encoder.encode('{"résults":{"items":[{"Value":7}]}}'), {
     format: "json",
     path: ["résults", "items"],
-    columns: numericSource.columns,
+    columns: numeric_source.columns,
   });
 
   expect(csv.rowCount).toBe(2);
@@ -176,14 +176,14 @@ test("invalid host offsets and scalar widths are rejected rather than trapped or
   const one = encoder.encode('[{"Value":1}]');
 
   expect(diagnostic(() => engine.execute(malformed, [])).code).toBe("shape");
-  expect(() => engine.parse(encoder.encode("[]"), numericSource, { maxRows: 2 ** 32 })).toThrow(
+  expect(() => engine.parse(encoder.encode("[]"), numeric_source, { maxRows: 2 ** 32 })).toThrow(
     RangeError,
   );
   const infinite = filter("eq", Number.POSITIVE_INFINITY);
   expect(diagnostic(() => engine.execute(json('[{"Value":1}]'), [infinite])).code).toBe(
     "definition",
   );
-  expect(diagnostic(() => engine.parse(one, numericSource, { maxOutputBytes: 8 })).code).toBe(
+  expect(diagnostic(() => engine.parse(one, numeric_source, { maxOutputBytes: 8 })).code).toBe(
     "limit",
   );
 });
@@ -191,7 +191,7 @@ test("invalid host offsets and scalar widths are rejected rather than trapped or
 test("fatal failures use the shared serializable error envelope", () => {
   let failure: unknown;
   try {
-    engine.parse(encoder.encode('[{"Value":1},{"Value":2}]'), numericSource, { maxRows: 1 });
+    engine.parse(encoder.encode('[{"Value":1},{"Value":2}]'), numeric_source, { maxRows: 1 });
   } catch (error) {
     failure = error;
   }

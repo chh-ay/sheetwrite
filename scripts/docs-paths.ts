@@ -10,19 +10,19 @@ import type { ApiEntryPoint, ApiPackage } from "./public-api.js";
 
 /** The site route of an authored page at `path` under the docs content root. */
 export function routeForContentPath(contentRoot: string, path: string): string {
-  const relativePath = relative(contentRoot, path)
+  const relative_path = relative(contentRoot, path)
     .split(sep)
     .join("/")
     .replace(/\.mdx?$/, "");
-  const withoutIndex = relativePath === "index" ? "" : relativePath.replace(/\/index$/, "");
-  return `/docs/${withoutIndex}${withoutIndex.length === 0 ? "" : "/"}`;
+  const without_index = relative_path === "index" ? "" : relative_path.replace(/\/index$/, "");
+  return `/docs/${without_index}${without_index.length === 0 ? "" : "/"}`;
 }
 
 /** The slug of an entry point's reference page: `/docs/api/<slug>/`. */
 export function entrySlug(packageName: string, subpath: string): string {
-  const packageSlug = packageName.replace("@sheetwrite/", "");
-  if (subpath === ".") return packageSlug;
-  return `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+  const package_slug = packageName.replace("@sheetwrite/", "");
+  if (subpath === ".") return package_slug;
+  return `${package_slug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
 }
 
 /** The import specifier of an entry point, as readers write it. */

@@ -81,7 +81,7 @@ class LogicalClock {
   }
 }
 
-function traceWorkbook(): Workbook {
+function trace_workbook(): Workbook {
   return {
     activeSheet: "trace",
     sheets: [
@@ -100,7 +100,7 @@ function traceWorkbook(): Workbook {
   };
 }
 
-function traceValue(key: string, row: number): RowData[string] {
+function trace_value(key: string, row: number): RowData[string] {
   switch (key) {
     case "c0":
       return row;
@@ -123,9 +123,9 @@ function rows(start: number, end: number, columns: readonly DataSourceColumnBand
   const keys = columns.flatMap((band) => band.keys);
   return Array.from({ length: end - start }, (_, offset) => {
     const row = start + offset;
-    const pageRow: RowData = {};
-    for (const key of keys) pageRow[key] = traceValue(key, row);
-    return pageRow;
+    const page_row: RowData = {};
+    for (const key of keys) page_row[key] = trace_value(key, row);
+    return page_row;
   });
 }
 
@@ -135,58 +135,58 @@ function percentile(values: readonly number[], quantile: number): number {
   return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)] ?? 0;
 }
 
-function installControlledAnimationFrames(): () => void {
-  const originalRequest = globalThis.requestAnimationFrame;
-  const originalCancel = globalThis.cancelAnimationFrame;
-  let nextFrame = 1;
+function install_controlled_animation_frames(): () => void {
+  const original_request = globalThis.requestAnimationFrame;
+  const original_cancel = globalThis.cancelAnimationFrame;
+  let next_frame = 1;
   // The trace explicitly refreshes each frame; compositor callbacks must not race its logical clock.
-  globalThis.requestAnimationFrame = () => nextFrame++;
+  globalThis.requestAnimationFrame = () => next_frame++;
   globalThis.cancelAnimationFrame = () => undefined;
   return () => {
-    globalThis.requestAnimationFrame = originalRequest;
-    globalThis.cancelAnimationFrame = originalCancel;
+    globalThis.requestAnimationFrame = original_request;
+    globalThis.cancelAnimationFrame = original_cancel;
   };
 }
 
-async function runRepetition(repetition: number): Promise<RendererPrefetchRepetition> {
+async function run_repetition(repetition: number): Promise<RendererPrefetchRepetition> {
   const clock = new LogicalClock();
-  const restoreDatasourceClock = installDatasourceClockForTest(() => clock.now);
-  const restoreAnimationFrames = installControlledAnimationFrames();
+  const restore_datasource_clock = installDatasourceClockForTest(() => clock.now);
+  const restore_animation_frames = install_controlled_animation_frames();
   const host = document.createElement("div");
   host.style.cssText =
     "position:fixed;left:-10000px;top:0;width:640px;height:427px;contain:strict;";
   document.body.append(host);
   let grid: Grid | null = null;
   let requests = 0;
-  let requestedRows = 0;
-  let rowsServed = 0;
-  let bytesServed = 0;
+  let requested_rows = 0;
+  let rows_served = 0;
+  let bytes_served = 0;
   let aborts = 0;
-  const activeRequests = new Set<AbortSignal>();
-  let peakActiveRequests = 0;
+  const active_requests = new Set<AbortSignal>();
+  let peak_active_requests = 0;
 
   try {
     const mounted = createGrid(host, {
-      workbook: traceWorkbook(),
+      workbook: trace_workbook(),
       datasource: {
         capabilities: { protocol: 2, columns: "windowed" },
         getRows({ start, end, columns, signal }) {
           requests += 1;
-          requestedRows += end - start;
-          activeRequests.add(signal);
+          requested_rows += end - start;
+          active_requests.add(signal);
           const result = Promise.withResolvers<DataSourcePage>();
           const cancel = clock.schedule(() => {
-            const pageRows = rows(start, end, columns);
-            rowsServed += pageRows.length;
-            bytesServed += new TextEncoder().encode(JSON.stringify(pageRows)).byteLength;
-            activeRequests.delete(signal);
-            result.resolve({ protocol: 2, start, columns, rows: pageRows });
+            const page_rows = rows(start, end, columns);
+            rows_served += page_rows.length;
+            bytes_served += new TextEncoder().encode(JSON.stringify(page_rows)).byteLength;
+            active_requests.delete(signal);
+            result.resolve({ protocol: 2, start, columns, rows: page_rows });
           });
           signal.addEventListener(
             "abort",
             () => {
               cancel();
-              activeRequests.delete(signal);
+              active_requests.delete(signal);
               aborts += 1;
               result.reject(new DOMException("Logical datasource request aborted", "AbortError"));
             },
@@ -205,13 +205,13 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
     const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
     if (!scroller) throw new Error("Prefetch fixture did not mount its scroller");
     let visible = { start: 0, end: VIEWPORT_ROWS };
-    const unsubscribe = grid.on("scroll", ({ firstRow, lastRow }) => {
-      visible = { start: firstRow, end: lastRow + 1 };
+    const unsubscribe = grid.on("scroll", ({ firstRow: first_row, lastRow: last_row }) => {
+      visible = { start: first_row, end: last_row + 1 };
     });
-    const renderAt = (row: number): boolean => {
+    const render_at = (row: number): boolean => {
       scroller.scrollTop = row * ROW_HEIGHT;
       mounted.refresh();
-      peakActiveRequests = Math.max(peakActiveRequests, activeRequests.size);
+      peak_active_requests = Math.max(peak_active_requests, active_requests.size);
       return store.isRangeFullyLoaded({
         sheet: "trace",
         start: { row: visible.start, col: 0 },
@@ -219,98 +219,110 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
       });
     };
 
-    renderAt(0);
+    render_at(0);
     await clock.advance(SOURCE_LATENCY_MS);
-    renderAt(0);
-    let visibleStart = VIEWPORT_ROWS / 2;
-    renderAt(visibleStart);
+    render_at(0);
+    let visible_start = VIEWPORT_ROWS / 2;
+    render_at(visible_start);
     await clock.advance(SOURCE_LATENCY_MS);
-    renderAt(visibleStart);
+    render_at(visible_start);
 
     // Excluded warm-up: the fixed viewport and its two real aligned look-ahead bands are resident.
-    const warm = { requests, requestedRows, rowsServed, bytesServed, aborts };
+    const warm = {
+      requests,
+      requestedRows: requested_rows,
+      rowsServed: rows_served,
+      bytesServed: bytes_served,
+      aborts,
+    };
     const waits: number[] = [];
-    const demandedRows = new Set<number>();
-    let waitStarted: number | null = null;
-    let measuredFrames = 0;
-    let residentFrames = 0;
-    const measure = (isResident: boolean) => {
-      measuredFrames += 1;
-      for (let row = visible.start; row < visible.end; row++) demandedRows.add(row);
-      if (isResident) {
-        residentFrames += 1;
-        if (waitStarted !== null) {
-          waits.push(clock.now - waitStarted);
-          waitStarted = null;
+    const demanded_rows = new Set<number>();
+    let wait_started: number | null = null;
+    let measured_frames = 0;
+    let resident_frames = 0;
+    const measure = (is_resident: boolean) => {
+      measured_frames += 1;
+      for (let row = visible.start; row < visible.end; row++) demanded_rows.add(row);
+      if (is_resident) {
+        resident_frames += 1;
+        if (wait_started !== null) {
+          waits.push(clock.now - wait_started);
+          wait_started = null;
         }
-      } else if (waitStarted === null) {
-        waitStarted = clock.now;
+      } else if (wait_started === null) {
+        wait_started = clock.now;
       }
     };
 
     for (let frame = 0; frame < 40; frame++) {
       await clock.advance(FRAME_MS);
-      visibleStart += VIEWPORT_ROWS / 4;
-      measure(renderAt(visibleStart));
+      visible_start += VIEWPORT_ROWS / 4;
+      measure(render_at(visible_start));
     }
     await clock.advance(FRAME_MS);
-    measure(renderAt(visibleStart));
+    measure(render_at(visible_start));
     for (let frame = 0; frame < 8; frame++) {
       await clock.advance(FRAME_MS);
-      visibleStart -= VIEWPORT_ROWS / 4;
-      measure(renderAt(visibleStart));
+      visible_start -= VIEWPORT_ROWS / 4;
+      measure(render_at(visible_start));
     }
-    const steady = { requests, requestedRows, rowsServed, bytesServed, aborts };
-    const demandedStart = Math.min(...demandedRows);
-    const demandedEnd = Math.max(...demandedRows) + 1;
-    const demandedBytes = new TextEncoder().encode(
-      JSON.stringify(rows(demandedStart, demandedEnd, TRACE_BANDS)),
+    const steady = {
+      requests,
+      requestedRows: requested_rows,
+      rowsServed: rows_served,
+      bytesServed: bytes_served,
+      aborts,
+    };
+    const demanded_start = Math.min(...demanded_rows);
+    const demanded_end = Math.max(...demanded_rows) + 1;
+    const demanded_bytes = new TextEncoder().encode(
+      JSON.stringify(rows(demanded_start, demanded_end, TRACE_BANDS)),
     ).byteLength;
 
-    visibleStart = 3_000;
-    const jumpVisibleResidentBeforeResponse = renderAt(visibleStart);
-    const abortsAfterJump = aborts;
+    visible_start = 3_000;
+    const jump_visible_resident_before_response = render_at(visible_start);
+    const aborts_after_jump = aborts;
     await clock.advance(SOURCE_LATENCY_MS);
-    const jumpVisibleResidentAfterResponse = renderAt(visibleStart);
+    const jump_visible_resident_after_response = render_at(visible_start);
     const cache = store.getPagedStats("trace");
     unsubscribe();
 
-    const measuredRequestedRows = steady.requestedRows - warm.requestedRows;
-    const measuredRowsServed = steady.rowsServed - warm.rowsServed;
-    const measuredBytesServed = steady.bytesServed - warm.bytesServed;
+    const measured_requested_rows = steady.requestedRows - warm.requestedRows;
+    const measured_rows_served = steady.rowsServed - warm.rowsServed;
+    const measured_bytes_served = steady.bytesServed - warm.bytesServed;
     return {
       repetition,
-      residencyRatio: residentFrames / measuredFrames,
+      residencyRatio: resident_frames / measured_frames,
       p95VisibleWaitMs: percentile(waits, 0.95),
-      measuredFrames,
-      residentFrames,
+      measuredFrames: measured_frames,
+      residentFrames: resident_frames,
       requests: steady.requests - warm.requests,
-      requestedRows: measuredRequestedRows,
-      rowsServed: measuredRowsServed,
-      bytesServed: measuredBytesServed,
-      requestedRowMultiplier: measuredRequestedRows / demandedRows.size,
-      servedByteMultiplier: demandedBytes === 0 ? 0 : measuredBytesServed / demandedBytes,
+      requestedRows: measured_requested_rows,
+      rowsServed: measured_rows_served,
+      bytesServed: measured_bytes_served,
+      requestedRowMultiplier: measured_requested_rows / demanded_rows.size,
+      servedByteMultiplier: demanded_bytes === 0 ? 0 : measured_bytes_served / demanded_bytes,
       reversalAborts: steady.aborts - warm.aborts,
-      jumpAborts: abortsAfterJump - steady.aborts,
+      jumpAborts: aborts_after_jump - steady.aborts,
       cacheAllocatedBytes: cache.allocatedBytes,
       cacheChunks: cache.chunks,
-      peakActiveRequests,
-      jumpVisibleResidentBeforeResponse,
-      jumpVisibleResidentAfterResponse,
+      peakActiveRequests: peak_active_requests,
+      jumpVisibleResidentBeforeResponse: jump_visible_resident_before_response,
+      jumpVisibleResidentAfterResponse: jump_visible_resident_after_response,
     };
   } finally {
     grid?.destroy();
     host.remove();
-    restoreAnimationFrames();
-    restoreDatasourceClock();
+    restore_animation_frames();
+    restore_datasource_clock();
   }
 }
 
-async function runRendererPrefetchTrace(): Promise<RendererPrefetchReport> {
+async function run_renderer_prefetch_trace(): Promise<RendererPrefetchReport> {
   await initSheetwrite();
   const repetitions: RendererPrefetchRepetition[] = [];
   for (let repetition = 1; repetition <= REPETITIONS; repetition++) {
-    repetitions.push(await runRepetition(repetition));
+    repetitions.push(await run_repetition(repetition));
   }
   return {
     policy: {
@@ -337,13 +349,13 @@ async function runRendererPrefetchTrace(): Promise<RendererPrefetchReport> {
 
 /** Exposes the renderer trace only after the island has mounted in the browser. */
 export function PrefetchFixture() {
-  const [isReady, setIsReady] = createSignal(false);
+  const [is_ready, set_is_ready] = createSignal(false);
   onMount(() => {
-    window.__sheetwriteRunPrefetchTrace = runRendererPrefetchTrace;
-    setIsReady(true);
+    window.__sheetwriteRunPrefetchTrace = run_renderer_prefetch_trace;
+    set_is_ready(true);
     onCleanup(() => {
       delete window.__sheetwriteRunPrefetchTrace;
     });
   });
-  return <main data-testid="prefetch-fixture" data-ready={isReady() || undefined} />;
+  return <main data-testid="prefetch-fixture" data-ready={is_ready() || undefined} />;
 }

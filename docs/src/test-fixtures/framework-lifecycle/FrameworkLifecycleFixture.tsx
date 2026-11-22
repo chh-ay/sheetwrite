@@ -7,31 +7,35 @@ interface FrameworkLifecycleFixtureProps {
 type Framework = "react" | "vue" | "svelte";
 type MountFixture = (host: HTMLElement) => () => void;
 
-function isFramework(framework: string): framework is Framework {
+function is_framework(framework: string): framework is Framework {
   return framework === "react" || framework === "vue" || framework === "svelte";
 }
 
-async function loadFixture(framework: Framework): Promise<MountFixture> {
+async function load_fixture(framework: Framework): Promise<MountFixture> {
   switch (framework) {
     case "react": {
-      const [{ default: ReactFixture }, { createElement }, { createRoot }] = await Promise.all([
+      const [
+        { default: ReactFixture },
+        { createElement: create_element },
+        { createRoot: create_root },
+      ] = await Promise.all([
         import("@docs/test-fixtures/framework-lifecycle/ReactFixture.js"),
         import("react"),
         import("react-dom/client"),
       ]);
       return (host) => {
-        const root = createRoot(host);
-        root.render(createElement(ReactFixture));
+        const root = create_root(host);
+        root.render(create_element(ReactFixture));
         return () => root.unmount();
       };
     }
     case "vue": {
-      const [{ default: VueFixture }, { createApp }] = await Promise.all([
+      const [{ default: VueFixture }, { createApp: create_app }] = await Promise.all([
         import("@docs/test-fixtures/framework-lifecycle/VueFixture.js"),
         import("vue"),
       ]);
       return (host) => {
-        const app = createApp(VueFixture);
+        const app = create_app(VueFixture);
         app.mount(host);
         return () => app.unmount();
       };
@@ -54,20 +58,20 @@ export function FrameworkLifecycleFixture(props: FrameworkLifecycleFixtureProps)
   let host: HTMLDivElement | undefined;
   onMount(() => {
     const framework = props.framework;
-    if (!isFramework(framework)) return;
+    if (!is_framework(framework)) return;
     if (host === undefined) throw new Error("Framework lifecycle fixture did not mount its host");
     const target = host;
-    let isDisposed = false;
-    let unmountFixture: (() => void) | undefined;
+    let is_disposed = false;
+    let unmount_fixture: (() => void) | undefined;
     onCleanup(() => {
-      isDisposed = true;
-      unmountFixture?.();
+      is_disposed = true;
+      unmount_fixture?.();
     });
-    void loadFixture(framework).then((mountFixture) => {
-      if (!isDisposed) unmountFixture = mountFixture(target);
+    void load_fixture(framework).then((mount_fixture) => {
+      if (!is_disposed) unmount_fixture = mount_fixture(target);
     });
   });
-  return isFramework(props.framework) ? (
+  return is_framework(props.framework) ? (
     <div
       ref={(element) => {
         host = element;

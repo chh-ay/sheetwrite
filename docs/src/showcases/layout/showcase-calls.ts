@@ -42,7 +42,7 @@ let index:
   | undefined;
 
 /** Built on first use, so a bundle that never calls `showcaseCalls` drops the manifest. */
-function apiIndex(): NonNullable<typeof index> {
+function api_index(): NonNullable<typeof index> {
   index ??= {
     routes: apiReferenceRoutes(manifest),
     previews: apiSymbolPreviews(manifest),
@@ -52,7 +52,7 @@ function apiIndex(): NonNullable<typeof index> {
 }
 
 /** The first sentence of a doc comment, with `{@link X}` written as `X`. */
-function firstSentence(documentation: string | undefined): string | undefined {
+function first_sentence(documentation: string | undefined): string | undefined {
   const lead = documentation
     ?.split(/\n\s*\n|\n@/)[0]
     ?.replace(/\{@link(?:code|plain)?\s+([^}|\s]+)(?:[\s|][^}]*)?\}/g, "$1")
@@ -70,7 +70,7 @@ export function showcaseCalls(
   code: string,
   notes: Readonly<Record<string, string>> = {},
 ): ShowcaseCall[] {
-  const { routes, previews, members } = apiIndex();
+  const { routes, previews, members } = api_index();
   return [...new Set(code.match(CALL) ?? [])]
     .filter((call) => !BUILT_IN.test(call))
     .map((call) => call.replace(/^new /, ""))
@@ -80,7 +80,7 @@ export function showcaseCalls(
       const member = label.includes(".") ? members.get(symbol) : undefined;
       const href = member?.route ?? routes.get(symbol);
       const summary =
-        notes[label] ?? firstSentence(member ? member.docs : previews.get(symbol)?.docs);
+        notes[label] ?? first_sentence(member ? member.docs : previews.get(symbol)?.docs);
       return { label, symbol, href, summary };
     });
 }

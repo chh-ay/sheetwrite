@@ -72,7 +72,7 @@ const defined = session.define({
 });
 if (defined.status !== "applied") throw new Error(`The query was not defined: ${defined.status}`);
 
-const samplesMs: number[] = [];
+const samples_ms: number[] = [];
 for (let sample = 0; sample < WARMUP + SAMPLES; sample += 1) {
   const started = performance.now();
   const result = await session.refresh("sales");
@@ -84,11 +84,11 @@ for (let sample = 0; sample < WARMUP + SAMPLES; sample += 1) {
   if (last !== `Customer ${(ROWS - 1) % CUSTOMERS}`) {
     throw new Error(`Refresh ${sample} left ${String(last)} in the last row`);
   }
-  if (sample >= WARMUP) samplesMs.push(elapsed);
+  if (sample >= WARMUP) samples_ms.push(elapsed);
 }
 grid.destroy();
 
-const timing = summarize(samplesMs);
-const report = { rows: ROWS, median: timing.median, p95: timing.p95, samplesMs };
+const timing = summarize(samples_ms);
+const report = { rows: ROWS, median: timing.median, p95: timing.p95, samplesMs: samples_ms };
 if (OUTPUT) writeFileSync(OUTPUT, `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(report)}\n`);

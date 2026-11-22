@@ -72,7 +72,7 @@ function ribbon(tab: string, ...commands: string[]) {
 }
 
 /** Select the first `rows` rows of columns A to E, from A1. */
-async function selectRows(page: Page, rows: number) {
+async function select_rows(page: Page, rows: number) {
   await page.locator(".sheetwrite-shell-grid").click({ position: { x: 80, y: 44 } });
   await page.keyboard.down("Shift");
   for (let row = 1; row < rows; row += 1) await page.keyboard.press("ArrowDown");
@@ -128,7 +128,7 @@ interface CardCrop {
 }
 
 /** A point in the grid element: the middle of a cell by its row and column from 0. */
-function cellPoint(row: number, col: number) {
+function cell_point(row: number, col: number) {
   const left = ORDERS_COLUMN_EDGES[col];
   const right = ORDERS_COLUMN_EDGES[col + 1];
   if (left === undefined || right === undefined) throw new Error(`Orders has no column ${col}`);
@@ -136,7 +136,7 @@ function cellPoint(row: number, col: number) {
 }
 
 /** An inclusive block of the Orders sheet, rows and columns from 0. */
-function ordersRange(top: number, left: number, bottom: number, right: number) {
+function orders_range(top: number, left: number, bottom: number, right: number) {
   return { sheet: "orders", start: { row: top, col: left }, end: { row: bottom, col: right } };
 }
 
@@ -150,7 +150,7 @@ async function select(page: Page, selection: GridSelection) {
  * A paste of one row of 16,385 columns, one more than a paste may have: the
  * grid refuses it before anything is written, and says why.
  */
-function pasteRefused(name: string, size: ShotSize): Shot {
+function paste_refused(name: string, size: ShotSize): Shot {
   return {
     name,
     size,
@@ -227,7 +227,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "app",
     query: { sheet: "orders" },
     steps: async (page) => {
-      await selectRows(page, 12);
+      await select_rows(page, 12);
       await ribbon("Data", "Custom Sort")(page);
     },
   },
@@ -287,7 +287,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     name: "grid-overview",
     size: "app",
     query: { sheet: "orders" },
-    steps: (page) => select(page, { kind: "range", range: ordersRange(1, 3, 8, 4) }),
+    steps: (page) => select(page, { kind: "range", range: orders_range(1, 3, 8, 4) }),
   },
   // The grid feature pages use the compact ribbon, so the grid gets the room.
   {
@@ -297,7 +297,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     steps: async (page) => {
       await page
         .locator(".sheetwrite-shell-grid")
-        .click({ button: "right", position: cellPoint(1, 1) });
+        .click({ button: "right", position: cell_point(1, 1) });
       await settle(page);
     },
   },
@@ -306,7 +306,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
     steps: async (page) => {
-      await page.locator(".sheetwrite-shell-grid").dblclick({ position: cellPoint(7, 1) });
+      await page.locator(".sheetwrite-shell-grid").dblclick({ position: cell_point(7, 1) });
       await page.keyboard.press("End");
       await page.keyboard.type(" north");
       await settle(page);
@@ -323,7 +323,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
     steps: async (page) => {
-      await select(page, { kind: "range", range: ordersRange(1, 3, 2, 3) });
+      await select(page, { kind: "range", range: orders_range(1, 3, 2, 3) });
       const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
       if (grid === null) throw new Error("The grid is not on the stage");
       const handle = {
@@ -342,7 +342,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
     steps: async (page) => {
-      await page.locator(".sheetwrite-shell-grid").click({ position: cellPoint(1, 0) });
+      await page.locator(".sheetwrite-shell-grid").click({ position: cell_point(1, 0) });
       await page.keyboard.press("Control+f");
       // Fill the Find input itself, so the search runs and the matches highlight.
       await page.getByRole("textbox", { name: "Find in sheet" }).fill("EMEA");
@@ -354,13 +354,13 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
     steps: (page) =>
-      select(page, { kind: "multi", ranges: [ordersRange(1, 1, 3, 2), ordersRange(5, 3, 8, 4)] }),
+      select(page, { kind: "multi", ranges: [orders_range(1, 1, 3, 2), orders_range(5, 3, 8, 4)] }),
   },
   {
     name: "status-bar",
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
-    steps: (page) => select(page, { kind: "range", range: ordersRange(1, 4, 12, 4) }),
+    steps: (page) => select(page, { kind: "range", range: orders_range(1, 4, 12, 4) }),
   },
   { name: "ribbon", size: "wide", query: { sheet: "orders" } },
   // The formatting, analysis, data and formula pages, on the Report, Pivot and Formulas sheets.
@@ -481,7 +481,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "orders", ribbon: "compact" },
     steps: async (page) => {
-      await select(page, { kind: "range", range: ordersRange(2, 2, 5, 4) });
+      await select(page, { kind: "range", range: orders_range(2, 2, 5, 4) });
       await page.evaluate(() => window.__sheetwriteFigureGrid?.actions.cut());
       // The paste target beside the cut cells, where the move would land.
       await select(page, { kind: "cell", addr: { sheet: "orders", row: 2, col: 5 } });
@@ -492,7 +492,7 @@ const PAGE_SHOTS: readonly Shot[] = [
     size: "app",
     query: { sheet: "orders", ribbon: "compact" },
     steps: async (page) => {
-      await select(page, { kind: "range", range: ordersRange(1, 3, 4, 4) });
+      await select(page, { kind: "range", range: orders_range(1, 3, 4, 4) });
       await page.locator(".sheetwrite-shell-grid").focus();
       await page.keyboard.press("Control+c");
       await select(page, { kind: "cell", addr: { sheet: "orders", row: 1, col: 6 } });
@@ -564,9 +564,9 @@ const PAGE_SHOTS: readonly Shot[] = [
   },
   // The paste refused past its limits, at the page size and at the tablet and
   // phone sizes: its message is wider than a phone crop of the page size.
-  pasteRefused("paste-refused", "panel"),
-  pasteRefused("paste-refused-tablet", "sectionTablet"),
-  pasteRefused("paste-refused-phone", "sectionPhone"),
+  paste_refused("paste-refused", "panel"),
+  paste_refused("paste-refused-tablet", "sectionTablet"),
+  paste_refused("paste-refused-phone", "sectionPhone"),
   // The formula assist demo's stage and budget: March's total in D13, whose
   // neighbours left and right agree, so `=` in the formula bar shows the rest.
   // The Formula assist page shows it at the panel size.
@@ -783,7 +783,7 @@ const STAGE_HEIGHT_FOR_CROP = 1000;
 const DASHBOARD_MARGIN = 12;
 
 /** The box around the named dashboard items (every item by default), with the dashboard's margin. */
-async function itemsBox(page: Page, titles?: readonly string[]) {
+async function items_box(page: Page, titles?: readonly string[]) {
   const boxes = await page
     .locator(".sheetwrite-dashboard-item")
     .evaluateAll(
@@ -810,7 +810,7 @@ async function itemsBox(page: Page, titles?: readonly string[]) {
 }
 
 /** Hides every dashboard item but the named ones. */
-async function hideOtherItems(page: Page, titles: readonly string[]) {
+async function hide_other_items(page: Page, titles: readonly string[]) {
   await page.locator(".sheetwrite-dashboard-item").evaluateAll((items, kept) => {
     for (const item of items) {
       const title = item.querySelector(".sheetwrite-dashboard-item-title")?.textContent ?? "";
@@ -828,13 +828,13 @@ async function settle(page: Page) {
 }
 
 /** The clip of a `{ x, y }` crop: the shot's size from that point of the stage. */
-async function cropBox(page: Page, crop: ShotPoint, size: ShotSize): Promise<Box> {
+async function crop_box(page: Page, crop: ShotPoint, size: ShotSize): Promise<Box> {
   const { width, height } = SHOT_SIZES[size];
-  const stage = await stageBox(page);
+  const stage = await stage_box(page);
   return { x: stage.x + crop.x, y: stage.y + crop.y, width, height };
 }
 
-async function stageBox(page: Page): Promise<Box> {
+async function stage_box(page: Page): Promise<Box> {
   const box = await page.locator("#stage").boundingBox();
   if (box === null) throw new Error("The stage is not on the page");
   return box;
@@ -853,7 +853,7 @@ const ORDERS_ROWS_CHECKED = 40;
 /** How far past an edge a box may reach and still count as inside: subpixel layout. */
 const EDGE_TOLERANCE = 0.5;
 
-function unionBox(boxes: readonly Box[]): Box {
+function union_box(boxes: readonly Box[]): Box {
   const left = Math.min(...boxes.map((box) => box.x));
   const top = Math.min(...boxes.map((box) => box.y));
   const right = Math.max(...boxes.map((box) => box.x + box.width));
@@ -862,7 +862,7 @@ function unionBox(boxes: readonly Box[]): Box {
 }
 
 /** The box of a block of Orders cells, from the site theme's grid geometry. */
-async function ordersCellsBox(page: Page, cells: CellBlock): Promise<Box> {
+async function orders_cells_box(page: Page, cells: CellBlock): Promise<Box> {
   const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
   if (grid === null) throw new Error("The grid is not on the page");
   const left = ORDERS_COLUMN_EDGES[cells.left];
@@ -879,7 +879,7 @@ async function ordersCellsBox(page: Page, cells: CellBlock): Promise<Box> {
 }
 
 /** The box around a card's parts, cells and area. */
-async function cardBox(page: Page, crop: CardCrop): Promise<Box> {
+async function card_box(page: Page, crop: CardCrop): Promise<Box> {
   const boxes: Box[] = [];
   for (const selector of crop.parts) {
     const part = page.locator(selector);
@@ -889,13 +889,13 @@ async function cardBox(page: Page, crop: CardCrop): Promise<Box> {
     if (box === null) throw new Error(`The card part ${selector} is not shown`);
     boxes.push(box);
   }
-  if (crop.cells !== undefined) boxes.push(await ordersCellsBox(page, crop.cells));
+  if (crop.cells !== undefined) boxes.push(await orders_cells_box(page, crop.cells));
   if (crop.area !== undefined) {
-    const stage = await stageBox(page);
+    const stage = await stage_box(page);
     boxes.push({ ...crop.area, x: stage.x + crop.area.x, y: stage.y + crop.area.y });
   }
   if (boxes.length === 0) throw new Error("A card crop needs parts, cells or an area");
-  const box = unionBox(boxes);
+  const box = union_box(boxes);
   if (crop.across === undefined) return box;
   const span = await page.locator(crop.across).boundingBox();
   if (span === null) throw new Error(`The card's span ${crop.across} is not shown`);
@@ -903,12 +903,12 @@ async function cardBox(page: Page, crop: CardCrop): Promise<Box> {
 }
 
 /** Every Orders cell, column header and row number, labelled, for the cut check. */
-async function ordersCellBoxes(page: Page): Promise<(Box & { label: string })[]> {
+async function orders_cell_boxes(page: Page): Promise<(Box & { label: string })[]> {
   const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
   if (grid === null) throw new Error("The grid is not on the page");
-  const [rowNumbersRight = 0, ...edges] = ORDERS_COLUMN_EDGES;
+  const [row_numbers_right = 0, ...edges] = ORDERS_COLUMN_EDGES;
   const boxes: (Box & { label: string })[] = [];
-  let left = rowNumbersRight;
+  let left = row_numbers_right;
   for (const [col, right] of edges.entries()) {
     const letter = String.fromCharCode("A".charCodeAt(0) + col);
     const x = grid.x + left;
@@ -921,7 +921,7 @@ async function ordersCellBoxes(page: Page): Promise<(Box & { label: string })[]>
         boxes.push({
           x: grid.x,
           y,
-          width: rowNumbersRight,
+          width: row_numbers_right,
           height: ROW_HEIGHT,
           label: `row ${row + 1}`,
         });
@@ -935,20 +935,20 @@ async function ordersCellBoxes(page: Page): Promise<(Box & { label: string })[]>
 /**
  * What `box` cuts through: each visible text, control and, on the Orders
  * sheet, each grid cell that is partly inside it. A thing covered at that
- * point (by a dialog or a menu) is not cut; nor is a `cutThrough` field,
+ * point (by a dialog or a menu) is not cut; nor is a `cut_through` field,
  * though its own text is.
  */
-async function cutByBox(
+async function cut_by_box(
   page: Page,
   box: Box,
-  cutThrough: readonly string[],
+  cut_through: readonly string[],
   cells: readonly (Box & { label: string })[],
 ): Promise<string[]> {
   return page.evaluate(
-    ({ box, cutThrough, cells, tolerance }) => {
+    ({ box, cutThrough: cut_through, cells, tolerance }) => {
       const right = box.x + box.width;
       const bottom = box.y + box.height;
-      const isCut = (rect: DOMRect) =>
+      const is_cut = (rect: DOMRect) =>
         rect.width > 0 &&
         rect.height > 0 &&
         rect.left < right - tolerance &&
@@ -960,16 +960,16 @@ async function cutByBox(
           rect.top < box.y - tolerance ||
           rect.bottom > bottom + tolerance);
       // The element on top where `rect` meets the box: tells a shown thing from a covered one.
-      const topmostInside = (rect: DOMRect) =>
+      const topmost_inside = (rect: DOMRect) =>
         document.elementFromPoint(
           (Math.max(rect.left, box.x) + Math.min(rect.right, right)) / 2,
           (Math.max(rect.top, box.y) + Math.min(rect.bottom, bottom)) / 2,
         );
-      const exempt = cutThrough.flatMap((selector) => [...document.querySelectorAll(selector)]);
+      const exempt = cut_through.flatMap((selector) => [...document.querySelectorAll(selector)]);
       const cut: string[] = [];
       // Hidden text and fields: screen-reader-only (a 1 px box clipped out of
       // sight) or hidden with visibility, as the card's `hide` does.
-      const isVisuallyHidden = (element: Element) => {
+      const is_visually_hidden = (element: Element) => {
         const rect = element.getBoundingClientRect();
         return (
           rect.width <= 1 || rect.height <= 1 || getComputedStyle(element).visibility !== "visible"
@@ -980,23 +980,24 @@ async function cutByBox(
       for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
         const text = node.textContent?.trim();
         const owner = node.parentElement;
-        if (!text || owner === null || isVisuallyHidden(owner)) continue;
+        if (!text || owner === null || is_visually_hidden(owner)) continue;
         const range = document.createRange();
         range.selectNodeContents(node);
-        const shownAndCut = [...range.getClientRects()].some((rect) => {
-          if (!isCut(rect)) return false;
-          const hit = topmostInside(rect);
+        const shown_and_cut = [...range.getClientRects()].some((rect) => {
+          if (!is_cut(rect)) return false;
+          const hit = topmost_inside(rect);
           return hit !== null && (owner.contains(hit) || hit.contains(owner));
         });
-        if (shownAndCut) cut.push(`"${text.slice(0, 40)}"`);
+        if (shown_and_cut) cut.push(`"${text.slice(0, 40)}"`);
       }
 
       const controls = "button, input, select, textarea, [role=button], [role=tab], [role=option]";
       for (const control of document.querySelectorAll(controls)) {
-        if (exempt.some((field) => field.contains(control)) || isVisuallyHidden(control)) continue;
+        if (exempt.some((field) => field.contains(control)) || is_visually_hidden(control))
+          continue;
         const rect = control.getBoundingClientRect();
-        if (!isCut(rect)) continue;
-        const hit = topmostInside(rect);
+        if (!is_cut(rect)) continue;
+        const hit = topmost_inside(rect);
         if (hit !== null && (control.contains(hit) || hit.contains(control))) {
           const name = `${control.tagName.toLowerCase()}.${[...control.classList].join(".")}`;
           cut.push(`<${name}> ${control.textContent?.trim().slice(0, 30) ?? ""}`);
@@ -1005,11 +1006,11 @@ async function cutByBox(
 
       for (const cell of cells) {
         const rect = DOMRect.fromRect(cell);
-        if (!isCut(rect)) continue;
+        if (!is_cut(rect)) continue;
         // The grid draws its cells on a canvas under transparent overlay
         // layers; a cell shows unless something with a background (a menu,
         // a dialog, a panel) is on top of it there.
-        const hit = topmostInside(rect);
+        const hit = topmost_inside(rect);
         const grid = hit?.closest(".sheetwrite-shell-grid");
         let covered = hit === null || grid === null || grid === undefined;
         for (
@@ -1024,12 +1025,12 @@ async function cutByBox(
       }
       return cut;
     },
-    { box, cutThrough, cells, tolerance: EDGE_TOLERANCE },
+    { box, cutThrough: cut_through, cells, tolerance: EDGE_TOLERANCE },
   );
 }
 
 /** The background the nearest painted ancestor of `selector`'s element shows. */
-async function backgroundBehind(page: Page, selector: string): Promise<string> {
+async function background_behind(page: Page, selector: string): Promise<string> {
   return page
     .locator(selector)
     .first()
@@ -1046,7 +1047,7 @@ async function backgroundBehind(page: Page, selector: string): Promise<string> {
  * Writes a highlight card: the parts' box, checked to cut nothing, fitted
  * into the card's frame on the background behind them.
  */
-async function captureCard(
+async function capture_card(
   browser: Browser,
   page: Page,
   shot: Shot,
@@ -1060,9 +1061,9 @@ async function captureCard(
       for (const element of elements) (element as HTMLElement).style.visibility = "hidden";
     });
   }
-  const box = await cardBox(page, crop);
-  const cells = shot.query.sheet === "orders" ? await ordersCellBoxes(page) : [];
-  const cut = await cutByBox(page, box, crop.cutThrough ?? [], cells);
+  const box = await card_box(page, crop);
+  const cells = shot.query.sheet === "orders" ? await orders_cell_boxes(page) : [];
+  const cut = await cut_by_box(page, box, crop.cutThrough ?? [], cells);
   if (cut.length > 0) throw new Error(`${shot.name} crops through ${cut.join(", ")}`);
 
   const card = SHOT_SIZES.highlight;
@@ -1076,7 +1077,7 @@ async function captureCard(
       `${shot.name}'s ${Math.round(box.width)}×${Math.round(box.height)} px parts fit its card only at ${fit.toFixed(2)}×; show fewer parts`,
     );
   }
-  const background = await backgroundBehind(page, crop.parts[0] ?? ".sheetwrite-shell-grid");
+  const background = await background_behind(page, crop.parts[0] ?? ".sheetwrite-shell-grid");
   const image = await page.screenshot({ clip: box, animations: "disabled" });
   const frame = await browser.newPage({ viewport: card, deviceScaleFactor: scale });
   try {
@@ -1091,7 +1092,7 @@ async function captureCard(
   }
 }
 
-function isCardCrop(crop: Shot["crop"]): crop is CardCrop {
+function is_card_crop(crop: Shot["crop"]): crop is CardCrop {
   return typeof crop === "object" && "parts" in crop;
 }
 
@@ -1107,7 +1108,7 @@ async function capture(shot: Shot, origin: string, scratch: string) {
       for (const scale of SCALES) {
         const page = await browser.newPage({
           viewport: { width, height },
-          deviceScaleFactor: isCardCrop(shot.crop) ? scale * CARD_OVERSAMPLING : scale,
+          deviceScaleFactor: is_card_crop(shot.crop) ? scale * CARD_OVERSAMPLING : scale,
           colorScheme: theme,
           locale: "en-US",
           timezoneId: "UTC",
@@ -1139,19 +1140,19 @@ async function capture(shot: Shot, origin: string, scratch: string) {
         await shot.steps?.(page);
         const png = join(scratch, `${shot.name}-${theme}-${scale}x.png`);
         if (shot.crop === "items") {
-          const clip = await itemsBox(page, shot.cropItems);
+          const clip = await items_box(page, shot.cropItems);
           // The crop's margin reaches into the neighbouring items; hide them, so
           // it shows the dashboard's background as an all-items crop does.
-          if (shot.cropItems !== undefined) await hideOtherItems(page, shot.cropItems);
+          if (shot.cropItems !== undefined) await hide_other_items(page, shot.cropItems);
           const expected = SHOT_SIZES[shot.size];
           if (clip.width !== expected.width || clip.height !== expected.height) {
             throw new Error(`${shot.name} crops to ${clip.width}×${clip.height}, not its size`);
           }
           await page.screenshot({ path: png, clip, animations: "disabled" });
-        } else if (isCardCrop(shot.crop)) {
-          await captureCard(browser, page, shot, shot.crop, scale, png);
+        } else if (is_card_crop(shot.crop)) {
+          await capture_card(browser, page, shot, shot.crop, scale, png);
         } else if (shot.crop !== undefined) {
-          const clip = await cropBox(page, shot.crop, shot.size);
+          const clip = await crop_box(page, shot.crop, shot.size);
           await page.screenshot({ path: png, clip, animations: "disabled" });
         } else {
           await page.locator("#stage").screenshot({ path: png, animations: "disabled" });

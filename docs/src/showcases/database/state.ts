@@ -63,15 +63,15 @@ export const [undoRunning, setUndoRunning] = createSignal(false);
 export const [limitReport, setLimitReport] = createSignal<LimitReport | null>(null);
 
 /** One guard for every database action, so both islands' controls wait for the same run. */
-const [actionState, setActionState] = createSignal<ActionState>({ pending: false, error: null });
-const guard = createActionGuard(setActionState);
-export const busy = () => actionState().pending;
-export const actionError = () => actionState().error;
+const [action_state, set_action_state] = createSignal<ActionState>({ pending: false, error: null });
+const guard = createActionGuard(set_action_state);
+export const busy = () => action_state().pending;
+export const actionError = () => action_state().error;
 export const runGuarded = guard.run;
 
-let logId = 0;
+let log_id = 0;
 export function pushLog(kind: LogEntry["kind"], text: string): void {
-  logId += 1;
-  const entry: LogEntry = { id: logId, kind, text };
+  log_id += 1;
+  const entry: LogEntry = { id: log_id, kind, text };
   setLog((entries) => [entry, ...entries].slice(0, LOG_LIMIT));
 }

@@ -16,7 +16,7 @@ const MIN_CACHED_STRINGS = 50_000;
 const MAX_STRINGS_AFTER_TRIM = 1_000;
 const FIXTURE_TIMEOUT_MS = 90_000;
 
-async function retainedHeapBytes(session: CDPSession): Promise<number> {
+async function retained_heap_bytes(session: CDPSession): Promise<number> {
   for (let turn = 0; turn < GC_TURNS; turn++) {
     await session.send("HeapProfiler.collectGarbage");
   }
@@ -25,14 +25,14 @@ async function retainedHeapBytes(session: CDPSession): Promise<number> {
   return usage.usedSize;
 }
 
-async function runAction(page: Page, label: string, status: string): Promise<void> {
+async function run_action(page: Page, label: string, status: string): Promise<void> {
   await page.getByRole("button", { name: label }).click();
   await expect(page.locator(STATUS)).toHaveAttribute("data-status", status, {
     timeout: FIXTURE_TIMEOUT_MS,
   });
 }
 
-async function cachedStrings(page: Page): Promise<number> {
+async function cached_strings(page: Page): Promise<number> {
   return Number(await page.locator(STRINGS).getAttribute("data-entries"));
 }
 // Chromium only: the heap is read through the Chromium DevTools protocol.
@@ -46,30 +46,30 @@ test("trimMemory lowers retained heap and keeps the document and the visible gri
   await expect(page.locator(STATUS)).toHaveAttribute("data-status", "ready", {
     timeout: FIXTURE_TIMEOUT_MS,
   });
-  const loadedDocument = await page.locator(DOCUMENT).getAttribute("data-digest");
-  expect(loadedDocument).toMatch(/^[0-9a-f]{64}$/u);
+  const loaded_document = await page.locator(DOCUMENT).getAttribute("data-digest");
+  expect(loaded_document).toMatch(/^[0-9a-f]{64}$/u);
 
-  await runAction(page, "Scroll through", "scrolled");
+  await run_action(page, "Scroll through", "scrolled");
   const session = await page.context().newCDPSession(page);
-  const heapBefore = await retainedHeapBytes(session);
-  const pixelsBefore = await page.locator(HOST).screenshot();
-  const documentBefore = await page.locator(DOCUMENT).getAttribute("data-digest");
-  const stringsBefore = await cachedStrings(page);
+  const heap_before = await retained_heap_bytes(session);
+  const pixels_before = await page.locator(HOST).screenshot();
+  const document_before = await page.locator(DOCUMENT).getAttribute("data-digest");
+  const strings_before = await cached_strings(page);
 
-  await runAction(page, "Trim memory", "trimmed");
-  const heapAfter = await retainedHeapBytes(session);
-  const pixelsAfter = await page.locator(HOST).screenshot();
-  const documentAfter = await page.locator(DOCUMENT).getAttribute("data-digest");
-  const stringsAfter = await cachedStrings(page);
+  await run_action(page, "Trim memory", "trimmed");
+  const heap_after = await retained_heap_bytes(session);
+  const pixels_after = await page.locator(HOST).screenshot();
+  const document_after = await page.locator(DOCUMENT).getAttribute("data-digest");
+  const strings_after = await cached_strings(page);
 
   test.info().annotations.push({
     type: "retained heap",
-    description: `${heapBefore} B before, ${heapAfter} B after trimMemory(); cached strings ${stringsBefore} before, ${stringsAfter} after`,
+    description: `${heap_before} B before, ${heap_after} B after trimMemory(); cached strings ${strings_before} before, ${strings_after} after`,
   });
-  expect(documentBefore).toBe(loadedDocument);
-  expect(documentAfter).toBe(documentBefore);
-  expect(pixelsAfter.equals(pixelsBefore)).toBe(true);
-  expect(stringsBefore).toBeGreaterThan(MIN_CACHED_STRINGS);
-  expect(stringsAfter).toBeLessThan(MAX_STRINGS_AFTER_TRIM);
-  expect(heapBefore - heapAfter).toBeGreaterThan(MIN_TRIMMED_BYTES);
+  expect(document_before).toBe(loaded_document);
+  expect(document_after).toBe(document_before);
+  expect(pixels_after.equals(pixels_before)).toBe(true);
+  expect(strings_before).toBeGreaterThan(MIN_CACHED_STRINGS);
+  expect(strings_after).toBeLessThan(MAX_STRINGS_AFTER_TRIM);
+  expect(heap_before - heap_after).toBeGreaterThan(MIN_TRIMMED_BYTES);
 });

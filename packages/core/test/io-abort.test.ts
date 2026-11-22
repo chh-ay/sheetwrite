@@ -17,12 +17,12 @@ import {
 import { keepXlsxSlots } from "./fixtures.js";
 
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
-let restoreXlsxSlots = keepXlsxSlots();
+let restore_xlsx_slots = keepXlsxSlots();
 beforeEach(() => {
-  restoreXlsxSlots = keepXlsxSlots();
+  restore_xlsx_slots = keepXlsxSlots();
 });
 afterEach(() => {
-  restoreXlsxSlots();
+  restore_xlsx_slots();
 });
 import {
   fromXlsxTable,
@@ -74,14 +74,14 @@ interface CountingSignal {
   readonly checks: () => number;
 }
 
-/** A real signal that aborts with `reason` at the `abortAt`-th `throwIfAborted()` call. */
-function signalAbortingAt(abortAt: number, reason: Error): CountingSignal {
+/** A real signal that aborts with `reason` at the `abort_at`-th `throwIfAborted()` call. */
+function signal_aborting_at(abort_at: number, reason: Error): CountingSignal {
   const controller = new AbortController();
   const { signal } = controller;
   let checks = 0;
   signal.throwIfAborted = () => {
     checks += 1;
-    if (checks === abortAt) controller.abort(reason);
+    if (checks === abort_at) controller.abort(reason);
     AbortSignal.prototype.throwIfAborted.call(signal);
   };
   return { signal, checks: () => checks };
@@ -91,17 +91,17 @@ function signalAbortingAt(abortAt: number, reason: Error): CountingSignal {
  * Run `operation` once with a signal that never fires to count its checks, then
  * once more aborting at each check. Every aborted run must fail with the reason.
  */
-async function expectAbortAtEveryCheck(
+async function expect_abort_at_every_check(
   operation: (signal: AbortSignal) => unknown,
 ): Promise<number> {
-  const counting = signalAbortingAt(Number.POSITIVE_INFINITY, new Error("never"));
+  const counting = signal_aborting_at(Number.POSITIVE_INFINITY, new Error("never"));
   await operation(counting.signal);
   const total = counting.checks();
 
-  for (let abortAt = 1; abortAt <= total; abortAt++) {
-    const reason = new Error(`abort at check ${abortAt}`);
+  for (let abort_at = 1; abort_at <= total; abort_at++) {
+    const reason = new Error(`abort at check ${abort_at}`);
     const failure = await Promise.resolve()
-      .then(() => operation(signalAbortingAt(abortAt, reason).signal))
+      .then(() => operation(signal_aborting_at(abort_at, reason).signal))
       .then(
         () => undefined,
         (error: unknown) => error,
@@ -119,13 +119,13 @@ describe("delimited-text abort", () => {
   it("parsing rejects with the reason before the scan and once per chunk of records", async () => {
     const csv = Array.from({ length: RECORD_COUNT }, (_unused, row) => `${row},x`).join("\r\n");
     // One check before the scan, then one per full chunk of records.
-    const expectedChecks = 1 + Math.floor(RECORD_COUNT / RECORDS_PER_CHECK);
+    const expected_checks = 1 + Math.floor(RECORD_COUNT / RECORDS_PER_CHECK);
 
-    expect(await expectAbortAtEveryCheck((signal) => parseCsv(csv, { signal }))).toBe(
-      expectedChecks,
+    expect(await expect_abort_at_every_check((signal) => parseCsv(csv, { signal }))).toBe(
+      expected_checks,
     );
-    expect(await expectAbortAtEveryCheck((signal) => fromCsv(csv, columns, { signal }))).toBe(
-      expectedChecks,
+    expect(await expect_abort_at_every_check((signal) => fromCsv(csv, columns, { signal }))).toBe(
+      expected_checks,
     );
   });
 
@@ -138,19 +138,21 @@ describe("delimited-text abort", () => {
       start: { row: 0, col: 0 },
       end: { row: EXPORT_ROWS - 1, col: 1 },
     };
-    const resourceLimits: Partial<DelimitedTextResourceLimits> = {
+    const resource_limits: Partial<DelimitedTextResourceLimits> = {
       maxWriterWindowRows: WINDOW_ROWS,
     };
     const before = JSON.stringify(source.exportSnapshot());
 
     const windows = Math.ceil(EXPORT_ROWS / WINDOW_ROWS);
-    for (const exportOnce of [
-      (signal: AbortSignal) => toCsv(sheet, source, { signal, resourceLimits }),
-      (signal: AbortSignal) => toTsv(range, source, { signal, resourceLimits }),
-      (signal: AbortSignal) => drain(toCsvStream(sheet, source, { signal, resourceLimits })),
-      (signal: AbortSignal) => drain(toTsvStream(range, source, { signal, resourceLimits })),
+    for (const export_once of [
+      (signal: AbortSignal) => toCsv(sheet, source, { signal, resourceLimits: resource_limits }),
+      (signal: AbortSignal) => toTsv(range, source, { signal, resourceLimits: resource_limits }),
+      (signal: AbortSignal) =>
+        drain(toCsvStream(sheet, source, { signal, resourceLimits: resource_limits })),
+      (signal: AbortSignal) =>
+        drain(toTsvStream(range, source, { signal, resourceLimits: resource_limits })),
     ]) {
-      const checks = await expectAbortAtEveryCheck(exportOnce);
+      const checks = await expect_abort_at_every_check(export_once);
       expect(checks).toBeGreaterThanOrEqual(windows);
       // One check per cell would be at least one per row and column.
       expect(checks).toBeLessThan(EXPORT_ROWS * columns.length);
@@ -164,22 +166,22 @@ describe("delimited-text abort", () => {
     const slices = 3;
     const row = ["x".repeat(slices * FIELD_SLICE_CHARACTERS), ...SHORT_FIELDS];
     // One check for the first chunk of records, then one before each later slice.
-    const expectedChecks = 1 + (slices - 1);
+    const expected_checks = 1 + (slices - 1);
 
     expect(
-      await expectAbortAtEveryCheck((signal) => [
+      await expect_abort_at_every_check((signal) => [
         ...encodeDelimitedTextChunks([row], ",", { signal }),
       ]),
-    ).toBe(expectedChecks);
+    ).toBe(expected_checks);
   });
 
   it("an invalid option keeps only its type, never a copy of the value", () => {
-    const resourceLimits: Partial<DelimitedTextResourceLimits> = {};
-    Reflect.set(resourceLimits, "maxRows", "x".repeat(1 << 20));
+    const resource_limits: Partial<DelimitedTextResourceLimits> = {};
+    Reflect.set(resource_limits, "maxRows", "x".repeat(1 << 20));
 
     let failure: unknown;
     try {
-      parseCsv("a", { resourceLimits });
+      parseCsv("a", { resourceLimits: resource_limits });
     } catch (error) {
       failure = error;
     }
@@ -200,23 +202,23 @@ describe("XLSX call abort", () => {
   };
 
   it("rejects with the reason, not a wrapped failure, before and during the backend call", async () => {
-    const lateFailure = new TypeError("backend stream closed");
+    const late_failure = new TypeError("backend stream closed");
     let calls = 0;
-    let abortDuringCall: (() => void) | undefined;
-    const failAfterAbort = async (): Promise<never> => {
+    let abort_during_call: (() => void) | undefined;
+    const fail_after_abort = async (): Promise<never> => {
       calls += 1;
-      abortDuringCall?.();
-      throw lateFailure;
+      abort_during_call?.();
+      throw late_failure;
     };
     setXlsxWorkbookBackend({
       name: "abort-test",
-      toXlsxWorkbook: failAfterAbort,
-      fromXlsxWorkbook: failAfterAbort,
+      toXlsxWorkbook: fail_after_abort,
+      fromXlsxWorkbook: fail_after_abort,
     });
-    setXlsxTableExportBackend({ name: "abort-test", toXlsxTable: failAfterAbort });
-    setXlsxTableImportBackend({ name: "abort-test", fromXlsxTable: failAfterAbort });
+    setXlsxTableExportBackend({ name: "abort-test", toXlsxTable: fail_after_abort });
+    setXlsxTableImportBackend({ name: "abort-test", fromXlsxTable: fail_after_abort });
     const source = store();
-    const xlsxCalls = [
+    const xlsx_calls = [
       (signal: AbortSignal) => toXlsxWorkbook(snapshot, { signal }),
       (signal: AbortSignal) => fromXlsxWorkbook(new Uint8Array(0), { signal }),
       (signal: AbortSignal) => toXlsxTable(source.getWorkbook(), source, { signal }),
@@ -224,18 +226,18 @@ describe("XLSX call abort", () => {
     ];
 
     try {
-      for (const call of xlsxCalls) {
+      for (const call of xlsx_calls) {
         const early = new AbortController();
         early.abort(new Error("aborted before the call"));
         await expect(call(early.signal)).rejects.toBe(early.signal.reason);
 
         const during = new AbortController();
         const reason = new Error("aborted during the call");
-        abortDuringCall = () => during.abort(reason);
+        abort_during_call = () => during.abort(reason);
         await expect(call(during.signal)).rejects.toBe(reason);
-        abortDuringCall = undefined;
+        abort_during_call = undefined;
       }
-      expect(calls).toBe(xlsxCalls.length);
+      expect(calls).toBe(xlsx_calls.length);
     } finally {
       source.dispose();
     }

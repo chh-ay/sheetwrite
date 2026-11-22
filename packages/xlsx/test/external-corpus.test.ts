@@ -28,13 +28,15 @@ const manifest = (await Bun.file(
   fixtures: ExternalFixture[];
   googleFixtures: GoogleExternalFixture[];
 };
-const externalDirectory = process.env.SHEETWRITE_EXTERNAL_XLSX_DIR;
-const scheduledIt =
-  process.env.SHEETWRITE_EXTERNAL_XLSX === "1" || externalDirectory ? it : it.skip;
+const external_directory = process.env.SHEETWRITE_EXTERNAL_XLSX_DIR;
+const scheduled_it =
+  process.env.SHEETWRITE_EXTERNAL_XLSX === "1" || external_directory ? it : it.skip;
 
-async function fixtureBytes(fixture: ExternalFixture | GoogleExternalFixture): Promise<Uint8Array> {
-  if (externalDirectory) {
-    return new Uint8Array(await Bun.file(`${externalDirectory}/${fixture.file}`).arrayBuffer());
+async function fixture_bytes(
+  fixture: ExternalFixture | GoogleExternalFixture,
+): Promise<Uint8Array> {
+  if (external_directory) {
+    return new Uint8Array(await Bun.file(`${external_directory}/${fixture.file}`).arrayBuffer());
   }
   const url =
     "downloadUrl" in fixture
@@ -51,12 +53,12 @@ beforeAll(async () => {
 
 describe("scheduled independent Microsoft Excel corpus", () => {
   for (const fixture of manifest.fixtures) {
-    scheduledIt(`imports checksum-locked ${fixture.file}`, async () => {
-      const bytes = await fixtureBytes(fixture);
+    scheduled_it(`imports checksum-locked ${fixture.file}`, async () => {
+      const bytes = await fixture_bytes(fixture);
       expect(new Bun.CryptoHasher("sha256").update(bytes).digest("hex")).toBe(fixture.sha256);
-      const appXml = strFromU8(unzipSync(bytes)["docProps/app.xml"] ?? new Uint8Array());
-      expect(appXml).toContain(`<Application>${fixture.producer}</Application>`);
-      expect(appXml).toContain(`<AppVersion>${fixture.appVersion}</AppVersion>`);
+      const app_xml = strFromU8(unzipSync(bytes)["docProps/app.xml"] ?? new Uint8Array());
+      expect(app_xml).toContain(`<Application>${fixture.producer}</Application>`);
+      expect(app_xml).toContain(`<AppVersion>${fixture.appVersion}</AppVersion>`);
       const snapshot = await fromXlsxWorkbook(bytes);
       expect(snapshot.sheets.some((sheet) => sheet.cells.length > 0)).toBe(true);
     });
@@ -65,11 +67,11 @@ describe("scheduled independent Microsoft Excel corpus", () => {
 
 describe("scheduled independent Google Sheets corpus", () => {
   for (const fixture of manifest.googleFixtures) {
-    scheduledIt(`imports ${fixture.file}`, async () => {
+    scheduled_it(`imports ${fixture.file}`, async () => {
       expect(fixture.downloadUrl).toContain("docs.google.com/spreadsheets/");
       expect([fixture.producer, fixture.redistributed]).toEqual(["Google Sheets", false]);
       // The published sheet changes over time, so only its import is checked.
-      const snapshot = await fromXlsxWorkbook(await fixtureBytes(fixture));
+      const snapshot = await fromXlsxWorkbook(await fixture_bytes(fixture));
       expect(snapshot.sheets.some((sheet) => sheet.cells.length > 0)).toBe(true);
     });
   }

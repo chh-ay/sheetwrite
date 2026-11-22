@@ -168,7 +168,7 @@ class Reader {
   }
 }
 
-function parseEngine(bytes: Uint8Array): Engine {
+function parse_engine(bytes: Uint8Array): Engine {
   const engine: Engine = {
     functionImports: 0,
     types: [],
@@ -190,28 +190,28 @@ function parseEngine(bytes: Uint8Array): Engine {
     const end = reader.at + size;
     const count = id === SECTION_CUSTOM ? 0 : reader.unsigned();
     for (let index = 0; index < count; index += 1) {
-      if (id === SECTION_IMPORT) readImport(reader, engine);
+      if (id === SECTION_IMPORT) read_import(reader, engine);
       if (id === SECTION_FUNCTION) engine.types.push(reader.unsigned());
       if (id === SECTION_MEMORY) engine.memory = new Uint8Array(reader.limits() * WASM_PAGE_BYTES);
       if (id === SECTION_GLOBAL) {
         reader.slice(2);
         engine.globals.push(reader.constant());
       }
-      if (id === SECTION_ELEMENT) readElement(reader, engine);
+      if (id === SECTION_ELEMENT) read_element(reader, engine);
       if (id === SECTION_CODE) engine.bodies.push(reader.slice(reader.unsigned()));
-      if (id === SECTION_DATA) readData(reader, engine);
+      if (id === SECTION_DATA) read_data(reader, engine);
       if (id === SECTION_EXPORT)
         engine.exports.set(reader.name(), { kind: reader.byte(), index: reader.unsigned() });
     }
     if (id === SECTION_DATA) engine.dataBytes = size;
     if (id === SECTION_CUSTOM && reader.name() === "name")
-      readFunctionNames(reader, end, engine.names);
+      read_function_names(reader, end, engine.names);
     reader.at = end;
   }
   return engine;
 }
 
-function readImport(reader: Reader, engine: Engine): void {
+function read_import(reader: Reader, engine: Engine): void {
   reader.name();
   reader.name();
   const kind = reader.byte();
@@ -230,7 +230,7 @@ function readImport(reader: Reader, engine: Engine): void {
   }
 }
 
-function readElement(reader: Reader, engine: Engine): void {
+function read_element(reader: Reader, engine: Engine): void {
   const flags = reader.unsigned();
   if (flags !== ELEMENT_ACTIVE_FUNCTIONS)
     throw new Error(`element segment kind ${flags} is not handled`);
@@ -242,7 +242,7 @@ function readElement(reader: Reader, engine: Engine): void {
   for (let entry = 0; entry < length; entry += 1) engine.elements.push(reader.unsigned());
 }
 
-function readData(reader: Reader, engine: Engine): void {
+function read_data(reader: Reader, engine: Engine): void {
   const mode = reader.unsigned();
   if (mode === DATA_PASSIVE) throw new Error("passive data segments are not handled");
   if (mode === DATA_ACTIVE_EXPLICIT_MEMORY) reader.unsigned();
@@ -256,7 +256,7 @@ function readData(reader: Reader, engine: Engine): void {
   engine.dataEnd = Math.max(engine.dataEnd, address + bytes.length);
 }
 
-function readFunctionNames(reader: Reader, end: number, names: Map<number, string>): void {
+function read_function_names(reader: Reader, end: number, names: Map<number, string>): void {
   while (reader.at < end) {
     const subsection = reader.byte();
     const size = reader.unsigned();
@@ -274,7 +274,7 @@ function plain(value: number): Immediate {
 }
 
 /** The immediates of an instruction whose opcode the reader has just read. */
-function readImmediates(reader: Reader, opcode: number): Immediate[] {
+function read_immediates(reader: Reader, opcode: number): Immediate[] {
   if (opcode === 0x02 || opcode === 0x03 || opcode === 0x04) {
     const first = reader.byte();
     if (first === BLOCK_EMPTY || VALUE_TYPES.has(first)) return [plain(first)];
@@ -299,8 +299,8 @@ function readImmediates(reader: Reader, opcode: number): Immediate[] {
   if (opcode === OPCODE_I64_CONST) return [{ kind: "packed-constant", value: reader.signed() }];
   if (opcode === 0x43) return [...reader.slice(4)].map(plain);
   if (opcode === 0x44) return [...reader.slice(8)].map(plain);
-  if (opcode === OPCODE_PREFIX_MISC) return readMiscImmediates(reader);
-  const hasNoImmediates =
+  if (opcode === OPCODE_PREFIX_MISC) return read_misc_immediates(reader);
+  const has_no_immediates =
     opcode <= 0x01 ||
     opcode === 0x05 ||
     opcode === OPCODE_END ||
@@ -309,12 +309,12 @@ function readImmediates(reader: Reader, opcode: number): Immediate[] {
     opcode === 0x1b ||
     (opcode >= 0x45 && opcode <= 0xc4) ||
     opcode === 0xd1;
-  if (hasNoImmediates) return [];
+  if (has_no_immediates) return [];
   throw new Error(`opcode 0x${opcode.toString(16)} is not handled`);
 }
 
 /** Immediates after the 0xfc prefix: saturating truncation, bulk memory and tables. */
-function readMiscImmediates(reader: Reader): Immediate[] {
+function read_misc_immediates(reader: Reader): Immediate[] {
   const subopcode = reader.unsigned();
   const immediates = [plain(subopcode)];
   if (subopcode <= 7) return immediates;
@@ -327,7 +327,7 @@ function readMiscImmediates(reader: Reader): Immediate[] {
   throw new Error(`0xfc ${subopcode} is not handled`);
 }
 
-function decodeBody(body: Uint8Array): { locals: Uint8Array; instructions: Instruction[] } {
+function decode_body(body: Uint8Array): { locals: Uint8Array; instructions: Instruction[] } {
   const reader = new Reader(body);
   const groups = reader.unsigned();
   for (let group = 0; group < groups; group += 1) {
@@ -338,12 +338,12 @@ function decodeBody(body: Uint8Array): { locals: Uint8Array; instructions: Instr
   const instructions: Instruction[] = [];
   while (!reader.isDone) {
     const opcode = reader.byte();
-    instructions.push({ opcode, immediates: readImmediates(reader, opcode) });
+    instructions.push({ opcode, immediates: read_immediates(reader, opcode) });
   }
   return { locals, instructions };
 }
 
-function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+function same_bytes(left: Uint8Array, right: Uint8Array): boolean {
   return left.length === right.length && left.every((byte, at) => byte === right[at]);
 }
 
@@ -352,7 +352,7 @@ function word(memory: Uint8Array, address: number): number {
 }
 
 /** The file name of the panic location at `address`, if one is there. */
-function locationFile(engine: Engine, address: number): string | undefined {
+function location_file(engine: Engine, address: number): string | undefined {
   if (address < engine.dataStart || address + LOCATION_BYTES > engine.dataEnd) return undefined;
   const file = word(engine.memory, address);
   const length = word(engine.memory, address + WORD_BYTES);
@@ -369,7 +369,7 @@ function locationFile(engine: Engine, address: number): string | undefined {
 }
 
 /** Every function's name without crate hashes, each moved module read as its old one. */
-function normalizedNames(engine: Engine, modules: [string, string][]): Map<number, string> {
+function normalized_names(engine: Engine, modules: [string, string][]): Map<number, string> {
   const names = new Map<number, string>();
   engine.bodies.forEach((_, position) => {
     const index = engine.functionImports + position;
@@ -382,9 +382,9 @@ function normalizedNames(engine: Engine, modules: [string, string][]): Map<numbe
 }
 
 /** A body's locals and opcodes: what identifies functions that wasm-opt merged under one name. */
-function opcodeShape(body: Uint8Array | undefined): string {
+function opcode_shape(body: Uint8Array | undefined): string {
   if (body === undefined) return "";
-  const { locals, instructions } = decodeBody(body);
+  const { locals, instructions } = decode_body(body);
   return `${locals.join(",")}|${instructions.map((instruction) => instruction.opcode).join(",")}`;
 }
 
@@ -393,7 +393,7 @@ function opcodeShape(body: Uint8Array | undefined): string {
  * functions, the survivor's name depends on their order, so the functions
  * left over are paired by their opcodes.
  */
-function pairFunctions(
+function pair_functions(
   before: Engine,
   after: Engine,
   modules: [string, string][],
@@ -401,36 +401,36 @@ function pairFunctions(
 ): { pairs: Map<number, number>; pairedByOpcodes: number } {
   const pairs = new Map<number, number>();
   for (let index = 0; index < before.functionImports; index += 1) pairs.set(index, index);
-  const afterByName = new Map<string, number[]>();
-  for (const [index, name] of normalizedNames(after, modules)) {
-    afterByName.set(name, [...(afterByName.get(name) ?? []), index]);
+  const after_by_name = new Map<string, number[]>();
+  for (const [index, name] of normalized_names(after, modules)) {
+    after_by_name.set(name, [...(after_by_name.get(name) ?? []), index]);
   }
   const unpaired: number[] = [];
-  for (const [index, name] of normalizedNames(before, modules)) {
-    const match = afterByName.get(name)?.shift();
+  for (const [index, name] of normalized_names(before, modules)) {
+    const match = after_by_name.get(name)?.shift();
     if (match === undefined) unpaired.push(index);
     else pairs.set(index, match);
   }
-  const leftOver = [...afterByName.values()].flat();
-  const bodyOf = (engine: Engine, index: number): Uint8Array | undefined =>
+  const left_over = [...after_by_name.values()].flat();
+  const body_of = (engine: Engine, index: number): Uint8Array | undefined =>
     engine.bodies[index - engine.functionImports];
-  let pairedByOpcodes = 0;
+  let paired_by_opcodes = 0;
   for (const index of unpaired) {
-    const shape = opcodeShape(bodyOf(before, index));
-    const match = leftOver.findIndex(
-      (candidate) => opcodeShape(bodyOf(after, candidate)) === shape,
+    const shape = opcode_shape(body_of(before, index));
+    const match = left_over.findIndex(
+      (candidate) => opcode_shape(body_of(after, candidate)) === shape,
     );
-    const paired = leftOver[match];
+    const paired = left_over[match];
     if (paired === undefined) {
       findings.push(`no counterpart for ${before.names.get(index) ?? index}`);
       continue;
     }
     pairs.set(index, paired);
-    leftOver.splice(match, 1);
-    pairedByOpcodes += 1;
+    left_over.splice(match, 1);
+    paired_by_opcodes += 1;
   }
-  for (const index of leftOver) findings.push(`new function ${after.names.get(index) ?? index}`);
-  return { pairs, pairedByOpcodes };
+  for (const index of left_over) findings.push(`new function ${after.names.get(index) ?? index}`);
+  return { pairs, pairedByOpcodes: paired_by_opcodes };
 }
 
 /** A pairing that the data alone does not explain; see `Comparison.resolve`. */
@@ -483,7 +483,7 @@ class Comparison {
     readonly after: Engine,
     modules: [string, string][],
   ) {
-    ({ pairs: this.pairs, pairedByOpcodes: this.pairedByOpcodes } = pairFunctions(
+    ({ pairs: this.pairs, pairedByOpcodes: this.pairedByOpcodes } = pair_functions(
       before,
       after,
       modules,
@@ -539,20 +539,22 @@ class Comparison {
     const ends = new Set(
       this.data.extents.map(([from, to, length]) => `${from + length}→${to + length}`),
     );
-    let endPointers = 0;
+    let end_pointers = 0;
     for (const { from, to, where } of [...this.conflicts, ...this.data.mismatches]) {
-      if (ends.has(`${from}→${to}`)) endPointers += 1;
+      if (ends.has(`${from}→${to}`)) end_pointers += 1;
       else this.findings.push(`${where}: address ${from} → ${to} holds different data`);
     }
     const shifts = new Set(
-      [...this.addresses].filter(([, { isProven }]) => isProven).map(([from, { to }]) => to - from),
+      [...this.addresses]
+        .filter(([, { isProven: is_proven }]) => is_proven)
+        .map(([from, { to }]) => to - from),
     );
     let arithmetic = 0;
     for (const { from, to, where } of this.derived) {
       const shift = to - from;
-      const isArithmetic =
+      const is_arithmetic =
         Math.abs(from) >= MIN_ADDRESS_ARITHMETIC && (shifts.has(shift) || shifts.has(-shift));
-      if (!isArithmetic) {
+      if (!is_arithmetic) {
         this.findings.push(
           `${where}: ${from} → ${to} is neither a moved address nor the paired function`,
         );
@@ -561,7 +563,7 @@ class Comparison {
       arithmetic += 1;
       this.coverShifted(shift);
     }
-    return { endPointers, arithmetic };
+    return { endPointers: end_pointers, arithmetic };
   }
 
   /**
@@ -570,22 +572,22 @@ class Comparison {
    * address minus an offset, which moved with the rest of the data.
    */
   coverShifted(shift: number): void {
-    const { coveredBefore, coveredAfter } = this.data;
-    let runStart = -1;
+    const { coveredBefore: covered_before, coveredAfter: covered_after } = this.data;
+    let run_start = -1;
     for (let address = this.before.dataStart; address <= this.before.dataEnd; address += 1) {
-      const isMatch =
+      const is_match =
         address < this.before.dataEnd &&
-        !(coveredBefore.has(address) && coveredAfter.has(address + shift)) &&
+        !(covered_before.has(address) && covered_after.has(address + shift)) &&
         this.before.memory[address] === this.after.memory[address + shift];
-      if (isMatch && runStart === -1) runStart = address;
-      if (isMatch || runStart === -1) continue;
-      if (address - runStart >= MIN_SHIFTED_RUN_BYTES) {
-        for (let at = runStart; at < address; at += 1) {
-          coveredBefore.add(at);
-          coveredAfter.add(at + shift);
+      if (is_match && run_start === -1) run_start = address;
+      if (is_match || run_start === -1) continue;
+      if (address - run_start >= MIN_SHIFTED_RUN_BYTES) {
+        for (let at = run_start; at < address; at += 1) {
+          covered_before.add(at);
+          covered_after.add(at + shift);
         }
       }
-      runStart = -1;
+      run_start = -1;
     }
   }
 
@@ -609,24 +611,24 @@ class Comparison {
   }
 
   compareFunctions(): void {
-    for (const [fromIndex, toIndex] of this.pairs) {
-      if (fromIndex < this.before.functionImports) continue;
-      const where = this.before.names.get(fromIndex) ?? `function ${fromIndex}`;
-      const position = fromIndex - this.before.functionImports;
-      const otherPosition = toIndex - this.after.functionImports;
-      if (this.before.types[position] !== this.after.types[otherPosition])
+    for (const [from_index, to_index] of this.pairs) {
+      if (from_index < this.before.functionImports) continue;
+      const where = this.before.names.get(from_index) ?? `function ${from_index}`;
+      const position = from_index - this.before.functionImports;
+      const other_position = to_index - this.after.functionImports;
+      if (this.before.types[position] !== this.after.types[other_position])
         this.findings.push(`${where}: type changed`);
-      const left = decodeBody(this.before.bodies[position] ?? new Uint8Array());
-      const right = decodeBody(this.after.bodies[otherPosition] ?? new Uint8Array());
+      const left = decode_body(this.before.bodies[position] ?? new Uint8Array());
+      const right = decode_body(this.after.bodies[other_position] ?? new Uint8Array());
       if (
-        !sameBytes(left.locals, right.locals) ||
+        !same_bytes(left.locals, right.locals) ||
         left.instructions.length !== right.instructions.length
       ) {
         this.findings.push(`${where}: different locals or number of instructions`);
         continue;
       }
-      const findingsBefore = this.findings.length;
-      let isRelocated = false;
+      const findings_before = this.findings.length;
+      let is_relocated = false;
       left.instructions.forEach((instruction, at) => {
         const counterpart = right.instructions[at];
         if (counterpart?.opcode !== instruction.opcode) {
@@ -635,11 +637,11 @@ class Comparison {
         }
         instruction.immediates.forEach((immediate, slot) => {
           const other = counterpart.immediates[slot] ?? plain(-1);
-          isRelocated ||= immediate.value !== other.value;
+          is_relocated ||= immediate.value !== other.value;
           this.compareImmediate(immediate, other, where);
         });
       });
-      if (isRelocated && this.findings.length === findingsBefore) this.relocatedFunctions += 1;
+      if (is_relocated && this.findings.length === findings_before) this.relocatedFunctions += 1;
     }
     this.before.elements.forEach((function_, slot) => {
       if (this.pairs.get(function_) === undefined)
@@ -674,38 +676,38 @@ class Comparison {
   compareData(): void {
     for (;;) {
       this.data = Comparison.emptyDataPass();
-      const rejectedBefore = this.rejected.size;
+      const rejected_before = this.rejected.size;
       const checked = new Set<number>();
       for (;;) {
         const pending = [...this.addresses].filter(([from]) => !checked.has(from));
         if (pending.length === 0) break;
-        const startsBefore = [...this.addresses.keys()].sort((left, right) => left - right);
-        const startsAfter = [...this.addresses.values()]
+        const starts_before = [...this.addresses.keys()].sort((left, right) => left - right);
+        const starts_after = [...this.addresses.values()]
           .map(({ to }) => to)
           .sort((left, right) => left - right);
-        for (const [from, { to, isProven }] of pending) {
+        for (const [from, { to, isProven: is_proven }] of pending) {
           checked.add(from);
           const length = Math.min(
-            this.extent(this.before, from, startsBefore),
-            this.extent(this.after, to, startsAfter),
+            this.extent(this.before, from, starts_before),
+            this.extent(this.after, to, starts_after),
           );
-          this.compareConstant(from, to, length, isProven);
+          this.compareConstant(from, to, length, is_proven);
         }
       }
-      const isStable = this.rejected.size === rejectedBefore;
-      if (isStable) return;
+      const is_stable = this.rejected.size === rejected_before;
+      if (is_stable) return;
     }
   }
 
   /** The panic location at `from` and `to`, counted, when both sides hold one. */
   isLocationPair(from: number, to: number): boolean {
-    const fileBefore = locationFile(this.before, from);
-    const fileAfter = locationFile(this.after, to);
-    if (fileBefore === undefined || fileAfter === undefined) return false;
-    if (fileBefore !== fileAfter) this.data.locationsWithNewFiles += 1;
-    const lineAndColumn = (engine: Engine, address: number): string =>
+    const file_before = location_file(this.before, from);
+    const file_after = location_file(this.after, to);
+    if (file_before === undefined || file_after === undefined) return false;
+    if (file_before !== file_after) this.data.locationsWithNewFiles += 1;
+    const line_and_column = (engine: Engine, address: number): string =>
       engine.memory.subarray(address + 2 * WORD_BYTES, address + LOCATION_BYTES).join(",");
-    if (lineAndColumn(this.before, from) !== lineAndColumn(this.after, to))
+    if (line_and_column(this.before, from) !== line_and_column(this.after, to))
       this.data.locationsWithNewLines += 1;
     return true;
   }
@@ -717,33 +719,36 @@ class Comparison {
    * the bytes after it stay uncovered unless another pairing explains them.
    */
   compareConstant(from: number, to: number, length: number, isProven: boolean): void {
-    const isAligned = from % WORD_BYTES === 0 && to % WORD_BYTES === 0;
+    const is_aligned = from % WORD_BYTES === 0 && to % WORD_BYTES === 0;
     let offset = 0;
     while (offset < length) {
-      const isWord = isAligned && offset % WORD_BYTES === 0 && offset + WORD_BYTES <= length;
+      const is_word = is_aligned && offset % WORD_BYTES === 0 && offset + WORD_BYTES <= length;
       if (
-        isWord &&
+        is_word &&
         offset + LOCATION_BYTES <= length &&
         this.isLocationPair(from + offset, to + offset)
       ) {
         offset += LOCATION_BYTES;
         continue;
       }
-      if (isWord) {
-        const leftWord = word(this.before.memory, from + offset);
-        const rightWord = word(this.after.memory, to + offset);
-        const isStoredAddress =
-          this.isAddress(this.before, leftWord) && this.isAddress(this.after, rightWord);
-        if (isStoredAddress) {
+      if (is_word) {
+        const left_word = word(this.before.memory, from + offset);
+        const right_word = word(this.after.memory, to + offset);
+        const is_stored_address =
+          this.isAddress(this.before, left_word) && this.isAddress(this.after, right_word);
+        if (is_stored_address) {
           this.pairAddress(
-            leftWord,
-            rightWord,
-            isProven && leftWord !== rightWord,
+            left_word,
+            right_word,
+            isProven && left_word !== right_word,
             `data at ${from}`,
           );
-          if (leftWord !== rightWord) this.data.relocatedWords += 1;
+          if (left_word !== right_word) this.data.relocatedWords += 1;
         }
-        if (isStoredAddress || (leftWord !== rightWord && this.isPairedSlot(leftWord, rightWord))) {
+        if (
+          is_stored_address ||
+          (left_word !== right_word && this.isPairedSlot(left_word, right_word))
+        ) {
           offset += WORD_BYTES;
           continue;
         }
@@ -772,32 +777,37 @@ class Comparison {
     covered: Set<number>,
     side: string,
   ): { files: Set<string>; zeros: number } {
-    const fileBytes = new Map<number, string>();
+    const file_bytes = new Map<number, string>();
     for (const address of covered) {
-      const file = address % WORD_BYTES === 0 ? locationFile(engine, address) : undefined;
+      const file = address % WORD_BYTES === 0 ? location_file(engine, address) : undefined;
       if (file === undefined) continue;
       const start = word(engine.memory, address);
-      for (let at = 0; at <= file.length; at += 1) fileBytes.set(start + at, file);
+      for (let at = 0; at <= file.length; at += 1) file_bytes.set(start + at, file);
     }
     const files = new Set<string>();
     let zeros = 0;
-    let unexplainedFrom = -1;
+    let unexplained_from = -1;
     for (let address = engine.dataStart; address <= engine.dataEnd; address += 1) {
-      const file = fileBytes.get(address);
-      const isUnexplained =
+      const file = file_bytes.get(address);
+      const is_unexplained =
         address < engine.dataEnd &&
         !covered.has(address) &&
         file === undefined &&
         engine.memory[address] !== 0;
       if (address < engine.dataEnd && !covered.has(address) && file !== undefined) files.add(file);
-      if (address < engine.dataEnd && !covered.has(address) && file === undefined && !isUnexplained)
+      if (
+        address < engine.dataEnd &&
+        !covered.has(address) &&
+        file === undefined &&
+        !is_unexplained
+      )
         zeros += 1;
-      if (isUnexplained && unexplainedFrom === -1) unexplainedFrom = address;
-      if (!isUnexplained && unexplainedFrom !== -1) {
+      if (is_unexplained && unexplained_from === -1) unexplained_from = address;
+      if (!is_unexplained && unexplained_from !== -1) {
         this.findings.push(
-          `data ${side} ${unexplainedFrom}-${address - 1}: bytes that no pairing explains`,
+          `data ${side} ${unexplained_from}-${address - 1}: bytes that no pairing explains`,
         );
-        unexplainedFrom = -1;
+        unexplained_from = -1;
       }
     }
     return { files, zeros };
@@ -810,17 +820,17 @@ export function compareRelocations(
   afterBytes: Uint8Array,
   modules: [string, string][],
 ): RelocationReport {
-  const comparison = new Comparison(parseEngine(beforeBytes), parseEngine(afterBytes), modules);
+  const comparison = new Comparison(parse_engine(beforeBytes), parse_engine(afterBytes), modules);
   const { before, after, findings } = comparison;
   comparison.compareFunctions();
   comparison.compareData();
   const { data } = comparison;
-  const { endPointers, arithmetic } = comparison.resolve();
-  const looseBefore = comparison.uncovered(before, data.coveredBefore, "before");
-  const looseAfter = comparison.uncovered(after, data.coveredAfter, "after");
-  const added = [...looseAfter.files].filter((file) => !looseBefore.files.has(file)).sort();
-  const dropped = [...looseBefore.files].filter((file) => !looseAfter.files.has(file)).sort();
-  const bytesOf = (files: string[]): number =>
+  const { endPointers: end_pointers, arithmetic } = comparison.resolve();
+  const loose_before = comparison.uncovered(before, data.coveredBefore, "before");
+  const loose_after = comparison.uncovered(after, data.coveredAfter, "after");
+  const added = [...loose_after.files].filter((file) => !loose_before.files.has(file)).sort();
+  const dropped = [...loose_before.files].filter((file) => !loose_after.files.has(file)).sort();
+  const bytes_of = (files: string[]): number =>
     files.reduce((total, file) => total + file.length + 1, 0);
   const renumbered = [...comparison.pairs].filter(([from, to]) => from !== to).length;
   const lines = [
@@ -828,13 +838,13 @@ export function compareRelocations(
       `${comparison.pairs.size - before.functionImports - comparison.pairedByOpcodes} paired by name, ` +
       `${comparison.pairedByOpcodes} by opcodes (merged duplicates); ${renumbered} renumbered.`,
     `Code: ${comparison.relocatedFunctions} functions differ only in function numbers and data addresses; ` +
-      `${comparison.addresses.size} data addresses paired, ${endPointers} of them ends of slices; ` +
+      `${comparison.addresses.size} data addresses paired, ${end_pointers} of them ends of slices; ` +
       `${arithmetic} constants are an address plus or minus an offset.`,
     `Data section: ${before.dataBytes} B → ${after.dataBytes} B. ${data.relocatedWords} stored addresses moved; ` +
       `${data.locationsWithNewFiles} panic locations name a new file, ${data.locationsWithNewLines} a new line or column.`,
-    `Data bytes that no constant explains: file names added ${added.join(", ") || "none"} (${bytesOf(added)} B), ` +
-      `dropped ${dropped.join(", ") || "none"} (${bytesOf(dropped)} B); ` +
-      `zero padding ${looseBefore.zeros} B → ${looseAfter.zeros} B.`,
+    `Data bytes that no constant explains: file names added ${added.join(", ") || "none"} (${bytes_of(added)} B), ` +
+      `dropped ${dropped.join(", ") || "none"} (${bytes_of(dropped)} B); ` +
+      `zero padding ${loose_before.zeros} B → ${loose_after.zeros} B.`,
   ];
   if (findings.length > 0) {
     lines.push(

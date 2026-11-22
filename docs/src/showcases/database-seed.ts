@@ -30,10 +30,10 @@ export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
     ["Fieldstone Group", 35, 79, 22],
   ];
   const months = ["Jan", "Feb", "Mar"];
-  const lines = months.flatMap((month, monthIndex) =>
+  const lines = months.flatMap((month, month_index) =>
     accounts.map(([account, seats, rate, cost], index) => ({
       account: `${month} · ${account}`,
-      seats: seats + monthIndex * (2 + (index % 4)),
+      seats: seats + month_index * (2 + (index % 4)),
       rate,
       cost,
     })),

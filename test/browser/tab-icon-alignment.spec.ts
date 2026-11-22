@@ -25,7 +25,7 @@ function offsets(page: Page): Promise<Record<string, number>> {
     const beside = tabs.filter((tab) => tab.getBoundingClientRect().right <= left + 1).at(-1);
     if (beside === undefined) throw new Error("No tab beside +");
 
-    const opticalCentre = (tab: HTMLElement): number => {
+    const optical_centre = (tab: HTMLElement): number => {
       const walker = document.createTreeWalker(tab, NodeFilter.SHOW_TEXT);
       let text = walker.nextNode();
       while (text !== null && text.textContent?.trim() === "") text = walker.nextNode();
@@ -42,14 +42,14 @@ function offsets(page: Page): Promise<Record<string, number>> {
       const x = context.measureText("x");
       return baseline - (x.actualBoundingBoxAscent - x.actualBoundingBoxDescent) / 2;
     };
-    const iconCentre = (button: HTMLElement): number => {
+    const icon_centre = (button: HTMLElement): number => {
       const box = button.querySelector("svg")?.getBoundingClientRect();
       if (box === undefined) throw new Error("No icon");
       return box.top + box.height / 2;
     };
     return {
-      add: iconCentre(add) - opticalCentre(beside),
-      more: iconCentre(more) - opticalCentre(active),
+      add: icon_centre(add) - optical_centre(beside),
+      more: icon_centre(more) - optical_centre(active),
     };
   });
 }
@@ -57,9 +57,9 @@ function offsets(page: Page): Promise<Record<string, number>> {
 const WIDTHS = [1_440, 834, 390, 320];
 
 // Firefox and WebKit run the @portability tests too, so this runs in all three engines.
-for (const deviceScaleFactor of [1, 2]) {
-  test.describe(`at DPR ${deviceScaleFactor}`, () => {
-    test.use({ deviceScaleFactor });
+for (const device_scale_factor of [1, 2]) {
+  test.describe(`at DPR ${device_scale_factor}`, () => {
+    test.use({ deviceScaleFactor: device_scale_factor });
 
     for (const [path, ready] of [
       ["/showcases/spreadsheet/", "Narrow"],

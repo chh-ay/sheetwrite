@@ -19,19 +19,19 @@ interface Separators {
 }
 
 const US_SEPARATORS: Separators = { group: ",", decimal: "." };
-const separatorCache = new Map<string, Separators>();
+const separator_cache = new Map<string, Separators>();
 
 /** The grouping and decimal separators of `locale`, as `Intl` formats numbers there. */
-function separatorsOf(locale: string | undefined): Separators {
+function separators_of(locale: string | undefined): Separators {
   if (locale === undefined || locale === "en-US") return US_SEPARATORS;
-  let found = separatorCache.get(locale);
+  let found = separator_cache.get(locale);
   if (found === undefined) {
     const parts = new Intl.NumberFormat(locale).formatToParts(12_345.6);
     found = {
       group: parts.find((part) => part.type === "group")?.value ?? ",",
       decimal: parts.find((part) => part.type === "decimal")?.value ?? ".",
     };
-    separatorCache.set(locale, found);
+    separator_cache.set(locale, found);
   }
   return found;
 }
@@ -53,14 +53,14 @@ const MONTHS = [
 ];
 
 /** Excel's two-digit years: 00 to 29 are 2000s, 30 to 99 are 1900s. */
-function fullYear(text: string): number {
+function full_year(text: string): number {
   const year = Number(text);
   if (text.length > 2) return year;
   return year < 30 ? 2000 + year : 1900 + year;
 }
 
 /** The month its English name or first three letters (or `Sept`) give, 1 to 12, or 0. */
-function monthOf(name: string): number {
+function month_of(name: string): number {
   const lower = name.toLowerCase();
   const index = MONTHS.findIndex(
     (month) =>
@@ -76,7 +76,7 @@ const PLAIN_NUMBER = /^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
  * threes, a decimal part, an exponent, a leading currency symbol or a
  * trailing `%`.
  */
-function generalNumber(text: string, separators: Separators): GeneralNumber | null {
+function general_number(text: string, separators: Separators): GeneralNumber | null {
   let body = text;
   let negative = false;
   if (body.startsWith("(") && body.endsWith(")")) {
@@ -84,7 +84,7 @@ function generalNumber(text: string, separators: Separators): GeneralNumber | nu
     body = body.slice(1, -1).trim();
   }
   let signed = false;
-  const takeSign = (): void => {
+  const take_sign = (): void => {
     if (signed || negative) return;
     if (body.startsWith("-") || body.startsWith("+")) {
       negative = body.startsWith("-");
@@ -92,12 +92,12 @@ function generalNumber(text: string, separators: Separators): GeneralNumber | nu
       body = body.slice(1).trimStart();
     }
   };
-  takeSign();
+  take_sign();
   let symbol = "";
   if (body.length > 0 && CURRENCY_SYMBOLS.includes(body[0]!)) {
     symbol = body[0]!;
     body = body.slice(1).trimStart();
-    takeSign();
+    take_sign();
   }
   let percent = false;
   if (symbol === "" && body.endsWith("%")) {
@@ -107,8 +107,8 @@ function generalNumber(text: string, separators: Separators): GeneralNumber | nu
 
   // Grouping is in threes after the first group, as Excel reads it.
   let grouped = false;
-  const decimalAt = body.indexOf(separators.decimal);
-  const whole = decimalAt < 0 ? body : body.slice(0, decimalAt);
+  const decimal_at = body.indexOf(separators.decimal);
+  const whole = decimal_at < 0 ? body : body.slice(0, decimal_at);
   if (whole.includes(separators.group)) {
     const groups = whole.split(separators.group);
     if (!/^\d{1,3}$/.test(groups[0]!) || groups.slice(1).some((group) => !/^\d{3}$/.test(group))) {
@@ -118,7 +118,7 @@ function generalNumber(text: string, separators: Separators): GeneralNumber | nu
   }
   const plain =
     (grouped ? whole.split(separators.group).join("") : whole) +
-    (decimalAt < 0 ? "" : `.${body.slice(decimalAt + separators.decimal.length)}`);
+    (decimal_at < 0 ? "" : `.${body.slice(decimal_at + separators.decimal.length)}`);
   const match = PLAIN_NUMBER.exec(plain);
   if (match === null || (match[1] === "" && (match[2] ?? "") === "")) return null;
   const scientific = match[3] !== undefined;
@@ -140,22 +140,22 @@ function generalNumber(text: string, separators: Separators): GeneralNumber | nu
 const TIME = /^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(?:([AaPp])[Mm]?)?$/;
 
 /** A time of day as a fraction of a day: `9:30`, `9:30:15`, `9:30 PM`, `9 PM`. */
-function generalTime(text: string): GeneralNumber | null {
+function general_time(text: string): GeneralNumber | null {
   const match = TIME.exec(text);
   if (match === null) return null;
-  const [, hourText, minuteText, secondText, meridiem] = match;
+  const [, hour_text, minute_text, second_text, meridiem] = match;
   // A bare number is not a time; `9 PM` is.
-  if (minuteText === undefined && meridiem === undefined) return null;
-  let hour = Number(hourText);
-  const minute = Number(minuteText ?? 0);
-  const second = Number(secondText ?? 0);
+  if (minute_text === undefined && meridiem === undefined) return null;
+  let hour = Number(hour_text);
+  const minute = Number(minute_text ?? 0);
+  const second = Number(second_text ?? 0);
   if (minute > 59 || second > 59) return null;
   if (meridiem !== undefined) {
     if (hour < 1 || hour > 12) return null;
     hour = (hour % 12) + (meridiem.toLowerCase() === "p" ? 12 : 0);
   }
   const value = (hour * 3600 + minute * 60 + second) / 86_400;
-  const seconds = secondText !== undefined;
+  const seconds = second_text !== undefined;
   if (meridiem !== undefined) {
     return { value, numberFormat: seconds ? "h:mm:ss AM/PM" : "h:mm AM/PM" };
   }
@@ -180,12 +180,12 @@ export interface ShortDate {
 }
 
 const US_SHORT_DATE: ShortDate = { order: "mdy", separator: "/", code: "m/d/yyyy" };
-const shortDateCache = new Map<string, ShortDate>();
+const short_date_cache = new Map<string, ShortDate>();
 
 /** The short date of `locale`, read once from `Intl` and cached; US English when unset. */
 export function shortDateOf(locale: string | undefined): ShortDate {
   if (locale === undefined || locale === "en-US") return US_SHORT_DATE;
-  let found = shortDateCache.get(locale);
+  let found = short_date_cache.get(locale);
   if (found === undefined) {
     const parts = new Intl.DateTimeFormat(locale, {
       dateStyle: "short",
@@ -216,20 +216,20 @@ export function shortDateOf(locale: string | undefined): ShortDate {
             ? `yyyy${sign}${month}${sign}${day}`
             : `${month}${sign}${day}${sign}yyyy`,
     };
-    shortDateCache.set(locale, found);
+    short_date_cache.set(locale, found);
   }
   return found;
 }
 
 /** The date `day` of `month` in the current year, shown as `d-mmm`, or null. */
-function dayOfThisYear(month: number, day: number): GeneralNumber | null {
+function day_of_this_year(month: number, day: number): GeneralNumber | null {
   const serial = componentsToSerial(new Date().getFullYear(), month, day, 0, 0, 0);
   return serial === null ? null : { value: serial, numberFormat: "d-mmm" };
 }
 
 /** The first day of `month` in the year `year` gives, shown as `mmm-yy`, or null. */
-function firstOfMonth(month: number, year: string): GeneralNumber | null {
-  const serial = componentsToSerial(fullYear(year), month, 1, 0, 0, 0);
+function first_of_month(month: number, year: string): GeneralNumber | null {
+  const serial = componentsToSerial(full_year(year), month, 1, 0, 0, 0);
   return serial === null ? null : { value: serial, numberFormat: "mmm-yy" };
 }
 
@@ -240,15 +240,15 @@ function firstOfMonth(month: number, year: string): GeneralNumber | null {
  * `1/99` is January 1999.
  * https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/two-digit-year-numbers
  */
-function twoPartDate(month: number, number: string): GeneralNumber | null {
+function two_part_date(month: number, number: string): GeneralNumber | null {
   return (
-    (number.length <= 2 ? dayOfThisYear(month, Number(number)) : null) ??
-    firstOfMonth(month, number)
+    (number.length <= 2 ? day_of_this_year(month, Number(number)) : null) ??
+    first_of_month(month, number)
   );
 }
 
 /** Whether `part` is one to four digits. */
-function isDateNumber(part: string): boolean {
+function is_date_number(part: string): boolean {
   if (part.length === 0 || part.length > 4) return false;
   for (let index = 0; index < part.length; index++) {
     const code = part.charCodeAt(index);
@@ -264,29 +264,29 @@ function isDateNumber(part: string): boolean {
  * (Excel's rule for two-part dates). `undefined` when the text has another
  * shape, so the other forms read it.
  */
-function numericDate(text: string, dates: ShortDate): GeneralNumber | null | undefined {
+function numeric_date(text: string, dates: ShortDate): GeneralNumber | null | undefined {
   const parts = text.split(text.includes("/") ? "/" : dates.separator);
-  if (parts.length < 2 || parts.length > 3 || !parts.every(isDateNumber)) return undefined;
+  if (parts.length < 2 || parts.length > 3 || !parts.every(is_date_number)) return undefined;
   const [first, second, third] = parts as [string, string, string | undefined];
   // A four-digit year first is the ISO order, which `parseDateInput` reads.
-  const yearFirst = first.length === 4;
-  if (yearFirst && dates.order !== "ymd") return undefined;
+  const year_first = first.length === 4;
+  if (year_first && dates.order !== "ymd") return undefined;
   if (third === undefined) {
-    if (yearFirst) return firstOfMonth(Number(second), first);
+    if (year_first) return first_of_month(Number(second), first);
     if (first.length > 2) return null;
-    if (dates.order !== "dmy") return twoPartDate(Number(first), second);
+    if (dates.order !== "dmy") return two_part_date(Number(first), second);
     return (
-      (second.length <= 2 ? dayOfThisYear(Number(second), Number(first)) : null) ??
-      firstOfMonth(Number(first), second)
+      (second.length <= 2 ? day_of_this_year(Number(second), Number(first)) : null) ??
+      first_of_month(Number(first), second)
     );
   }
-  const [year, month, day] = yearFirst
+  const [year, month, day] = year_first
     ? [first, second, third]
     : dates.order === "dmy"
       ? [third, second, first]
       : [third, first, second];
   if (month.length > 2 || day.length > 2 || year.length === 1 || year.length === 3) return null;
-  const serial = componentsToSerial(fullYear(year), Number(month), Number(day), 0, 0, 0);
+  const serial = componentsToSerial(full_year(year), Number(month), Number(day), 0, 0, 0);
   return serial === null ? null : { value: serial, numberFormat: dates.code };
 }
 
@@ -294,18 +294,18 @@ function numericDate(text: string, dates: ShortDate): GeneralNumber | null | und
  * A date with no time: the forms Excel's General reads, with numeric dates
  * in the order of the locale's short date.
  */
-function generalDate(text: string, dates: ShortDate): GeneralNumber | null {
-  const numeric = numericDate(text, dates);
+function general_date(text: string, dates: ShortDate): GeneralNumber | null {
+  const numeric = numeric_date(text, dates);
   if (numeric !== undefined) return numeric;
-  const dayMonth = DAY_MONTH_YEAR.exec(text);
-  if (dayMonth) {
-    const [, day, name, year] = dayMonth;
-    const month = monthOf(name!);
+  const day_month = DAY_MONTH_YEAR.exec(text);
+  if (day_month) {
+    const [, day, name, year] = day_month;
+    const month = month_of(name!);
     const serial =
       month === 0
         ? null
         : componentsToSerial(
-            year === undefined ? new Date().getFullYear() : fullYear(year),
+            year === undefined ? new Date().getFullYear() : full_year(year),
             month,
             Number(day),
             0,
@@ -315,18 +315,18 @@ function generalDate(text: string, dates: ShortDate): GeneralNumber | null {
     if (serial === null) return null;
     return { value: serial, numberFormat: year === undefined ? "d-mmm" : "d-mmm-yy" };
   }
-  const monthDay = MONTH_DAY_YEAR.exec(text);
-  if (monthDay) {
-    const [, name, day, year] = monthDay;
-    const month = monthOf(name!);
+  const month_day = MONTH_DAY_YEAR.exec(text);
+  if (month_day) {
+    const [, name, day, year] = month_day;
+    const month = month_of(name!);
     const serial =
       month === 0 ? null : componentsToSerial(Number(year), month, Number(day), 0, 0, 0);
     return serial === null ? null : { value: serial, numberFormat: "d-mmm-yy" };
   }
-  const monthNumber = MONTH_NUMBER.exec(text);
-  if (monthNumber) {
-    const month = monthOf(monthNumber[1]!);
-    return month === 0 ? null : twoPartDate(month, monthNumber[2]!);
+  const month_number = MONTH_NUMBER.exec(text);
+  if (month_number) {
+    const month = month_of(month_number[1]!);
+    return month === 0 ? null : two_part_date(month, month_number[2]!);
   }
   const iso = parseDateInput(text);
   if (iso === null) return null;
@@ -350,7 +350,7 @@ const MAX_DATE_TEXT_LENGTH = 40;
  * the order of a numeric date.
  */
 export function parseGeneralNumber(text: string, locale?: string): GeneralNumber | null {
-  const number = generalNumber(text, separatorsOf(locale));
+  const number = general_number(text, separators_of(locale));
   if (number !== null) return number;
   if (text.length > MAX_DATE_TEXT_LENGTH) return null;
 
@@ -363,16 +363,16 @@ export function parseGeneralNumber(text: string, locale?: string): GeneralNumber
     return { value: sign ? -value : value, numberFormat: over < 10 ? "# ?/?" : "# ??/??" };
   }
 
-  const time = generalTime(text);
+  const time = general_time(text);
   if (time !== null) return time;
   const dates = shortDateOf(locale);
-  const date = generalDate(text, dates);
+  const date = general_date(text, dates);
   if (date !== null) return date;
 
   const stamp = DATE_THEN_TIME.exec(text);
   if (stamp) {
-    const day = generalDate(stamp[1]!, dates);
-    const clock = generalTime(stamp[2]!);
+    const day = general_date(stamp[1]!, dates);
+    const clock = general_time(stamp[2]!);
     if (day === null || clock === null || clock.value >= 1) return null;
     const seconds = clock.numberFormat?.includes("ss") === true;
     return {
@@ -396,7 +396,7 @@ export function numberFormatDateKind(format: string | undefined): "date" | "time
 }
 
 /** Three lowercase letters as one number: `jan` and `Jan` give the same key. */
-function letterKey(text: string): number {
+function letter_key(text: string): number {
   return (
     ((text.charCodeAt(0) | 0x20) << 16) |
     ((text.charCodeAt(1) | 0x20) << 8) |
@@ -404,7 +404,7 @@ function letterKey(text: string): number {
   );
 }
 
-const MONTH_KEYS = new Set(MONTHS.map(letterKey));
+const MONTH_KEYS = new Set(MONTHS.map(letter_key));
 
 /**
  * Whether General could read `text` (trimmed, not empty) as a number, date or
@@ -423,5 +423,5 @@ export function mayBeGeneralNumber(text: string): boolean {
   if (first === 0x24 || first === 0xa3 || first === 0xa5 || first === 0x20ac) return true;
   const lower = first | 0x20;
   if (lower < 0x61 || lower > 0x7a || text.length < 3) return false;
-  return MONTH_KEYS.has(letterKey(text));
+  return MONTH_KEYS.has(letter_key(text));
 }

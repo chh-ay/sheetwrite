@@ -119,7 +119,7 @@ function identity(shortcut: KeyShortcut): string {
   return bindingIdentities(parseShortcut(shortcut)).join("|");
 }
 
-function sameKeys(a: readonly KeyShortcut[], b: readonly KeyShortcut[]): boolean {
+function same_keys(a: readonly KeyShortcut[], b: readonly KeyShortcut[]): boolean {
   return (
     a.length === b.length &&
     a.every((shortcut, index) => identity(shortcut) === identity(b[index]!))
@@ -134,7 +134,7 @@ function overlaps(a: KeyShortcut, b: KeyShortcut): boolean {
 
 /** Whether the user changed `action`'s keys from Excel's defaults. */
 export function isChanged(action: KeyboardAction, bindings: KeyBindings): boolean {
-  return !sameKeys(keysOf(action, bindings), defaultKeys(action));
+  return !same_keys(keysOf(action, bindings), defaultKeys(action));
 }
 
 /** Only the actions that differ from Excel's defaults, each as a list of keys or `null`. */
@@ -224,7 +224,7 @@ export function keysLabel(shortcut: KeyShortcut): string {
 const NAMED_KEYS: Readonly<Record<string, string>> = { pageup: "PageUp", pagedown: "PageDown" };
 
 /** Keys as words, for search: "ctrl+shift+b", or "cmd+shift+b" and "⌘⇧b" on a Mac. */
-function searchText(shortcut: KeyShortcut): string {
+function search_text(shortcut: KeyShortcut): string {
   const parsed = parseShortcut(shortcut);
   const mac = isMac();
   const words = [
@@ -255,8 +255,8 @@ export function matchesQuery(
   const haystack = [
     commandLabel(action),
     group,
-    ...keysOf(action, bindings).map(searchText),
-    ...defaultKeys(action).map(searchText),
+    ...keysOf(action, bindings).map(search_text),
+    ...defaultKeys(action).map(search_text),
   ]
     .join(" ")
     .toLowerCase();
@@ -348,13 +348,13 @@ export function readKeys(event: KeyboardEvent): PressedKeys {
  */
 export function refusedKeys(
   shortcut: KeyShortcut,
-  environment = currentEnvironment(),
+  environment = current_environment(),
 ): string | null {
   const parsed = parseShortcut(shortcut);
   // With Ctrl or Alt, Page Up and Page Down switch sheets, as in Excel, so they can be assigned.
-  const switchesSheets =
+  const switches_sheets =
     (parsed.key === "pageup" || parsed.key === "pagedown") && (parsed.ctrl || parsed.alt);
-  if (SHEET_KEYS.has(parsed.key) && !switchesSheets) {
+  if (SHEET_KEYS.has(parsed.key) && !switches_sheets) {
     return `${keysLabel(shortcut)} moves or edits in the sheet, as in Excel, so it can't be assigned.`;
   }
   const bare = !parsed.ctrl && !parsed.meta && !parsed.alt;
@@ -369,7 +369,7 @@ export function refusedKeys(
   if (bare && parsed.key === "f6") {
     return `${keysLabel(shortcut)} moves the focus between the parts of the window and out of the grid, as in Excel, so it can't be assigned.`;
   }
-  return reservedReason(parsed, environment);
+  return reserved_reason(parsed, environment);
 }
 
 /** The browser engine and the operating system the page runs in. */
@@ -378,7 +378,7 @@ export interface Environment {
   readonly platform: "mac" | "windows" | "linux";
 }
 
-function currentEnvironment(): Environment {
+function current_environment(): Environment {
   const agent = navigator.userAgent;
   const engine = /Firefox\//.test(agent)
     ? "firefox"
@@ -402,7 +402,7 @@ function currentEnvironment(): Environment {
  * `reserved="true"` keys (browser/base/content/browser-sets.inc.xhtml),
  * and Apple's, Microsoft's and GNOME's lists of system shortcuts.
  */
-function reservedKeys(environment: Environment): readonly (readonly [string, string, string])[] {
+function reserved_keys(environment: Environment): readonly (readonly [string, string, string])[] {
   const { engine, platform } = environment;
   const mac = platform === "mac";
   const accel = mac ? "Meta" : "Ctrl";
@@ -480,9 +480,9 @@ function press(shortcut: ParsedShortcut, mac: boolean): string {
 }
 
 /** Why the page never receives `shortcut` here, or null when it does. */
-function reservedReason(
+function reserved_reason(
   shortcut: ParsedShortcut,
-  environment = currentEnvironment(),
+  environment = current_environment(),
 ): string | null {
   const mac = environment.platform === "mac";
   if (shortcut.meta && !shortcut.either && !mac) {
@@ -490,7 +490,7 @@ function reservedReason(
     return `The operating system keeps ${key}, so the page never receives ${formatShortcut(shortcut)}.`;
   }
   const pressed = press(shortcut, mac);
-  for (const [keys, who, what] of reservedKeys(environment)) {
+  for (const [keys, who, what] of reserved_keys(environment)) {
     const reserved = parseShortcut(keys as KeyShortcut);
     if (press(reserved, mac) !== pressed) continue;
     const verb = who === "Chrome and Edge" ? "use" : "uses";
@@ -502,7 +502,7 @@ function reservedReason(
 /** The reason the first of `action`'s keys never reaches the page here, if one doesn't. */
 export function unreachableKeys(action: KeyboardAction, bindings: KeyBindings): string | null {
   for (const key of keysOf(action, bindings)) {
-    const reason = reservedReason(parseShortcut(key));
+    const reason = reserved_reason(parseShortcut(key));
     if (reason !== null) return reason;
   }
   return null;

@@ -150,7 +150,7 @@ const XLSX_LAYOUT_OPS: ReadonlySet<DocumentOp["op"]> = new Set([
   "removeMerge",
 ]);
 
-function isSnapshotAllocationFailure(error: unknown): boolean {
+function is_snapshot_allocation_failure(error: unknown): boolean {
   if (error instanceof RangeError) return true;
   if (error instanceof SheetwriteError && error.code === "resource-limit") return true;
   if (typeof error === "string") {
@@ -193,28 +193,28 @@ interface LocalPolicyOutcome {
  * @see createGrid
  */
 export class SheetwriteStore implements Store {
-  private dataEngine: StoreDataEngine;
+  private data_engine: StoreDataEngine;
 
   /**
    * Every store call reaches the engine through here, so one check refuses
    * all of them while a host function from `@sheetwrite/core/functions` runs.
    */
   private get engine(): StoreDataEngine {
-    this.dataEngine.hostFunctions?.assertIdle();
-    return this.dataEngine;
+    this.data_engine.hostFunctions?.assertIdle();
+    return this.data_engine;
   }
 
   private readonly listeners = new Set<ChangeListener>();
   private epoch = 0;
-  private detailedChangeCapture = false;
-  private protectionResolver: ProtectionResolver | undefined;
-  private mutationPolicy: MutationPolicyMode;
+  private detailed_change_capture = false;
+  private protection_resolver: ProtectionResolver | undefined;
+  private mutation_policy: MutationPolicyMode;
   private policy: StoreMutationPolicy;
-  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
+  private readonly transaction_resource_limits: Readonly<TransactionResourceLimits>;
   /** Document limits a snapshot of this store must meet; row and column inserts are held to them. */
-  private readonly snapshotResourceLimits: Readonly<SnapshotResourceLimits>;
-  private documentId?: string;
-  private documentVersion?: number;
+  private readonly snapshot_resource_limits: Readonly<SnapshotResourceLimits>;
+  private document_id?: string;
+  private document_version?: number;
   /** Engine generation at construction; a different current value means the instance stopped. */
   private readonly generation = engineGeneration();
 
@@ -226,7 +226,7 @@ export class SheetwriteStore implements Store {
   ) {
     // Frozen once here so exported snapshots share the payloads instead of copying them.
     if (workbook.xlsxSource) workbook.xlsxSource = freezeXlsxSource(workbook.xlsxSource);
-    this.transactionResourceLimits = resolveTransactionResourceLimits(
+    this.transaction_resource_limits = resolveTransactionResourceLimits(
       options.transactionResourceLimits,
     );
     const storage = options.storage ?? "dense";
@@ -235,12 +235,17 @@ export class SheetwriteStore implements Store {
       resourceLimits: options.snapshotResourceLimits,
     });
     // The assertion above has validated every override.
-    this.snapshotResourceLimits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
+    this.snapshot_resource_limits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
 
     try {
-      this.dataEngine = new StoreDataEngine(workbook, data, options, this.snapshotResourceLimits);
+      this.data_engine = new StoreDataEngine(
+        workbook,
+        data,
+        options,
+        this.snapshot_resource_limits,
+      );
     } catch (error) {
-      if (!isSnapshotAllocationFailure(error)) throw error;
+      if (!is_snapshot_allocation_failure(error)) throw error;
       const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
       let actual = 0;
       for (const sheet of workbook.sheets) {
@@ -248,7 +253,7 @@ export class SheetwriteStore implements Store {
         actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
       }
 
-      throw new SnapshotResourceError(resource, this.snapshotResourceLimits[resource], actual, {
+      throw new SnapshotResourceError(resource, this.snapshot_resource_limits[resource], actual, {
         cause: error,
       });
     }
@@ -258,8 +263,8 @@ export class SheetwriteStore implements Store {
       (sheet) => this.engine.pivotOutputs(sheet),
       this.engine.validationReads,
     );
-    this.protectionResolver = options.protectionResolver;
-    this.mutationPolicy = options.mutationPolicy ?? "atomic";
+    this.protection_resolver = options.protectionResolver;
+    this.mutation_policy = options.mutationPolicy ?? "atomic";
     registerStoreEngine(this, this.engine, this.generation);
   }
 
@@ -273,8 +278,8 @@ export class SheetwriteStore implements Store {
     let store: SheetwriteStore | undefined;
     try {
       store = new SheetwriteStore(workbook, undefined, options);
-      store.documentId = snapshot.documentId;
-      store.documentVersion = snapshot.version;
+      store.document_id = snapshot.documentId;
+      store.document_version = snapshot.version;
       store.epoch = snapshot.version ?? 0;
       store.engine.hydrateSnapshot(snapshot);
       if (workbook.xlsxSource) {
@@ -295,7 +300,7 @@ export class SheetwriteStore implements Store {
         store?.dispose();
       }
 
-      if (isSnapshotAllocationFailure(error)) {
+      if (is_snapshot_allocation_failure(error)) {
         throw new SnapshotValidationError(
           [
             {
@@ -313,20 +318,20 @@ export class SheetwriteStore implements Store {
 
   /** Replace only after a separate store has validated and hydrated every sheet. */
   replaceSnapshot(snapshot: WorkbookSnapshot): void {
-    this.assertEngineRunning();
+    this.assert_engine_running();
 
     const replacement = SheetwriteStore.fromSnapshot(snapshot, {
-      protectionResolver: this.protectionResolver,
-      mutationPolicy: this.mutationPolicy,
-      transactionResourceLimits: this.transactionResourceLimits,
+      protectionResolver: this.protection_resolver,
+      mutationPolicy: this.mutation_policy,
+      transactionResourceLimits: this.transaction_resource_limits,
     });
 
     const previous = this.engine;
     replaceStoreEngine(this, replacement);
-    this.dataEngine = replacement.dataEngine;
+    this.data_engine = replacement.data_engine;
     this.workbook = replacement.workbook;
-    this.documentId = replacement.documentId;
-    this.documentVersion = replacement.documentVersion;
+    this.document_id = replacement.document_id;
+    this.document_version = replacement.document_version;
     this.epoch += 1;
     this.policy = new StoreMutationPolicy(
       this.workbook,
@@ -340,10 +345,10 @@ export class SheetwriteStore implements Store {
 
   setProtectionResolver(
     resolver: ProtectionResolver | undefined,
-    mode: MutationPolicyMode = this.mutationPolicy,
+    mode: MutationPolicyMode = this.mutation_policy,
   ): void {
-    this.protectionResolver = resolver;
-    this.mutationPolicy = mode;
+    this.protection_resolver = resolver;
+    this.mutation_policy = mode;
   }
 
   /** Clones of the pivot definitions on `sheet`, or on every sheet; readable without the engine. */
@@ -578,11 +583,11 @@ export class SheetwriteStore implements Store {
   }
 
   recalculateVolatile(now = new Date()): void {
-    this.assertEngineRunning();
+    this.assert_engine_running();
     try {
       this.engine.recomputeVolatile(now);
     } catch (error) {
-      throw this.stopOnTrap(error);
+      throw this.stop_on_trap(error);
     }
 
     this.epoch += 1;
@@ -859,7 +864,7 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
-    this.assertEngineRunning();
+    this.assert_engine_running();
     // Each setBlock's `values` and `styleIds` are read once into private
     // copies. An engine-built transaction already went through its layer's
     // ingress, and that layer matches results to its operations by identity.
@@ -870,40 +875,42 @@ export class SheetwriteStore implements Store {
     const owned = copied ? { ...tx, patches: copied } : tx;
     const preparation = new TransactionPreparation(owned.patches);
     try {
-      return this.applyPreparedTransaction(owned, reasonOrOptions, preparation);
+      return this.apply_prepared_transaction(owned, reasonOrOptions, preparation);
     } catch (error) {
       // Change listeners run inside this call too: a trap in a listener's
       // engine read stops the engine the same way.
-      throw this.stopOnTrap(error);
+      throw this.stop_on_trap(error);
     } finally {
       preparation.dispose();
     }
   }
 
   /** Admission, policy, application and notification for one transaction, in that order. */
-  private applyPreparedTransaction(
+  private apply_prepared_transaction(
     tx: Transaction,
-    reasonOrOptions: CommitReason | TransactionApplicationOptions,
+    reason_or_options: CommitReason | TransactionApplicationOptions,
     preparation: TransactionPreparation,
   ): ApplyTransactionResult {
     // A transaction built and measured by an engine layer carries its resource
     // record; without one, direct callers pay the full payload walk. An
     // engine-built atomic batch is bounded by the batch ceilings instead.
     const limits = isAtomicBatch(tx.patches)
-      ? atomicBatchLimits(this.transactionResourceLimits)
-      : this.transactionResourceLimits;
-    const admittedResources = takeAdmittedTransactionResources(tx);
-    const resourceResolution = resolveTransactionResourceValidation(
+      ? atomicBatchLimits(this.transaction_resource_limits)
+      : this.transaction_resource_limits;
+    const admitted_resources = takeAdmittedTransactionResources(tx);
+    const resource_resolution = resolveTransactionResourceValidation(
       tx.patches,
       limits,
-      admittedResources,
+      admitted_resources,
     );
-    const rejected = this.admissionRejection(tx, resourceResolution.result);
+    const rejected = this.admission_rejection(tx, resource_resolution.result);
     if (rejected) return rejected;
 
     const options =
-      typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
-    const commitReason = options.commitReason ?? "api";
+      typeof reason_or_options === "string"
+        ? { commitReason: reason_or_options }
+        : reason_or_options;
+    const commit_reason = options.commitReason ?? "api";
     const source = options.source ?? "local";
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
       return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
@@ -911,35 +918,36 @@ export class SheetwriteStore implements Store {
 
     const policy =
       source === "local"
-        ? this.applyLocalPolicy(tx, commitReason, limits, preparation)
+        ? this.apply_local_policy(tx, commit_reason, limits, preparation)
         : { tx, warnings: [], rejections: [] };
     if ("status" in policy) return policy;
 
-    const effectiveTx = policy.tx;
+    const effective_tx = policy.tx;
     if (source === "local" || options.localReplay === true) {
-      const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
-      if (dirtyCapacityIssue) {
-        return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
+      const dirty_capacity_issue = this.engine.pagedDirtyCapacityIssue(effective_tx.patches);
+      if (dirty_capacity_issue) {
+        return { status: "rejected", epoch: this.epoch, issues: [dirty_capacity_issue] };
       }
     }
 
     if (
       source === "local" &&
-      effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
+      effective_tx.patches.some((patch) => !this.engine.canApplyLocally(patch))
     ) {
       return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
 
-    const hasListeners = this.listeners.size > 0;
-    const effects = this.engine.applyPatches(effectiveTx.patches, {
+    const has_listeners = this.listeners.size > 0;
+    const effects = this.engine.applyPatches(effective_tx.patches, {
       remoteLoad: source === "remote" && options.localReplay !== true,
-      captureChanges: hasListeners,
-      captureDetailedChanges: this.detailedChangeCapture,
+      captureChanges: has_listeners,
+      captureDetailedChanges: this.detailed_change_capture,
       trustedHistory:
-        admittedResources !== undefined &&
-        resourceResolution.admitted === admittedResources &&
-        !this.protectionResolver,
-      replayPivotSources: source === "remote" || commitReason === "undo" || commitReason === "redo",
+        admitted_resources !== undefined &&
+        resource_resolution.admitted === admitted_resources &&
+        !this.protection_resolver,
+      replayPivotSources:
+        source === "remote" || commit_reason === "undo" || commit_reason === "redo",
     });
     // Listeners and the result hand the operations to callers.
     releaseOwnedArrays();
@@ -948,25 +956,25 @@ export class SheetwriteStore implements Store {
       return {
         status: "noop",
         epoch: this.epoch,
-        reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
+        reason: effective_tx.patches.length === 0 ? "empty" : "out-of-bounds",
       };
     }
 
-    const xlsxSource = this.workbook.xlsxSource;
-    if (xlsxSource) this.invalidateXlsxGraphs(xlsxSource, effects.appliedPatches);
+    const xlsx_source = this.workbook.xlsxSource;
+    if (xlsx_source) this.invalidate_xlsx_graphs(xlsx_source, effects.appliedPatches);
 
     this.epoch += 1;
     const transaction =
-      effects.appliedPatches.length === effectiveTx.patches.length
-        ? effectiveTx
-        : { ...effectiveTx, patches: effects.appliedPatches };
+      effects.appliedPatches.length === effective_tx.patches.length
+        ? effective_tx
+        : { ...effective_tx, patches: effects.appliedPatches };
     setTransactionStorageRevision(transaction, effects.storageRevision);
 
-    if (hasListeners) {
+    if (has_listeners) {
       const event: ChangeEvent = {
         transaction,
         changes: effects.changes ?? [],
-        commitReason,
+        commitReason: commit_reason,
         source,
         epoch: this.epoch,
       };
@@ -985,13 +993,13 @@ export class SheetwriteStore implements Store {
   }
 
   /** Reject a transaction whose payload exceeds its limits or whose operations cannot apply. */
-  private admissionRejection(
+  private admission_rejection(
     tx: Transaction,
     resources: TransactionResourceValidationResult,
   ): ApplyTransactionResult | undefined {
     if (!resources.ok) return { status: "rejected", epoch: this.epoch, issues: [resources.issue] };
 
-    const issue = this.transactionOperationIssue(tx);
+    const issue = this.transaction_operation_issue(tx);
     return issue ? { status: "rejected", epoch: this.epoch, issues: [issue] } : undefined;
   }
 
@@ -1000,9 +1008,9 @@ export class SheetwriteStore implements Store {
    * receive live operations and may edit them, so the kept operations are
    * admitted again afterwards.
    */
-  private applyLocalPolicy(
+  private apply_local_policy(
     tx: Transaction,
-    commitReason: CommitReason,
+    commit_reason: CommitReason,
     limits: Readonly<TransactionResourceLimits>,
     preparation: TransactionPreparation,
   ): LocalPolicyOutcome | ApplyTransactionResult {
@@ -1010,29 +1018,29 @@ export class SheetwriteStore implements Store {
     releaseOwnedArrays();
     const policy = this.policy.evaluate(
       tx.patches,
-      commitReason,
-      this.protectionResolver,
-      this.mutationPolicy,
+      commit_reason,
+      this.protection_resolver,
+      this.mutation_policy,
     );
     if (policy.rejections.length > 0 && policy.patches.length === 0) {
       return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
     }
 
-    const effectiveTx =
+    const effective_tx =
       policy.patches.length === tx.patches.length ? tx : { ...tx, patches: policy.patches };
-    if (this.protectionResolver) {
-      preparation.bind(effectiveTx.patches);
+    if (this.protection_resolver) {
+      preparation.bind(effective_tx.patches);
 
       // Do not reuse measurements taken before the callbacks ran.
-      const callbackResources = resolveTransactionResourceValidation(
-        effectiveTx.patches,
+      const callback_resources = resolveTransactionResourceValidation(
+        effective_tx.patches,
         limits,
       ).result;
-      const rejected = this.admissionRejection(effectiveTx, callbackResources);
+      const rejected = this.admission_rejection(effective_tx, callback_resources);
       if (rejected) return rejected;
     }
 
-    return { tx: effectiveTx, warnings: policy.warnings, rejections: policy.rejections };
+    return { tx: effective_tx, warnings: policy.warnings, rejections: policy.rejections };
   }
 
   /**
@@ -1040,9 +1048,9 @@ export class SheetwriteStore implements Store {
    * O(patches + graphs) and never reads cells; undo cannot restore a dropped
    * graph because the original package is not kept.
    */
-  private invalidateXlsxGraphs(source: XlsxSourceSnapshot, patches: readonly DocumentOp[]): void {
-    const valuesTouched = new Set<SheetId>();
-    const layoutTouched = new Set<SheetId>();
+  private invalidate_xlsx_graphs(source: XlsxSourceSnapshot, patches: readonly DocumentOp[]): void {
+    const values_touched = new Set<SheetId>();
+    const layout_touched = new Set<SheetId>();
     for (const patch of patches) {
       // A native chart reads cells but changes neither values nor layout, so retained
       // drawings and charts stay valid beside it.
@@ -1055,13 +1063,13 @@ export class SheetwriteStore implements Store {
       ) {
         // A chart or pivot may read through a defined name, whose target is not tracked,
         // and a calculation change can move any formula result.
-        for (const sheet of this.workbook.sheets) valuesTouched.add(sheet.id);
+        for (const sheet of this.workbook.sheets) values_touched.add(sheet.id);
         continue;
       }
       const sheet = patchSheetId(patch);
       if (sheet === null) continue;
-      valuesTouched.add(sheet);
-      if (XLSX_LAYOUT_OPS.has(patch.op)) layoutTouched.add(sheet);
+      values_touched.add(sheet);
+      if (XLSX_LAYOUT_OPS.has(patch.op)) layout_touched.add(sheet);
     }
 
     const live = new Map(this.workbook.sheets.map((sheet) => [sheet.id, sheet.name]));
@@ -1072,8 +1080,8 @@ export class SheetwriteStore implements Store {
         graph.dependencies.every((dependency) =>
           dependency.scope === "values"
             ? live.get(dependency.sheetId) === dependency.name &&
-              !valuesTouched.has(dependency.sheetId)
-            : live.has(dependency.sheetId) && !layoutTouched.has(dependency.sheetId),
+              !values_touched.has(dependency.sheetId)
+            : live.has(dependency.sheetId) && !layout_touched.has(dependency.sheetId),
         );
       if (!valid) dropped.add(graph.target);
       return valid;
@@ -1095,7 +1103,7 @@ export class SheetwriteStore implements Store {
   }
 
   setDetailedChangeCapture(enabled: boolean): void {
-    this.detailedChangeCapture = enabled;
+    this.detailed_change_capture = enabled;
   }
 
   acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
@@ -1103,7 +1111,7 @@ export class SheetwriteStore implements Store {
   }
 
   exportSnapshot(): WorkbookSnapshot {
-    return this.engine.exportSnapshot(this.documentId, this.documentVersion);
+    return this.engine.exportSnapshot(this.document_id, this.document_version);
   }
 
   /** Updates formulas that name the sheet to its new name. */
@@ -1124,11 +1132,11 @@ export class SheetwriteStore implements Store {
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
-    this.assertEngineRunning();
+    this.assert_engine_running();
     try {
       this.engine.loadPage(sheet, start, columns, rows, protect);
     } catch (error) {
-      throw this.stopOnTrap(error);
+      throw this.stop_on_trap(error);
     }
   }
 
@@ -1142,11 +1150,11 @@ export class SheetwriteStore implements Store {
   }
 
   /** Refuse work once the engine stopped: its instance can be half-written. */
-  private assertEngineRunning(): void {
+  private assert_engine_running(): void {
     if (this.generation !== engineGeneration()) throw engineFailedError();
   }
 
-  private stopOnTrap(error: unknown): unknown {
+  private stop_on_trap(error: unknown): unknown {
     return isEngineTrap(error) ? stopEngine(error, this.generation) : error;
   }
 
@@ -1154,25 +1162,25 @@ export class SheetwriteStore implements Store {
    * The first operation that is malformed, breaks sheet lifecycle, names a
    * missing sheet, or grows a sheet past a document limit.
    */
-  private transactionOperationIssue(tx: Transaction): MutationIssue | undefined {
-    const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
+  private transaction_operation_issue(tx: Transaction): MutationIssue | undefined {
+    const sheet_lifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
     let growth: SheetGrowth | undefined;
-    for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
-      const operationPath = `transaction.patches[${operationIndex}]`;
-      const operation = tx.patches[operationIndex];
-      const unsafeError = validateDocumentOperationShape(operation, operationPath).find(
+    for (let operation_index = 0; operation_index < tx.patches.length; operation_index++) {
+      const operation_path = `transaction.patches[${operation_index}]`;
+      const operation = tx.patches[operation_index];
+      const unsafe_error = validateDocumentOperationShape(operation, operation_path).find(
         (error) => error.code !== "out-of-bounds",
       );
-      if (unsafeError || !operation) {
+      if (unsafe_error || !operation) {
         return {
           kind: "invalid-operation",
           severity: "error",
-          operationIndex,
-          message: unsafeError?.message ?? "Operation is missing",
+          operationIndex: operation_index,
+          message: unsafe_error?.message ?? "Operation is missing",
         };
       }
 
-      const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
+      const lifecycle = applySheetLifecycleOperation(sheet_lifecycle, operation);
       if (lifecycle && !lifecycle.ok) {
         return {
           kind: "sheet-lifecycle",
@@ -1182,26 +1190,26 @@ export class SheetwriteStore implements Store {
             operation.op === "addSheet"
               ? operation.sheet.id
               : (patchSheetId(operation) ?? undefined),
-          operationIndex,
+          operationIndex: operation_index,
           message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
         };
       }
 
-      const requiredSheets = requiredOperationSheets(operation, lifecycle === null);
-      const missingSheet = requiredSheets.find(
-        (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
+      const required_sheets = required_operation_sheets(operation, lifecycle === null);
+      const missing_sheet = required_sheets.find(
+        (sheet) => !sheet_lifecycle.sheets.some((candidate) => candidate.id === sheet),
       );
-      if (missingSheet !== undefined) {
+      if (missing_sheet !== undefined) {
         return {
           kind: "invalid-operation",
           severity: "error",
-          operationIndex,
-          message: `Sheet ${missingSheet} does not exist`,
+          operationIndex: operation_index,
+          message: `Sheet ${missing_sheet} does not exist`,
         };
       }
 
       if (operation.op === "addRows" || operation.op === "addColumns") {
-        growth ??= this.sheetGrowth();
+        growth ??= this.sheet_growth();
         const issue = growth.grow(
           operation.sheet,
           operation.op === "addRows" ? operation.count : 0,
@@ -1215,7 +1223,7 @@ export class SheetwriteStore implements Store {
   }
 
   /** Every sheet's dimensions now, and where its cells live, for {@link SheetGrowth}. */
-  private sheetGrowth(): SheetGrowth {
+  private sheet_growth(): SheetGrowth {
     const sheets = new Map<SheetId, SheetDimensions>();
     for (const sheet of this.engine.getWorkbook().sheets) {
       sheets.set(sheet.id, {
@@ -1229,100 +1237,100 @@ export class SheetwriteStore implements Store {
             : "dense",
       });
     }
-    return new SheetGrowth(sheets, this.snapshotResourceLimits);
+    return new SheetGrowth(sheets, this.snapshot_resource_limits);
   }
 }
 
 /** Every sheet a new sheet's snapshot refers to, which must exist once it is added. */
-function addedSheetReferences(sheet: SheetSnapshot): SheetId[] {
-  const requiredSheets: SheetId[] = [];
+function added_sheet_references(sheet: SheetSnapshot): SheetId[] {
+  const required_sheets: SheetId[] = [];
   for (const block of sheet.cells) {
     for (const cell of block.cells) {
-      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+      if (cell.value.kind === "ref") required_sheets.push(cell.value.target.sheet);
     }
   }
 
   for (const rule of sheet.conditionalFormats ?? []) {
-    requiredSheets.push(rule.range.sheet);
+    required_sheets.push(rule.range.sheet);
   }
 
   for (const hyperlink of sheet.hyperlinks ?? []) {
-    requiredSheets.push(hyperlink.range.sheet);
+    required_sheets.push(hyperlink.range.sheet);
     if (hyperlink.target.kind === "internal") {
-      requiredSheets.push(hyperlink.target.range.sheet);
+      required_sheets.push(hyperlink.target.range.sheet);
     }
   }
 
   for (const rule of sheet.validationRules ?? []) {
-    requiredSheets.push(rule.range.sheet);
+    required_sheets.push(rule.range.sheet);
   }
 
   for (const entry of sheet.protectedRanges ?? []) {
-    requiredSheets.push(entry.range.sheet);
+    required_sheets.push(entry.range.sheet);
   }
 
-  for (const note of sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+  for (const note of sheet.notes ?? []) required_sheets.push(note.addr.sheet);
   for (const chart of sheet.charts ?? []) {
-    for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
+    for (const range of chartSourceRanges(chart)) required_sheets.push(range.sheet);
   }
 
-  return requiredSheets;
+  return required_sheets;
 }
 
 /**
  * Sheets an operation reads or writes. The primary sheet is included unless
  * sheet lifecycle already checked it.
  */
-function requiredOperationSheets(operation: DocumentOp, includePrimary: boolean): SheetId[] {
-  if (operation.op === "addSheet") return addedSheetReferences(operation.sheet);
+function required_operation_sheets(operation: DocumentOp, include_primary: boolean): SheetId[] {
+  if (operation.op === "addSheet") return added_sheet_references(operation.sheet);
 
-  const requiredSheets: SheetId[] = [];
-  const primarySheet = patchSheetId(operation);
-  if (includePrimary && primarySheet !== null) requiredSheets.push(primarySheet);
+  const required_sheets: SheetId[] = [];
+  const primary_sheet = patchSheetId(operation);
+  if (include_primary && primary_sheet !== null) required_sheets.push(primary_sheet);
 
   if (operation.op === "set" && operation.value.kind === "ref") {
-    requiredSheets.push(operation.value.target.sheet);
+    required_sheets.push(operation.value.target.sheet);
   } else if (operation.op === "setRange") {
     for (const cell of operation.cells) {
-      if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+      if (cell.value.kind === "ref") required_sheets.push(cell.value.target.sheet);
     }
   } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
     if (operation.op === "restoreBlock") {
-      requiredSheets.push(
+      required_sheets.push(
         ...preparedRestore(operation, validateDocumentOperationShape).requiredSheets,
       );
     } else {
-      for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+      for (const [, target] of operation.block.refs ?? []) required_sheets.push(target.sheet);
     }
   } else if (operation.op === "setNamedRange") {
-    if (operation.namedRange.range) requiredSheets.push(operation.namedRange.range.sheet);
+    if (operation.namedRange.range) required_sheets.push(operation.namedRange.range.sheet);
     if (operation.namedRange.scope !== undefined) {
-      requiredSheets.push(operation.namedRange.scope);
+      required_sheets.push(operation.namedRange.scope);
     }
   } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
-    requiredSheets.push(operation.scope);
+    required_sheets.push(operation.scope);
   } else if (operation.op === "setHyperlink") {
-    requiredSheets.push(operation.hyperlink.range.sheet);
+    required_sheets.push(operation.hyperlink.range.sheet);
     if (operation.hyperlink.target.kind === "internal") {
-      requiredSheets.push(operation.hyperlink.target.range.sheet);
+      required_sheets.push(operation.hyperlink.target.range.sheet);
     }
   } else if (operation.op === "setValidationRule") {
-    requiredSheets.push(operation.rule.range.sheet);
+    required_sheets.push(operation.rule.range.sheet);
   } else if (operation.op === "setProtectedRange") {
-    requiredSheets.push(operation.protectedRange.range.sheet);
+    required_sheets.push(operation.protectedRange.range.sheet);
   } else if (operation.op === "setSheetMeta") {
     for (const rule of operation.patch.conditionalFormats ?? []) {
-      requiredSheets.push(rule.range.sheet);
+      required_sheets.push(rule.range.sheet);
     }
   } else if (operation.op === "setChart") {
-    for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
+    for (const range of chartSourceRanges(operation.chart)) required_sheets.push(range.sheet);
   } else if (
     operation.op === "setPivot" &&
     !operation.pivot.source.invalid &&
     "range" in operation.pivot.source
   ) {
-    requiredSheets.push(operation.pivot.source.range.sheet);
+    required_sheets.push(operation.pivot.source.range.sheet);
   }
 
-  return requiredSheets;
+  return required_sheets;
 }

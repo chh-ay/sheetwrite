@@ -109,7 +109,7 @@ declare global {
   }
 }
 
-function nextFrame(): Promise<void> {
+function next_frame(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   requestAnimationFrame(() => resolve());
   return promise;
@@ -121,21 +121,21 @@ function settle(): Promise<void> {
   return promise;
 }
 
-function dispatchKey(element: Element, key: string): void {
+function dispatch_key(element: Element, key: string): void {
   element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
 /** The date column is typed in Sheetwrite, so its ISO text ingests as date serials. */
-function sheetwriteColumnType(column: BenchColumn): CellFormat {
+function sheetwrite_column_type(column: BenchColumn): CellFormat {
   return column.key === "date" ? "date" : column.type;
 }
 
-function makeWorkbook(rowCount: number): Workbook {
+function make_workbook(row_count: number): Workbook {
   const columns: Column[] = COLUMNS.map((column) => ({
     key: column.key,
     header: column.header,
     width: column.width,
-    type: sheetwriteColumnType(column),
+    type: sheetwrite_column_type(column),
     numberFormat:
       column.key === "amount"
         ? AMOUNT_NUMBER_FORMAT
@@ -144,9 +144,12 @@ function makeWorkbook(rowCount: number): Workbook {
           : undefined,
     numberLocale: NUMBER_LOCALE,
   }));
-  return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+  return {
+    activeSheet: SHEET,
+    sheets: [{ id: SHEET, name: "Bench", rowCount: row_count, columns }],
+  };
 }
-function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): string | number {
+function dataset_value_at(dataset: ColumnarDataset, row: number, col: number): string | number {
   if (col === 0) return dataset.id[row]!;
   if (col === 1) return dataset.date[row]!;
   if (col === 2) return dataset.customer[row]!;
@@ -159,12 +162,12 @@ function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): str
  * write this rather than the dataset text, so a restored cell matches a freshly
  * loaded one and no scenario depends on which scenarios ran before it.
  */
-function ingestedValueAt(dataset: ColumnarDataset, row: number, col: number): CellScalar {
+function ingested_value_at(dataset: ColumnarDataset, row: number, col: number): CellScalar {
   const column = COLUMNS[col];
   if (!column) throw new RangeError(`benchmark column ${col} is missing`);
-  const value = datasetValueAt(dataset, row, col);
+  const value = dataset_value_at(dataset, row, col);
   return typeof value === "string"
-    ? parseCellLiteralInput(value, sheetwriteColumnType(column))
+    ? parseCellLiteralInput(value, sheetwrite_column_type(column))
     : value;
 }
 
@@ -174,7 +177,7 @@ type PanePaintFn = (
   divider: { x: number | null; y: number | null },
 ) => void;
 
-function emptyFrozenPaneProbe(): FrozenPaneProbe {
+function empty_frozen_pane_probe(): FrozenPaneProbe {
   return {
     paneFrames: 0,
     paneCount: 0,
@@ -195,16 +198,16 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   private host!: HTMLElement;
   private readonly data: { rowCount: number; columns: Record<string, ArrayLike<string | number>> };
   private readonly dataset: ColumnarDataset;
-  private formulaDenseRows = 0;
-  private textHeavyRows = 0;
-  private wrapHeavyRows = 0;
-  private searchMatchRows = 0;
-  private conditionalFormatRows = 0;
-  private frozenPaneProbeArmed = false;
-  private frozenPaneProbeState: FrozenPaneProbe = emptyFrozenPaneProbe();
-  private windowReadDiagnosticMode: WindowReadDiagnosticMode = "baseline";
-  private priorDecodedView: InstrumentedVisibleWindowView | undefined;
-  private windowTransferCountersState = {
+  private formula_dense_rows = 0;
+  private text_heavy_rows = 0;
+  private wrap_heavy_rows = 0;
+  private search_match_rows = 0;
+  private conditional_format_rows = 0;
+  private frozen_pane_probe_armed = false;
+  private frozen_pane_probe_state: FrozenPaneProbe = empty_frozen_pane_probe();
+  private window_read_diagnostic_mode: WindowReadDiagnosticMode = "baseline";
+  private prior_decoded_view: InstrumentedVisibleWindowView | undefined;
+  private window_transfer_counters_state = {
     logicalFrames: 0,
     windowReadRequests: 0,
     logicalWindowReads: 0,
@@ -212,8 +215,8 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     outputAllocationEvents: 0,
   };
   /** Canvas frames the renderer has drawn; `repaint()` fails when one call draws none. */
-  private canvasFrames = 0;
-  private readWindows!: { invalidateData(): void };
+  private canvas_frames = 0;
+  private read_windows!: { invalidateData(): void };
   constructor(
     dataset: ColumnarDataset,
     private readonly windowTransferDiagnostic: boolean,
@@ -235,11 +238,11 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   mount(host: HTMLElement): void {
     this.host = host;
     this.grid = createGrid(host, {
-      workbook: makeWorkbook(this.initialRowCount),
+      workbook: make_workbook(this.initialRowCount),
       data: this.data,
     });
-    this.installFrameCounter();
-    if (this.windowTransferDiagnostic) this.installWindowTransferDiagnostic();
+    this.install_frame_counter();
+    if (this.windowTransferDiagnostic) this.install_window_transfer_diagnostic();
   }
 
   /**
@@ -247,16 +250,16 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * internal that was renamed or removed fails the mount instead of turning a
    * timed repaint into a no-op.
    */
-  private installFrameCounter(): void {
-    const readWindows: unknown = Reflect.get(this.grid, "readWindows");
+  private install_frame_counter(): void {
+    const read_windows: unknown = Reflect.get(this.grid, "read_windows");
     if (
-      typeof readWindows !== "object" ||
-      readWindows === null ||
-      typeof Reflect.get(readWindows, "invalidateData") !== "function"
+      typeof read_windows !== "object" ||
+      read_windows === null ||
+      typeof Reflect.get(read_windows, "invalidateData") !== "function"
     ) {
       throw new Error("repaint requires the grid's read-window controller");
     }
-    this.readWindows = readWindows as { invalidateData(): void };
+    this.read_windows = read_windows as { invalidateData(): void };
     const renderer = Reflect.get(this.grid, "renderer") as
       | {
           paint?: (view: InstrumentedVisibleWindowView) => void;
@@ -268,55 +271,55 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     }
     const paint = renderer.paint.bind(renderer);
     renderer.paint = (view) => {
-      this.canvasFrames++;
+      this.canvas_frames++;
       paint(view);
     };
     if (typeof renderer.paintPanes === "function") {
-      const paintPanes = renderer.paintPanes.bind(renderer);
+      const paint_panes = renderer.paintPanes.bind(renderer);
       renderer.paintPanes = (panes, divider) => {
-        this.canvasFrames++;
-        paintPanes(panes, divider);
+        this.canvas_frames++;
+        paint_panes(panes, divider);
       };
     }
   }
 
-  private installWindowTransferDiagnostic(): void {
-    const originalRead = this.grid.store.getVisibleWindow.bind(this.grid.store);
+  private install_window_transfer_diagnostic(): void {
+    const original_read = this.grid.store.getVisibleWindow.bind(this.grid.store);
     this.grid.store.getVisibleWindow = ((...args) => {
-      this.windowTransferCountersState.windowReadRequests++;
-      if (this.windowReadDiagnosticMode === "reuse-decoded-view-upper-bound") {
-        if (!this.priorDecodedView) {
+      this.window_transfer_counters_state.windowReadRequests++;
+      if (this.window_read_diagnostic_mode === "reuse-decoded-view-upper-bound") {
+        if (!this.prior_decoded_view) {
           throw new Error("window-transfer upper bound has no prior decoded view");
         }
-        return this.priorDecodedView;
+        return this.prior_decoded_view;
       }
-      const view = originalRead(...args) as InstrumentedVisibleWindowView;
-      const copiedBytes = view.ffiOutputBytes;
-      const outputAllocationEvents = view.ffiOutputAllocationEvents;
+      const view = original_read(...args) as InstrumentedVisibleWindowView;
+      const copied_bytes = view.ffiOutputBytes;
+      const output_allocation_events = view.ffiOutputAllocationEvents;
       if (
-        typeof copiedBytes !== "number" ||
-        !Number.isSafeInteger(copiedBytes) ||
-        copiedBytes < 0 ||
-        typeof outputAllocationEvents !== "number" ||
-        !Number.isSafeInteger(outputAllocationEvents) ||
-        outputAllocationEvents <= 0
+        typeof copied_bytes !== "number" ||
+        !Number.isSafeInteger(copied_bytes) ||
+        copied_bytes < 0 ||
+        typeof output_allocation_events !== "number" ||
+        !Number.isSafeInteger(output_allocation_events) ||
+        output_allocation_events <= 0
       ) {
         throw new Error("visible-window read omitted exact output transfer counters");
       }
-      this.windowTransferCountersState.logicalWindowReads++;
-      this.windowTransferCountersState.copiedBytes += copiedBytes;
-      this.windowTransferCountersState.outputAllocationEvents += outputAllocationEvents;
-      this.priorDecodedView = view;
+      this.window_transfer_counters_state.logicalWindowReads++;
+      this.window_transfer_counters_state.copiedBytes += copied_bytes;
+      this.window_transfer_counters_state.outputAllocationEvents += output_allocation_events;
+      this.prior_decoded_view = view;
       return view;
     }) as typeof this.grid.store.getVisibleWindow;
 
     const renderer = Reflect.get(this.grid, "renderer") as {
       paint(view: InstrumentedVisibleWindowView): void;
     };
-    const originalPaint = renderer.paint.bind(renderer);
+    const original_paint = renderer.paint.bind(renderer);
     renderer.paint = (view): void => {
-      this.windowTransferCountersState.logicalFrames++;
-      originalPaint(view);
+      this.window_transfer_counters_state.logicalFrames++;
+      original_paint(view);
     };
   }
 
@@ -359,28 +362,28 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     return this.host.querySelector(".sheetwrite-editor") !== null;
   }
 
-  private scrollElement(): HTMLElement {
+  private scroll_element(): HTMLElement {
     const element = this.host.querySelector<HTMLElement>(".sheetwrite-scroller");
     if (!element) throw new Error("sheetwrite scroller is not mounted");
     return element;
   }
 
   prepareScroll(axis: "top" | "left", startMiddle: boolean): void {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
     element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
     this.grid.refresh();
   }
 
   scrollBy(axis: "top" | "left", pixels: number): void {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     if (axis === "top") element.scrollTop += pixels;
     else element.scrollLeft += pixels;
     this.grid.refresh();
   }
 
   scrollObservation(): ScrollObservation {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     return {
       top: element.scrollTop,
       left: element.scrollLeft,
@@ -399,13 +402,13 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
 
   openEditor(): void {
     this.host.focus();
-    dispatchKey(this.host, "F2");
+    dispatch_key(this.host, "F2");
     if (!this.editorOpen()) throw new Error("Sheetwrite editor did not open");
   }
 
   closeEditor(): void {
     const editor = this.host.querySelector<HTMLTextAreaElement>(".sheetwrite-editor");
-    if (editor) dispatchKey(editor, "Escape");
+    if (editor) dispatch_key(editor, "Escape");
   }
 
   editCommit(value: string): void {
@@ -414,25 +417,25 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     if (!editor) throw new Error("Sheetwrite editor disappeared before commit");
     editor.value = value;
     editor.dispatchEvent(new Event("input", { bubbles: true }));
-    dispatchKey(editor, "Enter");
+    dispatch_key(editor, "Enter");
   }
 
   moveSelection(direction: "down" | "right"): void {
     this.host.focus();
-    dispatchKey(this.host, direction === "down" ? "ArrowDown" : "ArrowRight");
+    dispatch_key(this.host, direction === "down" ? "ArrowDown" : "ArrowRight");
     this.grid.refresh();
   }
 
   insertRows(at: number, count: number): void {
-    this.applyRowEdit({ op: "addRows", sheet: SHEET, at, count });
+    this.apply_row_edit({ op: "addRows", sheet: SHEET, at, count });
   }
 
   removeRows(at: number, count: number): void {
-    this.applyRowEdit({ op: "removeRows", sheet: SHEET, at, count });
+    this.apply_row_edit({ op: "removeRows", sheet: SHEET, at, count });
   }
 
   /** A row edit the store refuses fails the scenario instead of timing a no-op. */
-  private applyRowEdit(patch: DocumentOp): void {
+  private apply_row_edit(patch: DocumentOp): void {
     const result = this.grid.store.applyTransaction({ patches: [patch] });
     if (result.status !== "applied") {
       const detail =
@@ -456,10 +459,10 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * the call draws no canvas frame, so a timed repaint can never be a no-op.
    */
   repaint(): void {
-    const before = this.canvasFrames;
-    this.readWindows.invalidateData();
+    const before = this.canvas_frames;
+    this.read_windows.invalidateData();
     this.grid.refresh();
-    if (this.canvasFrames === before) throw new Error("repaint drew no canvas frame");
+    if (this.canvas_frames === before) throw new Error("repaint drew no canvas frame");
   }
 
   formattedSentinels(): readonly [string, string] {
@@ -475,7 +478,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     return getNumberFormatResourceStatsForTest();
   }
 
-  private applyPatches(patches: readonly DocumentOp[]): void {
+  private apply_patches(patches: readonly DocumentOp[]): void {
     for (let start = 0; start < patches.length; start += TRANSACTION_CHUNK_SIZE) {
       this.grid.store.applyTransaction({
         patches: patches.slice(start, start + TRANSACTION_CHUNK_SIZE),
@@ -485,9 +488,9 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   installFormulaDense(): void {
-    this.formulaDenseRows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
+    this.formula_dense_rows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.formulaDenseRows; row++) {
+    for (let row = 1; row <= this.formula_dense_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         patches.push({
           op: "set",
@@ -496,28 +499,28 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         });
       }
     }
-    this.applyPatches(patches);
+    this.apply_patches(patches);
   }
 
   clearFormulaDense(): void {
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.formulaDenseRows; row++) {
+    for (let row = 1; row <= this.formula_dense_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingested_value_at(this.dataset, row, col) },
         });
       }
     }
-    this.formulaDenseRows = 0;
-    this.applyPatches(patches);
+    this.formula_dense_rows = 0;
+    this.apply_patches(patches);
   }
 
   installTextHeavy(rowCount: number): void {
-    this.textHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
+    this.text_heavy_rows = Math.min(rowCount, this.initialRowCount - 1);
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.textHeavyRows; row++) {
+    for (let row = 1; row <= this.text_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         patches.push({
           op: "set",
@@ -526,28 +529,28 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         });
       }
     }
-    this.applyPatches(patches);
+    this.apply_patches(patches);
   }
 
   clearTextHeavy(): void {
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.textHeavyRows; row++) {
+    for (let row = 1; row <= this.text_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingested_value_at(this.dataset, row, col) },
         });
       }
     }
-    this.textHeavyRows = 0;
-    this.applyPatches(patches);
+    this.text_heavy_rows = 0;
+    this.apply_patches(patches);
   }
 
   installWrapHeavy(rowCount: number): void {
-    this.wrapHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
+    this.wrap_heavy_rows = Math.min(rowCount, this.initialRowCount - 1);
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.wrapHeavyRows; row++) {
+    for (let row = 1; row <= this.wrap_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         const prefix = `${WRAP_HEAVY_TEXT_PREFIX}${row}-${col}-`;
         patches.push({
@@ -564,28 +567,28 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         });
       }
     }
-    this.applyPatches(patches);
+    this.apply_patches(patches);
   }
 
   clearWrapHeavy(): void {
-    if (this.wrapHeavyRows === 0) return;
+    if (this.wrap_heavy_rows === 0) return;
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.wrapHeavyRows; row++) {
+    for (let row = 1; row <= this.wrap_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingested_value_at(this.dataset, row, col) },
         });
       }
     }
-    this.wrapHeavyRows = 0;
-    this.applyPatches(patches);
+    this.wrap_heavy_rows = 0;
+    this.apply_patches(patches);
   }
 
   installWrapUnicode(text: string): void {
     const { row, col } = WRAP_UNICODE_CELL;
-    this.applyPatches([
+    this.apply_patches([
       {
         op: "set",
         addr: { sheet: SHEET, row, col },
@@ -597,40 +600,40 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
 
   clearWrapUnicode(): void {
     const { row, col } = WRAP_UNICODE_CELL;
-    this.applyPatches([
+    this.apply_patches([
       {
         op: "set",
         addr: { sheet: SHEET, row, col },
-        value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+        value: { kind: "literal", value: ingested_value_at(this.dataset, row, col) },
       },
     ]);
   }
 
   installSearchMatches(rowCount: number): void {
-    this.searchMatchRows = Math.min(rowCount, this.initialRowCount - 1);
+    this.search_match_rows = Math.min(rowCount, this.initialRowCount - 1);
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.searchMatchRows; row++) {
+    for (let row = 1; row <= this.search_match_rows; row++) {
       patches.push({
         op: "set",
         addr: { sheet: SHEET, row, col: COL.customer },
         value: { kind: "literal", value: `${SEARCH_MATCH_PREFIX}${row}` },
       });
     }
-    this.applyPatches(patches);
+    this.apply_patches(patches);
   }
 
   clearSearchMatches(): void {
-    if (this.searchMatchRows === 0) return;
+    if (this.search_match_rows === 0) return;
     const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.searchMatchRows; row++) {
+    for (let row = 1; row <= this.search_match_rows; row++) {
       patches.push({
         op: "set",
         addr: { sheet: SHEET, row, col: COL.customer },
         value: { kind: "literal", value: this.dataset.customer[row] ?? "" },
       });
     }
-    this.searchMatchRows = 0;
-    this.applyPatches(patches);
+    this.search_match_rows = 0;
+    this.apply_patches(patches);
   }
 
   beginSearch(query: string): void {
@@ -642,7 +645,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * set cannot pass by recomputing the expected answer.
    */
   searchState(): SearchProbe {
-    const controller = Reflect.get(this.grid, "searchController") as
+    const controller = Reflect.get(this.grid, "search_controller") as
       | {
           matches: { length: number; at(index: number): { row: number; col: number } | null };
           active: number;
@@ -684,27 +687,27 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     if (!renderer || typeof renderer.paintPanes !== "function") {
       throw new Error("frozen-pane probe requires a pane-capable renderer");
     }
-    if (!this.frozenPaneProbeArmed) {
-      const paintOriginal = renderer.paintPanes.bind(renderer);
+    if (!this.frozen_pane_probe_armed) {
+      const paint_original = renderer.paintPanes.bind(renderer);
       renderer.paintPanes = (panes, divider) => {
-        this.recordFrozenPaneFrame(panes);
-        paintOriginal(panes, divider);
+        this.record_frozen_pane_frame(panes);
+        paint_original(panes, divider);
       };
-      this.frozenPaneProbeArmed = true;
+      this.frozen_pane_probe_armed = true;
     }
-    this.frozenPaneProbeState = emptyFrozenPaneProbe();
+    this.frozen_pane_probe_state = empty_frozen_pane_probe();
   }
 
   frozenPaneProbe(): FrozenPaneProbe {
-    return this.frozenPaneProbeState;
+    return this.frozen_pane_probe_state;
   }
 
   /** The coordinator pushes the corner, top, left, and body panes in that order. */
-  private recordFrozenPaneFrame(panes: readonly PanePaint[]): void {
+  private record_frozen_pane_frame(panes: readonly PanePaint[]): void {
     const pinned = panes[0];
     const body = panes[panes.length - 1];
-    this.frozenPaneProbeState = {
-      paneFrames: this.frozenPaneProbeState.paneFrames + 1,
+    this.frozen_pane_probe_state = {
+      paneFrames: this.frozen_pane_probe_state.paneFrames + 1,
       paneCount: panes.length,
       pinnedRows: pinned ? { start: pinned.view.rows.start, end: pinned.view.rows.end } : null,
       pinnedColumns: pinned ? [...pinned.view.cols] : [],
@@ -716,25 +719,25 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   installConditionalFormats(rowCount: number): void {
-    this.conditionalFormatRows = Math.min(rowCount, this.initialRowCount - 1);
-    if (this.conditionalFormatRows < 1) {
+    this.conditional_format_rows = Math.min(rowCount, this.initialRowCount - 1);
+    if (this.conditional_format_rows < 1) {
       throw new RangeError("conditional formats need at least one body row");
     }
     const range = {
       sheet: SHEET,
       start: { row: 1, col: 0 },
-      end: { row: this.conditionalFormatRows, col: this.colCount - 1 },
+      end: { row: this.conditional_format_rows, col: this.colCount - 1 },
     };
-    const amountColumn = String.fromCharCode("A".charCodeAt(0) + COL.amount);
+    const amount_column = String.fromCharCode("A".charCodeAt(0) + COL.amount);
     this.grid.setConditionalFormats([
       {
         range,
-        when: { kind: "formula", source: `=$${amountColumn}1>${CONDITIONAL_AMOUNT_THRESHOLD}` },
+        when: { kind: "formula", source: `=$${amount_column}1>${CONDITIONAL_AMOUNT_THRESHOLD}` },
         style: { backgroundColor: CONDITIONAL_HIGH_BACKGROUND },
       },
       {
         range,
-        when: { kind: "formula", source: `=$${amountColumn}1<=${CONDITIONAL_AMOUNT_THRESHOLD}` },
+        when: { kind: "formula", source: `=$${amount_column}1<=${CONDITIONAL_AMOUNT_THRESHOLD}` },
         style: { color: CONDITIONAL_LOW_COLOR },
       },
       {
@@ -746,15 +749,15 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   clearConditionalFormats(): void {
-    if (this.conditionalFormatRows === 0) return;
-    this.conditionalFormatRows = 0;
+    if (this.conditional_format_rows === 0) return;
+    this.conditional_format_rows = 0;
     this.grid.setConditionalFormats([]);
   }
 
   installCurrencyFormat(): void {
     const column = this.sheet().columns[COL.amount];
     if (!column) throw new RangeError("benchmark sheet is missing the amount column");
-    this.applyAmountColumnFormat(
+    this.apply_amount_column_format(
       { type: "currency", numberFormat: CURRENCY_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
       column.width,
     );
@@ -763,7 +766,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   clearCurrencyFormat(): void {
     const column = this.sheet().columns[COL.amount];
     if (!column) throw new RangeError("benchmark sheet is missing the amount column");
-    this.applyAmountColumnFormat(
+    this.apply_amount_column_format(
       { type: "number", numberFormat: AMOUNT_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
       column.width,
     );
@@ -773,7 +776,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * Paint reads a layout snapshot taken from the sheet, so the unchanged width is
    * re-applied to rebuild that snapshot for the new format.
    */
-  private applyAmountColumnFormat(patch: Partial<Column>, width: number): void {
+  private apply_amount_column_format(patch: Partial<Column>, width: number): void {
     this.grid.store.applyTransaction({
       patches: [{ op: "setColumn", sheet: SHEET, col: COL.amount, patch }],
     });
@@ -844,27 +847,27 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     if (!this.windowTransferDiagnostic) {
       throw new Error("window-transfer mode requires benchmark diagnostic configuration");
     }
-    if (mode === "reuse-decoded-view-upper-bound" && !this.priorDecodedView) {
-      this.windowReadDiagnosticMode = "baseline";
+    if (mode === "reuse-decoded-view-upper-bound" && !this.prior_decoded_view) {
+      this.window_read_diagnostic_mode = "baseline";
       this.grid.store.getVisibleWindow(
         SHEET,
         { start: 0, end: Math.min(32, this.initialRowCount) },
         Array.from({ length: this.colCount }, (_, column) => column),
       );
     }
-    this.windowReadDiagnosticMode = mode;
+    this.window_read_diagnostic_mode = mode;
   }
 
   resetWindowTransferCounters(): void {
-    this.windowTransferCountersState.logicalFrames = 0;
-    this.windowTransferCountersState.windowReadRequests = 0;
-    this.windowTransferCountersState.logicalWindowReads = 0;
-    this.windowTransferCountersState.copiedBytes = 0;
-    this.windowTransferCountersState.outputAllocationEvents = 0;
+    this.window_transfer_counters_state.logicalFrames = 0;
+    this.window_transfer_counters_state.windowReadRequests = 0;
+    this.window_transfer_counters_state.logicalWindowReads = 0;
+    this.window_transfer_counters_state.copiedBytes = 0;
+    this.window_transfer_counters_state.outputAllocationEvents = 0;
   }
 
   windowTransferCounters(): WindowTransferCounters {
-    return { ...this.windowTransferCountersState };
+    return { ...this.window_transfer_counters_state };
   }
 
   destroy(): void {
@@ -880,8 +883,8 @@ class HandsontableAdapter implements RenderBenchAdapter {
   private host!: HTMLElement;
   private readonly data: CellValue[][];
   private readonly dataset: ColumnarDataset;
-  private formulaDenseRows = 0;
-  private textHeavyRows = 0;
+  private formula_dense_rows = 0;
+  private text_heavy_rows = 0;
 
   constructor(dataset: ColumnarDataset) {
     this.dataset = dataset;
@@ -960,14 +963,14 @@ class HandsontableAdapter implements RenderBenchAdapter {
     return this.hot.getActiveEditor()?.isOpened() ?? false;
   }
 
-  private scrollElement(): HTMLElement {
+  private scroll_element(): HTMLElement {
     const element = this.host.querySelector<HTMLElement>(".ht_master .wtHolder");
     if (!element) throw new Error("Handsontable scroller is not mounted");
     return element;
   }
 
   prepareScroll(axis: "top" | "left", startMiddle: boolean): void {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
     element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
     element.dispatchEvent(new Event("scroll"));
@@ -975,7 +978,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   scrollBy(axis: "top" | "left", pixels: number): void {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     if (axis === "top") element.scrollTop += pixels;
     else element.scrollLeft += pixels;
     element.dispatchEvent(new Event("scroll"));
@@ -983,7 +986,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   scrollObservation(): ScrollObservation {
-    const element = this.scrollElement();
+    const element = this.scroll_element();
     return {
       top: element.scrollTop,
       left: element.scrollLeft,
@@ -1021,15 +1024,15 @@ class HandsontableAdapter implements RenderBenchAdapter {
 
   moveSelection(direction: "down" | "right"): void {
     const selection = this.hot.getSelectedLast();
-    const selectedRow = selection?.[0];
-    const selectedCol = selection?.[1];
-    if (selectedRow === undefined || selectedCol === undefined) {
+    const selected_row = selection?.[0];
+    const selected_col = selection?.[1];
+    if (selected_row === undefined || selected_col === undefined) {
       throw new Error("Handsontable has no active selection");
     }
     const row =
-      direction === "down" ? Math.min(this.hot.countRows() - 1, selectedRow + 1) : selectedRow;
+      direction === "down" ? Math.min(this.hot.countRows() - 1, selected_row + 1) : selected_row;
     const col =
-      direction === "right" ? Math.min(this.hot.countCols() - 1, selectedCol + 1) : selectedCol;
+      direction === "right" ? Math.min(this.hot.countCols() - 1, selected_col + 1) : selected_col;
     this.hot.selectCell(row, col);
   }
 
@@ -1058,8 +1061,8 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   installFormulaDense(): void {
-    this.formulaDenseRows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
-    for (let row = 1; row <= this.formulaDenseRows; row++) {
+    this.formula_dense_rows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
+    for (let row = 1; row <= this.formula_dense_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         this.data[row]![col] = `=A${row + 1}+${col}`;
       }
@@ -1068,18 +1071,18 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   clearFormulaDense(): void {
-    for (let row = 1; row <= this.formulaDenseRows; row++) {
+    for (let row = 1; row <= this.formula_dense_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
-        this.data[row]![col] = datasetValueAt(this.dataset, row, col);
+        this.data[row]![col] = dataset_value_at(this.dataset, row, col);
       }
     }
-    this.formulaDenseRows = 0;
+    this.formula_dense_rows = 0;
     this.hot.render();
   }
 
   installTextHeavy(rowCount: number): void {
-    this.textHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
-    for (let row = 1; row <= this.textHeavyRows; row++) {
+    this.text_heavy_rows = Math.min(rowCount, this.initialRowCount - 1);
+    for (let row = 1; row <= this.text_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
         this.data[row]![col] = `diagnostic-long-${row}-${col}-${LONG_TEXT_SUFFIX}`;
       }
@@ -1088,12 +1091,12 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   clearTextHeavy(): void {
-    for (let row = 1; row <= this.textHeavyRows; row++) {
+    for (let row = 1; row <= this.text_heavy_rows; row++) {
       for (let col = 1; col < this.colCount; col++) {
-        this.data[row]![col] = datasetValueAt(this.dataset, row, col);
+        this.data[row]![col] = dataset_value_at(this.dataset, row, col);
       }
     }
-    this.textHeavyRows = 0;
+    this.text_heavy_rows = 0;
     this.hot.render();
   }
 
@@ -1148,16 +1151,16 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 }
 
-const statusElement = document.getElementById("status");
-const resultsElement = document.getElementById("results");
-const stageElement = document.getElementById("stage");
+const status_element = document.getElementById("status");
+const results_element = document.getElementById("results");
+const stage_element = document.getElementById("stage");
 
-function setStatus(text: string): void {
-  if (statusElement) statusElement.textContent = text;
+function set_status(text: string): void {
+  if (status_element) status_element.textContent = text;
 }
 
-function renderResults(result: BrowserCombinationResult): void {
-  if (!resultsElement) return;
+function render_results(result: BrowserCombinationResult): void {
+  if (!results_element) return;
   const lines = [
     `run: ${result.runId}`,
     `engine: ${result.engine} · rows: ${result.rows.toLocaleString("en-US")} · round: ${result.round}`,
@@ -1173,10 +1176,10 @@ function renderResults(result: BrowserCombinationResult): void {
       );
     }
   }
-  resultsElement.textContent = lines.join("\n");
+  results_element.textContent = lines.join("\n");
 }
 
-function teardownFailures(results: readonly ScenarioResult[], error: unknown): ScenarioResult[] {
+function teardown_failures(results: readonly ScenarioResult[], error: unknown): ScenarioResult[] {
   const normalized = error instanceof Error ? error : new Error(String(error));
   return results.map((result): FailedScenario => ({
     runId: result.runId,
@@ -1201,29 +1204,29 @@ function teardownFailures(results: readonly ScenarioResult[], error: unknown): S
 }
 
 async function run(configuration: PageConfiguration): Promise<void> {
-  if (!stageElement) throw new Error("benchmark page is missing #stage");
+  if (!stage_element) throw new Error("benchmark page is missing #stage");
   window.__benchStage = "build";
-  setStatus(`building ${configuration.rows.toLocaleString("en-US")}-row dataset`);
-  await nextFrame();
+  set_status(`building ${configuration.rows.toLocaleString("en-US")}-row dataset`);
+  await next_frame();
   if (configuration.engine === "sheetwrite") await initSheetwrite();
   const dataset = makeColumnar(configuration.rows);
   const hash = datasetChecksum(dataset);
 
-  stageElement.replaceChildren();
+  stage_element.replaceChildren();
   const host = document.createElement("div");
   host.style.width = `${RENDER_VIEWPORT.width}px`;
   host.style.height = `${RENDER_VIEWPORT.height}px`;
   host.tabIndex = 0;
   host.setAttribute("role", "application");
   host.setAttribute("aria-label", `${configuration.engine} benchmark grid`);
-  stageElement.appendChild(host);
+  stage_element.appendChild(host);
 
   let adapter: RenderBenchAdapter =
     configuration.engine === "sheetwrite"
       ? new SheetwriteAdapter(dataset, configuration.windowTransferDiagnostic)
       : new HandsontableAdapter(dataset);
   window.__benchStage = "mount";
-  setStatus(`mounting ${configuration.engine}`);
+  set_status(`mounting ${configuration.engine}`);
   adapter.mount(host);
   await settle();
 
@@ -1239,9 +1242,9 @@ async function run(configuration: PageConfiguration): Promise<void> {
   window.__benchResults = output;
 
   const results: ScenarioResult[] = [];
-  for (const scenarioId of configuration.scenarios) {
-    setStatus(`running ${scenarioId}`);
-    const result = runRenderScenario(adapter, dataset, scenarioId, {
+  for (const scenario_id of configuration.scenarios) {
+    set_status(`running ${scenario_id}`);
+    const result = runRenderScenario(adapter, dataset, scenario_id, {
       runId: configuration.runId,
       round: configuration.round,
       warmupSamples: configuration.warmupSamples,
@@ -1254,14 +1257,14 @@ async function run(configuration: PageConfiguration): Promise<void> {
     results.push(result);
     output = { ...output, results: [...results] };
     window.__benchResults = output;
-    renderResults(output);
+    render_results(output);
     await settle();
     if (result.status === "failed") {
       // A failed scenario can leak mutated document state (e.g. rows it never
       // rolled back). Rebuild the fixture so later scenarios validate against
       // the canonical document instead of cascading the wreckage into
       // spurious failures.
-      setStatus(`rebuilding ${configuration.engine} after ${scenarioId} failure`);
+      set_status(`rebuilding ${configuration.engine} after ${scenario_id} failure`);
       try {
         adapter.destroy();
       } catch {
@@ -1282,80 +1285,80 @@ async function run(configuration: PageConfiguration): Promise<void> {
   try {
     adapter.destroy();
   } catch (error) {
-    output = { ...output, results: teardownFailures(results, error) };
+    output = { ...output, results: teardown_failures(results, error) };
     window.__benchResults = output;
   }
   window.__benchStage = "complete";
   window.__benchDone = true;
-  renderResults(output);
-  setStatus(`done — ${configuration.engine} @ ${configuration.rows.toLocaleString("en-US")} rows`);
+  render_results(output);
+  set_status(`done — ${configuration.engine} @ ${configuration.rows.toLocaleString("en-US")} rows`);
   console.log("[render-bench]", JSON.stringify(output));
 }
 
-function positiveInteger(value: string | null, fallback: number): number {
+function positive_integer(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function nonNegativeInteger(value: string | null, fallback: number): number {
+function non_negative_integer(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function readConfiguration(params: URLSearchParams): PageConfiguration {
+function read_configuration(params: URLSearchParams): PageConfiguration {
   const engine = params.get("engine") === "handsontable" ? "handsontable" : "sheetwrite";
-  const runId = params.get("runId");
-  if (!runId) throw new Error("render benchmark requires a runId");
-  const requestedScenarios =
+  const run_id = params.get("runId");
+  if (!run_id) throw new Error("render benchmark requires a runId");
+  const requested_scenarios =
     params.get("scenarios")?.split(",") ?? RENDER_SCENARIOS.map((scenario) => scenario.id);
   if (
-    requestedScenarios.length === 0 ||
-    new Set(requestedScenarios).size !== requestedScenarios.length
+    requested_scenarios.length === 0 ||
+    new Set(requested_scenarios).size !== requested_scenarios.length
   ) {
     throw new Error("render benchmark scenarios must be non-empty and unique");
   }
-  for (const scenarioId of requestedScenarios) {
-    if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
-      throw new Error(`unknown render benchmark scenario: ${scenarioId}`);
+  for (const scenario_id of requested_scenarios) {
+    if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenario_id)) {
+      throw new Error(`unknown render benchmark scenario: ${scenario_id}`);
     }
   }
   const diagnostic = params.get("diagnostic");
   if (diagnostic !== null && diagnostic !== "window-transfer") {
     throw new Error("unknown render benchmark diagnostic configuration");
   }
-  const windowTransferDiagnostic = diagnostic === "window-transfer";
-  const requestedWindowTransferScenarios = requestedScenarios.filter((scenario) =>
+  const window_transfer_diagnostic = diagnostic === "window-transfer";
+  const requested_window_transfer_scenarios = requested_scenarios.filter((scenario) =>
     WINDOW_TRANSFER_SCENARIO_IDS.includes(
       scenario as (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number],
     ),
   );
   if (
-    requestedWindowTransferScenarios.length > 0 &&
-    (!windowTransferDiagnostic ||
+    requested_window_transfer_scenarios.length > 0 &&
+    (!window_transfer_diagnostic ||
       engine !== "sheetwrite" ||
-      requestedWindowTransferScenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
-      !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => requestedScenarios.includes(scenario)))
+      requested_window_transfer_scenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
+      !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => requested_scenarios.includes(scenario)))
   ) {
     throw new Error(
       "window-transfer scenarios require the complete sheetwrite benchmark diagnostic pair",
     );
   }
-  if (windowTransferDiagnostic && requestedWindowTransferScenarios.length === 0) {
+  if (window_transfer_diagnostic && requested_window_transfer_scenarios.length === 0) {
     throw new Error("window-transfer diagnostic configuration requires its scenario pair");
   }
   return {
     engine,
-    scenarios: requestedScenarios as ScenarioId[],
-    rows: positiveInteger(params.get("rows"), 100_000),
-    measuredSamples: positiveInteger(params.get("samples"), 3),
-    warmupSamples: nonNegativeInteger(params.get("warmups"), 1),
+    scenarios: requested_scenarios as ScenarioId[],
+    rows: positive_integer(params.get("rows"), 100_000),
+    measuredSamples: positive_integer(params.get("samples"), 3),
+    warmupSamples: non_negative_integer(params.get("warmups"), 1),
     minimumSampleDurationMs: Math.max(
       RENDER_MINIMUM_SAMPLE_MS,
-      positiveInteger(params.get("minimumSampleMs"), RENDER_MINIMUM_SAMPLE_MS),
+      positive_integer(params.get("minimumSampleMs"), RENDER_MINIMUM_SAMPLE_MS),
     ),
-    runId,
-    round: positiveInteger(params.get("round"), 1),
-    windowTransferDiagnostic,
+    runId: run_id,
+    round: positive_integer(params.get("round"), 1),
+    windowTransferDiagnostic: window_transfer_diagnostic,
   };
 }
 
@@ -1365,25 +1368,25 @@ async function boot(): Promise<void> {
   delete window.__benchStage;
   window.__benchDone = false;
   const params = new URLSearchParams(location.search);
-  const runButton = document.getElementById("run");
+  const run_button = document.getElementById("run");
   const launch = async (): Promise<void> => {
     delete window.__benchResults;
     delete window.__benchError;
     window.__benchDone = false;
     try {
-      await run(readConfiguration(params));
+      await run(read_configuration(params));
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error));
       window.__benchError = normalized.message;
       window.__benchDone = true;
-      setStatus(`error: ${normalized.message}`);
-      if (resultsElement)
-        resultsElement.textContent = `${normalized.name}: ${normalized.message}\n${normalized.stack ?? ""}`;
+      set_status(`error: ${normalized.message}`);
+      if (results_element)
+        results_element.textContent = `${normalized.name}: ${normalized.message}\n${normalized.stack ?? ""}`;
     }
   };
-  runButton?.addEventListener("click", () => void launch());
+  run_button?.addEventListener("click", () => void launch());
   if (params.get("auto") === "1") await launch();
-  else setStatus("ready — automated runs must provide runId and auto=1");
+  else set_status("ready — automated runs must provide runId and auto=1");
 }
 
 void boot();

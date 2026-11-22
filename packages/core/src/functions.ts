@@ -40,7 +40,7 @@ export type {
 /** Registries by engine, so a store that never registers a function holds none. */
 const registries = new WeakMap<StoreDataEngine, HostFunctionRegistry>();
 
-function engineOf(store: Store): StoreDataEngine {
+function engine_of(store: Store): StoreDataEngine {
   const engine = storeEngine(store);
   if (engine === null) {
     throw invalidFunction("Host functions need a SheetwriteStore", "");
@@ -49,7 +49,7 @@ function engineOf(store: Store): StoreDataEngine {
   return engine;
 }
 
-function registryOf(engine: StoreDataEngine): HostFunctionRegistry | undefined {
+function registry_of(engine: StoreDataEngine): HostFunctionRegistry | undefined {
   const registry = registries.get(engine);
   registry?.assertIdle();
 
@@ -65,11 +65,11 @@ export interface FormulaFunctionDefinition {
 }
 
 /** Register `functions` on the store of a new grid, then recalculate once. */
-function registerFunctions(store: Store, functions: readonly FormulaFunctionDefinition[]): void {
+function register_functions(store: Store, functions: readonly FormulaFunctionDefinition[]): void {
   if (functions.length === 0) return;
 
-  const engine = engineOf(store);
-  let registry = registryOf(engine);
+  const engine = engine_of(store);
+  let registry = registry_of(engine);
   if (registry === undefined) {
     registry = new HostFunctionRegistry();
     engine.installHostFunctions(registry);
@@ -137,7 +137,7 @@ export function functionsAddon(
   return {
     name: "functions",
     grid({ grid, settings }) {
-      registerFunctions(grid.store, [...functions, ...(settings ?? [])]);
+      register_functions(grid.store, [...functions, ...(settings ?? [])]);
     },
   };
 }
@@ -152,7 +152,7 @@ export function functionsAddon(
  */
 export async function listFunctions(store: Store): Promise<readonly FormulaFunctionMetadata[]> {
   // Only a SheetwriteStore has an engine; for any other store this throws.
-  engineOf(store);
+  engine_of(store);
 
   return storeFunctions(store);
 }

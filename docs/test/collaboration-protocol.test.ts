@@ -26,7 +26,7 @@ afterEach(() => {
   while (cleanups.length > 0) cleanups.pop()?.();
 });
 
-function pointsEdit(row: number, value: number) {
+function points_edit(row: number, value: number) {
   return {
     op: "set" as const,
     addr: { sheet: "plan", row, col: 2 },
@@ -34,12 +34,12 @@ function pointsEdit(row: number, value: number) {
   };
 }
 
-function commitRequest(clientMutationId: string, rows: readonly number[]) {
+function commit_request(client_mutation_id: string, rows: readonly number[]) {
   return {
     documentId: COLLABORATION_DOCUMENT_ID,
     baseVersion: 0,
-    clientMutationId,
-    operations: rows.map((row) => pointsEdit(row, 12)),
+    clientMutationId: client_mutation_id,
+    operations: rows.map((row) => points_edit(row, 12)),
   };
 }
 
@@ -49,12 +49,12 @@ describe("showcase collaboration server", () => {
     const records: ShowcaseCommitRecord[] = [];
     cleanups.push(server.observeCommits((record) => records.push(record)));
 
-    expect(await server.commit(commitRequest("unit-m1", [0]))).toMatchObject({
+    expect(await server.commit(commit_request("unit-m1", [0]))).toMatchObject({
       status: "applied",
       version: 1,
     });
-    expect((await server.commit(commitRequest("unit-m1", [0]))).status).toBe("duplicate");
-    expect((await server.commit(commitRequest("unit-m2", [1]))).status).toBe("conflict");
+    expect((await server.commit(commit_request("unit-m1", [0]))).status).toBe("duplicate");
+    expect((await server.commit(commit_request("unit-m2", [1]))).status).toBe("conflict");
     expect(records.map(({ status, version }) => [status, version])).toEqual([
       ["applied", 1],
       ["duplicate", 1],
@@ -70,7 +70,7 @@ describe("showcase collaboration server", () => {
     const statuses: string[] = [];
     cleanups.push(server.subscribe((operation) => broadcasts.push(operation)));
     cleanups.push(server.observeCommits((record) => statuses.push(record.status)));
-    const request = { ...commitRequest("batch-m1", [0, 1]), versionOperationCounts: [1, 1] };
+    const request = { ...commit_request("batch-m1", [0, 1]), versionOperationCounts: [1, 1] };
 
     expect(await link.commitBatch(request)).toMatchObject({ status: "applied", version: 2 });
     expect(await link.commitBatch(request)).toMatchObject({ status: "duplicate", version: 2 });
@@ -91,7 +91,7 @@ describe("showcase network link", () => {
     const link = new ShowcaseNetworkLink(server);
     cleanups.push(() => link.destroy());
     const edit = (row: number) =>
-      server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(row, 12)]);
+      server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [points_edit(row, 12)]);
     const unsubscribe = link.subscribe(() => {});
     await edit(0); // v1, delivered to the old subscriber
     link.setConnected(false);

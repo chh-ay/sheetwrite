@@ -15,7 +15,7 @@ import {
 } from "./workbook-fixtures.js";
 
 /** A source sheet with A1 "Report" and the extra worksheet parts, beside an empty destination sheet. */
-function authoredVector(
+function authored_vector(
   options: { worksheetExtra?: string; target?: string; external?: boolean } = {},
 ): Uint8Array {
   return rawXlsx({
@@ -36,7 +36,7 @@ function authoredVector(
   });
 }
 
-function sourceSnapshot(): WorkbookSnapshot {
+function source_snapshot(): WorkbookSnapshot {
   return book([
     sheet(
       "source",
@@ -78,14 +78,14 @@ function sourceSnapshot(): WorkbookSnapshot {
 
 describe("XLSX hyperlink and conditional-format fidelity", () => {
   it("exports hyperlink appearance into native cell styles without relying on metadata", async () => {
-    const source = sourceSnapshot();
+    const source = source_snapshot();
     const first = sheetAt(source);
     const [column] = first.columns;
     const cells = first.cells[0];
-    const internalCell = cells?.cells[1];
-    if (!column || !cells || !internalCell) throw new Error("the source sheet lost its cells");
+    const internal_cell = cells?.cells[1];
+    if (!column || !cells || !internal_cell) throw new Error("the source sheet lost its cells");
     column.cellStyle = { bold: true, color: "#ABCDEF" };
-    internalCell.style = { color: "#654321", underline: false };
+    internal_cell.style = { color: "#654321", underline: false };
     cells.cells.push({ rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "Default" } });
     first.hyperlinks?.push({
       id: "default-link",
@@ -129,7 +129,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     ['ref="A1" r:id="rId1" display=""', ""],
   ])("uses cell text only when hyperlink display is omitted: %s", async (attributes, display) => {
     const imported = await backend.fromXlsxWorkbook(
-      authoredVector({
+      authored_vector({
         worksheetExtra: `<hyperlinks><hyperlink ${attributes}/></hyperlinks>`,
         target: "https://example.com/report",
       }),
@@ -140,13 +140,13 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("round-trips external relationships, stable internal targets, display/style, formula, and stop", async () => {
-    const source = sourceSnapshot();
+    const source = source_snapshot();
     const bytes = await backend.toXlsxWorkbook(source);
-    const sheetXml = partText(bytes, "xl/worksheets/sheet1.xml");
-    expect(sheetXml).toContain('<hyperlink ref="A1" r:id="rId1" display="Report"/>');
-    expect(sheetXml).toContain('location="&apos;Destination Sheet&apos;!B2"');
-    expect(sheetXml).toContain('type="expression"');
-    expect(sheetXml).toContain('stopIfTrue="1"');
+    const sheet_xml = partText(bytes, "xl/worksheets/sheet1.xml");
+    expect(sheet_xml).toContain('<hyperlink ref="A1" r:id="rId1" display="Report"/>');
+    expect(sheet_xml).toContain('location="&apos;Destination Sheet&apos;!B2"');
+    expect(sheet_xml).toContain('type="expression"');
+    expect(sheet_xml).toContain('stopIfTrue="1"');
     expect(partText(bytes, "xl/worksheets/_rels/sheet1.xml.rels")).toContain(
       'Target="https://example.com/report?q=1" TargetMode="External"',
     );
@@ -157,21 +157,21 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("drops unsafe external schemes with a warning and rejects traversing internal targets", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      authoredVector({
+      authored_vector({
         worksheetExtra:
           '<hyperlinks><hyperlink ref="A1" r:id="rId1" display="Unsafe"/></hyperlinks>',
         target: "javascript:alert(1)",
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(sheetAt(imported).hyperlinks ?? []).toEqual([]);
     expect(warnings).toContainEqual(
       expect.objectContaining({ code: "hyperlink", sheet: "Source", cell: "A1" }),
     );
 
-    const traversal = authoredVector({
+    const traversal = authored_vector({
       worksheetExtra: '<hyperlinks><hyperlink ref="A1" r:id="rId1"/></hyperlinks>',
       target: "../../../escape.xml",
       external: false,
@@ -182,17 +182,17 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("emits exact per-kind warnings and keeps only the bounded 32-rule prefix", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const rules = Array.from(
       { length: 33 },
       (_, index) =>
         `<conditionalFormatting sqref="A1"><cfRule type="expression" priority="${index + 10}"><formula>TRUE</formula></cfRule></conditionalFormatting>`,
     ).join("");
     const imported = await backend.fromXlsxWorkbook(
-      authoredVector({
+      authored_vector({
         worksheetExtra: `<conditionalFormatting sqref="A1"><cfRule type="colorScale" priority="2"><colorScale/></cfRule></conditionalFormatting><conditionalFormatting sqref="A1"><cfRule type="dataBar" priority="3"><dataBar/></cfRule></conditionalFormatting>${rules}`,
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(sheetAt(imported).conditionalFormats).toHaveLength(32);
     expect(
@@ -201,7 +201,7 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
   });
 
   it("drops malformed, unsafe, and over-budget conditional rules independently", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const rules = [
       '<cfRule type="cellIs" priority="-1" operator="equal"><formula>1</formula></cfRule>',
       '<cfRule type="cellIs" priority="2" operator="between"><formula>1</formula></cfRule>',
@@ -211,10 +211,10 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
       '<cfRule type="containsBlanks" priority="6" dxfId="999"/>',
     ].join("");
     const imported = await backend.fromXlsxWorkbook(
-      authoredVector({
+      authored_vector({
         worksheetExtra: `<conditionalFormatting sqref="A1">${rules}</conditionalFormatting>`,
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(sheetAt(imported).conditionalFormats).toBeUndefined();
     expect(

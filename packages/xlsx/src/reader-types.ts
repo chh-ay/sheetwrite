@@ -52,11 +52,11 @@ export class CellStyleIndices {
 
   /** A recorded style index; never substitute a different style for a missing record. */
   at(cellIndex: number): number {
-    const styleIndex = this.#indices[cellIndex];
-    if (styleIndex === undefined || cellIndex >= this.#length) {
+    const style_index = this.#indices[cellIndex];
+    if (style_index === undefined || cellIndex >= this.#length) {
       throw new RangeError(`Sheetwrite: XLSX cell style record ${cellIndex} is out of range`);
     }
-    return styleIndex;
+    return style_index;
   }
 }
 

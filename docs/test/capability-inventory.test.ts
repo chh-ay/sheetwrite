@@ -14,7 +14,7 @@ import {
 // cases prove they reject each kind of broken entry instead of passing it.
 
 /** The inventory with one capability's fields replaced. */
-function withCapability(id: string, change: Partial<Capability>): Capability[] {
+function with_capability(id: string, change: Partial<Capability>): Capability[] {
   return CAPABILITY_INVENTORY.map((capability) =>
     capability.id === id ? { ...capability, ...change } : capability,
   );
@@ -48,8 +48,8 @@ it.each([
     "declared twice",
   ],
 ] as const)("rejects %s", (_case, change, issue) => {
-  const capabilityId = "testPath" in change ? "editing.cell-edit" : "collab.presence";
-  const issues = collectCapabilityIssues(withCapability(capabilityId, change), CAPABILITY_OWNERS);
+  const capability_id = "testPath" in change ? "editing.cell-edit" : "collab.presence";
+  const issues = collectCapabilityIssues(with_capability(capability_id, change), CAPABILITY_OWNERS);
   expect(issues.join("\n")).toContain(issue);
 });
 

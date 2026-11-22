@@ -43,7 +43,7 @@ const PROOF_LINKS = [
   { href: "/showcases/collaboration/", label: "Collaboration" },
 ];
 
-function rendererLabel(kind: RenderingMode): string {
+function renderer_label(kind: RenderingMode): string {
   return kind === "worker" ? "Web Worker" : "Main thread";
 }
 
@@ -56,7 +56,7 @@ const money = new Intl.NumberFormat("en-US", {
 });
 
 /** The construction options in the page URL; defaults stay out of it. */
-function readSpec(): { renderer: RenderingMode; data: WorkbenchDataMode } {
+function read_spec(): { renderer: RenderingMode; data: WorkbenchDataMode } {
   const search = new URLSearchParams(window.location.search);
   return {
     renderer: search.get("renderer") === "worker" ? "worker" : "canvas",
@@ -64,7 +64,7 @@ function readSpec(): { renderer: RenderingMode; data: WorkbenchDataMode } {
   };
 }
 
-function writeSpec(spec: { renderer: RenderingMode; data: WorkbenchDataMode }): void {
+function write_spec(spec: { renderer: RenderingMode; data: WorkbenchDataMode }): void {
   const url = new URL(window.location.href);
   url.search = "";
   if (spec.renderer === "worker") url.searchParams.set("renderer", "worker");
@@ -83,57 +83,57 @@ function writeSpec(spec: { renderer: RenderingMode; data: WorkbenchDataMode }): 
  */
 export function VanillaWorkbench(props: VanillaWorkbenchProps) {
   let host!: HTMLDivElement;
-  let fileInput!: HTMLInputElement;
+  let file_input!: HTMLInputElement;
   const tabs: HTMLButtonElement[] = [];
   let workbench: Workbench | null = null;
-  let readOnlyNow = false;
+  let read_only_now = false;
 
-  const [ready, setReady] = createSignal(false);
-  const [renderer, setRenderer] = createSignal<RenderingMode>("canvas");
-  const [data, setData] = createSignal<WorkbenchDataMode>("columnar");
-  const [alive, setAlive] = createSignal(true);
-  const [phase, setPhase] = createSignal<Phase>("booting");
-  const [generation, setGeneration] = createSignal(0);
-  const [resetCount, setResetCount] = createSignal(0);
-  const [imported, setImported] = createSignal<ImportedDocument | null>(null);
-  const [readOnly, setReadOnly] = createSignal(false);
-  const [selection, setSelection] = createSignal("No active cell");
-  const [bootError, setBootError] = createSignal<string | null>(null);
-  const [rendererState, setRendererState] = createSignal<RendererState | null>(null);
-  const [fallbackCount, setFallbackCount] = createSignal(0);
-  const [pagedStats, setPagedStats] = createSignal<PagedStoreStats | null>(null);
-  const [activity, setActivity] = createSignal<string | null>(null);
-  const [scenario, setScenario] = createSignal<WorkbenchScenario>("lifecycle");
-  const exportAction = useAction();
-  const importAction = useAction();
+  const [ready, set_ready] = createSignal(false);
+  const [renderer, set_renderer] = createSignal<RenderingMode>("canvas");
+  const [data, set_data] = createSignal<WorkbenchDataMode>("columnar");
+  const [alive, set_alive] = createSignal(true);
+  const [phase, set_phase] = createSignal<Phase>("booting");
+  const [generation, set_generation] = createSignal(0);
+  const [reset_count, set_reset_count] = createSignal(0);
+  const [imported, set_imported] = createSignal<ImportedDocument | null>(null);
+  const [read_only, set_read_only] = createSignal(false);
+  const [selection, set_selection] = createSignal("No active cell");
+  const [boot_error, set_boot_error] = createSignal<string | null>(null);
+  const [renderer_state, set_renderer_state] = createSignal<RendererState | null>(null);
+  const [fallback_count, set_fallback_count] = createSignal(0);
+  const [paged_stats, set_paged_stats] = createSignal<PagedStoreStats | null>(null);
+  const [activity, set_activity] = createSignal<string | null>(null);
+  const [scenario, set_scenario] = createSignal<WorkbenchScenario>("lifecycle");
+  const export_action = useAction();
+  const import_action = useAction();
 
   onMount(() => {
-    const spec = readSpec();
-    setRenderer(spec.renderer);
-    setData(spec.data);
-    if (spec.data === "paged") setScenario("paged");
-    setReady(true);
+    const spec = read_spec();
+    set_renderer(spec.renderer);
+    set_data(spec.data);
+    if (spec.data === "paged") set_scenario("paged");
+    set_ready(true);
   });
 
-  const changeSpec = (next: { renderer: RenderingMode; data: WorkbenchDataMode }) => {
-    setRenderer(next.renderer);
-    setData(next.data);
-    writeSpec(next);
+  const change_spec = (next: { renderer: RenderingMode; data: WorkbenchDataMode }) => {
+    set_renderer(next.renderer);
+    set_data(next.data);
+    write_spec(next);
   };
 
   // Reset is destroy + create of a fresh generation, not a state patch:
-  // `resetCount` re-runs this effect with unchanged options.
+  // `reset_count` re-runs this effect with unchanged options.
   createEffect(
     on(
-      [ready, alive, renderer, data, imported, resetCount],
-      ([isReady, isAlive, kind, mode, doc]) => {
-        if (!isReady || !isAlive) return;
+      [ready, alive, renderer, data, imported, reset_count],
+      ([is_ready, is_alive, kind, mode, doc]) => {
+        if (!is_ready || !is_alive) return;
         let cancelled = false;
         let created: Workbench | null = null;
-        setPhase("booting");
-        setBootError(null);
-        setFallbackCount(0);
-        setSelection("No active cell");
+        set_phase("booting");
+        set_boot_error(null);
+        set_fallback_count(0);
+        set_selection("No active cell");
         void import("./boot.js")
           .then(async (engine) => {
             await engine.initSheetwrite();
@@ -142,21 +142,21 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
               host,
               { renderer: kind, data: mode, ...(doc === null ? {} : { snapshot: doc.snapshot }) },
               {
-                onActivity: setActivity,
-                onSelectionChange: (next) => setSelection(selectionLabel(next, "No active cell")),
+                onActivity: set_activity,
+                onSelectionChange: (next) => set_selection(selectionLabel(next, "No active cell")),
                 onRendererChange: (state) => {
-                  setRendererState(state);
-                  if (state.fallback !== null) setFallbackCount((count) => count + 1);
+                  set_renderer_state(state);
+                  if (state.fallback !== null) set_fallback_count((count) => count + 1);
                 },
-                onPagedStats: setPagedStats,
+                onPagedStats: set_paged_stats,
               },
             );
-            next.setReadOnly(readOnlyNow);
+            next.setReadOnly(read_only_now);
             created = next;
             workbench = next;
-            setPhase("live");
-            setGeneration((count) => count + 1);
-            setActivity(
+            set_phase("live");
+            set_generation((count) => count + 1);
+            set_activity(
               doc === null
                 ? `Grid created — ${props.rows.toLocaleString()} rows, ${mode === "paged" ? "paged host source" : "dense columnar data"}`
                 : `Grid created from ${doc.label}`,
@@ -164,25 +164,25 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
           })
           .catch(async (error: unknown) => {
             if (cancelled) return;
-            const { describeActionError } = await import("./boot.js");
-            const message = describeActionError(error);
-            setPhase("failed");
-            setBootError(message);
-            setActivity(`Grid failed to boot: ${message}`);
+            const { describeActionError: describe_action_error } = await import("./boot.js");
+            const message = describe_action_error(error);
+            set_phase("failed");
+            set_boot_error(message);
+            set_activity(`Grid failed to boot: ${message}`);
           });
         onCleanup(() => {
           cancelled = true;
           created?.destroy();
           workbench = null;
-          setPagedStats(null);
+          set_paged_stats(null);
         });
       },
     ),
   );
 
   onMount(() => {
-    void import("./boot.js").then(({ observeSiteTheme, ENGINE_THEME }) => {
-      const stop = observeSiteTheme(() => workbench?.grid.replaceTheme(ENGINE_THEME));
+    void import("./boot.js").then(({ observeSiteTheme: observe_site_theme, ENGINE_THEME }) => {
+      const stop = observe_site_theme(() => workbench?.grid.replaceTheme(ENGINE_THEME));
       onCleanup(stop);
     });
   });
@@ -193,36 +193,36 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
   const transitioning = () => phase() === "booting" || (alive() && phase() === "destroyed");
   // Only a live generation has a store and a paint loop; before that the
   // readout shows the requested options, never the previous generation.
-  const requested = () => (live() ? (rendererState()?.requested ?? renderer()) : renderer());
-  const activeLabel = () => {
+  const requested = () => (live() ? (renderer_state()?.requested ?? renderer()) : renderer());
+  const active_label = () => {
     if (!alive()) return "none";
-    return phase() === "live" ? rendererLabel(rendererState()?.active ?? renderer()) : "starting";
+    return phase() === "live" ? renderer_label(renderer_state()?.active ?? renderer()) : "starting";
   };
   /** Allocation stays partial until the host has served every page. */
-  const pagedState = (): "loading" | "partial" | "complete" => {
-    const stats = pagedStats();
+  const paged_state = (): "loading" | "partial" | "complete" => {
+    const stats = paged_stats();
     if (stats === null) return "loading";
     return stats.fullyLoaded ? "complete" : "partial";
   };
 
-  const changeRenderer = (next: RenderingMode) => {
+  const change_renderer = (next: RenderingMode) => {
     if (next === renderer()) return;
-    setActivity(
-      `Renderer is construction-bound — rebuilding on the ${rendererLabel(next).toLowerCase()}`,
+    set_activity(
+      `Renderer is construction-bound — rebuilding on the ${renderer_label(next).toLowerCase()}`,
     );
-    changeSpec({ renderer: next, data: data() });
+    change_spec({ renderer: next, data: data() });
   };
-  const changeData = (next: WorkbenchDataMode) => {
+  const change_data = (next: WorkbenchDataMode) => {
     if (next === data() && imported() === null) return;
-    setImported(null);
-    changeSpec({ renderer: renderer(), data: next });
+    set_imported(null);
+    change_spec({ renderer: renderer(), data: next });
   };
-  const selectScenario = (next: WorkbenchScenario) => {
-    setScenario(next);
-    if (next === "paged" && data() !== "paged") changeData("paged");
-    else if (next !== "paged" && data() === "paged") changeData("columnar");
+  const select_scenario = (next: WorkbenchScenario) => {
+    set_scenario(next);
+    if (next === "paged" && data() !== "paged") change_data("paged");
+    else if (next !== "paged" && data() === "paged") change_data("columnar");
   };
-  const onScenarioKeyDown = (event: KeyboardEvent, index: number) => {
+  const on_scenario_key_down = (event: KeyboardEvent, index: number) => {
     const count = WORKBENCH_SCENARIOS.length;
     const target =
       event.key === "ArrowRight"
@@ -238,69 +238,71 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
     event.preventDefault();
     const next = WORKBENCH_SCENARIOS[target];
     if (!next) return;
-    selectScenario(next.id);
+    select_scenario(next.id);
     tabs[target]?.focus();
   };
-  const toggleGrid = (event: MouseEvent) => {
+  const toggle_grid = (event: MouseEvent) => {
     // A double-click would destroy and then immediately re-create the grid.
     if (isRepeatClick(event) || transitioning()) return;
     if (!alive()) {
-      setAlive(true);
+      set_alive(true);
       return;
     }
-    setAlive(false);
-    setPhase("destroyed");
-    setActivity("Grid destroyed — no listeners, chrome, or canvas survive teardown");
+    set_alive(false);
+    set_phase("destroyed");
+    set_activity("Grid destroyed — no listeners, chrome, or canvas survive teardown");
   };
-  const toggleReadOnly = (next: boolean) => {
-    readOnlyNow = next;
-    setReadOnly(next);
+  const toggle_read_only = (next: boolean) => {
+    read_only_now = next;
+    set_read_only(next);
     workbench?.setReadOnly(next);
-    setActivity(next ? "Editing locked — a live option, no rebuild needed" : "Editing unlocked");
+    set_activity(next ? "Editing locked — a live option, no rebuild needed" : "Editing unlocked");
   };
-  const withGrid = (action: (current: Workbench, engine: typeof Engine) => void) => {
+  const with_grid = (action: (current: Workbench, engine: typeof Engine) => void) => {
     const current = workbench;
     if (current === null) return;
     void import("./boot.js").then((engine) => {
       try {
         action(current, engine);
       } catch (error) {
-        setActivity(engine.describeActionError(error));
+        set_activity(engine.describeActionError(error));
       }
     });
   };
-  const addSummary = () =>
-    withGrid(({ grid }, engine) => {
+  const add_summary = () =>
+    with_grid(({ grid }, engine) => {
       engine.addSummarySheet(grid, host.clientWidth);
-      setActivity("Summary sheet active — live cross-sheet formulas over the fixture");
+      set_activity("Summary sheet active — live cross-sheet formulas over the fixture");
     });
   const total = () =>
-    withGrid(({ grid }, engine) => {
+    with_grid(({ grid }, engine) => {
       const sum = engine.totalRevenue(grid);
-      setActivity(`Pipeline total ${money.format(sum)} across ${props.rows.toLocaleString()} rows`);
+      set_activity(
+        `Pipeline total ${money.format(sum)} across ${props.rows.toLocaleString()} rows`,
+      );
     });
-  const exportWorkbook = () => {
+  const export_workbook = () => {
     const current = workbench;
     if (current === null) return;
-    void exportAction.run(
+    void export_action.run(
       async () => {
         const engine = await import("./boot.js");
         const bytes = await engine.exportWorkbookXlsx(current.grid, "sheetwrite-workbench.xlsx");
-        setActivity(`Exported workbook — ${kilobytes.format(bytes / 1024)} KB of XLSX`);
+        set_activity(`Exported workbook — ${kilobytes.format(bytes / 1024)} KB of XLSX`);
       },
       (error) =>
         `Export failed: ${String(error instanceof Error ? error.message : error)} Try again.`,
     );
   };
-  const importWorkbook = (file: File) => {
-    void importAction.run(
+  const import_workbook = (file: File) => {
+    void import_action.run(
       async () => {
         const engine = await import("./boot.js");
         const { snapshot, warnings } = await engine.importWorkbookXlsx(await file.arrayBuffer());
-        setImported({ snapshot, label: file.name });
-        setAlive(true);
+        set_imported({ snapshot, label: file.name });
+        set_alive(true);
         if (warnings.length > 0) {
-          setActivity(
+          set_activity(
             `${file.name}: ${warnings.length} fidelity warning${warnings.length === 1 ? "" : "s"}`,
           );
         }
@@ -329,8 +331,8 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                   data-pending={selected() && phase() === "booting" ? "" : undefined}
                   data-selected={selected() ? "" : undefined}
                   id={`sw-vw-tab-${item.id}`}
-                  onClick={() => selectScenario(item.id)}
-                  onKeyDown={(event) => onScenarioKeyDown(event, index())}
+                  onClick={() => select_scenario(item.id)}
+                  onKeyDown={(event) => on_scenario_key_down(event, index())}
                   ref={(node) => {
                     tabs[index()] = node;
                   }}
@@ -361,7 +363,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
               class="sw-workbench-primary"
               data-tone={alive() ? "danger" : undefined}
               {...pendingProps(transitioning())}
-              onClick={toggleGrid}
+              onClick={toggle_grid}
               type="button"
             >
               {transitioning() ? "Creating grid…" : alive() ? "Destroy grid" : "Create grid"}
@@ -387,7 +389,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                   The host reports the failure instead of retrying silently. Select Destroy grid,
                   then Create grid to retry the same construction options.
                 </p>
-                <Show when={bootError()}>
+                <Show when={boot_error()}>
                   {(message) => <code class="sw-vw-state__error">{message()}</code>}
                 </Show>
                 <div class="sw-vw-teardown">
@@ -480,16 +482,16 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
               <dd>
                 <output
                   class="sw-vw-readout"
-                  data-fallback-count={fallbackCount()}
+                  data-fallback-count={fallback_count()}
                   data-testid="renderer"
                 >
                   <span>
-                    <span class="sw-vw-readout__key">Requested:</span> {rendererLabel(requested())}
+                    <span class="sw-vw-readout__key">Requested:</span> {renderer_label(requested())}
                   </span>{" "}
                   <span>
-                    <span class="sw-vw-readout__key">Active:</span> {activeLabel()}
+                    <span class="sw-vw-readout__key">Active:</span> {active_label()}
                   </span>
-                  <Show when={live() && rendererState()?.fallback}>
+                  <Show when={live() && renderer_state()?.fallback}>
                     {(fallback) => (
                       <>
                         {" "}
@@ -515,21 +517,21 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                 >
                   <span
                     class="sw-vw-paged"
-                    data-chunks={pagedStats()?.chunks ?? 0}
-                    data-fully-loaded={pagedStats()?.fullyLoaded ?? false}
+                    data-chunks={paged_stats()?.chunks ?? 0}
+                    data-fully-loaded={paged_stats()?.fullyLoaded ?? false}
                     data-testid="paged-stats"
                   >
                     <span>
-                      <Show fallback="Host pages" when={pagedStats()}>
+                      <Show fallback="Host pages" when={paged_stats()}>
                         {(stats) =>
                           `${stats().chunks.toLocaleString()} pages · ${kilobytes.format(stats().allocatedBytes / 1024)} KB`
                         }
                       </Show>
                     </span>
-                    <span class="sw-vw-load-state" data-state={pagedState()}>
-                      {pagedState() === "complete"
+                    <span class="sw-vw-load-state" data-state={paged_state()}>
+                      {paged_state() === "complete"
                         ? "fully loaded"
-                        : pagedState() === "partial"
+                        : paged_state() === "partial"
                           ? "partially loaded"
                           : "loading"}
                     </span>
@@ -570,7 +572,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                     <RenderingModeChoice
                       label="Rendering thread"
                       mode={renderer()}
-                      onChange={changeRenderer}
+                      onChange={change_renderer}
                     />
                   </div>
                 </div>
@@ -606,7 +608,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
               <Button disabled={!live()} onClick={total}>
                 Total ARR
               </Button>
-              <Button onClick={() => changeData("columnar")}>Restore dense source</Button>
+              <Button onClick={() => change_data("columnar")}>Restore dense source</Button>
             </div>
             <p class="sw-vw-note">
               Summary sheet stays disabled while the store holds only the visited pages.
@@ -626,7 +628,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
             <div aria-label="Workbook operations" class="sw-vw-actions" role="toolbar">
               <Button
                 disabled={!live() || (data() === "paged" && imported() === null)}
-                onClick={addSummary}
+                onClick={add_summary}
               >
                 Summary sheet
               </Button>
@@ -634,18 +636,18 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                 Total ARR
               </Button>
               <Button
-                aria-busy={exportAction.pending || undefined}
-                disabled={!live() || exportAction.pending}
-                onClick={exportWorkbook}
+                aria-busy={export_action.pending || undefined}
+                disabled={!live() || export_action.pending}
+                onClick={export_workbook}
               >
-                {exportAction.pending ? "Exporting…" : "Export XLSX"}
+                {export_action.pending ? "Exporting…" : "Export XLSX"}
               </Button>
               <Button
-                aria-busy={importAction.pending || undefined}
-                disabled={transitioning() || importAction.pending}
-                onClick={() => fileInput.click()}
+                aria-busy={import_action.pending || undefined}
+                disabled={transitioning() || import_action.pending}
+                onClick={() => file_input.click()}
               >
-                {importAction.pending ? "Importing…" : "Import XLSX"}
+                {import_action.pending ? "Importing…" : "Import XLSX"}
               </Button>
               <input
                 accept=".xlsx"
@@ -654,15 +656,15 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                 onChange={(event) => {
                   const file = event.currentTarget.files?.[0];
                   event.currentTarget.value = "";
-                  if (file !== undefined) importWorkbook(file);
+                  if (file !== undefined) import_workbook(file);
                 }}
                 ref={(element) => {
-                  fileInput = element;
+                  file_input = element;
                 }}
                 type="file"
               />
             </div>
-            <ActionError error={exportAction.error ?? importAction.error} />
+            <ActionError error={export_action.error ?? import_action.error} />
           </section>
 
           <details class="sw-vw-details">
@@ -674,7 +676,7 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                 </span>
                 <RadioGroup
                   label="Data path"
-                  onChange={changeData}
+                  onChange={change_data}
                   options={DATA_PATHS}
                   value={data()}
                 />
@@ -685,15 +687,15 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                 </span>
                 <label class="sw-vw-toggle">
                   <input
-                    checked={readOnly()}
-                    onChange={(event) => toggleReadOnly(event.currentTarget.checked)}
+                    checked={read_only()}
+                    onChange={(event) => toggle_read_only(event.currentTarget.checked)}
                     type="checkbox"
                   />
                   <span aria-hidden="true" class="sw-vw-toggle__track" />
                   Read-only
                 </label>
               </div>
-              <Button disabled={!live()} onClick={() => setResetCount((count) => count + 1)}>
+              <Button disabled={!live()} onClick={() => set_reset_count((count) => count + 1)}>
                 Reset generation
               </Button>
             </div>

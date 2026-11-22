@@ -36,11 +36,11 @@ export async function replaceDocument(
   try {
     signal?.throwIfAborted();
     run.signal.throwIfAborted();
-    assertReplacementAllowed(host);
+    assert_replacement_allowed(host);
 
     const snapshot = await loadWorkbook(source, run.signal);
     run.signal.throwIfAborted();
-    assertReplacementAllowed(host);
+    assert_replacement_allowed(host);
 
     // Construction and hydration may fail. None of the live owners is reset first.
     host.store?.replaceSnapshot(snapshot);
@@ -51,14 +51,14 @@ export async function replaceDocument(
     host.closeFind();
 
     const workbook = host.grid.store.getWorkbook();
-    const activeSheet =
+    const active_sheet =
       workbook.sheets.find(
         (sheet) =>
           sheet.id === workbook.activeSheet && (sheet.visibility ?? "visible") === "visible",
       )?.id ??
       workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
       workbook.activeSheet;
-    host.activate(workbook, activeSheet);
+    host.activate(workbook, active_sheet);
     host.grid.clearSearch();
     host.grid.openPanel(null);
     host.grid.highlightCells(null);
@@ -69,7 +69,7 @@ export async function replaceDocument(
   }
 }
 
-function assertReplacementAllowed(host: DocumentReplacementHost): void {
+function assert_replacement_allowed(host: DocumentReplacementHost): void {
   if (host.store === null || host.grid.getCommandState("importXlsx").disabled) {
     throw new SheetwriteError(
       "unavailable",

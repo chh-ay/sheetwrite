@@ -14,10 +14,10 @@ import type { Sheet, Workbook } from "../types/document.js";
 export class SheetRegistry {
   /** Engine handle of each live sheet. */
   readonly handles = new Map<SheetId, number>();
-  private readonly byId = new Map<SheetId, Sheet>();
+  private readonly by_id = new Map<SheetId, Sheet>();
 
   constructor(readonly workbook: Workbook) {
-    for (const sheet of workbook.sheets) this.byId.set(sheet.id, sheet);
+    for (const sheet of workbook.sheets) this.by_id.set(sheet.id, sheet);
   }
 
   /** Engine handle of `sheet`; an unknown sheet throws `unknownSheetError`. */
@@ -30,12 +30,12 @@ export class SheetRegistry {
 
   /** Metadata of `sheet`, or undefined when the workbook has no such sheet. */
   find(sheet: SheetId): Sheet | undefined {
-    return this.byId.get(sheet);
+    return this.by_id.get(sheet);
   }
 
   /** Metadata of `sheet`; an unknown sheet throws `unknownSheetError`. */
   sheetMeta(sheet: SheetId): Sheet {
-    const meta = this.byId.get(sheet);
+    const meta = this.by_id.get(sheet);
     if (!meta) throw unknownSheetError(sheet);
 
     return meta;
@@ -44,12 +44,12 @@ export class SheetRegistry {
   /** Put `sheet` at position `order` of the workbook's sheets. */
   insertSheet(sheet: Sheet, order: number): void {
     this.workbook.sheets.splice(order, 0, sheet);
-    this.byId.set(sheet.id, sheet);
+    this.by_id.set(sheet.id, sheet);
   }
 
   /** Remove the sheet at position `index` of the workbook's sheets. */
   removeSheetAt(index: number): void {
     const [removed] = this.workbook.sheets.splice(index, 1);
-    if (removed) this.byId.delete(removed.id);
+    if (removed) this.by_id.delete(removed.id);
   }
 }

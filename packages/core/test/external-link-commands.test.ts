@@ -13,14 +13,14 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 const grids: Grid[] = [];
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
-  restoreStubs();
+  restore_stubs();
 });
 
 const link = (book: string, value: number): ExternalLink => ({
@@ -30,7 +30,7 @@ const link = (book: string, value: number): ExternalLink => ({
 });
 
 /** A grid whose B1 and B2 read the A1 cell of two linked workbooks. */
-function linkedGrid(): Grid {
+function linked_grid(): Grid {
   const workbook = makeWorkbook(4);
   workbook.externalLinks = [link("Budget.xlsx", 7), link("Sales.xlsx", 5)];
   const host = document.createElement("div");
@@ -55,7 +55,7 @@ const shown = (grid: Grid, row: number) => grid.store.getCell(at(row)).resolved;
 
 describe("external link commands", () => {
   it("updates values from the resolver in one undoable change", async () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     const updates = await updateExternalLinks(grid, async ({ book, sheets }) => {
       if (book === "Sales.xlsx") return null;
       expect(sheets).toEqual(["Annual"]);
@@ -82,7 +82,7 @@ describe("external link commands", () => {
   });
 
   it("points formulas at another workbook and keeps the saved values", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     expect(
       changeExternalLinkSource(grid, "sales.xlsx", { book: "Q1.xlsx", target: "Q1.xlsx" }),
     ).toBe(true);
@@ -101,7 +101,7 @@ describe("external link commands", () => {
   });
 
   it("replaces formulas with their values and removes the link", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     expect(breakExternalLinks(grid, ["Budget.xlsx"])).toBe(true);
 
     expect(grid.store.getFormula(at(0))).toBeNull();
@@ -116,7 +116,7 @@ describe("external link commands", () => {
   });
 
   it("changes the source of and breaks formulas that use a name of the link", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     const links = grid.store.getWorkbook().externalLinks ?? [];
     grid.applyTransaction({
       patches: [
@@ -144,7 +144,7 @@ describe("external link commands", () => {
   });
 
   it("reads a link that is added after the formula", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     grid.applyTransaction({
       patches: [
         { op: "set", addr: at(2), value: { kind: "formula", src: "=[New.xlsx]Annual!A1+1" } },
@@ -161,7 +161,7 @@ describe("external link commands", () => {
   });
 
   it("gives a refreshed link new, cleared and error values, and undoes them", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     const sales = link("Sales.xlsx", 5);
     const budget = (
       cells: Array<[number, ExternalLink["sheets"][number]["cells"][number]["value"]]>,
@@ -211,7 +211,7 @@ describe("external link commands", () => {
   });
 
   it("reads a refreshed link whose values reach past its old extent", () => {
-    const grid = linkedGrid();
+    const grid = linked_grid();
     grid.applyTransaction({
       patches: [
         { op: "set", addr: at(2), value: { kind: "formula", src: "=[Budget.xlsx]Annual!A3" } },

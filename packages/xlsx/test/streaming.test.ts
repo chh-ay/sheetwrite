@@ -26,7 +26,7 @@ beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
-const largeSnapshot = (rows: number) =>
+const large_snapshot = (rows: number) =>
   book([
     sheet(
       "s",
@@ -35,9 +35,9 @@ const largeSnapshot = (rows: number) =>
     ),
   ]);
 
-/** A store over one table sheet of `rowCount` rows holding `columns`. */
-function tableStore(
-  rowCount: number,
+/** A store over one table sheet of `row_count` rows holding `columns`. */
+function table_store(
+  row_count: number,
   columns: Record<string, (string | number)[]>,
   extra: Partial<Workbook["sheets"][number]> = {},
 ) {
@@ -47,7 +47,7 @@ function tableStore(
       {
         id: "s",
         name: "Table",
-        rowCount,
+        rowCount: row_count,
         columns: Object.keys(columns).map((key) => ({
           key,
           header: key.toUpperCase(),
@@ -58,7 +58,7 @@ function tableStore(
       },
     ],
   };
-  return new SheetwriteStore(workbook, { rowCount, columns });
+  return new SheetwriteStore(workbook, { rowCount: row_count, columns });
 }
 
 async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array[]> {
@@ -69,7 +69,7 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array[]
   return chunks;
 }
 
-const failureOf = (stream: ReadableStream<Uint8Array>) =>
+const failure_of = (stream: ReadableStream<Uint8Array>) =>
   collect(stream).then(
     () => {
       throw new Error("expected the stream to fail");
@@ -79,22 +79,22 @@ const failureOf = (stream: ReadableStream<Uint8Array>) =>
 
 /** Stored entries reach the worksheet reader in 8 KiB inflater chunks. */
 const CHUNK_BYTES = 8 * 1024;
-const storedWorkbook = (sheetXml: string) =>
-  new Blob([new Uint8Array(rawXlsx({ sheets: [{ xml: sheetXml }], compressionLevel: 0 }))]);
+const stored_workbook = (sheet_xml: string) =>
+  new Blob([new Uint8Array(rawXlsx({ sheets: [{ xml: sheet_xml }], compressionLevel: 0 }))]);
 
 /** A snapshot cell and its value object: the representation import must return. */
 const OUTPUT_OBJECTS_PER_CELL = 2;
 const PER_CELL_SLACK = 0.25;
 const FIXED_OBJECT_SLACK = 20_000;
 
-function liveObjects(): number {
+function live_objects(): number {
   Bun.gc(true);
   return heapStats().objectCount;
 }
 
 describe("XLSX streaming", () => {
   it("emits bounded workbook chunks with the same entries as the buffered export", async () => {
-    const source = largeSnapshot(20_000);
+    const source = large_snapshot(20_000);
     const chunks = await collect(toXlsxWorkbookStream(source));
     expect(chunks.length).toBeGreaterThan(2);
     expect(Math.max(...chunks.map((chunk) => chunk.byteLength))).toBeLessThanOrEqual(64 * 1024);
@@ -103,43 +103,43 @@ describe("XLSX streaming", () => {
   });
 
   it("stops producing on cancel and surfaces output ceilings as stream errors", async () => {
-    const rowCount = 50_000;
-    const store = tableStore(rowCount, {
-      a: Array.from({ length: rowCount }, (_, row) => `value-${row}-${Math.sin(row)}`),
+    const row_count = 50_000;
+    const store = table_store(row_count, {
+      a: Array.from({ length: row_count }, (_, row) => `value-${row}-${Math.sin(row)}`),
     });
-    let windowReads = 0;
-    const readWindow = store.getVisibleWindow.bind(store);
-    store.getVisibleWindow = ((sheetId, rows, columns) => {
-      windowReads++;
-      return readWindow(sheetId, rows, columns);
+    let window_reads = 0;
+    const read_window = store.getVisibleWindow.bind(store);
+    store.getVisibleWindow = ((sheet_id, rows, columns) => {
+      window_reads++;
+      return read_window(sheet_id, rows, columns);
     }) as typeof store.getVisibleWindow;
     const reader = toXlsxTableStream(store.getWorkbook(), store).getReader();
     expect((await reader.read()).done).toBe(false);
     await reader.cancel();
-    const readsAtCancel = windowReads;
+    const reads_at_cancel = window_reads;
     expect(await reader.read()).toEqual({ done: true, value: undefined });
-    expect(windowReads).toBe(readsAtCancel);
-    expect(readsAtCancel).toBeLessThan(Math.ceil(rowCount / 4096));
+    expect(window_reads).toBe(reads_at_cancel);
+    expect(reads_at_cancel).toBeLessThan(Math.ceil(row_count / 4096));
     store.dispose();
     expect(
-      await failureOf(
-        toXlsxWorkbookStream(largeSnapshot(2_000), { resourceLimits: { maxOutputBytes: 1024 } }),
+      await failure_of(
+        toXlsxWorkbookStream(large_snapshot(2_000), { resourceLimits: { maxOutputBytes: 1024 } }),
       ),
     ).toMatchObject({ code: "xlsx-resource-limit" });
     const controller = new AbortController();
     controller.abort(new Error("cancelled workbook stream"));
     expect(
-      await failureOf(toXlsxWorkbookStream(largeSnapshot(10), { signal: controller.signal })),
+      await failure_of(toXlsxWorkbookStream(large_snapshot(10), { signal: controller.signal })),
     ).toBe(controller.signal.reason);
   });
 
   it("streams the store-backed table export with the same entries as the buffered export", async () => {
-    const rowCount = 10_000;
-    const store = tableStore(
-      rowCount,
+    const row_count = 10_000;
+    const store = table_store(
+      row_count,
       {
-        a: Array.from({ length: rowCount }, (_, row) => `r${row}`),
-        b: Array.from({ length: rowCount }, (_, row) => row),
+        a: Array.from({ length: row_count }, (_, row) => `r${row}`),
+        b: Array.from({ length: row_count }, (_, row) => row),
       },
       { merges: [{ r0: 0, c0: 0, r1: 1, c1: 1 }] },
     );
@@ -147,14 +147,14 @@ describe("XLSX streaming", () => {
     expect(unzipSync(streamed)).toEqual(unzipSync(await toXlsxTable(store.getWorkbook(), store)));
     const imported = sheetAt(await fromXlsxWorkbook(streamed));
     expect(imported.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(imported.rowCount).toBe(rowCount + 1);
+    expect(imported.rowCount).toBe(row_count + 1);
     store.dispose();
   });
 
   it("fails instead of mixing table states when the store changes mid-stream", async () => {
-    const rowCount = 20_000;
-    const store = tableStore(rowCount, {
-      a: Array.from({ length: rowCount }, (_, row) => `value-${row}-${Math.sin(row)}`),
+    const row_count = 20_000;
+    const store = table_store(row_count, {
+      a: Array.from({ length: row_count }, (_, row) => `value-${row}-${Math.sin(row)}`),
     });
     const reader = toXlsxTableStream(store.getWorkbook(), store).getReader();
     await reader.read();
@@ -173,27 +173,27 @@ describe("XLSX streaming", () => {
   });
 
   it("imports a seekable Blob with the same result as buffered bytes", async () => {
-    const bytes = await toXlsxWorkbook(largeSnapshot(500));
-    const fromBlob = await fromXlsxWorkbookFile(new Blob([new Uint8Array(bytes)]));
-    expect(fromBlob).toEqual(await fromXlsxWorkbook(bytes));
+    const bytes = await toXlsxWorkbook(large_snapshot(500));
+    const from_blob = await fromXlsxWorkbookFile(new Blob([new Uint8Array(bytes)]));
+    expect(from_blob).toEqual(await fromXlsxWorkbook(bytes));
   });
 
   // Sweeping the padding before the rows moves the chunk boundary across every byte of the row markup.
   it("imports worksheet rows identically wherever an inflater chunk boundary falls", async () => {
-    const rowXml = (row: number) =>
+    const row_xml = (row: number) =>
       `<row r="${row}"><c r="A${row}" t="inlineStr"><is><t>x&amp;y&#x1F600;é€😀<![CDATA[<c&>]]>z</t></is></c><!-- é --><c r="B${row}"><f>IF(A${row}="&lt;","&amp;",1)</f></c><c r="C${row}"><v>12.5</v></c></row>`;
     const rows = Array.from({ length: 60 }, (_, index) => 10 + index);
-    const unitBytes = new TextEncoder().encode(rowXml(10)).byteLength;
+    const unit_bytes = new TextEncoder().encode(row_xml(10)).byteLength;
     const expected = rows.flatMap((row): [number, number, CellValue][] => [
       [row - 1, 0, { kind: "literal", value: "x&y😀é€😀<c&>z" }],
       [row - 1, 1, { kind: "formula", src: `=IF(A${row}="<","&",1)` }],
       [row - 1, 2, { kind: "literal", value: 12.5 }],
     ]);
-    for (let pad = 0; pad < unitBytes; pad++) {
+    for (let pad = 0; pad < unit_bytes; pad++) {
       const xml = worksheet(
-        `<!--${"p".repeat(pad)}--><sheetData>${rows.map(rowXml).join("")}</sheetData>`,
+        `<!--${"p".repeat(pad)}--><sheetData>${rows.map(row_xml).join("")}</sheetData>`,
       );
-      const imported = await fromXlsxWorkbookFile(storedWorkbook(xml));
+      const imported = await fromXlsxWorkbookFile(stored_workbook(xml));
       expect(
         cellsOf(imported).map((cell) => [cell.row, cell.col, cell.value]),
         `padding ${pad}`,
@@ -203,14 +203,14 @@ describe("XLSX streaming", () => {
 
   it("rejects a DTD split across inflater chunks", async () => {
     const declaration = "<!DOCTYPE worksheet>";
-    const declarationOffset = worksheet(`<!---->${declaration}`).indexOf(declaration);
+    const declaration_offset = worksheet(`<!---->${declaration}`).indexOf(declaration);
     for (let split = 1; split < "<!DOCTYPE".length; split++) {
       const xml = worksheet(
-        `<!--${"p".repeat(CHUNK_BYTES - split - declarationOffset)}-->${declaration}<sheetData/>`,
+        `<!--${"p".repeat(CHUNK_BYTES - split - declaration_offset)}-->${declaration}<sheetData/>`,
       );
       expect(xml.indexOf("<!DOCTYPE")).toBe(CHUNK_BYTES - split);
       await expect(
-        fromXlsxWorkbookFile(storedWorkbook(xml)),
+        fromXlsxWorkbookFile(stored_workbook(xml)),
         `split ${split}`,
       ).rejects.toMatchObject({
         code: "xlsx-import-failed",
@@ -229,7 +229,7 @@ describe("XLSX streaming", () => {
       for (const split of [0, 1, Math.floor(reference.length / 2), reference.length - 1]) {
         const xml = worksheet(`<!--${"p".repeat(CHUNK_BYTES - split - offset)}-->${body}`);
         expect(xml.indexOf(reference), `split ${split}`).toBe(CHUNK_BYTES - split);
-        const result = fromXlsxWorkbookFile(storedWorkbook(xml));
+        const result = fromXlsxWorkbookFile(stored_workbook(xml));
         if (accepted) {
           expect(sheetAt(await result).cells[0]?.cells[0]?.value, `split ${split}`).toEqual({
             kind: "literal",
@@ -248,17 +248,17 @@ describe("XLSX streaming", () => {
     const xml = worksheet(
       `<dimension ref="A1" note="${"a>b'".repeat(40_000)}"/><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>`,
     );
-    const imported = await fromXlsxWorkbookFile(storedWorkbook(xml));
+    const imported = await fromXlsxWorkbookFile(stored_workbook(xml));
     expect(sheetAt(imported).cells[0]?.cells.map((cell) => cell.value)).toEqual([
       { kind: "literal", value: 7 },
     ]);
   });
 
   it("keeps one object representation per cell when the worksheet ends", async () => {
-    const rowCount = 20_000;
+    const row_count = 20_000;
     const columns = ["A", "B", "C", "D"];
     const rows = Array.from(
-      { length: rowCount },
+      { length: row_count },
       (_, row) =>
         `<row r="${row + 1}">${columns.map((column, col) => `<c r="${column}${row + 1}"><v>${row * columns.length + col}</v></c>`).join("")}</row>`,
     ).join("");
@@ -272,20 +272,20 @@ describe("XLSX streaming", () => {
         },
       ],
     });
-    const cells = rowCount * columns.length;
-    const before = liveObjects();
-    let atWorksheetEnd = 0;
+    const cells = row_count * columns.length;
+    const before = live_objects();
+    let at_worksheet_end = 0;
     const imported = await fromXlsxWorkbook(bytes, {
       onWarning: (warning) => {
-        if (warning.message.includes("zoom")) atWorksheetEnd = liveObjects();
+        if (warning.message.includes("zoom")) at_worksheet_end = live_objects();
       },
     });
 
     expect(sheetAt(imported).cells[0]?.cells).toHaveLength(cells);
-    expect(atWorksheetEnd).toBeGreaterThan(before);
+    expect(at_worksheet_end).toBeGreaterThan(before);
     // Each output cell is two objects, a cell and its value. A second per-cell
     // record or a retained row tree adds at least one more object per cell.
-    expect(atWorksheetEnd - before).toBeLessThan(
+    expect(at_worksheet_end - before).toBeLessThan(
       cells * (OUTPUT_OBJECTS_PER_CELL + PER_CELL_SLACK) + FIXED_OBJECT_SLACK,
     );
   });
@@ -321,7 +321,7 @@ describe("ZIP raw entries", () => {
     );
 
     // The first local header is corrupt, and only a later entry is over the ratio.
-    const overRatio = patchEntries(
+    const over_ratio = patchEntries(
       rawZip({ "a.xml": "<a/>", "b.xml": `<b>${"b".repeat(4_096)}</b>` }),
       ({ view, local, index }) => {
         if (index === 0) view.setUint32(local, 0, true);
@@ -329,7 +329,7 @@ describe("ZIP raw entries", () => {
     );
     await expect(
       ZipReader.open(
-        overRatio,
+        over_ratio,
         createCodecContext("import", { resourceLimits: { maxCompressionRatio: 2 } }),
       ),
     ).rejects.toMatchObject({ resource: "maxCompressionRatio" });
@@ -337,7 +337,7 @@ describe("ZIP raw entries", () => {
 });
 
 /** A ZIP with one deflate entry `a.xml` whose compressed bytes are `payload`, declared as `content`. */
-function deflateEntryZip(payload: Uint8Array<ArrayBuffer>, content: Uint8Array): Uint8Array {
+function deflate_entry_zip(payload: Uint8Array<ArrayBuffer>, content: Uint8Array): Uint8Array {
   const chunks: Uint8Array[] = [];
   const archive = new Zip((error, chunk) => {
     if (error) throw error;
@@ -356,7 +356,7 @@ function deflateEntryZip(payload: Uint8Array<ArrayBuffer>, content: Uint8Array):
   return new Uint8Array(Buffer.concat(chunks));
 }
 
-async function readEntry(archive: Uint8Array): Promise<Uint8Array> {
+async function read_entry(archive: Uint8Array): Promise<Uint8Array> {
   return (await ZipReader.open(archive, createCodecContext("import"))).read("a.xml");
 }
 
@@ -375,7 +375,7 @@ describe("ZIP inflate", () => {
       }
     };
     try {
-      expect(await readEntry(deflateEntryZip(stream, content))).toEqual(content);
+      expect(await read_entry(deflate_entry_zip(stream, content))).toEqual(content);
     } finally {
       globalThis.DecompressionStream = runtime;
     }
@@ -387,11 +387,11 @@ describe("ZIP inflate", () => {
     const trailing = new Uint8Array(stream.length + 3);
     trailing.set(stream);
     trailing.set([1, 2, 3], stream.length);
-    expect(await readEntry(deflateEntryZip(trailing, content))).toEqual(content);
+    expect(await read_entry(deflate_entry_zip(trailing, content))).toEqual(content);
     // An empty payload is no valid deflate stream, but fflate reads it as no bytes.
     const empty = new Uint8Array(0);
-    expect(await readEntry(deflateEntryZip(empty, empty))).toEqual(empty);
-    await expect(readEntry(deflateEntryZip(stream.subarray(0, -16), content))).rejects.toThrow(
+    expect(await read_entry(deflate_entry_zip(empty, empty))).toEqual(empty);
+    await expect(read_entry(deflate_entry_zip(stream.subarray(0, -16), content))).rejects.toThrow(
       "Sheetwrite: invalid XLSX ZIP: deflate stream for a.xml is corrupt",
     );
   });
@@ -409,7 +409,7 @@ describe("ZIP inflate", () => {
  * The archive that fflate's own ZIP deflate writes for `parts`, in the order given, with the
  * writer's 64 KiB pushes.
  */
-function fflateArchive(parts: Readonly<Record<string, Uint8Array>>): Uint8Array {
+function fflate_archive(parts: Readonly<Record<string, Uint8Array>>): Uint8Array {
   const chunks: Uint8Array[] = [];
   const archive = new Zip((error, chunk) => {
     if (error) throw error;
@@ -432,24 +432,24 @@ function fflateArchive(parts: Readonly<Record<string, Uint8Array>>): Uint8Array 
  * Each entry's local header and central record, with the two fields that depend on the deflate
  * codec cleared: the compressed size and the local header offset.
  */
-function entryHeaders(bytes: Uint8Array): Uint8Array[] {
+function entry_headers(bytes: Uint8Array): Uint8Array[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = bytes.length - 22;
   const headers: Uint8Array[] = [];
   let offset = view.getUint32(eocd + 16, true);
   for (let index = 0; index < view.getUint16(eocd + 10, true); index++) {
-    const nameLength = view.getUint16(offset + 28, true);
+    const name_length = view.getUint16(offset + 28, true);
     const end =
       offset +
       46 +
-      nameLength +
+      name_length +
       view.getUint16(offset + 30, true) +
       view.getUint16(offset + 32, true);
     const central = bytes.slice(offset, end);
     const local = view.getUint32(offset + 42, true);
     new DataView(central.buffer).setUint32(20, 0, true);
     new DataView(central.buffer).setUint32(42, 0, true);
-    headers.push(bytes.slice(local, local + 30 + nameLength), central);
+    headers.push(bytes.slice(local, local + 30 + name_length), central);
     offset = end;
   }
   return headers;
@@ -469,7 +469,7 @@ describe("ZIP deflate", () => {
 
   it("writes fflate's bytes by default, also where the runtime has CompressionStream", async () => {
     expect(typeof CompressionStream).toBe("function");
-    expect(await writeZip(unsorted, createCodecContext("export"))).toEqual(fflateArchive(parts));
+    expect(await writeZip(unsorted, createCodecContext("export"))).toEqual(fflate_archive(parts));
   });
 
   it("deflates with the runtime CompressionStream for native compression", async () => {
@@ -491,8 +491,8 @@ describe("ZIP deflate", () => {
 
   it("writes the parts and ZIP headers of the fflate archive for native compression", async () => {
     const written = await writeZip(unsorted, native());
-    const reference = fflateArchive(parts);
-    expect(entryHeaders(written)).toEqual(entryHeaders(reference));
+    const reference = fflate_archive(parts);
+    expect(entry_headers(written)).toEqual(entry_headers(reference));
     // fflate reads every part of both archives, and so does this package's reader.
     expect(unzipSync(written)).toEqual(unzipSync(reference));
     const reader = await ZipReader.open(written, createCodecContext("import"));
@@ -503,7 +503,7 @@ describe("ZIP deflate", () => {
     const runtime = globalThis.CompressionStream;
     Reflect.deleteProperty(globalThis, "CompressionStream");
     try {
-      expect(await writeZip(unsorted, native())).toEqual(fflateArchive(parts));
+      expect(await writeZip(unsorted, native())).toEqual(fflate_archive(parts));
     } finally {
       globalThis.CompressionStream = runtime;
     }
@@ -528,7 +528,7 @@ function letters(length: number): string {
 }
 
 /** A package whose worksheet is exactly `size` bytes; a comment of varied text fills the remaining space. */
-function sizedPackage(size: number, body = SMALL_SHEET_DATA): Uint8Array {
+function sized_package(size: number, body = SMALL_SHEET_DATA): Uint8Array {
   const padding = size - worksheet(`${body}<!---->`).length;
   const xml = worksheet(`${body}<!--${letters(padding)}-->`);
   expect(xml.length).toBe(size);
@@ -545,12 +545,12 @@ describe.each([ONE_STEP_PARSE_BYTES, ONE_STEP_PARSE_BYTES + 1])(
         // This file's codec, directly: the spy watches this module's ZipReader, and the
         // installed add-on may come from another copy of the package in the test run.
         const cells = JSON.stringify(
-          sheetAt(await sheetwriteWorkbookBackend.fromXlsxWorkbook(sizedPackage(size))).cells,
+          sheetAt(await sheetwriteWorkbookBackend.fromXlsxWorkbook(sized_package(size))).cells,
         );
         expect(cells).toContain('"hello"');
         expect(cells).toContain("42");
-        const sheetReads = buffered.mock.calls.filter(([part]) => part === SHEET_PART);
-        expect(sheetReads.length).toBe(size > ONE_STEP_PARSE_BYTES ? 0 : 1);
+        const sheet_reads = buffered.mock.calls.filter(([part]) => part === SHEET_PART);
+        expect(sheet_reads.length).toBe(size > ONE_STEP_PARSE_BYTES ? 0 : 1);
       } finally {
         buffered.mockRestore();
       }
@@ -573,9 +573,9 @@ describe.each([ONE_STEP_PARSE_BYTES, ONE_STEP_PARSE_BYTES + 1])(
         ["maxXmlElements", `<sheetData>${rows.join("")}</sheetData>`, { maxXmlElements: 100 }],
         ["maxEntryUncompressedBytes", SMALL_SHEET_DATA, { maxEntryUncompressedBytes: size - 1 }],
       ];
-      for (const [resource, body, resourceLimits] of cases) {
+      for (const [resource, body, resource_limits] of cases) {
         await expect(
-          fromXlsxWorkbook(sizedPackage(size, body), { resourceLimits }),
+          fromXlsxWorkbook(sized_package(size, body), { resourceLimits: resource_limits }),
           resource,
         ).rejects.toMatchObject({
           resource,
@@ -585,7 +585,7 @@ describe.each([ONE_STEP_PARSE_BYTES, ONE_STEP_PARSE_BYTES + 1])(
 
     it("rejects worksheet data longer or shorter than the declared size", async () => {
       for (const actual of [size + 1, size - 1]) {
-        const archive = patchEntries(sizedPackage(actual), ({ view, central, local, name }) => {
+        const archive = patchEntries(sized_package(actual), ({ view, central, local, name }) => {
           if (name !== SHEET_PART) return;
           view.setUint32(central + CENTRAL_UNCOMPRESSED_SIZE, size, true);
           view.setUint32(local + LOCAL_UNCOMPRESSED_SIZE, size, true);

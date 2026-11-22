@@ -22,8 +22,8 @@ it("installs every backend through initSheetwrite, and a repeated install is a n
     }),
   ]);
   const store = SheetwriteStore.fromSnapshot(snapshot);
-  const tableBytes = await toXlsxTable(store.getWorkbook(), store);
-  expect(await fromXlsxTable(tableBytes)).toEqual({
+  const table_bytes = await toXlsxTable(store.getWorkbook(), store);
+  expect(await fromXlsxTable(table_bytes)).toEqual({
     rowCount: 1,
     columns: { Value: ["registered"] },
   });

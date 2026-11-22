@@ -71,9 +71,9 @@ describe("Excel function coverage", () => {
     const page = renderExcelCoveragePage(inventory, source);
     const rows = page.content.split("\n").filter((line) => line.startsWith("| [`"));
 
-    const catalogNames = source.families.flatMap((family) => family.functions.map((f) => f.name));
+    const catalog_names = source.families.flatMap((family) => family.functions.map((f) => f.name));
     expect(rows.map((row) => /^\| \[`([^`]+)`\]/.exec(row)?.[1]).sort()).toEqual(
-      catalogNames.sort(),
+      catalog_names.sort(),
     );
     for (const row of rows.filter((line) => line.includes("| Partly supported |"))) {
       const notes = row.split(" | ").at(-1) ?? "";

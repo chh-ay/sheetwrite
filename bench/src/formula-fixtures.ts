@@ -16,14 +16,14 @@ import { CellStore, historyKernel } from "./formula-engine.js";
 import { writeNumberColumn, writeStringColumn } from "./packed-fixture.js";
 import { now, summarize } from "./stats.js";
 
-function diamondOutput(levels: number): number {
+function diamond_output(levels: number): number {
   let expected = 2;
   for (let level = 0; level < levels; level++) expected = expected + 1 + (expected + 2);
   return expected;
 }
 
 export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
-  const lookup = lookupVariantOutput(id);
+  const lookup = lookup_variant_output(id);
   if (lookup !== undefined) return lookup;
   switch (id) {
     case "independent-parse-load":
@@ -40,7 +40,7 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "formula-constant-edit":
       return `${CONSTANT_EDIT_FILL + CONSTANT_EDIT_EDITED_BASE}:${size + CONSTANT_EDIT_FILL}`;
     case "diamond-edit":
-      return diamondOutput(size);
+      return diamond_output(size);
     case "shared-range-edit":
       return 101;
     case "distinct-range-edit":
@@ -58,7 +58,7 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "criteria-range-edit":
       return size - Math.floor(size / 2) + 1;
     case "xlookup-mixed-exact":
-      return mixedLookupOutput(size);
+      return mixed_lookup_output(size);
     case "lookup-range-edit":
       return (size - 1) * 2;
     case "spill-filter-resize":
@@ -73,7 +73,7 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       // Compared as text: the relative tolerance would hide a small error in a 5-billion total.
       return `${(size * (size - 1)) / 2 + size * SUM_MULTI_RANGE_FILL}`;
     case "sumifs-3-criteria":
-      return sumifsCriteriaTotal(size);
+      return sumifs_criteria_total(size);
     case "countif-100k":
       return size - Math.floor(size / COUNTIF_MATCH_SHARE);
     case "unicode-text-date-edit":
@@ -108,7 +108,7 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "table-append-row":
       return ((size + 1) * (size + 2)) / 2;
     case "sort-formula-column":
-      return 2 * (sortedSourceRow(size, size - 1) + 1);
+      return 2 * (sorted_source_row(size, size - 1) + 1);
     case "cell-move-refs":
       return size * CELL_MOVE_SCALE;
     case "parse-load-qualified":
@@ -117,19 +117,19 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "memory-import":
       return size * 2;
     case "groupby-sum":
-      return groupingEditedTotal(size);
+      return grouping_edited_total(size);
     case "pivotby-percentof":
-      return groupingFirstQuarterShare(size);
+      return grouping_first_quarter_share(size);
     case "pivot-rebuild":
-      return pivotRebuildOutput(size);
+      return pivot_rebuild_output(size);
     case "getpivotdata-many":
-      return pivotDataValue(size - 1);
+      return pivot_data_value(size - 1);
     case "getpivotdata-source-edit":
-      return pivotDataValue(size - 1) + PIVOT_DATA_SOURCE_DELTA;
+      return pivot_data_value(size - 1) + PIVOT_DATA_SOURCE_DELTA;
     case "analysis-calls":
-      return analysisCallsOutput(size);
+      return analysis_calls_output(size);
     case "history-diff":
-      return historyDiffOutput();
+      return history_diff_output();
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -139,33 +139,33 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "spill-filter-same-range":
       return `${SAME_RANGE_EDITED_FIRST}:0`;
     case "conditional-format-window":
-      return conditionalWindowOutput(size);
+      return conditional_window_output(size);
     case "take-sort-filter":
-      return `${takeSortFilterFirst(size)}:0`;
+      return `${take_sort_filter_first(size)}:0`;
     case "paged-cell-reads":
-      return pagedCellReadsOutput(size);
+      return paged_cell_reads_output(size);
     case "paged-insert-row":
-      return pagedInsertRowOutput(size);
+      return paged_insert_row_output(size);
     case "paged-range-loaded":
       return 1;
     case "paged-eviction":
-      return pagedEvictionOutput(size);
+      return paged_eviction_output(size);
     case "index-match-many":
       return INDEX_MATCH_VALUE_SCALE * (SHAPE_EDITED_SCALE + size - 1);
     case "rank-many":
       return `${size}:${RANK_MANY_EDITED_FIRST}`;
     case "sort-unique-filter":
-      return sortUniqueOutput(SORT_UNIQUE_EDITED_ROWS);
+      return sort_unique_output(SORT_UNIQUE_EDITED_ROWS);
     case "subtotal-filtered":
-      return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
+      return subtotal_output(size, SUBTOTAL_EDITED_FIRST);
     case "sort-mixed-blanks":
-      return sortMixedBlanksOutput(size);
+      return sort_mixed_blanks_output(size);
     case "sort-rows-labels":
-      return sortRowsOutput(size, sortRowsLabel);
+      return sort_rows_output(size, sort_rows_label);
     case "sort-rows-numbers":
-      return sortRowsOutput(size, sortRowsNumber);
+      return sort_rows_output(size, sort_rows_number);
     case "sparse-page-write":
-      return sparsePageOutput(size);
+      return sparse_page_output(size);
     case "map-lambda":
     case "lambda-call":
     case "named-lambda":
@@ -175,7 +175,7 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "byrow-lambda":
       return 2 * size * CLOSURE_EDITED_SCALE;
     case "measure-pivot":
-      return measurePivotOutput(size);
+      return measure_pivot_output(size);
     default:
       throw new Error(`formula benchmark has no expected output for workload=${id};size=${size}`);
   }
@@ -200,31 +200,31 @@ export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`formula benchmark correctness failure: ${message}`);
 }
 
-function setFormulas(store: CellStore, sheet: number, formulas: readonly FormulaCell[]): void {
+function set_formulas(store: CellStore, sheet: number, formulas: readonly FormulaCell[]): void {
   for (const formula of formulas) {
     store.setFormula(sheet, formula.row, formula.col, formula.src, 0);
   }
 }
 
-function numberAt(store: CellStore, sheet: number, row: number, col: number): number {
+function number_at(store: CellStore, sheet: number, row: number, col: number): number {
   const cell = store.getCell(sheet, row, col);
   const value = cell.num;
   cell.free();
   return value;
 }
 
-function textAt(store: CellStore, sheet: number, row: number, col: number): string | undefined {
+function text_at(store: CellStore, sheet: number, row: number, col: number): string | undefined {
   const cell = store.getCell(sheet, row, col);
   const value = cell.string;
   cell.free();
   return value;
 }
 
-function numericColumn(count: number, value: (row: number) => number): Float64Array {
+function numeric_column(count: number, value: (row: number) => number): Float64Array {
   return Float64Array.from({ length: count }, (_, row) => value(row));
 }
 
-function independentLoadFixture(count: number): TimedFixture {
+function independent_load_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -232,22 +232,22 @@ function independentLoadFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   const formulas = independentFormulas(count);
   return {
     store,
-    run: () => setFormulas(store, sheet, formulas),
+    run: () => set_formulas(store, sheet, formulas),
     check: () => {
       store.recompute(sheet);
-      return numberAt(store, sheet, count - 1, 1);
+      return number_at(store, sheet, count - 1, 1);
     },
     dispose: () => store.free(),
   };
 }
 
-function independentRecomputeFixture(count: number): TimedFixture {
+function independent_recompute_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -255,27 +255,27 @@ function independentRecomputeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
-  setFormulas(store, sheet, independentFormulas(count));
+  set_formulas(store, sheet, independentFormulas(count));
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
   };
 }
 
-function chainFixture(depth: number): TimedFixture {
+function chain_fixture(depth: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(1, depth);
   store.setNumber(sheet, 0, 0, 1, 0);
-  setFormulas(store, sheet, linearChain(depth));
+  set_formulas(store, sheet, linearChain(depth));
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, depth - 1, 0),
+    check: () => number_at(store, sheet, depth - 1, 0),
     dispose: () => store.free(),
   };
 }
@@ -284,24 +284,24 @@ function chainFixture(depth: number): TimedFixture {
 const FAN_OUT_SOURCE_VALUE = 1;
 const FAN_OUT_EDITED_VALUE = 10;
 
-function fanOutEditFixture(count: number, unrelated = false): TimedFixture {
+function fan_out_edit_fixture(count: number, unrelated = false): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, Math.max(1, count));
-  const editedColumn = unrelated ? 2 : 0;
+  const edited_column = unrelated ? 2 : 0;
   store.setNumber(sheet, 0, 0, FAN_OUT_SOURCE_VALUE, 0);
-  setFormulas(store, sheet, fanOutFormulas(count));
+  set_formulas(store, sheet, fanOutFormulas(count));
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.setNumber(sheet, 0, editedColumn, FAN_OUT_EDITED_VALUE, 0);
+      store.setNumber(sheet, 0, edited_column, FAN_OUT_EDITED_VALUE, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
-      if (unrelated) store.clearCell(sheet, 0, editedColumn, 0);
-      else store.setNumber(sheet, 0, editedColumn, FAN_OUT_SOURCE_VALUE, 0);
+      if (unrelated) store.clearCell(sheet, 0, edited_column, 0);
+      else store.setNumber(sheet, 0, edited_column, FAN_OUT_SOURCE_VALUE, 0);
       store.recompute(sheet);
     },
   };
@@ -312,7 +312,7 @@ const CONSTANT_EDIT_FILL = 10;
 const CONSTANT_EDIT_BASE = 1;
 const CONSTANT_EDIT_EDITED_BASE = 2;
 
-function constantEditFixture(count: number): TimedFixture {
+function constant_edit_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -320,7 +320,7 @@ function constantEditFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -328,7 +328,7 @@ function constantEditFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, () => CONSTANT_EDIT_FILL),
+    numeric_column(count, () => CONSTANT_EDIT_FILL),
     0,
   );
   for (let row = 0; row < count; row++) {
@@ -341,7 +341,7 @@ function constantEditFixture(count: number): TimedFixture {
       store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_EDITED_BASE}`, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
+    check: () => `${number_at(store, sheet, 0, 2)}:${number_at(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: () => {
       store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_BASE}`, 0);
@@ -383,7 +383,7 @@ export function gridConstantEditSample(count: number) {
     },
   );
   try {
-    const samplesMs: number[] = [];
+    const samples_ms: number[] = [];
     // Alternate constants so every sample is a real source replacement.
     for (let sample = 0; sample < 12; sample++) {
       const constant = sample % 2 === 0 ? CONSTANT_EDIT_EDITED_BASE : CONSTANT_EDIT_BASE;
@@ -397,21 +397,21 @@ export function gridConstantEditSample(count: number) {
           },
         ],
       });
-      const elapsedMs = now() - started;
+      const elapsed_ms = now() - started;
       assert(result.status === "applied", "Grid constant edit must apply");
       assert(
         store.getCell({ sheet: "constant-edit", row: 0, col: 2 }).resolved ===
           CONSTANT_EDIT_FILL + constant,
         "Grid constant edit output",
       );
-      if (sample >= 2) samplesMs.push(elapsedMs);
+      if (sample >= 2) samples_ms.push(elapsed_ms);
     }
     const output = `${store.getCell({ sheet: "constant-edit", row: 0, col: 2 }).resolved}:${store.getCell({ sheet: "constant-edit", row: count - 1, col: 2 }).resolved}`;
     return {
       id: "grid-formula-constant-edit",
       size: count,
-      samplesMs,
-      stat: summarize(samplesMs),
+      samplesMs: samples_ms,
+      stat: summarize(samples_ms),
       output,
     };
   } finally {
@@ -420,7 +420,7 @@ export function gridConstantEditSample(count: number) {
 }
 
 /** Undo a timed one-cell number edit, untimed, so the next timed edit repeats the same work. */
-function restoreNumber(
+function restore_number(
   store: CellStore,
   sheet: number,
   cell: { row: number; col: number; value: number },
@@ -431,11 +431,11 @@ function restoreNumber(
   };
 }
 
-function diamondFixture(levels: number): TimedFixture {
+function diamond_fixture(levels: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, levels);
   store.setNumber(sheet, 0, 0, 1, 0);
-  setFormulas(store, sheet, diamondFormulas(levels));
+  set_formulas(store, sheet, diamondFormulas(levels));
   store.recompute(sheet);
   return {
     store,
@@ -443,13 +443,13 @@ function diamondFixture(levels: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, levels - 1, 3),
+    check: () => number_at(store, sheet, levels - 1, 3),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function sharedRangeFixture(count: number): TimedFixture {
+function shared_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, Math.max(count, 100));
   writeNumberColumn(
@@ -457,10 +457,10 @@ function sharedRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(100, () => 1),
+    numeric_column(100, () => 1),
     0,
   );
-  setFormulas(store, sheet, sharedRangeFormulas(count));
+  set_formulas(store, sheet, sharedRangeFormulas(count));
   store.recompute(sheet);
   return {
     store,
@@ -468,13 +468,13 @@ function sharedRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function distinctRangeFixture(count: number): TimedFixture {
+function distinct_range_fixture(count: number): TimedFixture {
   const rows = count * 10;
   const store = new CellStore();
   const sheet = store.addSheet(2, rows);
@@ -483,10 +483,10 @@ function distinctRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(rows, () => 1),
+    numeric_column(rows, () => 1),
     0,
   );
-  setFormulas(store, sheet, distinctRangeFormulas(count));
+  set_formulas(store, sheet, distinctRangeFormulas(count));
   store.recompute(sheet);
   return {
     store,
@@ -494,13 +494,13 @@ function distinctRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    check: () => `${number_at(store, sheet, 0, 1)}:${number_at(store, sheet, count - 1, 1)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function crossSheetFixture(count: number): TimedFixture {
+function cross_sheet_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const source = store.addSheet(1, 100);
   const summary = store.addSheet(1, count);
@@ -511,7 +511,7 @@ function crossSheetFixture(count: number): TimedFixture {
     source,
     0,
     0,
-    numericColumn(100, () => 1),
+    numeric_column(100, () => 1),
     0,
   );
   for (let row = 0; row < count; row++) {
@@ -524,13 +524,13 @@ function crossSheetFixture(count: number): TimedFixture {
       store.setNumber(source, 0, 0, 2, 0);
       store.recompute(source);
     },
-    check: () => numberAt(store, summary, count - 1, 0),
+    check: () => number_at(store, summary, count - 1, 0),
     dispose: () => store.free(),
-    restore: restoreNumber(store, source, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, source, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function topologyFixture(count: number): TimedFixture {
+function topology_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -538,10 +538,10 @@ function topologyFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
-  setFormulas(store, sheet, independentFormulas(count));
+  set_formulas(store, sheet, independentFormulas(count));
   store.recompute(sheet);
   return {
     store,
@@ -553,12 +553,12 @@ function topologyFixture(count: number): TimedFixture {
       }
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    check: () => `${number_at(store, sheet, 0, 1)}:${number_at(store, sheet, count - 1, 1)}`,
     dispose: () => store.free(),
   };
 }
 
-function cycleFixture(pairs: number): TimedFixture {
+function cycle_fixture(pairs: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, pairs);
   for (let row = 0; row < pairs; row++) {
@@ -568,12 +568,12 @@ function cycleFixture(pairs: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => textAt(store, sheet, pairs - 1, 1) ?? "",
+    check: () => text_at(store, sheet, pairs - 1, 1) ?? "",
     dispose: () => store.free(),
   };
 }
 
-function refRemovalFixture(count: number): TimedFixture {
+function ref_removal_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const source = store.addSheet(1, 1);
   const summary = store.addSheet(1, count);
@@ -587,12 +587,12 @@ function refRemovalFixture(count: number): TimedFixture {
     run: () => {
       store.removeSheet(source);
     },
-    check: () => textAt(store, summary, count - 1, 0) ?? "",
+    check: () => text_at(store, summary, count - 1, 0) ?? "",
     dispose: () => store.free(),
   };
 }
 
-function errorPropagationFixture(count: number): TimedFixture {
+function error_propagation_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   store.setFormula(sheet, 0, 0, "=1/0", 0);
@@ -600,12 +600,12 @@ function errorPropagationFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => textAt(store, sheet, count - 1, 1) ?? "",
+    check: () => text_at(store, sheet, count - 1, 1) ?? "",
     dispose: () => store.free(),
   };
 }
 
-function criteriaRangeFixture(count: number): TimedFixture {
+function criteria_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -613,7 +613,7 @@ function criteriaRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -621,7 +621,7 @@ function criteriaRangeFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, () => 1),
+    numeric_column(count, () => 1),
     0,
   );
   const threshold = Math.floor(count / 2);
@@ -633,13 +633,13 @@ function criteriaRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, count, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 2),
+    check: () => number_at(store, sheet, 0, 2),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
-function lookupRangeFixture(count: number): TimedFixture {
+function lookup_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   writeNumberColumn(
@@ -647,7 +647,7 @@ function lookupRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -655,7 +655,7 @@ function lookupRangeFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, (row) => row * 2),
+    numeric_column(count, (row) => row * 2),
     0,
   );
   store.setNumber(sheet, 0, 2, 0, 0);
@@ -667,9 +667,9 @@ function lookupRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 2, count - 1, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 3),
+    check: () => number_at(store, sheet, 0, 3),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: 0 }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: 0 }),
   };
 }
 
@@ -689,10 +689,10 @@ const TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW = 11;
 const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
 
 /** Ascending numeric key column plus a result column that scales with the key. */
-function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+function lookup_table_store(table_rows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
-  const sheet = store.addSheet(4, tableRows);
-  writeLookupTable(store, sheet, tableRows);
+  const sheet = store.addSheet(4, table_rows);
+  write_lookup_table(store, sheet, table_rows);
   return { store, sheet };
 }
 
@@ -700,23 +700,23 @@ function lookupTableStore(tableRows: number): { store: CellStore; sheet: number 
  * The lookup table in a datasource-backed paged sheet: every page loaded
  * from the host and none evicted, so lookups read clean pages.
  */
-function pagedLookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+function paged_lookup_table_store(table_rows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
-  const sheet = store.addPagedSheet(4, tableRows, PAGED_CHUNK_ROWS, 0, 0);
+  const sheet = store.addPagedSheet(4, table_rows, PAGED_CHUNK_ROWS, 0, 0);
   store.beginPageLoad();
-  writeLookupTable(store, sheet, tableRows);
+  write_lookup_table(store, sheet, table_rows);
   store.commitSources();
   return { store, sheet };
 }
 
-/** Keys `1..=tableRows` in A, results in B. */
-function writeLookupTable(store: CellStore, sheet: number, tableRows: number): void {
+/** Keys `1..=table_rows` in A, results in B. */
+function write_lookup_table(store: CellStore, sheet: number, table_rows: number): void {
   writeNumberColumn(
     store,
     sheet,
     0,
     0,
-    numericColumn(tableRows, (row) => row + 1),
+    numeric_column(table_rows, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -724,46 +724,46 @@ function writeLookupTable(store: CellStore, sheet: number, tableRows: number): v
     sheet,
     1,
     0,
-    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    numeric_column(table_rows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
     0,
   );
 }
 
 /** Zero-padded text keys stay ascending under the case-insensitive lookup comparison. */
-function textLookupKeyAt(row: number): string {
+function text_lookup_key_at(row: number): string {
   return `${TEXT_LOOKUP_KEY_PREFIX}${String(row).padStart(TEXT_LOOKUP_KEY_PADDING, "0")}`;
 }
 
 /** The query key differs from the stored key only by letter case. */
-function textLookupQueryKey(row: number): string {
+function text_lookup_query_key(row: number): string {
   return `${TEXT_LOOKUP_QUERY_PREFIX}${String(row).padStart(TEXT_LOOKUP_KEY_PADDING, "0")}`;
 }
 
 /** Sorts between the stored keys of `row` and `row + 1`, so only approximate matching can land. */
-function textLookupBetweenQueryKey(row: number): string {
-  return `${textLookupQueryKey(row)}5`;
+function text_lookup_between_query_key(row: number): string {
+  return `${text_lookup_query_key(row)}5`;
 }
 
 /** Ascending text key column plus the same result column as the numeric table. */
-function textLookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+function text_lookup_table_store(table_rows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
-  const sheet = store.addSheet(4, tableRows);
-  for (let row = 0; row < tableRows; row++) {
-    store.setString(sheet, row, 0, textLookupKeyAt(row), 0);
+  const sheet = store.addSheet(4, table_rows);
+  for (let row = 0; row < table_rows; row++) {
+    store.setString(sheet, row, 0, text_lookup_key_at(row), 0);
   }
   writeNumberColumn(
     store,
     sheet,
     1,
     0,
-    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    numeric_column(table_rows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
     0,
   );
   return { store, sheet };
 }
 
 /** The shared key cell takes a number for numeric tables and text for text tables. */
-function writeLookupKey(store: CellStore, sheet: number, key: number | string): void {
+function write_lookup_key(store: CellStore, sheet: number, key: number | string): void {
   if (typeof key === "number") store.setNumber(sheet, 0, 2, key, 0);
   else store.setString(sheet, 0, 2, key, 0);
 }
@@ -784,8 +784,8 @@ const LOOKUP_EDIT_SUFFIX = "-edit";
 const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   {
     id: "vlookup-many",
-    table: lookupTableStore,
-    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
+    table: lookup_table_store,
+    formula: (table_rows) => `=VLOOKUP($C$1,A1:B${table_rows},2,FALSE)`,
     initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_EDITED_KEY,
     initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
@@ -793,8 +793,8 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "vlookup-many-sorted",
-    table: lookupTableStore,
-    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
+    table: lookup_table_store,
+    formula: (table_rows) => `=VLOOKUP($C$1,A1:B${table_rows},2,TRUE)`,
     initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
     initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
@@ -802,8 +802,8 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "xlookup-many",
-    table: lookupTableStore,
-    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    table: lookup_table_store,
+    formula: (table_rows) => `=XLOOKUP($C$1,A1:A${table_rows},B1:B${table_rows})`,
     initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_EDITED_KEY,
     initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
@@ -811,8 +811,8 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "paged-vlookup-many",
-    table: pagedLookupTableStore,
-    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
+    table: paged_lookup_table_store,
+    formula: (table_rows) => `=VLOOKUP($C$1,A1:B${table_rows},2,FALSE)`,
     initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_EDITED_KEY,
     initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
@@ -820,8 +820,8 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "paged-xlookup-many",
-    table: pagedLookupTableStore,
-    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    table: paged_lookup_table_store,
+    formula: (table_rows) => `=XLOOKUP($C$1,A1:A${table_rows},B1:B${table_rows})`,
     initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_EDITED_KEY,
     initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
@@ -829,8 +829,8 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "xlookup-many-sorted",
-    table: lookupTableStore,
-    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows},,-1,2)`,
+    table: lookup_table_store,
+    formula: (table_rows) => `=XLOOKUP($C$1,A1:A${table_rows},B1:B${table_rows},,-1,2)`,
     initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
     initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
@@ -838,31 +838,31 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   },
   {
     id: "text-lookup-many",
-    table: textLookupTableStore,
-    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
-    initialKey: textLookupQueryKey(TEXT_LOOKUP_INITIAL_ROW),
-    editedKey: textLookupQueryKey(TEXT_LOOKUP_EDITED_ROW),
+    table: text_lookup_table_store,
+    formula: (table_rows) => `=XLOOKUP($C$1,A1:A${table_rows},B1:B${table_rows})`,
+    initialKey: text_lookup_query_key(TEXT_LOOKUP_INITIAL_ROW),
+    editedKey: text_lookup_query_key(TEXT_LOOKUP_EDITED_ROW),
     initialValue: (TEXT_LOOKUP_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
     editedValue: (TEXT_LOOKUP_EDITED_ROW + 1) * LOOKUP_RESULT_FACTOR,
   },
   {
     id: "text-lookup-many-sorted",
-    table: textLookupTableStore,
-    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
-    initialKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW),
-    editedKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_ROW),
+    table: text_lookup_table_store,
+    formula: (table_rows) => `=VLOOKUP($C$1,A1:B${table_rows},2,TRUE)`,
+    initialKey: text_lookup_between_query_key(TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW),
+    editedKey: text_lookup_between_query_key(TEXT_LOOKUP_APPROXIMATE_ROW),
     initialValue: (TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
     editedValue: (TEXT_LOOKUP_APPROXIMATE_ROW + 1) * LOOKUP_RESULT_FACTOR,
   },
 ];
 
 /** Every lookup workload reports the shared result plus the key its formulas were last queried with. */
-function lookupVariantOutput(id: string): FormulaOutput | undefined {
-  const editsKey = id.endsWith(LOOKUP_EDIT_SUFFIX);
-  const baseId = editsKey ? id.slice(0, -LOOKUP_EDIT_SUFFIX.length) : id;
-  const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === baseId);
+function lookup_variant_output(id: string): FormulaOutput | undefined {
+  const edits_key = id.endsWith(LOOKUP_EDIT_SUFFIX);
+  const base_id = edits_key ? id.slice(0, -LOOKUP_EDIT_SUFFIX.length) : id;
+  const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === base_id);
   if (variant === undefined) return undefined;
-  return editsKey
+  return edits_key
     ? `${variant.editedValue}:${variant.editedKey}`
     : `${variant.initialValue}:${variant.initialKey}`;
 }
@@ -875,37 +875,37 @@ type LookupPhase = "first-recompute" | "key-edit";
  * recalculation of all formulas or one key edit with its recalculation; afterwards every formula
  * is read outside the timed interval and compared with the value computed here.
  */
-function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant): TimedFixture {
-  const tableRows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
-  const { store, sheet } = variant.table(tableRows);
-  writeLookupKey(store, sheet, variant.initialKey);
-  const source = variant.formula(tableRows);
+function lookup_fixture(count: number, phase: LookupPhase, variant: LookupVariant): TimedFixture {
+  const table_rows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
+  const { store, sheet } = variant.table(table_rows);
+  write_lookup_key(store, sheet, variant.initialKey);
+  const source = variant.formula(table_rows);
   for (let row = 0; row < count; row++) store.setFormula(sheet, row, 3, source, 0);
-  const editsKey = phase === "key-edit";
-  const expectedValue = editsKey ? variant.editedValue : variant.initialValue;
-  const expectedKey = editsKey ? variant.editedKey : variant.initialKey;
+  const edits_key = phase === "key-edit";
+  const expected_value = edits_key ? variant.editedValue : variant.initialValue;
+  const expected_key = edits_key ? variant.editedKey : variant.initialKey;
   // The edit phase starts from computed values, so its timed unit is the key edit alone.
-  if (editsKey) store.recompute(sheet);
+  if (edits_key) store.recompute(sheet);
   return {
     store,
     run: () => {
-      if (editsKey) writeLookupKey(store, sheet, variant.editedKey);
+      if (edits_key) write_lookup_key(store, sheet, variant.editedKey);
       store.recompute(sheet);
     },
     check: () => {
       for (let row = 0; row < count; row++) {
-        const value = numberAt(store, sheet, row, 3);
+        const value = number_at(store, sheet, row, 3);
         assert(
-          value === expectedValue,
-          `${variant.id} row ${row} expected ${expectedValue}, observed ${value}`,
+          value === expected_value,
+          `${variant.id} row ${row} expected ${expected_value}, observed ${value}`,
         );
       }
-      return `${expectedValue}:${expectedKey}`;
+      return `${expected_value}:${expected_key}`;
     },
     dispose: () => store.free(),
-    ...(editsKey && {
+    ...(edits_key && {
       restore: () => {
-        writeLookupKey(store, sheet, variant.initialKey);
+        write_lookup_key(store, sheet, variant.initialKey);
         store.recompute(sheet);
       },
     }),
@@ -918,20 +918,20 @@ function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant
 const MIXED_LOOKUP_ROWS_PER_FORMULA = 10;
 
 /** Even rows hold numbers and odd rows text, so one key column mixes types. */
-function mixedLookupKeyAt(row: number): number | string {
+function mixed_lookup_key_at(row: number): number | string {
   return row % 2 === 0 ? row : `Key${row}`;
 }
 
 /** Formula `formula` looks up table row `formula * 10 + formula % 2`, so the
  * keys alternate between numbers and text. Text keys differ from the table
  * only in case. */
-function mixedLookupRowOf(formula: number): number {
+function mixed_lookup_row_of(formula: number): number {
   return formula * MIXED_LOOKUP_ROWS_PER_FORMULA + (formula % 2);
 }
 
-function mixedLookupOutput(tableRows: number): string {
-  const last = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA - 1;
-  return `${mixedLookupRowOf(last) + 1}`;
+function mixed_lookup_output(table_rows: number): string {
+  const last = table_rows / MIXED_LOOKUP_ROWS_PER_FORMULA - 1;
+  return `${mixed_lookup_row_of(last) + 1}`;
 }
 
 /**
@@ -939,11 +939,11 @@ function mixedLookupOutput(tableRows: number): string {
  * unit is the first recalculation of all formulas; every result is checked
  * outside the timed interval.
  */
-function mixedLookupFixture(tableRows: number): TimedFixture {
+function mixed_lookup_fixture(table_rows: number): TimedFixture {
   const store = new CellStore();
-  const sheet = store.addSheet(4, tableRows);
-  for (let row = 0; row < tableRows; row++) {
-    const key = mixedLookupKeyAt(row);
+  const sheet = store.addSheet(4, table_rows);
+  for (let row = 0; row < table_rows; row++) {
+    const key = mixed_lookup_key_at(row);
     if (typeof key === "number") store.setNumber(sheet, row, 0, key, 0);
     else store.setString(sheet, row, 0, key, 0);
   }
@@ -952,20 +952,20 @@ function mixedLookupFixture(tableRows: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(tableRows, (row) => row + 1),
+    numeric_column(table_rows, (row) => row + 1),
     0,
   );
 
-  const formulas = tableRows / MIXED_LOOKUP_ROWS_PER_FORMULA;
+  const formulas = table_rows / MIXED_LOOKUP_ROWS_PER_FORMULA;
   for (let formula = 0; formula < formulas; formula++) {
-    const key = mixedLookupKeyAt(mixedLookupRowOf(formula));
+    const key = mixed_lookup_key_at(mixed_lookup_row_of(formula));
     if (typeof key === "number") store.setNumber(sheet, formula, 2, key, 0);
     else store.setString(sheet, formula, 2, key.toLowerCase(), 0);
     store.setFormula(
       sheet,
       formula,
       3,
-      `=XLOOKUP(C${formula + 1},A1:A${tableRows},B1:B${tableRows})`,
+      `=XLOOKUP(C${formula + 1},A1:A${table_rows},B1:B${table_rows})`,
       0,
     );
   }
@@ -975,20 +975,20 @@ function mixedLookupFixture(tableRows: number): TimedFixture {
     run: () => store.recompute(sheet),
     check: () => {
       for (let formula = 0; formula < formulas; formula++) {
-        const value = numberAt(store, sheet, formula, 3);
-        const expected = mixedLookupRowOf(formula) + 1;
+        const value = number_at(store, sheet, formula, 3);
+        const expected = mixed_lookup_row_of(formula) + 1;
         assert(
           value === expected,
           `xlookup-mixed-exact row ${formula} expected ${expected}, observed ${value}`,
         );
       }
-      return mixedLookupOutput(tableRows);
+      return mixed_lookup_output(table_rows);
     },
     dispose: () => store.free(),
   };
 }
 
-function spillFilterResizeFixture(count: number): TimedFixture {
+function spill_filter_resize_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -996,7 +996,7 @@ function spillFilterResizeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   for (let row = 0; row < count; row++) store.setBool(sheet, row, 1, row + 1 < count, 0);
@@ -1009,7 +1009,7 @@ function spillFilterResizeFixture(count: number): TimedFixture {
       store.recompute(sheet);
     },
     check: () =>
-      `${numberAt(store, sheet, count - 1, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
+      `${number_at(store, sheet, count - 1, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: () => {
       store.setBool(sheet, count - 1, 1, false, 0);
@@ -1026,7 +1026,7 @@ const SAME_RANGE_EDITED_FIRST = -1;
  * instead of the filter, so the spill comes back over the same range with one
  * changed cell: the anchor.
  */
-function spillFilterSameRangeFixture(count: number): TimedFixture {
+function spill_filter_same_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -1034,7 +1034,7 @@ function spillFilterSameRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   for (let row = 0; row < count; row++) store.setBool(sheet, row, 1, true, 0);
@@ -1046,9 +1046,9 @@ function spillFilterSameRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, SAME_RANGE_EDITED_FIRST, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
+    check: () => `${number_at(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -1070,21 +1070,21 @@ const CONDITIONAL_FORMULA_KIND = 6;
 const CONDITIONAL_GREATER_KIND = 0;
 
 /** The window's cell values; the sheet's one column right of the window is blank. */
-function conditionalWindowValue(row: number, col: number): number {
+function conditional_window_value(row: number, col: number): number {
   return col < CONDITIONAL_WINDOW_COLS ? (row * 7 + col * 3) % 10 : 0;
 }
 
 /** Matched rule bits over the window, counted here from the same rules. */
-function conditionalWindowOutput(size: number): number {
-  const value = conditionalWindowValue;
+function conditional_window_output(size: number): number {
+  const value = conditional_window_value;
   let matches = 0;
   for (let row = 0; row < size / CONDITIONAL_WINDOW_COLS; row++) {
-    const rowSum = value(row, 0) + value(row, 1) + value(row, 2);
+    const row_sum = value(row, 0) + value(row, 1) + value(row, 2);
     for (let col = 0; col < CONDITIONAL_WINDOW_COLS; col++) {
       const cell = value(row, col);
       if (cell > value(1, 0)) matches++;
       if (cell > value(row, col + 1) && row % 2 === 0) matches++;
-      if (rowSum > 12) matches++;
+      if (row_sum > 12) matches++;
       if (cell > CONDITIONAL_WINDOW_GREATER_THAN) matches++;
     }
   }
@@ -1092,7 +1092,7 @@ function conditionalWindowOutput(size: number): number {
 }
 
 /** Set bits in the conditional-match words at the end of a packed window. */
-function packedConditionalMatches(packed: Uint8Array): number {
+function packed_conditional_matches(packed: Uint8Array): number {
   const view = new DataView(packed.buffer, packed.byteOffset, packed.byteLength);
   const words = view.getUint32(32, true);
   let matches = 0;
@@ -1106,15 +1106,15 @@ function packedConditionalMatches(packed: Uint8Array): number {
  * One render-window read of `size` visible cells, 100 columns wide, under
  * three formula rules and one value rule. Nothing changes between reads.
  */
-function conditionalFormatWindowFixture(size: number): TimedFixture {
+function conditional_format_window_fixture(size: number): TimedFixture {
   const rows = size / CONDITIONAL_WINDOW_COLS;
   const store = new CellStore();
   const sheet = store.addSheet(CONDITIONAL_WINDOW_COLS + 1, rows);
   for (let col = 0; col < CONDITIONAL_WINDOW_COLS; col++) {
-    const values = numericColumn(rows, (row) => conditionalWindowValue(row, col));
+    const values = numeric_column(rows, (row) => conditional_window_value(row, col));
     writeNumberColumn(store, sheet, col, 0, values, 0);
   }
-  const ruleCount = CONDITIONAL_WINDOW_FORMULAS.length + 1;
+  const rule_count = CONDITIONAL_WINDOW_FORMULAS.length + 1;
   const bounds = [0, 0, rows - 1, CONDITIONAL_WINDOW_COLS - 1];
   store.setConditionalRules(
     sheet,
@@ -1122,13 +1122,13 @@ function conditionalFormatWindowFixture(size: number): TimedFixture {
       ...CONDITIONAL_WINDOW_FORMULAS.map(() => CONDITIONAL_FORMULA_KIND),
       CONDITIONAL_GREATER_KIND,
     ]),
-    Uint32Array.from(Array.from({ length: ruleCount }, () => bounds).flat()),
+    Uint32Array.from(Array.from({ length: rule_count }, () => bounds).flat()),
     Float64Array.from([
       ...CONDITIONAL_WINDOW_FORMULAS.map(() => 0),
       CONDITIONAL_WINDOW_GREATER_THAN,
     ]),
     [...CONDITIONAL_WINDOW_FORMULAS, ""],
-    new Uint8Array(ruleCount),
+    new Uint8Array(rule_count),
   );
   const cols = Uint32Array.from({ length: CONDITIONAL_WINDOW_COLS }, (_, col) => col);
   let packed: Uint8Array = new Uint8Array();
@@ -1139,7 +1139,7 @@ function conditionalFormatWindowFixture(size: number): TimedFixture {
       packed = view.takePacked();
       view.free();
     },
-    check: () => packedConditionalMatches(packed),
+    check: () => packed_conditional_matches(packed),
     dispose: () => store.free(),
     // A read changes nothing, so the next read needs no undo.
     restore: () => {},
@@ -1155,13 +1155,13 @@ const TAKE_SORT_FILTER_TAKEN = 1_000;
 /** The threshold in E1 before and after the timed edit; C must be above it. */
 const TAKE_SORT_FILTER_THRESHOLD = 10;
 const TAKE_SORT_FILTER_EDITED_THRESHOLD = 11;
-const takeSortFilterFlag = (row: number) =>
+const take_sort_filter_flag = (row: number) =>
   (row * TAKE_SORT_FILTER_FLAG_STEP) % TAKE_SORT_FILTER_FLAGS;
 
 /** Column B of the first spilled row: the largest B among rows above the edited threshold. */
-function takeSortFilterFirst(count: number): number {
+function take_sort_filter_first(count: number): number {
   for (let row = 0; row < count; row++) {
-    if (takeSortFilterFlag(row) > TAKE_SORT_FILTER_EDITED_THRESHOLD) return count - row;
+    if (take_sort_filter_flag(row) > TAKE_SORT_FILTER_EDITED_THRESHOLD) return count - row;
   }
   throw new Error("take-sort-filter keeps no row");
 }
@@ -1173,13 +1173,17 @@ function takeSortFilterFirst(count: number): number {
  * read instead of copying them, so the chain copies only the 1,000 rows it
  * spills (#325, R4).
  */
-function takeSortFilterFixture(count: number): TimedFixture {
+function take_sort_filter_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(9, count);
   const keys = Math.floor(count / TAKE_SORT_FILTER_KEYS_PER_VALUE);
-  const columns = [(row: number) => row % keys, (row: number) => count - row, takeSortFilterFlag];
+  const columns = [
+    (row: number) => row % keys,
+    (row: number) => count - row,
+    take_sort_filter_flag,
+  ];
   columns.forEach((value, col) =>
-    writeNumberColumn(store, sheet, col, 0, numericColumn(count, value), 0),
+    writeNumberColumn(store, sheet, col, 0, numeric_column(count, value), 0),
   );
   store.setNumber(sheet, 0, 4, TAKE_SORT_FILTER_THRESHOLD, 0);
   store.setFormula(
@@ -1197,13 +1201,13 @@ function takeSortFilterFixture(count: number): TimedFixture {
       store.recompute(sheet);
     },
     check: () =>
-      `${numberAt(store, sheet, 0, 6)}:${store.spillAnchorRow(sheet, TAKE_SORT_FILTER_TAKEN - 1, 5)}`,
+      `${number_at(store, sheet, 0, 6)}:${store.spillAnchorRow(sheet, TAKE_SORT_FILTER_TAKEN - 1, 5)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 4, value: TAKE_SORT_FILTER_THRESHOLD }),
+    restore: restore_number(store, sheet, { row: 0, col: 4, value: TAKE_SORT_FILTER_THRESHOLD }),
   };
 }
 
-function spillSequenceAdmissionFixture(count: number): TimedFixture {
+function spill_sequence_admission_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(1, count);
   store.setFormula(sheet, 0, 0, `=SEQUENCE(${count})`, 0);
@@ -1211,12 +1215,12 @@ function spillSequenceAdmissionFixture(count: number): TimedFixture {
     store,
     run: () => store.recompute(sheet),
     check: () =>
-      `${numberAt(store, sheet, 0, 0)}:${numberAt(store, sheet, count - 1, 0)}:${store.spillAnchorRow(sheet, count - 1, 0)}`,
+      `${number_at(store, sheet, 0, 0)}:${number_at(store, sheet, count - 1, 0)}:${store.spillAnchorRow(sheet, count - 1, 0)}`,
     dispose: () => store.free(),
   };
 }
 
-function sumProductVectorFixture(count: number): TimedFixture {
+function sum_product_vector_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -1224,7 +1228,7 @@ function sumProductVectorFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => (row % 10) + 1),
+    numeric_column(count, (row) => (row % 10) + 1),
     0,
   );
   writeNumberColumn(
@@ -1232,7 +1236,7 @@ function sumProductVectorFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, () => 2),
+    numeric_column(count, () => 2),
     0,
   );
   store.setFormula(sheet, 0, 2, `=SUMPRODUCT(A1:A${count},B1:B${count})`, 0);
@@ -1243,13 +1247,13 @@ function sumProductVectorFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 3, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 2),
+    check: () => number_at(store, sheet, 0, 2),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function sumProductMatrixFixture(elements: number): TimedFixture {
+function sum_product_matrix_fixture(elements: number): TimedFixture {
   const columns = 10;
   const rows = elements / columns;
   assert(Number.isInteger(rows), "SUMPRODUCT matrix shape");
@@ -1261,7 +1265,7 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
       sheet,
       col,
       0,
-      numericColumn(rows, () => 1),
+      numeric_column(rows, () => 1),
       0,
     );
     writeNumberColumn(
@@ -1269,7 +1273,7 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
       sheet,
       columns + col,
       0,
-      numericColumn(rows, () => 2),
+      numeric_column(rows, () => 2),
       0,
     );
   }
@@ -1281,13 +1285,13 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 3, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, columns * 2),
+    check: () => number_at(store, sheet, 0, columns * 2),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
-function criteriaMultiRangeFixture(count: number): TimedFixture {
+function criteria_multi_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   writeNumberColumn(
@@ -1295,7 +1299,7 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -1303,7 +1307,7 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, (row) => row % 2),
+    numeric_column(count, (row) => row % 2),
     0,
   );
   writeNumberColumn(
@@ -1311,7 +1315,7 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
     sheet,
     2,
     0,
-    numericColumn(count, () => 2),
+    numeric_column(count, () => 2),
     0,
   );
   const threshold = count / 2;
@@ -1329,9 +1333,9 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, count, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 3),
+    check: () => number_at(store, sheet, 0, 3),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -1339,7 +1343,7 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
 const SUM_MULTI_RANGE_FILL = 2;
 const COUNTIF_MATCH_SHARE = 2;
 
-function sumMultiRangeFixture(count: number): TimedFixture {
+function sum_multi_range_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -1347,7 +1351,7 @@ function sumMultiRangeFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -1355,14 +1359,14 @@ function sumMultiRangeFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, () => SUM_MULTI_RANGE_FILL),
+    numeric_column(count, () => SUM_MULTI_RANGE_FILL),
     0,
   );
   store.setFormula(sheet, 0, 2, `=SUM(A1:A${count},B1:B${count})`, 0);
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => `${numberAt(store, sheet, 0, 2)}`,
+    check: () => `${number_at(store, sheet, 0, 2)}`,
     dispose: () => store.free(),
   };
 }
@@ -1373,7 +1377,7 @@ const SUMIFS_CRITERIA_OFFSET = 3;
 const SUMIFS_TEXT_MATCH = "keep";
 const SUMIFS_TEXT_OTHER = "skip";
 
-function sumifsCriteriaTotal(count: number): number {
+function sumifs_criteria_total(count: number): number {
   const threshold = Math.floor(count / COUNTIF_MATCH_SHARE);
   let total = 0;
   for (let row = SUMIFS_CRITERIA_OFFSET; row < count; row += SUMIFS_CRITERIA_PERIOD) {
@@ -1382,7 +1386,7 @@ function sumifsCriteriaTotal(count: number): number {
   return total;
 }
 
-function sumifsCriteriaFixture(count: number): TimedFixture {
+function sumifs_criteria_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(5, count);
   writeNumberColumn(
@@ -1390,7 +1394,7 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -1398,7 +1402,7 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, (row) => row % 2),
+    numeric_column(count, (row) => row % 2),
     0,
   );
   for (let row = 0; row < count; row++) {
@@ -1415,7 +1419,7 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
     sheet,
     3,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   store.setFormula(
@@ -1428,12 +1432,12 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, 0, 4),
+    check: () => number_at(store, sheet, 0, 4),
     dispose: () => store.free(),
   };
 }
 
-function countifFixture(count: number): TimedFixture {
+function countif_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -1441,7 +1445,7 @@ function countifFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   store.setFormula(
@@ -1454,12 +1458,12 @@ function countifFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, 0, 1),
+    check: () => number_at(store, sheet, 0, 1),
     dispose: () => store.free(),
   };
 }
 
-function unicodeTextDateFixture(count: number): TimedFixture {
+function unicode_text_date_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   store.setString(sheet, 0, 0, "café😀-2024-02-29", 0);
@@ -1473,7 +1477,7 @@ function unicodeTextDateFixture(count: number): TimedFixture {
       store.setString(sheet, 0, 0, "naïv😀-2024-03-01", 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
       store.setString(sheet, 0, 0, "café😀-2024-02-29", 0);
@@ -1482,7 +1486,7 @@ function unicodeTextDateFixture(count: number): TimedFixture {
   };
 }
 
-function percentileCovarianceFixture(count: number): TimedFixture {
+function percentile_covariance_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -1490,7 +1494,7 @@ function percentileCovarianceFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -1498,7 +1502,7 @@ function percentileCovarianceFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, (row) => 2 * (row + 1) + 3),
+    numeric_column(count, (row) => 2 * (row + 1) + 3),
     0,
   );
   store.setFormula(
@@ -1511,12 +1515,12 @@ function percentileCovarianceFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, 0, 2),
+    check: () => number_at(store, sheet, 0, 2),
     dispose: () => store.free(),
   };
 }
 
-function letReuseFixture(count: number): TimedFixture {
+function let_reuse_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -1524,7 +1528,7 @@ function letReuseFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, () => 1),
+    numeric_column(count, () => 1),
     0,
   );
   store.setFormula(sheet, 0, 1, `=LET(total,SUM(A1:A${count}),total+total+total)`, 0);
@@ -1535,9 +1539,9 @@ function letReuseFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 2, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 1),
+    check: () => number_at(store, sheet, 0, 1),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -1562,7 +1566,7 @@ const CONCAT_MANY_SUFFIX = "a";
 const CONCAT_MANY_EDITED_SUFFIX = "b";
 
 /** A sheet with one formula per row in column B; `$C$1` holds what the timed edit changes. */
-function shapeRowsFixture(
+function shape_rows_fixture(
   count: number,
   fill: (store: CellStore, sheet: number, rows: number) => void,
   formula: (row: number) => string,
@@ -1575,11 +1579,11 @@ function shapeRowsFixture(
   const rows = count + SHAPE_EDITED_SCALE;
   const sheet = store.addSheet(3, rows);
   fill(store, sheet, rows);
-  const setSource = (value: string | number) =>
+  const set_source = (value: string | number) =>
     typeof value === "string"
       ? store.setString(sheet, 0, 2, value, 0)
       : store.setNumber(sheet, 0, 2, value, 0);
-  setSource(source);
+  set_source(source);
   for (let row = 0; row < count; row++) {
     store.setFormula(sheet, row, 1, formula(row), 0);
   }
@@ -1587,44 +1591,44 @@ function shapeRowsFixture(
   return {
     store,
     run: () => {
-      setSource(edited);
+      set_source(edited);
       store.recompute(sheet);
     },
     check: () => check(store, sheet),
     dispose: () => store.free(),
     restore: () => {
-      setSource(source);
+      set_source(source);
       store.recompute(sheet);
     },
   };
 }
 
-function numbersInA(fraction = 0): (store: CellStore, sheet: number, rows: number) => void {
+function numbers_in_a(fraction = 0): (store: CellStore, sheet: number, rows: number) => void {
   return (store, sheet, rows) =>
     writeNumberColumn(
       store,
       sheet,
       0,
       0,
-      numericColumn(rows, (row) => row + 1 + fraction),
+      numeric_column(rows, (row) => row + 1 + fraction),
       0,
     );
 }
 
-function shapeRowFixture(id: string, count: number): TimedFixture {
-  const last = (store: CellStore, sheet: number) => numberAt(store, sheet, count - 1, 1);
+function shape_row_fixture(id: string, count: number): TimedFixture {
+  const last = (store: CellStore, sheet: number) => number_at(store, sheet, count - 1, 1);
   switch (id) {
     case "round-many":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
-        numbersInA(ROUND_MANY_FRACTION),
+        numbers_in_a(ROUND_MANY_FRACTION),
         (row) => `=ROUND(A${row + 1}*$C$1,2)`,
         SHAPE_SCALE,
         SHAPE_EDITED_SCALE,
         last,
       );
     case "concat-many":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
         (store, sheet, rows) => {
           for (let row = 0; row < rows; row++) {
@@ -1634,31 +1638,31 @@ function shapeRowFixture(id: string, count: number): TimedFixture {
         (row) => `=A${row + 1}&" "&$C$1`,
         CONCAT_MANY_SUFFIX,
         CONCAT_MANY_EDITED_SUFFIX,
-        (store, sheet) => textAt(store, sheet, count - 1, 1) ?? "",
+        (store, sheet) => text_at(store, sheet, count - 1, 1) ?? "",
       );
     case "offset-many":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
-        numbersInA(),
+        numbers_in_a(),
         (row) => `=OFFSET(A${row + 1},$C$1,0)`,
         SHAPE_SCALE,
         SHAPE_EDITED_SCALE,
         last,
       );
     case "indirect-many":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
-        numbersInA(),
+        numbers_in_a(),
         () => `=INDIRECT("A"&(ROW()+$C$1))`,
         SHAPE_SCALE,
         SHAPE_EDITED_SCALE,
         last,
       );
     case "let-calls":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
-        numbersInA(),
-        letCallsFormula,
+        numbers_in_a(),
+        let_calls_formula,
         SHAPE_SCALE,
         SHAPE_EDITED_SCALE,
         last,
@@ -1669,7 +1673,7 @@ function shapeRowFixture(id: string, count: number): TimedFixture {
 }
 
 /** `let-many` with function-call bindings: even rows one, odd rows three. */
-function letCallsFormula(row: number): string {
+function let_calls_formula(row: number): string {
   const source = `A${row + 1}*$C$1`;
   return row % 2 === 0
     ? `=LET(x,ROUND(${source},2),x+x+x)`
@@ -1690,24 +1694,24 @@ const NAME_SCALE = 2;
 /** Sorting moves row `i` to row `(i * SORT_STRIDE) % rows`; prime, so it permutes every size. */
 const SORT_STRIDE = 7_919;
 
-function bindingName(index: number): string {
+function binding_name(index: number): string {
   return `Scale_${index}`;
 }
 
 /** Every `NAMED_FORMULA_STRIDE`th formula multiplies by a defined name, the others by 2. */
-function namedRowFormula(row: number, cell: string): string {
+function named_row_formula(row: number, cell: string): string {
   const scale =
     row % NAMED_FORMULA_STRIDE === 0
-      ? bindingName((row / NAMED_FORMULA_STRIDE) % BINDING_NAMES)
+      ? binding_name((row / NAMED_FORMULA_STRIDE) % BINDING_NAMES)
       : String(NAME_SCALE);
   return `=${cell}*${scale}`;
 }
 
 /** Points the names at `C1`…`C10` of `sheet`, one name at a time. */
-function defineBindingNames(store: CellStore, sheet: number): void {
+function define_binding_names(store: CellStore, sheet: number): void {
   for (let index = 0; index < BINDING_NAMES; index++) {
     assert(
-      store.setNamedRange(bindingName(index), -1, sheet, index, 2, index, 2),
+      store.setNamedRange(binding_name(index), -1, sheet, index, 2, index, 2),
       "binding name defined",
     );
   }
@@ -1715,16 +1719,16 @@ function defineBindingNames(store: CellStore, sheet: number): void {
 
 /**
  * Column A holds 1…count, column B a formula per row, and C1:C10 the values
- * the names point at. Without `usesNames`, every formula is `=A1*2`.
+ * the names point at. Without `uses_names`, every formula is `=A1*2`.
  */
-function namedFormulasSheet(store: CellStore, count: number, usesNames = true): number {
+function named_formulas_sheet(store: CellStore, count: number, uses_names = true): number {
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
     store,
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -1732,41 +1736,41 @@ function namedFormulasSheet(store: CellStore, count: number, usesNames = true): 
     sheet,
     2,
     0,
-    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    numeric_column(BINDING_NAMES, () => NAME_SCALE),
     0,
   );
   for (let row = 0; row < count; row++) {
     const cell = `A${row + 1}`;
-    const formula = usesNames ? namedRowFormula(row, cell) : `=${cell}*${NAME_SCALE}`;
+    const formula = uses_names ? named_row_formula(row, cell) : `=${cell}*${NAME_SCALE}`;
     store.setFormula(sheet, row, 1, formula, 0);
   }
   return sheet;
 }
 
 /** The value of the last formula that uses a name, `offset` rows below where it was written. */
-function lastNamedFormula(store: CellStore, sheet: number, count: number, offset = 0): number {
-  return numberAt(store, sheet, count - NAMED_FORMULA_STRIDE + offset, 1);
+function last_named_formula(store: CellStore, sheet: number, count: number, offset = 0): number {
+  return number_at(store, sheet, count - NAMED_FORMULA_STRIDE + offset, 1);
 }
 
 /**
  * The formulas exist before the names, as when a workbook defines its names
  * after its formulas. The timed run defines the ten names one at a time.
  */
-function nameDefineFixture(count: number): TimedFixture {
+function name_define_fixture(count: number): TimedFixture {
   const store = new CellStore();
-  const sheet = namedFormulasSheet(store, count);
+  const sheet = named_formulas_sheet(store, count);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      defineBindingNames(store, sheet);
+      define_binding_names(store, sheet);
       store.recompute(sheet);
     },
-    check: () => lastNamedFormula(store, sheet, count),
+    check: () => last_named_formula(store, sheet, count),
     dispose: () => store.free(),
     restore: () => {
       for (let index = 0; index < BINDING_NAMES; index++) {
-        store.removeNamedRange(bindingName(index), -1);
+        store.removeNamedRange(binding_name(index), -1);
       }
       store.recompute(sheet);
     },
@@ -1777,21 +1781,21 @@ function nameDefineFixture(count: number): TimedFixture {
  * `name-define` over a sheet whose formulas use no name: defining names
  * must cost no more than the names themselves.
  */
-function nameDefineUnusedFixture(count: number): TimedFixture {
+function name_define_unused_fixture(count: number): TimedFixture {
   const store = new CellStore();
-  const sheet = namedFormulasSheet(store, count, false);
+  const sheet = named_formulas_sheet(store, count, false);
   store.recompute(sheet);
   return {
     store,
     run: () => {
-      defineBindingNames(store, sheet);
+      define_binding_names(store, sheet);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
       for (let index = 0; index < BINDING_NAMES; index++) {
-        store.removeNamedRange(bindingName(index), -1);
+        store.removeNamedRange(binding_name(index), -1);
       }
       store.recompute(sheet);
     },
@@ -1799,10 +1803,10 @@ function nameDefineUnusedFixture(count: number): TimedFixture {
 }
 
 /** The timed run inserts one row above everything, so every formula and name moves. */
-function rowInsertNamesFixture(count: number): TimedFixture {
+function row_insert_names_fixture(count: number): TimedFixture {
   const store = new CellStore();
-  const sheet = namedFormulasSheet(store, count);
-  defineBindingNames(store, sheet);
+  const sheet = named_formulas_sheet(store, count);
+  define_binding_names(store, sheet);
   store.recompute(sheet);
   return {
     store,
@@ -1810,7 +1814,7 @@ function rowInsertNamesFixture(count: number): TimedFixture {
       assert(store.addRows(sheet, 0, 1), "row inserted");
       store.recompute(sheet);
     },
-    check: () => lastNamedFormula(store, sheet, count, 1),
+    check: () => last_named_formula(store, sheet, count, 1),
     dispose: () => store.free(),
     restore: () => {
       assert(store.removeRows(sheet, 0, 1), "row removed");
@@ -1820,7 +1824,7 @@ function rowInsertNamesFixture(count: number): TimedFixture {
 }
 
 /** Table `Sales` over A:B with a header row: `Amount` holds numbers, `Double` is `=[@Amount]*2`. */
-function setSalesTable(store: CellStore, sheet: number, bodyRows: number): void {
+function set_sales_table(store: CellStore, sheet: number, body_rows: number): void {
   assert(
     store.setTable(
       "sales",
@@ -1828,7 +1832,7 @@ function setSalesTable(store: CellStore, sheet: number, bodyRows: number): void 
       sheet,
       0,
       0,
-      bodyRows,
+      body_rows,
       1,
       true,
       false,
@@ -1840,7 +1844,7 @@ function setSalesTable(store: CellStore, sheet: number, bodyRows: number): void 
 }
 
 /** A sheet whose rows 1…count are the body of `Sales`, with `Amount` 1…count and room for one more row. */
-function salesSheet(store: CellStore, count: number): number {
+function sales_sheet(store: CellStore, count: number): number {
   const sheet = store.addSheet(4, count + 2);
   store.setString(sheet, 0, 0, "Amount", 0);
   store.setString(sheet, 0, 1, "Double", 0);
@@ -1849,10 +1853,10 @@ function salesSheet(store: CellStore, count: number): number {
     sheet,
     0,
     1,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
-  setSalesTable(store, sheet, count);
+  set_sales_table(store, sheet, count);
   return sheet;
 }
 
@@ -1863,9 +1867,9 @@ const TABLE_ROW_FORMULA = "=[@Amount]*2";
  * appends a row the way a user does: a value, the table grown by one row,
  * and the column's formula in the new row.
  */
-function tableAppendRowFixture(count: number): TimedFixture {
+function table_append_row_fixture(count: number): TimedFixture {
   const store = new CellStore();
-  const sheet = salesSheet(store, count);
+  const sheet = sales_sheet(store, count);
   for (let row = 1; row <= count; row++) {
     store.setFormula(sheet, row, 1, TABLE_ROW_FORMULA, 0);
   }
@@ -1876,14 +1880,14 @@ function tableAppendRowFixture(count: number): TimedFixture {
     store,
     run: () => {
       store.setNumber(sheet, added, 0, added, 0);
-      setSalesTable(store, sheet, added);
+      set_sales_table(store, sheet, added);
       store.setFormula(sheet, added, 1, TABLE_ROW_FORMULA, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 3),
+    check: () => number_at(store, sheet, 0, 3),
     dispose: () => store.free(),
     restore: () => {
-      setSalesTable(store, sheet, count);
+      set_sales_table(store, sheet, count);
       store.clearCell(sheet, added, 1, 0);
       store.clearCell(sheet, added, 0, 0);
       store.recompute(sheet);
@@ -1892,7 +1896,7 @@ function tableAppendRowFixture(count: number): TimedFixture {
 }
 
 /** The source row that sorting moves to target row `row`. */
-function sortedSourceRow(rows: number, row: number): number {
+function sorted_source_row(rows: number, row: number): number {
   return (row * SORT_STRIDE) % rows;
 }
 
@@ -1903,7 +1907,7 @@ const CELL_MOVE_SCALE = 2;
  * Column A holds 1…count and column B `=A{r}*$D$1`. The timed run moves D1 to
  * D2, as a cut and paste does, so every formula's reference follows it.
  */
-function cellMoveRefsFixture(count: number): TimedFixture {
+function cell_move_refs_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   writeNumberColumn(
@@ -1911,7 +1915,7 @@ function cellMoveRefsFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   store.setNumber(sheet, 0, 3, CELL_MOVE_SCALE, 0);
@@ -1925,7 +1929,7 @@ function cellMoveRefsFixture(count: number): TimedFixture {
       assert(store.moveCells(sheet, 0, 3, 1, 1, sheet, 1, 3, false) === 0, "cell moved");
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
       assert(store.moveCells(sheet, 1, 3, 1, 1, sheet, 0, 3, false) === 0, "cell moved back");
@@ -1935,7 +1939,7 @@ function cellMoveRefsFixture(count: number): TimedFixture {
 }
 
 /** Column A holds 1…count and column B `=A{r}*2`. The timed run sorts A:B by a fixed shuffle. */
-function sortFormulaColumnFixture(count: number): TimedFixture {
+function sort_formula_column_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -1943,14 +1947,14 @@ function sortFormulaColumnFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   for (let row = 0; row < count; row++) {
     store.setFormula(sheet, row, 1, `=A${row + 1}*2`, 0);
   }
   store.recompute(sheet);
-  const order = Uint32Array.from({ length: count }, (_, row) => sortedSourceRow(count, row));
+  const order = Uint32Array.from({ length: count }, (_, row) => sorted_source_row(count, row));
   const inverse = new Uint32Array(count);
   for (const [target, source] of order.entries()) inverse[source] = target;
   return {
@@ -1959,7 +1963,7 @@ function sortFormulaColumnFixture(count: number): TimedFixture {
       assert(store.permuteRows(sheet, 0, 0, 2, order) === 0, "rows sorted");
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
       assert(store.permuteRows(sheet, 0, 0, 2, inverse) === 0, "rows unsorted");
@@ -1969,7 +1973,7 @@ function sortFormulaColumnFixture(count: number): TimedFixture {
 }
 
 /** Loads `=Data!A{r}+Data!B{r}` into a second sheet; A holds the row and B holds 1. */
-function parseLoadQualifiedFixture(count: number): TimedFixture {
+function parse_load_qualified_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const data = store.addSheet(2, count);
   const calc = store.addSheet(1, count);
@@ -1980,7 +1984,7 @@ function parseLoadQualifiedFixture(count: number): TimedFixture {
     data,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   writeNumberColumn(
@@ -1988,7 +1992,7 @@ function parseLoadQualifiedFixture(count: number): TimedFixture {
     data,
     1,
     0,
-    numericColumn(count, () => 1),
+    numeric_column(count, () => 1),
     0,
   );
   const formulas = Array.from({ length: count }, (_, row) => `=Data!A${row + 1}+Data!B${row + 1}`);
@@ -1999,16 +2003,16 @@ function parseLoadQualifiedFixture(count: number): TimedFixture {
     },
     check: () => {
       store.recompute(calc);
-      return numberAt(store, calc, count - 1, 0);
+      return number_at(store, calc, count - 1, 0);
     },
     dispose: () => store.free(),
   };
 }
 
 /** Loads `=[@Amount]*2` into every body row of `Sales`. */
-function parseLoadTableFixture(count: number): TimedFixture {
+function parse_load_table_fixture(count: number): TimedFixture {
   const store = new CellStore();
-  const sheet = salesSheet(store, count);
+  const sheet = sales_sheet(store, count);
   return {
     store,
     run: () => {
@@ -2018,7 +2022,7 @@ function parseLoadTableFixture(count: number): TimedFixture {
     },
     check: () => {
       store.recompute(sheet);
-      return numberAt(store, sheet, count, 1);
+      return number_at(store, sheet, count, 1);
     },
     dispose: () => store.free(),
   };
@@ -2029,7 +2033,7 @@ function parseLoadTableFixture(count: number): TimedFixture {
  * every tenth one also uses a defined name. The timed run imports the state
  * exported at setup.
  */
-function memoryImportFixture(count: number): TimedFixture {
+function memory_import_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const data = store.addSheet(3, count);
   const calc = store.addSheet(1, count);
@@ -2040,7 +2044,7 @@ function memoryImportFixture(count: number): TimedFixture {
     data,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -2048,12 +2052,12 @@ function memoryImportFixture(count: number): TimedFixture {
     data,
     2,
     0,
-    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    numeric_column(BINDING_NAMES, () => NAME_SCALE),
     0,
   );
-  defineBindingNames(store, data);
+  define_binding_names(store, data);
   for (let row = 0; row < count; row++) {
-    store.setFormula(calc, row, 0, namedRowFormula(row, `Data!A${row + 1}`), 0);
+    store.setFormula(calc, row, 0, named_row_formula(row, `Data!A${row + 1}`), 0);
   }
   store.recompute(calc);
   const state = store.exportMemoryState();
@@ -2066,7 +2070,7 @@ function memoryImportFixture(count: number): TimedFixture {
     check: () => {
       assert(imported, "memory state imported");
       imported.recompute(calc);
-      return numberAt(imported, calc, count - 1, 0);
+      return number_at(imported, calc, count - 1, 0);
     },
     dispose: () => {
       imported?.free();
@@ -2079,26 +2083,26 @@ function memoryImportFixture(count: number): TimedFixture {
   };
 }
 
-function bindingRowFixture(id: string, count: number): TimedFixture {
+function binding_row_fixture(id: string, count: number): TimedFixture {
   switch (id) {
     case "name-define":
-      return nameDefineFixture(count);
+      return name_define_fixture(count);
     case "name-define-unused":
-      return nameDefineUnusedFixture(count);
+      return name_define_unused_fixture(count);
     case "row-insert-names":
-      return rowInsertNamesFixture(count);
+      return row_insert_names_fixture(count);
     case "table-append-row":
-      return tableAppendRowFixture(count);
+      return table_append_row_fixture(count);
     case "sort-formula-column":
-      return sortFormulaColumnFixture(count);
+      return sort_formula_column_fixture(count);
     case "cell-move-refs":
-      return cellMoveRefsFixture(count);
+      return cell_move_refs_fixture(count);
     case "parse-load-qualified":
-      return parseLoadQualifiedFixture(count);
+      return parse_load_qualified_fixture(count);
     case "parse-load-table":
-      return parseLoadTableFixture(count);
+      return parse_load_table_fixture(count);
     case "memory-import":
-      return memoryImportFixture(count);
+      return memory_import_fixture(count);
     default:
       throw new Error(`unknown formula fixture: ${id}`);
   }
@@ -2121,7 +2125,7 @@ const CLOSURE_LAMBDA = "LAMBDA(x,s,x*s+1)";
  * One helper formula in D1 over `count` rows: A and B hold 1…count and `$C$1`
  * the scale the timed edit changes.
  */
-function closureRangeFixture(
+function closure_range_fixture(
   count: number,
   formula: string,
   check: (store: CellStore, sheet: number) => number,
@@ -2134,7 +2138,7 @@ function closureRangeFixture(
       sheet,
       col,
       0,
-      numericColumn(count, (row) => row + 1),
+      numeric_column(count, (row) => row + 1),
       0,
     );
   }
@@ -2149,17 +2153,17 @@ function closureRangeFixture(
     },
     check: () => check(store, sheet),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: CLOSURE_SCALE }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: CLOSURE_SCALE }),
   };
 }
 
 /** The columns of the `orders` table behind `measure-pivot`, and how each row fills them. */
 const ORDER_COLUMNS = ["region", "quarter", "amount", "qty"] as const;
 const ORDER_REGIONS = 25;
-const orderRegion = (row: number) => row % ORDER_REGIONS;
-const orderQuarter = (row: number) => (Math.floor(row / ORDER_REGIONS) % 4) + 1;
-const orderAmount = (row: number) => (row % 7) + 1;
-const orderQty = (row: number) => (row % 3) + 1;
+const order_region = (row: number) => row % ORDER_REGIONS;
+const order_quarter = (row: number) => (Math.floor(row / ORDER_REGIONS) % 4) + 1;
+const order_amount = (row: number) => (row % 7) + 1;
+const order_qty = (row: number) => (row % 3) + 1;
 const ORDER_EDITED_AMOUNT = 101;
 
 /**
@@ -2175,19 +2179,19 @@ const ORDER_MEASURES = [
  * The pivot's first cell (region `R0`, quarter 1) after the timed edit: the
  * sum of its two measures.
  */
-function measurePivotOutput(rows: number): number {
+function measure_pivot_output(rows: number): number {
   let amount = 0;
   let qty = 0;
-  let quarterAmount = 0;
+  let quarter_amount = 0;
   for (let row = 0; row < rows; row++) {
-    if (orderQuarter(row) !== 1) continue;
-    const value = row === 0 ? ORDER_EDITED_AMOUNT : orderAmount(row);
-    quarterAmount += value;
-    if (orderRegion(row) !== 0) continue;
+    if (order_quarter(row) !== 1) continue;
+    const value = row === 0 ? ORDER_EDITED_AMOUNT : order_amount(row);
+    quarter_amount += value;
+    if (order_region(row) !== 0) continue;
     amount += value;
-    qty += orderQty(row);
+    qty += order_qty(row);
   }
-  return amount / qty + amount / quarterAmount;
+  return amount / qty + amount / quarter_amount;
 }
 
 /**
@@ -2195,7 +2199,7 @@ function measurePivotOutput(rows: number): number {
  * pivot over it: regions down, quarters across, both measures in each cell.
  * The timed run changes the first order's amount, so every cell updates.
  */
-function measurePivotFixture(count: number): TimedFixture {
+function measure_pivot_fixture(count: number): TimedFixture {
   // Only the full engine has pivots and measures.
   const store = new CellStore() as unknown as InstanceType<formulas.EngineInstance["CellStore"]>;
   const orders = store.addSheet(ORDER_COLUMNS.length, count + 1);
@@ -2204,10 +2208,10 @@ function measurePivotFixture(count: number): TimedFixture {
     store.setString(orders, 0, col, header, 0);
   }
   for (let row = 0; row < count; row++) {
-    store.setString(orders, row + 1, 0, `R${orderRegion(row)}`, 0);
+    store.setString(orders, row + 1, 0, `R${order_region(row)}`, 0);
   }
-  for (const [col, value] of [orderQuarter, orderAmount, orderQty].entries()) {
-    writeNumberColumn(store, orders, col + 1, 1, numericColumn(count, value), 0);
+  for (const [col, value] of [order_quarter, order_amount, order_qty].entries()) {
+    writeNumberColumn(store, orders, col + 1, 1, numeric_column(count, value), 0);
   }
   assert(
     store.setTable(
@@ -2264,45 +2268,45 @@ function measurePivotFixture(count: number): TimedFixture {
     store,
     run: () => edit(ORDER_EDITED_AMOUNT),
     // Below the quarter labels and the measure names: region R0 in quarter 1.
-    check: () => numberAt(store, output, 2, 1) + numberAt(store, output, 2, 2),
+    check: () => number_at(store, output, 2, 1) + number_at(store, output, 2, 2),
     dispose: () => store.free(),
-    restore: () => edit(orderAmount(0)),
+    restore: () => edit(order_amount(0)),
   };
 }
 
-function closureRowFixture(id: string, count: number): TimedFixture {
-  const last = (store: CellStore, sheet: number) => numberAt(store, sheet, count - 1, 1);
+function closure_row_fixture(id: string, count: number): TimedFixture {
+  const last = (store: CellStore, sheet: number) => number_at(store, sheet, count - 1, 1);
   switch (id) {
     case "map-lambda":
-      return closureRangeFixture(count, `=MAP(A1:A${count},LAMBDA(x,x*$C$1+1))`, (store, sheet) =>
-        numberAt(store, sheet, count - 1, 3),
+      return closure_range_fixture(count, `=MAP(A1:A${count},LAMBDA(x,x*$C$1+1))`, (store, sheet) =>
+        number_at(store, sheet, count - 1, 3),
       );
     case "reduce-lambda":
-      return closureRangeFixture(
+      return closure_range_fixture(
         count,
         `=REDUCE(0,A1:A${count},LAMBDA(a,x,a+x*$C$1))`,
-        (store, sheet) => numberAt(store, sheet, 0, 3),
+        (store, sheet) => number_at(store, sheet, 0, 3),
       );
     case "byrow-lambda":
-      return closureRangeFixture(
+      return closure_range_fixture(
         count,
         `=BYROW(A1:B${count},LAMBDA(r,SUM(r)*$C$1))`,
-        (store, sheet) => numberAt(store, sheet, count - 1, 3),
+        (store, sheet) => number_at(store, sheet, count - 1, 3),
       );
     case "lambda-call":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
-        numbersInA(),
+        numbers_in_a(),
         (row) => `=${CLOSURE_LAMBDA}(A${row + 1},$C$1)`,
         CLOSURE_SCALE,
         CLOSURE_EDITED_SCALE,
         last,
       );
     case "named-lambda":
-      return shapeRowsFixture(
+      return shape_rows_fixture(
         count,
         (store, sheet, rows) => {
-          numbersInA()(store, sheet, rows);
+          numbers_in_a()(store, sheet, rows);
           assert(store.setNamedFormula(CLOSURE_NAME, -1, `=${CLOSURE_LAMBDA}`), "LAMBDA name set");
         },
         (row) => `=${CLOSURE_NAME}(A${row + 1},$C$1)`,
@@ -2311,7 +2315,7 @@ function closureRowFixture(id: string, count: number): TimedFixture {
         last,
       );
     case "measure-pivot":
-      return measurePivotFixture(count);
+      return measure_pivot_fixture(count);
     default:
       throw new Error(`unknown formula fixture: ${id}`);
   }
@@ -2342,22 +2346,22 @@ const GROUPING_OUTPUT_ROWS = GROUPING_PRODUCTS + GROUPING_REGIONS + 1;
 /** The two key columns, a column per quarter and the total. */
 const GROUPING_OUTPUT_COLS = GROUPING_KEY_FIELDS + GROUPING_QUARTERS + 1;
 
-function groupingQuarter(row: number): number {
+function grouping_quarter(row: number): number {
   return Math.floor(row / GROUPING_QUARTER_RUN) % GROUPING_QUARTERS;
 }
 
 /** The sum of the amounts after the timed edit, which raises the first one. */
-function groupingEditedTotal(rows: number): number {
+function grouping_edited_total(rows: number): number {
   return rows * GROUPING_AMOUNT + GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
 }
 
 /** The first quarter's share of the edited total; the edited first row is in it. */
-function groupingFirstQuarterShare(rows: number): number {
-  let firstQuarter = GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
+function grouping_first_quarter_share(rows: number): number {
+  let first_quarter = GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
   for (let row = 0; row < rows; row++) {
-    if (groupingQuarter(row) === 0) firstQuarter += GROUPING_AMOUNT;
+    if (grouping_quarter(row) === 0) first_quarter += GROUPING_AMOUNT;
   }
-  return firstQuarter / groupingEditedTotal(rows);
+  return first_quarter / grouping_edited_total(rows);
 }
 
 /**
@@ -2365,14 +2369,14 @@ function groupingFirstQuarterShare(rows: number): number {
  * product in one region), the amount, and quarter text `Q0`…`Q3`. `formula`
  * goes in F1; the timed run edits the first amount.
  */
-function groupingFixture(
+function grouping_fixture(
   rows: number,
   formula: string,
   check: (store: CellStore, sheet: number) => number,
 ): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(GROUPING_FORMULA_COL + GROUPING_OUTPUT_COLS, rows);
-  const textColumn = (col: number, text: (row: number) => string) =>
+  const text_column = (col: number, text: (row: number) => string) =>
     writeStringColumn(
       store,
       sheet,
@@ -2381,17 +2385,17 @@ function groupingFixture(
       Array.from({ length: rows }, (_, row) => text(row)),
       0,
     );
-  textColumn(0, (row) => `R${row % GROUPING_REGIONS}`);
-  textColumn(1, (row) => `P${String(row % GROUPING_PRODUCTS).padStart(2, "0")}`);
+  text_column(0, (row) => `R${row % GROUPING_REGIONS}`);
+  text_column(1, (row) => `P${String(row % GROUPING_PRODUCTS).padStart(2, "0")}`);
   writeNumberColumn(
     store,
     sheet,
     GROUPING_AMOUNT_COL,
     0,
-    numericColumn(rows, () => GROUPING_AMOUNT),
+    numeric_column(rows, () => GROUPING_AMOUNT),
     0,
   );
-  textColumn(GROUPING_QUARTER_COL, (row) => `Q${groupingQuarter(row)}`);
+  text_column(GROUPING_QUARTER_COL, (row) => `Q${grouping_quarter(row)}`);
   store.setFormula(sheet, 0, GROUPING_FORMULA_COL, formula, 0);
   store.recompute(sheet);
   return {
@@ -2402,7 +2406,7 @@ function groupingFixture(
     },
     check: () => check(store, sheet),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, {
+    restore: restore_number(store, sheet, {
       row: 0,
       col: GROUPING_AMOUNT_COL,
       value: GROUPING_AMOUNT,
@@ -2411,10 +2415,10 @@ function groupingFixture(
 }
 
 /** `GROUPBY` with SUM by region and product, with subtotals; checks the grand total. */
-function groupBySumFixture(rows: number): TimedFixture {
+function group_by_sum_fixture(rows: number): TimedFixture {
   const last = GROUPING_OUTPUT_ROWS - 1;
-  return groupingFixture(rows, `=GROUPBY(A1:B${rows},C1:C${rows},SUM,0,2)`, (store, sheet) =>
-    numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+  return grouping_fixture(rows, `=GROUPBY(A1:B${rows},C1:C${rows},SUM,0,2)`, (store, sheet) =>
+    number_at(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
   );
 }
 
@@ -2423,13 +2427,13 @@ function groupBySumFixture(rows: number): TimedFixture {
  * subtotals and by quarter with a total; checks the first quarter's share in
  * the grand-total row.
  */
-function pivotByPercentOfFixture(rows: number): TimedFixture {
+function pivot_by_percent_of_fixture(rows: number): TimedFixture {
   // One header row holds the quarters.
   const last = GROUPING_OUTPUT_ROWS;
-  return groupingFixture(
+  return grouping_fixture(
     rows,
     `=PIVOTBY(A1:B${rows},D1:D${rows},C1:C${rows},PERCENTOF,0,2,,1,,,2)`,
-    (store, sheet) => numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+    (store, sheet) => number_at(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
   );
 }
 
@@ -2452,11 +2456,11 @@ const PIVOT_RANGE_SOURCE = 0;
 const PIVOT_OUTPUT_ROWS = 2_000;
 const PIVOT_OUTPUT_COLS = 32;
 
-function pivotSourceSheet(store: CellStore, rows: number): number {
+function pivot_source_sheet(store: CellStore, rows: number): number {
   const sheet = store.addSheet(PIVOT_FIELDS, rows + 1);
   for (let field = 0; field < PIVOT_FIELDS; field++) {
     store.setString(sheet, 0, field, `Field${field}`, 0);
-    const values = numericColumn(rows, (row) =>
+    const values = numeric_column(rows, (row) =>
       field < PIVOT_DIGIT_FIELDS
         ? Math.floor(row / PIVOT_DIGITS ** field) % PIVOT_DIGITS
         : row + field,
@@ -2467,7 +2471,7 @@ function pivotSourceSheet(store: CellStore, rows: number): number {
 }
 
 /** The packed definition `setPivots` takes, anchored at A1, with every total. */
-function pivotDefinition(
+function pivot_definition(
   source: number,
   rows: number,
   axes: { rowFields: number[]; colFields: number[]; values: [number, number][] },
@@ -2500,7 +2504,7 @@ const PIVOT_ID = "pivot";
 type PivotStore = CellStore &
   Pick<InstanceType<typeof formulas.CellStore>, "setPivots" | "pivotStatus">;
 
-function hasPivots(store: CellStore): store is PivotStore {
+function has_pivots(store: CellStore): store is PivotStore {
   return "setPivots" in store && "pivotStatus" in store;
 }
 
@@ -2508,13 +2512,13 @@ function hasPivots(store: CellStore): store is PivotStore {
  * The pivot benchmark's pivot: three row fields, one column field, SUM and
  * AVERAGE. The timed run installs it and recalculates; restoring removes it.
  */
-function pivotRebuildFixture(rows: number): TimedFixture {
+function pivot_rebuild_fixture(rows: number): TimedFixture {
   const store = new CellStore();
-  assert(hasPivots(store), "the full engine has pivot tables");
-  const source = pivotSourceSheet(store, rows);
+  assert(has_pivots(store), "the full engine has pivot tables");
+  const source = pivot_source_sheet(store, rows);
   const output = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
   store.commitSources();
-  const definition = pivotDefinition(source, rows, {
+  const definition = pivot_definition(source, rows, {
     rowFields: [0, 1, 2],
     colFields: [3],
     values: [
@@ -2523,7 +2527,7 @@ function pivotRebuildFixture(rows: number): TimedFixture {
     ],
   });
   // The first leaf group's SUM: below the column and value headers.
-  const leafRow = PIVOT_DIGIT_FIELDS;
+  const leaf_row = PIVOT_DIGIT_FIELDS;
   return {
     store,
     run: () => {
@@ -2532,7 +2536,7 @@ function pivotRebuildFixture(rows: number): TimedFixture {
     },
     check: () => {
       assert(store.pivotStatus(output)[0] === 0, "pivot built");
-      return numberAt(store, output, leafRow, 1);
+      return number_at(store, output, leaf_row, 1);
     },
     dispose: () => store.free(),
     restore: () => {
@@ -2543,7 +2547,7 @@ function pivotRebuildFixture(rows: number): TimedFixture {
 }
 
 /** The first leaf group holds every row whose four digit fields are 0. */
-function pivotRebuildOutput(rows: number): number {
+function pivot_rebuild_output(rows: number): number {
   const stride = PIVOT_DIGITS ** PIVOT_DIGIT_FIELDS;
   let sum = 0;
   for (let row = 0; row < rows; row += stride) sum += row + PIVOT_SUM_FIELD;
@@ -2560,13 +2564,13 @@ const PIVOT_DATA_SOURCE_DELTA = 1_000;
 const PIVOT_DATA_SOURCE_ROW = 99;
 
 /** The item pair that GETPIVOTDATA cell `index` names. */
-function pivotDataItems(index: number): [number, number] {
+function pivot_data_items(index: number): [number, number] {
   return [index % PIVOT_DIGITS, Math.floor(index / PIVOT_DIGITS) % PIVOT_DIGITS];
 }
 
 /** Sum of field 4 over the source rows whose last two digits are `first` and `second`. */
-function pivotDataValue(index: number): number {
-  const [first, second] = pivotDataItems(index);
+function pivot_data_value(index: number): number {
+  const [first, second] = pivot_data_items(index);
   let sum = 0;
   for (let row = first + second * PIVOT_DIGITS; row < PIVOT_DATA_SOURCE_ROWS; row += 100) {
     sum += row + PIVOT_SUM_FIELD;
@@ -2582,10 +2586,10 @@ function pivotDataValue(index: number): number {
  * recalculated all of them). With "source" the timed edit changes one source
  * value: the pivot updates, then all of them recalculate once.
  */
-function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): TimedFixture {
+function get_pivot_data_many_fixture(count: number, edit: "unrelated" | "source"): TimedFixture {
   const store = new CellStore();
-  assert(hasPivots(store), "the full engine has pivot tables");
-  const source = pivotSourceSheet(store, PIVOT_DATA_SOURCE_ROWS);
+  assert(has_pivots(store), "the full engine has pivot tables");
+  const source = pivot_source_sheet(store, PIVOT_DATA_SOURCE_ROWS);
   const pivot = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
   const calc = store.addSheet(2, count);
   store.setSheetName(pivot, "pivot", "Pivot");
@@ -2593,7 +2597,7 @@ function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): T
   assert(
     store.setPivots(
       pivot,
-      pivotDefinition(source, PIVOT_DATA_SOURCE_ROWS, {
+      pivot_definition(source, PIVOT_DATA_SOURCE_ROWS, {
         rowFields: [0, 1],
         colFields: [],
         values: [[PIVOT_SUM_FIELD, PIVOT_SUM]],
@@ -2605,7 +2609,7 @@ function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): T
   store.recompute(pivot);
   store.setNumber(calc, 0, 0, PIVOT_DATA_EDIT, 0);
   for (let index = 0; index < count; index++) {
-    const [first, second] = pivotDataItems(index);
+    const [first, second] = pivot_data_items(index);
     store.setFormula(
       calc,
       index,
@@ -2625,9 +2629,9 @@ function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): T
         store.setNumber(source, row, PIVOT_SUM_FIELD, value + PIVOT_DATA_SOURCE_DELTA, 0);
         store.recompute(source);
       },
-      check: () => numberAt(store, calc, count - 1, 1),
+      check: () => number_at(store, calc, count - 1, 1),
       dispose: () => store.free(),
-      restore: restoreNumber(store, source, { row, col: PIVOT_SUM_FIELD, value }),
+      restore: restore_number(store, source, { row, col: PIVOT_SUM_FIELD, value }),
     };
   }
   return {
@@ -2636,9 +2640,9 @@ function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): T
       store.setNumber(calc, 0, 0, PIVOT_DATA_EDITED, 0);
       store.recompute(calc);
     },
-    check: () => numberAt(store, calc, count - 1, 1),
+    check: () => number_at(store, calc, count - 1, 1),
     dispose: () => store.free(),
-    restore: restoreNumber(store, calc, { row: 0, col: 0, value: PIVOT_DATA_EDIT }),
+    restore: restore_number(store, calc, { row: 0, col: 0, value: PIVOT_DATA_EDIT }),
   };
 }
 
@@ -2650,43 +2654,43 @@ const ANALYSIS_PREFIX = "ab";
  * timed edit recalculates all of them. FORECAST.LINEAR fits `$A$2:$A$3` (2, 3)
  * over `$A$1:$A$2` (1, 2), the line y = x + 1.
  */
-function analysisCallsFixture(count: number): TimedFixture {
-  return shapeRowsFixture(
+function analysis_calls_fixture(count: number): TimedFixture {
+  return shape_rows_fixture(
     count,
-    numbersInA(),
+    numbers_in_a(),
     (row) =>
       `=SUMSQ(A${row + 1},$C$1)+AGGREGATE(9,6,A${row + 1},$C$1)` +
       `+FORECAST.LINEAR(A${row + 1},$A$2:$A$3,$A$1:$A$2)` +
       `+LEN(TEXTBEFORE("${ANALYSIS_PREFIX}-"&A${row + 1}&$C$1,"-"))`,
     SHAPE_SCALE,
     SHAPE_EDITED_SCALE,
-    (store, sheet) => numberAt(store, sheet, count - 1, 1),
+    (store, sheet) => number_at(store, sheet, count - 1, 1),
   );
 }
 
 /** The last formula, after the edit: its row holds `count` and `$C$1` holds the edited scale. */
-function analysisCallsOutput(count: number): number {
+function analysis_calls_output(count: number): number {
   const scale = SHAPE_EDITED_SCALE;
-  const sumOfSquares = count * count + scale * scale;
+  const sum_of_squares = count * count + scale * scale;
   const sum = count + scale;
   const forecast = count + 1;
-  return sumOfSquares + sum + forecast + ANALYSIS_PREFIX.length;
+  return sum_of_squares + sum + forecast + ANALYSIS_PREFIX.length;
 }
 
-function fullEngineRowFixture(id: string, size: number): TimedFixture {
+function full_engine_row_fixture(id: string, size: number): TimedFixture {
   switch (id) {
     case "groupby-sum":
-      return groupBySumFixture(size);
+      return group_by_sum_fixture(size);
     case "pivotby-percentof":
-      return pivotByPercentOfFixture(size);
+      return pivot_by_percent_of_fixture(size);
     case "pivot-rebuild":
-      return pivotRebuildFixture(size);
+      return pivot_rebuild_fixture(size);
     case "getpivotdata-many":
-      return getPivotDataManyFixture(size, "unrelated");
+      return get_pivot_data_many_fixture(size, "unrelated");
     case "getpivotdata-source-edit":
-      return getPivotDataManyFixture(size, "source");
+      return get_pivot_data_many_fixture(size, "source");
     case "analysis-calls":
-      return analysisCallsFixture(size);
+      return analysis_calls_fixture(size);
     default:
       throw new Error(`unknown formula fixture: ${id}`);
   }
@@ -2723,7 +2727,7 @@ interface HistoryWrite {
   author: number;
 }
 
-function historyChange(index: number): HistoryWrite {
+function history_change(index: number): HistoryWrite {
   return {
     row: HISTORY_CHANGE_STRIDE * index + HISTORY_CHANGE_ROW,
     col: (index * HISTORY_CHANGE_COL_STRIDE) % HISTORY_COLS,
@@ -2732,7 +2736,7 @@ function historyChange(index: number): HistoryWrite {
 }
 
 /** Scattered writes first, then the write of each changed cell, so its author is the last one. */
-function historyWrites(): HistoryWrite[] {
+function history_writes(): HistoryWrite[] {
   const scattered = HISTORY_WRITES - HISTORY_PAGE;
   return [
     ...Array.from({ length: scattered }, (_, index) => ({
@@ -2740,26 +2744,26 @@ function historyWrites(): HistoryWrite[] {
       col: index % HISTORY_COLS,
       author: index % HISTORY_AUTHORS,
     })),
-    ...Array.from({ length: HISTORY_PAGE }, (_, index) => historyChange(index)),
+    ...Array.from({ length: HISTORY_PAGE }, (_, index) => history_change(index)),
   ];
 }
 
 /** Each change counts its cell's position plus its author times the cell count. */
-function historyChangeChecksum(row: number, col: number, author: number): number {
+function history_change_checksum(row: number, col: number, author: number): number {
   return row * HISTORY_COLS + col + author * HISTORY_CELLS;
 }
 
-function historyDiffOutput(): number {
+function history_diff_output(): number {
   let checksum = 0;
   for (let index = 0; index < HISTORY_PAGE; index++) {
-    const change = historyChange(index);
-    checksum += historyChangeChecksum(change.row, change.col, change.author);
+    const change = history_change(index);
+    checksum += history_change_checksum(change.row, change.col, change.author);
   }
   return checksum;
 }
 
 /** A sheet of 5,000 × 20 numbers, column by column. */
-function historyVersion(changes: readonly HistoryWrite[]): { store: CellStore; sheet: number } {
+function history_version(changes: readonly HistoryWrite[]): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(HISTORY_COLS, HISTORY_ROWS);
   for (let col = 0; col < HISTORY_COLS; col++) {
@@ -2768,7 +2772,7 @@ function historyVersion(changes: readonly HistoryWrite[]): { store: CellStore; s
       sheet,
       col,
       0,
-      numericColumn(HISTORY_ROWS, (row) => row * HISTORY_COLS + col),
+      numeric_column(HISTORY_ROWS, (row) => row * HISTORY_COLS + col),
       0,
     );
   }
@@ -2791,7 +2795,7 @@ interface HistoryWindow {
   after: Uint8Array;
 }
 
-function historyWindowBytes(
+function history_window_bytes(
   version: { store: CellStore; sheet: number },
   row0: number,
   rows: number,
@@ -2805,25 +2809,25 @@ function historyWindowBytes(
   }
 }
 
-function historyDiffFixture(): TimedFixture {
+function history_diff_fixture(): TimedFixture {
   if (historyKernel === undefined) throw new Error("this engine has no version-history kernel");
   const { DiffKernel } = historyKernel;
-  const before = historyVersion([]);
-  const after = historyVersion(Array.from({ length: HISTORY_PAGE }, (_, k) => historyChange(k)));
-  const windowRows = Math.floor(HISTORY_WINDOW_CELLS / HISTORY_COLS);
+  const before = history_version([]);
+  const after = history_version(Array.from({ length: HISTORY_PAGE }, (_, k) => history_change(k)));
+  const window_rows = Math.floor(HISTORY_WINDOW_CELLS / HISTORY_COLS);
   const windows: HistoryWindow[] = [];
-  for (let row0 = 0; row0 < HISTORY_ROWS; row0 += windowRows) {
-    const rows = Math.min(windowRows, HISTORY_ROWS - row0);
+  for (let row0 = 0; row0 < HISTORY_ROWS; row0 += window_rows) {
+    const rows = Math.min(window_rows, HISTORY_ROWS - row0);
     windows.push({
       row0,
       rows,
-      before: historyWindowBytes(before, row0, rows),
-      after: historyWindowBytes(after, row0, rows),
+      before: history_window_bytes(before, row0, rows),
+      after: history_window_bytes(after, row0, rows),
     });
   }
   before.store.free();
-  const writes = historyWrites();
-  const noStyles = new Uint32Array();
+  const writes = history_writes();
+  const no_styles = new Uint32Array();
   let checksum = Number.NaN;
   return {
     store: after.store,
@@ -2834,7 +2838,7 @@ function historyDiffFixture(): TimedFixture {
         for (const write of writes) {
           kernel.touch(slot, write.row, write.col, write.row, write.col, write.author);
         }
-        kernel.setStyles(noStyles, noStyles);
+        kernel.setStyles(no_styles, no_styles);
         for (const window of windows) {
           assert(kernel.loadAfter(window.after), "later window loaded");
           assert(kernel.loadBefore(window.before), "earlier window loaded");
@@ -2866,7 +2870,7 @@ function historyDiffFixture(): TimedFixture {
         );
         checksum = 0;
         for (const [index, row] of rows.entries()) {
-          checksum += historyChangeChecksum(row, cols[index] ?? 0, authors[index] ?? 0);
+          checksum += history_change_checksum(row, cols[index] ?? 0, authors[index] ?? 0);
         }
       } finally {
         kernel.free();
@@ -2880,7 +2884,7 @@ function historyDiffFixture(): TimedFixture {
 }
 
 /** Even rows bind one name, odd rows bind three that build on each other. */
-function letManyFormula(row: number): string {
+function let_many_formula(row: number): string {
   const source = `A${row + 1}*$C$1`;
   return row % 2 === 0 ? `=LET(x,${source},x+x+x)` : `=LET(x,${source},y,x+1,z,y*x,x+y+z)`;
 }
@@ -2936,18 +2940,18 @@ const SPARSE_PAGE_LABELS = 97;
 const KIND_NUMBER = 1;
 const KIND_STRING = 2;
 
-function sortUniqueKey(row: number): string {
+function sort_unique_key(row: number): string {
   return `k${(row * SORT_UNIQUE_STEP) % SORT_UNIQUE_KEYS}`;
 }
 
 /** First and last of the sorted distinct keys of the rows before `rows`, and their count. */
-function sortUniqueOutput(rows: number): string {
-  const keys = [...new Set(Array.from({ length: rows }, (_, row) => sortUniqueKey(row)))].sort();
+function sort_unique_output(rows: number): string {
+  const keys = [...new Set(Array.from({ length: rows }, (_, row) => sort_unique_key(row)))].sort();
   return `${keys[0]}:${keys.at(-1)}:${keys.length}`;
 }
 
 /** The `sort-mixed-blanks` cell of one row; `null` is a blank cell. */
-function sortMixedValue(row: number): number | string | boolean | null {
+function sort_mixed_value(row: number): number | string | boolean | null {
   const step = row * SORT_MIXED_STEP;
   switch (row % SORT_MIXED_KINDS) {
     case 0:
@@ -2967,11 +2971,11 @@ function sortMixedValue(row: number): number | string | boolean | null {
  * compares equal to 0, "" and FALSE at once, so the order of this column
  * depends on the sort algorithm, and the row checks only what it must keep.
  */
-function sortMixedBlanksOutput(count: number): string {
+function sort_mixed_blanks_output(count: number): string {
   let texts = 0;
   let sum = SORT_MIXED_EDITED_FIRST;
   for (let row = 1; row < count; row++) {
-    const value = sortMixedValue(row);
+    const value = sort_mixed_value(row);
     if (typeof value === "string") texts++;
     else if (typeof value === "number") sum += value;
     else if (value === true) sum++;
@@ -2980,17 +2984,17 @@ function sortMixedBlanksOutput(count: number): string {
 }
 
 /** A label without hyphens or case, so its collation order is its code order. */
-function sortRowsLabel(row: number): string {
+function sort_rows_label(row: number): string {
   const label = (row * SORT_ROWS_STEP) % SORT_ROWS_LABELS;
   return `L${String(label).padStart(SORT_ROWS_LABEL_DIGITS, "0")}`;
 }
 
-function sortRowsNumber(row: number): number {
+function sort_rows_number(row: number): number {
   return ((row * SORT_ROWS_STEP) % SORT_ROWS_NUMBERS) / SORT_ROWS_NUMBER_SCALE;
 }
 
 /** First, middle and last row of a sorted order and a weighted sum of all of it. */
-function sortRowsDigest(order: ArrayLike<number>): string {
+function sort_rows_digest(order: ArrayLike<number>): string {
   let sum = 0;
   for (let position = 0; position < order.length; position++) {
     sum = (sum + (position + 1) * (order[position] ?? 0)) % SORT_ROWS_DIGEST_MODULUS;
@@ -2999,16 +3003,16 @@ function sortRowsDigest(order: ArrayLike<number>): string {
   return `${order[0]}:${middle}:${order[order.length - 1]}:${sum}`;
 }
 
-/** `sortRowsOutput` results, computed once per row and size. */
-const sortRowsOutputs = new Map<string, string>();
+/** `sort_rows_output` results, computed once per row and size. */
+const sort_rows_outputs = new Map<string, string>();
 
 /**
  * The digests of the ascending and the descending order of `size` rows of
  * `value`: equal values keep their row order in both directions.
  */
-function sortRowsOutput(size: number, value: (row: number) => number | string): string {
-  const cacheKey = `${value.name}:${size}`;
-  const cached = sortRowsOutputs.get(cacheKey);
+function sort_rows_output(size: number, value: (row: number) => number | string): string {
+  const cache_key = `${value.name}:${size}`;
+  const cached = sort_rows_outputs.get(cache_key);
   if (cached !== undefined) return cached;
   const values = Array.from({ length: size }, (_, row) => value(row));
   const rows = Array.from({ length: size }, (_, row) => row);
@@ -3022,31 +3026,31 @@ function sortRowsOutput(size: number, value: (row: number) => number | string): 
     const b = values[right]!;
     return a > b ? -1 : a < b ? 1 : left - right;
   });
-  const output = `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`;
-  sortRowsOutputs.set(cacheKey, output);
+  const output = `${sort_rows_digest(ascending)}|${sort_rows_digest(descending)}`;
+  sort_rows_outputs.set(cache_key, output);
   return output;
 }
 
-function subtotalVisible(row: number): boolean {
+function subtotal_visible(row: number): boolean {
   return Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0;
 }
 
 /** Sum of `row + 1` over the visible rows, with A1 holding `first`. */
-function subtotalOutput(count: number, first: number): number {
+function subtotal_output(count: number, first: number): number {
   let total = first;
-  for (let row = 1; row < count; row++) if (subtotalVisible(row)) total += row + 1;
+  for (let row = 1; row < count; row++) if (subtotal_visible(row)) total += row + 1;
   return total;
 }
 
 /** The value a `sparse-page-write` block holds at one offset: blank, a number or a label. */
-function sparsePageValue(offset: number): number | string | null {
+function sparse_page_value(offset: number): number | string | null {
   if (offset % SPARSE_PAGE_BLANK_EVERY === 0) return null;
   return offset % 2 === 0 ? offset : `label${offset % SPARSE_PAGE_LABELS}`;
 }
 
-function sparsePageOutput(rows: number): string {
+function sparse_page_output(rows: number): string {
   const last = (rows - 1) * SPARSE_PAGE_COLUMNS;
-  return `${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 2))}:${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 1))}`;
+  return `${String(sparse_page_value(last + SPARSE_PAGE_COLUMNS - 2))}:${String(sparse_page_value(last + SPARSE_PAGE_COLUMNS - 1))}`;
 }
 
 /**
@@ -3054,7 +3058,7 @@ function sparsePageOutput(rows: number): string {
  * B. Each key is `$C$1` plus the formula's row, so the timed edit recomputes
  * every lookup, and each match lands near the top of the table.
  */
-function indexMatchFixture(formulas: number, rows: number): TimedFixture {
+function index_match_fixture(formulas: number, rows: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, rows);
   writeNumberColumn(
@@ -3062,7 +3066,7 @@ function indexMatchFixture(formulas: number, rows: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(rows, (row) => row + 1),
+    numeric_column(rows, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -3070,7 +3074,7 @@ function indexMatchFixture(formulas: number, rows: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(rows, (row) => (row + 1) * INDEX_MATCH_VALUE_SCALE),
+    numeric_column(rows, (row) => (row + 1) * INDEX_MATCH_VALUE_SCALE),
     0,
   );
   store.setNumber(sheet, 0, 2, SHAPE_SCALE, 0);
@@ -3090,9 +3094,9 @@ function indexMatchFixture(formulas: number, rows: number): TimedFixture {
       store.setNumber(sheet, 0, 2, SHAPE_EDITED_SCALE, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, formulas - 1, 3),
+    check: () => number_at(store, sheet, formulas - 1, 3),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: SHAPE_SCALE }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: SHAPE_SCALE }),
   };
 }
 
@@ -3101,7 +3105,7 @@ function indexMatchFixture(formulas: number, rows: number): TimedFixture {
  * one edit of A1 recomputes all of them: the fill-down shape that reads the
  * column once per formula.
  */
-function rankManyFixture(count: number): TimedFixture {
+function rank_many_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -3109,7 +3113,7 @@ function rankManyFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   for (let row = 0; row < count; row++) {
@@ -3128,9 +3132,9 @@ function rankManyFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, RANK_MANY_EDITED_FIRST, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    check: () => `${number_at(store, sheet, 0, 1)}:${number_at(store, sheet, count - 1, 1)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -3138,16 +3142,16 @@ function rankManyFixture(count: number): TimedFixture {
  * One `SORT(UNIQUE(FILTER()))` over text keys in A, kept while B is below
  * `$D$1`. The timed edit narrows the filter to the first rows.
  */
-function sortUniqueFilterFixture(count: number): TimedFixture {
+function sort_unique_filter_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sortUniqueKey(row), 0);
+  for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sort_unique_key(row), 0);
   writeNumberColumn(
     store,
     sheet,
     1,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
   store.setNumber(sheet, 0, 3, count, 0);
@@ -3162,10 +3166,10 @@ function sortUniqueFilterFixture(count: number): TimedFixture {
     check: () => {
       const last = SORT_UNIQUE_EDITED_ROWS - 1;
       const spilled = store.spillAnchorRow(sheet, last, 2) === 0 ? SORT_UNIQUE_EDITED_ROWS : 0;
-      return `${textAt(store, sheet, 0, 2) ?? ""}:${textAt(store, sheet, last, 2) ?? ""}:${spilled}`;
+      return `${text_at(store, sheet, 0, 2) ?? ""}:${text_at(store, sheet, last, 2) ?? ""}:${spilled}`;
     },
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 3, value: count }),
+    restore: restore_number(store, sheet, { row: 0, col: 3, value: count }),
   };
 }
 
@@ -3173,18 +3177,18 @@ function sortUniqueFilterFixture(count: number): TimedFixture {
  * `=SORT(A1:An)` over numbers, text, logical values and blank cells in turn.
  * The timed edit changes the number in A1.
  */
-function sortMixedBlanksFixture(count: number): TimedFixture {
+function sort_mixed_blanks_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   for (let row = 0; row < count; row++) {
-    const value = sortMixedValue(row);
+    const value = sort_mixed_value(row);
     if (typeof value === "number") store.setNumber(sheet, row, 0, value, 0);
     else if (typeof value === "string") store.setString(sheet, row, 0, value, 0);
     else if (typeof value === "boolean") store.setBool(sheet, row, 0, value, 0);
   }
   store.setFormula(sheet, 0, 2, `=SORT(A1:A${count})`, 0);
   store.recompute(sheet);
-  const first = sortMixedValue(0);
+  const first = sort_mixed_value(0);
   assert(typeof first === "number", "sort-mixed-blanks: A1 holds a number");
   return {
     store,
@@ -3204,7 +3208,7 @@ function sortMixedBlanksFixture(count: number): TimedFixture {
       return `${texts}:${sum}`;
     },
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: first }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: first }),
   };
 }
 
@@ -3213,7 +3217,7 @@ function sortMixedBlanksFixture(count: number): TimedFixture {
  * ascending then descending, as the sort command does. Sorting changes no
  * cell, so every run repeats the same work.
  */
-function sortRowsFixture(count: number, value: (row: number) => number | string): TimedFixture {
+function sort_rows_fixture(count: number, value: (row: number) => number | string): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(1, count);
   const values = Array.from({ length: count }, (_, row) => value(row));
@@ -3223,23 +3227,23 @@ function sortRowsFixture(count: number, value: (row: number) => number | string)
     writeNumberColumn(store, sheet, 0, 0, Float64Array.from(values as number[]), 0);
   }
   const column = Uint32Array.of(0);
-  const allRows = new Uint32Array(0);
+  const all_rows = new Uint32Array(0);
   let ascending: Uint32Array = new Uint32Array(0);
   let descending: Uint32Array = new Uint32Array(0);
   return {
     store,
     run: () => {
-      ascending = store.sortRowsMulti(sheet, column, Uint8Array.of(1), allRows);
-      descending = store.sortRowsMulti(sheet, column, Uint8Array.of(0), allRows);
+      ascending = store.sortRowsMulti(sheet, column, Uint8Array.of(1), all_rows);
+      descending = store.sortRowsMulti(sheet, column, Uint8Array.of(0), all_rows);
     },
-    check: () => `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`,
+    check: () => `${sort_rows_digest(ascending)}|${sort_rows_digest(descending)}`,
     dispose: () => store.free(),
     restore: () => {},
   };
 }
 
 /** `SUBTOTAL(109)` over a column whose filter hides every other block of rows. */
-function subtotalFilteredFixture(count: number): TimedFixture {
+function subtotal_filtered_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   writeNumberColumn(
@@ -3247,7 +3251,7 @@ function subtotalFilteredFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   const hidden: number[] = [];
@@ -3266,9 +3270,9 @@ function subtotalFilteredFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, SUBTOTAL_EDITED_FIRST, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, 0, 1),
+    check: () => number_at(store, sheet, 0, 1),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
 }
 
@@ -3277,7 +3281,7 @@ function subtotalFilteredFixture(count: number): TimedFixture {
  * snapshot hydration and datasource pages write: numbers and labels, with
  * every tenth cell blank. The inputs are built before the timed write.
  */
-function sparsePageWriteFixture(rows: number): TimedFixture {
+function sparse_page_write_fixture(rows: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(SPARSE_PAGE_COLUMNS, rows);
   const offsets: number[] = [];
@@ -3285,7 +3289,7 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
   const numbers: number[] = [];
   const texts: string[] = [];
   for (let offset = 0; offset < rows * SPARSE_PAGE_COLUMNS; offset++) {
-    const value = sparsePageValue(offset);
+    const value = sparse_page_value(offset);
     if (value === null) continue;
     offsets.push(offset);
     kinds.push(typeof value === "number" ? KIND_NUMBER : KIND_STRING);
@@ -3293,14 +3297,14 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
     if (typeof value === "string") texts.push(value);
   }
   const encoder = new TextEncoder();
-  const textBytes = encoder.encode(texts.join(""));
-  const textOffsets = new Uint32Array(texts.length + 1);
+  const text_bytes = encoder.encode(texts.join(""));
+  const text_offsets = new Uint32Array(texts.length + 1);
   for (let index = 0; index < texts.length; index++) {
-    textOffsets[index + 1] = (textOffsets[index] ?? 0) + encoder.encode(texts[index]).length;
+    text_offsets[index + 1] = (text_offsets[index] ?? 0) + encoder.encode(texts[index]).length;
   }
-  const entryOffsets = Uint32Array.from(offsets);
-  const entryKinds = Uint8Array.from(kinds);
-  const entryNumbers = Float64Array.from(numbers);
+  const entry_offsets = Uint32Array.from(offsets);
+  const entry_kinds = Uint8Array.from(kinds);
+  const entry_numbers = Float64Array.from(numbers);
   const styles = new Uint32Array(offsets.length);
   const none = new Uint32Array();
   return {
@@ -3313,11 +3317,11 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
         0,
         rows,
         SPARSE_PAGE_COLUMNS,
-        entryOffsets,
-        entryKinds,
-        entryNumbers,
-        textBytes,
-        textOffsets,
+        entry_offsets,
+        entry_kinds,
+        entry_numbers,
+        text_bytes,
+        text_offsets,
         styles,
         none,
         [],
@@ -3329,8 +3333,8 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
     },
     check: () => {
       const last = rows - 1;
-      const number = numberAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 2);
-      return `${number}:${textAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 1) ?? ""}`;
+      const number = number_at(store, sheet, last, SPARSE_PAGE_COLUMNS - 2);
+      return `${number}:${text_at(store, sheet, last, SPARSE_PAGE_COLUMNS - 1) ?? ""}`;
     },
     dispose: () => store.free(),
   };
@@ -3340,7 +3344,7 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
  * A LET in every row, as modern workbooks write them. The timed edit changes
  * the shared scale, so every LET recalculates.
  */
-function letManyFixture(count: number): TimedFixture {
+function let_many_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -3348,12 +3352,12 @@ function letManyFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   store.setNumber(sheet, 0, 2, LET_MANY_SCALE, 0);
   for (let row = 0; row < count; row++) {
-    store.setFormula(sheet, row, 1, letManyFormula(row), 0);
+    store.setFormula(sheet, row, 1, let_many_formula(row), 0);
   }
   store.recompute(sheet);
   return {
@@ -3362,16 +3366,16 @@ function letManyFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 2, LET_MANY_EDITED_SCALE, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: LET_MANY_SCALE }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: LET_MANY_SCALE }),
   };
 }
 
 /** The LET binding is used three times (`x+x+x`), so a re-evaluated binding costs that multiple. */
 const LET_REPEAT_FACTOR = 3;
 
-function letRepeatFixture(count: number): TimedFixture {
+function let_repeat_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   writeNumberColumn(
@@ -3379,7 +3383,7 @@ function letRepeatFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row + 1),
+    numeric_column(count, (row) => row + 1),
     0,
   );
   writeNumberColumn(
@@ -3387,7 +3391,7 @@ function letRepeatFixture(count: number): TimedFixture {
     sheet,
     1,
     0,
-    numericColumn(count, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    numeric_column(count, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
     0,
   );
   store.setNumber(sheet, 0, 2, count, 0);
@@ -3399,13 +3403,13 @@ function letRepeatFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 2, count - 1, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 3)}:${numberAt(store, sheet, 0, 2)}`,
+    check: () => `${number_at(store, sheet, 0, 3)}:${number_at(store, sheet, 0, 2)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: count }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: count }),
   };
 }
 
-function iterativeFinanceFixture(count: number): TimedFixture {
+function iterative_finance_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
   const cashflows = [-70_000, 12_000, 15_000, 18_000, 21_000, 26_000];
@@ -3416,12 +3420,12 @@ function iterativeFinanceFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, count - 1, 1),
+    check: () => number_at(store, sheet, count - 1, 1),
     dispose: () => store.free(),
   };
 }
 
-function incrementalDependencyClosureFixture(count: number): TimedFixture {
+function incremental_dependency_closure_fixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
@@ -3429,10 +3433,10 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
     sheet,
     0,
     0,
-    numericColumn(count, (row) => row),
+    numeric_column(count, (row) => row),
     0,
   );
-  setFormulas(store, sheet, dependencyClosureFormulas(count));
+  set_formulas(store, sheet, dependencyClosureFormulas(count));
   store.recompute(sheet);
   return {
     store,
@@ -3440,9 +3444,9 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, 10, 0);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
+    check: () => `${number_at(store, sheet, 0, 2)}:${number_at(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+    restore: restore_number(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -3473,17 +3477,17 @@ const PAGED_EVICTION_PAGE_BYTES =
   BigUint64Array.BYTES_PER_ELEMENT;
 
 /** Column A holds `row`, column B `row + 1`, and `$C$1` the scale. */
-function pagedCellReadsOutput(count: number): number {
+function paged_cell_reads_output(count: number): number {
   const last = count - 1;
   return last + (last + 1) * PAGED_READ_EDITED_SCALE;
 }
 
 /** Old row 10 of column A one row lower, and every loaded and edited cell kept. */
-function pagedInsertRowOutput(rows: number): string {
+function paged_insert_row_output(rows: number): string {
   return `${PAGED_INSERT_AT}:${rows * 2}:${PAGED_DIRTY_CELLS}`;
 }
 
-function pagedEvictionOutput(pages: number): string {
+function paged_eviction_output(pages: number): string {
   return `${PAGED_EVICTION_RESIDENT}:${pages * PAGED_EVICTION_CHUNK_ROWS - 1}:0`;
 }
 
@@ -3491,15 +3495,15 @@ function pagedEvictionOutput(pages: number): string {
  * A paged sheet whose first `loaded` columns hold `row + col` in clean,
  * loaded pages. A budget of 0 keeps every page resident.
  */
-function loadedPagedSheet(
+function loaded_paged_sheet(
   cols: number,
   rows: number,
   loaded: number,
-  chunkRows: number,
-  byteBudget: number,
+  chunk_rows: number,
+  byte_budget: number,
 ): { store: CellStore; sheet: number } {
   const store = new CellStore();
-  const sheet = store.addPagedSheet(cols, rows, chunkRows, byteBudget, 0);
+  const sheet = store.addPagedSheet(cols, rows, chunk_rows, byte_budget, 0);
   store.beginPageLoad();
   for (let col = 0; col < loaded; col++) {
     writeNumberColumn(
@@ -3507,7 +3511,7 @@ function loadedPagedSheet(
       sheet,
       col,
       0,
-      numericColumn(rows, (row) => row + col),
+      numeric_column(rows, (row) => row + col),
       0,
     );
   }
@@ -3516,7 +3520,7 @@ function loadedPagedSheet(
 }
 
 /** `PAGED_DIRTY_CELLS` local edits spread evenly down column B. */
-function addPagedEdits(store: CellStore, sheet: number, rows: number): void {
+function add_paged_edits(store: CellStore, sheet: number, rows: number): void {
   for (let index = 0; index < PAGED_DIRTY_CELLS; index++) {
     const row = Math.floor((index * rows) / PAGED_DIRTY_CELLS);
     store.setNumber(sheet, row, 1, row + 1 + PAGED_DIRTY_OFFSET, 0);
@@ -3528,8 +3532,8 @@ function addPagedEdits(store: CellStore, sheet: number, rows: number): void {
  * loaded cells and one edited cell, one at a time. The timed edit changes the
  * scale, so every formula recalculates.
  */
-function pagedCellReadsFixture(count: number): TimedFixture {
-  const { store, sheet } = loadedPagedSheet(4, count, 2, PAGED_CHUNK_ROWS, 0);
+function paged_cell_reads_fixture(count: number): TimedFixture {
+  const { store, sheet } = loaded_paged_sheet(4, count, 2, PAGED_CHUNK_ROWS, 0);
   store.setNumber(sheet, 0, 2, PAGED_READ_SCALE, 0);
   for (let row = 0; row < count; row++) {
     store.setFormula(sheet, row, 3, `=A${row + 1}+B${row + 1}*$C$1`, 0);
@@ -3541,39 +3545,39 @@ function pagedCellReadsFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 2, PAGED_READ_EDITED_SCALE, 0);
       store.recompute(sheet);
     },
-    check: () => numberAt(store, sheet, count - 1, 3),
+    check: () => number_at(store, sheet, count - 1, 3),
     dispose: () => store.free(),
-    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: PAGED_READ_SCALE }),
+    restore: restore_number(store, sheet, { row: 0, col: 2, value: PAGED_READ_SCALE }),
   };
 }
 
 /** Two loaded columns of `rows` rows, with local edits in column B. */
-function editedPagedSheet(rows: number): { store: CellStore; sheet: number } {
-  const paged = loadedPagedSheet(2, rows, 2, PAGED_CHUNK_ROWS, 0);
-  addPagedEdits(paged.store, paged.sheet, rows);
+function edited_paged_sheet(rows: number): { store: CellStore; sheet: number } {
+  const paged = loaded_paged_sheet(2, rows, 2, PAGED_CHUNK_ROWS, 0);
+  add_paged_edits(paged.store, paged.sheet, rows);
   return paged;
 }
 
-function pagedInsertRowCheck(store: CellStore, sheet: number): string {
+function paged_insert_row_check(store: CellStore, sheet: number): string {
   const stats = store.pagedStats(sheet);
-  return `${numberAt(store, sheet, PAGED_INSERT_AT + 1, 0)}:${stats[1]}:${stats[2]}`;
+  return `${number_at(store, sheet, PAGED_INSERT_AT + 1, 0)}:${stats[1]}:${stats[2]}`;
 }
 
 /** One row inserted near the top of a paged sheet; removing it again restores the sheet. */
-function pagedInsertRowFixture(rows: number): TimedFixture {
-  const { store, sheet } = editedPagedSheet(rows);
+function paged_insert_row_fixture(rows: number): TimedFixture {
+  const { store, sheet } = edited_paged_sheet(rows);
   return {
     store,
     run: () => assert(store.addRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: insert"),
-    check: () => pagedInsertRowCheck(store, sheet),
+    check: () => paged_insert_row_check(store, sheet),
     dispose: () => store.free(),
     restore: () => assert(store.removeRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: restore"),
   };
 }
 
 /** Whether every cell of both columns is loaded. The check changes nothing to restore. */
-function pagedRangeLoadedFixture(rows: number): TimedFixture {
-  const { store, sheet } = editedPagedSheet(rows);
+function paged_range_loaded_fixture(rows: number): TimedFixture {
+  const { store, sheet } = edited_paged_sheet(rows);
   let loaded = false;
   return {
     store,
@@ -3592,7 +3596,7 @@ function pagedRangeLoadedFixture(rows: number): TimedFixture {
  * writes evicts the oldest one. The fixture starts in the state a run leaves:
  * the pinned pages and the newest pages resident. So a run needs no restore.
  */
-function pagedEvictionFixture(pages: number): TimedFixture {
+function paged_eviction_fixture(pages: number): TimedFixture {
   const rows = pages * PAGED_EVICTION_CHUNK_ROWS;
   const store = new CellStore();
   const sheet = store.addPagedSheet(
@@ -3602,21 +3606,21 @@ function pagedEvictionFixture(pages: number): TimedFixture {
     PAGED_EVICTION_RESIDENT * PAGED_EVICTION_PAGE_BYTES,
     0,
   );
-  const pinnedRows = PAGED_EVICTION_PINNED * PAGED_EVICTION_CHUNK_ROWS;
-  store.pinViewportBands(sheet, Uint32Array.of(0, pinnedRows, 0, 1));
-  const values = numericColumn(rows, (row) => row);
+  const pinned_rows = PAGED_EVICTION_PINNED * PAGED_EVICTION_CHUNK_ROWS;
+  store.pinViewportBands(sheet, Uint32Array.of(0, pinned_rows, 0, 1));
+  const values = numeric_column(rows, (row) => row);
   const load = (start: number, end: number) => {
     store.beginPageLoad();
     writeNumberColumn(store, sheet, 0, start, values.subarray(start, end), 0);
     store.commitSources();
   };
-  load(0, pinnedRows);
+  load(0, pinned_rows);
   load(rows - (PAGED_EVICTION_RESIDENT - PAGED_EVICTION_PINNED) * PAGED_EVICTION_CHUNK_ROWS, rows);
   return {
     store,
     run: () => load(0, rows),
     check: () =>
-      `${store.pagedStats(sheet)[0]}:${numberAt(store, sheet, rows - 1, 0)}:${numberAt(store, sheet, 0, 0)}`,
+      `${store.pagedStats(sheet)[0]}:${number_at(store, sheet, rows - 1, 0)}:${number_at(store, sheet, 0, 0)}`,
     dispose: () => store.free(),
     restore: () => {},
   };
@@ -3628,7 +3632,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     (variant) => id === variant.id || id === `${variant.id}${LOOKUP_EDIT_SUFFIX}`,
   );
   if (lookup !== undefined)
-    return lookupFixture(
+    return lookup_fixture(
       size,
       id.endsWith(LOOKUP_EDIT_SUFFIX) ? "key-edit" : "first-recompute",
       lookup,
@@ -3639,7 +3643,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "offset-many":
     case "indirect-many":
     case "let-calls":
-      return shapeRowFixture(id, size);
+      return shape_row_fixture(id, size);
     case "name-define":
     case "name-define-unused":
     case "row-insert-names":
@@ -3649,124 +3653,124 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "parse-load-qualified":
     case "parse-load-table":
     case "memory-import":
-      return bindingRowFixture(id, size);
+      return binding_row_fixture(id, size);
     case "map-lambda":
     case "reduce-lambda":
     case "byrow-lambda":
     case "lambda-call":
     case "named-lambda":
     case "measure-pivot":
-      return closureRowFixture(id, size);
+      return closure_row_fixture(id, size);
     case "groupby-sum":
     case "pivotby-percentof":
     case "pivot-rebuild":
     case "getpivotdata-many":
     case "getpivotdata-source-edit":
     case "analysis-calls":
-      return fullEngineRowFixture(id, size);
+      return full_engine_row_fixture(id, size);
     case "paged-cell-reads":
-      return pagedCellReadsFixture(size);
+      return paged_cell_reads_fixture(size);
     case "paged-insert-row":
-      return pagedInsertRowFixture(size);
+      return paged_insert_row_fixture(size);
     case "paged-range-loaded":
-      return pagedRangeLoadedFixture(size);
+      return paged_range_loaded_fixture(size);
     case "paged-eviction":
-      return pagedEvictionFixture(size);
+      return paged_eviction_fixture(size);
     case "rank-many":
-      return rankManyFixture(size);
+      return rank_many_fixture(size);
     case "sort-unique-filter":
-      return sortUniqueFilterFixture(size);
+      return sort_unique_filter_fixture(size);
     case "subtotal-filtered":
-      return subtotalFilteredFixture(size);
+      return subtotal_filtered_fixture(size);
     case "sort-mixed-blanks":
-      return sortMixedBlanksFixture(size);
+      return sort_mixed_blanks_fixture(size);
     case "sort-rows-labels":
-      return sortRowsFixture(size, sortRowsLabel);
+      return sort_rows_fixture(size, sort_rows_label);
     case "sort-rows-numbers":
-      return sortRowsFixture(size, sortRowsNumber);
+      return sort_rows_fixture(size, sort_rows_number);
     case "sparse-page-write":
-      return sparsePageWriteFixture(size);
+      return sparse_page_write_fixture(size);
     case "index-match-many":
       assert(rangeSize !== undefined, "INDEX/MATCH range size");
-      return indexMatchFixture(size, rangeSize);
+      return index_match_fixture(size, rangeSize);
     case "history-diff":
-      return historyDiffFixture();
+      return history_diff_fixture();
     case "independent-parse-load":
-      return independentLoadFixture(size);
+      return independent_load_fixture(size);
     case "independent-first-recompute":
-      return independentRecomputeFixture(size);
+      return independent_recompute_fixture(size);
     case "linear-chain":
-      return chainFixture(size);
+      return chain_fixture(size);
     case "wide-fan-out-edit":
-      return fanOutEditFixture(size);
+      return fan_out_edit_fixture(size);
     case "scalar-edit-affects-1":
-      return fanOutEditFixture(size);
+      return fan_out_edit_fixture(size);
     case "scalar-edit-affects-1000":
-      return fanOutEditFixture(size);
+      return fan_out_edit_fixture(size);
     case "scalar-edit-affects-100000":
-      return fanOutEditFixture(size);
+      return fan_out_edit_fixture(size);
     case "formula-constant-edit":
-      return constantEditFixture(size);
+      return constant_edit_fixture(size);
     case "diamond-edit":
-      return diamondFixture(size);
+      return diamond_fixture(size);
     case "shared-range-edit":
-      return sharedRangeFixture(size);
+      return shared_range_fixture(size);
     case "distinct-range-edit":
-      return distinctRangeFixture(size);
+      return distinct_range_fixture(size);
     case "cross-sheet-range-edit":
-      return crossSheetFixture(size);
+      return cross_sheet_fixture(size);
     case "topology-remove-add":
-      return topologyFixture(size);
+      return topology_fixture(size);
     case "cycles":
-      return cycleFixture(size);
+      return cycle_fixture(size);
     case "removed-sheet-ref":
-      return refRemovalFixture(size);
+      return ref_removal_fixture(size);
     case "error-propagation":
-      return errorPropagationFixture(size);
+      return error_propagation_fixture(size);
     case "criteria-range-edit":
-      return criteriaRangeFixture(size);
+      return criteria_range_fixture(size);
     case "lookup-range-edit":
-      return lookupRangeFixture(size);
+      return lookup_range_fixture(size);
     case "xlookup-mixed-exact":
-      return mixedLookupFixture(size);
+      return mixed_lookup_fixture(size);
     case "spill-filter-resize":
-      return spillFilterResizeFixture(size);
+      return spill_filter_resize_fixture(size);
     case "sumproduct-vector-edit":
-      return sumProductVectorFixture(size);
+      return sum_product_vector_fixture(size);
     case "sumproduct-matrix-edit":
-      return sumProductMatrixFixture(size);
+      return sum_product_matrix_fixture(size);
     case "criteria-multi-range-edit":
-      return criteriaMultiRangeFixture(size);
+      return criteria_multi_range_fixture(size);
     case "sum-multi-range":
-      return sumMultiRangeFixture(size);
+      return sum_multi_range_fixture(size);
     case "sumifs-3-criteria":
-      return sumifsCriteriaFixture(size);
+      return sumifs_criteria_fixture(size);
     case "countif-100k":
-      return countifFixture(size);
+      return countif_fixture(size);
     case "unicode-text-date-edit":
-      return unicodeTextDateFixture(size);
+      return unicode_text_date_fixture(size);
     case "percentile-covariance":
-      return percentileCovarianceFixture(size);
+      return percentile_covariance_fixture(size);
     case "let-reuse-edit":
-      return letReuseFixture(size);
+      return let_reuse_fixture(size);
     case "let-repeat":
-      return letRepeatFixture(size);
+      return let_repeat_fixture(size);
     case "let-many":
-      return letManyFixture(size);
+      return let_many_fixture(size);
     case "iterative-finance":
-      return iterativeFinanceFixture(size);
+      return iterative_finance_fixture(size);
     case "incremental-dependency-closure-edit":
-      return incrementalDependencyClosureFixture(size);
+      return incremental_dependency_closure_fixture(size);
     case "spill-sequence-admission":
-      return spillSequenceAdmissionFixture(size);
+      return spill_sequence_admission_fixture(size);
     case "spill-filter-same-range":
-      return spillFilterSameRangeFixture(size);
+      return spill_filter_same_range_fixture(size);
     case "conditional-format-window":
-      return conditionalFormatWindowFixture(size);
+      return conditional_format_window_fixture(size);
     case "take-sort-filter":
-      return takeSortFilterFixture(size);
+      return take_sort_filter_fixture(size);
     case "scalar-edit-affects-0":
-      return fanOutEditFixture(size, true);
+      return fan_out_edit_fixture(size, true);
     default:
       throw new Error(`unknown formula fixture: ${id}`);
   }

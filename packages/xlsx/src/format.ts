@@ -69,7 +69,7 @@ const DATE_TIME_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
  * like a date without a time.
  */
 export function isoDateSerial(text: string): number | undefined {
-  const unzonedDateTime = DATE_TIME_PREFIX.test(text) && !TIME_ZONE_SUFFIX.test(text);
-  const date = new Date(unzonedDateTime ? `${text}Z` : text);
+  const unzoned_date_time = DATE_TIME_PREFIX.test(text) && !TIME_ZONE_SUFFIX.test(text);
+  const date = new Date(unzoned_date_time ? `${text}Z` : text);
   return Number.isFinite(date.getTime()) ? dateToSerial(date) : undefined;
 }

@@ -42,7 +42,7 @@ function tracked(name: string, value: object | null | undefined): TrackedObject[
 }
 
 /** Use the grid's features that fill owner-scoped caches, then destroy it. */
-function useAndDestroy(index: number): TrackedObject[] {
+function use_and_destroy(index: number): TrackedObject[] {
   const host = document.createElement("div");
   document.body.append(host);
   const grid: Grid = createGrid(host, {
@@ -79,7 +79,7 @@ function useAndDestroy(index: number): TrackedObject[] {
     ...tracked("action feedback channel", actionFeedbackFor(grid)),
     ...tracked("merge index", merges ? prepareMergeIndex(merges) : undefined),
     ...tracked("renderer", Reflect.get(grid, "renderer")),
-    ...tracked("read windows", Reflect.get(grid, "readWindows")),
+    ...tracked("read windows", Reflect.get(grid, "read_windows")),
   ];
   grid.destroy();
   host.remove();
@@ -87,7 +87,7 @@ function useAndDestroy(index: number): TrackedObject[] {
 }
 
 /** Keep the grid alive while proving the replaced document no longer has owners. */
-async function useAndImport(): Promise<{ grid: Grid; objects: TrackedObject[] }> {
+async function use_and_import(): Promise<{ grid: Grid; objects: TrackedObject[] }> {
   const host = document.createElement("div");
   document.body.append(host);
   const grid = createGrid(host, {
@@ -99,10 +99,10 @@ async function useAndImport(): Promise<{ grid: Grid; objects: TrackedObject[] }>
   });
   grid.search("Old");
   grid.refresh();
-  const oldWorkbook = grid.store.getWorkbook();
-  const merges = oldWorkbook.sheets[0]?.merges;
+  const old_workbook = grid.store.getWorkbook();
+  const merges = old_workbook.sheets[0]?.merges;
   const objects = [
-    ...tracked("replaced workbook", oldWorkbook),
+    ...tracked("replaced workbook", old_workbook),
     ...tracked("replaced engine", storeEngine(grid.store)),
     ...tracked("replaced merge index", merges ? prepareMergeIndex(merges) : undefined),
   ];
@@ -123,20 +123,20 @@ async function useAndImport(): Promise<{ grid: Grid; objects: TrackedObject[] }>
   return { grid, objects };
 }
 
-function retainedObjects(objects: readonly TrackedObject[]): TrackedObject[] {
+function retained_objects(objects: readonly TrackedObject[]): TrackedObject[] {
   return objects.filter((object) => object.ref.deref() !== undefined);
 }
 
-const restoreStubs = installCanvasTestStubs();
+const restore_stubs = installCanvasTestStubs();
 await initSheetwrite();
 let objects: TrackedObject[] = [];
-for (let index = 0; index < GRIDS; index++) objects = objects.concat(useAndDestroy(index));
-const imported = await useAndImport();
+for (let index = 0; index < GRIDS; index++) objects = objects.concat(use_and_destroy(index));
+const imported = await use_and_import();
 objects = objects.concat(imported.objects);
 await collectUntilFreed(objects.map((object) => object.ref));
-restoreStubs();
+restore_stubs();
 
-const retained = retainedObjects(objects);
+const retained = retained_objects(objects);
 imported.grid.destroy();
 document.body.replaceChildren();
 process.stdout.write(

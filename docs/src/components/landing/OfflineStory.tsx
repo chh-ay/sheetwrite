@@ -41,15 +41,15 @@ const MINI_COLUMNS = 4;
 const MINI_CELLS = MINI_COLUMNS * MINI_COLUMNS;
 const MINI_CELL_INDEXES = Array.from({ length: MINI_CELLS }, (_, index) => index);
 
-function miniCell(gridX: number, index: number) {
+function mini_cell(grid_x: number, index: number) {
   return {
-    x: gridX + MINI_X0 + (index % MINI_COLUMNS) * MINI_PITCH_X,
+    x: grid_x + MINI_X0 + (index % MINI_COLUMNS) * MINI_PITCH_X,
     y: MINI_Y0 + Math.floor(index / MINI_COLUMNS) * MINI_PITCH_Y,
   };
 }
 
-function miniCentre(gridX: number, index: number) {
-  const cell = miniCell(gridX, index);
+function mini_centre(grid_x: number, index: number) {
+  const cell = mini_cell(grid_x, index);
 
   return { x: cell.x + MINI_WIDTH / 2, y: cell.y + MINI_HEIGHT / 2 };
 }
@@ -58,7 +58,7 @@ function MiniGrid(props: Readonly<{ x: number; marked: ReadonlyMap<number, JSX.C
   return (
     <For each={MINI_CELL_INDEXES}>
       {(index) => {
-        const cell = miniCell(props.x, index);
+        const cell = mini_cell(props.x, index);
         return (
           <rect
             class="sr-mini"
@@ -93,7 +93,7 @@ const BRAM_GRID_X = 424;
 const QUEUE_SHIFT_DELAY = 0.35;
 
 /** A queued chip's style: one shift time per chip ahead of it, as React leaves unset ones out. */
-function queueStyle(shifts: readonly string[]): JSX.CSSProperties {
+function queue_style(shifts: readonly string[]): JSX.CSSProperties {
   const style: JSX.CSSProperties = { "--pitch": px(OUTBOX_PITCH) };
   shifts.forEach((shift, ahead) => {
     style[`--shift-${ahead + 1}`] = shift;
@@ -102,13 +102,13 @@ function queueStyle(shifts: readonly string[]): JSX.CSSProperties {
 }
 
 export function OfflineStory() {
-  const bramCells = new Map<number, JSX.CSSProperties>(
+  const bram_cells = new Map<number, JSX.CSSProperties>(
     OFFLINE_EDITS.map((edit) => [
       edit.cell,
       { "--edit": secs(edit.edit), "--ack": secs(edit.commit) },
     ]),
   );
-  const anaCells = new Map<number, JSX.CSSProperties>(
+  const ana_cells = new Map<number, JSX.CSSProperties>(
     OFFLINE_EDITS.map((edit) => [edit.cell, { "--apply": secs(edit.apply) }]),
   );
   // Every chip drains from the head of the queue (slot 0), after the chips ahead of it left.
@@ -134,7 +134,7 @@ export function OfflineStory() {
           x={196}
           y={94}
         />
-        <MiniGrid marked={anaCells} x={ANA_GRID_X} />
+        <MiniGrid marked={ana_cells} x={ANA_GRID_X} />
       </g>
 
       <g class="sr-server">
@@ -182,7 +182,7 @@ export function OfflineStory() {
         <text class="sr-sub sr-state-offline" x={440} y={94}>
           offline
         </text>
-        <MiniGrid marked={bramCells} x={BRAM_GRID_X} />
+        <MiniGrid marked={bram_cells} x={BRAM_GRID_X} />
         <text class="sr-sub" x={440} y={248}>
           Outbox
         </text>
@@ -190,15 +190,15 @@ export function OfflineStory() {
 
       <Index each={OFFLINE_EDITS}>
         {(edit, index) => {
-          const slotX = OUTBOX_X + index * OUTBOX_PITCH;
-          const slot = { x: slotX + OUTBOX_CHIP_WIDTH / 2, y: head.y };
-          const cell = miniCentre(BRAM_GRID_X, edit().cell);
+          const slot_x = OUTBOX_X + index * OUTBOX_PITCH;
+          const slot = { x: slot_x + OUTBOX_CHIP_WIDTH / 2, y: head.y };
+          const cell = mini_centre(BRAM_GRID_X, edit().cell);
           // The queue moves up one slot each time a chip ahead of this one leaves.
           const shifts = OFFLINE_EDITS.slice(0, index).map((ahead) =>
             secs(ahead.drain + QUEUE_SHIFT_DELAY),
           );
           return (
-            <g class="sr-queue" data-shifts={shifts.length} style={queueStyle(shifts)}>
+            <g class="sr-queue" data-shifts={shifts.length} style={queue_style(shifts)}>
               <g
                 class="sr-outbox"
                 style={{
@@ -216,7 +216,7 @@ export function OfflineStory() {
                   height={OUTBOX_CHIP_HEIGHT}
                   rx={OUTBOX_CHIP_HEIGHT / 2}
                   width={OUTBOX_CHIP_WIDTH}
-                  x={slotX}
+                  x={slot_x}
                   y={OUTBOX_Y}
                 />
                 <text x={slot.x} y={OUTBOX_Y + 14} data-center="">
@@ -230,7 +230,7 @@ export function OfflineStory() {
 
       <Index each={OFFLINE_EDITS}>
         {(edit, index) => {
-          const cell = miniCentre(ANA_GRID_X, edit().cell);
+          const cell = mini_centre(ANA_GRID_X, edit().cell);
           return (
             <Packet
               label={`v${FIRST_VERSION + index + 1}`}

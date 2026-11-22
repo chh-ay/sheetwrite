@@ -54,7 +54,7 @@ const SINGLE_TRACK_HEIGHT = 18;
 export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps) {
   const description = series.map((entry) => `${entry.label}: ${entry.valueText}`).join("; ");
   const height = SINGLE_TRACK_HEIGHT + TRACK_GAP * (series.length - 1);
-  const originAt = origin === undefined ? undefined : scalePosition(scale, origin);
+  const origin_at = origin === undefined ? undefined : scalePosition(scale, origin);
   return (
     <svg className="fig-lane" height={height} role="img" width="100%">
       <title>{label}</title>
@@ -69,11 +69,11 @@ export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps
           y2={height}
         />
       ))}
-      {originAt === undefined ? null : (
+      {origin_at === undefined ? null : (
         <line
           className="fig-lane__origin"
-          x1={`${originAt}%`}
-          x2={`${originAt}%`}
+          x1={`${origin_at}%`}
+          x2={`${origin_at}%`}
           y1="0"
           y2={height}
         />
@@ -88,11 +88,11 @@ export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps
         const radius = entry.range === undefined ? MARK_RADIUS : RANGE_MARK_RADIUS;
         return (
           <g data-tone={entry.tone} key={entry.key}>
-            {originAt === undefined ? null : (
+            {origin_at === undefined ? null : (
               <line
                 className="fig-lane__stem"
-                x1={`${Math.min(originAt, first)}%`}
-                x2={`${Math.max(originAt, last)}%`}
+                x1={`${Math.min(origin_at, first)}%`}
+                x2={`${Math.max(origin_at, last)}%`}
                 y1={middle}
                 y2={middle}
               />

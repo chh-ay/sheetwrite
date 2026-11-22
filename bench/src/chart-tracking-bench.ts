@@ -127,9 +127,9 @@ export function checkChartEvents(
 
   const actual = events.flatMap((event) => event.charts).map((ref) => `${ref.sheet}/${ref.id}`);
   const unique = new Set(actual);
-  const allowedIds = new Set(allowed.map((ref) => `${ref.sheet}/${ref.id}`));
+  const allowed_ids = new Set(allowed.map((ref) => `${ref.sheet}/${ref.id}`));
   const missing = required.map((ref) => `${ref.sheet}/${ref.id}`).filter((id) => !unique.has(id));
-  const unrelated = actual.filter((id) => !allowedIds.has(id));
+  const unrelated = actual.filter((id) => !allowed_ids.has(id));
   if (unique.size !== actual.length || missing.length > 0 || unrelated.length > 0) {
     throw new Error(
       `Incorrect chart identities: missing ${missing.join(",")}, unrelated ${unrelated.join(",")}`,
@@ -138,11 +138,11 @@ export function checkChartEvents(
   return actual.length;
 }
 
-function sheet(id: string, rowCount: number): Sheet {
+function sheet(id: string, row_count: number): Sheet {
   return {
     id,
     name: id,
-    rowCount,
+    rowCount: row_count,
     columns: ["a", "b", "c", "d"].map((key) => ({
       key,
       header: key,
@@ -183,12 +183,12 @@ function apply(store: SheetwriteStore, patches: DocumentOp[]): void {
 function fixture(
   count: number,
   source: "literal" | "formula",
-  withCharts: boolean,
+  with_charts: boolean,
 ): SheetwriteStore {
   const sheets = [sheet(SOURCE_SHEET, count + 2)];
   for (let index = 0; index < Math.ceil(count / CHARTS_PER_SHEET); index++) {
     const owner = sheet(`charts${index}`, 10);
-    if (withCharts) {
+    if (with_charts) {
       owner.charts = Array.from(
         { length: Math.min(CHARTS_PER_SHEET, count - index * CHARTS_PER_SHEET) },
         (_, slot) => chart(index * CHARTS_PER_SHEET + slot),
@@ -199,10 +199,10 @@ function fixture(
 
   const workbook: Workbook = { activeSheet: SOURCE_SHEET, sheets };
   const store = new SheetwriteStore(workbook);
-  const { maxOperations } = DEFAULT_TRANSACTION_RESOURCE_LIMITS;
-  for (let start = 0; start < count; start += maxOperations) {
+  const { maxOperations: max_operations } = DEFAULT_TRANSACTION_RESOURCE_LIMITS;
+  for (let start = 0; start < count; start += max_operations) {
     const patches: DocumentOp[] = Array.from(
-      { length: Math.min(maxOperations, count - start) },
+      { length: Math.min(max_operations, count - start) },
       (_, offset) => {
         const row = start + offset;
         return {
@@ -238,7 +238,7 @@ const SOURCES: readonly ChartSource[] = ["literal", "formula"];
  * 20,000 formulas leaves enough of it that a collection inside the warm-up
  * took most of its time budget on Linux.
  */
-function settleHeap(): void {
+function settle_heap(): void {
   Bun.gc(true);
 }
 
@@ -264,17 +264,17 @@ class WarmUp {
 }
 
 /** Commit time of the no-chart control workbook of `count` charts' size. */
-function measureControl(count: number, samples: number, warmups: number): Stat {
+function measure_control(count: number, samples: number, warmups: number): Stat {
   const control = fixture(count, "literal", false);
-  settleHeap();
-  const controlTimes: number[] = [];
+  settle_heap();
+  const control_times: number[] = [];
   try {
     // Keep the subscription and workbook shape identical in the no-chart control.
     const detach = subscribeChartChanges(control, () => {
       throw new Error("No-chart control emitted an event");
     });
     const warmup = new WarmUp(warmups);
-    for (let value = 1; controlTimes.length < samples; value++) {
+    for (let value = 1; control_times.length < samples; value++) {
       const warming = warmup.running();
       const patch: DocumentOp = {
         op: "set",
@@ -285,13 +285,13 @@ function measureControl(count: number, samples: number, warmups: number): Stat {
       apply(control, [patch]);
       const elapsed = now() - start;
       if (warming) warmup.count();
-      else controlTimes.push(elapsed);
+      else control_times.push(elapsed);
     }
     detach();
   } finally {
     control.dispose();
   }
-  return summarize(controlTimes);
+  return summarize(control_times);
 }
 
 interface SourceRun {
@@ -303,22 +303,22 @@ interface SourceRun {
 }
 
 /** The outside and inside rows of one workbook. */
-function measureSource({
+function measure_source({
   count,
   source,
-  baselineMs,
+  baselineMs: baseline_ms,
   samples,
   warmups,
 }: SourceRun): ChartTrackingRow[] {
   const rows: ChartTrackingRow[] = [];
   const store = fixture(count, source, true);
-  settleHeap();
+  settle_heap();
   const events: ChartChangeEvent[] = [];
   let started = 0;
-  let eventLatency = 0;
+  let event_latency = 0;
   let resolutions = 0;
   const detach = subscribeChartChanges(store, (event) => {
-    eventLatency = now() - started;
+    event_latency = now() - started;
     events.push(event);
     // Resolving views is consumer work, not chart invalidation.
   });
@@ -331,7 +331,7 @@ function measureSource({
           : required;
       const commits: number[] = [];
       const latencies: number[] = [];
-      const resolveTimes: number[] = [];
+      const resolve_times: number[] = [];
       const named: number[] = [];
       const warmup = new WarmUp(warmups);
       let value = 0;
@@ -351,16 +351,16 @@ function measureSource({
         started = now();
         apply(store, [patch]);
         const elapsed = now() - started;
-        const namedCharts = checkChartEvents(events, required, allowed);
+        const named_charts = checkChartEvents(events, required, allowed);
         // Resolution is what a consumer does with the event; it is timed on its own.
         const resolved: Array<{ ref: ChartRef; view: ChartView | null }> = [];
-        const resolveStart = now();
+        const resolve_start = now();
         for (const event of events) {
           for (const ref of event.charts) {
             resolved.push({ ref, view: resolveChartView(store, ref.sheet, ref.id) });
           }
         }
-        const resolveElapsed = now() - resolveStart;
+        const resolve_elapsed = now() - resolve_start;
         for (const { ref, view } of resolved) {
           if (view === null) {
             throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
@@ -376,15 +376,15 @@ function measureSource({
           }
           resolutions++;
         }
-        if (resolutions !== namedCharts) throw new Error("Incorrect chart resolution count");
+        if (resolutions !== named_charts) throw new Error("Incorrect chart resolution count");
         if (warming) {
           warmup.count();
         } else {
           commits.push(elapsed);
-          named.push(namedCharts);
-          if (namedCharts > 0) {
-            latencies.push(eventLatency);
-            resolveTimes.push(resolveElapsed);
+          named.push(named_charts);
+          if (named_charts > 0) {
+            latencies.push(event_latency);
+            resolve_times.push(resolve_elapsed);
           }
         }
       }
@@ -394,9 +394,9 @@ function measureSource({
         scenario:
           source === "formula" && scenario === "inside" ? "literal-dependency-edit" : scenario,
         commitMs: summarize(commits),
-        baselineMs,
+        baselineMs: baseline_ms,
         eventMs: latencies.length > 0 ? summarize(latencies) : null,
-        resolveMs: resolveTimes.length > 0 ? summarize(resolveTimes) : null,
+        resolveMs: resolve_times.length > 0 ? summarize(resolve_times) : null,
         expectedEvents: summarize(named).median > 0 ? 1 : 0,
         expectedCharts: summarize(named).median,
         resolutionsPerCommit: summarize(named).median,
@@ -417,7 +417,7 @@ type ColdScenario = ChartColdRow["scenario"];
  * One cold sample, in this process: load the workbook, then time its first
  * commit and the resolution of every chart that commit names.
  */
-async function coldSample(
+async function cold_sample(
   source: ChartSource,
   count: number,
   scenario: ColdScenario,
@@ -426,7 +426,7 @@ async function coldSample(
   const store = fixture(count, source, true);
   const events: ChartChangeEvent[] = [];
   const detach = subscribeChartChanges(store, (event) => events.push(event));
-  settleHeap();
+  settle_heap();
   await Bun.sleep(COLD_SETTLE_MS);
   try {
     const patch: DocumentOp = {
@@ -461,7 +461,7 @@ async function coldSample(
 }
 
 /** Run `samples` cold samples of one row, each in a fresh process. */
-function measureCold(
+function measure_cold(
   source: ChartSource,
   count: number,
   scenario: ColdScenario,
@@ -501,14 +501,14 @@ export async function captureChartTracking(
   const warmups = smoke ? 2 : WARMUPS;
   const counts: readonly number[] = smoke ? [200] : FULL_COUNTS;
   const baselines = new Map<number, Stat>();
-  for (const count of counts) baselines.set(count, measureControl(count, samples, warmups));
+  for (const count of counts) baselines.set(count, measure_control(count, samples, warmups));
 
   const rows: ChartTrackingRow[] = [];
   for (const source of only === undefined ? SOURCES : [only]) {
     for (const count of counts) {
-      const baselineMs = baselines.get(count);
-      if (baselineMs === undefined) throw new Error(`Missing no-chart baseline for ${count}`);
-      rows.push(...measureSource({ count, source, baselineMs, samples, warmups }));
+      const baseline_ms = baselines.get(count);
+      if (baseline_ms === undefined) throw new Error(`Missing no-chart baseline for ${count}`);
+      rows.push(...measure_source({ count, source, baselineMs: baseline_ms, samples, warmups }));
     }
   }
   // Report rows by chart count, as before; the measurement order is above.
@@ -517,12 +517,12 @@ export async function captureChartTracking(
 
   if (baseline === undefined) throw new Error("Missing no-chart baseline");
 
-  const coldSamples = smoke ? 3 : COLD_SAMPLES;
-  const coldRows: ChartColdRow[] = [];
+  const cold_samples = smoke ? 3 : COLD_SAMPLES;
+  const cold_rows: ChartColdRow[] = [];
   for (const source of only === undefined ? SOURCES : [only]) {
     for (const count of smoke ? [200] : COLD_COUNTS) {
       for (const scenario of ["outside", "inside"] as const) {
-        coldRows.push(measureCold(source, count, scenario, coldSamples));
+        cold_rows.push(measure_cold(source, count, scenario, cold_samples));
       }
     }
   }
@@ -540,13 +540,13 @@ export async function captureChartTracking(
     warmups,
     baseline,
     rows,
-    coldSamples,
-    coldRows,
+    coldSamples: cold_samples,
+    coldRows: cold_rows,
   };
 }
 
 /** Parse `<source>:<count>:<scenario>` of a cold sample child process. */
-function coldSampleArgs(value: string): [ChartSource, number, ColdScenario] {
+function cold_sample_args(value: string): [ChartSource, number, ColdScenario] {
   const [source, count, scenario] = value.split(":");
   if (
     (source !== "literal" && source !== "formula") ||
@@ -567,9 +567,9 @@ if (import.meta.main) {
       output: { type: "string", default: "results/chart-tracking-results.json" },
     },
   });
-  const coldArgs = values["cold-sample"];
-  if (coldArgs !== undefined) {
-    process.stdout.write(`${await coldSample(...coldSampleArgs(coldArgs))}\n`);
+  const cold_args = values["cold-sample"];
+  if (cold_args !== undefined) {
+    process.stdout.write(`${await cold_sample(...cold_sample_args(cold_args))}\n`);
     process.exit(0);
   }
   const { source } = values;

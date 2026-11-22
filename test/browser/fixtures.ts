@@ -12,7 +12,7 @@ export { siteUrl } from "./playwright.config.js";
  */
 export const test = base.extend<{ allowErrors: boolean }>({
   allowErrors: [false, { option: true }],
-  page: async ({ page, allowErrors }, use) => {
+  page: async ({ page, allowErrors: allow_errors }, use) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(`console: ${message.text()}`);
@@ -20,7 +20,7 @@ export const test = base.extend<{ allowErrors: boolean }>({
     page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
     page.context().on("weberror", (error) => errors.push(`worker: ${error.error().message}`));
     await use(page);
-    if (!allowErrors) expect(errors).toEqual([]);
+    if (!allow_errors) expect(errors).toEqual([]);
   },
 });
 
@@ -119,18 +119,18 @@ export async function screenshotPixels(page: Page, image: Buffer): Promise<Uint8
  * its background. The most frequent opaque color is treated as the background.
  */
 export function hasOpaqueForeground(rgba: ArrayLike<number>): boolean {
-  const opaqueColors = new Map<string, number>();
-  let opaquePixels = 0;
+  const opaque_colors = new Map<string, number>();
+  let opaque_pixels = 0;
   for (let offset = 0; offset + 3 < rgba.length; offset += 4) {
     if (rgba[offset + 3] !== 255) continue;
-    opaquePixels += 1;
+    opaque_pixels += 1;
     const key = `${rgba[offset]},${rgba[offset + 1]},${rgba[offset + 2]}`;
-    opaqueColors.set(key, (opaqueColors.get(key) ?? 0) + 1);
+    opaque_colors.set(key, (opaque_colors.get(key) ?? 0) + 1);
   }
-  if (opaqueColors.size < 2) return false;
-  let dominantCount = 0;
-  for (const count of opaqueColors.values()) dominantCount = Math.max(dominantCount, count);
-  return dominantCount < opaquePixels;
+  if (opaque_colors.size < 2) return false;
+  let dominant_count = 0;
+  for (const count of opaque_colors.values()) dominant_count = Math.max(dominant_count, count);
+  return dominant_count < opaque_pixels;
 }
 
 /**
@@ -139,10 +139,10 @@ export function hasOpaqueForeground(rgba: ArrayLike<number>): boolean {
  */
 export function focusAt(page: Page, grid: string, part?: string): Promise<string> {
   return page.evaluate(
-    ([gridSelector, partSelector]) => {
+    ([grid_selector, part_selector]) => {
       const active = document.activeElement;
-      const host = document.querySelector(gridSelector);
-      const region = partSelector === undefined ? null : document.querySelector(partSelector);
+      const host = document.querySelector(grid_selector);
+      const region = part_selector === undefined ? null : document.querySelector(part_selector);
       if (host === null || active === null || active === document.body) return "none";
       if (active === host) return "grid";
       if (region?.contains(active)) return "part";

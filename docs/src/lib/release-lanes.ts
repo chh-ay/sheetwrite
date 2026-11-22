@@ -102,9 +102,9 @@ export function resultRatios(text: string): LaneResult["ratios"] {
   if (faster !== null) return ends(faster[1], faster[2]);
   const instead = INSTEAD_OF.exec(text);
   if (instead !== null) {
-    const [, after = "", afterUnit = "", before = "", beforeUnit = ""] = instead;
+    const [, after = "", after_unit = "", before = "", before_unit = ""] = instead;
     return [
-      (number(before) * (SECONDS[beforeUnit] ?? 1)) / (number(after) * (SECONDS[afterUnit] ?? 1)),
+      (number(before) * (SECONDS[before_unit] ?? 1)) / (number(after) * (SECONDS[after_unit] ?? 1)),
     ];
   }
   const less = LESS_TIME.exec(text);
@@ -149,7 +149,7 @@ export function parseReleaseLanes(meta: string, body: string, id: string): Relea
 }
 
 /** Escaped text with `code` spans, as a workload label writes them. */
-function labelHtml(label: string): string {
+function label_html(label: string): string {
   return escapeHtml(label).replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
@@ -176,7 +176,7 @@ function row(entry: ReleaseLaneRow, axis: RatioAxis): string {
         `<span data-machine="${result.key}">${legendMark(KEYS[result.key].shape, KEYS[result.key].tone)}${KEYS[result.key].name} <b>${escapeHtml(result.text)}</b></span>`,
     )
     .join("");
-  return `<li class="machines__row"><span class="machines__label">${labelHtml(entry.label)}</span><span class="machines__lane">${lane}</span><span class="machines__values">${values}</span></li>`;
+  return `<li class="machines__row"><span class="machines__label">${label_html(entry.label)}</span><span class="machines__lane">${lane}</span><span class="machines__values">${values}</span></li>`;
 }
 
 /** The lanes as HTML: a legend of the machines used, the axis, then one row per workload. */

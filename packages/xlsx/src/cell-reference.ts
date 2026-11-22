@@ -20,10 +20,10 @@ const CELL_REFERENCE = /^\$?([A-Z]{1,3})\$?([1-9]\d*)$/i;
 export function parseCellReference(text: string): { row: number; col: number } | undefined {
   const match = CELL_REFERENCE.exec(text);
   const label = match?.[1];
-  const rowText = match?.[2];
-  if (label === undefined || rowText === undefined) return undefined;
+  const row_text = match?.[2];
+  if (label === undefined || row_text === undefined) return undefined;
 
-  const row = Number(rowText) - 1;
+  const row = Number(row_text) - 1;
   if (!Number.isSafeInteger(row)) return undefined;
   return { row, col: labelToCol(label.toUpperCase()) };
 }

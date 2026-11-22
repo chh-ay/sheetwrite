@@ -8,8 +8,8 @@ import {
 } from "../src/indexeddb.js";
 import type { PendingCommit } from "../src/types.js";
 
-const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
-const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
+const indexed_db_descriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+const key_range_descriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
 
 beforeEach(() => {
   Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: new IDBFactory() });
@@ -17,9 +17,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (indexedDbDescriptor) Object.defineProperty(globalThis, "indexedDB", indexedDbDescriptor);
+  if (indexed_db_descriptor) Object.defineProperty(globalThis, "indexedDB", indexed_db_descriptor);
   else Reflect.deleteProperty(globalThis, "indexedDB");
-  if (keyRangeDescriptor) Object.defineProperty(globalThis, "IDBKeyRange", keyRangeDescriptor);
+  if (key_range_descriptor) Object.defineProperty(globalThis, "IDBKeyRange", key_range_descriptor);
   else Reflect.deleteProperty(globalThis, "IDBKeyRange");
 });
 
@@ -29,10 +29,10 @@ const LOAD_OPTIONS = {
   maxBytes: 32 * 1024 * 1024,
 } as const;
 
-function commit(documentId: string, clientMutationId: string, value: string): PendingCommit {
+function commit(document_id: string, client_mutation_id: string, value: string): PendingCommit {
   return {
-    documentId,
-    clientMutationId,
+    documentId: document_id,
+    clientMutationId: client_mutation_id,
     baseVersion: 3,
     operations: [
       {
@@ -44,21 +44,21 @@ function commit(documentId: string, clientMutationId: string, value: string): Pe
   };
 }
 
-function requestResult<T>(request: IDBRequest<T>): Promise<T> {
+function request_result<T>(request: IDBRequest<T>): Promise<T> {
   const { promise, resolve, reject } = Promise.withResolvers<T>();
   request.onsuccess = () => resolve(request.result);
   request.onerror = () => reject(request.error);
   return promise;
 }
 
-function transactionDone(transaction: IDBTransaction): Promise<void> {
+function transaction_done(transaction: IDBTransaction): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>();
   transaction.oncomplete = () => resolve();
   transaction.onabort = transaction.onerror = () => reject(transaction.error);
   return promise;
 }
 
-function controlledVersionChangeEvent(type: string): IDBVersionChangeEvent {
+function controlled_version_change_event(type: string): IDBVersionChangeEvent {
   // Bun lacks this DOM constructor; handlers under test do not inspect version fields.
   const event = new Event(type);
   return event as IDBVersionChangeEvent;
@@ -83,7 +83,7 @@ class ControlledDatabase {
 
   versionchange(): void {
     const database = this.asDatabase();
-    this.onversionchange?.call(database, controlledVersionChangeEvent("versionchange"));
+    this.onversionchange?.call(database, controlled_version_change_event("versionchange"));
   }
 }
 
@@ -98,23 +98,23 @@ class ControlledOpenRequest {
     null;
 
   blocked(): void {
-    const request = this.asRequest();
-    this.onblocked?.call(request, controlledVersionChangeEvent("blocked"));
+    const request = this.as_request();
+    this.onblocked?.call(request, controlled_version_change_event("blocked"));
   }
 
   failed(message = "controlled open failure"): void {
     this.error = new DOMException(message, "UnknownError");
-    const request = this.asRequest();
+    const request = this.as_request();
     this.onerror?.call(request, new Event("error"));
   }
 
   succeeded(database: ControlledDatabase): void {
     this.result = database.asDatabase();
-    const request = this.asRequest();
+    const request = this.as_request();
     this.onsuccess?.call(request, new Event("success"));
   }
 
-  private asRequest(): IDBOpenDBRequest {
+  private as_request(): IDBOpenDBRequest {
     // Lifecycle tests deliberately expose only the IDBOpenDBRequest callbacks used by open().
     return this as unknown as IDBOpenDBRequest;
   }
@@ -131,18 +131,18 @@ class ControlledIndexedDbFactory {
   }
 }
 
-function installControlledFactory(): ControlledIndexedDbFactory {
+function install_controlled_factory(): ControlledIndexedDbFactory {
   const factory = new ControlledIndexedDbFactory();
-  const indexedDbFactory = factory as unknown as IDBFactory;
-  Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: indexedDbFactory });
+  const indexed_db_factory = factory as unknown as IDBFactory;
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: indexed_db_factory });
   return factory;
 }
 
-async function seedRecords(
-  databaseName: string,
+async function seed_records(
+  database_name: string,
   records: readonly Record<string, unknown>[],
 ): Promise<void> {
-  const request = indexedDB.open(databaseName, 1);
+  const request = indexedDB.open(database_name, 1);
   request.onupgradeneeded = () => {
     const store = request.result.createObjectStore("pending-commits", {
       keyPath: ["documentId", "clientMutationId"],
@@ -150,19 +150,19 @@ async function seedRecords(
     store.createIndex("by-document", "documentId");
     request.result.createObjectStore("pending-commits-meta", { keyPath: "documentId" });
   };
-  const database = await requestResult(request);
+  const database = await request_result(request);
   const transaction = database.transaction("pending-commits", "readwrite");
   const store = transaction.objectStore("pending-commits");
   for (const record of records) store.put(record);
-  await transactionDone(transaction);
+  await transaction_done(transaction);
   database.close();
 }
 
-async function storedRecords(databaseName: string): Promise<Array<Record<string, unknown>>> {
-  const database = await requestResult(indexedDB.open(databaseName));
+async function stored_records(database_name: string): Promise<Array<Record<string, unknown>>> {
+  const database = await request_result(indexedDB.open(database_name));
   const transaction = database.transaction("pending-commits", "readonly");
-  const records = await requestResult(transaction.objectStore("pending-commits").getAll());
-  await transactionDone(transaction);
+  const records = await request_result(transaction.objectStore("pending-commits").getAll());
+  await transaction_done(transaction);
   database.close();
   return records as Array<Record<string, unknown>>;
 }
@@ -177,10 +177,10 @@ describe("IndexedDbPendingCommitStorage", () => {
     await storage.put(first);
     await storage.put(second);
     await storage.put(other);
-    const firstOperation = first.operations[0]!;
-    if (firstOperation.op !== "set") throw new Error("Expected set operation fixture");
-    (first.operations as Array<typeof firstOperation>)[0] = {
-      ...firstOperation,
+    const first_operation = first.operations[0]!;
+    if (first_operation.op !== "set") throw new Error("Expected set operation fixture");
+    (first.operations as Array<typeof first_operation>)[0] = {
+      ...first_operation,
       value: { kind: "literal", value: "mutated" },
     };
     await storage.put(commit("document-a", "mutation-a", "updated"));
@@ -234,7 +234,7 @@ describe("IndexedDbPendingCommitStorage", () => {
     await expect(
       storage.load("document-a", { maxRecords: -1, maxOperations: 2, maxBytes: bytes }),
     ).rejects.toMatchObject({ code: "invalid-limits", operation: "pending-storage" });
-    expect(await storedRecords("bounded-cursor")).toHaveLength(2);
+    expect(await stored_records("bounded-cursor")).toHaveLength(2);
     await expect(
       storage.load("document-a", {
         maxRecords: 2,
@@ -272,7 +272,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   });
 
   it("persists legacy migration schema and queue order across reopen", async () => {
-    await seedRecords("legacy-queue", [
+    await seed_records("legacy-queue", [
       {
         documentId: "document-a",
         clientMutationId: "legacy-c",
@@ -293,13 +293,13 @@ describe("IndexedDbPendingCommitStorage", () => {
       },
     ]);
     const migrating = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
-    const migratedOrder = (await migrating.load("document-a", LOAD_OPTIONS)).map(
+    const migrated_order = (await migrating.load("document-a", LOAD_OPTIONS)).map(
       (item) => item.clientMutationId,
     );
-    expect(migratedOrder).toEqual(["legacy-c", "legacy-b", "legacy-a"]);
+    expect(migrated_order).toEqual(["legacy-c", "legacy-b", "legacy-a"]);
     migrating.close();
 
-    const persisted = await storedRecords("legacy-queue");
+    const persisted = await stored_records("legacy-queue");
     expect(persisted.map((record) => record.queueSchemaVersion)).toEqual([1, 1, 1]);
     expect(
       persisted
@@ -310,7 +310,7 @@ describe("IndexedDbPendingCommitStorage", () => {
     const reopened = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
     expect(
       (await reopened.load("document-a", LOAD_OPTIONS)).map((item) => item.clientMutationId),
-    ).toEqual(migratedOrder);
+    ).toEqual(migrated_order);
     expect(await reopened.load("document-a", LOAD_OPTIONS)).toMatchObject([
       { operations: [{ value: { value: "third" } }] },
       { operations: [{ value: { value: "second" } }] },
@@ -320,7 +320,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   });
 
   it("rejects pending records from a newer schema", async () => {
-    await seedRecords("future-queue", [
+    await seed_records("future-queue", [
       {
         queueSchemaVersion: 2,
         sequence: 1,
@@ -338,38 +338,38 @@ describe("IndexedDbPendingCommitStorage", () => {
   });
 
   it("aborts active requests and transactions with the host reason", async () => {
-    const requestStorage = new IndexedDbPendingCommitStorage({
+    const request_storage = new IndexedDbPendingCommitStorage({
       databaseName: "active-request-abort",
     });
-    await requestStorage.put(commit("document-a", "seed", "seed"));
-    const requestAbort = new AbortController();
-    const pendingPut = requestStorage.put(
+    await request_storage.put(commit("document-a", "seed", "seed"));
+    const request_abort = new AbortController();
+    const pending_put = request_storage.put(
       commit("document-a", "mutation-a", "value"),
-      requestAbort.signal,
+      request_abort.signal,
     );
-    requestAbort.abort(new Error("cancel active request"));
-    await expect(pendingPut).rejects.toMatchObject({
+    request_abort.abort(new Error("cancel active request"));
+    await expect(pending_put).rejects.toMatchObject({
       code: "aborted",
-      cause: requestAbort.signal.reason,
+      cause: request_abort.signal.reason,
     });
-    requestStorage.close();
+    request_storage.close();
 
-    const transactionStorage = new IndexedDbPendingCommitStorage({
+    const transaction_storage = new IndexedDbPendingCommitStorage({
       databaseName: "active-transaction-abort",
     });
-    await transactionStorage.put(commit("document-a", "mutation-a", "value"));
-    const transactionAbort = new AbortController();
-    const pendingRemove = transactionStorage.remove(
+    await transaction_storage.put(commit("document-a", "mutation-a", "value"));
+    const transaction_abort = new AbortController();
+    const pending_remove = transaction_storage.remove(
       "document-a",
       "mutation-a",
-      transactionAbort.signal,
+      transaction_abort.signal,
     );
-    transactionAbort.abort(new Error("cancel active transaction"));
-    await expect(pendingRemove).rejects.toMatchObject({
+    transaction_abort.abort(new Error("cancel active transaction"));
+    await expect(pending_remove).rejects.toMatchObject({
       code: "aborted",
-      cause: transactionAbort.signal.reason,
+      cause: transaction_abort.signal.reason,
     });
-    transactionStorage.close();
+    transaction_storage.close();
   });
 
   it("fails deterministically for pre-aborted operations and unavailable browser storage", async () => {
@@ -393,17 +393,17 @@ describe("IndexedDbPendingCommitStorage", () => {
     storage.close();
   });
   it("closes a blocked attempt's late database and permits a retry", async () => {
-    const factory = installControlledFactory();
+    const factory = install_controlled_factory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "blocked-open" });
-    const blockedLoad = storage.load("document-a", LOAD_OPTIONS);
-    const blockedRequest = factory.requests[0]!;
-    blockedRequest.blocked();
-    await expect(blockedLoad).rejects.toMatchObject({ code: "blocked" });
+    const blocked_load = storage.load("document-a", LOAD_OPTIONS);
+    const blocked_request = factory.requests[0]!;
+    blocked_request.blocked();
+    await expect(blocked_load).rejects.toMatchObject({ code: "blocked" });
 
-    const lateDatabase = new ControlledDatabase();
-    blockedRequest.succeeded(lateDatabase);
+    const late_database = new ControlledDatabase();
+    blocked_request.succeeded(late_database);
     await Promise.resolve();
-    expect(lateDatabase.closeCalls).toBe(1);
+    expect(late_database.closeCalls).toBe(1);
 
     const retry = storage.load("document-a", LOAD_OPTIONS);
     expect(factory.requests).toHaveLength(2);
@@ -416,7 +416,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   });
 
   it("clears a failed open so the next operation starts a fresh attempt", async () => {
-    const factory = installControlledFactory();
+    const factory = install_controlled_factory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "retry-open" });
     const first = storage.load("document-a", LOAD_OPTIONS);
     factory.requests[0]!.failed();
@@ -430,33 +430,33 @@ describe("IndexedDbPendingCommitStorage", () => {
   });
 
   it("rejects close during open and closes a database delivered afterward", async () => {
-    const factory = installControlledFactory();
+    const factory = install_controlled_factory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-during-open" });
     const load = storage.load("document-a", LOAD_OPTIONS);
     const request = factory.requests[0]!;
     storage.close();
-    const lateDatabase = new ControlledDatabase();
-    request.succeeded(lateDatabase);
+    const late_database = new ControlledDatabase();
+    request.succeeded(late_database);
 
     await expect(load).rejects.toMatchObject({ code: "aborted" });
-    expect(lateDatabase.closeCalls).toBe(1);
+    expect(late_database.closeCalls).toBe(1);
   });
 
   it("drops a versionchanged connection and successfully starts a replacement open", async () => {
-    const factory = installControlledFactory();
+    const factory = install_controlled_factory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "versionchange-open" });
-    const firstLoad = storage.load("document-a", LOAD_OPTIONS);
-    const firstDatabase = new ControlledDatabase();
-    factory.requests[0]!.succeeded(firstDatabase);
-    await expect(firstLoad).rejects.toThrow("controlled database transaction");
+    const first_load = storage.load("document-a", LOAD_OPTIONS);
+    const first_database = new ControlledDatabase();
+    factory.requests[0]!.succeeded(first_database);
+    await expect(first_load).rejects.toThrow("controlled database transaction");
 
-    firstDatabase.versionchange();
-    expect(firstDatabase.closeCalls).toBe(1);
-    const reopenedLoad = storage.load("document-a", LOAD_OPTIONS);
+    first_database.versionchange();
+    expect(first_database.closeCalls).toBe(1);
+    const reopened_load = storage.load("document-a", LOAD_OPTIONS);
     expect(factory.requests).toHaveLength(2);
     const replacement = new ControlledDatabase();
     factory.requests[1]!.succeeded(replacement);
-    await expect(reopenedLoad).rejects.toThrow("controlled database transaction");
+    await expect(reopened_load).rejects.toThrow("controlled database transaction");
     storage.close();
     await Promise.resolve();
     expect(replacement.closeCalls).toBe(1);

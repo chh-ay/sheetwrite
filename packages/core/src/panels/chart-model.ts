@@ -84,35 +84,35 @@ export function chartFromRange(
 ): ChartDefinition {
   const { start, end } = range;
 
-  let categoryText = false;
-  let categoryOther = false;
+  let category_text = false;
+  let category_other = false;
   // A chart reads at most MAX_CHART_POINTS cells per series, so the scan of a
   // whole-column selection stops there too.
-  const lastScanned = Math.min(end.row, start.row + MAX_CHART_POINTS);
-  for (let row = start.row + 1; row <= lastScanned; row++) {
+  const last_scanned = Math.min(end.row, start.row + MAX_CHART_POINTS);
+  for (let row = start.row + 1; row <= last_scanned; row++) {
     const value = read(row, start.col);
-    if (typeof value === "string") categoryText = true;
-    else if (value !== null) categoryOther = true;
+    if (typeof value === "string") category_text = true;
+    else if (value !== null) category_other = true;
   }
-  const hasCategories = end.col > start.col && categoryText && !categoryOther;
+  const has_categories = end.col > start.col && category_text && !category_other;
 
-  const firstSeriesCol = hasCategories ? start.col + 1 : start.col;
-  let headerText = end.row > start.row;
-  for (let col = firstSeriesCol; col <= end.col && headerText; col++) {
-    headerText = typeof read(start.row, col) === "string";
+  const first_series_col = has_categories ? start.col + 1 : start.col;
+  let header_text = end.row > start.row;
+  for (let col = first_series_col; col <= end.col && header_text; col++) {
+    header_text = typeof read(start.row, col) === "string";
   }
-  const firstValueRow = headerText ? start.row + 1 : start.row;
+  const first_value_row = header_text ? start.row + 1 : start.row;
 
-  const column = (col: number, fromRow: number, toRow: number): Range => ({
+  const column = (col: number, from_row: number, to_row: number): Range => ({
     sheet: range.sheet,
-    start: { row: fromRow, col },
-    end: { row: toRow, col },
+    start: { row: from_row, col },
+    end: { row: to_row, col },
   });
   const series: ChartSeries[] = [];
-  for (let col = firstSeriesCol; col <= end.col; col++) {
-    const entry: ChartSeries = { values: column(col, firstValueRow, end.row) };
-    if (headerText) entry.nameRange = column(col, start.row, start.row);
-    if (hasCategories) entry.categories = column(start.col, firstValueRow, end.row);
+  for (let col = first_series_col; col <= end.col; col++) {
+    const entry: ChartSeries = { values: column(col, first_value_row, end.row) };
+    if (header_text) entry.nameRange = column(col, start.row, start.row);
+    if (has_categories) entry.categories = column(start.col, first_value_row, end.row);
     series.push(entry);
   }
 
@@ -169,6 +169,7 @@ export function withPivotValue(
   if (next.length === 0) return null;
 
   const { pivotValues: _plotted, ...rest } = chart;
-  const everyValue = next.length === count && next.every((candidate, index) => candidate === index);
-  return everyValue ? rest : { ...rest, pivotValues: next };
+  const every_value =
+    next.length === count && next.every((candidate, index) => candidate === index);
+  return every_value ? rest : { ...rest, pivotValues: next };
 }

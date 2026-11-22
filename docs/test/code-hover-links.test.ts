@@ -9,17 +9,17 @@ import { splitDocumentation } from "../src/lib/api-reference-routes.js";
 import { sheetwriteCodeHovers } from "../src/lib/sheetwrite-code-hovers.js";
 
 /** The link targets in `code` rendered with hovers from a manifest of `exports` in @sheetwrite/core. */
-async function hoverLinks(exports: readonly object[], code: string): Promise<string[]> {
+async function hover_links(exports: readonly object[], code: string): Promise<string[]> {
   // A working directory inside docs/ resolves @sheetwrite/core as the site
   // does, and holds its own API manifest, so the test does not need the
   // generated docs data.
   const cwd = await mkdtemp(join(new URL("./", import.meta.url).pathname, ".hover-"));
   try {
     await mkdir(join(cwd, "src/generated"), { recursive: true });
-    const entryPoints = [{ subpath: ".", classification: "supported", exports }];
+    const entry_points = [{ subpath: ".", classification: "supported", exports }];
     await writeFile(
       join(cwd, "src/generated/public-api.json"),
-      JSON.stringify({ packages: [{ name: "@sheetwrite/core", entryPoints }] }),
+      JSON.stringify({ packages: [{ name: "@sheetwrite/core", entryPoints: entry_points }] }),
     );
     const renderer = new ExpressiveCode({ plugins: [sheetwriteCodeHovers({ cwd })] });
     const rendered = await renderer.render({ language: "ts", code });
@@ -30,7 +30,7 @@ async function hoverLinks(exports: readonly object[], code: string): Promise<str
 }
 
 test("hover see-also tags link guide paths and API names", async () => {
-  const hrefs = await hoverLinks(
+  const hrefs = await hover_links(
     [{ name: "createGrid" }],
     'import { initSheetwrite } from "@sheetwrite/core";\nawait initSheetwrite();',
   );
@@ -39,7 +39,7 @@ test("hover see-also tags link guide paths and API names", async () => {
 });
 
 test("a name the sample declares links no API member that shares it", async () => {
-  const hrefs = await hoverLinks(
+  const hrefs = await hover_links(
     [
       { name: "GridCommandState" },
       {

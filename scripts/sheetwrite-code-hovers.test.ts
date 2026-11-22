@@ -111,7 +111,7 @@ describe("Sheetwrite hover quality", () => {
 });
 describe("Generated fence reference links", () => {
   it("links inferred local values when their type resolves to one public API symbol", () => {
-    const inferredRoutes = new Map([
+    const inferred_routes = new Map([
       ["DataSourceRequest", "/docs/api/core/data-source-request/"],
       ["SheetwriteError", "/docs/api/core/sheetwrite-error/"],
       ["Theme", "/docs/api/core/theme/"],
@@ -120,14 +120,14 @@ describe("Generated fence reference links", () => {
       referenceRouteForHover(
         "request",
         'let request: Omit<DataSourceRequest, "signal">',
-        inferredRoutes,
+        inferred_routes,
       ),
     ).toBe("/docs/api/core/data-source-request/");
-    expect(referenceRouteForHover("error", "let error: SheetwriteError", inferredRoutes)).toBe(
+    expect(referenceRouteForHover("error", "let error: SheetwriteError", inferred_routes)).toBe(
       "/docs/api/core/sheetwrite-error/",
     );
     expect(
-      referenceRouteForHover("value", "let value: Theme | SheetwriteError", inferredRoutes),
+      referenceRouteForHover("value", "let value: Theme | SheetwriteError", inferred_routes),
     ).toBeUndefined();
   });
 });

@@ -32,9 +32,9 @@ export function FormulaFilter(props: {
   const typed = isServer
     ? ""
     : ((document.getElementById(`${id}-search`) as HTMLInputElement | null)?.value ?? "");
-  const [query, setQuery] = createSignal(typed);
-  const [engine, setEngine] = createSignal("all");
-  const [count, setCount] = createSignal(props.total);
+  const [query, set_query] = createSignal(typed);
+  const [engine, set_engine] = createSignal("all");
+  const [count, set_count] = createSignal(props.total);
 
   createEffect(() => {
     const needle = query().trim().toLowerCase();
@@ -42,18 +42,18 @@ export function FormulaFilter(props: {
     const table = document.getElementById(formulaTableId(props.family));
     let visible = 0;
     for (const family of table?.querySelectorAll<HTMLElement>(".sw-formula-family") ?? []) {
-      let familyCount = 0;
+      let family_count = 0;
       for (const row of family.querySelectorAll<HTMLElement>("[data-formula-name]")) {
         const matches =
           (row.dataset.formulaName ?? "").toLowerCase().includes(needle) &&
           (wanted === "all" || row.dataset.engine === wanted);
         row.hidden = !matches;
-        if (matches) familyCount++;
+        if (matches) family_count++;
       }
-      family.hidden = familyCount === 0;
-      visible += familyCount;
+      family.hidden = family_count === 0;
+      visible += family_count;
     }
-    setCount(visible);
+    set_count(visible);
   });
 
   return (
@@ -63,7 +63,7 @@ export function FormulaFilter(props: {
           Find a function
           <input
             id={`${id}-search`}
-            onInput={(event) => setQuery(event.currentTarget.value)}
+            onInput={(event) => set_query(event.currentTarget.value)}
             placeholder="Name or alias, e.g. SUM"
             type="search"
             value={query()}
@@ -73,7 +73,7 @@ export function FormulaFilter(props: {
           class="sw-formula-filter__engine"
           id={`${id}-engine`}
           label="Available in"
-          onChange={setEngine}
+          onChange={set_engine}
           options={ENGINE_OPTIONS}
           value={engine()}
         />

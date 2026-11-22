@@ -38,127 +38,129 @@ export async function loadWorkbookPackage(
   data: Blob | ArrayBuffer | Uint8Array,
   context: XlsxCodecContext,
 ): Promise<LoadedWorkbookPackage> {
-  const packageFile = await OpcPackage.open(data, context);
-  const workbookPart = packageFile.officeDocumentPart();
-  await packageFile.load([workbookPart]);
-  const workbookRoot = packageFile.readXml(workbookPart);
-  packageFile.release([workbookPart]);
-  assertXmlRoot(workbookRoot, "workbook", MAIN_NAMESPACES, workbookPart);
+  const package_file = await OpcPackage.open(data, context);
+  const workbook_part = package_file.officeDocumentPart();
+  await package_file.load([workbook_part]);
+  const workbook_root = package_file.readXml(workbook_part);
+  package_file.release([workbook_part]);
+  assertXmlRoot(workbook_root, "workbook", MAIN_NAMESPACES, workbook_part);
   const date1904 = xmlBoolean(
-    xmlAttribute(xmlChild(workbookRoot, "workbookPr") ?? workbookRoot, "date1904"),
+    xmlAttribute(xmlChild(workbook_root, "workbookPr") ?? workbook_root, "date1904"),
   );
-  const workbookRelationships = packageFile.relationships(workbookPart);
+  const workbook_relationships = package_file.relationships(workbook_part);
 
-  const stylesPart = workbookRelationships.find(
+  const styles_part = workbook_relationships.find(
     (relationship) =>
       relationshipTypeMatches(relationship.type, "styles") && !relationship.external,
   )?.target;
-  const sharedStringsPart = workbookRelationships.find(
+  const shared_strings_part = workbook_relationships.find(
     (relationship) =>
       relationshipTypeMatches(relationship.type, "sharedStrings") && !relationship.external,
   )?.target;
-  const themePart = workbookRelationships.find(
+  const theme_part = workbook_relationships.find(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
-  const metadataPart = workbookRelationships.find(
+  const metadata_part = workbook_relationships.find(
     (relationship) =>
       relationshipTypeMatches(relationship.type, "sheetMetadata") && !relationship.external,
   )?.target;
 
   // Before the sheets, whose formulas name the links by index.
-  const externalLinks = await readExternalLinks(
-    packageFile,
-    workbookRoot,
-    workbookRelationships,
+  const external_links = await readExternalLinks(
+    package_file,
+    workbook_root,
+    workbook_relationships,
     context,
   );
-  context.externalBooks = externalLinks.books;
-  const readLinkParts = new Set(externalLinks.parts.values());
-  for (const relationship of workbookRelationships) {
-    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
+  context.externalBooks = external_links.books;
+  const read_link_parts = new Set(external_links.parts.values());
+  for (const relationship of workbook_relationships) {
+    const external_link = relationshipTypeMatches(relationship.type, "externalLink");
     if (
       relationship.external ||
       ["worksheet", "styles", "sharedStrings", "theme", "sheetMetadata"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       ) ||
       (isRetainedRelationship("workbook", relationship.type) &&
-        (!externalLink || readLinkParts.has(relationship.target)))
+        (!external_link || read_link_parts.has(relationship.target)))
     ) {
       continue;
     }
     emitWarning(context, {
-      code: externalLink ? "external-relationship" : "unsupported-feature",
-      message: externalLink
+      code: external_link ? "external-relationship" : "unsupported-feature",
+      message: external_link
         ? "External-link workbook graph was dropped"
         : `Unsupported workbook relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
       part: relationship.target,
     });
   }
 
-  const styleParts = [stylesPart, themePart].filter((part): part is string => part !== undefined);
-  await packageFile.load(styleParts);
-  const styles = new ParsedStyles(
-    stylesPart ? packageFile.readXml(stylesPart) : undefined,
-    context,
-    themePart ? packageFile.readXml(themePart) : undefined,
-    stylesPart ?? "xl/styles.xml",
-    themePart ?? "xl/theme/theme1.xml",
+  const style_parts = [styles_part, theme_part].filter(
+    (part): part is string => part !== undefined,
   );
-  packageFile.release(styleParts);
+  await package_file.load(style_parts);
+  const styles = new ParsedStyles(
+    styles_part ? package_file.readXml(styles_part) : undefined,
+    context,
+    theme_part ? package_file.readXml(theme_part) : undefined,
+    styles_part ?? "xl/styles.xml",
+    theme_part ?? "xl/theme/theme1.xml",
+  );
+  package_file.release(style_parts);
 
-  if (sharedStringsPart) await packageFile.load([sharedStringsPart]);
-  const sharedStrings = parseSharedStrings(packageFile, sharedStringsPart, context);
-  if (sharedStringsPart) packageFile.release([sharedStringsPart]);
+  if (shared_strings_part) await package_file.load([shared_strings_part]);
+  const shared_strings = parseSharedStrings(package_file, shared_strings_part, context);
+  if (shared_strings_part) package_file.release([shared_strings_part]);
 
   // Excel's dynamic arrays are formula cells whose `cm` names this part's metadata.
-  if (metadataPart) {
-    await packageFile.load([metadataPart]);
-    const metadataRoot = packageFile.readXml(metadataPart);
-    packageFile.release([metadataPart]);
-    assertXmlRoot(metadataRoot, "metadata", MAIN_NAMESPACES, metadataPart);
-    context.dynamicArrayMetadata = dynamicArrayCellMetadata(metadataRoot);
+  if (metadata_part) {
+    await package_file.load([metadata_part]);
+    const metadata_root = package_file.readXml(metadata_part);
+    package_file.release([metadata_part]);
+    assertXmlRoot(metadata_root, "metadata", MAIN_NAMESPACES, metadata_part);
+    context.dynamicArrayMetadata = dynamicArrayCellMetadata(metadata_root);
   }
   return {
-    packageFile,
-    workbookPart,
-    workbookRoot,
+    packageFile: package_file,
+    workbookPart: workbook_part,
+    workbookRoot: workbook_root,
     date1904,
-    workbookRelationships,
-    externalLinks,
+    workbookRelationships: workbook_relationships,
+    externalLinks: external_links,
     styles,
-    sharedStrings,
+    sharedStrings: shared_strings,
   };
 }
 
-function discoverWorksheets(
-  packageFile: OpcPackage,
-  workbookPart: string,
-  workbookRoot: XmlElement,
+function discover_worksheets(
+  package_file: OpcPackage,
+  workbook_part: string,
+  workbook_root: XmlElement,
   context: XlsxCodecContext,
 ) {
-  const sheetCollection = xmlChild(workbookRoot, "sheets");
-  if (!sheetCollection) return readerFailure("workbook has no sheet collection");
+  const sheet_collection = xmlChild(workbook_root, "sheets");
+  if (!sheet_collection) return readerFailure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
-  const sheetNames: string[] = [];
-  for (const element of xmlChildren(sheetCollection, "sheet")) {
-    const rawName = xmlAttribute(element, "name");
-    const relationshipId = xmlAttribute(element, "id");
-    if (rawName === undefined || !relationshipId) {
+  const sheet_names: string[] = [];
+  for (const element of xmlChildren(sheet_collection, "sheet")) {
+    const raw_name = xmlAttribute(element, "name");
+    const relationship_id = xmlAttribute(element, "id");
+    if (raw_name === undefined || !relationship_id) {
       return readerFailure("worksheet declaration is incomplete");
     }
-    const validatedName = validateSheetName(decodeXstring(rawName), sheetNames);
+    const validated_name = validateSheetName(decodeXstring(raw_name), sheet_names);
     // Excel refuses to rename a sheet to History, but a file from another
     // program can hold one, and it opens.
-    if (!validatedName.ok && validatedName.code !== "reserved") {
+    if (!validated_name.ok && validated_name.code !== "reserved") {
       return readerFailure(
-        `worksheet name ${JSON.stringify(validatedName.name)} is unsafe or duplicated (${validatedName.code})`,
+        `worksheet name ${JSON.stringify(validated_name.name)} is unsafe or duplicated (${validated_name.code})`,
       );
     }
-    const name = validatedName.name;
-    sheetNames.push(name);
-    const relationship = packageFile.relationship(workbookPart, relationshipId);
+    const name = validated_name.name;
+    sheet_names.push(name);
+    const relationship = package_file.relationship(workbook_part, relationship_id);
     if (!relationshipTypeMatches(relationship.type, "worksheet")) {
-      return readerFailure(`relationship ${relationshipId} is not a worksheet`);
+      return readerFailure(`relationship ${relationship_id} is not a worksheet`);
     }
     const state = xmlAttribute(element, "state");
     if (
@@ -172,76 +174,83 @@ function discoverWorksheets(
     references.push({ name, state, relationship });
   }
 
-  const metadataCandidates = references.filter((reference) =>
+  const metadata_candidates = references.filter((reference) =>
     reference.name.startsWith(META_STEM),
   ).length;
-  assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
+  assertResource(context, "maxSheets", references.length - Math.min(1, metadata_candidates));
   return references;
 }
 
 export async function readSourceSheets(loaded: LoadedWorkbookPackage, context: XlsxCodecContext) {
-  const { packageFile, workbookPart, workbookRoot, styles, sharedStrings, date1904 } = loaded;
-  const references = discoverWorksheets(packageFile, workbookPart, workbookRoot, context);
+  const {
+    packageFile: package_file,
+    workbookPart: workbook_part,
+    workbookRoot: workbook_root,
+    styles,
+    sharedStrings: shared_strings,
+    date1904,
+  } = loaded;
+  const references = discover_worksheets(package_file, workbook_part, workbook_root, context);
 
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
-  const parsedSheets: ParsedSheet[] = [];
+  const parsed_sheets: ParsedSheet[] = [];
   for (const reference of references) {
     checkAbort(context);
-    const worksheetPart = reference.relationship.target;
+    const worksheet_part = reference.relationship.target;
     // The worksheet itself is streamed by parseSheet; only its small parts are loaded.
-    const parts = packageFile
-      .relationships(worksheetPart)
+    const parts = package_file
+      .relationships(worksheet_part)
       .filter(
         (relationship) =>
           !relationship.external &&
           ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
       )
       .map((relationship) => relationship.target);
-    await packageFile.load(parts);
+    await package_file.load(parts);
     try {
-      parsedSheets.push(
-        await parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
+      parsed_sheets.push(
+        await parseSheet(package_file, reference, styles, shared_strings, context, usage, date1904),
       );
     } finally {
-      packageFile.release(parts);
+      package_file.release(parts);
     }
   }
 
   let metadata: WorkbookSnapshot | null = null;
-  let metadataIndex = -1;
-  for (const [index, sheet] of parsedSheets.entries()) {
+  let metadata_index = -1;
+  for (const [index, sheet] of parsed_sheets.entries()) {
     const parsed = metadataFromSheet(sheet, context);
     if (parsed) {
       metadata = parsed;
-      metadataIndex = index;
+      metadata_index = index;
       break;
     }
   }
 
-  const sourceSheets = parsedSheets.filter((_sheet, index) => index !== metadataIndex);
-  const sourceReferences = references.filter((_sheet, index) => index !== metadataIndex);
-  assertResource(context, "maxSheets", sourceSheets.length);
-  if (sourceSheets.length === 0)
+  const source_sheets = parsed_sheets.filter((_sheet, index) => index !== metadata_index);
+  const source_references = references.filter((_sheet, index) => index !== metadata_index);
+  assertResource(context, "maxSheets", source_sheets.length);
+  if (source_sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX workbook has no worksheets");
   if (
-    sourceReferences.every(
+    source_references.every(
       (reference) => reference.state === "hidden" || reference.state === "veryHidden",
     )
   ) {
     return readerFailure("workbook requires at least one visible worksheet");
   }
 
-  let sourceCellCount = 0;
-  let sourceTableCount = 0;
-  for (const source of sourceSheets) {
-    sourceCellCount += source.cells.length;
-    sourceTableCount += source.tables.length;
-    assertResource(context, "maxCells", sourceCellCount);
-    if (sourceTableCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+  let source_cell_count = 0;
+  let source_table_count = 0;
+  for (const source of source_sheets) {
+    source_cell_count += source.cells.length;
+    source_table_count += source.tables.length;
+    assertResource(context, "maxCells", source_cell_count);
+    if (source_table_count > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
       return readerFailure(
         `workbook exceeds the table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
       );
     }
   }
-  return { references, sourceReferences, sourceSheets, metadata };
+  return { references, sourceReferences: source_references, sourceSheets: source_sheets, metadata };
 }

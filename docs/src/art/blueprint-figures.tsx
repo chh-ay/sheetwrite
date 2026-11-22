@@ -81,45 +81,45 @@ const PAIR_OFFSET = 12;
  * it. Wide, the renderer sits beside the core, in its row, at its height; on
  * phones it sits under the engine, its connector running down beside it.
  */
-function architectureLayout(
+function architecture_layout(
   least: number,
   labels: {
     readonly down: readonly [string, string];
     readonly up: readonly [string, string];
     readonly side?: string;
   },
-  isStacked: boolean,
+  is_stacked: boolean,
 ): BlueprintLayout {
-  const widestLabel = Math.max(...[...labels.down, ...labels.up].map(labelWidth));
+  const widest_label = Math.max(...[...labels.down, ...labels.up].map(labelWidth));
   const column = Math.max(
     least,
     nodeWidth(HOST),
     nodeWidth(CORE),
     nodeWidth(WASM),
-    2 * (PAIR_OFFSET + SPACING.label + widestLabel),
+    2 * (PAIR_OFFSET + SPACING.label + widest_label),
   );
-  const rowHeight = Math.max(nodeHeight(CORE), nodeHeight(RENDERER));
+  const row_height = Math.max(nodeHeight(CORE), nodeHeight(RENDERER));
   const host = node({ ...HOST, x: 0, y: 0, w: column });
-  const core = node({ ...CORE, x: 0, y: host.rect.h + SPACING.row, w: column, h: rowHeight });
-  const wasm = node({ ...WASM, x: 0, y: core.rect.y + rowHeight + SPACING.row, w: column });
-  const renderer = isStacked
+  const core = node({ ...CORE, x: 0, y: host.rect.h + SPACING.row, w: column, h: row_height });
+  const wasm = node({ ...WASM, x: 0, y: core.rect.y + row_height + SPACING.row, w: column });
+  const renderer = is_stacked
     ? node({ ...RENDERER, x: 0, y: wasm.rect.y + wasm.rect.h + SPACING.tile, w: column })
     : node({
         ...RENDERER,
         x: column + linkGap(labels.side === undefined ? [] : [labels.side]),
         y: core.rect.y,
         w: nodeWidth(RENDERER),
-        h: rowHeight,
+        h: row_height,
       });
   const down = 0.5 - PAIR_OFFSET / column;
   const up = 0.5 + PAIR_OFFSET / column;
   const pair = (
     upper: BlueprintNode,
     lower: BlueprintNode,
-    [downLabel, upLabel]: readonly [string, string],
+    [down_label, up_label]: readonly [string, string],
   ): BlueprintEdge[] => [
-    { from: upper.id, fromSide: "bottom", to: lower.id, t: down, kind: "main", label: downLabel },
-    { from: lower.id, fromSide: "top", to: upper.id, t: up, kind: "back", label: upLabel },
+    { from: upper.id, fromSide: "bottom", to: lower.id, t: down, kind: "main", label: down_label },
+    { from: lower.id, fromSide: "top", to: upper.id, t: up, kind: "back", label: up_label },
   ];
   return {
     nodes: [host, core, renderer, wasm],
@@ -130,7 +130,7 @@ function architectureLayout(
         from: "core",
         fromSide: "right",
         to: "renderer",
-        ...(isStacked ? { toSide: "right" as const } : {}),
+        ...(is_stacked ? { toSide: "right" as const } : {}),
         kind: "side",
         ...(labels.side === undefined ? {} : { label: labels.side }),
       },
@@ -138,8 +138,8 @@ function architectureLayout(
   };
 }
 
-function architectureWide(): BlueprintLayout {
-  return architectureLayout(
+function architecture_wide(): BlueprintLayout {
+  return architecture_layout(
     320,
     {
       down: ["createGrid · applyTransaction", "store ops · recalculation"],
@@ -151,8 +151,8 @@ function architectureWide(): BlueprintLayout {
 }
 
 /** On phones the labels are one word each, and the renderer stacks under the engine. */
-function architectureNarrow(): BlueprintLayout {
-  return architectureLayout(
+function architecture_narrow(): BlueprintLayout {
+  return architecture_layout(
     NARROW - BRACKET,
     { down: ["createGrid", "store ops"], up: ["events", "windows"] },
     true,
@@ -163,9 +163,9 @@ function architectureNarrow(): BlueprintLayout {
 export function ArchitectureFigure(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={architectureNarrow()}
+      narrow={architecture_narrow()}
       text={ARCHITECTURE_TEXT}
-      wide={architectureWide()}
+      wide={architecture_wide()}
     />
   );
 }
@@ -183,7 +183,7 @@ const XLSX_TEXT = {
  * whose arrows enter it. Its arrows enter its side spread apart, so the
  * box stays its own size however far apart those steps are.
  */
-function besideSteps(
+function beside_steps(
   spec: Omit<BlueprintNode, "rect">,
   x: number,
   w: number,
@@ -199,8 +199,8 @@ function besideSteps(
  * error beside the steps that can fail and the warnings level with the two
  * steps that report them.
  */
-function xlsxWide(): BlueprintLayout {
-  const importSteps = [
+function xlsx_wide(): BlueprintLayout {
+  const import_steps = [
     { id: "bytes", eyebrow: "Import", title: "XLSX bytes", lines: ["File or fetch"] },
     { id: "unzip", title: "Unzip", lines: ["Sizes, ratio", "capped"] },
     { id: "parse", title: "Parse XML", lines: ["No DTDs or", "entities"] },
@@ -212,7 +212,7 @@ function xlsxWide(): BlueprintLayout {
     },
     { id: "grid", title: "Grid", lines: ["Recalculated", "and painted"] },
   ] as const;
-  const exportSteps = [
+  const export_steps = [
     { id: "source", eyebrow: "Export", title: "Workbook", lines: ["From the grid"] },
     { id: "write", title: "Write", lines: ["XLSX, CSV", "or TSV"] },
     { id: "file", title: "File", lines: ["Download", "or bytes"] },
@@ -230,31 +230,31 @@ function xlsxWide(): BlueprintLayout {
     tone: "muted",
   } as const;
   const h = Math.max(
-    ...[...importSteps, ...exportSteps, error, warnings].map((step) => nodeHeight(step)),
+    ...[...import_steps, ...export_steps, error, warnings].map((step) => nodeHeight(step)),
   );
-  const rowY = (row: number) => row * (h + SPACING.row);
+  const row_y = (row: number) => row * (h + SPACING.row);
   const columns = [
-    Math.max(...importSteps.map(nodeWidth)),
+    Math.max(...import_steps.map(nodeWidth)),
     Math.max(nodeWidth(error), nodeWidth(warnings)),
-    Math.max(...exportSteps.map(nodeWidth)),
+    Math.max(...export_steps.map(nodeWidth)),
   ] as const;
-  const columnX = [
+  const column_x = [
     0,
     columns[0] + SPACING.link,
     columns[0] + columns[1] + 2 * SPACING.link,
   ] as const;
   // The export column starts level with Parse XML, so Write sits level with Workbook.
-  const exportFirstRow = 2;
+  const export_first_row = 2;
   const nodes: BlueprintNode[] = [
-    ...importSteps.map((step, row) => node({ ...step, x: 0, y: rowY(row), w: columns[0], h })),
-    node({ ...warnings, x: columnX[1], y: rowY(3), w: columns[1], h }),
-    ...exportSteps.map((step, row) =>
-      node({ ...step, x: columnX[2], y: rowY(exportFirstRow + row), w: columns[2], h }),
+    ...import_steps.map((step, row) => node({ ...step, x: 0, y: row_y(row), w: columns[0], h })),
+    node({ ...warnings, x: column_x[1], y: row_y(3), w: columns[1], h }),
+    ...export_steps.map((step, row) =>
+      node({ ...step, x: column_x[2], y: row_y(export_first_row + row), w: columns[2], h }),
     ),
   ];
   const [, unzip, parse] = nodes;
   if (unzip === undefined || parse === undefined) throw new Error("The XLSX steps are missing");
-  nodes.push(besideSteps(error, columnX[1], columns[1], [unzip, parse]));
+  nodes.push(beside_steps(error, column_x[1], columns[1], [unzip, parse]));
   return {
     nodes,
     edges: [
@@ -273,7 +273,7 @@ function xlsxWide(): BlueprintLayout {
 }
 
 /** The import and export paths stacked, with the error and the warnings in a column beside them. */
-function xlsxNarrow(): BlueprintLayout {
+function xlsx_narrow(): BlueprintLayout {
   const steps = [
     { id: "bytes", eyebrow: "Import", title: "XLSX bytes", lines: ["File or fetch"] },
     { id: "unzip", title: "Unzip", lines: ["Sizes, ratio", "capped"] },
@@ -283,9 +283,9 @@ function xlsxNarrow(): BlueprintLayout {
     { id: "source", eyebrow: "Export", title: "Workbook", lines: ["From the grid"] },
     { id: "write", title: "Write", lines: ["XLSX, CSV", "or TSV"] },
   ] as const;
-  const errorText = { title: "Typed error", lines: ["Nothing", "imported"] } as const;
-  const warningsText = { title: "Warnings", lines: ["Anything", "not kept"] } as const;
-  const right = { w: Math.max(nodeWidth(errorText), nodeWidth(warningsText)) };
+  const error_text = { title: "Typed error", lines: ["Nothing", "imported"] } as const;
+  const warnings_text = { title: "Warnings", lines: ["Anything", "not kept"] } as const;
+  const right = { w: Math.max(nodeWidth(error_text), nodeWidth(warnings_text)) };
   const w = Math.max(...steps.map(nodeWidth));
   // The export path starts a new group, a tile's space further down.
   let y = 0;
@@ -295,17 +295,19 @@ function xlsxNarrow(): BlueprintLayout {
     y += placed.rect.h + SPACING.row;
     return placed;
   });
-  const rightAt = { x: w + SPACING.link, w: right.w };
+  const right_at = { x: w + SPACING.link, w: right.w };
   const [, unzip, parse, workbook, , , write] = nodes;
   if (!unzip || !parse || !workbook || !write) throw new Error("The XLSX steps are missing");
-  const error = besideSteps({ id: "error", ...errorText, tone: "danger" }, rightAt.x, rightAt.w, [
-    unzip,
-    parse,
-  ]);
-  const warnings = besideSteps(
-    { id: "warnings", ...warningsText, tone: "muted" },
-    rightAt.x,
-    rightAt.w,
+  const error = beside_steps(
+    { id: "error", ...error_text, tone: "danger" },
+    right_at.x,
+    right_at.w,
+    [unzip, parse],
+  );
+  const warnings = beside_steps(
+    { id: "warnings", ...warnings_text, tone: "muted" },
+    right_at.x,
+    right_at.w,
     [workbook, write],
   );
   return {
@@ -326,7 +328,7 @@ function xlsxNarrow(): BlueprintLayout {
 
 /** Import and export: the import path, its failure exit, the export path, and the warnings of both. */
 export function XlsxFlowFigure(): JSX.Element {
-  return <BlueprintDiagram narrow={xlsxNarrow()} text={XLSX_TEXT} wide={xlsxWide()} />;
+  return <BlueprintDiagram narrow={xlsx_narrow()} text={XLSX_TEXT} wide={xlsx_wide()} />;
 }
 
 // ---- Documents and operations: how changes reach the store -----------------------
@@ -347,7 +349,7 @@ const SOURCES = [
   },
 ] as const;
 
-function documentOpsWide(): BlueprintLayout {
+function document_ops_wide(): BlueprintLayout {
   const w = Math.max(...SOURCES.map(nodeWidth));
   let y = 0;
   const sources = SOURCES.map((source) => {
@@ -356,22 +358,22 @@ function documentOpsWide(): BlueprintLayout {
     return placed;
   });
   const height = y - SPACING.tile;
-  const storeText = {
+  const store_text = {
     title: "Store",
     code: ["DocumentOp[]"],
     lines: ["One reducer, one change event"],
   } as const;
-  const snapshotText = {
+  const snapshot_text = {
     title: "Load a snapshot",
     code: ["WorkbookSnapshot"],
     lines: ["Validated; no event or undo"],
   } as const;
   // The store stands as tall as the sources, so each arrow runs straight
   // across; the snapshot sits under the store and hydrates it from below.
-  const column = Math.max(nodeWidth(storeText), nodeWidth(snapshotText));
+  const column = Math.max(nodeWidth(store_text), nodeWidth(snapshot_text));
   const store = node({
     id: "store",
-    ...storeText,
+    ...store_text,
     x: w + SPACING.link,
     y: 0,
     w: column,
@@ -380,7 +382,7 @@ function documentOpsWide(): BlueprintLayout {
   });
   const snapshot = node({
     id: "snapshot",
-    ...snapshotText,
+    ...snapshot_text,
     x: store.rect.x,
     y: height + SPACING.row,
     w: column,
@@ -403,7 +405,7 @@ function documentOpsWide(): BlueprintLayout {
 /** The gutter left of stacked sources, where their connectors drop to the box below. */
 const GUTTER = 40;
 
-function documentOpsNarrow(): BlueprintLayout {
+function document_ops_narrow(): BlueprintLayout {
   // Phones show each source's short name; the wide drawing and the description say the rest.
   const short = [
     { id: "grid", title: "Grid edits", lines: ["Undo, sync"] },
@@ -463,9 +465,9 @@ function documentOpsNarrow(): BlueprintLayout {
 export function DocumentOpsFigure(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={documentOpsNarrow()}
+      narrow={document_ops_narrow()}
       text={DOCUMENT_OPS_TEXT}
-      wide={documentOpsWide()}
+      wide={document_ops_wide()}
     />
   );
 }
@@ -636,7 +638,7 @@ const PIVOT = {
 const MANY_TO_ONE = "many → one";
 
 /** Orders beside Customers, joined many to one, and the pivot under both. */
-function relationshipWide(): BlueprintLayout {
+function relationship_wide(): BlueprintLayout {
   const gap = linkGap([MANY_TO_ONE]);
   const half = Math.max((WIDE - gap) / 2, nodeWidth(ORDERS), nodeWidth(CUSTOMERS));
   const top = Math.max(nodeHeight(ORDERS), nodeHeight(CUSTOMERS));
@@ -668,7 +670,7 @@ function relationshipWide(): BlueprintLayout {
 }
 
 /** On phones the three stack; Orders reaches the pivot down its left side. */
-function relationshipNarrow(): BlueprintLayout {
+function relationship_narrow(): BlueprintLayout {
   const w = NARROW - BRACKET;
   const orders = node({ ...ORDERS, x: BRACKET, y: 0, w });
   const customers = node({ ...CUSTOMERS, x: BRACKET, y: orders.rect.h + SPACING.row, w });
@@ -692,10 +694,10 @@ function relationshipNarrow(): BlueprintLayout {
 export function RelationshipFigure(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={relationshipNarrow()}
+      narrow={relationship_narrow()}
       note="No match or a blank key reads blank; a duplicate key on the one side shows #VALUE! at the pivot."
       text={RELATIONSHIP_TEXT}
-      wide={relationshipWide()}
+      wide={relationship_wide()}
     />
   );
 }

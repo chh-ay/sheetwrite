@@ -7,11 +7,11 @@ import {
   type DataToolsScenario,
 } from "../src/showcases/scenarios/data-tools.js";
 
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 let scenario: DataToolsScenario | null = null;
 let host: HTMLElement;
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
   host = document.createElement("div");
   document.body.append(host);
 });
@@ -19,7 +19,7 @@ afterEach(() => {
   scenario?.dispose();
   scenario = null;
   host.remove();
-  restoreCanvas();
+  restore_canvas();
 });
 
 test("clear view preserves independent manual and grouped visibility", async () => {

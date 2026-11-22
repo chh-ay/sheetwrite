@@ -25,9 +25,9 @@ export function resizeTargetAt(
   prev: number,
   threshold = RESIZE_THRESHOLD,
 ): number | null {
-  const distEnd = Math.abs(pos - (start + size));
-  const distStart = Math.abs(pos - start);
-  if (distEnd <= threshold && (prev < 0 || distEnd <= distStart)) return index;
-  if (distStart <= threshold && prev >= 0) return prev;
+  const dist_end = Math.abs(pos - (start + size));
+  const dist_start = Math.abs(pos - start);
+  if (dist_end <= threshold && (prev < 0 || dist_end <= dist_start)) return index;
+  if (dist_start <= threshold && prev >= 0) return prev;
   return null;
 }

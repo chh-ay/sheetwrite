@@ -25,12 +25,12 @@ import {
 import { keepXlsxSlots } from "./fixtures.js";
 
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
-let restoreXlsxSlots = keepXlsxSlots();
+let restore_xlsx_slots = keepXlsxSlots();
 beforeEach(() => {
-  restoreXlsxSlots = keepXlsxSlots();
+  restore_xlsx_slots = keepXlsxSlots();
 });
 afterEach(() => {
-  restoreXlsxSlots();
+  restore_xlsx_slots();
 });
 
 beforeAll(async () => {
@@ -43,9 +43,12 @@ const AB: Column[] = [
 ];
 
 /** One sheet "s" with fresh copies of `columns`. */
-function workbook(columns: Column[] = AB, rowCount = 3): Workbook {
+function workbook(columns: Column[] = AB, row_count = 3): Workbook {
   const copies = columns.map((column) => ({ ...column }));
-  return { activeSheet: "s", sheets: [{ id: "s", name: "S", rowCount, columns: copies }] };
+  return {
+    activeSheet: "s",
+    sheets: [{ id: "s", name: "S", rowCount: row_count, columns: copies }],
+  };
 }
 
 describe("export", () => {
@@ -97,11 +100,11 @@ describe("export", () => {
       [toXlsxWorkbook(snapshot), "xlsx-export", "toXlsxWorkbook"],
       [fromXlsxWorkbook(new Uint8Array()), "xlsx-import", "fromXlsxWorkbook"],
     ];
-    for (const [call, operation, functionName] of calls) {
+    for (const [call, operation, function_name] of calls) {
       await expect(call).rejects.toMatchObject({
         code: "optional-backend-unavailable",
         operation,
-        context: { backend: "xlsx", functionName },
+        context: { backend: "xlsx", functionName: function_name },
       });
     }
     store.dispose();
@@ -311,26 +314,28 @@ describe("export", () => {
       ["éé"],
     ]);
 
-    let inputFailure: unknown;
+    let input_failure: unknown;
     try {
       parseCsv("ééx", { resourceLimits: { maxInputBytes: 4 } });
     } catch (error) {
-      inputFailure = error;
+      input_failure = error;
     }
-    expect(inputFailure).toBeInstanceOf(DelimitedTextResourceError);
-    expect(inputFailure).toMatchObject({
+    expect(input_failure).toBeInstanceOf(DelimitedTextResourceError);
+    expect(input_failure).toMatchObject({
       resource: "maxInputBytes",
       limit: 4,
       actual: 5,
       operation: "delimited-parse",
     });
-    for (const [text, resourceLimits] of [
+    for (const [text, resource_limits] of [
       ["ééx", { maxFieldBytes: 4 }],
       ["a\nb", { maxRows: 1 }],
       ["a,b", { maxColumns: 1 }],
       ["a,b\nc", { maxCells: 2 }],
     ] as const) {
-      expect(() => parseCsv(text, { resourceLimits })).toThrow(DelimitedTextResourceError);
+      expect(() => parseCsv(text, { resourceLimits: resource_limits })).toThrow(
+        DelimitedTextResourceError,
+      );
     }
     expect(() => parseCsv("a", { resourceLimits: { maxRows: 0 } })).toThrow(
       DelimitedTextOptionsError,
@@ -349,31 +354,31 @@ describe("export", () => {
   });
 
   it("streams CSV/TSV on demand with byte-identical output and lazy cancellable store reads", async () => {
-    const rowCount = 20_000;
+    const row_count = 20_000;
     const text = Array.from(
-      { length: rowCount },
+      { length: row_count },
       (_unused, row) => `value-${row}-${"x".repeat(12)}`,
     );
-    const store = new SheetwriteStore(workbook(AB, rowCount), {
-      rowCount,
-      columns: { a: text, b: Array.from({ length: rowCount }, (_unused, row) => row) },
+    const store = new SheetwriteStore(workbook(AB, row_count), {
+      rowCount: row_count,
+      columns: { a: text, b: Array.from({ length: row_count }, (_unused, row) => row) },
     });
     const options = {
       resourceLimits: {
         maxWriterWindowRows: 128,
-        maxRows: rowCount + 1,
-        maxCells: (rowCount + 1) * 2,
+        maxRows: row_count + 1,
+        maxCells: (row_count + 1) * 2,
       },
     };
-    let windowReads = 0;
-    const readWindow = store.getVisibleWindow.bind(store);
+    let window_reads = 0;
+    const read_window = store.getVisibleWindow.bind(store);
     store.getVisibleWindow = ((sheet, rows, columns) => {
-      windowReads++;
-      return readWindow(sheet, rows, columns);
+      window_reads++;
+      return read_window(sheet, rows, columns);
     }) as typeof store.getVisibleWindow;
     const sheet = store.getWorkbook().sheets[0]!;
     const stream = toCsvStream(sheet, store, options);
-    expect(windowReads).toBe(0);
+    expect(window_reads).toBe(0);
 
     const chunks: Uint8Array[] = [];
     for await (const chunk of stream) chunks.push(chunk);
@@ -383,16 +388,16 @@ describe("export", () => {
       toCsv(sheet, store, options),
     );
 
-    windowReads = 0;
+    window_reads = 0;
     const reader = toCsvStream(sheet, store, options).getReader();
     await reader.read();
     await reader.cancel();
-    const readsAtCancel = windowReads;
+    const reads_at_cancel = window_reads;
     expect(await reader.read()).toEqual({ done: true, value: undefined });
-    expect(windowReads).toBe(readsAtCancel);
-    expect(readsAtCancel).toBeLessThan(Math.ceil(rowCount / 128) / 2);
+    expect(window_reads).toBe(reads_at_cancel);
+    expect(reads_at_cancel).toBeLessThan(Math.ceil(row_count / 128) / 2);
 
-    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 1 } };
+    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: row_count - 1, col: 1 } };
     const tsv: Uint8Array[] = [];
     for await (const chunk of toTsvStream(range, store, options)) tsv.push(chunk);
     expect(new TextDecoder().decode(Buffer.concat(tsv))).toBe(toTsv(range, store, options));
@@ -407,7 +412,7 @@ describe("export", () => {
     const sheet = store.getWorkbook().sheets[0]!;
     const controller = new AbortController();
     controller.abort(new Error("cancelled CSV stream"));
-    const failureOf = async (stream: ReadableStream<Uint8Array>): Promise<unknown> => {
+    const failure_of = async (stream: ReadableStream<Uint8Array>): Promise<unknown> => {
       const reader = stream.getReader();
       try {
         while (!(await reader.read()).done);
@@ -416,11 +421,11 @@ describe("export", () => {
       }
       throw new Error("expected the stream to fail");
     };
-    expect(await failureOf(toCsvStream(sheet, store, { signal: controller.signal }))).toBe(
+    expect(await failure_of(toCsvStream(sheet, store, { signal: controller.signal }))).toBe(
       controller.signal.reason,
     );
     expect(
-      await failureOf(toCsvStream(sheet, store, { resourceLimits: { maxOutputBytes: 8 } })),
+      await failure_of(toCsvStream(sheet, store, { resourceLimits: { maxOutputBytes: 8 } })),
     ).toBeInstanceOf(DelimitedTextResourceError);
     store.dispose();
   });

@@ -17,10 +17,10 @@ const ROWS = 6;
 
 const address = (row: number, col = 0) => ({ sheet: "s1", row, col });
 
-const block = (firstRow: number, lastRow: number, lastCol = 2): Range => ({
+const block = (first_row: number, last_row: number, last_col = 2): Range => ({
   sheet: "s1",
-  start: { row: firstRow, col: 0 },
-  end: { row: lastRow, col: lastCol },
+  start: { row: first_row, col: 0 },
+  end: { row: last_row, col: last_col },
 });
 
 const BYTES_PER_ROW = 4;

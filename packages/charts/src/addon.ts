@@ -6,14 +6,16 @@ import { createChartViewCache } from "./view-cache.js";
  * The chart renderer of one grid. The SVG drawing code loads when the grid
  * creates it; a chart mounted before then draws as soon as it loads.
  */
-function createLazyChartRenderer(store: Store): ChartRenderer {
+function create_lazy_chart_renderer(store: Store): ChartRenderer {
   let renderer: ChartRenderer | undefined;
-  let isDisposed = false;
+  let is_disposed = false;
 
-  const loaded = import("./chart-renderer.js").then(({ createChartRenderer }) => {
-    if (!isDisposed) renderer = createChartRenderer(store);
-    return renderer;
-  });
+  const loaded = import("./chart-renderer.js").then(
+    ({ createChartRenderer: create_chart_renderer }) => {
+      if (!is_disposed) renderer = create_chart_renderer(store);
+      return renderer;
+    },
+  );
 
   return {
     mount(host, chart, size) {
@@ -22,26 +24,26 @@ function createLazyChartRenderer(store: Store): ChartRenderer {
       let width = size.width;
       let height = size.height;
       let mounted: MountedChart | undefined;
-      let isUnmounted = false;
+      let is_unmounted = false;
 
       void loaded.then((ready) => {
-        if (ready && !isUnmounted) mounted = ready.mount(host, chart, { width, height });
+        if (ready && !is_unmounted) mounted = ready.mount(host, chart, { width, height });
       });
 
       return {
-        resize(nextWidth, nextHeight) {
-          width = nextWidth;
-          height = nextHeight;
-          mounted?.resize(nextWidth, nextHeight);
+        resize(next_width, next_height) {
+          width = next_width;
+          height = next_height;
+          mounted?.resize(next_width, next_height);
         },
         dispose() {
-          isUnmounted = true;
+          is_unmounted = true;
           mounted?.dispose();
         },
       };
     },
     dispose() {
-      isDisposed = true;
+      is_disposed = true;
       renderer?.dispose();
     },
   };
@@ -74,7 +76,7 @@ export function chartsAddon(): SheetwriteAddon {
   return {
     name: "charts",
     setup(context) {
-      context.charts({ views: createChartViewCache, renderer: createLazyChartRenderer });
+      context.charts({ views: createChartViewCache, renderer: create_lazy_chart_renderer });
     },
   };
 }

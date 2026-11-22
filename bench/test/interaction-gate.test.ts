@@ -28,7 +28,7 @@ const RECORDED = validateInteractionArtifact(
 const fixture = () => mutableCopy(RECORDED);
 
 test("rejects drifted identity, provenance, values, ceilings and previous captures", () => {
-  const aboveCeiling = (key: InteractionCeilingMetric) => (artifact: Fixture) => {
+  const above_ceiling = (key: InteractionCeilingMetric) => (artifact: Fixture) => {
     const samples = artifact.samples[key];
     samples.fill(INTERACTION_CEILINGS[key] + 1, 0, 3);
     artifact.values = mutableCopy(
@@ -57,11 +57,11 @@ test("rejects drifted identity, provenance, values, ceilings and previous captur
       "values.lookupMedianNs.stat.median does not match raw samples",
     ],
     [
-      aboveCeiling("lookupP95Ns"),
+      above_ceiling("lookupP95Ns"),
       `lookupP95Ns median ${INTERACTION_CEILINGS.lookupP95Ns + 1} exceeds the release ceiling`,
     ],
     ...INTERACTION_SAMPLE_CEILING_KEYS.map((key): Rejection<Fixture> => [
-      aboveCeiling(key),
+      above_ceiling(key),
       `${key} sample ${INTERACTION_CEILINGS[key] + 1} exceeds the release ceiling`,
     ]),
     ...INTERACTION_CEILING_KEYS.map((key): Rejection<Fixture> => [
@@ -82,26 +82,26 @@ const SHELL_URL = "http://127.0.0.1:5197/node_modules/.vite/deps/react-dom_clien
 const PROFILE_INTERVAL_US = 1_000;
 const MS_US = 1_000;
 
-function task(startMs: number, durationMs: number): TraceEvent {
-  const event = { name: "RunTask", ph: "X", ts: startMs * MS_US, dur: durationMs * MS_US };
+function task(start_ms: number, duration_ms: number): TraceEvent {
+  const event = { name: "RunTask", ph: "X", ts: start_ms * MS_US, dur: duration_ms * MS_US };
   return { ...event, pid: 1, tid: 1, url: undefined, profile: undefined };
 }
 
-/** `count` profiled samples of one URL, one millisecond apart from `startMs`. */
-function samples(startMs: number, url: string, count: number, tid = 1): TraceEvent {
+/** `count` profiled samples of one URL, one millisecond apart from `start_ms`. */
+function samples(start_ms: number, url: string, count: number, tid = 1): TraceEvent {
   const nodes = [
     { id: 1, url: PACKAGE_URL },
     { id: 2, url: SHELL_URL },
   ];
   const profile = {
-    startTime: startMs * MS_US,
+    startTime: start_ms * MS_US,
     nodes,
     samples: Array.from({ length: count }, () => (url === PACKAGE_URL ? 1 : 2)),
     timeDeltas: Array.from({ length: count }, (_, index) =>
       index === 0 ? 0 : PROFILE_INTERVAL_US,
     ),
   };
-  const event = { name: "ProfileChunk", ph: "P", ts: startMs * MS_US, dur: undefined };
+  const event = { name: "ProfileChunk", ph: "P", ts: start_ms * MS_US, dur: undefined };
   return { ...event, pid: 1, tid, url: undefined, profile };
 }
 

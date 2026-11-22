@@ -102,7 +102,7 @@ function setup(pivots: PivotDefinition[], sheet: string, id: string, values: Ran
   return { store, events };
 }
 
-function seriesValues(store: SheetwriteStore, sheet: string, id: string) {
+function series_values(store: SheetwriteStore, sheet: string, id: string) {
   return resolveChartView(store, sheet, id)?.series[0]?.values;
 }
 
@@ -117,14 +117,14 @@ const scenarios: Record<string, () => void> = {
     };
     const { store, events } = setup([pivot], "report", "total", grown);
     try {
-      const empty = seriesValues(store, "report", "total");
+      const empty = series_values(store, "report", "total");
 
       // The edited cell is outside the series; only the pivot carries the change into it.
       apply(store, [set("data", 3, 0, "North")]);
       assert.equal(events.length, 1, "a pivot source edit reaches the chart");
       assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "total" }]);
-      assert.notDeepEqual(seriesValues(store, "report", "total"), empty);
-      assert.deepEqual(seriesValues(store, "report", "total"), [GRAND_TOTAL]);
+      assert.notDeepEqual(series_values(store, "report", "total"), empty);
+      assert.deepEqual(series_values(store, "report", "total"), [GRAND_TOTAL]);
     } finally {
       store.dispose();
     }
@@ -136,12 +136,12 @@ const scenarios: Record<string, () => void> = {
       assert.equal(store.setPivot(pivot, "report").status, "applied");
       assert.equal(events.length, 1, "setPivot reaches a chart under its output");
       assert.deepEqual(events[0]?.charts, [{ sheet: "report", id: "sums" }]);
-      assert.deepEqual(seriesValues(store, "report", "sums"), [15, 20]);
+      assert.deepEqual(series_values(store, "report", "sums"), [15, 20]);
 
       assert.equal(store.removePivot("sales").status, "applied");
       assert.equal(events.length, 2, "removePivot reaches a chart under its old output");
       assert.deepEqual(events[1]?.charts, [{ sheet: "report", id: "sums" }]);
-      assert.deepEqual(seriesValues(store, "report", "sums"), [null, null]);
+      assert.deepEqual(series_values(store, "report", "sums"), [null, null]);
     } finally {
       store.dispose();
     }
@@ -160,7 +160,7 @@ const scenarios: Record<string, () => void> = {
       assert.equal(store.setPivot({ ...pivot, name: "Renamed" }, "report").status, "applied");
       assert.equal(store.removePivot("sales").status, "applied");
       assert.deepEqual(events, []);
-      assert.deepEqual(seriesValues(store, "plain", "flat"), [1, 2]);
+      assert.deepEqual(series_values(store, "plain", "flat"), [1, 2]);
     } finally {
       store.dispose();
     }

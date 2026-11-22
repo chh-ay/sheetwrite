@@ -25,28 +25,28 @@ export const ALL_GROUPS = "all";
  */
 export function HubFilter(props: HubFilterProps) {
   let root!: HTMLDivElement;
-  const [group, setGroup] = createSignal(ALL_GROUPS);
-  const [shown, setShown] = createSignal(props.total);
+  const [group, set_group] = createSignal(ALL_GROUPS);
+  const [shown, set_shown] = createSignal(props.total);
 
   const choose = (next: string): void => {
-    setGroup(next);
+    set_group(next);
     const scenes = root.closest(".sw-hub__scenes");
     if (scenes === null) return;
     let visible = 0;
     for (const section of scenes.querySelectorAll<HTMLElement>(".sw-hub__group")) {
-      let inSection = 0;
+      let in_section = 0;
       for (const list of section.querySelectorAll<HTMLElement>(".sw-hub-scenes")) {
         list.dataset.group = next;
       }
       for (const card of section.querySelectorAll<HTMLElement>("li[data-group]")) {
         const show = next === ALL_GROUPS || card.dataset.group === next;
         card.hidden = !show;
-        if (show) inSection += 1;
+        if (show) in_section += 1;
       }
-      section.hidden = inSection === 0;
-      visible += inSection;
+      section.hidden = in_section === 0;
+      visible += in_section;
     }
-    setShown(visible);
+    set_shown(visible);
   };
 
   return (

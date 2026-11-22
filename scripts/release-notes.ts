@@ -77,14 +77,14 @@ export interface ReleaseNotesLinks {
   readonly previous?: { readonly version: string; readonly compareUrl: string };
 }
 
-function parseEntry(lines: readonly string[]): ChangelogEntry {
-  const [firstLine = "", ...rest] = lines;
+function parse_entry(lines: readonly string[]): ChangelogEntry {
+  const [first_line = "", ...rest] = lines;
   const details = rest.map((line) =>
     line.startsWith(ENTRY_CONTINUATION) ? line.slice(ENTRY_CONTINUATION.length) : line.trim(),
   );
   while (details.length > 0 && details.at(-1) === "") details.pop();
 
-  const github = GITHUB_ENTRY.exec(firstLine)?.groups;
+  const github = GITHUB_ENTRY.exec(first_line)?.groups;
   if (github?.summary !== undefined) {
     return {
       summary: github.summary,
@@ -95,16 +95,16 @@ function parseEntry(lines: readonly string[]): ChangelogEntry {
     };
   }
 
-  const legacy = COMMIT_ENTRY.exec(firstLine)?.groups;
+  const legacy = COMMIT_ENTRY.exec(first_line)?.groups;
   if (legacy?.summary !== undefined && legacy.commit !== undefined) {
     return { summary: legacy.summary, details, commit: legacy.commit, authors: [] };
   }
 
-  return { summary: firstLine.slice(ENTRY_START.length), details, authors: [] };
+  return { summary: first_line.slice(ENTRY_START.length), details, authors: [] };
 }
 
 /** Splits a group body into entries; each entry starts at a top-level list item. */
-function parseEntries(lines: readonly string[]): ChangelogEntry[] {
+function parse_entries(lines: readonly string[]): ChangelogEntry[] {
   const entries: string[][] = [];
   for (const line of lines) {
     if (line.startsWith(ENTRY_START)) {
@@ -115,8 +115,8 @@ function parseEntries(lines: readonly string[]): ChangelogEntry[] {
   }
 
   return entries
-    .filter(([firstLine = ""]) => !DEPENDENCY_UPDATE_ENTRY.test(firstLine))
-    .map(parseEntry);
+    .filter(([first_line = ""]) => !DEPENDENCY_UPDATE_ENTRY.test(first_line))
+    .map(parse_entry);
 }
 
 /**
@@ -128,35 +128,38 @@ export function changelogSection(changelog: string, version: string): ChangelogS
   const start = lines.findIndex((line) => VERSION_HEADING.exec(line)?.[1] === version);
   if (start === -1) throw new Error(`CHANGELOG has no section for ${version}`);
 
-  const nextIndex = lines.findIndex((line, index) => index > start && VERSION_HEADING.test(line));
-  const end = nextIndex === -1 ? lines.length : nextIndex;
-  const previousVersion =
-    nextIndex === -1 ? undefined : VERSION_HEADING.exec(lines[nextIndex] ?? "")?.[1];
+  const next_index = lines.findIndex((line, index) => index > start && VERSION_HEADING.test(line));
+  const end = next_index === -1 ? lines.length : next_index;
+  const previous_version =
+    next_index === -1 ? undefined : VERSION_HEADING.exec(lines[next_index] ?? "")?.[1];
 
   const groups: ChangelogGroup[] = [];
   let heading: string | undefined;
   let body: string[] = [];
-  const closeGroup = () => {
+  const close_group = () => {
     if (heading === undefined) return;
-    const entries = parseEntries(body);
+    const entries = parse_entries(body);
     if (entries.length > 0) groups.push({ heading, entries });
   };
   for (const line of lines.slice(start + 1, end)) {
-    const groupHeading = GROUP_HEADING.exec(line)?.[1];
-    if (groupHeading === undefined) {
+    const group_heading = GROUP_HEADING.exec(line)?.[1];
+    if (group_heading === undefined) {
       body.push(line);
       continue;
     }
-    closeGroup();
-    heading = groupHeading;
+    close_group();
+    heading = group_heading;
     body = [];
   }
-  closeGroup();
+  close_group();
 
-  return { groups, ...(previousVersion === undefined ? {} : { previousVersion }) };
+  return {
+    groups,
+    ...(previous_version === undefined ? {} : { previousVersion: previous_version }),
+  };
 }
 
-function releaseNotesRank(name: string): number {
+function release_notes_rank(name: string): number {
   const preferred = RELEASE_NOTES_PACKAGE_ORDER.indexOf(name);
   if (preferred !== -1) return preferred;
 
@@ -173,10 +176,10 @@ export function byReleaseNotesOrder(
   left: { readonly name: string },
   right: { readonly name: string },
 ): number {
-  return releaseNotesRank(left.name) - releaseNotesRank(right.name);
+  return release_notes_rank(left.name) - release_notes_rank(right.name);
 }
 
-function entryReference(entry: ChangelogEntry): string {
+function entry_reference(entry: ChangelogEntry): string {
   const source =
     entry.pull !== undefined
       ? `#${entry.pull}`
@@ -191,27 +194,27 @@ function entryReference(entry: ChangelogEntry): string {
   return reference === "" ? "" : ` (${reference})`;
 }
 
-function renderEntry(entry: ChangelogEntry, alsoIn: readonly string[]): string {
+function render_entry(entry: ChangelogEntry, also_in: readonly string[]): string {
   const lines = [
-    `${ENTRY_START}${entry.summary}${entryReference(entry)}`,
+    `${ENTRY_START}${entry.summary}${entry_reference(entry)}`,
     ...entry.details.map((line) => (line === "" ? "" : `${ENTRY_CONTINUATION}${line}`)),
   ];
-  if (alsoIn.length > 0) {
+  if (also_in.length > 0) {
     // Its own paragraph, so it does not read as part of the change's last sentence.
-    lines.push("", `${ENTRY_CONTINUATION}_Also in ${packageList(alsoIn)}._`);
+    lines.push("", `${ENTRY_CONTINUATION}_Also in ${package_list(also_in)}._`);
   }
   return lines.join("\n");
 }
 
 /** "`a`", "`a` and `b`", "`a`, `b` and `c`". */
-function packageList(names: readonly string[]): string {
+function package_list(names: readonly string[]): string {
   const quoted = names.map((name) => `\`${name}\``);
   const last = quoted.pop();
   return quoted.length === 0 ? `${last}` : `${quoted.join(", ")} and ${last}`;
 }
 
 /** One changeset: changesets copies the same text and pull request into every package it names. */
-function changesetIdentity(entry: ChangelogEntry): string {
+function changeset_identity(entry: ChangelogEntry): string {
   return JSON.stringify([entry.pull ?? entry.commit ?? null, entry.summary, entry.details]);
 }
 
@@ -232,13 +235,13 @@ interface NotesSection {
  * goes under "All packages"; any other entry goes under the first package
  * that has it, with the other packages named after it.
  */
-function notesSections(packages: readonly PackageChangelog[]): NotesSection[] {
+function notes_sections(packages: readonly PackageChangelog[]): NotesSection[] {
   const ordered = [...packages].sort(byReleaseNotesOrder);
   const placed = new Map<string, { readonly heading: string; readonly placed: PlacedEntry }>();
   for (const { name, section } of ordered) {
     for (const group of section.groups) {
       for (const entry of group.entries) {
-        const identity = changesetIdentity(entry);
+        const identity = changeset_identity(entry);
         const existing = placed.get(identity);
         if (existing === undefined) {
           placed.set(identity, { heading: group.heading, placed: { entry, packages: [name] } });
@@ -256,9 +259,9 @@ function notesSections(packages: readonly PackageChangelog[]): NotesSection[] {
     ]),
   );
   for (const { heading, placed: entry } of placed.values()) {
-    const [firstPackage = ALL_PACKAGES_HEADING] = entry.packages;
-    const isInEveryPackage = ordered.length > 1 && entry.packages.length === ordered.length;
-    const title = isInEveryPackage ? ALL_PACKAGES_HEADING : firstPackage;
+    const [first_package = ALL_PACKAGES_HEADING] = entry.packages;
+    const is_in_every_package = ordered.length > 1 && entry.packages.length === ordered.length;
+    const title = is_in_every_package ? ALL_PACKAGES_HEADING : first_package;
     const groups = sections.get(title)?.groups;
     if (groups === undefined) throw new Error(`No release notes section for ${title}`);
     const entries = groups.get(heading) ?? [];
@@ -274,11 +277,11 @@ export function renderReleaseNotes(
   links: ReleaseNotesLinks,
 ): string {
   const blocks: string[] = [];
-  for (const section of notesSections(packages)) {
+  for (const section of notes_sections(packages)) {
     blocks.push(`## ${section.title}`);
     for (const [heading, entries] of section.groups) {
       const rendered = entries.map(({ entry, packages: names }) =>
-        renderEntry(entry, section.title === ALL_PACKAGES_HEADING ? [] : names.slice(1)),
+        render_entry(entry, section.title === ALL_PACKAGES_HEADING ? [] : names.slice(1)),
       );
       blocks.push(`### ${heading}`, rendered.join("\n"));
     }

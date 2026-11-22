@@ -26,8 +26,8 @@ export function legacyFullWidthDataSource(loadRows: LegacyRowLoader): DataSource
             "Legacy datasource page must contain a safe start and rows array",
           );
         }
-        const declaredKeys = request.columns.flatMap((band) => [...band.keys]);
-        const declared = new Set(declaredKeys);
+        const declared_keys = request.columns.flatMap((band) => [...band.keys]);
+        const declared = new Set(declared_keys);
         const rows = page.rows.map((row) => {
           if (row === null || typeof row !== "object" || Array.isArray(row)) {
             throw datasourceFailure("Legacy datasource rows must be keyed objects");
@@ -38,7 +38,7 @@ export function legacyFullWidthDataSource(loadRows: LegacyRowLoader): DataSource
             }
           }
           const normalized: RowData = Object.create(null) as RowData;
-          for (const key of declaredKeys) {
+          for (const key of declared_keys) {
             normalized[key] = Object.hasOwn(row, key) ? row[key]! : null;
           }
           return normalized;

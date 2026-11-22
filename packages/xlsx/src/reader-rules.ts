@@ -42,10 +42,10 @@ export function parseValidation(
   const formula2 = xmlChild(element, "formula2")?.text;
   // Snapshot validation refuses a formula longer than Excel's limit, which
   // would fail the whole import, so such a rule is dropped instead.
-  let formulaTooLong = false;
-  const formulaText = (formula: string): string => {
+  let formula_too_long = false;
+  const formula_text = (formula: string): string => {
     const text = `=${decodeXstring(formula)}`;
-    if (text.length > MAX_VALIDATION_FORMULA_LENGTH) formulaTooLong = true;
+    if (text.length > MAX_VALIDATION_FORMULA_LENGTH) formula_too_long = true;
     return text;
   };
   let condition: DataValidationCondition | undefined;
@@ -54,10 +54,10 @@ export function parseValidation(
   } else if (type === "list" && formula1 !== undefined) {
     condition =
       formula1.startsWith('"') && formula1.endsWith('"')
-        ? { kind: "list", values: quotedListValues(formula1.slice(1, -1)) }
-        : { kind: "list", source: formulaText(formula1) };
+        ? { kind: "list", values: quoted_list_values(formula1.slice(1, -1)) }
+        : { kind: "list", source: formula_text(formula1) };
   } else if (type === "custom" && formula1 !== undefined) {
-    condition = { kind: "custom", formula: formulaText(formula1) };
+    condition = { kind: "custom", formula: formula_text(formula1) };
   } else if (
     type === "decimal" ||
     type === "whole" ||
@@ -65,16 +65,16 @@ export function parseValidation(
     type === "time" ||
     type === "textLength"
   ) {
-    const serialShift = type === "date" && date1904 ? DATE_1904_OFFSET : 0;
+    const serial_shift = type === "date" && date1904 ? DATE_1904_OFFSET : 0;
     const operand = (formula: string | undefined): DataValidationOperand | undefined => {
       if (formula === undefined) return undefined;
       const number = Number(formula);
       return formula.trim() !== "" && Number.isFinite(number)
-        ? number + serialShift
-        : formulaText(formula);
+        ? number + serial_shift
+        : formula_text(formula);
     };
     const operator = xmlAttribute(element, "operator") ?? "between";
-    const comparison = validationComparison(operator, operand(formula1), operand(formula2));
+    const comparison = validation_comparison(operator, operand(formula1), operand(formula2));
     if (!comparison) {
       emitWarning(context, {
         code: "validation-loss",
@@ -97,13 +97,13 @@ export function parseValidation(
       });
       return [];
     }
-    const bounds = comparisonBounds(comparison);
+    const bounds = comparison_bounds(comparison);
     condition =
       type === "date" || type === "time" || type === "textLength"
         ? { kind: type, ...bounds }
         : { kind: "number", ...bounds, ...(type === "whole" ? { integer: true } : {}) };
   }
-  if (formulaTooLong) {
+  if (formula_too_long) {
     emitWarning(context, {
       code: "validation-loss",
       message: `Excel validation formula exceeds ${MAX_VALIDATION_FORMULA_LENGTH} characters and was dropped`,
@@ -119,39 +119,39 @@ export function parseValidation(
     });
     return [];
   }
-  const showError = xmlBoolean(xmlAttribute(element, "showErrorMessage"));
-  const styleAttribute = xmlAttribute(element, "errorStyle");
-  const errorStyle: ValidationErrorStyle =
-    styleAttribute === "warning" || styleAttribute === "information" ? styleAttribute : "stop";
-  const policy: DataValidationRule["policy"] = !showError
+  const show_error = xmlBoolean(xmlAttribute(element, "showErrorMessage"));
+  const style_attribute = xmlAttribute(element, "errorStyle");
+  const error_style: ValidationErrorStyle =
+    style_attribute === "warning" || style_attribute === "information" ? style_attribute : "stop";
+  const policy: DataValidationRule["policy"] = !show_error
     ? "allow"
-    : errorStyle === "stop"
+    : error_style === "stop"
       ? "reject"
       : "warn";
   // A rule keeps only the style its policy does not imply: information for
   // `warn`, and the style Excel remembers while the alert is off.
-  const impliedStyle = policy === "warn" ? "warning" : "stop";
-  const helpText = validationText(element, "error", 255, context, sheet);
-  const errorTitle = validationText(element, "errorTitle", 32, context, sheet);
-  const inputTitle = validationText(element, "promptTitle", 32, context, sheet);
-  const inputMessage = validationText(element, "prompt", 255, context, sheet);
-  const showInputMessage = xmlAttribute(element, "showInputMessage");
+  const implied_style = policy === "warn" ? "warning" : "stop";
+  const help_text = validation_text(element, "error", 255, context, sheet);
+  const error_title = validation_text(element, "errorTitle", 32, context, sheet);
+  const input_title = validation_text(element, "promptTitle", 32, context, sheet);
+  const input_message = validation_text(element, "prompt", 255, context, sheet);
+  const show_input_message = xmlAttribute(element, "showInputMessage");
   const fields = {
     policy,
     ...(type === "list" && xmlBoolean(xmlAttribute(element, "showDropDown"))
       ? { inCellDropdown: false }
       : {}),
-    ...(errorStyle === impliedStyle ? {} : { errorStyle }),
-    ...(showInputMessage !== undefined && !xmlBoolean(showInputMessage)
+    ...(error_style === implied_style ? {} : { errorStyle: error_style }),
+    ...(show_input_message !== undefined && !xmlBoolean(show_input_message)
       ? { showInputMessage: false }
       : {}),
-    ...(helpText === undefined ? {} : { helpText }),
-    ...(errorTitle === undefined ? {} : { errorTitle }),
-    ...(inputTitle === undefined ? {} : { inputTitle }),
-    ...(inputMessage === undefined ? {} : { inputMessage }),
+    ...(help_text === undefined ? {} : { helpText: help_text }),
+    ...(error_title === undefined ? {} : { errorTitle: error_title }),
+    ...(input_title === undefined ? {} : { inputTitle: input_title }),
+    ...(input_message === undefined ? {} : { inputMessage: input_message }),
   };
-  return ranges.map((rangeText) => {
-    const range = parseRange(rangeText);
+  return ranges.map((range_text) => {
+    const range = parseRange(range_text);
     return {
       range: { start: { row: range.r0, col: range.c0 }, end: { row: range.r1, col: range.c1 } },
       condition: structuredClone(condition),
@@ -165,7 +165,7 @@ export function parseValidation(
 const DATE_1904_OFFSET = 1462;
 
 /** The items of a typed list, the text between the quotes of `"North,South"`. */
-function quotedListValues(body: string): CellScalar[] {
+function quoted_list_values(body: string): CellScalar[] {
   const values: CellScalar[] = [];
   let value = "";
   for (let index = 0; index <= body.length; index++) {
@@ -193,14 +193,14 @@ const SINGLE_OPERATORS = new Set([
   "lessThanOrEqual",
 ] as const);
 
-function isSingleOperator(
+function is_single_operator(
   operator: string,
 ): operator is Extract<DataValidationComparison, { value: unknown }>["operator"] {
   return (SINGLE_OPERATORS as ReadonlySet<string>).has(operator);
 }
 
 /** Excel's operator and operands as a comparison; undefined when they make none. */
-function validationComparison(
+function validation_comparison(
   operator: string,
   first: DataValidationOperand | undefined,
   second: DataValidationOperand | undefined,
@@ -212,7 +212,9 @@ function validationComparison(
     }
     return { operator, min: first, max: second };
   }
-  return isSingleOperator(operator) && first !== undefined ? { operator, value: first } : undefined;
+  return is_single_operator(operator) && first !== undefined
+    ? { operator, value: first }
+    : undefined;
 }
 
 /**
@@ -220,7 +222,7 @@ function validationComparison(
  * minimum and maximum say exactly stay `min` and `max`; the rest, and every
  * formula bound, stay a `comparison`.
  */
-function comparisonBounds(
+function comparison_bounds(
   comparison: DataValidationComparison,
 ): { min?: number; max?: number } | { comparison: DataValidationComparison } {
   if ("value" in comparison) {
@@ -238,26 +240,26 @@ function comparisonBounds(
 }
 
 /** A validation title or message attribute; one longer than Excel allows is dropped with a warning. */
-function validationText(
+function validation_text(
   element: XmlElement,
   attribute: "error" | "errorTitle" | "prompt" | "promptTitle",
-  maxLength: number,
+  max_length: number,
   context: XlsxCodecContext,
   sheet: string,
 ): string | undefined {
   const raw = xmlAttribute(element, attribute);
   if (!raw) return undefined;
   const text = decodeXstring(raw);
-  if (Array.from(text).length <= maxLength) return text;
+  if (Array.from(text).length <= max_length) return text;
   emitWarning(context, {
     code: "validation-loss",
-    message: `Excel validation ${attribute} exceeded ${maxLength} characters and was dropped`,
+    message: `Excel validation ${attribute} exceeded ${max_length} characters and was dropped`,
     sheet,
   });
   return undefined;
 }
 
-function conditionalScalar(formula: string | undefined): CellScalar | undefined {
+function conditional_scalar(formula: string | undefined): CellScalar | undefined {
   if (formula === undefined) return undefined;
   const value = formula.trim();
   if (/^TRUE$/i.test(value)) return true;
@@ -276,30 +278,30 @@ export function parseConditionalFormats(
   context: XlsxCodecContext,
 ): ConditionalFormatRule[] {
   const parsed: { priority: number; order: number; rule: ConditionalFormatRule }[] = [];
-  let sourceOrder = 0;
+  let source_order = 0;
   const dropped = (message: string): void =>
     emitWarning(context, { code: "format-loss", message, sheet });
   for (const collection of xmlChildren(root, "conditionalFormatting")) {
     const ranges = (xmlAttribute(collection, "sqref") ?? "").trim().split(/\s+/).filter(Boolean);
     for (const element of xmlChildren(collection, "cfRule")) {
-      const order = sourceOrder++;
+      const order = source_order++;
       const type = xmlAttribute(element, "type") ?? "(missing)";
       if (type === "colorScale" || type === "dataBar" || type === "iconSet") {
         dropped(`Excel conditional-format rule type ${type} is unsupported and was dropped`);
         continue;
       }
-      const rawPriority = xmlAttribute(element, "priority");
-      const priority = rawPriority === undefined ? Number.MAX_SAFE_INTEGER : Number(rawPriority);
+      const raw_priority = xmlAttribute(element, "priority");
+      const priority = raw_priority === undefined ? Number.MAX_SAFE_INTEGER : Number(raw_priority);
       if (!Number.isSafeInteger(priority) || priority < 0) {
         dropped("Excel conditional-format rule has an invalid priority and was dropped");
         continue;
       }
       const operator = xmlAttribute(element, "operator");
-      const rawFormula = xmlChild(element, "formula")?.text;
-      const formula = rawFormula === undefined ? undefined : decodeXstring(rawFormula.trim());
+      const raw_formula = xmlChild(element, "formula")?.text;
+      const formula = raw_formula === undefined ? undefined : decodeXstring(raw_formula.trim());
       let when: ConditionalFormatPredicate | undefined;
       if (type === "cellIs") {
-        const value = conditionalScalar(formula);
+        const value = conditional_scalar(formula);
         if (value !== undefined) {
           when =
             operator === "greaterThan" && typeof value === "number"
@@ -341,20 +343,20 @@ export function parseConditionalFormats(
         dropped("External-data conditional-format formula was dropped");
         continue;
       }
-      const rawDxf = xmlAttribute(element, "dxfId");
+      const raw_dxf = xmlAttribute(element, "dxfId");
       const differential =
-        rawDxf !== undefined && /^\d+$/.test(rawDxf)
-          ? styles.differentialAt(Number(rawDxf))
+        raw_dxf !== undefined && /^\d+$/.test(raw_dxf)
+          ? styles.differentialAt(Number(raw_dxf))
           : undefined;
-      if (rawDxf !== undefined && !differential) {
+      if (raw_dxf !== undefined && !differential) {
         dropped(
           `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
         );
         continue;
       }
       const style: CellStyle = differential ?? {};
-      for (const rangeText of ranges) {
-        const range = parseRange(rangeText);
+      for (const range_text of ranges) {
+        const range = parseRange(range_text);
         parsed.push({
           priority,
           order,

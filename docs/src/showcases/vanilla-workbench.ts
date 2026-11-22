@@ -94,7 +94,7 @@ export interface Workbench {
 /** Fill the "Highlight cell" menu item paints; readers expect Undo to remove it. */
 const HIGHLIGHT_FILL = "#d946ef4d";
 
-function cellRange(cell: CellAddress): Range {
+function cell_range(cell: CellAddress): Range {
   return { sheet: cell.sheet, start: { row: cell.row, col: cell.col }, end: cell };
 }
 
@@ -103,20 +103,20 @@ function cellRange(cell: CellAddress): Range {
  * formatting: Ctrl+Z removes it, and it survives export. Clearing restores the
  * cell's other formatting in the same transaction.
  */
-function setHighlight(grid: Grid, cell: CellAddress, on: boolean): void {
-  const { backgroundColor: _previousFill, ...otherStyle } = grid.store.getCell(cell).style;
-  const range = cellRange(cell);
+function set_highlight(grid: Grid, cell: CellAddress, on: boolean): void {
+  const { backgroundColor: _previous_fill, ...other_style } = grid.store.getCell(cell).style;
+  const range = cell_range(cell);
   grid.applyTransaction({
     patches: on
       ? [{ op: "setRangeStyle", range, style: { backgroundColor: HIGHLIGHT_FILL } }]
       : [
           { op: "setRangeStyle", range, style: null },
-          { op: "setRangeStyle", range, style: otherStyle },
+          { op: "setRangeStyle", range, style: other_style },
         ],
   });
 }
 
-function workbenchGridConfig(events: WorkbenchEvents, grid: () => Grid | null): GridConfig {
+function workbench_grid_config(events: WorkbenchEvents, grid: () => Grid | null): GridConfig {
   return {
     toolbar: false,
     contextMenu: (context) => {
@@ -137,7 +137,7 @@ function workbenchGridConfig(events: WorkbenchEvents, grid: () => Grid | null): 
           visible: cell !== null,
           onClick(instance, target) {
             if (target === null) return;
-            setHighlight(instance, target, !highlighted);
+            set_highlight(instance, target, !highlighted);
             events.onActivity(
               `${highlighted ? "Highlight cleared" : "Highlighted"} R${target.row + 1} C${target.col + 1} · Ctrl+Z undoes it`,
             );
@@ -157,26 +157,26 @@ function workbenchGridConfig(events: WorkbenchEvents, grid: () => Grid | null): 
  * window is reported to the host: the page protocol belongs to it, not to
  * the grid.
  */
-function createRevenuePageSource(onServed: (start: number, end: number) => void): DataSource {
-  let firstRequest = true;
+function create_revenue_page_source(on_served: (start: number, end: number) => void): DataSource {
+  let first_request = true;
   return {
     capabilities: { protocol: 2, columns: "windowed" },
     getRows({ start, end, columns, signal, revision }) {
       const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
-      const requestedKeys = columns.flatMap((band) => band.keys);
-      const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
-      firstRequest = false;
+      const requested_keys = columns.flatMap((band) => band.keys);
+      const latency = first_request ? 0 : PAGE_LATENCY_MS;
+      first_request = false;
       const timer = setTimeout(() => {
         const rows: RowData[] = [];
         for (let row = start; row < end; row++) {
-          const pageRow: RowData = {};
-          for (const key of requestedKeys) {
-            pageRow[key] = ENGINE_DATA.columns[key]?.[row] ?? null;
+          const page_row: RowData = {};
+          for (const key of requested_keys) {
+            page_row[key] = ENGINE_DATA.columns[key]?.[row] ?? null;
           }
-          rows.push(pageRow);
+          rows.push(page_row);
         }
         resolve({ protocol: 2, start, columns, rows, revision });
-        onServed(start, end);
+        on_served(start, end);
       }, latency);
       signal.addEventListener(
         "abort",
@@ -208,20 +208,20 @@ export function createWorkbench(
   const root = document.createElement("div");
   root.className = "sheetwrite-shell";
 
-  const toolbarRow = document.createElement("div");
-  toolbarRow.className = "sheetwrite-shell-row sheetwrite-shell-toolbar-row";
+  const toolbar_row = document.createElement("div");
+  toolbar_row.className = "sheetwrite-shell-row sheetwrite-shell-toolbar-row";
 
-  const formulaRow = document.createElement("div");
-  formulaRow.className = "sheetwrite-shell-row sheetwrite-shell-formula-row";
+  const formula_row = document.createElement("div");
+  formula_row.className = "sheetwrite-shell-row sheetwrite-shell-formula-row";
 
-  const gridHost = document.createElement("div");
-  gridHost.className = "sheetwrite-shell-grid";
-  gridHost.setAttribute("aria-label", "Spreadsheet grid");
+  const grid_host = document.createElement("div");
+  grid_host.className = "sheetwrite-shell-grid";
+  grid_host.setAttribute("aria-label", "Spreadsheet grid");
 
-  const bottomRow = document.createElement("div");
-  bottomRow.className = "sheetwrite-shell-row sheetwrite-shell-bottom-row";
+  const bottom_row = document.createElement("div");
+  bottom_row.className = "sheetwrite-shell-row sheetwrite-shell-bottom-row";
 
-  root.append(toolbarRow, formulaRow, gridHost, bottomRow);
+  root.append(toolbar_row, formula_row, grid_host, bottom_row);
   host.appendChild(root);
 
   // Construction-bound options are decided here and only here. Changing
@@ -232,7 +232,7 @@ export function createWorkbench(
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
     presentation: "data-grid",
     theme: ENGINE_THEME,
-    config: workbenchGridConfig(events, () => grid),
+    config: workbench_grid_config(events, () => grid),
     renderer: spec.renderer,
     ...(spec.renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
   };
@@ -240,7 +240,7 @@ export function createWorkbench(
   const workbook = createEngineWorkbook();
   for (const sheet of workbook.sheets) {
     const target =
-      gridHost.clientWidth - rowGutterWidth(sheet.rowCount, ENGINE_THEME.rowHeaderWidth);
+      grid_host.clientWidth - rowGutterWidth(sheet.rowCount, ENGINE_THEME.rowHeaderWidth);
     const widths = fitColumnPixels(
       sheet.columns.map((column) => column.width),
       target,
@@ -257,11 +257,11 @@ export function createWorkbench(
 
   try {
     if (spec.snapshot !== undefined) {
-      grid = createGridFromSnapshot(gridHost, spec.snapshot, base);
+      grid = createGridFromSnapshot(grid_host, spec.snapshot, base);
     } else if (spec.data === "paged") {
-      grid = createGrid(gridHost, {
+      grid = createGrid(grid_host, {
         workbook,
-        datasource: createRevenuePageSource((start, end) =>
+        datasource: create_revenue_page_source((start, end) =>
           events.onActivity(
             `Rows ${(start + 1).toLocaleString()}–${end.toLocaleString()} served by the host page source`,
           ),
@@ -271,7 +271,7 @@ export function createWorkbench(
       });
       grid.setFrozen(0, 1);
     } else {
-      grid = createGrid(gridHost, {
+      grid = createGrid(grid_host, {
         workbook,
         data: ENGINE_DATA,
         ...base,
@@ -331,45 +331,45 @@ export function createWorkbench(
 
   // Paged allocation is observable: pages land asynchronously after
   // scrolls, so poll the cheap WASM stats read while this generation lives.
-  let statsTimer: ReturnType<typeof setInterval> | null = null;
+  let stats_timer: ReturnType<typeof setInterval> | null = null;
   if (spec.snapshot === undefined && spec.data === "paged") {
     const report = (): void => events.onPagedStats(pagedStatsOf(grid, WORKBENCH_SHEET));
     report();
-    statsTimer = setInterval(report, PAGED_STATS_INTERVAL_MS);
+    stats_timer = setInterval(report, PAGED_STATS_INTERVAL_MS);
     unsubscribes.push(grid.on("scroll", report));
   } else {
     events.onPagedStats(null);
   }
 
-  const focusGrid = (): void => gridHost.focus();
+  const focus_grid = (): void => grid_host.focus();
   const pieces: ShellPiece[] = [];
-  pieces.push(createToolbar(toolbarRow, grid));
-  const nameBox = createNameBox(formulaRow, grid, { focusGrid });
-  nameBox.element.id = "namebox";
-  pieces.push(nameBox);
+  pieces.push(createToolbar(toolbar_row, grid));
+  const name_box = createNameBox(formula_row, grid, { focusGrid: focus_grid });
+  name_box.element.id = "namebox";
+  pieces.push(name_box);
 
   const fx = document.createElement("span");
   fx.className = "sheetwrite-shell-fx";
   fx.textContent = "fx";
   fx.setAttribute("aria-hidden", "true");
-  formulaRow.appendChild(fx);
+  formula_row.appendChild(fx);
 
-  const formulaBar = createFormulaBar(formulaRow, grid, { focusGrid });
-  formulaBar.element.id = "formula";
-  pieces.push(formulaBar);
-  pieces.push(createSelectionStatus(bottomRow, grid));
+  const formula_bar = createFormulaBar(formula_row, grid, { focusGrid: focus_grid });
+  formula_bar.element.id = "formula";
+  pieces.push(formula_bar);
+  pieces.push(createSelectionStatus(bottom_row, grid));
 
   let destroyed = false;
   return {
     grid,
-    setReadOnly(readOnly: boolean) {
-      grid.setReadOnly(readOnly);
-      formulaBar.setReadOnly(readOnly);
+    setReadOnly(read_only: boolean) {
+      grid.setReadOnly(read_only);
+      formula_bar.setReadOnly(read_only);
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      if (statsTimer !== null) clearInterval(statsTimer);
+      if (stats_timer !== null) clearInterval(stats_timer);
       for (const unsubscribe of unsubscribes) unsubscribe();
       for (const piece of pieces) piece.destroy();
       grid.destroy();

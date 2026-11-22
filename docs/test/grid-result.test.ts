@@ -14,19 +14,19 @@ type Node = {
 };
 
 const text = (value: string): Node => ({ type: "text", value });
-const cell = (tagName: string, ...children: Node[]): Node => ({
+const cell = (tag_name: string, ...children: Node[]): Node => ({
   type: "element",
-  tagName,
+  tagName: tag_name,
   properties: {},
   children,
 });
 
-function textOf(node: Node): string {
-  return node.value ?? (node.children ?? []).map(textOf).join("");
+function text_of(node: Node): string {
+  return node.value ?? (node.children ?? []).map(text_of).join("");
 }
 
 /** A result div around a 2×2 table, optionally replacing its final cell value. */
-function resultDiv(
+function result_div(
   properties: Record<string, unknown>,
   value: Node = text("12"),
   ...extras: Node[]
@@ -53,22 +53,22 @@ function render(div: Node): Node {
 }
 
 /** The faded edge column and row are decoration, hidden from assistive technology. */
-const isEdge = (node: Node): boolean => node.properties?.ariaHidden === "true";
+const is_edge = (node: Node): boolean => node.properties?.ariaHidden === "true";
 
 /** Authored body rows of the rendered sheet: thead holds the column letters. */
-function sheetRows(figure: Node): Node[] {
+function sheet_rows(figure: Node): Node[] {
   const table = figure.children?.[0]?.children?.[0];
-  return (table?.children?.[1]?.children ?? []).filter((row) => !isEdge(row));
+  return (table?.children?.[1]?.children ?? []).filter((row) => !is_edge(row));
 }
 
 /** Cells that carry a marker, as A1 references. */
 function marked(figure: Node, marker: string): string[] {
-  return sheetRows(figure).flatMap((row, rowIndex) =>
+  return sheet_rows(figure).flatMap((row, row_index) =>
     (row.children ?? [])
       .slice(1)
-      .filter((sheetCell) => !isEdge(sheetCell))
-      .flatMap((sheetCell, colIndex) =>
-        sheetCell.properties?.[marker] === "true" ? [`${colToA1(colIndex)}${rowIndex + 1}`] : [],
+      .filter((sheet_cell) => !is_edge(sheet_cell))
+      .flatMap((sheet_cell, col_index) =>
+        sheet_cell.properties?.[marker] === "true" ? [`${colToA1(col_index)}${row_index + 1}`] : [],
       ),
   );
 }
@@ -76,7 +76,7 @@ function marked(figure: Node, marker: string): string[] {
 describe("grid result figures", () => {
   it("turns an authored table into a sheet with letters, row numbers, and grid-formatted values", () => {
     const figure = render(
-      resultDiv(
+      result_div(
         { dataCaption: "Totals" },
         {
           type: "element",
@@ -90,7 +90,7 @@ describe("grid result figures", () => {
     const rows = (figure.children?.[0]?.children?.[0]?.children ?? []).flatMap(
       (part) => part.children ?? [],
     );
-    expect(rows.map((row) => (row.children ?? []).map(textOf))).toEqual([
+    expect(rows.map((row) => (row.children ?? []).map(text_of))).toEqual([
       ["", "A", "B", "C"],
       ["1", "Item", "Total", ""],
       ["2", "Pen", formatNumber(1234.5, "#,##0.00", "de-DE"), ""],
@@ -105,7 +105,7 @@ describe("grid result figures", () => {
       "true",
       undefined,
     ]);
-    expect(textOf(figure.children?.[1] ?? text(""))).toBe("Totals");
+    expect(text_of(figure.children?.[1] ?? text(""))).toBe("Totals");
   });
 
   it("rejects missing and blank sw-format values instead of displaying zero", () => {
@@ -138,7 +138,7 @@ describe("grid result figures", () => {
 
   it("marks cells by A1 reference, the first selected cell active, and shows row IDs", () => {
     const figure = render(
-      resultDiv({
+      result_div({
         dataSelected: "B1:B2",
         dataNotes: "A2",
         dataLists: "B2 A1",
@@ -149,7 +149,7 @@ describe("grid result figures", () => {
     expect(marked(figure, "dataActive")).toEqual(["B1"]);
     expect(marked(figure, "dataNote")).toEqual(["A2"]);
     expect(marked(figure, "dataList")).toEqual(["A1", "B2"]);
-    expect(sheetRows(figure).map((row) => textOf(row.children?.[0] ?? text("")))).toEqual([
+    expect(sheet_rows(figure).map((row) => text_of(row.children?.[0] ?? text("")))).toEqual([
       "1header",
       "2invoice-1",
     ]);
@@ -165,7 +165,7 @@ describe("grid result figures", () => {
     const legend = cell("dl", cell("dt", text("B2")), cell("dd", token("1234.5")));
     const menu = cell("div", text("Copy value"));
     const caption = cell("figcaption", text("Total: "), token("99"));
-    const figure = render(resultDiv({}, undefined, text("\n"), legend, caption, menu));
+    const figure = render(result_div({}, undefined, text("\n"), legend, caption, menu));
 
     expect((figure.children ?? []).map((part) => part.tagName)).toEqual([
       "div",
@@ -175,16 +175,16 @@ describe("grid result figures", () => {
     ]);
     expect(figure.children?.[1]?.properties?.className).toEqual(["sw-grid-result__legend"]);
     const total = `Total: ${formatNumber(99, "#,##0.00", "de-DE")}`;
-    expect(textOf(figure.children?.[1] ?? text(""))).toBe(
+    expect(text_of(figure.children?.[1] ?? text(""))).toBe(
       `B2${formatNumber(1234.5, "#,##0.00", "de-DE")}`,
     );
-    expect(textOf(figure.children?.[3] ?? text(""))).toBe(total);
+    expect(text_of(figure.children?.[3] ?? text(""))).toBe(total);
     expect(figure.properties?.ariaLabel).toBe(total);
   });
 
   it("rejects a marker that points outside the table", () => {
-    expect(() => render(resultDiv({ dataNotes: "C1" }))).toThrow("C1");
-    expect(() => render(resultDiv({ dataSelected: "A1:A3" }))).toThrow("A3");
-    expect(() => render(resultDiv({ dataRowIds: "one two three" }))).toThrow("3 row IDs");
+    expect(() => render(result_div({ dataNotes: "C1" }))).toThrow("C1");
+    expect(() => render(result_div({ dataSelected: "A1:A3" }))).toThrow("A3");
+    expect(() => render(result_div({ dataRowIds: "one two three" }))).toThrow("3 row IDs");
   });
 });

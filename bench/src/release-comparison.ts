@@ -122,22 +122,22 @@ function git(args: readonly string[]): string {
   return result.stdout.toString().trim();
 }
 
-function pointOf(value: RecordValue): Point | undefined {
-  const medianValue = value.median ?? value.medianMs;
+function point_of(value: RecordValue): Point | undefined {
+  const median_value = value.median ?? value.medianMs;
   const p95 = value.p95 ?? value.p95Ms;
-  if (!finite(medianValue) || !finite(p95)) return undefined;
+  if (!finite(median_value) || !finite(p95)) return undefined;
 
   const mad = value.mad ?? value.madMs ?? value.observedMadMs;
 
   return {
-    median: medianValue,
+    median: median_value,
     p95,
     ...(finite(mad) ? { mad } : {}),
     ...(finite(value.max) ? { max: value.max } : {}),
   };
 }
 
-function unitOf(key: string, value: RecordValue): Unit {
+function unit_of(key: string, value: RecordValue): Unit {
   if (finite(value.medianMs) || key.endsWith("Ms")) return "ms";
   if (key.endsWith("Ns")) return "ns";
   if (key.endsWith("Bytes")) return "bytes";
@@ -158,7 +158,7 @@ function identity(value: RecordValue): Record<string, string | number> {
   return labels;
 }
 
-function extractMetrics(artifact: unknown): Map<string, ExtractedMetric> {
+function extract_metrics(artifact: unknown): Map<string, ExtractedMetric> {
   const metrics = new Map<string, ExtractedMetric>();
 
   function visit(
@@ -169,8 +169,8 @@ function extractMetrics(artifact: unknown): Map<string, ExtractedMetric> {
   ): void {
     if (Array.isArray(value)) {
       value.forEach((element: unknown, index: number) => {
-        const elementRecord = record(element);
-        const labels = elementRecord === undefined ? {} : identity(elementRecord);
+        const element_record = record(element);
+        const labels = element_record === undefined ? {} : identity(element_record);
         const selector =
           Object.entries(labels)
             .map(([field, label]) => `${field}=${label}`)
@@ -183,7 +183,7 @@ function extractMetrics(artifact: unknown): Map<string, ExtractedMetric> {
     const fields = record(value);
     if (fields === undefined) return;
 
-    const point = pointOf(fields);
+    const point = point_of(fields);
     if (point !== undefined) {
       const existing = metrics.get(path);
       const samples =
@@ -191,7 +191,7 @@ function extractMetrics(artifact: unknown): Map<string, ExtractedMetric> {
       if (existing === undefined) {
         metrics.set(path, {
           key: path,
-          unit: unitOf(leaf, fields),
+          unit: unit_of(leaf, fields),
           labels: inherited,
           points: [point],
           samples,
@@ -221,7 +221,7 @@ function extractMetrics(artifact: unknown): Map<string, ExtractedMetric> {
   return metrics;
 }
 
-function reduceMetric(metric: ExtractedMetric | undefined): Point | null {
+function reduce_metric(metric: ExtractedMetric | undefined): Point | null {
   if (metric === undefined) return null;
 
   const mads = metric.points.map((point) => point.mad).filter(finite);
@@ -239,7 +239,7 @@ function ratio(candidate: number, base: number): number | null {
   return base === 0 ? (candidate === 0 ? 1 : null) : candidate / base;
 }
 
-function thresholdOf(artifact: string) {
+function threshold_of(artifact: string) {
   if (artifact === "render-baseline.json")
     return {
       kind: "bootstrap-median-delta",
@@ -274,53 +274,53 @@ function thresholdOf(artifact: string) {
   };
 }
 
-function compareMetric(
+function compare_metric(
   artifact: string,
   base: ExtractedMetric | undefined,
   candidate: ExtractedMetric | undefined,
-  familySize: number,
+  family_size: number,
 ): MetricComparison {
   const metric = candidate ?? base;
   if (metric === undefined) throw new Error(`${artifact}: missing both metric sides`);
 
-  const oldPoint = reduceMetric(base);
-  const newPoint = reduceMetric(candidate);
+  const old_point = reduce_metric(base);
+  const new_point = reduce_metric(candidate);
   const comparison: MetricComparison = {
     key: metric.key,
     unit: metric.unit,
     rounds: { base: base?.points.length ?? 0, candidate: candidate?.points.length ?? 0 },
-    base: oldPoint,
-    candidate: newPoint,
-    medianRatio: oldPoint && newPoint ? ratio(newPoint.median, oldPoint.median) : null,
-    p95Ratio: oldPoint && newPoint ? ratio(newPoint.p95, oldPoint.p95) : null,
-    medianDelta: oldPoint && newPoint ? newPoint.median - oldPoint.median : null,
-    p95Delta: oldPoint && newPoint ? newPoint.p95 - oldPoint.p95 : null,
+    base: old_point,
+    candidate: new_point,
+    medianRatio: old_point && new_point ? ratio(new_point.median, old_point.median) : null,
+    p95Ratio: old_point && new_point ? ratio(new_point.p95, old_point.p95) : null,
+    medianDelta: old_point && new_point ? new_point.median - old_point.median : null,
+    p95Delta: old_point && new_point ? new_point.p95 - old_point.p95 : null,
     verdict:
-      oldPoint === null
+      old_point === null
         ? "new-only"
-        : newPoint === null
+        : new_point === null
           ? "removed"
-          : newPoint.median > oldPoint.median
+          : new_point.median > old_point.median
             ? "slower"
-            : newPoint.median < oldPoint.median
+            : new_point.median < old_point.median
               ? "faster"
               : "unchanged",
     limit: null,
   };
 
-  if (artifact === "interaction-results.json" && newPoint !== null) {
+  if (artifact === "interaction-results.json" && new_point !== null) {
     const key = metric.key.replace(/^values\./, "");
     const ceiling = INTERACTION_LIMITS.get(key);
     if (ceiling !== undefined) {
       comparison.limit = ceiling;
       comparison.ceilingPassed =
-        (key === "lookupP95Ns" ? newPoint.median : (newPoint.max ?? Number.POSITIVE_INFINITY)) <=
+        (key === "lookupP95Ns" ? new_point.median : (new_point.max ?? Number.POSITIVE_INFINITY)) <=
         ceiling;
       if (!comparison.ceilingPassed) comparison.verdict = "regression";
     }
   }
 
-  if (oldPoint === null || newPoint === null) return comparison;
+  if (old_point === null || new_point === null) return comparison;
 
   if (artifact === "render-baseline.json" && base !== undefined && candidate !== undefined) {
     comparison.limit = CONTROLLED_COMPARISON_POLICY.maximumRegressionMs;
@@ -328,41 +328,44 @@ function compareMetric(
       base.samples,
       candidate.samples,
       metric.key,
-      familySize,
+      family_size,
     );
-    const improvementBound = independentMedianDeltaLowerBound(
+    const improvement_bound = independentMedianDeltaLowerBound(
       candidate.samples,
       base.samples,
       metric.key,
-      familySize,
+      family_size,
     );
     comparison.verdict =
       comparison.lowerConfidenceBoundMs > comparison.limit
         ? "regression"
-        : improvementBound > comparison.limit
+        : improvement_bound > comparison.limit
           ? "improvement"
           : "within-noise";
   }
 
-  if (thresholdOf(artifact).kind === "formula-release-limit") {
+  if (threshold_of(artifact).kind === "formula-release-limit") {
     if (metric.key.endsWith(".stat")) {
-      const isSubMillisecond = oldPoint.median < 1;
-      const floor = isSubMillisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : RELEASE_FORMULA_FLOOR_MS;
-      const medianLimit = Math.max(
-        oldPoint.median * RELEASE_FORMULA_RATIO_LIMIT,
-        oldPoint.median + floor,
+      const is_sub_millisecond = old_point.median < 1;
+      const floor = is_sub_millisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : RELEASE_FORMULA_FLOOR_MS;
+      const median_limit = Math.max(
+        old_point.median * RELEASE_FORMULA_RATIO_LIMIT,
+        old_point.median + floor,
       );
-      const p95Limit = Math.max(oldPoint.p95 * RELEASE_FORMULA_RATIO_LIMIT, oldPoint.p95 + floor);
-      comparison.limit = medianLimit;
+      const p95_limit = Math.max(
+        old_point.p95 * RELEASE_FORMULA_RATIO_LIMIT,
+        old_point.p95 + floor,
+      );
+      comparison.limit = median_limit;
       comparison.verdict =
-        newPoint.median > medianLimit || (!isSubMillisecond && newPoint.p95 > p95Limit)
+        new_point.median > median_limit || (!is_sub_millisecond && new_point.p95 > p95_limit)
           ? "regression"
-          : newPoint.median < oldPoint.median
+          : new_point.median < old_point.median
             ? "faster"
             : "within-noise";
     } else if (metric.unit === "bytes" || metric.unit === "count") {
-      comparison.limit = oldPoint.median;
-      if (newPoint.median > oldPoint.median || newPoint.p95 > oldPoint.p95) {
+      comparison.limit = old_point.median;
+      if (new_point.median > old_point.median || new_point.p95 > old_point.p95) {
         comparison.verdict = "regression";
       }
     }
@@ -371,7 +374,7 @@ function compareMetric(
   return comparison;
 }
 
-function stampOf(value: unknown): RecordValue | null {
+function stamp_of(value: unknown): RecordValue | null {
   const artifact = record(value);
   if (artifact === undefined) return null;
 
@@ -390,9 +393,9 @@ function stampOf(value: unknown): RecordValue | null {
  * every release suite. A baseline has a receipt for each suite its release
  * measured; a suite without one is new in the candidate.
  */
-async function readCaptureRecords(
+async function read_capture_records(
   directory: string,
-  engineCommit: string,
+  engine_commit: string,
   baseline: boolean,
 ): Promise<readonly RecordValue[]> {
   // Sorted: directory order differs between filesystems, and the comparison embeds these records.
@@ -408,7 +411,7 @@ async function readCaptureRecords(
     const label = capture?.label;
     if (
       capture?.status !== "passed" ||
-      metadata?.engineCommit !== engineCommit ||
+      metadata?.engineCommit !== engine_commit ||
       metadata.dirty !== false ||
       metadata.memoryMax !== CAPTURE_MEMORY_MAX ||
       metadata.effectiveMemoryMaxBytes !== CAPTURE_MEMORY_BYTES ||
@@ -451,7 +454,7 @@ async function readCaptureRecords(
   return records;
 }
 
-function coveringCapture(
+function covering_capture(
   captures: readonly RecordValue[],
   artifact: string,
 ): RecordValue | undefined {
@@ -462,15 +465,15 @@ function coveringCapture(
   );
 }
 
-function captureForArtifact(captures: readonly RecordValue[], artifact: string): RecordValue {
-  const capture = coveringCapture(captures, artifact);
+function capture_for_artifact(captures: readonly RecordValue[], artifact: string): RecordValue {
+  const capture = covering_capture(captures, artifact);
   if (capture === undefined) throw new Error(`No scope receipt covers ${artifact}`);
   const metadata = record(capture.metadata);
   if (metadata === undefined) throw new Error(`No capture metadata for ${artifact}`);
   return metadata;
 }
 
-function baselineContextOf(artifact: RecordValue | undefined): RecordValue | undefined {
+function baseline_context_of(artifact: RecordValue | undefined): RecordValue | undefined {
   return record(artifact?.baselineContext) ?? record(record(artifact?.source)?.baselineContext);
 }
 
@@ -478,23 +481,27 @@ function baselineContextOf(artifact: RecordValue | undefined): RecordValue | und
  * The baseline release, read from its engine captures: each records the older
  * engine measured under the candidate's harness, and they must all agree.
  */
-async function readBaselineIdentity(baselineDir: string): Promise<BaselineIdentity> {
+async function read_baseline_identity(baseline_dir: string): Promise<BaselineIdentity> {
   const labels = new Set<string>();
   for (const artifact of Object.keys(ENGINE_ONLY_ARTIFACTS)) {
-    const file = Bun.file(resolve(baselineDir, artifact));
+    const file = Bun.file(resolve(baseline_dir, artifact));
     if (!(await file.exists())) continue;
-    const label = baselineContextOf(record(await file.json()))?.label;
+    const label = baseline_context_of(record(await file.json()))?.label;
     labels.add(typeof label === "string" ? label : "");
   }
-  const [engineLabel] = labels;
-  const parsed = engineLabel === undefined ? undefined : parseEngineBaselineLabel(engineLabel);
-  if (labels.size !== 1 || engineLabel === undefined || parsed === undefined) {
+  const [engine_label] = labels;
+  const parsed = engine_label === undefined ? undefined : parseEngineBaselineLabel(engine_label);
+  if (labels.size !== 1 || engine_label === undefined || parsed === undefined) {
     throw new Error("Baseline engine captures do not name one frozen-harness baseline release");
   }
-  return { engineLabel, baseVersion: parsed.engineVersion, harnessVersion: parsed.harnessVersion };
+  return {
+    engineLabel: engine_label,
+    baseVersion: parsed.engineVersion,
+    harnessVersion: parsed.harnessVersion,
+  };
 }
 
-function assertMatchingConditions(
+function assert_matching_conditions(
   baseline: readonly RecordValue[],
   candidate: readonly RecordValue[],
 ): Readonly<Record<string, string>> {
@@ -517,8 +524,8 @@ function assertMatchingConditions(
         throw new Error(`Capture conditions differ: ${field}`);
     }
   }
-  const before = captureForArtifact(baseline, "data-results.json");
-  const after = captureForArtifact(candidate, "data-results.json");
+  const before = capture_for_artifact(baseline, "data-results.json");
+  const after = capture_for_artifact(candidate, "data-results.json");
   // Both data captures run the same harness: the same bench-only patch, or none when the
   // baseline release's own harness already follows the current data protocol.
   const patch = before.harnessPatchSha256;
@@ -532,88 +539,88 @@ function assertMatchingConditions(
   return matchingCaptureAffinities(baseline, candidate);
 }
 
-async function compareSuite(
+async function compare_suite(
   artifact: string,
-  resultsDir: string,
-  baselineDir: string,
-  baseCommit: string,
-  candidateCommit: string,
-  baselineCaptures: readonly RecordValue[],
-  candidateCaptures: readonly RecordValue[],
+  results_dir: string,
+  baseline_dir: string,
+  base_commit: string,
+  candidate_commit: string,
+  baseline_captures: readonly RecordValue[],
+  candidate_captures: readonly RecordValue[],
   identity: BaselineIdentity,
 ) {
-  const baseFile = Bun.file(resolve(baselineDir, artifact));
-  const base: unknown = (await baseFile.exists()) ? await baseFile.json() : null;
-  const candidateFile = Bun.file(resolve(resultsDir, artifact));
-  const candidate: unknown = (await candidateFile.exists()) ? await candidateFile.json() : null;
+  const base_file = Bun.file(resolve(baseline_dir, artifact));
+  const base: unknown = (await base_file.exists()) ? await base_file.json() : null;
+  const candidate_file = Bun.file(resolve(results_dir, artifact));
+  const candidate: unknown = (await candidate_file.exists()) ? await candidate_file.json() : null;
   // The baseline release measured a suite exactly when its result set has that suite's receipt.
-  const newOnly = coveringCapture(baselineCaptures, artifact) === undefined;
-  if (candidate === null || (base === null && !newOnly))
+  const new_only = covering_capture(baseline_captures, artifact) === undefined;
+  if (candidate === null || (base === null && !new_only))
     throw new Error(`Missing fresh capture for ${artifact}`);
-  if (newOnly && base !== null) throw new Error(`No scope receipt covers baseline ${artifact}`);
-  const candidateCapture = captureForArtifact(candidateCaptures, artifact);
-  const baselineCapture = newOnly ? null : captureForArtifact(baselineCaptures, artifact);
-  const baseStamp = stampOf(base);
+  if (new_only && base !== null) throw new Error(`No scope receipt covers baseline ${artifact}`);
+  const candidate_capture = capture_for_artifact(candidate_captures, artifact);
+  const baseline_capture = new_only ? null : capture_for_artifact(baseline_captures, artifact);
+  const base_stamp = stamp_of(base);
   if (
-    stampOf(candidate)?.commit !== candidateCommit ||
-    stampOf(candidate)?.dirty === true ||
-    (baselineCapture !== null &&
-      (baseStamp?.dirty === true ||
-        (baseStamp?.commit !== baselineCapture.commit &&
-          baseStamp?.commit !== baselineCapture.harnessCommit)))
+    stamp_of(candidate)?.commit !== candidate_commit ||
+    stamp_of(candidate)?.dirty === true ||
+    (baseline_capture !== null &&
+      (base_stamp?.dirty === true ||
+        (base_stamp?.commit !== baseline_capture.commit &&
+          base_stamp?.commit !== baseline_capture.harnessCommit)))
   ) {
     throw new Error(`Wrong commit or dirty source in ${artifact}`);
   }
-  const baselineObject = record(base);
-  const candidateObject = record(candidate);
+  const baseline_object = record(base);
+  const candidate_object = record(candidate);
   if (artifact === "data-results.json") {
-    const oldMeta = record(baselineObject?.meta);
-    const newMeta = record(candidateObject?.meta);
+    const old_meta = record(baseline_object?.meta);
+    const new_meta = record(candidate_object?.meta);
     if (
-      baselineObject?.protocolVersion !== DATA_GATE_PROTOCOL_VERSION ||
-      candidateObject?.protocolVersion !== DATA_GATE_PROTOCOL_VERSION ||
-      baselineObject.matrixId !== candidateObject.matrixId ||
-      oldMeta?.gcBetweenSamples !== true ||
-      newMeta?.gcBetweenSamples !== true ||
-      oldMeta.freshDocumentBetweenIngestSamples !== true ||
-      newMeta.freshDocumentBetweenIngestSamples !== true
+      baseline_object?.protocolVersion !== DATA_GATE_PROTOCOL_VERSION ||
+      candidate_object?.protocolVersion !== DATA_GATE_PROTOCOL_VERSION ||
+      baseline_object.matrixId !== candidate_object.matrixId ||
+      old_meta?.gcBetweenSamples !== true ||
+      new_meta?.gcBetweenSamples !== true ||
+      old_meta.freshDocumentBetweenIngestSamples !== true ||
+      new_meta.freshDocumentBetweenIngestSamples !== true
     ) {
       throw new Error(
         "Data protocol mismatch: both sides require v2, untimed full GC, and fresh ingest documents",
       );
     }
   }
-  if (ENGINE_ONLY_ARTIFACTS[artifact] && !newOnly) {
-    const context = baselineContextOf(baselineObject);
+  if (ENGINE_ONLY_ARTIFACTS[artifact] && !new_only) {
+    const context = baseline_context_of(baseline_object);
     if (
       context?.label !== identity.engineLabel ||
-      context.engineCommit !== baseCommit ||
-      context.harnessCommit !== candidateCommit
+      context.engineCommit !== base_commit ||
+      context.harnessCommit !== candidate_commit
     ) {
       throw new Error(`Missing frozen-harness engine identity in ${artifact}`);
     }
   }
-  const baseMetrics = extractMetrics(base);
-  const candidateMetrics = extractMetrics(candidate);
-  const coreOnlyKeys = new Set<string>();
-  for (const key of baseMetrics.keys()) {
+  const base_metrics = extract_metrics(base);
+  const candidate_metrics = extract_metrics(candidate);
+  const core_only_keys = new Set<string>();
+  for (const key of base_metrics.keys()) {
     if (
       key.includes("grid-constant-edit") ||
       (artifact === "full-engine-results.json" && key.includes(".initialization."))
     ) {
-      coreOnlyKeys.add(key);
-      baseMetrics.delete(key);
+      core_only_keys.add(key);
+      base_metrics.delete(key);
     }
   }
-  const keys = [...new Set([...baseMetrics.keys(), ...candidateMetrics.keys()])].sort();
+  const keys = [...new Set([...base_metrics.keys(), ...candidate_metrics.keys()])].sort();
   const metrics = keys.map((key) => {
-    const metric = compareMetric(
+    const metric = compare_metric(
       artifact,
-      baseMetrics.get(key),
-      candidateMetrics.get(key),
+      base_metrics.get(key),
+      candidate_metrics.get(key),
       keys.length,
     );
-    if (coreOnlyKeys.has(key))
+    if (core_only_keys.has(key))
       metric.note = `${identity.harnessVersion}-only: timed current-core path; no version ratio`;
     else if (metric.verdict === "new-only" && ENGINE_ONLY_ARTIFACTS[artifact])
       metric.note = `not in ${identity.baseVersion}`;
@@ -622,13 +629,13 @@ async function compareSuite(
   const count = (verdict: Verdict) => metrics.filter((metric) => metric.verdict === verdict).length;
   return {
     artifact,
-    status: newOnly ? "new-only" : "compared",
+    status: new_only ? "new-only" : "compared",
     comparisonLabel: ENGINE_ONLY_ARTIFACTS[artifact] ? identity.engineLabel : identity.baseVersion,
-    base: baseStamp,
-    candidate: stampOf(candidate),
-    baselineCapture,
-    candidateCapture,
-    threshold: thresholdOf(artifact),
+    base: base_stamp,
+    candidate: stamp_of(candidate),
+    baselineCapture: baseline_capture,
+    candidateCapture: candidate_capture,
+    threshold: threshold_of(artifact),
     summary: {
       metrics: metrics.length,
       regression: count("regression"),
@@ -658,49 +665,52 @@ async function main(): Promise<void> {
       output: { type: "string", default: "results/release-comparison.json" },
     },
   });
-  const generatorCommit = git(["rev-parse", "HEAD"]);
+  const generator_commit = git(["rev-parse", "HEAD"]);
   const dirty = sourceTreeDirty(false);
-  const generatedAt = new Date().toISOString();
+  const generated_at = new Date().toISOString();
   if (dirty) throw new Error("Comparison source tree must be clean");
-  const resultsDir = resolve(BENCH_ROOT, values["results-dir"]);
-  const baselineResultsDir = values["baseline-results-dir"];
-  if (baselineResultsDir === undefined) throw new Error("--baseline-results-dir is required");
-  const baselineDir = resolve(BENCH_ROOT, baselineResultsDir);
-  const identity = await readBaselineIdentity(baselineDir);
+  const results_dir = resolve(BENCH_ROOT, values["results-dir"]);
+  const baseline_results_dir = values["baseline-results-dir"];
+  if (baseline_results_dir === undefined) throw new Error("--baseline-results-dir is required");
+  const baseline_dir = resolve(BENCH_ROOT, baseline_results_dir);
+  const identity = await read_baseline_identity(baseline_dir);
   // Both measured commits come from the capture metadata: captures run on frozen
   // commits, and this generator may run from a later tooling commit. They are
   // provenance only: receipts and artifacts are matched against them as strings,
   // so a clone need not contain either commit.
-  const captureMetadata = record(
-    await Bun.file(resolve(resultsDir, "release-capture-metadata.json")).json(),
+  const capture_metadata = record(
+    await Bun.file(resolve(results_dir, "release-capture-metadata.json")).json(),
   );
-  const commitId = /^[a-f0-9]{40}$/u;
-  const candidateCommit = captureMetadata?.captureCommit;
-  const baseCommit = captureMetadata?.baselineEngineCommit;
+  const commit_id = /^[a-f0-9]{40}$/u;
+  const candidate_commit = capture_metadata?.captureCommit;
+  const base_commit = capture_metadata?.baselineEngineCommit;
   if (
-    typeof candidateCommit !== "string" ||
-    !commitId.test(candidateCommit) ||
-    typeof baseCommit !== "string" ||
-    !commitId.test(baseCommit)
+    typeof candidate_commit !== "string" ||
+    !commit_id.test(candidate_commit) ||
+    typeof base_commit !== "string" ||
+    !commit_id.test(base_commit)
   ) {
     throw new Error("Capture methodology metadata does not identify the measured commits");
   }
-  const baselineCaptures = await readCaptureRecords(baselineDir, baseCommit, true);
-  const candidateCaptures = await readCaptureRecords(resultsDir, candidateCommit, false);
-  const effectiveCpuAffinityBySuite = assertMatchingConditions(baselineCaptures, candidateCaptures);
-  // assertMatchingConditions proved these fields equal across every capture.
-  const conditions = record(candidateCaptures[0]?.metadata);
+  const baseline_captures = await read_capture_records(baseline_dir, base_commit, true);
+  const candidate_captures = await read_capture_records(results_dir, candidate_commit, false);
+  const effective_cpu_affinity_by_suite = assert_matching_conditions(
+    baseline_captures,
+    candidate_captures,
+  );
+  // assert_matching_conditions proved these fields equal across every capture.
+  const conditions = record(candidate_captures[0]?.metadata);
   const suites = [];
   for (const artifact of RELEASE_ARTIFACTS)
     suites.push(
-      await compareSuite(
+      await compare_suite(
         artifact,
-        resultsDir,
-        baselineDir,
-        baseCommit,
-        candidateCommit,
-        baselineCaptures,
-        candidateCaptures,
+        results_dir,
+        baseline_dir,
+        base_commit,
+        candidate_commit,
+        baseline_captures,
+        candidate_captures,
         identity,
       ),
     );
@@ -708,20 +718,20 @@ async function main(): Promise<void> {
   const comparison = {
     schemaVersion: 1,
     protocol: "sheetwrite-release-comparison-v1",
-    generatedAt,
-    captureMetadata,
+    generatedAt: generated_at,
+    captureMetadata: capture_metadata,
     meta: {
-      commit: candidateCommit,
+      commit: candidate_commit,
       dirty,
-      timestamp: generatedAt,
-      generatorCommit,
+      timestamp: generated_at,
+      generatorCommit: generator_commit,
       machine: conditions?.machine,
       cpu: conditions?.cpu,
       bun: conditions?.bun,
       node: conditions?.node,
       npm: conditions?.npm,
       kernel: conditions?.kernel,
-      effectiveCpuAffinityBySuite,
+      effectiveCpuAffinityBySuite: effective_cpu_affinity_by_suite,
       cpuSlotMeaning:
         "Reserved entry slot; effectiveCpuAffinityBySuite records the per-suite mask.",
       legacyAffinitySource:
@@ -733,10 +743,10 @@ async function main(): Promise<void> {
     },
     base: {
       ref: values["base-ref"] ?? `release/version-${identity.baseVersion}`,
-      commit: baseCommit,
-      captureRecords: baselineCaptures,
+      commit: base_commit,
+      captureRecords: baseline_captures,
     },
-    candidate: { commit: candidateCommit, dirty, captureRecords: candidateCaptures },
+    candidate: { commit: candidate_commit, dirty, captureRecords: candidate_captures },
     reduction:
       "Median of per-round medians and median of per-round p95s for repeated keys; single-record summaries are preserved. Round labels are not paired between independent captures. Missing metrics are never silently dropped. Ratios are candidate/base; zero base gives null except zero/zero = 1. Lower is better; faster/slower for byte/count/ratio metrics means decreased/increased. This artifact is descriptive release evidence, not controlled gate approval.",
     suites,

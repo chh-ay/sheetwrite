@@ -24,7 +24,7 @@ function declarations(body: string): Array<[string, string]> {
 }
 
 /** Bodies of the top-level rules whose selector list includes `selector`. */
-function ruleBodies(css: string, selector: string): string[] {
+function rule_bodies(css: string, selector: string): string[] {
   const bodies: string[] = [];
   // Top-level rules start a line; at-rules and nested blocks are not token rules.
   for (const match of css.matchAll(/(?:^|\n)([^@\s/{}][^{}]*?)\s*\{([^{}]*)\}/g)) {
@@ -45,7 +45,7 @@ export function themeTokens(
   const tokens = new Map<string, string>();
   const selectors = theme === "dark" ? [LIGHT_SELECTOR, DARK_SELECTOR] : [LIGHT_SELECTOR];
   for (const selector of selectors) {
-    for (const body of ruleBodies(css, selector)) {
+    for (const body of rule_bodies(css, selector)) {
       for (const [name, value] of declarations(body)) tokens.set(name, value);
     }
   }

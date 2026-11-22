@@ -70,7 +70,7 @@ function table(
       start,
       end: { row: start.row + rows, col: start.col + columns.length - 1 },
     },
-    columns: columns.map(([columnId, columnName]) => ({ id: columnId, name: columnName })),
+    columns: columns.map(([column_id, column_name]) => ({ id: column_id, name: column_name })),
     headerRow: true,
     totalsRow: false,
   };
@@ -147,9 +147,9 @@ export const PIVOT_ROWS_USED =
   3 + Math.max(new Set(PRODUCTS.map((product) => product[2])).size, REGIONS.length);
 
 /** A model pivot: rows from a related table, revenue and orders from Orders, and the measure. */
-function modelPivot(rowField: RowFieldId): PivotDefinition {
+function model_pivot(row_field: RowFieldId): PivotDefinition {
   const fields: TableColumnRef[] = [
-    ROW_FIELDS[rowField].field,
+    ROW_FIELDS[row_field].field,
     { table: "orders", column: "amount" },
     { table: "orders", column: "order" },
   ];
@@ -182,7 +182,7 @@ const REPORT_ROWS = 24;
 const READ_LABEL_COL = 6;
 
 /** A deterministic order: product and region keys, units and an amount. */
-function orderRow(index: number): CellScalar[] {
+function order_row(index: number): CellScalar[] {
   const product = PRODUCTS[(index * 5 + Math.floor(index / 7)) % PRODUCTS.length] ?? PRODUCTS[0];
   const region = REGIONS[(index * 3 + Math.floor(index / 5)) % REGIONS.length] ?? REGIONS[0];
   const units = 1 + ((index * 7) % 9);
@@ -190,7 +190,7 @@ function orderRow(index: number): CellScalar[] {
   return [`ORD-${5001 + index}`, product[0], region[0], units, units * price];
 }
 
-function setRow(
+function set_row(
   sheet: string,
   row: number,
   col: number,
@@ -203,34 +203,34 @@ function setRow(
   }));
 }
 
-function modelOperations(): DocumentOp[] {
+function model_operations(): DocumentOp[] {
   const header = (source: WorkbookTable) => source.columns.map((column) => column.name);
   const operations: DocumentOp[] = [
-    ...setRow(ORDERS_SHEET, 0, 0, header(ORDERS_TABLE)),
-    ...setRow(LOOKUPS_SHEET, 0, 0, header(PRODUCTS_TABLE)),
-    ...setRow(LOOKUPS_SHEET, 0, 4, header(REGIONS_TABLE)),
+    ...set_row(ORDERS_SHEET, 0, 0, header(ORDERS_TABLE)),
+    ...set_row(LOOKUPS_SHEET, 0, 0, header(PRODUCTS_TABLE)),
+    ...set_row(LOOKUPS_SHEET, 0, 4, header(REGIONS_TABLE)),
   ];
   for (let index = 0; index < ORDER_ROWS; index++) {
-    operations.push(...setRow(ORDERS_SHEET, index + 1, 0, orderRow(index)));
+    operations.push(...set_row(ORDERS_SHEET, index + 1, 0, order_row(index)));
   }
   PRODUCTS.forEach((product, index) =>
-    operations.push(...setRow(LOOKUPS_SHEET, index + 1, 0, product)),
+    operations.push(...set_row(LOOKUPS_SHEET, index + 1, 0, product)),
   );
   REGIONS.forEach((region, index) =>
-    operations.push(...setRow(LOOKUPS_SHEET, index + 1, 4, region)),
+    operations.push(...set_row(LOOKUPS_SHEET, index + 1, 4, region)),
   );
   PIVOT_READS.forEach((read, row) => {
-    operations.push(...setRow(REPORT_SHEET, row, READ_LABEL_COL, [read.label]), {
+    operations.push(...set_row(REPORT_SHEET, row, READ_LABEL_COL, [read.label]), {
       op: "set",
       addr: { sheet: REPORT_SHEET, row, col: READ_LABEL_COL + 1 },
       value: { kind: "formula", src: read.src },
     });
   });
-  const format = (sheet: string, rows: [number, number], col: number, numberFormat: string) =>
+  const format = (sheet: string, rows: [number, number], col: number, number_format: string) =>
     operations.push({
       op: "setRangeStyle",
       range: { sheet, start: { row: rows[0], col }, end: { row: rows[1], col } },
-      style: { numberFormat },
+      style: { numberFormat: number_format },
     });
   format(ORDERS_SHEET, [1, ORDER_ROWS], ORDERS_AMOUNT_COL, MONEY);
   // The pivot's Revenue and Average order columns, for every row a row field can produce.
@@ -242,7 +242,7 @@ function modelOperations(): DocumentOp[] {
   return operations;
 }
 
-function modelWorkbook(): Workbook {
+function model_workbook(): Workbook {
   const columns = (widths: readonly number[]) =>
     widths.map((width, index) => ({
       key: `c${index}`,
@@ -331,30 +331,30 @@ export function createDataModelScenario(host: HTMLElement): DataModelScenario {
   const controller = new AbortController();
   const listeners = createListeners();
   let grid: Grid | null = null;
-  let shellElement: HTMLElement | null = null;
+  let shell_element: HTMLElement | null = null;
   let dispose = () => {};
-  let rowField = FIRST_ROW_FIELD;
+  let row_field = FIRST_ROW_FIELD;
 
   const ready = (async () => {
     // Letter headers without filler columns: the grid ends with each sheet's columns.
     const shell = await mountShowcaseShell(
       host,
-      { workbook: modelWorkbook(), presentation: "data-grid" },
+      { workbook: model_workbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;
     grid = shell.grid;
-    shellElement = shell.element;
-    requireApplied(grid.applyRemoteOperations(modelOperations()), "The model tables");
-    requireApplied(grid.setPivot(modelPivot(rowField), REPORT_SHEET), "The model pivot");
-    const stopChanges = grid.on("change", () => listeners.notify());
+    shell_element = shell.element;
+    requireApplied(grid.applyRemoteOperations(model_operations()), "The model tables");
+    requireApplied(grid.setPivot(model_pivot(row_field), REPORT_SHEET), "The model pivot");
+    const stop_changes = grid.on("change", () => listeners.notify());
     dispose = () => {
-      stopChanges();
+      stop_changes();
       shell.dispose();
     };
   })();
 
-  const requireGrid = (): Grid => {
+  const require_grid = (): Grid => {
     if (!grid) throw new Error("The data model is still loading");
     return grid;
   };
@@ -365,7 +365,7 @@ export function createDataModelScenario(host: HTMLElement): DataModelScenario {
     snapshot() {
       const current = grid;
       return {
-        rowField,
+        rowField: row_field,
         relationships: RELATIONSHIPS.map((relationship) => ({
           id: relationship.id,
           label: relationship.label,
@@ -390,40 +390,40 @@ export function createDataModelScenario(host: HTMLElement): DataModelScenario {
       };
     },
     setRowField(id) {
-      requireApplied(requireGrid().setPivot(modelPivot(id), REPORT_SHEET), "The pivot change");
-      rowField = id;
+      requireApplied(require_grid().setPivot(model_pivot(id), REPORT_SHEET), "The pivot change");
+      row_field = id;
       listeners.notify();
     },
     duplicateProductKey() {
       const [first] = PRODUCTS;
       requireApplied(
-        requireGrid().applyTransaction({
-          patches: setRow(LOOKUPS_SHEET, 2, 0, [first[0]]),
+        require_grid().applyTransaction({
+          patches: set_row(LOOKUPS_SHEET, 2, 0, [first[0]]),
         }),
         "The key change",
       );
     },
     orphanOrder() {
-      const productCol = ORDERS_TABLE.columns.findIndex((column) => column.id === "product");
+      const product_col = ORDERS_TABLE.columns.findIndex((column) => column.id === "product");
       requireApplied(
-        requireGrid().applyTransaction({
-          patches: setRow(ORDERS_SHEET, 1, productCol, [UNKNOWN_PRODUCT]),
+        require_grid().applyTransaction({
+          patches: set_row(ORDERS_SHEET, 1, product_col, [UNKNOWN_PRODUCT]),
         }),
         "The order change",
       );
     },
     openRelationships() {
-      if (!shellElement) throw new Error("The data model is still loading");
-      pressRibbonCommand(shellElement, "Data", "relationships");
+      if (!shell_element) throw new Error("The data model is still loading");
+      pressRibbonCommand(shell_element, "Data", "relationships");
     },
     openFieldList() {
-      const current = requireGrid();
+      const current = require_grid();
       current.setActiveSheet(REPORT_SHEET);
       current.setSelection({ kind: "cell", addr: { sheet: REPORT_SHEET, row: 1, col: 0 } });
       current.actions.showPivotFields();
     },
     undo() {
-      requireGrid().undo();
+      require_grid().undo();
     },
     dispose() {
       controller.abort();

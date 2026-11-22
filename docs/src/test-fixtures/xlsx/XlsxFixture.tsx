@@ -48,7 +48,7 @@ const snapshot: WorkbookSnapshot = {
 };
 
 /** A1:B5: a header and four items; the AutoFilter keeps the Qty values above 5. */
-const autoFilterSnapshot: WorkbookSnapshot = {
+const auto_filter_snapshot: WorkbookSnapshot = {
   schemaVersion: 1,
   workbook: { activeSheet: "items" },
   sheets: [
@@ -79,10 +79,10 @@ const autoFilterSnapshot: WorkbookSnapshot = {
               ["kiwi", 1],
               ["pear", 12],
             ] as const
-          ).flatMap((row, rowOffset) =>
-            row.map((value, colOffset) => ({
-              rowOffset,
-              colOffset,
+          ).flatMap((row, row_offset) =>
+            row.map((value, col_offset) => ({
+              rowOffset: row_offset,
+              colOffset: col_offset,
               value: { kind: "literal" as const, value },
             })),
           ),
@@ -93,7 +93,7 @@ const autoFilterSnapshot: WorkbookSnapshot = {
 };
 
 /** JSON with every object's keys sorted, so equal values compare equal whatever their key order. */
-function sortedJson(value: unknown): string {
+function sorted_json(value: unknown): string {
   return JSON.stringify(value, (_key, field: unknown) =>
     field !== null && typeof field === "object" && !Array.isArray(field)
       ? Object.fromEntries(Object.entries(field).sort(([a], [b]) => (a < b ? -1 : 1)))
@@ -105,14 +105,14 @@ function sortedJson(value: unknown): string {
  * Write a filtered store to XLSX and read it back: the AutoFilter and its
  * condition must survive, and the read store must show the same rows.
  */
-async function autoFilterRoundTrip(): Promise<number> {
-  const store = SheetwriteStore.fromSnapshot(autoFilterSnapshot);
+async function auto_filter_round_trip(): Promise<number> {
+  const store = SheetwriteStore.fromSnapshot(auto_filter_snapshot);
   try {
     const imported = await fromXlsxWorkbook(await toXlsxWorkbook(store));
     const sheet = imported.sheets[0];
     if (
-      sortedJson(sheet?.autoFilter) !== sortedJson(autoFilterSnapshot.sheets[0]?.autoFilter) ||
-      sortedJson(sheet?.filters) !== sortedJson(autoFilterSnapshot.sheets[0]?.filters)
+      sorted_json(sheet?.autoFilter) !== sorted_json(auto_filter_snapshot.sheets[0]?.autoFilter) ||
+      sorted_json(sheet?.filters) !== sorted_json(auto_filter_snapshot.sheets[0]?.filters)
     ) {
       throw new Error(
         `The AutoFilter changed in an XLSX round trip: ${JSON.stringify({
@@ -133,15 +133,15 @@ async function autoFilterRoundTrip(): Promise<number> {
 }
 
 export function XlsxFixture() {
-  const [result, setResult] = createSignal<{
+  const [result, set_result] = createSignal<{
     status: "running" | "ready" | "error";
     text: string;
   }>({ status: "running", text: "running" });
 
   onMount(() => {
-    let isCancelled = false;
+    let is_cancelled = false;
     onCleanup(() => {
-      isCancelled = true;
+      is_cancelled = true;
     });
 
     void (async () => {
@@ -157,16 +157,20 @@ export function XlsxFixture() {
         ) {
           throw new Error("Workbook XLSX round-trip changed browser-visible semantics");
         }
-        const shownRows = await autoFilterRoundTrip();
-        if (!isCancelled) {
-          setResult({
+        const shown_rows = await auto_filter_round_trip();
+        if (!is_cancelled) {
+          set_result({
             status: "ready",
-            text: JSON.stringify({ bytes: bytes.byteLength, formula: formula.src, shownRows }),
+            text: JSON.stringify({
+              bytes: bytes.byteLength,
+              formula: formula.src,
+              shownRows: shown_rows,
+            }),
           });
         }
       } catch (error) {
-        if (!isCancelled) {
-          setResult({
+        if (!is_cancelled) {
+          set_result({
             status: "error",
             text: error instanceof Error ? (error.stack ?? error.message) : String(error),
           });

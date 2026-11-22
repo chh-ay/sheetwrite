@@ -71,21 +71,21 @@ function record(value: unknown, message: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function positiveInteger(value: unknown): value is number {
+function positive_integer(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0;
 }
 
-function finiteNonNegative(value: unknown): value is number {
+function finite_non_negative(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-function sizes(value: unknown, label: string, allowZero = false): FirstPaintSizes {
+function sizes(value: unknown, label: string, allow_zero = false): FirstPaintSizes {
   const input = record(value, `${label} sizes are missing`);
   for (const field of ["rawBytes", "gzipBytes", "brotliBytes"] as const) {
     if (
-      !(allowZero
+      !(allow_zero
         ? Number.isSafeInteger(input[field]) && (input[field] as number) >= 0
-        : positiveInteger(input[field]))
+        : positive_integer(input[field]))
     ) {
       throw new Error(`${label} ${field} is missing or invalid`);
     }
@@ -93,7 +93,7 @@ function sizes(value: unknown, label: string, allowZero = false): FirstPaintSize
   return input as unknown as FirstPaintSizes;
 }
 
-function signedSizes(value: unknown, label: string): FirstPaintSizes {
+function signed_sizes(value: unknown, label: string): FirstPaintSizes {
   const input = record(value, `${label} sizes are missing`);
   for (const field of ["rawBytes", "gzipBytes", "brotliBytes"] as const) {
     if (!Number.isSafeInteger(input[field])) {
@@ -114,7 +114,7 @@ function percentile(sorted: readonly number[], fraction: number): number {
 }
 
 /** The sorted sample at `index`; timing validation has already proved there are enough. */
-function percentileAt(sorted: readonly number[], index: number): number {
+function percentile_at(sorted: readonly number[], index: number): number {
   const sample = sorted[index];
   if (sample === undefined) throw new Error(`Timing has no sample at ${index}`);
 
@@ -126,20 +126,20 @@ function timing(value: unknown, label: string): FirstPaintTiming {
   if (
     !Array.isArray(input.samplesMs) ||
     input.samplesMs.length < FIRST_PAINT_MIN_ROUNDS ||
-    !input.samplesMs.every(finiteNonNegative)
+    !input.samplesMs.every(finite_non_negative)
   ) {
     throw new Error(`${label} timing requires ${FIRST_PAINT_MIN_ROUNDS} finite samples`);
   }
-  const samplesMs = [...input.samplesMs].sort((left, right) => left - right) as number[];
-  const middle = Math.floor(samplesMs.length / 2);
-  const upper = percentileAt(samplesMs, middle);
-  const expectedMedian =
-    samplesMs.length % 2 === 0 ? (percentileAt(samplesMs, middle - 1) + upper) / 2 : upper;
-  const expectedP95 = percentile(samplesMs, 0.95);
-  if (input.medianMs !== expectedMedian || input.p95Ms !== expectedP95) {
+  const samples_ms = [...input.samplesMs].sort((left, right) => left - right) as number[];
+  const middle = Math.floor(samples_ms.length / 2);
+  const upper = percentile_at(samples_ms, middle);
+  const expected_median =
+    samples_ms.length % 2 === 0 ? (percentile_at(samples_ms, middle - 1) + upper) / 2 : upper;
+  const expected_p95 = percentile(samples_ms, 0.95);
+  if (input.medianMs !== expected_median || input.p95Ms !== expected_p95) {
     throw new Error(`${label} timing summary does not match retained samples`);
   }
-  return { samplesMs: input.samplesMs as number[], medianMs: expectedMedian, p95Ms: expectedP95 };
+  return { samplesMs: input.samplesMs as number[], medianMs: expected_median, p95Ms: expected_p95 };
 }
 
 function variant(value: unknown, label: string): FirstPaintVariant {
@@ -214,29 +214,29 @@ export function validateFirstPaintEvidence(value: unknown): FirstPaintEvidence {
     if (typeof fixture.version !== "string" || fixture.version.length === 0) {
       throw new Error(`${fixture.bundler} version is missing`);
     }
-    const eagerImports = fixture.eagerImports;
+    const eager_imports = fixture.eagerImports;
     if (
-      !Array.isArray(eagerImports) ||
-      eagerImports.length !== 2 ||
-      eagerImports[0] !== "@sheetwrite/core#createGrid" ||
-      eagerImports[1] !== "@sheetwrite/core#initSheetwrite"
+      !Array.isArray(eager_imports) ||
+      eager_imports.length !== 2 ||
+      eager_imports[0] !== "@sheetwrite/core#createGrid" ||
+      eager_imports[1] !== "@sheetwrite/core#initSheetwrite"
     ) {
       throw new Error(`${fixture.bundler} eager surface is not comparable`);
     }
     const baseline = variant(fixture.baseline, `${fixture.bundler} baseline`);
-    const candidateInput = record(fixture.candidate, `${fixture.bundler} candidate is missing`);
-    const candidateVariant = variant(candidateInput, `${fixture.bundler} candidate`);
-    if (baseline.checksum !== candidateVariant.checksum) {
+    const candidate_input = record(fixture.candidate, `${fixture.bundler} candidate is missing`);
+    const candidate_variant = variant(candidate_input, `${fixture.bundler} candidate`);
+    if (baseline.checksum !== candidate_variant.checksum) {
       throw new Error(`${fixture.bundler} candidate first-paint semantics differ from baseline`);
     }
     if (
-      typeof candidateInput.deferredChunk !== "string" ||
-      candidateInput.deferredChunk.length === 0
+      typeof candidate_input.deferredChunk !== "string" ||
+      candidate_input.deferredChunk.length === 0
     ) {
       throw new Error(`${fixture.bundler} candidate deferred chunk is missing`);
     }
     const interaction = record(
-      candidateInput.interaction,
+      candidate_input.interaction,
       `${fixture.bundler} interaction evidence is missing`,
     );
     if (
@@ -248,22 +248,22 @@ export function validateFirstPaintEvidence(value: unknown): FirstPaintEvidence {
     ) {
       throw new Error(`${fixture.bundler} interaction loading/error behavior is incomplete`);
     }
-    const deltaInput = record(fixture.delta, `${fixture.bundler} size delta is missing`);
-    const deltaSizes = signedSizes(deltaInput, `${fixture.bundler} size delta`);
-    const expectedDelta = {
-      rawBytes: baseline.initialJavaScript.rawBytes - candidateVariant.initialJavaScript.rawBytes,
+    const delta_input = record(fixture.delta, `${fixture.bundler} size delta is missing`);
+    const delta_sizes = signed_sizes(delta_input, `${fixture.bundler} size delta`);
+    const expected_delta = {
+      rawBytes: baseline.initialJavaScript.rawBytes - candidate_variant.initialJavaScript.rawBytes,
       gzipBytes:
-        baseline.initialJavaScript.gzipBytes - candidateVariant.initialJavaScript.gzipBytes,
+        baseline.initialJavaScript.gzipBytes - candidate_variant.initialJavaScript.gzipBytes,
       brotliBytes:
-        baseline.initialJavaScript.brotliBytes - candidateVariant.initialJavaScript.brotliBytes,
+        baseline.initialJavaScript.brotliBytes - candidate_variant.initialJavaScript.brotliBytes,
     };
     if (
-      deltaSizes.rawBytes !== expectedDelta.rawBytes ||
-      deltaSizes.gzipBytes !== expectedDelta.gzipBytes ||
-      deltaSizes.brotliBytes !== expectedDelta.brotliBytes ||
-      typeof deltaInput.brotliPercent !== "number" ||
-      deltaInput.brotliPercent !==
-        (expectedDelta.brotliBytes / baseline.initialJavaScript.brotliBytes) * 100
+      delta_sizes.rawBytes !== expected_delta.rawBytes ||
+      delta_sizes.gzipBytes !== expected_delta.gzipBytes ||
+      delta_sizes.brotliBytes !== expected_delta.brotliBytes ||
+      typeof delta_input.brotliPercent !== "number" ||
+      delta_input.brotliPercent !==
+        (expected_delta.brotliBytes / baseline.initialJavaScript.brotliBytes) * 100
     ) {
       throw new Error(`${fixture.bundler} recorded size delta is inconsistent`);
     }
@@ -271,14 +271,14 @@ export function validateFirstPaintEvidence(value: unknown): FirstPaintEvidence {
       bundler: fixture.bundler,
       version: fixture.version,
       provenance: provenance(fixture.provenance, fixture.bundler),
-      eagerImports,
+      eagerImports: eager_imports,
       baseline,
       candidate: {
-        ...candidateVariant,
-        deferredChunk: candidateInput.deferredChunk,
+        ...candidate_variant,
+        deferredChunk: candidate_input.deferredChunk,
         interaction,
       },
-      delta: { ...deltaSizes, brotliPercent: deltaInput.brotliPercent },
+      delta: { ...delta_sizes, brotliPercent: delta_input.brotliPercent },
     } as FirstPaintFixtureEvidence;
   });
   const next = fixtures.find((fixture) => fixture.bundler === "next");

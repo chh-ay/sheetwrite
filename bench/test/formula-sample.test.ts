@@ -17,7 +17,7 @@ it("builds one fixture per sample, restores it between edits and warms up for th
   let runs = 0;
   let restores = 0;
   // Every timed edit must start from the unedited state, or a later run times a no-op.
-  const statesBeforeRun = new Set<string>();
+  const states_before_run = new Set<string>();
   const started = performance.now();
   const sample = collectAggregatedSample(
     "formula-constant-edit",
@@ -29,7 +29,7 @@ it("builds one fixture per sample, restores it between edits and warms up for th
       const { run, restore } = fixture;
       fixture.run = () => {
         runs += 1;
-        statesBeforeRun.add(fixture.check() === unedited ? "unedited" : "edited");
+        states_before_run.add(fixture.check() === unedited ? "unedited" : "edited");
         run();
       };
       if (restore !== undefined) {
@@ -47,14 +47,14 @@ it("builds one fixture per sample, restores it between edits and warms up for th
     },
   );
   // Only a lower bound: a slow machine cannot break it.
-  const elapsedMs = performance.now() - started;
+  const elapsed_ms = performance.now() - started;
 
   expect(builds).toBe(1);
   expect(sample.iterations).toBeGreaterThan(1);
   expect(sample.totalMs).toBeGreaterThanOrEqual(MINIMUM_SAMPLE_MS);
-  expect(elapsedMs).toBeGreaterThanOrEqual(MINIMUM_WARMUP_MS + MINIMUM_SAMPLE_MS);
+  expect(elapsed_ms).toBeGreaterThanOrEqual(MINIMUM_WARMUP_MS + MINIMUM_SAMPLE_MS);
   expect(runs).toBeGreaterThan(sample.iterations + WARMUP_FIXTURES);
-  expect([...statesBeforeRun]).toEqual(["unedited"]);
+  expect([...states_before_run]).toEqual(["unedited"]);
   expect(restores).toBe(runs - 1);
 });
 

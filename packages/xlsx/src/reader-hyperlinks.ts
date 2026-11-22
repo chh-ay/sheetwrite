@@ -11,28 +11,28 @@ import { readerFailure, parseRange } from "./reader-values.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import { decodeXstring, type XmlElement, xmlAttribute, xmlChildren } from "./xml.js";
 
-function parseHyperlinkLocation(
+function parse_hyperlink_location(
   value: string,
-  currentSheet: string,
+  current_sheet: string,
 ): { sheetName: string; range: Omit<CellHyperlink["range"], "sheet"> } | null {
   const location = decodeXstring(value).replace(/^#/, "");
   const separator = location.lastIndexOf("!");
-  let sheetName = currentSheet;
-  let rangeText = location;
+  let sheet_name = current_sheet;
+  let range_text = location;
   if (separator >= 0) {
-    const rawSheet = location.slice(0, separator);
-    rangeText = location.slice(separator + 1);
-    if (rawSheet.startsWith("'") && rawSheet.endsWith("'")) {
-      sheetName = rawSheet.slice(1, -1).replaceAll("''", "'");
+    const raw_sheet = location.slice(0, separator);
+    range_text = location.slice(separator + 1);
+    if (raw_sheet.startsWith("'") && raw_sheet.endsWith("'")) {
+      sheet_name = raw_sheet.slice(1, -1).replaceAll("''", "'");
     } else {
-      sheetName = rawSheet;
+      sheet_name = raw_sheet;
     }
   }
-  if (!sheetName || !rangeText) return null;
+  if (!sheet_name || !range_text) return null;
   try {
-    const parsed = parseRange(rangeText.replaceAll("$", ""));
+    const parsed = parseRange(range_text.replaceAll("$", ""));
     return {
-      sheetName,
+      sheetName: sheet_name,
       range: {
         start: { row: parsed.r0, col: parsed.c0 },
         end: { row: parsed.r1, col: parsed.c1 },
@@ -69,7 +69,7 @@ export function parseHyperlinks(
       start: { row: source.r0, col: source.c0 },
       end: { row: source.r1, col: source.c1 },
     };
-    const relationshipId = xmlAttribute(element, "id");
+    const relationship_id = xmlAttribute(element, "id");
     const location = xmlAttribute(element, "location");
     const display = xmlAttribute(element, "display");
     if (display !== undefined && display.length > MAX_HYPERLINK_DISPLAY_LENGTH) {
@@ -89,7 +89,7 @@ export function parseHyperlinks(
         cell: reference,
       });
     }
-    if (relationshipId && location) {
+    if (relationship_id && location) {
       emitWarning(context, {
         code: "hyperlink",
         message: "Hyperlink combined relationship and location is unsupported and was dropped",
@@ -98,10 +98,10 @@ export function parseHyperlinks(
       });
       continue;
     }
-    if (relationshipId) {
-      const relationship = relationships.find((candidate) => candidate.id === relationshipId);
+    if (relationship_id) {
+      const relationship = relationships.find((candidate) => candidate.id === relationship_id);
       if (!relationship || !relationshipTypeMatches(relationship.type, "hyperlink")) {
-        return readerFailure(`hyperlink relationship ${relationshipId} in ${sheet} is invalid`);
+        return readerFailure(`hyperlink relationship ${relationship_id} in ${sheet} is invalid`);
       }
       if (!relationship.external) {
         emitWarning(context, {
@@ -131,7 +131,7 @@ export function parseHyperlinks(
       continue;
     }
     if (location) {
-      const target = parseHyperlinkLocation(location, sheet);
+      const target = parse_hyperlink_location(location, sheet);
       if (!target) {
         emitWarning(context, {
           code: "hyperlink",

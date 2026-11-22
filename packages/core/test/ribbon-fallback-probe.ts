@@ -17,7 +17,7 @@ process.on("unhandledRejection", (reason) => reported.push(reason));
 
 await initSheetwrite();
 const restore = installCanvasTestStubs();
-const removeStyles = installCoreStyles();
+const remove_styles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
 document.body.appendChild(host);
@@ -48,6 +48,6 @@ try {
   assert.equal(reported.length, 1, "the load error still reaches the host");
 } finally {
   grid.destroy();
-  removeStyles();
+  remove_styles();
   restore();
 }

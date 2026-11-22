@@ -116,7 +116,7 @@ interface RunOptions {
   readonly steps: number;
 }
 
-function numberArgument(args: readonly string[], name: string, fallback: number): number {
+function number_argument(args: readonly string[], name: string, fallback: number): number {
   const text = optionValue(args, name);
   if (text === undefined) return fallback;
   const value = Number(text);
@@ -133,7 +133,7 @@ function field(value: unknown, key: string): unknown {
 }
 
 /** `Layout` reports its dirty objects; `UpdateLayoutTree` its restyled elements. */
-function touchedNodes(name: string, args: unknown): number {
+function touched_nodes(name: string, args: unknown): number {
   const count =
     name === LAYOUT_EVENT
       ? field(field(args, "beginData"), "dirtyObjects")
@@ -143,7 +143,7 @@ function touchedNodes(name: string, args: unknown): number {
   return typeof count === "number" ? count : 0;
 }
 
-function traceEventOf(value: unknown): TraceEvent | null {
+function trace_event_of(value: unknown): TraceEvent | null {
   if (typeof value !== "object" || value === null) return null;
   if (!("name" in value && "ph" in value && "ts" in value && "pid" in value && "tid" in value)) {
     return null;
@@ -160,14 +160,14 @@ function traceEventOf(value: unknown): TraceEvent | null {
   ) {
     return null;
   }
-  return { name, ph, ts, dur, pid, tid, nodes: touchedNodes(name, field(value, "args")) };
+  return { name, ph, ts, dur, pid, tid, nodes: touched_nodes(name, field(value, "args")) };
 }
 
 function contains(outer: TraceEvent, inner: TraceEvent): boolean {
   return outer !== inner && outer.ts <= inner.ts && inner.ts + inner.dur <= outer.ts + outer.dur;
 }
 
-function markEvent(events: readonly TraceEvent[], name: string): TraceEvent {
+function mark_event(events: readonly TraceEvent[], name: string): TraceEvent {
   const mark = events.find((event) => event.name === name);
   if (!mark) throw new Error(`The trace has no ${name} mark.`);
 
@@ -178,65 +178,65 @@ function markEvent(events: readonly TraceEvent[], name: string): TraceEvent {
  * Style and layout inside the step's marks. Script that brackets a synchronous
  * step starts before its start mark, so script is matched by overlap.
  */
-function observeStep(events: readonly TraceEvent[], step: number): StepObservation {
-  const start = markEvent(events, stepMarkName(step, "start")).ts;
-  const endMark = markEvent(events, stepMarkName(step, "end"));
-  const end = endMark.ts;
+function observe_step(events: readonly TraceEvent[], step: number): StepObservation {
+  const start = mark_event(events, stepMarkName(step, "start")).ts;
+  const end_mark = mark_event(events, stepMarkName(step, "end"));
+  const end = end_mark.ts;
   const thread = events.filter(
-    (event) => event.pid === endMark.pid && event.tid === endMark.tid && event.ph === "X",
+    (event) => event.pid === end_mark.pid && event.tid === end_mark.tid && event.ph === "X",
   );
   const scripts = thread.filter(
     (event) => SCRIPT_EVENTS[event.name] === true && event.ts < end && event.ts + event.dur > start,
   );
-  const topLevelScripts = scripts.filter(
+  const top_level_scripts = scripts.filter(
     (script) => !scripts.some((outer) => contains(outer, script)),
   );
-  let forcedStyles = 0;
-  let forcedLayouts = 0;
-  let forcedNodes = 0;
-  let forcedUs = 0;
-  let frameUs = 0;
+  let forced_styles = 0;
+  let forced_layouts = 0;
+  let forced_nodes = 0;
+  let forced_us = 0;
+  let frame_us = 0;
   for (const event of thread) {
     if (event.name !== STYLE_EVENT && event.name !== LAYOUT_EVENT) continue;
     if (event.ts < start || event.ts + event.dur > end) continue;
-    if (topLevelScripts.some((script) => contains(script, event))) {
-      if (event.name === STYLE_EVENT) forcedStyles++;
-      else forcedLayouts++;
-      forcedNodes += event.nodes;
-      forcedUs += event.dur;
+    if (top_level_scripts.some((script) => contains(script, event))) {
+      if (event.name === STYLE_EVENT) forced_styles++;
+      else forced_layouts++;
+      forced_nodes += event.nodes;
+      forced_us += event.dur;
     } else {
-      frameUs += event.dur;
+      frame_us += event.dur;
     }
   }
-  const scriptUs = topLevelScripts.reduce(
+  const script_us = top_level_scripts.reduce(
     (total, script) => total + Math.min(end, script.ts + script.dur) - Math.max(start, script.ts),
     0,
   );
   return {
-    forcedStyles,
-    forcedLayouts,
-    forcedNodes,
-    forcedMs: forcedUs / TRACE_MICROSECONDS_PER_MS,
-    frameMs: frameUs / TRACE_MICROSECONDS_PER_MS,
-    scriptMs: scriptUs / TRACE_MICROSECONDS_PER_MS,
+    forcedStyles: forced_styles,
+    forcedLayouts: forced_layouts,
+    forcedNodes: forced_nodes,
+    forcedMs: forced_us / TRACE_MICROSECONDS_PER_MS,
+    frameMs: frame_us / TRACE_MICROSECONDS_PER_MS,
+    scriptMs: script_us / TRACE_MICROSECONDS_PER_MS,
   };
 }
 
-async function measureAction(
+async function measure_action(
   browser: Browser,
-  baseUrl: string,
+  base_url: string,
   action: ForcedLayoutAction,
   options: RunOptions,
 ): Promise<StepObservation[]> {
   const context = await browser.newContext({ viewport: { width: 1_120, height: 660 } });
   try {
     const page = await context.newPage();
-    const pageErrors: string[] = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
+    const page_errors: string[] = [];
+    page.on("pageerror", (error) => page_errors.push(error.message));
     page.on("console", (message) => {
-      if (message.type() === "error") pageErrors.push(message.text());
+      if (message.type() === "error") page_errors.push(message.text());
     });
-    const url = `${baseUrl}?action=${action}&warmups=${options.warmups}&steps=${options.steps}`;
+    const url = `${base_url}?action=${action}&warmups=${options.warmups}&steps=${options.steps}`;
     await page.goto(url, { waitUntil: "load" });
     await page
       .locator('#bench-status[data-status="idle"], #bench-status[data-status="error"]')
@@ -246,12 +246,12 @@ async function measureAction(
     const events: TraceEvent[] = [];
     session.on("Tracing.dataCollected", ({ value }) => {
       for (const entry of value) {
-        const event = traceEventOf(entry);
+        const event = trace_event_of(entry);
         if (event !== null) events.push(event);
       }
     });
-    const tracingComplete = new Promise<void>((resolveComplete) =>
-      session.once("Tracing.tracingComplete", () => resolveComplete()),
+    const tracing_complete = new Promise<void>((resolve_complete) =>
+      session.once("Tracing.tracingComplete", () => resolve_complete()),
     );
     await session.send("Tracing.start", {
       categories: TRACE_CATEGORIES,
@@ -262,13 +262,13 @@ async function measureAction(
       .locator('#bench-status[data-status="done"], #bench-status[data-status="error"]')
       .waitFor({ timeout: PAGE_TIMEOUT_MS });
     await session.send("Tracing.end");
-    await tracingComplete;
-    const finalStatus = await page.locator("#bench-status").getAttribute("data-status");
-    if (finalStatus !== "done" || pageErrors.length > 0) {
-      throw new Error(`${action} failed in the page: ${pageErrors.join("; ") || "error status"}`);
+    await tracing_complete;
+    const final_status = await page.locator("#bench-status").getAttribute("data-status");
+    if (final_status !== "done" || page_errors.length > 0) {
+      throw new Error(`${action} failed in the page: ${page_errors.join("; ") || "error status"}`);
     }
 
-    return Array.from({ length: options.steps }, (_, step) => observeStep(events, step));
+    return Array.from({ length: options.steps }, (_, step) => observe_step(events, step));
   } finally {
     await context.close();
   }
@@ -293,7 +293,7 @@ function summarize(
   };
 }
 
-function markdownTable(summaries: readonly ActionSummary[], browserVersion: string): string {
+function markdown_table(summaries: readonly ActionSummary[], browser_version: string): string {
   const ms = (value: number): string => value.toFixed(3);
   const rows = summaries.map((summary) =>
     [
@@ -311,7 +311,7 @@ function markdownTable(summaries: readonly ActionSummary[], browserVersion: stri
   );
 
   return [
-    `Forced style and layout per step, ${FORCED_LAYOUT_ROWS.toLocaleString("en-US")} rows, Chromium ${browserVersion}. Medians over all steps; nodes are the elements restyled plus the layout objects laid out by forced recalculations, and "most" is the largest step:`,
+    `Forced style and layout per step, ${FORCED_LAYOUT_ROWS.toLocaleString("en-US")} rows, Chromium ${browser_version}. Medians over all steps; nodes are the elements restyled plus the layout objects laid out by forced recalculations, and "most" is the largest step:`,
     "",
     "| Action | Steps | Forced styles | Forced layouts | Forced nodes | Most forced nodes | Ceiling | Forced ms | Frame style+layout ms | Script ms |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -319,13 +319,13 @@ function markdownTable(summaries: readonly ActionSummary[], browserVersion: stri
   ].join("\n");
 }
 
-async function runBenchmark(args: readonly string[]): Promise<void> {
-  const runs = numberArgument(args, "--runs", 3);
+async function run_benchmark(args: readonly string[]): Promise<void> {
+  const runs = number_argument(args, "--runs", 3);
   const options: RunOptions = {
-    warmups: numberArgument(args, "--warmups", 10),
-    steps: numberArgument(args, "--steps", 40),
+    warmups: number_argument(args, "--warmups", 10),
+    steps: number_argument(args, "--steps", 40),
   };
-  const outputPath = optionValue(args, "--output");
+  const output_path = optionValue(args, "--output");
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -341,7 +341,7 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
     },
   });
   const browser = await chromium.launch({ headless: true });
-  const browserVersion = browser.version();
+  const browser_version = browser.version();
   const observations: Record<ForcedLayoutAction, StepObservation[]> = {
     scroll: [],
     "arrow-down": [],
@@ -355,11 +355,11 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
     "edit-commit-refresh": [],
   };
   try {
-    const baseUrl = `http://${server.hostname}:${server.port}/`;
+    const base_url = `http://${server.hostname}:${server.port}/`;
     for (let run = 1; run <= runs; run++) {
       for (const action of FORCED_LAYOUT_ACTIONS) {
         process.stderr.write(`forced layout benchmark: run ${run}/${runs}, ${action}\n`);
-        observations[action].push(...(await measureAction(browser, baseUrl, action, options)));
+        observations[action].push(...(await measure_action(browser, base_url, action, options)));
       }
     }
   } finally {
@@ -368,17 +368,17 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
   }
 
   const summaries = FORCED_LAYOUT_ACTIONS.map((action) => summarize(action, observations[action]));
-  process.stdout.write(`${markdownTable(summaries, browserVersion)}\n`);
-  if (outputPath) {
+  process.stdout.write(`${markdown_table(summaries, browser_version)}\n`);
+  if (output_path) {
     const artifact = {
       rows: FORCED_LAYOUT_ROWS,
       runs,
       ...options,
-      browser: browserVersion,
+      browser: browser_version,
       summaries,
       steps: observations,
     };
-    await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+    await writeFile(output_path, `${JSON.stringify(artifact, null, 2)}\n`);
   }
   const over = summaries.filter((summary) => summary.maxForcedNodes > summary.ceiling);
   if (over.length > 0) {
@@ -394,5 +394,5 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
 }
 
 if (import.meta.main) {
-  await runBenchmark(process.argv.slice(2).filter((argument) => argument !== "--"));
+  await run_benchmark(process.argv.slice(2).filter((argument) => argument !== "--"));
 }

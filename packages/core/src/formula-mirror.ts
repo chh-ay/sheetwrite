@@ -95,7 +95,7 @@ export class TextMirror {
     layer.setAttribute("aria-hidden", "true");
     for (const name of GEOMETRY_STYLES) layer.style[name] = style[name];
     layer.style.color = style.color;
-    layer.style.lineHeight = this.lineHeight(style);
+    layer.style.lineHeight = this.line_height(style);
 
     // The field's glyphs become transparent; its caret keeps the text colour.
     field.style.caretColor = style.color;
@@ -131,7 +131,7 @@ export class TextMirror {
   sync(): void {
     const box = boxIn(this.field, layerParent(this.field));
     const style = this.layer.style;
-    style.lineHeight = this.lineHeight(getComputedStyle(this.field));
+    style.lineHeight = this.line_height(getComputedStyle(this.field));
     style.left = `${box.left}px`;
     style.top = `${box.top}px`;
     style.width = `${box.width}px`;
@@ -150,7 +150,7 @@ export class TextMirror {
    * A one-line input centres its text vertically, which a block does only when
    * its line fills the content box; a textarea keeps its own line height.
    */
-  private lineHeight(style: CSSStyleDeclaration): string {
+  private line_height(style: CSSStyleDeclaration): string {
     if (this.field instanceof HTMLTextAreaElement) return style.lineHeight;
 
     const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);

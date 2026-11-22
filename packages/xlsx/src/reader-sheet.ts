@@ -24,38 +24,38 @@ type RowGroups = NonNullable<SheetSnapshot["rowGroups"]>;
  * row after it is marked collapsed, or when every row of the group is hidden.
  * Each level is one walk over the outlined rows in order.
  */
-function outlineRowGroups(
+function outline_row_groups(
   levels: ReadonlyMap<number, number>,
-  collapsedRows: ReadonlySet<number>,
-  hiddenRows: ReadonlySet<number>,
+  collapsed_rows: ReadonlySet<number>,
+  hidden_rows: ReadonlySet<number>,
 ): RowGroups {
   const rows = Uint32Array.from(levels.keys()).sort();
-  const rowLevels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
-  const maxLevel = rowLevels.reduce((maximum, level) => Math.max(maximum, level), 0);
+  const row_levels = Uint8Array.from(rows, (row) => levels.get(row) ?? 0);
+  const max_level = row_levels.reduce((maximum, level) => Math.max(maximum, level), 0);
   const groups: RowGroups = [];
 
-  for (let level = 1; level <= maxLevel; level++) {
+  for (let level = 1; level <= max_level; level++) {
     let start = -1;
     let end = -1;
-    let allHidden = true;
+    let all_hidden = true;
     const close = (): void => {
-      const collapsed = collapsedRows.has(end + 1) || collapsedRows.has(end) || allHidden;
+      const collapsed = collapsed_rows.has(end + 1) || collapsed_rows.has(end) || all_hidden;
       groups.push({ start, end, collapsed });
     };
 
     rows.forEach((row, index) => {
-      if ((rowLevels[index] ?? 0) < level) return;
+      if ((row_levels[index] ?? 0) < level) return;
 
       if (start >= 0 && row === end + 1) {
         end = row;
-        allHidden &&= hiddenRows.has(row);
+        all_hidden &&= hidden_rows.has(row);
         return;
       }
 
       if (start >= 0) close();
       start = row;
       end = row;
-      allHidden = hiddenRows.has(row);
+      all_hidden = hidden_rows.has(row);
     });
 
     if (start >= 0) close();
@@ -77,14 +77,14 @@ export async function parseSheet(
   const {
     root,
     cells,
-    cellStyles,
-    columnCells,
-    sharedFormulas,
-    rowMeta,
-    outlineLevels,
-    collapsedRows,
-    maxRow: rowMaximum,
-    maxCol: colMaximum,
+    cellStyles: cell_styles,
+    columnCells: column_cells,
+    sharedFormulas: shared_formulas,
+    rowMeta: row_meta,
+    outlineLevels: outline_levels,
+    collapsedRows: collapsed_rows,
+    maxRow: row_maximum,
+    maxCol: col_maximum,
   } = await ingestWorksheetRows(
     packageFile,
     reference,
@@ -94,8 +94,8 @@ export async function parseSheet(
     usage,
     date1904,
   );
-  let maxRow = rowMaximum;
-  let maxCol = colMaximum;
+  let max_row = row_maximum;
+  let max_col = col_maximum;
 
   const dimension = xmlAttribute(
     xmlChild(root, "dimension") ?? { attributes: {}, children: [], name: "", text: "" },
@@ -105,50 +105,50 @@ export async function parseSheet(
     const range = parseRange(dimension);
     assertResource(context, "maxRowsPerSheet", range.r1 + 1);
     assertResource(context, "maxColumnsPerSheet", range.c1 + 1);
-    maxRow = Math.max(maxRow, range.r1);
-    maxCol = Math.max(maxCol, range.c1);
+    max_row = Math.max(max_row, range.r1);
+    max_col = Math.max(max_col, range.c1);
   }
 
   const columns = parseColumns(root, styles, context, reference.relationship.target);
-  for (const index of columns.keys()) maxCol = Math.max(maxCol, index);
-  const mergeCollection = xmlChild(root, "mergeCells");
-  const mergeElements = mergeCollection ? xmlChildren(mergeCollection, "mergeCell") : [];
-  usage.merges += mergeElements.length;
+  for (const index of columns.keys()) max_col = Math.max(max_col, index);
+  const merge_collection = xmlChild(root, "mergeCells");
+  const merge_elements = merge_collection ? xmlChildren(merge_collection, "mergeCell") : [];
+  usage.merges += merge_elements.length;
   assertResource(context, "maxMerges", usage.merges);
-  const merges = mergeElements.map((merge) => {
+  const merges = merge_elements.map((merge) => {
     const value = xmlAttribute(merge, "ref");
     if (!value) return readerFailure(`merge in ${reference.name} has no range`);
     const parsed = parseRange(value);
-    maxRow = Math.max(maxRow, parsed.r1);
-    maxCol = Math.max(maxCol, parsed.c1);
+    max_row = Math.max(max_row, parsed.r1);
+    max_col = Math.max(max_col, parsed.c1);
     return parsed;
   });
-  assertResource(context, "maxRowsPerSheet", maxRow + 1);
-  assertResource(context, "maxColumnsPerSheet", maxCol + 1);
+  assertResource(context, "maxRowsPerSheet", max_row + 1);
+  assertResource(context, "maxColumnsPerSheet", max_col + 1);
 
-  const autoFilter = parseAutoFilter(root, context, reference.name);
-  const shownRowMeta =
-    autoFilter && autoFilter.columns.length > 0
-      ? rowMetaShownByFilter(rowMeta, autoFilter.range)
-      : rowMeta;
-  const hiddenOutlineRows = new Set(
-    shownRowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
+  const auto_filter = parseAutoFilter(root, context, reference.name);
+  const shown_row_meta =
+    auto_filter && auto_filter.columns.length > 0
+      ? rowMetaShownByFilter(row_meta, auto_filter.range)
+      : row_meta;
+  const hidden_outline_rows = new Set(
+    shown_row_meta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
   );
-  const rowGroups = outlineRowGroups(outlineLevels, collapsedRows, hiddenOutlineRows);
+  const row_groups = outline_row_groups(outline_levels, collapsed_rows, hidden_outline_rows);
 
   const view = xmlChildren(xmlChild(root, "sheetViews") ?? root, "sheetView").at(-1);
   const pane = view ? xmlChild(view, "pane") : undefined;
-  const paneState = pane ? xmlAttribute(pane, "state") : undefined;
-  const frozen = pane && (paneState === "frozen" || paneState === "frozenSplit");
-  const frozenRows = frozen ? Number(xmlAttribute(pane, "ySplit") ?? 0) : 0;
-  const frozenCols = frozen ? Number(xmlAttribute(pane, "xSplit") ?? 0) : 0;
+  const pane_state = pane ? xmlAttribute(pane, "state") : undefined;
+  const frozen = pane && (pane_state === "frozen" || pane_state === "frozenSplit");
+  const frozen_rows = frozen ? Number(xmlAttribute(pane, "ySplit") ?? 0) : 0;
+  const frozen_cols = frozen ? Number(xmlAttribute(pane, "xSplit") ?? 0) : 0;
   // Excel's Tab Color, as an ARGB `rgb`; theme and indexed colors are not read.
-  const sheetProperties = xmlChild(root, "sheetPr");
-  const tabColorElement = sheetProperties ? xmlChild(sheetProperties, "tabColor") : undefined;
-  const tabColorArgb = tabColorElement ? xmlAttribute(tabColorElement, "rgb") : undefined;
-  const tabColor =
-    tabColorArgb && /^[\dA-Fa-f]{8}$/u.test(tabColorArgb)
-      ? `#${tabColorArgb.slice(2).toUpperCase()}`
+  const sheet_properties = xmlChild(root, "sheetPr");
+  const tab_color_element = sheet_properties ? xmlChild(sheet_properties, "tabColor") : undefined;
+  const tab_color_argb = tab_color_element ? xmlAttribute(tab_color_element, "rgb") : undefined;
+  const tab_color =
+    tab_color_argb && /^[\dA-Fa-f]{8}$/u.test(tab_color_argb)
+      ? `#${tab_color_argb.slice(2).toUpperCase()}`
       : undefined;
   if (view && xmlBoolean(xmlAttribute(view, "rightToLeft"))) {
     emitWarning(context, {
@@ -169,7 +169,7 @@ export async function parseSheet(
       sheet: reference.name,
     });
   }
-  if (pane && paneState === "split") {
+  if (pane && pane_state === "split") {
     emitWarning(context, {
       code: "unsupported-feature",
       message: "Split-pane worksheet view presentation was dropped",
@@ -177,9 +177,9 @@ export async function parseSheet(
     });
   }
 
-  const validationCollection = xmlChild(root, "dataValidations");
-  const validations = validationCollection
-    ? xmlChildren(validationCollection, "dataValidation").flatMap((validation) =>
+  const validation_collection = xmlChild(root, "dataValidations");
+  const validations = validation_collection
+    ? xmlChildren(validation_collection, "dataValidation").flatMap((validation) =>
         parseValidation(validation, context, reference.name, date1904),
       )
     : [];
@@ -191,24 +191,24 @@ export async function parseSheet(
     });
     validations.length = MAX_VALIDATION_RULES;
   }
-  const conditionalFormats = parseConditionalFormats(root, styles, reference.name, context);
-  const sortState = parseSortState(root, styles, context, reference.name);
+  const conditional_formats = parseConditionalFormats(root, styles, reference.name, context);
+  const sort_state = parseSortState(root, styles, context, reference.name);
 
   const relationships = packageFile.relationships(reference.relationship.target);
-  const hyperlinkCollection = xmlChild(root, "hyperlinks");
-  const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
-  let missingDisplays: Map<string, number[]> | undefined;
+  const hyperlink_collection = xmlChild(root, "hyperlinks");
+  const hyperlinks = parseHyperlinks(hyperlink_collection, relationships, reference.name, context);
+  let missing_displays: Map<string, number[]> | undefined;
   for (const [index, hyperlink] of hyperlinks.entries()) {
     if (hyperlink.display !== undefined) continue;
-    missingDisplays ??= new Map();
+    missing_displays ??= new Map();
     const key = `${hyperlink.range.start.row}:${hyperlink.range.start.col}`;
-    const indices = missingDisplays.get(key) ?? [];
+    const indices = missing_displays.get(key) ?? [];
     indices.push(index);
-    missingDisplays.set(key, indices);
+    missing_displays.set(key, indices);
   }
-  if (missingDisplays) {
+  if (missing_displays) {
     for (const cell of cells) {
-      const indices = missingDisplays.get(`${cell.rowOffset}:${cell.colOffset}`);
+      const indices = missing_displays.get(`${cell.rowOffset}:${cell.colOffset}`);
       if (!indices || cell.value.kind !== "literal" || cell.value.value === null) continue;
       const display = String(cell.value.value);
       if (display.length > MAX_HYPERLINK_DISPLAY_LENGTH) continue;
@@ -219,20 +219,20 @@ export async function parseSheet(
     }
   }
   for (const hyperlink of hyperlinks) {
-    maxRow = Math.max(maxRow, hyperlink.range.end.row);
-    maxCol = Math.max(maxCol, hyperlink.range.end.col);
+    max_row = Math.max(max_row, hyperlink.range.end.row);
+    max_col = Math.max(max_col, hyperlink.range.end.col);
   }
-  for (const rule of conditionalFormats) {
-    maxRow = Math.max(maxRow, rule.range.end.row);
-    maxCol = Math.max(maxCol, rule.range.end.col);
+  for (const rule of conditional_formats) {
+    max_row = Math.max(max_row, rule.range.end.row);
+    max_col = Math.max(max_col, rule.range.end.col);
   }
-  assertResource(context, "maxRowsPerSheet", maxRow + 1);
-  assertResource(context, "maxColumnsPerSheet", maxCol + 1);
+  assertResource(context, "maxRowsPerSheet", max_row + 1);
+  assertResource(context, "maxColumnsPerSheet", max_col + 1);
 
-  const extensionList = xmlChild(root, "extLst");
-  const hasConditionalFormatExtensions =
-    extensionList !== undefined && xmlHasDescendant(extensionList, "conditionalFormattings");
-  if (hasConditionalFormatExtensions) {
+  const extension_list = xmlChild(root, "extLst");
+  const has_conditional_format_extensions =
+    extension_list !== undefined && xmlHasDescendant(extension_list, "conditionalFormattings");
+  if (has_conditional_format_extensions) {
     emitWarning(context, {
       code: "format-loss",
       message: "Extended conditional formatting is unsupported and was dropped",
@@ -273,34 +273,34 @@ export async function parseSheet(
     state: reference.state,
     part: reference.relationship.target,
     cells,
-    cellStyles,
-    columnCells,
-    sharedFormulas,
-    rowCount: Math.max(0, maxRow + 1),
-    columnCount: Math.max(1, maxCol + 1),
+    cellStyles: cell_styles,
+    columnCells: column_cells,
+    sharedFormulas: shared_formulas,
+    rowCount: Math.max(0, max_row + 1),
+    columnCount: Math.max(1, max_col + 1),
     columns,
-    rowMeta: shownRowMeta,
+    rowMeta: shown_row_meta,
     merges,
-    rowGroups,
-    ...(Number.isInteger(frozenRows) && frozenRows > 0 ? { frozenRows } : {}),
-    ...(Number.isInteger(frozenCols) && frozenCols > 0 ? { frozenCols } : {}),
-    ...(tabColor ? { tabColor } : {}),
+    rowGroups: row_groups,
+    ...(Number.isInteger(frozen_rows) && frozen_rows > 0 ? { frozenRows: frozen_rows } : {}),
+    ...(Number.isInteger(frozen_cols) && frozen_cols > 0 ? { frozenCols: frozen_cols } : {}),
+    ...(tab_color ? { tabColor: tab_color } : {}),
     validations,
-    conditionalFormats,
-    ...(sortState ? { sortState } : {}),
-    ...(autoFilter ? { autoFilter } : {}),
+    conditionalFormats: conditional_formats,
+    ...(sort_state ? { sortState: sort_state } : {}),
+    ...(auto_filter ? { autoFilter: auto_filter } : {}),
     notes: comments.comments,
     hyperlinks,
-    hasUnsupportedValidation: Boolean(validationCollection && validations.length === 0),
+    hasUnsupportedValidation: Boolean(validation_collection && validations.length === 0),
     tables,
     hasConditionalFormatting: root.children.some(
       (child) => xmlLocalName(child.name) === "conditionalFormatting",
     ),
-    hasRowOutlines: outlineLevels.size > 0,
+    hasRowOutlines: outline_levels.size > 0,
     hasProtection: Boolean(xmlChild(root, "sheetProtection")),
-    hasValidationCollection: Boolean(validationCollection),
+    hasValidationCollection: Boolean(validation_collection),
     hasComments: comments.present,
-    hasHyperlinks: hyperlinkCollection !== undefined,
-    hasConditionalFormatExtensions,
+    hasHyperlinks: hyperlink_collection !== undefined,
+    hasConditionalFormatExtensions: has_conditional_format_extensions,
   };
 }

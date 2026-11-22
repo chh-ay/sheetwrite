@@ -30,12 +30,12 @@ const FIXTURE_KINDS = new Set(["original-test", "independent-xlsx", "spec-xlsx",
 const ID = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
-function usableText(value: string): boolean {
+function usable_text(value: string): boolean {
   return value.trim().length > 0;
 }
 
-function repoPath(path: string): boolean {
-  return usableText(path) && !path.startsWith("/") && !path.includes("..") && !path.includes("\\");
+function repo_path(path: string): boolean {
+  return usable_text(path) && !path.startsWith("/") && !path.includes("..") && !path.includes("\\");
 }
 
 export function collectCompatibilityIssues(
@@ -46,25 +46,25 @@ export function collectCompatibilityIssues(
   if (records.length === 0) issues.push("compatibility inventory is empty");
   if (fixtures.length === 0) issues.push("compatibility fixture inventory is empty");
 
-  const fixtureIds = new Set<string>();
+  const fixture_ids = new Set<string>();
   for (const fixture of fixtures) {
     if (!ID.test(fixture.id)) issues.push(`invalid compatibility fixture id: ${fixture.id}`);
-    if (fixtureIds.has(fixture.id))
+    if (fixture_ids.has(fixture.id))
       issues.push(`duplicate compatibility fixture id: ${fixture.id}`);
-    fixtureIds.add(fixture.id);
+    fixture_ids.add(fixture.id);
     if (!FIXTURE_KINDS.has(fixture.kind)) {
       issues.push(`invalid compatibility fixture kind: ${fixture.id}=${fixture.kind}`);
     }
-    if (!repoPath(fixture.path)) issues.push(`invalid compatibility fixture path: ${fixture.id}`);
+    if (!repo_path(fixture.path)) issues.push(`invalid compatibility fixture path: ${fixture.id}`);
     if (
-      !usableText(fixture.producer) ||
-      !usableText(fixture.producerVersion) ||
-      !usableText(fixture.license) ||
-      !usableText(fixture.provenance)
+      !usable_text(fixture.producer) ||
+      !usable_text(fixture.producerVersion) ||
+      !usable_text(fixture.license) ||
+      !usable_text(fixture.provenance)
     ) {
       issues.push(`incomplete compatibility fixture provenance: ${fixture.id}`);
     }
-    if (fixture.expected.length === 0 || fixture.expected.some((entry) => !usableText(entry))) {
+    if (fixture.expected.length === 0 || fixture.expected.some((entry) => !usable_text(entry))) {
       issues.push(`compatibility fixture has no expected normalized state: ${fixture.id}`);
     }
     if (
@@ -75,12 +75,12 @@ export function collectCompatibilityIssues(
     }
   }
 
-  const recordIds = new Set<string>();
-  const usedFixtures = new Set<string>();
+  const record_ids = new Set<string>();
+  const used_fixtures = new Set<string>();
   for (const record of records) {
     if (!ID.test(record.id)) issues.push(`invalid compatibility record id: ${record.id}`);
-    if (recordIds.has(record.id)) issues.push(`duplicate compatibility record id: ${record.id}`);
-    recordIds.add(record.id);
+    if (record_ids.has(record.id)) issues.push(`duplicate compatibility record id: ${record.id}`);
+    record_ids.add(record.id);
     if (!AREAS.has(record.area))
       issues.push(`invalid compatibility area: ${record.id}=${record.area}`);
     if (!DIALECTS.has(record.dialect)) {
@@ -101,12 +101,12 @@ export function collectCompatibilityIssues(
       }
     }
     if (
-      !usableText(record.label) ||
-      !usableText(record.semantics) ||
-      !usableText(record.divergence) ||
-      !usableText(record.source) ||
-      !usableText(record.importBehavior) ||
-      !usableText(record.exportBehavior)
+      !usable_text(record.label) ||
+      !usable_text(record.semantics) ||
+      !usable_text(record.divergence) ||
+      !usable_text(record.source) ||
+      !usable_text(record.importBehavior) ||
+      !usable_text(record.exportBehavior)
     ) {
       issues.push(`incomplete compatibility record boundary: ${record.id}`);
     }
@@ -114,15 +114,16 @@ export function collectCompatibilityIssues(
       issues.push(`compatibility record has no executable evidence: ${record.id}`);
     }
     for (const path of record.evidence) {
-      if (!repoPath(path)) issues.push(`invalid compatibility evidence path: ${record.id}=${path}`);
+      if (!repo_path(path))
+        issues.push(`invalid compatibility evidence path: ${record.id}=${path}`);
     }
     if (record.fixtureIds.length === 0) {
       issues.push(`compatibility record has no fixture ids: ${record.id}`);
     }
-    for (const fixtureId of record.fixtureIds) {
-      usedFixtures.add(fixtureId);
-      if (!fixtureIds.has(fixtureId)) {
-        issues.push(`unknown compatibility fixture: ${record.id}=${fixtureId}`);
+    for (const fixture_id of record.fixtureIds) {
+      used_fixtures.add(fixture_id);
+      if (!fixture_ids.has(fixture_id)) {
+        issues.push(`unknown compatibility fixture: ${record.id}=${fixture_id}`);
       }
     }
     if (record.resultMode === "warning" && !record.warningCode) {
@@ -134,7 +135,7 @@ export function collectCompatibilityIssues(
   }
 
   for (const fixture of fixtures) {
-    if (!usedFixtures.has(fixture.id))
+    if (!used_fixtures.has(fixture.id))
       issues.push(`unreferenced compatibility fixture: ${fixture.id}`);
   }
   return issues;

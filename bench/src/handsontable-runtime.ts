@@ -19,11 +19,11 @@ export function createHandsontable(
   requiredMethods: readonly string[] = DEFAULT_REQUIRED_METHODS,
 ): HotInstance {
   const namespace: unknown = HandsontableModule;
-  const namespaceRecord =
+  const namespace_record =
     namespace !== null && typeof namespace === "object"
       ? (namespace as Record<string, unknown>)
       : undefined;
-  const candidate = namespaceRecord?.default ?? namespace;
+  const candidate = namespace_record?.default ?? namespace;
   if (typeof candidate !== "function") {
     throw new TypeError("Handsontable public export is not constructable");
   }

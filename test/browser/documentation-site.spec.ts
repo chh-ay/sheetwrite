@@ -40,17 +40,19 @@ test("an old heading link is forwarded, and a long outline keeps the entry being
     { heading: id, line: READING_LINE_PX },
   );
   await expect(last).toHaveAttribute("aria-current", "location");
-  const [railBox, lastBox] = await Promise.all([rail.boundingBox(), last.boundingBox()]);
-  expect(lastBox && railBox && lastBox.y + lastBox.height <= railBox.y + railBox.height).toBe(true);
+  const [rail_box, last_box] = await Promise.all([rail.boundingBox(), last.boundingBox()]);
+  expect(last_box && rail_box && last_box.y + last_box.height <= rail_box.y + rail_box.height).toBe(
+    true,
+  );
   await expect(rail).toHaveAttribute("data-more", "start");
 });
 
 test("the landing loads no grid runtime, matches its files, and its story reel holds for the reader", async ({
   page,
 }) => {
-  const wasmRequests: string[] = [];
+  const wasm_requests: string[] = [];
   page.on("request", (request) => {
-    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasm_requests.push(request.url());
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const response = await page.goto("/");
@@ -60,16 +62,16 @@ test("the landing loads no grid runtime, matches its files, and its story reel h
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
   await expect(page.getByTestId("landing-product-story")).toBeVisible();
-  expect(wasmRequests).toEqual([]);
+  expect(wasm_requests).toEqual([]);
   await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
   await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
-  const socialImageDimensions = await page.evaluate(async () => {
+  const social_image_dimensions = await page.evaluate(async () => {
     const image = new Image();
     image.src = "/og-sheetwrite.webp";
     await image.decode();
     return { width: image.naturalWidth, height: image.naturalHeight };
   });
-  expect(socialImageDimensions).toEqual({ width: 1200, height: 630 });
+  expect(social_image_dimensions).toEqual({ width: 1200, height: 630 });
   const graph: Array<Record<string, unknown>> = (
     await page
       .locator('script[type="application/ld+json"]')
@@ -98,15 +100,15 @@ test("the landing loads no grid runtime, matches its files, and its story reel h
   const pause = reel.getByRole("button", { name: "Pause stories" });
   await pause.click();
   await expect(pause).toHaveAttribute("aria-pressed", "true");
-  await blurFocus(page);
+  await blur_focus(page);
   await expect(timer).toHaveCount(0);
   await pause.click();
-  await blurFocus(page);
+  await blur_focus(page);
   await expect(pause).toHaveAttribute("aria-pressed", "false");
   await expect(timer).toHaveCount(1);
 });
 
-async function blurFocus(page: Page): Promise<void> {
+async function blur_focus(page: Page): Promise<void> {
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
@@ -174,15 +176,15 @@ test("a guide has one heading, a canonical URL and its section icon; sidebar ico
   const eyebrow = page.locator(".sw-document__eyebrow");
   await expect(eyebrow).toHaveText("Getting started");
   // The same glyph as the section's row in the sidebar (the phone menu holds a copy).
-  const sidebarGlyph = await page
+  const sidebar_glyph = await page
     .locator('.sw-sidebar__nav a[href="/docs/start/"] > .sw-icon use')
     .first()
     .getAttribute("href");
-  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebarGlyph ?? "");
-  expect(await misplacedIcons(page)).toEqual([]);
+  await expect(eyebrow.locator(".sw-icon use")).toHaveAttribute("href", sidebar_glyph ?? "");
+  expect(await misplaced_icons(page)).toEqual([]);
   // This section's sidebar holds a label that wraps; its icon stays on the first line.
   await page.goto("/docs/concepts/");
-  expect(await misplacedIcons(page, { wraps: true })).toEqual([]);
+  expect(await misplaced_icons(page, { wraps: true })).toEqual([]);
 
   // A tab's landing page has no eyebrow, so no icon stands alone above its title.
   await page.goto("/docs/");
@@ -194,7 +196,7 @@ test("a guide has one heading, a canonical URL and its section icon; sidebar ico
 const ICON_CENTRE_TOLERANCE_PX = 1;
 
 /** Eyebrow and visible sidebar labels whose icon is off their first line's centre. */
-async function misplacedIcons(page: Page, { wraps = false } = {}): Promise<string[]> {
+async function misplaced_icons(page: Page, { wraps = false } = {}): Promise<string[]> {
   const rows = await page
     .locator(".sw-document__eyebrow, .sw-sidebar__nav a:has(> .sw-icon)")
     .evaluateAll((labels) =>
@@ -235,7 +237,7 @@ test("a code-name title wraps between its words, never inside one", async ({ pag
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/docs/${route}`);
     // Each run of the title's text between break points sits on one line.
-    const splitRuns = await page
+    const split_runs = await page
       .locator("main h1 > span")
       .first()
       .evaluate((title) =>
@@ -250,7 +252,7 @@ test("a code-name title wraps between its words, never inside one", async ({ pag
           })
           .map((node) => node.textContent),
       );
-    expect(splitRuns, `${route} at ${width} px`).toEqual([]);
+    expect(split_runs, `${route} at ${width} px`).toEqual([]);
   }
 });
 
@@ -265,13 +267,13 @@ test("generated API pages filter their outline and show member signatures", asyn
   const filter = page.getByRole("searchbox", { name: "Filter exported symbols" });
   await filter.fill("createGrid");
   await expect(classes).toHaveCount(0);
-  const hiddenTargets = await outline.locator("a").evaluateAll((links) =>
+  const hidden_targets = await outline.locator("a").evaluateAll((links) =>
     links.filter((link) => {
       const target = document.getElementById(link.getAttribute("href")?.slice(1) ?? "");
       return target === null || target.hidden;
     }),
   );
-  expect(hiddenTargets).toHaveLength(0);
+  expect(hidden_targets).toHaveLength(0);
   await filter.fill("");
 
   await page.locator('a[href="/docs/api/core/grid/"]').first().click();
@@ -311,7 +313,7 @@ test("generated API pages filter their outline and show member signatures", asyn
 /** The first Pagefind query loads the index; a cold load can take a while in CI. */
 const SEARCH_TIMEOUT_MS = 15_000;
 
-async function openSearch(page: Page, { hydrated = true } = {}) {
+async function open_search(page: Page, { hydrated = true } = {}) {
   // A concrete page: opening search mid /docs/ redirect re-render is racy.
   await page.goto("/docs/start/installation/");
   if (hydrated) await waitForHydration(page);
@@ -327,7 +329,7 @@ test("documentation search over the real index: typed early, ranked, keyboard dr
   page,
 }) => {
   // No wait for hydration: a reader types as soon as the dialog opens.
-  const { dialog } = await openSearch(page, { hydrated: false });
+  const { dialog } = await open_search(page, { hydrated: false });
   await page.keyboard.type("XLOOKUP");
   const field = page.getByRole("combobox", { name: "Search documentation" });
   const results = dialog.getByRole("listbox", { name: "Search results" }).getByRole("option");
@@ -407,20 +409,20 @@ test.describe(() => {
     expect((await request.get("/docs/proof/")).status()).toBe(404);
 
     const unbuilt = "Search becomes available after the static index is built.";
-    for (const missingIndex of [false, true]) {
+    for (const missing_index of [false, true]) {
       await page.unrouteAll();
       await page.route("**/pagefind/**", async (route) => {
         const pathname = new URL(route.request().url()).pathname;
-        if (missingIndex || pathname.endsWith(".pf_meta")) {
-          await route.fulfill({ status: missingIndex ? 404 : 503, body: "Unavailable" });
+        if (missing_index || pathname.endsWith(".pf_meta")) {
+          await route.fulfill({ status: missing_index ? 404 : 503, body: "Unavailable" });
         } else {
           await route.continue();
         }
       });
-      const { dialog, input } = await openSearch(page);
+      const { dialog, input } = await open_search(page);
       await input.fill("applyTransaction");
       const error = dialog.locator("[data-action-error]");
-      if (missingIndex) {
+      if (missing_index) {
         await expect(dialog).toContainText(unbuilt);
         await expect(error).toBeHidden();
       } else {

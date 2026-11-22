@@ -48,7 +48,7 @@ function run(command: readonly string[], cwd: string): string {
 }
 
 /** A clean checkout, at the commit its stamp names; results are outputs and may differ. */
-function cleanCommit(checkout: string): string {
+function clean_commit(checkout: string): string {
   const dirty = run(
     ["git", "status", "--porcelain", "--untracked-files=no", "--", ":!bench/results"],
     checkout,
@@ -79,7 +79,7 @@ function capture(
  * The CPUs this process may run on, as Linux lists them ("0-19"); other
  * systems schedule on every CPU.
  */
-async function cpuAffinity(): Promise<string> {
+async function cpu_affinity(): Promise<string> {
   if (platform() !== "linux") return `0-${cpus().length - 1}`;
   const status = await readFile("/proc/self/status", "utf8");
   const allowed = /^Cpus_allowed_list:\s*(\S+)$/mu.exec(status)?.[1];
@@ -88,7 +88,7 @@ async function cpuAffinity(): Promise<string> {
 }
 
 /** The platform power profile and CPU energy preference, where Linux reports them. */
-async function powerProfile(): Promise<string> {
+async function power_profile(): Promise<string> {
   if (platform() !== "linux") return "not reported";
   const read = async (path: string): Promise<string | undefined> => {
     const file = Bun.file(path);
@@ -103,49 +103,49 @@ async function powerProfile(): Promise<string> {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const baseVersion = requiredOption(args, "--base");
-  const baseCheckout = resolve(requiredOption(args, "--base-checkout"));
-  const candidateCheckout = resolve(requiredOption(args, "--candidate-checkout"));
-  const baseCommit = cleanCommit(baseCheckout);
-  const tagCommit = run(["git", "rev-parse", `v${baseVersion}^{commit}`], baseCheckout);
-  if (baseCommit !== tagCommit) {
+  const base_version = requiredOption(args, "--base");
+  const base_checkout = resolve(requiredOption(args, "--base-checkout"));
+  const candidate_checkout = resolve(requiredOption(args, "--candidate-checkout"));
+  const base_commit = clean_commit(base_checkout);
+  const tag_commit = run(["git", "rev-parse", `v${base_version}^{commit}`], base_checkout);
+  if (base_commit !== tag_commit) {
     throw new Error(
-      `${baseCheckout} is at ${baseCommit}, not the v${baseVersion} commit ${tagCommit}`,
+      `${base_checkout} is at ${base_commit}, not the v${base_version} commit ${tag_commit}`,
     );
   }
-  const candidateCommit = cleanCommit(candidateCheckout);
-  const outputDir = resolve(
+  const candidate_commit = clean_commit(candidate_checkout);
+  const output_dir = resolve(
     BENCH_ROOT,
     optionValue(args, "--output-dir") ?? `results/engine-comparison/${platform()}`,
   );
 
-  const affinity = await cpuAffinity();
-  const everyCpu = `0-${cpus().length - 1}`;
-  if (affinity !== everyCpu) {
+  const affinity = await cpu_affinity();
+  const every_cpu = `0-${cpus().length - 1}`;
+  if (affinity !== every_cpu) {
     throw new Error(
-      `this process may run only on CPUs ${affinity}; a formula capture needs every CPU (${everyCpu}), so background compilation does not share the measured core`,
+      `this process may run only on CPUs ${affinity}; a formula capture needs every CPU (${every_cpu}), so background compilation does not share the measured core`,
     );
   }
 
-  const startedAt = new Date().toISOString();
-  capture("base", candidateCheckout, {
-    SHEETWRITE_BENCH_ENGINE_ROOT: baseCheckout,
-    SHEETWRITE_BENCH_BASELINE_VERSION: baseVersion,
+  const started_at = new Date().toISOString();
+  capture("base", candidate_checkout, {
+    SHEETWRITE_BENCH_ENGINE_ROOT: base_checkout,
+    SHEETWRITE_BENCH_BASELINE_VERSION: base_version,
   });
-  capture("candidate", candidateCheckout, {});
-  capture("control", baseCheckout, {});
-  const finishedAt = new Date().toISOString();
+  capture("candidate", candidate_checkout, {});
+  capture("control", base_checkout, {});
+  const finished_at = new Date().toISOString();
 
-  await mkdir(outputDir, { recursive: true });
+  await mkdir(output_dir, { recursive: true });
   for (const [side, artifact] of Object.entries(ENGINE_COMPARISON_ARTIFACTS)) {
-    const checkout = side === "control" ? baseCheckout : candidateCheckout;
-    await copyFile(resolve(checkout, "bench/results", artifact), resolve(outputDir, artifact));
+    const checkout = side === "control" ? base_checkout : candidate_checkout;
+    await copyFile(resolve(checkout, "bench/results", artifact), resolve(output_dir, artifact));
   }
   const processors = cpus();
   const manifest = {
     protocol: ENGINE_COMPARISON_PROTOCOL,
-    base: { version: baseVersion, commit: baseCommit },
-    candidate: { commit: candidateCommit },
+    base: { version: base_version, commit: base_commit },
+    candidate: { commit: candidate_commit },
     order: ["base", "candidate", "control"],
     machine: {
       os: `${platform()} ${kernelRelease()}`,
@@ -153,17 +153,17 @@ async function main(): Promise<void> {
       cpu: processors[0]?.model ?? "unknown",
       logicalCores: processors.length,
       cpuAffinity: affinity,
-      powerProfile: await powerProfile(),
+      powerProfile: await power_profile(),
       memoryBytes: totalmem(),
       bun: Bun.version,
     },
-    startedAt,
-    finishedAt,
-    command: `bun src/engine-comparison.ts --base ${baseVersion} --base-checkout <clean checkout of v${baseVersion}, packages built> --candidate-checkout <clean checkout of the candidate, packages built>`,
+    startedAt: started_at,
+    finishedAt: finished_at,
+    command: `bun src/engine-comparison.ts --base ${base_version} --base-checkout <clean checkout of v${base_version}, packages built> --candidate-checkout <clean checkout of the candidate, packages built>`,
     artifacts: ENGINE_COMPARISON_ARTIFACTS,
   };
-  await writeFile(resolve(outputDir, "capture.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  process.stderr.write(`\nwrote both captures and capture.json to ${outputDir}\n`);
+  await writeFile(resolve(output_dir, "capture.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  process.stderr.write(`\nwrote both captures and capture.json to ${output_dir}\n`);
 }
 
 if (import.meta.main) await main();

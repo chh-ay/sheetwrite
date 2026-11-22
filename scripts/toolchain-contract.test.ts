@@ -15,26 +15,26 @@ import {
 } from "./workspace-tooling.js";
 
 const root = resolve(import.meta.dir, "..");
-const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
+const package_manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
   readonly engines?: Readonly<Record<string, string>>;
 };
-const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
+const rust_toolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
-const workflowEnv = parseWorkflowContract(workflow, "CI workflow").env ?? {};
-const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
-const sizeReport = JSON.parse(readFileSync(resolve(root, "scripts/size-report.json"), "utf8")) as {
+const workflow_env = parseWorkflowContract(workflow, "CI workflow").env ?? {};
+const node_version = readFileSync(resolve(root, ".node-version"), "utf8").trim();
+const size_report = JSON.parse(readFileSync(resolve(root, "scripts/size-report.json"), "utf8")) as {
   readonly toolchain?: Readonly<Record<string, string>>;
 };
 
 describe("contributor and CI toolchain contract", () => {
   it("pins Node and npm as exact release inputs", () => {
-    expect(nodeVersion).toBe(NODE_VERSION);
+    expect(node_version).toBe(NODE_VERSION);
     // Consumer engines and the exact CI/dev runtime are separate contracts.
-    expect(packageManifest.engines?.node).toBe("24.22.1");
-    expect(workflowEnv.NODE_VERSION).toBe(NODE_VERSION);
-    expect(workflowEnv.NPM_VERSION).toBe(NPM_VERSION);
-    expect(sizeReport.toolchain?.node).toBe(NODE_VERSION);
-    expect(sizeReport.toolchain?.npm).toBe(NPM_VERSION);
+    expect(package_manifest.engines?.node).toBe("24.22.1");
+    expect(workflow_env.NODE_VERSION).toBe(NODE_VERSION);
+    expect(workflow_env.NPM_VERSION).toBe(NPM_VERSION);
+    expect(size_report.toolchain?.node).toBe(NODE_VERSION);
+    expect(size_report.toolchain?.npm).toBe(NPM_VERSION);
   });
 
   it("rejects the invalid Brotli block switch from CVE-2026-111497", () => {
@@ -46,10 +46,10 @@ describe("contributor and CI toolchain contract", () => {
   });
 
   it("pins Rust, its WASM target, wasm-pack, cargo-audit, and coverage tooling", () => {
-    expect(rustToolchain).toContain(`channel = "${RUST_VERSION}"`);
-    expect(rustToolchain).toContain('components = ["clippy", "rustfmt", "llvm-tools-preview"]');
-    expect(rustToolchain).toContain(`targets = ["${WASM_TARGET}"]`);
-    expect(workflowEnv).toMatchObject({
+    expect(rust_toolchain).toContain(`channel = "${RUST_VERSION}"`);
+    expect(rust_toolchain).toContain('components = ["clippy", "rustfmt", "llvm-tools-preview"]');
+    expect(rust_toolchain).toContain(`targets = ["${WASM_TARGET}"]`);
+    expect(workflow_env).toMatchObject({
       RUST_VERSION,
       WASM_TARGET,
       WASM_PACK_VERSION,
@@ -62,15 +62,15 @@ describe("contributor and CI toolchain contract", () => {
 
   it("versions the engine crate with the npm engine packages", () => {
     // Changesets edits only package.json; changeset:version copies the version into the crate.
-    const versionOf = (name: string): string =>
+    const version_of = (name: string): string =>
       (
         JSON.parse(readFileSync(resolve(root, `packages/${name}/package.json`), "utf8")) as {
           version: string;
         }
       ).version;
-    const crateEntry = `name = "sheetwrite-wasm"\nversion = "${versionOf("wasm")}"`;
-    expect(versionOf("formulas")).toBe(versionOf("wasm"));
-    expect(readFileSync(resolve(root, "packages/wasm/Cargo.toml"), "utf8")).toContain(crateEntry);
-    expect(readFileSync(resolve(root, "packages/wasm/Cargo.lock"), "utf8")).toContain(crateEntry);
+    const crate_entry = `name = "sheetwrite-wasm"\nversion = "${version_of("wasm")}"`;
+    expect(version_of("formulas")).toBe(version_of("wasm"));
+    expect(readFileSync(resolve(root, "packages/wasm/Cargo.toml"), "utf8")).toContain(crate_entry);
+    expect(readFileSync(resolve(root, "packages/wasm/Cargo.lock"), "utf8")).toContain(crate_entry);
   });
 });

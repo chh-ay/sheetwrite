@@ -14,12 +14,21 @@ import type { CellInputSnapshot, Grid } from "../types/grid.js";
  */
 export function commitCellInput(grid: Grid, snapshot: CellInputSnapshot, raw: string): void {
   const style = grid.store.getCell(snapshot.address).style;
-  const { value, numberFormat } = parseCellEntry(raw, snapshot.format, style.numberFormat);
+  const { value, numberFormat: number_format } = parseCellEntry(
+    raw,
+    snapshot.format,
+    style.numberFormat,
+  );
   const general = style.numberFormat === undefined || style.numberFormat === "General";
   grid.applyTransaction({
     patches: [
-      numberFormat !== undefined && general
-        ? { op: "set", addr: snapshot.address, value, style: { ...style, numberFormat } }
+      number_format !== undefined && general
+        ? {
+            op: "set",
+            addr: snapshot.address,
+            value,
+            style: { ...style, numberFormat: number_format },
+          }
         : { op: "set", addr: snapshot.address, value },
     ],
   });

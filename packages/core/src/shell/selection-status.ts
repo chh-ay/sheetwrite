@@ -66,13 +66,13 @@ const NO_TOTALS: Totals = { average: "", count: "", sum: "" };
  * Sum show in the active cell's number format, as Excel's status bar does
  * (General when it has none); Count is a plain count.
  */
-function describeSummary(summary: SelectionSummary | null, numberFormat?: string): Totals {
+function describe_summary(summary: SelectionSummary | null, number_format?: string): Totals {
   if (summary === null || summary.count < 2) return NO_TOTALS;
   return {
     average:
-      summary.average === null ? "" : `Average: ${formatNumber(summary.average, numberFormat)}`,
+      summary.average === null ? "" : `Average: ${formatNumber(summary.average, number_format)}`,
     count: `Count: ${summary.count}`,
-    sum: summary.numericCount > 0 ? `Sum: ${formatNumber(summary.sum, numberFormat)}` : "",
+    sum: summary.numericCount > 0 ? `Sum: ${formatNumber(summary.sum, number_format)}` : "",
   };
 }
 
@@ -80,20 +80,20 @@ function describeSummary(summary: SelectionSummary | null, numberFormat?: string
 const STATUS_SEPARATOR = " · ";
 
 /** `B2:D9`, or `C5` for one cell, with the sheet's row numbers. */
-function rangeA1({ start, end }: Range): string {
+function range_a1({ start, end }: Range): string {
   const first = `${colToA1(start.col)}${start.row + 1}`;
   const last = `${colToA1(end.col)}${end.row + 1}`;
   return first === last ? first : `${first}:${last}`;
 }
 
 /** "Undo: Paste in B2:D9", or "Redo: Insert Rows" for a step that changed no cells. */
-function describeHistoryStep({ direction, step, range }: GridEvents["history-step"]): string {
-  const place = range ? ` in ${rangeA1(range)}` : "";
+function describe_history_step({ direction, step, range }: GridEvents["history-step"]): string {
+  const place = range ? ` in ${range_a1(range)}` : "";
   return `${direction === "undo" ? "Undo" : "Redo"}: ${step}${place}`;
 }
 
 /** Whether `patch` turns the AutoFilter of `sheet` on or off, or changes its filters. */
-function changesFilter(patch: DocumentOp, sheet: string): boolean {
+function changes_filter(patch: DocumentOp, sheet: string): boolean {
   return (
     patch.op === "setSheetMeta" &&
     patch.sheet === sheet &&
@@ -106,12 +106,12 @@ function changesFilter(patch: DocumentOp, sheet: string): boolean {
  * active sheet's AutoFilter its filters keep. Empty without an AutoFilter or
  * a filter.
  */
-function describeRecords(grid: Grid): string {
-  const autoFilter = grid.getAutoFilter();
+function describe_records(grid: Grid): string {
+  const auto_filter = grid.getAutoFilter();
   const filters = grid.getColumnFilters();
   const engine = storeEngine(grid.store);
-  if (!autoFilter || filters.size === 0 || !engine) return "";
-  const body = autoFilterBody(autoFilter);
+  if (!auto_filter || filters.size === 0 || !engine) return "";
+  const body = autoFilterBody(auto_filter);
   let found = 0;
   for (const row of engine.filteredRows(grid.getActiveSheet(), filters)) {
     if (row >= body.start && row <= body.end) found++;
@@ -154,14 +154,21 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     parts.append(element);
     return element;
   };
-  const historyPart = part();
-  const recordsPart = part();
-  const averagePart = part();
-  const countPart = part();
-  const sumPart = part();
-  const geometryPart = part();
+  const history_part = part();
+  const records_part = part();
+  const average_part = part();
+  const count_part = part();
+  const sum_part = part();
+  const geometry_part = part();
   // Sum, the total people read most, stays longest.
-  const dropOrder = [geometryPart, recordsPart, historyPart, countPart, averagePart, sumPart];
+  const drop_order = [
+    geometry_part,
+    records_part,
+    history_part,
+    count_part,
+    average_part,
+    sum_part,
+  ];
   const text = document.createElement("span");
   text.className = "sheetwrite-shell-status-text";
   output.append(mode, parts, text);
@@ -170,33 +177,33 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   let geometry = "";
   let totals = NO_TOTALS;
   // The last undo or redo, shown until the selection changes again.
-  let historyStep = "";
+  let history_step = "";
   const lifetime = new Scope();
   const summaries = new ScopeSlot(lifetime);
 
   // Show every part, then drop parts until the rest fit. It reads layout, so it
   // runs once a frame at most, after a change of text or of the host's size.
-  let fitFrame = 0;
+  let fit_frame = 0;
   const fit = (): void => {
-    fitFrame = 0;
+    fit_frame = 0;
     // The line may narrow to its cell mode and no further, so the tab strip
     // beside it narrows and scrolls before the mode is cut.
-    const modeRight = mode.getBoundingClientRect().right;
-    output.style.minWidth = `${Math.ceil(modeRight - output.getBoundingClientRect().left)}px`;
-    for (const element of dropOrder) element.classList.remove("sheetwrite-shell-status-dropped");
-    for (const element of dropOrder) {
+    const mode_right = mode.getBoundingClientRect().right;
+    output.style.minWidth = `${Math.ceil(mode_right - output.getBoundingClientRect().left)}px`;
+    for (const element of drop_order) element.classList.remove("sheetwrite-shell-status-dropped");
+    for (const element of drop_order) {
       if (parts.scrollWidth <= parts.clientWidth) break;
       if (!element.hidden) element.classList.add("sheetwrite-shell-status-dropped");
     }
   };
-  const scheduleFit = (): void => {
-    if (fitFrame === 0) fitFrame = requestAnimationFrame(fit);
+  const schedule_fit = (): void => {
+    if (fit_frame === 0) fit_frame = requestAnimationFrame(fit);
   };
   lifetime.add(() => {
-    if (fitFrame !== 0) cancelAnimationFrame(fitFrame);
+    if (fit_frame !== 0) cancelAnimationFrame(fit_frame);
   });
   if (typeof ResizeObserver !== "undefined") {
-    const resized = new ResizeObserver(scheduleFit);
+    const resized = new ResizeObserver(schedule_fit);
     resized.observe(host);
     // The line's own width changes too when the parts beside it change, such
     // as the sheet tabs when a sheet is added.
@@ -204,27 +211,27 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     lifetime.add(() => resized.disconnect());
   }
 
-  const showMode = (cellMode: CellMode): void => {
-    mode.textContent = MODE_LABELS[cellMode];
-    scheduleFit();
+  const show_mode = (cell_mode: CellMode): void => {
+    mode.textContent = MODE_LABELS[cell_mode];
+    schedule_fit();
   };
-  const setPart = (element: HTMLSpanElement, value: string): void => {
+  const set_part = (element: HTMLSpanElement, value: string): void => {
     element.textContent = value;
     element.hidden = value === "";
   };
   const show = (): void => {
-    const values = [historyStep, records, totals.average, totals.count, totals.sum, geometry];
-    setPart(historyPart, historyStep);
-    setPart(recordsPart, records);
-    setPart(averagePart, totals.average);
-    setPart(countPart, totals.count);
-    setPart(sumPart, totals.sum);
-    setPart(geometryPart, geometry);
+    const values = [history_step, records, totals.average, totals.count, totals.sum, geometry];
+    set_part(history_part, history_step);
+    set_part(records_part, records);
+    set_part(average_part, totals.average);
+    set_part(count_part, totals.count);
+    set_part(sum_part, totals.sum);
+    set_part(geometry_part, geometry);
     const line = values.filter(Boolean).join(STATUS_SEPARATOR);
     text.textContent = line;
     parts.hidden = line === "";
     text.hidden = line === "";
-    if (line !== "") scheduleFit();
+    if (line !== "") schedule_fit();
   };
 
   // A newer selection or edit makes an unfinished summary stale: the next
@@ -236,7 +243,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
       (summary) => {
         if (run.closed) return;
         run.close();
-        totals = describeSummary(summary, grid.getFocusCellStyle().numberFormat);
+        totals = describe_summary(summary, grid.getFocusCellStyle().numberFormat);
         show();
       },
       (error: unknown) => {
@@ -248,8 +255,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     );
   };
 
-  const onSelection = (selection: Selection | null): void => {
-    historyStep = "";
+  const on_selection = (selection: Selection | null): void => {
+    history_step = "";
     geometry = describeSelection(selection, (row) => grid.sheetRowOf(row));
     show();
     summarize();
@@ -257,18 +264,18 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
 
   // Like Excel, the count shows after the filter changes and goes with the
   // next edit, as edits do not filter again.
-  const onChange = (event: ChangeEvent): void => {
+  const on_change = (event: ChangeEvent): void => {
     const sheet = grid.getActiveSheet();
-    records = event.transaction.patches.some((patch) => changesFilter(patch, sheet))
-      ? describeRecords(grid)
+    records = event.transaction.patches.some((patch) => changes_filter(patch, sheet))
+      ? describe_records(grid)
       : "";
     show();
     summarize();
   };
   host.appendChild(output);
   lifetime.add(() => output.remove());
-  lifetime.add(grid.on("selection", (event) => onSelection(event.selection)));
-  lifetime.add(grid.on("change", onChange));
+  lifetime.add(grid.on("selection", (event) => on_selection(event.selection)));
+  lifetime.add(grid.on("change", on_change));
   lifetime.add(
     grid.on("active-sheet", () => {
       records = "";
@@ -278,13 +285,13 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   // Undo and redo select what they changed first, so the step outlives that selection event.
   lifetime.add(
     grid.on("history-step", (event) => {
-      historyStep = describeHistoryStep(event);
+      history_step = describe_history_step(event);
       show();
     }),
   );
-  lifetime.add(grid.on("cell-mode", (event) => showMode(event.mode)));
-  showMode(grid.getCellMode());
-  onSelection(grid.getSelection());
+  lifetime.add(grid.on("cell-mode", (event) => show_mode(event.mode)));
+  show_mode(grid.getCellMode());
+  on_selection(grid.getSelection());
 
   return {
     element: output,

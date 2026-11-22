@@ -7,15 +7,15 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, DataSourceRequest, GridEvents, Renderer, RowData } from "../src/types.js";
 import { coveredPage, makeWorkbook, mountHost, scrollerOf } from "./fixtures.js";
 
-const originalRaf = globalThis.requestAnimationFrame;
-let restoreStubs: () => void;
+const original_raf = globalThis.requestAnimationFrame;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 
   // Make scheduled renders run synchronously so a resize's repaint is observable
   // without racing a real animation-frame timer.
@@ -26,14 +26,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
+  restore_stubs();
+  globalThis.requestAnimationFrame = original_raf;
 });
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
 
 /** A 1,000-row paged sheet of one column with a frozen row and a 64-byte clean cache. */
-function mountPagedNameColumn() {
+function mount_paged_name_column() {
   const workbook = makeWorkbook(1_000);
   const sheet = workbook.sheets[0];
   if (!sheet) throw new Error("expected fixture sheet");
@@ -50,7 +50,7 @@ function mountPagedNameColumn() {
   return { host, grid, store };
 }
 
-function requestColumnIndices(request: DataSourceRequest): number[] {
+function request_column_indices(request: DataSourceRequest): number[] {
   const indices: number[] = [];
   for (const band of request.columns) {
     for (let column = band.start; column < band.end; column++) indices.push(column);
@@ -59,7 +59,7 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
 }
 
 /** A renderer that records the values of each paint. */
-function makePaintRecorder(): Renderer & { readonly paints: CellScalar[][] } {
+function make_paint_recorder(): Renderer & { readonly paints: CellScalar[][] } {
   const paints: CellScalar[][] = [];
   return {
     paints,
@@ -78,7 +78,7 @@ function makePaintRecorder(): Renderer & { readonly paints: CellScalar[][] } {
 describe("paged formula closures and residency", () => {
   it.each(["frozen", "merge"] as const)(
     "loads the formula closure of a visible %s anchor",
-    async (rootKind) => {
+    async (root_kind) => {
       const workbook = makeWorkbook(1_000);
       const sheet = workbook.sheets[0];
       if (!sheet) throw new Error("expected fixture sheet");
@@ -88,9 +88,9 @@ describe("paged formula closures and residency", () => {
         width: 100,
         type: "number" as const,
       }));
-      const rootRow = rootKind === "frozen" ? 0 : 50;
-      if (rootKind === "frozen") sheet.frozenRows = 1;
-      else sheet.merges = [{ r0: rootRow, c0: 0, r1: 220, c1: 0 }];
+      const root_row = root_kind === "frozen" ? 0 : 50;
+      if (root_kind === "frozen") sheet.frozenRows = 1;
+      else sheet.merges = [{ r0: root_row, c0: 0, r1: 220, c1: 0 }];
       const requests: DataSourceRequest[] = [];
       const host = mountHost();
       const grid = createGrid(host, {
@@ -108,7 +108,7 @@ describe("paged formula closures and residency", () => {
                 const values: RowData = {};
                 for (let column = 0; column < 20; column++) {
                   values[`c${column}`] =
-                    row === rootRow && column === 0
+                    row === root_row && column === 0
                       ? { kind: "formula", src: "=T901+1" }
                       : row === 900 && column === 19
                         ? 41
@@ -126,7 +126,7 @@ describe("paged formula closures and residency", () => {
         // Only the off-screen dependency is missing, not the source formula.
         store.loadPage(
           "s1",
-          rootRow,
+          root_row,
           [{ start: 0, end: 1, keys: ["c0"] }],
           [{ c0: { kind: "formula", src: "=T901+1" } }],
         );
@@ -140,10 +140,10 @@ describe("paged formula closures and residency", () => {
             (request) =>
               request.start <= 900 &&
               request.end > 900 &&
-              requestColumnIndices(request).includes(19),
+              request_column_indices(request).includes(19),
           ),
         ).toBe(true);
-        expect(grid.store.getCell({ sheet: "s1", row: rootRow, col: 0 }).resolved).toBe(42);
+        expect(grid.store.getCell({ sheet: "s1", row: root_row, col: 0 }).resolved).toBe(42);
         expect(store.getCellLoadState({ sheet: "s1", row: 900, col: 19 })).toBe("loaded-value");
       } finally {
         grid.destroy();
@@ -152,7 +152,7 @@ describe("paged formula closures and residency", () => {
   );
 
   it("keeps viewport chunks resident across disjoint bulk reads and releases both pin lifetimes", () => {
-    const { host, grid, store } = mountPagedNameColumn();
+    const { host, grid, store } = mount_paged_name_column();
     try {
       const scroller = scrollerOf(host);
       scroller.scrollTop = 100 * DEFAULT_THEME.rowHeight;
@@ -181,7 +181,7 @@ describe("paged formula closures and residency", () => {
     }
   });
   it("retains a visible formula dependency closure under clean-cache pressure", () => {
-    const { grid, store } = mountPagedNameColumn();
+    const { grid, store } = mount_paged_name_column();
     try {
       const columns = [{ start: 0, end: 1, keys: ["name"] }];
       store.loadPage("s1", 0, columns, [{ name: { kind: "formula", src: "=A901+1" } }]);
@@ -200,9 +200,9 @@ describe("paged formula closures and residency", () => {
 
 describe("datasource repaint invalidation", () => {
   it("loads the off-screen cells that visible formulas read", async () => {
-    const columnCount = 20;
+    const column_count = 20;
     const workbook = makeWorkbook(1_000);
-    workbook.sheets[0]!.columns = Array.from({ length: columnCount }, (_, column) => ({
+    workbook.sheets[0]!.columns = Array.from({ length: column_count }, (_, column) => ({
       key: `c${column}`,
       header: `C${column}`,
       width: 100,
@@ -222,7 +222,7 @@ describe("datasource repaint invalidation", () => {
               Array.from({ length: request.end - request.start }, (_, offset) => {
                 const row = request.start + offset;
                 const values: RowData = { c0: row };
-                for (let column = 1; column < columnCount; column++) {
+                for (let column = 1; column < column_count; column++) {
                   values[`c${column}`] = { kind: "formula", src: `=A${row + 1}*2` };
                 }
                 return values;
@@ -231,41 +231,43 @@ describe("datasource repaint invalidation", () => {
           ),
       },
     });
-    const recorder = makePaintRecorder();
+    const recorder = make_paint_recorder();
     Reflect.set(grid, "renderer", recorder);
-    let scrollEvent: GridEvents["scroll"] | undefined;
+    let scroll_event: GridEvents["scroll"] | undefined;
     grid.on("scroll", (event) => {
-      scrollEvent = event;
+      scroll_event = event;
     });
 
     // Scroll right past column A and down past the first loaded rows at once.
-    const scrollTop = 4_000;
+    const scroll_top = 4_000;
     const scroller = scrollerOf(host);
     scroller.scrollLeft = 1_200;
-    scroller.scrollTop = scrollTop;
+    scroller.scrollTop = scroll_top;
     scroller.dispatchEvent(new Event("scroll"));
     // Pages resolve as microtasks and renders run synchronously, so the
     // viewport page, the formula-read page, and their repaints settle here.
     for (let turn = 0; turn < 32; turn++) await Promise.resolve();
 
-    if (!scrollEvent) throw new Error("scroll event was not emitted");
-    const column = scrollEvent.firstVisibleColumn;
+    if (!scroll_event) throw new Error("scroll event was not emitted");
+    const column = scroll_event.firstVisibleColumn;
     if (column === null) throw new Error("no column is visible");
     expect(column).toBeGreaterThan(4);
     // The scroll event includes overscan rows; check the rows on screen.
-    const { rowHeight, headerHeight } = DEFAULT_THEME;
-    const firstOnScreen = Math.floor(scrollTop / rowHeight);
-    const lastOnScreen = Math.floor((scrollTop + host.clientHeight - headerHeight - 1) / rowHeight);
-    const lastPaint = recorder.paints.at(-1) ?? [];
-    for (let row = firstOnScreen; row <= lastOnScreen; row++) {
+    const { rowHeight: row_height, headerHeight: header_height } = DEFAULT_THEME;
+    const first_on_screen = Math.floor(scroll_top / row_height);
+    const last_on_screen = Math.floor(
+      (scroll_top + host.clientHeight - header_height - 1) / row_height,
+    );
+    const last_paint = recorder.paints.at(-1) ?? [];
+    for (let row = first_on_screen; row <= last_on_screen; row++) {
       expect(grid.store.getCell({ sheet: "s1", row, col: column }).resolved).toBe(row * 2);
-      expect(lastPaint).toContain(row * 2);
+      expect(last_paint).toContain(row * 2);
     }
     grid.destroy();
   });
 
   it("hydrates off-screen spill destinations before repainting a paged array", async () => {
-    const spillRows = 400;
+    const spill_rows = 400;
     const workbook = makeWorkbook(1_000);
     const sheet = workbook.sheets[0];
     if (!sheet) throw new Error("workbook fixture has no sheet");
@@ -284,7 +286,7 @@ describe("datasource repaint invalidation", () => {
               Array.from({ length: request.end - request.start }, (_, offset): RowData => ({
                 spill:
                   request.start + offset === 0
-                    ? { kind: "formula", src: `=SEQUENCE(${spillRows})` }
+                    ? { kind: "formula", src: `=SEQUENCE(${spill_rows})` }
                     : { kind: "literal", value: null },
               })),
             ),
@@ -292,17 +294,17 @@ describe("datasource repaint invalidation", () => {
         },
       },
     });
-    const recorder = makePaintRecorder();
+    const recorder = make_paint_recorder();
     Reflect.set(grid, "renderer", recorder);
     try {
       for (let turn = 0; turn < 32; turn++) await Promise.resolve();
-      const firstRequest = requests[0];
-      if (!firstRequest) throw new Error("viewport request was not issued");
-      expect(firstRequest.end).toBeLessThan(spillRows);
-      expect(requests.some((request) => request.end >= spillRows)).toBe(true);
+      const first_request = requests[0];
+      if (!first_request) throw new Error("viewport request was not issued");
+      expect(first_request.end).toBeLessThan(spill_rows);
+      expect(requests.some((request) => request.end >= spill_rows)).toBe(true);
       expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
-      expect(grid.store.getCell({ sheet: "s1", row: spillRows - 1, col: 0 }).resolved).toBe(
-        spillRows,
+      expect(grid.store.getCell({ sheet: "s1", row: spill_rows - 1, col: 0 }).resolved).toBe(
+        spill_rows,
       );
       expect(recorder.paints.at(-1)).toContain(1);
     } finally {
@@ -327,18 +329,18 @@ describe("scroll into view", () => {
   }
 
   /** A 720 × 400 px grid of `layout`, with its edges in zoomed content pixels. */
-  function mountLayout(layout: Layout) {
-    const rowCount = layout.rowCount ?? 200;
-    const workbook = makeWorkbook(rowCount);
+  function mount_layout(layout: Layout) {
+    const row_count = layout.rowCount ?? 200;
+    const workbook = makeWorkbook(row_count);
     const sheet = workbook.sheets[0];
     if (!sheet) throw new Error("expected fixture sheet");
-    const hiddenCols = new Set(layout.hiddenCols);
+    const hidden_cols = new Set(layout.hiddenCols);
     sheet.columns = layout.widths.map((width, col) => ({
       key: `c${col}`,
       header: `C${col}`,
       width,
       type: "text" as const,
-      ...(hiddenCols.has(col) ? { visible: false } : {}),
+      ...(hidden_cols.has(col) ? { visible: false } : {}),
     }));
     sheet.rowHeights = layout.heights;
     sheet.hiddenRows = new Set(layout.hiddenRows);
@@ -356,25 +358,25 @@ describe("scroll into view", () => {
     grid.setTheme({});
     const zoom = layout.zoom ?? 1;
     grid.setZoom(zoom);
-    const columnLefts: number[] = [];
+    const column_lefts: number[] = [];
     let x = 0;
     for (const [col, width] of layout.widths.entries()) {
-      columnLefts.push(x);
-      if (!hiddenCols.has(col)) x += width * zoom;
+      column_lefts.push(x);
+      if (!hidden_cols.has(col)) x += width * zoom;
     }
-    columnLefts.push(x);
+    column_lefts.push(x);
     // View rows skip hidden sheet rows; scrollToCell counts rows in the view.
-    const hiddenRows = new Set(layout.hiddenRows);
-    const rowTops: number[] = [];
+    const hidden_rows = new Set(layout.hiddenRows);
+    const row_tops: number[] = [];
     let y = 0;
-    for (let row = 0; row < rowCount; row++) {
-      if (hiddenRows.has(row)) continue;
-      rowTops.push(y);
+    for (let row = 0; row < row_count; row++) {
+      if (hidden_rows.has(row)) continue;
+      row_tops.push(y);
       y += (layout.heights?.get(row) ?? DEFAULT_THEME.rowHeight) * zoom;
     }
-    rowTops.push(y);
-    const frozenWidth = columnLefts[layout.frozenCols ?? 0] ?? 0;
-    const frozenHeight = rowTops[layout.frozenRows ?? 0] ?? 0;
+    row_tops.push(y);
+    const frozen_width = column_lefts[layout.frozenCols ?? 0] ?? 0;
+    const frozen_height = row_tops[layout.frozenRows ?? 0] ?? 0;
     const sizer = host.querySelector<HTMLElement>(".sheetwrite-sizer");
     if (!sizer) throw new Error("expected grid sizer");
     return {
@@ -386,24 +388,24 @@ describe("scroll into view", () => {
       }),
       /** The scroll that shows column `col` whole with the first body column on its gridline. */
       snappedLeft(col: number): number {
-        const body = VIEW_WIDTH - DEFAULT_THEME.rowHeaderWidth * zoom - frozenWidth;
+        const body = VIEW_WIDTH - DEFAULT_THEME.rowHeaderWidth * zoom - frozen_width;
         return snap(
-          columnLefts.slice(layout.frozenCols ?? 0),
-          columnLefts[col]!,
+          column_lefts.slice(layout.frozenCols ?? 0),
+          column_lefts[col]!,
           layout.widths[col]! * zoom,
           body,
-          frozenWidth,
+          frozen_width,
         );
       },
       /** The scroll that shows view row `row` whole with the first body row on its gridline. */
       snappedTop(row: number): number {
-        const body = VIEW_HEIGHT - DEFAULT_THEME.headerHeight * zoom - frozenHeight;
+        const body = VIEW_HEIGHT - DEFAULT_THEME.headerHeight * zoom - frozen_height;
         return snap(
-          rowTops.slice(layout.frozenRows ?? 0),
-          rowTops[row]!,
-          rowTops[row + 1]! - rowTops[row]!,
+          row_tops.slice(layout.frozenRows ?? 0),
+          row_tops[row]!,
+          row_tops[row + 1]! - row_tops[row]!,
           body,
-          frozenHeight,
+          frozen_height,
         );
       },
     };
@@ -448,7 +450,7 @@ describe("scroll into view", () => {
 
   for (const [name, layout] of LAYOUTS) {
     it(`stops on a column and row boundary going right and down: ${name}`, () => {
-      const view = mountLayout(layout);
+      const view = mount_layout(layout);
       const col = layout.widths.length - 3;
       const row = 120;
       try {
@@ -464,7 +466,7 @@ describe("scroll into view", () => {
   it("leaves room to stop on a boundary at the last column and row", () => {
     // The docs Report sheet's seven columns, 808 px, in a 720 px grid, with
     // the two 100 px empty columns an 800 px host pads a spreadsheet with.
-    const view = mountLayout({
+    const view = mount_layout({
       widths: [96, 112, 104, 104, 96, 88, 208, 100, 100],
       rowCount: 24,
       heights: new Map([

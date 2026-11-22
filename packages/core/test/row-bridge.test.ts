@@ -46,7 +46,7 @@ beforeAll(async () => {
 });
 
 /** A store whose sheet1 has the bridge's name and amount columns. */
-function storeOf(rowCount: number, values?: ColumnarData["columns"]): SheetwriteStore {
+function store_of(row_count: number, values?: ColumnarData["columns"]): SheetwriteStore {
   return new SheetwriteStore(
     {
       activeSheet: "sheet1",
@@ -54,7 +54,7 @@ function storeOf(rowCount: number, values?: ColumnarData["columns"]): Sheetwrite
         {
           id: "sheet1",
           name: "Sheet 1",
-          rowCount,
+          rowCount: row_count,
           columns: [
             { key: "name", header: "Name", width: 100, type: "text" },
             { key: "amount", header: "Amount", width: 100, type: "number" },
@@ -62,18 +62,18 @@ function storeOf(rowCount: number, values?: ColumnarData["columns"]): Sheetwrite
         },
       ],
     },
-    values && { rowCount, columns: values },
+    values && { rowCount: row_count, columns: values },
   );
 }
 
-const duplicateRowId = expect.objectContaining({
+const duplicate_row_id = expect.objectContaining({
   code: "invalid-argument",
   operation: "row-bridge",
 });
 
 describe("RowBridge", () => {
   it("projects revised restores during nested callbacks and after the event lifetime", () => {
-    const store = storeOf(3);
+    const store = store_of(3);
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const range = { sheet: "sheet1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } };
     const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [10] });
@@ -106,28 +106,28 @@ describe("RowBridge", () => {
       columns,
       defaultRows: rows,
       getRowId: (row) => row.id,
-      createRowId: ({ transactionId, offset }) => `${transactionId}-${offset}`,
+      createRowId: ({ transactionId: transaction_id, offset }) => `${transaction_id}-${offset}`,
     });
     const inserted = bridge.project(
       event([{ op: "addRows", sheet: "sheet1", at: 1, count: 2 }], [], "local", 1),
     );
-    const insertedIds =
+    const inserted_ids =
       inserted.deltas[0]?.kind === "row-structure" ? inserted.deltas[0].inserted : [];
-    expect(insertedIds).toHaveLength(2);
-    expect(bridge.rowIds()).toEqual(["row-a", ...insertedIds, "row-b", "row-c"]);
+    expect(inserted_ids).toHaveLength(2);
+    expect(bridge.rowIds()).toEqual(["row-a", ...inserted_ids, "row-b", "row-c"]);
 
     bridge.project(
       event([{ op: "moveRows", sheet: "sheet1", from: 3, count: 1, to: 0 }], [], "local", 2),
     );
-    expect(bridge.rowIds()).toEqual(["row-b", "row-a", ...insertedIds, "row-c"]);
+    expect(bridge.rowIds()).toEqual(["row-b", "row-a", ...inserted_ids, "row-c"]);
 
     const removed = bridge.project(
       event([{ op: "removeRows", sheet: "sheet1", at: 1, count: 2 }], [], "local", 3),
     );
     expect(removed.deltas[0]).toEqual(
-      expect.objectContaining({ kind: "row-structure", removed: ["row-a", insertedIds[0]] }),
+      expect.objectContaining({ kind: "row-structure", removed: ["row-a", inserted_ids[0]] }),
     );
-    expect(bridge.rowIds()).toEqual(["row-b", insertedIds[1]!, "row-c"]);
+    expect(bridge.rowIds()).toEqual(["row-b", inserted_ids[1]!, "row-c"]);
   });
 
   it("reconciles transformed, rejected, duplicate, out-of-order, and remote input without echoes", () => {
@@ -177,39 +177,41 @@ describe("RowBridge", () => {
     expect(remote.deltas).toHaveLength(1);
   });
 
-  for (const maxRecentTransactions of [1, undefined]) {
-    const echoWindowSize = maxRecentTransactions ?? 8192;
+  for (const max_recent_transactions of [1, undefined]) {
+    const echo_window_size = max_recent_transactions ?? 8192;
     for (const identity of ["transaction ID", "operation fingerprint"] as const) {
-      for (const laterTransactions of [echoWindowSize - 1, echoWindowSize]) {
-        it(`recognizes ${identity} echoes at the ${maxRecentTransactions ?? "default"} window boundary (${laterTransactions} later transactions)`, () => {
+      for (const later_transactions of [echo_window_size - 1, echo_window_size]) {
+        it(`recognizes ${identity} echoes at the ${max_recent_transactions ?? "default"} window boundary (${later_transactions} later transactions)`, () => {
           const bridge = createRowBridge({
             columns,
             defaultRows: rows,
             getRowId: (row) => row.id,
-            ...(maxRecentTransactions === undefined ? {} : { maxRecentTransactions }),
+            ...(max_recent_transactions === undefined
+              ? {}
+              : { maxRecentTransactions: max_recent_transactions }),
           });
           const addr = { sheet: "sheet1", row: 0, col: 1 };
           const operations: DocumentOp[] = [{ op: "set", addr, value: literal(0) }];
           // Use explicit IDs without epochs so version ordering cannot mask identity eviction.
           bridge.project(event(operations), undefined, "original");
-          for (let index = 1; index <= laterTransactions; index += 1) {
+          for (let index = 1; index <= later_transactions; index += 1) {
             bridge.project(
               event([{ op: "set", addr, value: literal(index) }]),
               undefined,
               `later-${index}`,
             );
           }
-          const echoValue = identity === "transaction ID" ? -1 : 0;
+          const echo_value = identity === "transaction ID" ? -1 : 0;
           const echo = bridge.project(
             event(
-              [{ op: "set", addr, value: literal(echoValue) }],
-              [{ addr, oldValue: literal(laterTransactions), newValue: literal(echoValue) }],
+              [{ op: "set", addr, value: literal(echo_value) }],
+              [{ addr, oldValue: literal(later_transactions), newValue: literal(echo_value) }],
               "remote",
             ),
             undefined,
             identity === "transaction ID" ? "original" : "server-echo",
           );
-          if (laterTransactions < echoWindowSize) {
+          if (later_transactions < echo_window_size) {
             expect(echo.status).toBe("duplicate");
             expect(echo.deltas).toEqual([]);
           } else {
@@ -221,8 +223,8 @@ describe("RowBridge", () => {
                 cell: expect.objectContaining({
                   rowId: "row-a",
                   columnKey: "amount",
-                  previous: literal(laterTransactions),
-                  next: literal(echoValue),
+                  previous: literal(later_transactions),
+                  next: literal(echo_value),
                 }),
               }),
             ]);
@@ -275,13 +277,13 @@ describe("RowBridge", () => {
 
   it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     "rejects an invalid recent transaction limit (%s)",
-    (maxRecentTransactions) => {
+    (max_recent_transactions) => {
       expect(() =>
         createRowBridge({
           columns,
           defaultRows: rows,
           getRowId: (row) => row.id,
-          maxRecentTransactions,
+          maxRecentTransactions: max_recent_transactions,
         }),
       ).toThrow(expect.objectContaining({ code: "invalid-argument", operation: "row-bridge" }));
     },
@@ -300,7 +302,7 @@ describe("RowBridge", () => {
     // The same identity at a different position is still a duplicate.
     expect(() =>
       bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 2)),
-    ).toThrow(duplicateRowId);
+    ).toThrow(duplicate_row_id);
 
     bridge.project(
       event([{ op: "moveRows", sheet: "sheet1", from: 1, count: 1, to: 3 }], [], "local", 3),
@@ -308,7 +310,7 @@ describe("RowBridge", () => {
     expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c", "generated"]);
     expect(() =>
       bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 4)),
-    ).toThrow(duplicateRowId);
+    ).toThrow(duplicate_row_id);
 
     bridge.project(event([{ op: "removeRows", sheet: "sheet1", at: 3, count: 1 }], [], "local", 5));
     bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 6));
@@ -324,12 +326,12 @@ describe("RowBridge", () => {
     });
     expect(() =>
       bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 1)),
-    ).toThrow(duplicateRowId);
+    ).toThrow(duplicate_row_id);
     expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c"]);
   });
 
   it("captures packed and clear before/after cells only when detailed capture is enabled", () => {
-    const store = storeOf(2, { name: ["A", "B"], amount: [1, 2] });
+    const store = store_of(2, { name: ["A", "B"], amount: [1, 2] });
     const bridge = createRowBridge({
       columns,
       defaultRows: rows.slice(0, 2),
@@ -376,7 +378,7 @@ describe("RowBridge", () => {
   });
 
   it("projects a clear as the cells it changed, not every cell of its range", () => {
-    const store = storeOf(3, { name: ["A", null, null], amount: [null, null, 3] });
+    const store = store_of(3, { name: ["A", null, null], amount: [null, null, 3] });
     // Row b holds no value, but a reference to an empty cell and a bold style.
     store.applyTransaction({
       patches: [
@@ -422,7 +424,7 @@ describe("RowBridge", () => {
   });
 
   it("lists every cleared cell when capture is off, even beside a captured set", () => {
-    const store = storeOf(3, { name: ["A", "B", "C"], amount: [1, 2, 3] });
+    const store = store_of(3, { name: ["A", "B", "C"], amount: [1, 2, 3] });
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.on("change", (change) => projections.push(bridge.project(change)));
@@ -452,7 +454,7 @@ describe("RowBridge", () => {
   });
 
   it("projects a captured clear of an empty range as no cells", () => {
-    const store = storeOf(3);
+    const store = store_of(3);
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.setDetailedChangeCapture(true);
@@ -476,7 +478,7 @@ describe("RowBridge", () => {
   });
 
   it("keeps a later write's change out of a captured clear in the same transaction", () => {
-    const store = storeOf(3, { name: ["A", null, "C"] });
+    const store = store_of(3, { name: ["A", null, "C"] });
     const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
     const projections: RowBridgeProjection<string>[] = [];
     store.setDetailedChangeCapture(true);

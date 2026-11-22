@@ -8,24 +8,24 @@ const ROW_COUNT = 1_000;
 const OFFSCREEN_ROW = ROW_COUNT - 1;
 const HOST_WIDTH = 800;
 const HOST_HEIGHT = 400;
-let restoreCanvas: () => void;
-let originalFrame: typeof requestAnimationFrame;
-let originalCancelFrame: typeof cancelAnimationFrame;
+let restore_canvas: () => void;
+let original_frame: typeof requestAnimationFrame;
+let original_cancel_frame: typeof cancelAnimationFrame;
 const mounted: Array<{ grid: Grid; host: HTMLElement }> = [];
 const frames = new Map<number, FrameRequestCallback>();
-let nextFrame = 0;
+let next_frame = 0;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
-  originalFrame = globalThis.requestAnimationFrame;
-  originalCancelFrame = globalThis.cancelAnimationFrame;
+  restore_canvas = installCanvasTestStubs();
+  original_frame = globalThis.requestAnimationFrame;
+  original_cancel_frame = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = (callback) => {
-    nextFrame += 1;
-    frames.set(nextFrame, callback);
-    return nextFrame;
+    next_frame += 1;
+    frames.set(next_frame, callback);
+    return next_frame;
   };
   globalThis.cancelAnimationFrame = (id) => {
     frames.delete(id);
@@ -38,12 +38,12 @@ afterEach(() => {
   }
   mounted.length = 0;
   frames.clear();
-  globalThis.requestAnimationFrame = originalFrame;
-  globalThis.cancelAnimationFrame = originalCancelFrame;
-  restoreCanvas();
+  globalThis.requestAnimationFrame = original_frame;
+  globalThis.cancelAnimationFrame = original_cancel_frame;
+  restore_canvas();
 });
 
-function flushFrames(): void {
+function flush_frames(): void {
   while (frames.size > 0) {
     const pending = [...frames.values()];
     frames.clear();
@@ -52,7 +52,7 @@ function flushFrames(): void {
 }
 
 function mount(
-  firstValue: CellValue = { kind: "literal", value: "visible" },
+  first_value: CellValue = { kind: "literal", value: "visible" },
   metadata: Partial<Sheet> = {},
   { primed = true }: { primed?: boolean } = {},
 ) {
@@ -68,8 +68,8 @@ function mount(
     ],
   };
   const values: Array<string | CellValue> = new Array<string | CellValue>(ROW_COUNT).fill("match");
-  values[0] = firstValue;
-  if (firstValue.kind === "formula" && firstValue.src.startsWith("=SEQUENCE")) {
+  values[0] = first_value;
+  if (first_value.kind === "formula" && first_value.src.startsWith("=SEQUENCE")) {
     values[1] = { kind: "literal", value: null };
     values[2] = { kind: "literal", value: null };
   }
@@ -86,7 +86,7 @@ function mount(
     config: { toolbar: false, find: false, contextMenu: false },
   });
   mounted.push({ grid, host });
-  flushFrames();
+  flush_frames();
   if (!primed) return { grid, host };
   // The first change on a sheet always repaints while the grid learns whether
   // the sheet holds formulas. Spend it on a value-preserving write so each test
@@ -103,7 +103,7 @@ function mount(
 
 function commit(grid: Grid, patches: DocumentOp[]): void {
   expect(grid.applyRemoteOperations(patches).status).toBe("applied");
-  flushFrames();
+  flush_frames();
 }
 
 function cell(host: HTMLElement, row = 0, col = 0): HTMLElement {
@@ -165,7 +165,7 @@ it("refreshes search matches for numbers whose engine text differs from JavaScri
   expect(grid.findNext().matches).toEqual([{ sheet: "s1", row: OFFSCREEN_ROW, col: 1 }]);
 });
 
-function expectWindowReadAfter(grid: Grid, patch: DocumentOp): void {
+function expect_window_read_after(grid: Grid, patch: DocumentOp): void {
   const reads = spyOn(grid.store, "getVisibleWindow");
   try {
     commit(grid, [patch]);
@@ -212,6 +212,6 @@ it.each([
   "re-reads the painted window for off-window edits on a sheet with $label",
   ({ metadata }) => {
     const { grid } = mount(undefined, metadata);
-    expectWindowReadAfter(grid, OFFSCREEN_EDIT);
+    expect_window_read_after(grid, OFFSCREEN_EDIT);
   },
 );

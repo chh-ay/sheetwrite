@@ -175,7 +175,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       events: [{ id: sequence, text, api, tone }, ...state.events].slice(0, TRACE_LIMIT),
     };
   }
-  function readCounts() {
+  function read_counts() {
     if (grid) {
       state = {
         ...state,
@@ -195,7 +195,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
   }
 
   function refresh() {
-    readCounts();
+    read_counts();
     publish();
   }
 
@@ -297,10 +297,10 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
         label: "Order identifiers",
         permissionKey: "dispatch-manager",
       });
-      grid.setProtectionResolver(({ protectedRange, operation }) => {
+      grid.setProtectionResolver(({ protectedRange: protected_range, operation }) => {
         // Visibility metadata does not alter the protected order identifiers.
         if (operation.op === "setRowMeta" || operation.op === "setSheetMeta") return "allow";
-        return protectedRange.permissionKey === "dispatch-manager" && manager ? "allow" : "deny";
+        return protected_range.permissionKey === "dispatch-manager" && manager ? "allow" : "deny";
       });
       grid.groupRows(0, GROUP_END);
       unsubscribes.push(
@@ -353,7 +353,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       if (!grid) return;
       grid.setColumnFilter(COLUMN.region, region ? { kind: "values", values: [region] } : null);
       grid.setColumnFilter(COLUMN.customer, customer ? { kind: "contains", text: customer } : null);
-      readCounts();
+      read_counts();
       record(
         `Showing ${state.visible.toLocaleString()} of ${state.total.toLocaleString()} orders.`,
         "setColumnFilter",
@@ -388,24 +388,24 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
         case "rows": {
           if (state.hiddenRows > 0) grid.showRows();
           else grid.hideRows([...HIDDEN_ROWS]);
-          const hiddenCount = grid.hiddenRows().length;
+          const hidden_count = grid.hiddenRows().length;
           record(
-            hiddenCount > 0
+            hidden_count > 0
               ? `Hid rows ${HIDDEN_ROWS[0] + 1} to ${HIDDEN_ROWS[2] + 1}.`
               : "Showed all rows.",
-            hiddenCount > 0 ? "hideRows" : "showRows",
+            hidden_count > 0 ? "hideRows" : "showRows",
           );
           break;
         }
         case "columns": {
           if (state.hiddenColumns > 0) grid.showColumns();
           else grid.hideColumns(HIDDEN_COLUMNS);
-          const hiddenCount = grid.hiddenColumns().length;
+          const hidden_count = grid.hiddenColumns().length;
           record(
-            hiddenCount > 0
+            hidden_count > 0
               ? `Hid the ${HIDDEN_COLUMNS.map((col) => DATA_COLUMNS[col].header).join(" and ")} columns.`
               : "Showed all columns.",
-            hiddenCount > 0 ? "hideColumns" : "showColumns",
+            hidden_count > 0 ? "hideColumns" : "showColumns",
           );
           break;
         }

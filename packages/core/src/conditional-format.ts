@@ -14,30 +14,30 @@ export function validConditionalRules(
 ): boolean {
   if (rules.length > MAX_CONDITIONAL_FORMAT_RULES) return false;
   return rules.every((rule) => {
-    const formulaSource = rule.when?.kind === "formula" ? rule.when.source : undefined;
+    const formula_source = rule.when?.kind === "formula" ? rule.when.source : undefined;
     if (
       rule.range.sheet !== sheet.id ||
       (rule.stopIfTrue !== undefined && typeof rule.stopIfTrue !== "boolean") ||
       (rule.when?.kind === "formula" &&
-        (typeof formulaSource !== "string" ||
-          !formulaSource.startsWith("=") ||
-          formulaSource.length > MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH))
+        (typeof formula_source !== "string" ||
+          !formula_source.startsWith("=") ||
+          formula_source.length > MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH))
     ) {
       return false;
     }
-    const startRow = Math.min(rule.range.start.row, rule.range.end.row);
-    const startCol = Math.min(rule.range.start.col, rule.range.end.col);
-    const endRow = Math.max(rule.range.start.row, rule.range.end.row);
-    const endCol = Math.max(rule.range.start.col, rule.range.end.col);
+    const start_row = Math.min(rule.range.start.row, rule.range.end.row);
+    const start_col = Math.min(rule.range.start.col, rule.range.end.col);
+    const end_row = Math.max(rule.range.start.row, rule.range.end.row);
+    const end_col = Math.max(rule.range.start.col, rule.range.end.col);
     return (
-      Number.isInteger(startRow) &&
-      startRow >= 0 &&
-      Number.isInteger(startCol) &&
-      startCol >= 0 &&
-      Number.isInteger(endRow) &&
-      endRow < sheet.rowCount &&
-      Number.isInteger(endCol) &&
-      endCol < sheet.columns.length
+      Number.isInteger(start_row) &&
+      start_row >= 0 &&
+      Number.isInteger(start_col) &&
+      start_col >= 0 &&
+      Number.isInteger(end_row) &&
+      end_row < sheet.rowCount &&
+      Number.isInteger(end_col) &&
+      end_col < sheet.columns.length
     );
   });
 }

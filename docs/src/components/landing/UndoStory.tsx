@@ -78,7 +78,7 @@ function PeerCells(props: Readonly<{ class: string }>) {
 }
 
 export function UndoStory() {
-  const peerDrop = UNDO_PEER.y - UNDO_SERVER.y;
+  const peer_drop = UNDO_PEER.y - UNDO_SERVER.y;
 
   return (
     <svg
@@ -90,7 +90,7 @@ export function UndoStory() {
         "--batch-send": secs(UNDO.batchSend),
         "--batch-applied": secs(UNDO.batchApplied),
         "--clear-applied": secs(UNDO.clearApplied),
-        "--peer-drop": px(peerDrop),
+        "--peer-drop": px(peer_drop),
       }}
       viewBox="0 0 640 330"
     >

@@ -23,24 +23,24 @@ const NUMBER_ROWS = Array.from(
     `<row r="${row + 1}"><c r="A${row + 1}"><v>${row}</v></c><c r="B${row + 1}"><v>${row}</v></c></row>`,
 ).join("");
 
-function numbersXlsx(workbookExtra?: string): Uint8Array {
+function numbers_xlsx(workbook_extra?: string): Uint8Array {
   return rawXlsx({
-    ...(workbookExtra ? { workbookExtra } : {}),
+    ...(workbook_extra ? { workbookExtra: workbook_extra } : {}),
     sheets: [{ xml: worksheet(`<sheetData>${NUMBER_ROWS}</sheetData>`) }],
   });
 }
 
 /** The same package with the declared size of `part` one byte larger in both ZIP headers. */
-function withWrongSize(bytes: Uint8Array, part: string): Uint8Array {
+function with_wrong_size(bytes: Uint8Array, part: string): Uint8Array {
   const copy = bytes.slice();
   const view = new DataView(copy.buffer);
   const name = new TextEncoder().encode(part);
-  const namedAt = (offset: number) => name.every((byte, index) => copy[offset + index] === byte);
+  const named_at = (offset: number) => name.every((byte, index) => copy[offset + index] === byte);
   for (let offset = 0; offset + 46 < copy.length; offset++) {
     const signature = view.getUint32(offset, true);
-    if (signature === LOCAL_SIGNATURE && namedAt(offset + 30)) {
+    if (signature === LOCAL_SIGNATURE && named_at(offset + 30)) {
       view.setUint32(offset + 22, view.getUint32(offset + 22, true) + 1, true);
-    } else if (signature === CENTRAL_SIGNATURE && namedAt(offset + 46)) {
+    } else if (signature === CENTRAL_SIGNATURE && named_at(offset + 46)) {
       view.setUint32(offset + 24, view.getUint32(offset + 24, true) + 1, true);
     }
   }
@@ -51,13 +51,13 @@ function withWrongSize(bytes: Uint8Array, part: string): Uint8Array {
 const MALFORMED: readonly [string, Uint8Array, XlsxWorkbookOptions, RegExp][] = [
   [
     "a worksheet whose declared size is wrong",
-    withWrongSize(numbersXlsx(), "xl/worksheets/sheet1.xml"),
+    with_wrong_size(numbers_xlsx(), "xl/worksheets/sheet1.xml"),
     {},
     /inflated size mismatch/,
   ],
   [
     "a snapshot larger than the import size limit",
-    numbersXlsx(),
+    numbers_xlsx(),
     { resourceLimits: { maxTotalUncompressedBytes: 16_000 } },
     /imported invalid workbook snapshot: Snapshot maxSerializedBytes limit 16000 exceeded/,
   ],
@@ -73,7 +73,7 @@ const MALFORMED: readonly [string, Uint8Array, XlsxWorkbookOptions, RegExp][] = 
   ],
   [
     "two defined names that differ only in case",
-    numbersXlsx(
+    numbers_xlsx(
       '<definedNames><definedName name="total">Sheet1!$A$1</definedName><definedName name="TOTAL">Sheet1!$A$2</definedName></definedNames>',
     ),
     {},
@@ -91,9 +91,9 @@ it.each(MALFORMED)("fromXlsxWorkbook refuses %s", async (_name, bytes, options, 
 
 let grid: Grid;
 let host: HTMLDivElement;
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
   host = document.createElement("div");
   document.body.append(host);
   grid = createGrid(host, {
@@ -114,7 +114,7 @@ beforeEach(() => {
 afterEach(() => {
   grid.destroy();
   host.remove();
-  restoreCanvas();
+  restore_canvas();
 });
 
 it.each(MALFORMED)(

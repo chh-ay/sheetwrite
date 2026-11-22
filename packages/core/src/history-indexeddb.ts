@@ -50,7 +50,7 @@ function result<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 /** A browser can report exhausted quota from a request or from the transaction abort. */
-function storageFailure(failure: unknown): unknown {
+function storage_failure(failure: unknown): unknown {
   if (failure instanceof DOMException && failure.name === "QuotaExceededError") {
     return new HistoryError("capacity", "IndexedDB history storage quota is exhausted", {
       cause: failure,
@@ -60,7 +60,7 @@ function storageFailure(failure: unknown): unknown {
   return failure;
 }
 
-function openDatabase(
+function open_database(
   factory: IDBFactory,
   name: string,
   signal?: AbortSignal,
@@ -121,11 +121,11 @@ function openDatabase(
 }
 
 /** Every key `[documentId, *]` of one document. */
-function documentRange(documentId: string): IDBKeyRange {
-  return IDBKeyRange.bound([documentId, ""], [documentId, KEY_END]);
+function document_range(document_id: string): IDBKeyRange {
+  return IDBKeyRange.bound([document_id, ""], [document_id, KEY_END]);
 }
 
-function indexMetadata(record: HistoryStoredRecord): HistoryRecordMetadata {
+function index_metadata(record: HistoryStoredRecord): HistoryRecordMetadata {
   return {
     id: record.id,
     kind: record.kind,
@@ -134,7 +134,7 @@ function indexMetadata(record: HistoryStoredRecord): HistoryRecordMetadata {
   };
 }
 
-function checkIndexMetadata(
+function check_index_metadata(
   value: unknown,
   kind: HistoryStoredRecord["kind"],
 ): HistoryRecordMetadata {
@@ -142,12 +142,12 @@ function checkIndexMetadata(
     throw new HistoryError("integrity", "Invalid history record index");
   }
 
-  const { id, encodedBytes, decodedBytes } = value;
-  if (!validId(id) || value.kind !== kind || !integer(encodedBytes) || !integer(decodedBytes)) {
+  const { id, encodedBytes: encoded_bytes, decodedBytes: decoded_bytes } = value;
+  if (!validId(id) || value.kind !== kind || !integer(encoded_bytes) || !integer(decoded_bytes)) {
     throw new HistoryError("integrity", "Invalid history record index");
   }
 
-  return { id, kind, encodedBytes, decodedBytes };
+  return { id, kind, encodedBytes: encoded_bytes, decodedBytes: decoded_bytes };
 }
 
 /**
@@ -157,14 +157,14 @@ function checkIndexMetadata(
  * atomic across restarts and tabs.
  */
 export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
-  private readonly databaseName: string;
+  private readonly database_name: string;
   private readonly factory: IDBFactory | undefined;
 
   /** Creates the storage; each call opens the database, so nothing opens yet. */
   constructor(options: IndexedDbHistoryStorageOptions = {}) {
     super();
 
-    this.databaseName = options.databaseName ?? DEFAULT_DATABASE;
+    this.database_name = options.databaseName ?? DEFAULT_DATABASE;
     this.factory = options.indexedDB;
   }
 
@@ -178,7 +178,7 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
       throw new HistoryError("unavailable", "IndexedDB history storage is not available");
     }
 
-    const database = await openDatabase(factory, this.databaseName, request.signal);
+    const database = await open_database(factory, this.database_name, request.signal);
     const transaction = database.transaction(STORE_NAMES, "readwrite");
 
     const completion = Promise.withResolvers<void>();
@@ -216,14 +216,14 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
         failure = cause;
         transaction.abort();
         await completion.promise;
-        throw storageFailure(cause);
+        throw storage_failure(cause);
       }
 
       await completion.promise;
       checkAbort(request.signal);
 
       if (failure !== undefined) {
-        throw storageFailure(failure);
+        throw storage_failure(failure);
       }
 
       return output;
@@ -233,23 +233,23 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
     }
   }
 
-  private operations(transaction: IDBTransaction, documentId: string): HistoryStorageTransaction {
+  private operations(transaction: IDBTransaction, document_id: string): HistoryStorageTransaction {
     const manifests = transaction.objectStore(MANIFESTS);
     const records = transaction.objectStore(RECORDS);
-    const recordIndex = transaction.objectStore(RECORD_INDEX);
+    const record_index = transaction.objectStore(RECORD_INDEX);
     const versions = transaction.objectStore(VERSIONS);
     const pins = transaction.objectStore(PINS);
 
-    const key = (id: string): [string, string] => [documentId, id];
-    const indexKey = (record: HistoryStoredRecord): [string, string, string] => [
-      documentId,
+    const key = (id: string): [string, string] => [document_id, id];
+    const index_key = (record: HistoryStoredRecord): [string, string, string] => [
+      document_id,
       record.kind,
       record.id,
     ];
 
     return {
       manifest: async () => {
-        const stored = await result<HistoryManifest | undefined>(manifests.get(documentId));
+        const stored = await result<HistoryManifest | undefined>(manifests.get(document_id));
 
         return (
           stored ?? {
@@ -263,14 +263,14 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
       },
 
       saveManifest: async (manifest) => {
-        await result(manifests.put(manifest, documentId));
+        await result(manifests.put(manifest, document_id));
       },
 
       record: async (id) => result<StoredHistoryRecord | undefined>(records.get(key(id))),
 
       saveRecord: async (stored) => {
         await result(records.put(stored, key(stored.record.id)));
-        await result(recordIndex.put(indexMetadata(stored.record), indexKey(stored.record)));
+        await result(record_index.put(index_metadata(stored.record), index_key(stored.record)));
       },
 
       deleteRecord: async (id) => {
@@ -280,22 +280,22 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
         }
 
         await result(records.delete(key(id)));
-        await result(recordIndex.delete(indexKey(stored.record)));
+        await result(record_index.delete(index_key(stored.record)));
       },
 
-      recordPage: async (kind, afterId, count) => {
-        // Lower bound open on `afterId`, so the page starts after the cursor record.
+      recordPage: async (kind, after_id, count) => {
+        // Lower bound open on `after_id`, so the page starts after the cursor record.
         const range = IDBKeyRange.bound(
-          [documentId, kind, afterId],
-          [documentId, kind, KEY_END],
+          [document_id, kind, after_id],
+          [document_id, kind, KEY_END],
           true,
         );
-        const values = await result<unknown[]>(recordIndex.getAll(range, count));
+        const values = await result<unknown[]>(record_index.getAll(range, count));
 
-        return values.map((value) => checkIndexMetadata(value, kind));
+        return values.map((value) => check_index_metadata(value, kind));
       },
 
-      versions: async () => result<HistoryVersion[]>(versions.getAll(documentRange(documentId))),
+      versions: async () => result<HistoryVersion[]>(versions.getAll(document_range(document_id))),
 
       saveVersion: async (version) => {
         await result(versions.put(version, key(version.id)));
@@ -305,7 +305,7 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
         await result(versions.delete(key(id)));
       },
 
-      pins: async () => result<HistoryReaderPin[]>(pins.getAll(documentRange(documentId))),
+      pins: async () => result<HistoryReaderPin[]>(pins.getAll(document_range(document_id))),
 
       savePin: async (pin) => {
         await result(pins.put(pin, key(pin.token)));

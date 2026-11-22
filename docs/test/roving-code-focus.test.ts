@@ -3,8 +3,13 @@ import { describe, expect, it } from "bun:test";
 import type { HastNode } from "../src/lib/build-hast.js";
 import { rovingCodeFocus } from "../src/lib/roving-code-focus.js";
 
-function symbol(className: string): HastNode {
-  return { type: "element", tagName: "span", properties: { className: [className] }, children: [] };
+function symbol(class_name: string): HastNode {
+  return {
+    type: "element",
+    tagName: "span",
+    properties: { className: [class_name] },
+    children: [],
+  };
 }
 
 describe("roving code focus", () => {

@@ -59,7 +59,7 @@ function box(
   return { id, ...node, rect: { x, y, w, h: h ?? nodeHeight(step) } };
 }
 
-function flowWide(
+function flow_wide(
   steps: readonly FigureStep[],
   outcome: FigureOutcome | undefined,
 ): BlueprintLayout {
@@ -103,11 +103,11 @@ function flowWide(
       : { from: `s${index}`, fromSide: "right", to: `s${index + 1}`, kind: "main" },
   );
   // An outcome keeps the flow on one row, so the row spans every step.
-  const rowWidth = widths.reduce((sum, w) => sum + w, 0) + gaps;
+  const row_width = widths.reduce((sum, w) => sum + w, 0) + gaps;
   if (outcome !== undefined) {
     const source = nodes[outcome.from];
     if (source === undefined) throw new Error(`No step ${outcome.from} for the outcome`);
-    const below = box("outcome", outcome.step, 0, h + ROW_SPACE, rowWidth);
+    const below = box("outcome", outcome.step, 0, h + ROW_SPACE, row_width);
     nodes.push(below);
     const centre = source.rect.x + source.rect.w / 2;
     edges.push({
@@ -126,7 +126,7 @@ function flowWide(
  * needs it, indented boxes with their indent; a wider drawing scales down to
  * fit a phone instead of letting text cross its box.
  */
-function stackWidth(full: readonly FigureStep[], indented: readonly FigureStep[] = []): number {
+function stack_width(full: readonly FigureStep[], indented: readonly FigureStep[] = []): number {
   return Math.max(
     NARROW,
     ...full.map(nodeWidth),
@@ -134,11 +134,11 @@ function stackWidth(full: readonly FigureStep[], indented: readonly FigureStep[]
   );
 }
 
-function flowNarrow(
+function flow_narrow(
   steps: readonly FigureStep[],
   outcome: FigureOutcome | undefined,
 ): BlueprintLayout {
-  const width = stackWidth(steps, outcome === undefined ? [] : [outcome.step]);
+  const width = stack_width(steps, outcome === undefined ? [] : [outcome.step]);
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
   let y = 0;
@@ -151,13 +151,13 @@ function flowNarrow(
       y += nodeHeight(outcome.step) + ROW_SPACE / 2;
     }
   });
-  const pathT = 12 / width;
+  const path_t = 12 / width;
   steps.slice(1).forEach((_, index) => {
     edges.push({
       from: `s${index}`,
       fromSide: "bottom",
       to: `s${index + 1}`,
-      t: outcome === undefined ? 0.5 : pathT,
+      t: outcome === undefined ? 0.5 : path_t,
       kind: "main",
     });
   });
@@ -185,15 +185,15 @@ export function FlowFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={flowNarrow(props.steps, props.outcome)}
+      narrow={flow_narrow(props.steps, props.outcome)}
       note={props.note}
       text={props.text}
-      wide={flowWide(props.steps, props.outcome)}
+      wide={flow_wide(props.steps, props.outcome)}
     />
   );
 }
 
-function fanWide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
+function fan_wide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
   // Tiles share the row equally, a tile's gap apart, each at least as wide as
   // the widest tile's text. When they don't fit in a row, they stack in a
   // column beside the source, centred on it, every arrow branching from one
@@ -243,8 +243,8 @@ function fanWide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLay
   };
 }
 
-function fanNarrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
-  const width = stackWidth([source], tiles);
+function fan_narrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLayout {
+  const width = stack_width([source], tiles);
   const top = box("source", source, 0, 0, width);
   let y = top.rect.y + top.rect.h + SPACING.tile;
   const nodes = tiles.map((tile, index) => {
@@ -253,7 +253,7 @@ function fanNarrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintL
     return placed;
   });
   // Each tile is reached from the source's lower-left, down the gutter and across into its left side.
-  const spineT = INDENT / 2 / top.rect.w;
+  const spine_t = INDENT / 2 / top.rect.w;
   return {
     nodes: [top, ...nodes],
     edges: nodes
@@ -261,7 +261,7 @@ function fanNarrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintL
       .map((node) => ({
         from: "source",
         fromSide: "bottom" as const,
-        t: spineT,
+        t: spine_t,
         to: node.id,
         toSide: "left" as const,
         kind: "main" as const,
@@ -280,15 +280,19 @@ export function FanFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={fanNarrow(props.source, props.tiles)}
+      narrow={fan_narrow(props.source, props.tiles)}
       note={props.note}
       text={props.text}
-      wide={fanWide(props.source, props.tiles)}
+      wide={fan_wide(props.source, props.tiles)}
     />
   );
 }
 
-function tilesLayout(tiles: readonly FigureStep[], width: number, wanted: number): BlueprintLayout {
+function tiles_layout(
+  tiles: readonly FigureStep[],
+  width: number,
+  wanted: number,
+): BlueprintLayout {
   const gap = SPACING.tile;
   const room = width;
   // Fewer columns when the widest tile's text doesn't fit its share of the row.
@@ -302,10 +306,10 @@ function tilesLayout(tiles: readonly FigureStep[], width: number, wanted: number
   });
   const nodes: BlueprintNode[] = [];
   let y = 0;
-  rows.forEach((row, rowIndex) => {
+  rows.forEach((row, row_index) => {
     const h = Math.max(...row.map((tile) => nodeHeight(tile)));
     row.forEach((tile, column) =>
-      nodes.push(box(`t${rowIndex * columns + column}`, tile, column * (w + gap), y, w, h)),
+      nodes.push(box(`t${row_index * columns + column}`, tile, column * (w + gap), y, w, h)),
     );
     y += h + gap;
   });
@@ -324,10 +328,10 @@ export function TileFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={tilesLayout(props.tiles, NARROW, props.narrowColumns ?? 1)}
+      narrow={tiles_layout(props.tiles, NARROW, props.narrowColumns ?? 1)}
       note={props.note}
       text={props.text}
-      wide={tilesLayout(props.tiles, WIDE, props.columns)}
+      wide={tiles_layout(props.tiles, WIDE, props.columns)}
     />
   );
 }
@@ -338,15 +342,15 @@ export interface FigurePair {
   readonly to: FigureStep;
 }
 
-function pairsWide(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
+function pairs_wide(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
   const gap = ROW_GAP;
   // Each side takes its share of the row, moved so both sides hold their
   // widest text; when both can't, the row grows and the kit stacks the figure.
   const room = width - gap;
-  const leftNeed = Math.max(...pairs.map((pair) => nodeWidth(pair.from)));
-  const rightNeed = Math.max(...pairs.map((pair) => nodeWidth(pair.to)));
-  const left = Math.max(leftNeed, Math.min(room * share, room - rightNeed));
-  const right = Math.max(rightNeed, room - left);
+  const left_need = Math.max(...pairs.map((pair) => nodeWidth(pair.from)));
+  const right_need = Math.max(...pairs.map((pair) => nodeWidth(pair.to)));
+  const left = Math.max(left_need, Math.min(room * share, room - right_need));
+  const right = Math.max(right_need, room - left);
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
   let y = 0;
@@ -361,10 +365,10 @@ function pairsWide(pairs: readonly FigurePair[], width: number, share: number): 
 }
 
 /** On phones each pair stacks: what goes in, and under it, indented, what comes out. */
-function pairsNarrow(pairs: readonly FigurePair[]): BlueprintLayout {
+function pairs_narrow(pairs: readonly FigurePair[]): BlueprintLayout {
   const nodes: BlueprintNode[] = [];
   const edges: BlueprintEdge[] = [];
-  const full = stackWidth(
+  const full = stack_width(
     pairs.map((pair) => pair.from),
     pairs.map((pair) => pair.to),
   );
@@ -393,10 +397,10 @@ export function PairsFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={pairsNarrow(props.pairs)}
+      narrow={pairs_narrow(props.pairs)}
       note={props.note}
       text={props.text}
-      wide={pairsWide(props.pairs, WIDE, 0.55)}
+      wide={pairs_wide(props.pairs, WIDE, 0.55)}
     />
   );
 }
@@ -426,17 +430,17 @@ const LIFELINE = 28;
 /** From a note's bottom to the next message's line: the label above that line clears the note. */
 const AFTER_NOTE = 32;
 
-function sequenceLayout(
+function sequence_layout(
   lanes: readonly SequenceLane[],
   steps: readonly SequenceStep[],
   width: number,
-  leastNoteWidth: number,
+  least_note_width: number,
 ): BlueprintLayout {
   const messages = steps.filter((step) => "message" in step);
-  const headWidth = Math.max(...lanes.map((lane) => nodeWidth({ title: lane.name })));
-  const noteWidth = Math.max(
-    leastNoteWidth,
-    headWidth,
+  const head_width = Math.max(...lanes.map((lane) => nodeWidth({ title: lane.name })));
+  const note_width = Math.max(
+    least_note_width,
+    head_width,
     ...steps.map((step) => ("note" in step ? nodeWidth({ title: step.note }) : 0)),
   );
   // Lanes far enough apart for the heads, and for each message's label or lost mark between two lifelines.
@@ -446,23 +450,23 @@ function sequenceLayout(
     ),
   );
   const span = Math.max(
-    (width - noteWidth) / Math.max(1, lanes.length - 1),
-    headWidth + SPACING.tile,
+    (width - note_width) / Math.max(1, lanes.length - 1),
+    head_width + SPACING.tile,
     between + LIFELINE + 2 * SPACING.tile,
   );
-  const centre = new Map(lanes.map((lane, index) => [lane.id, noteWidth / 2 + index * span]));
-  const headHeight = Math.max(...lanes.map((lane) => nodeHeight({ title: lane.name })));
+  const centre = new Map(lanes.map((lane, index) => [lane.id, note_width / 2 + index * span]));
+  const head_height = Math.max(...lanes.map((lane) => nodeHeight({ title: lane.name })));
   const heads = lanes.map((lane) => {
-    const x = (centre.get(lane.id) ?? 0) - headWidth / 2;
-    return box(`head-${lane.id}`, { title: lane.name }, x, 0, headWidth, headHeight);
+    const x = (centre.get(lane.id) ?? 0) - head_width / 2;
+    return box(`head-${lane.id}`, { title: lane.name }, x, 0, head_width, head_height);
   });
-  const top = headHeight;
+  const top = head_height;
   // Each lane is a column of segments: lifeline bars, broken where a note sits.
   const segments = new Map<string, BlueprintNode[]>(lanes.map((lane) => [lane.id, []]));
   const open = new Map<string, number>(lanes.map((lane) => [lane.id, top]));
   const nodes: BlueprintNode[] = [...heads];
   const edges: BlueprintEdge[] = [];
-  const closeLane = (lane: string, y: number) => {
+  const close_lane = (lane: string, y: number) => {
     const start = open.get(lane) ?? top;
     if (y - start < 4) return;
     const x = (centre.get(lane) ?? 0) - LIFELINE / 2;
@@ -482,14 +486,14 @@ function sequenceLayout(
   steps.forEach((step, index) => {
     if ("note" in step) {
       const h = nodeHeight({ title: step.note });
-      closeLane(step.lane, y - 8);
-      const x = (centre.get(step.lane) ?? 0) - noteWidth / 2;
+      close_lane(step.lane, y - 8);
+      const x = (centre.get(step.lane) ?? 0) - note_width / 2;
       const note = box(
         `note-${index}`,
         { title: step.note, ...(step.tone ? { tone: step.tone } : {}) },
         x,
         y - 8,
-        noteWidth,
+        note_width,
         h,
       );
       nodes.push(note);
@@ -502,7 +506,7 @@ function sequenceLayout(
     }
   });
   const bottom = y - MESSAGE_STEP + 16;
-  for (const lane of lanes) closeLane(lane.id, bottom);
+  for (const lane of lanes) close_lane(lane.id, bottom);
   const at = (lane: string, level: number) =>
     segments.get(lane)?.find((node) => level >= node.rect.y && level <= node.rect.y + node.rect.h);
   pending.forEach(({ step, y: level }, index) => {
@@ -511,27 +515,27 @@ function sequenceLayout(
     if (from === undefined || to === undefined)
       throw new Error(`No lane under the "${step.message}" message`);
     const rightward = to.rect.x > from.rect.x;
-    const fromSide = rightward ? "right" : "left";
+    const from_side = rightward ? "right" : "left";
     if (step.lost) {
       // The mark sits in the middle of the gap between the two lifelines and names the message.
       const start = rightward ? from.rect.x + from.rect.w : from.rect.x;
       const end = rightward ? to.rect.x : to.rect.x + to.rect.w;
       const mid = (start + end) / 2;
       const title = `${step.message} lost`;
-      const markWidth = Math.min(nodeWidth({ title }), Math.abs(end - start) - 2 * SPACING.tile);
-      const markHeight = nodeHeight({ title });
+      const mark_width = Math.min(nodeWidth({ title }), Math.abs(end - start) - 2 * SPACING.tile);
+      const mark_height = nodeHeight({ title });
       const mark = box(
         `lost-${index}`,
         { title },
-        mid - markWidth / 2,
-        level - markHeight / 2,
-        markWidth,
-        markHeight,
+        mid - mark_width / 2,
+        level - mark_height / 2,
+        mark_width,
+        mark_height,
       );
       nodes.push({ ...mark, tone: "danger" });
       edges.push({
         from: from.id,
-        fromSide,
+        fromSide: from_side,
         t: (level - from.rect.y) / from.rect.h,
         to: mark.id,
         toT: 0.5,
@@ -541,7 +545,7 @@ function sequenceLayout(
     }
     edges.push({
       from: from.id,
-      fromSide,
+      fromSide: from_side,
       t: (level - from.rect.y) / from.rect.h,
       to: to.id,
       toT: (level - to.rect.y) / to.rect.h,
@@ -563,10 +567,10 @@ export function SequenceFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={sequenceLayout(props.lanes, props.steps, NARROW, 124)}
+      narrow={sequence_layout(props.lanes, props.steps, NARROW, 124)}
       note={props.note}
       text={props.text}
-      wide={sequenceLayout(props.lanes, props.steps, WIDE, 168)}
+      wide={sequence_layout(props.lanes, props.steps, WIDE, 168)}
     />
   );
 }
@@ -577,7 +581,10 @@ export interface FigureLink {
   readonly back?: string;
 }
 
-function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]): BlueprintLayout {
+function exchange_wide(
+  steps: readonly FigureStep[],
+  links: readonly FigureLink[],
+): BlueprintLayout {
   // Each gap holds its labels above and below the connectors.
   const gap = linkGap(
     links.flatMap((link) => (link.back ? [link.forward, link.back] : [link.forward])),
@@ -611,16 +618,16 @@ function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]
   return { nodes, edges };
 }
 
-function exchangeNarrow(
+function exchange_narrow(
   steps: readonly FigureStep[],
   links: readonly FigureLink[],
 ): BlueprintLayout {
   // Each label sits beside its connector, at 0.4 and 0.6 of the box's width, inside the box's span.
-  const widestLabel = Math.max(
+  const widest_label = Math.max(
     0,
     ...links.flatMap((link) => [link.forward, link.back ?? ""]).map(labelWidth),
   );
-  const width = Math.max(stackWidth(steps), (SPACING.label + widestLabel) / 0.4);
+  const width = Math.max(stack_width(steps), (SPACING.label + widest_label) / 0.4);
   const nodes: BlueprintNode[] = [];
   let y = 0;
   steps.forEach((step, index) => {
@@ -667,10 +674,10 @@ export function ExchangeFigure(
   }
   return (
     <BlueprintDiagram
-      narrow={exchangeNarrow(props.steps, props.links)}
+      narrow={exchange_narrow(props.steps, props.links)}
       note={props.note}
       text={props.text}
-      wide={exchangeWide(props.steps, props.links)}
+      wide={exchange_wide(props.steps, props.links)}
     />
   );
 }
@@ -684,7 +691,7 @@ function facing(target: BlueprintNode, source: BlueprintNode, axis: "x" | "y"): 
   return Math.min(0.85, Math.max(0.15, (middle - start) / length));
 }
 
-function mergeWide(sources: readonly FigureStep[], steps: readonly FigureStep[]): BlueprintLayout {
+function merge_wide(sources: readonly FigureStep[], steps: readonly FigureStep[]): BlueprintLayout {
   const columns = steps.length + 1;
   const gap = FAN_GAP;
   const w = Math.max(
@@ -696,10 +703,10 @@ function mergeWide(sources: readonly FigureStep[], steps: readonly FigureStep[])
     box(`in${index}`, source, 0, index * (h + SPACING.tile), w, h),
   );
   const height = sources.length * h + (sources.length - 1) * SPACING.tile;
-  const stepHeight = Math.max(...steps.map((step) => nodeHeight(step)));
-  const y = (height - stepHeight) / 2;
+  const step_height = Math.max(...steps.map((step) => nodeHeight(step)));
+  const y = (height - step_height) / 2;
   const right = steps.map((step, index) =>
-    box(`s${index}`, step, (index + 1) * (w + gap), y, w, stepHeight),
+    box(`s${index}`, step, (index + 1) * (w + gap), y, w, step_height),
   );
   const first = right[0];
   if (first === undefined) throw new Error("A merge needs at least one step after its sources");
@@ -724,7 +731,7 @@ function mergeWide(sources: readonly FigureStep[], steps: readonly FigureStep[])
   };
 }
 
-function mergeNarrow(
+function merge_narrow(
   sources: readonly FigureStep[],
   steps: readonly FigureStep[],
 ): BlueprintLayout {
@@ -733,7 +740,7 @@ function mergeNarrow(
   const across = sources.length === 2 && 2 * need + SPACING.tile <= NARROW ? 2 : 1;
   // Stacked sources are indented, so their connectors can drop down on the left.
   const inset = across === 1 ? INDENT : 0;
-  const width = Math.max(stackWidth(steps), inset + across * need + (across - 1) * SPACING.tile);
+  const width = Math.max(stack_width(steps), inset + across * need + (across - 1) * SPACING.tile);
   const w = (width - inset - (across - 1) * SPACING.tile) / across;
   const h = Math.max(...sources.map((source) => nodeHeight(source)));
   const nodes: BlueprintNode[] = sources.map((source, index) =>
@@ -756,7 +763,7 @@ function mergeNarrow(
   const first = right[0];
   if (first === undefined) throw new Error("A merge needs at least one step after its sources");
   // Stacked sources drop down on their left, the upper ones farther out, so no two cross.
-  const sourceEdges: BlueprintEdge[] =
+  const source_edges: BlueprintEdge[] =
     across === 2
       ? nodes.map((source) => ({
           from: source.id,
@@ -777,7 +784,7 @@ function mergeNarrow(
   return {
     nodes: [...nodes, ...right],
     edges: [
-      ...sourceEdges,
+      ...source_edges,
       ...right.slice(1).map((step, index) => ({
         from: `s${index}`,
         fromSide: "bottom" as const,
@@ -799,10 +806,10 @@ export function MergeFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={mergeNarrow(props.sources, props.steps)}
+      narrow={merge_narrow(props.sources, props.steps)}
       note={props.note}
       text={props.text}
-      wide={mergeWide(props.sources, props.steps)}
+      wide={merge_wide(props.sources, props.steps)}
     />
   );
 }
