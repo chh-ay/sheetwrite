@@ -735,12 +735,14 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   );
   await cell_editor.fill("A line far wider than its cell ".repeat(8));
   await cell_editor.press("End");
+  // Typing reveals the caret in every engine; WebKit does not scroll for End alone.
+  await page.keyboard.type(".");
   const long_line = await cell_editor.evaluate((field) => ({
     overflowX: getComputedStyle(field).overflowX,
     height: field.getBoundingClientRect().height,
-    scrolled: field.scrollLeft > 0,
   }));
-  expect(long_line).toEqual({ overflowX: "hidden", height: one_line_height, scrolled: true });
+  expect(long_line).toEqual({ overflowX: "hidden", height: one_line_height });
+  await expect.poll(() => cell_editor.evaluate((field) => field.scrollLeft > 0)).toBe(true);
   await cell_editor.press("Escape");
   expect(await formula_in_g3()).toBe(source);
 
