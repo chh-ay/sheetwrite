@@ -16,6 +16,10 @@ Pick the affected packages, choose `major` / `minor` / `patch`, and write a
 short summary. This creates a Markdown file under `.changeset/` — commit it
 alongside your change.
 
+`bun run changeset:ci` asks for a changeset only when a pull request changes a
+published package's shipped files. A change to tests, test fixtures,
+benchmarks, scripts, docs or CI needs none, so don't add an empty changeset.
+
 Private workspaces are excluded by Changesets policy, so you only select the
 published packages: `@sheetwrite/core`, `@sheetwrite/wasm`, `@sheetwrite/xlsx`,
 `@sheetwrite/charts`, `@sheetwrite/react`, `@sheetwrite/vue`, `@sheetwrite/svelte`.

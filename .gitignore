@@ -5,6 +5,8 @@ node_modules/
 dist/
 # The webpack bundler fixture's stylesheet build (webpack.styles.config.js).
 test/bundler-fixtures/webpack/dist-styles/
+# Written by `next build` in the Next.js bundler fixtures.
+test/bundler-fixtures/**/next-env.d.ts
 *.tsbuildinfo
 .astro/
 .tanstack/

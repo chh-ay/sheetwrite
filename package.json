@@ -8,7 +8,6 @@
   "license": "MIT",
   "workspaces": [
     "packages/*",
-    "examples/*",
     "docs",
     "docs/hovers",
     "docs/svelte-codegen",
