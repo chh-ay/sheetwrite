@@ -103,7 +103,7 @@ describe("SUBTOTAL over hidden rows", () => {
 
   it("closes the mutation when the engine rejects the hidden rows", () => {
     const store = store_with_subtotals();
-    const set_hidden_rows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");
+    const set_hidden_rows = spyOn(getEngine().CellStore.prototype, "setRowVisibility");
     set_hidden_rows.mockReturnValue(false);
     try {
       expect(() =>

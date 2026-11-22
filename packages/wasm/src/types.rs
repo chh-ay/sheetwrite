@@ -1344,6 +1344,14 @@ impl StringStorage {
             .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
     }
 
+    /// Drops the spare capacity that growth left in the pool, keeping every
+    /// id: what [`Self::collection`] releases when no string is dead.
+    pub(crate) fn release_slack(&mut self) {
+        self.bytes.shrink_to_fit();
+        self.spans.shrink_to_fit();
+        self.lookup.shrink_to_fit();
+    }
+
     pub(crate) fn index_memory_stats(&self) -> MemoryOwnerStats {
         let mut stats = MemoryOwnerStats::default();
         stats.add_hash_table::<u64, InternSlot>(self.lookup.len(), self.lookup.capacity());

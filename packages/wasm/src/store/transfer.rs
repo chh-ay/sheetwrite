@@ -521,7 +521,8 @@ mod tests {
         // Code 9 skips only the filtered row, so the two kinds stay apart.
         original.set_formula(0, 1, 1, "=SUBTOTAL(9,A1:A3)", 0);
         original.recompute_changed();
-        assert!(original.set_hidden_rows(0, &[0, 0], &[2, 2]));
+        // The filter keeps rows 0, 1 and 3 of the four.
+        assert!(original.set_row_visibility(0, &[0, 0], Some(vec![0, 1, 3])));
 
         let mut replacement =
             CellStore::read_memory_state(&original.export_memory_state()).unwrap();
@@ -530,7 +531,7 @@ mod tests {
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 8.0);
         assert_eq!(replacement.get_cell(0, 1, 1).num(), 9.0);
 
-        assert!(replacement.set_hidden_rows(0, &[], &[]));
+        assert!(replacement.set_row_visibility(0, &[], None));
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 13.0);
     }
 

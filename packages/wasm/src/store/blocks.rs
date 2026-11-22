@@ -593,7 +593,14 @@ impl CellStore {
             return BLOCK_RESOURCE_LIMIT;
         }
 
-        let mut source_kinds = vec![0u8; cell_count];
+        // A block without formulas or references, such as a columnar import,
+        // needs no per-cell source kinds; reads below treat a missing entry
+        // as a literal.
+        let mut source_kinds = if formula_offsets.is_empty() && reference_offsets.is_empty() {
+            Vec::new()
+        } else {
+            vec![0u8; cell_count]
+        };
         let mut seen_offsets = FxHashSet::with_capacity_and_hasher(
             formula_offsets
                 .len()
@@ -675,7 +682,13 @@ impl CellStore {
             }
         }
 
-        let mut string_ids = vec![NO_STRING; cell_count];
+        // Only string cells read their pool ids, so a block without text,
+        // such as an all-number import, allocates none.
+        let mut string_ids = if text_count == 0 {
+            Vec::new()
+        } else {
+            vec![NO_STRING; cell_count]
+        };
         let mut text_bounds = text_offsets.windows(2);
         for (offset, &kind) in kinds.iter().enumerate() {
             if kind != KIND_STRING {
@@ -685,7 +698,7 @@ impl CellStore {
             let Some(&[start, end]) = text_bounds.next() else {
                 return BLOCK_SOURCE_INVALID;
             };
-            if source_kinds[offset] != 0 {
+            if source_kinds.get(offset).is_some_and(|&source| source != 0) {
                 continue;
             }
             string_ids[offset] = self.intern(&source_text[start as usize..end as usize]);
@@ -699,7 +712,7 @@ impl CellStore {
             prepared,
             |row, col| {
                 let offset = order.index(row, col, rows, cols);
-                if source_kinds[offset] != 0 {
+                if source_kinds.get(offset).is_some_and(|&source| source != 0) {
                     return (KIND_FORMULA, 0, styles[offset]);
                 }
                 let (kind, payload) = match kinds[offset] {

@@ -3254,14 +3254,7 @@ function subtotal_filtered_fixture(count: number): TimedFixture {
     numeric_column(count, (row) => row + 1),
     0,
   );
-  const hidden: number[] = [];
-  for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
-    hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
-  }
-  assert(
-    store.setHiddenRows(sheet, new Uint32Array(), Uint32Array.from(hidden)),
-    "subtotal-filtered: hidden rows rejected",
-  );
+  assert(hide_every_other_block(store, sheet, count), "subtotal-filtered: hidden rows rejected");
   store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
   store.recompute(sheet);
   return {
@@ -3274,6 +3267,37 @@ function subtotal_filtered_fixture(count: number): TimedFixture {
     dispose: () => store.free(),
     restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
+}
+
+/** An engine before `setRowVisibility`, which took the filtered rows as runs. */
+interface HiddenRunsStore {
+  setHiddenRows(sheet: number, manual: Uint32Array, filtered: Uint32Array): boolean;
+}
+
+function takes_hidden_runs(store: object): store is HiddenRunsStore {
+  return "setHiddenRows" in store && !("setRowVisibility" in store);
+}
+
+/**
+ * Hides every other block of `SUBTOTAL_BLOCK_ROWS` rows, as a filter would.
+ * The gate runs this harness on older base engines too, which take the
+ * filtered rows as runs instead of the rows the filter keeps.
+ */
+function hide_every_other_block(store: CellStore, sheet: number, count: number): boolean {
+  const manual = new Uint32Array();
+  if (takes_hidden_runs(store)) {
+    const hidden: number[] = [];
+    for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
+      hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
+    }
+    return store.setHiddenRows(sheet, manual, Uint32Array.from(hidden));
+  }
+
+  const kept: number[] = [];
+  for (let row = 0; row < count; row++) {
+    if (Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0) kept.push(row);
+  }
+  return store.setRowVisibility(sheet, manual, Uint32Array.from(kept));
 }
 
 /**
