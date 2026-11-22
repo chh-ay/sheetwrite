@@ -43,7 +43,13 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/document.ts",
     "window-reader.ts",
   ],
-  "view-patches.ts": ["../plain-data.ts", "../types/coordinates.ts", "../types/document.ts"],
+  "view-patches.ts": [
+    // Marks a filter's copied picks as owned, so the transaction measures them in one pass.
+    "../json-bytes.ts",
+    "../plain-data.ts",
+    "../types/coordinates.ts",
+    "../types/document.ts",
+  ],
   "view-state.ts": [
     "../errors.ts",
     "../plain-data.ts",

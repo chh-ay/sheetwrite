@@ -80,7 +80,7 @@ import {
   validatePivotReferences,
   validatePivotShape,
 } from "../pivot.js";
-import { cloneJsonValue } from "../plain-data.js";
+import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -821,20 +821,21 @@ export class StoreDataEngine {
       throw store_failure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
 
-    assertWorkbookTables(
-      workbook.sheets,
-      DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-      (workbook.namedRanges ?? []).map((range) => range.name),
-    );
-
+    // The store checked the tables already, in `assertWorkbookAllocationLimits`.
     assertWorkbookCharts(workbook.sheets);
 
     this.workbook = workbook;
     this.sheets = new SheetRegistry(workbook);
     this.storage_options = options;
     this.wasm = new (getEngine().CellStore)();
-    this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
-    this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    // A new engine starts with the default limits, the engine's ceilings.
+    if (
+      storageLimits.maxDenseCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ||
+      storageLimits.maxLocalPagedCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells
+    ) {
+      this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
+      this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    }
     this.view = new StoreViewState(this.wasm, this.sheets);
     this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
     this.snapshot_codec = new StoreSnapshotCodec(
@@ -872,8 +873,14 @@ export class StoreDataEngine {
 
       this.sheets.handles.set(sheet.id, handle);
       this.sheet_ids_by_handle[handle] = sheet.id;
-      this.sync_spill_blockers(sheet);
-      this.view.queueHiddenRows(sheet.id);
+      if (
+        (sheet.merges?.length ?? 0) > 0 ||
+        (sheet.protectedRanges?.length ?? 0) > 0 ||
+        (sheet.validationRules?.length ?? 0) > 0
+      )
+        this.sync_spill_blockers(sheet);
+      if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
+        this.view.queueHiddenRows(sheet.id);
     }
 
     // Before any formula is loaded, so formulas find the links they read.
@@ -904,7 +911,12 @@ export class StoreDataEngine {
       }
     }
 
-    if (!this.sync_relationships(workbook.dataModel)) {
+    // A new engine holds no relationships or measures.
+    const model = workbook.dataModel;
+    if (
+      ((model?.relationships?.length ?? 0) > 0 || (model?.measures?.length ?? 0) > 0) &&
+      !this.sync_relationships(model)
+    ) {
       this.wasm.free();
       throw store_failure("invalid-snapshot", "invalid data model");
     }
@@ -4018,7 +4030,7 @@ export class StoreDataEngine {
           if (patch.patch.filters !== undefined) {
             sheet.filters = patch.patch.filters.map(([col, filter]) => [
               col,
-              cloneJsonValue(filter),
+              cloneColumnFilter(filter),
             ]);
           }
 

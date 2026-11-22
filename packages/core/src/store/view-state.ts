@@ -1,5 +1,5 @@
 import { SheetwriteError } from "../errors.js";
-import { cloneJsonValue } from "../plain-data.js";
+import { cloneColumnFilter } from "../plain-data.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
@@ -178,7 +178,7 @@ export class StoreViewState {
 
     state.sortKeys = meta.sortKeys?.map((key) => ({ ...key })) ?? [];
     state.filters = new Map(
-      meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? [],
+      meta.filters?.map(([col, filter]) => [col, cloneColumnFilter(filter)]) ?? [],
     );
     state.hiddenRows = new Set(meta.hiddenRows ?? []);
     state.groups = meta.rowGroups?.map((group) => ({ ...group })) ?? [];
@@ -545,7 +545,9 @@ export class StoreViewState {
       const meta = this.sheets.sheetMeta(sheet);
       state = {
         sortKeys: meta.sortKeys?.map((key) => ({ ...key })) ?? [],
-        filters: new Map(meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? []),
+        filters: new Map(
+          meta.filters?.map(([col, filter]) => [col, cloneColumnFilter(filter)]) ?? [],
+        ),
         hiddenRows: new Set(meta.hiddenRows ?? []),
         groups: meta.rowGroups?.map((group) => ({ ...group })) ?? [],
       };

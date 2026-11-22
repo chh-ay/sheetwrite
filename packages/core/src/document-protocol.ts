@@ -159,12 +159,13 @@ const TRANSACTION_RESOURCE_KEYS = [
  * caller-owned object. Every ceiling is an inclusive non-negative safe integer.
  *
  * @param overrides - Limits to change; the others keep their defaults.
- * @returns A frozen copy of the full set of limits.
+ * @returns The full set of limits, frozen.
  * @throws SheetwriteError with code `invalid-limits` when a value is not a non-negative safe integer.
  */
 export function resolveTransactionResourceLimits(
-  overrides: Partial<TransactionResourceLimits> = {},
+  overrides?: Partial<TransactionResourceLimits>,
 ): Readonly<TransactionResourceLimits> {
+  if (overrides === undefined) return DEFAULT_TRANSACTION_RESOURCE_LIMITS;
   const limits: TransactionResourceLimits = { ...DEFAULT_TRANSACTION_RESOURCE_LIMITS };
   for (const resource of TRANSACTION_RESOURCE_KEYS) {
     const value = overrides[resource];
@@ -556,7 +557,7 @@ export class SnapshotValidationError extends SheetwriteError {
 
 interface ResolvedSnapshotValidationOptions {
   readonly storage: SnapshotStorageMode;
-  readonly limits: SnapshotResourceLimits;
+  readonly limits: Readonly<SnapshotResourceLimits>;
 }
 
 const SNAPSHOT_RESOURCE_KEYS = [
@@ -655,6 +656,9 @@ function resolve_snapshot_validation_options(
       message: "Snapshot storage must be dense or paged",
     };
   }
+  // The defaults are within the engine's ceilings already.
+  if (options.resourceLimits === undefined)
+    return { storage, limits: DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
   const overrides: Partial<SnapshotResourceLimits> = {};
   for (const resource of SNAPSHOT_RESOURCE_KEYS) {
     const override = options.resourceLimits?.[resource];
@@ -668,15 +672,15 @@ function resolve_snapshot_validation_options(
     }
     overrides[resource] = override;
   }
-  return { storage, limits: resolveSnapshotResourceLimits(overrides) };
+  return { storage, limits: resolve_snapshot_resource_limits(overrides) };
 }
 
 /**
  * `DEFAULT_SNAPSHOT_RESOURCE_LIMITS` with validated `overrides` over it, and
  * `maxDenseCells` and `maxLocalPagedCells` capped at the engine's ceilings,
- * which the store also gives the engine.
+ * which `assertWorkbookAllocationLimits` returns to the store.
  */
-export function resolveSnapshotResourceLimits(
+function resolve_snapshot_resource_limits(
   overrides: Partial<SnapshotResourceLimits> = {},
 ): SnapshotResourceLimits {
   const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
@@ -857,11 +861,14 @@ function preflight_snapshot_resources(
   return undefined;
 }
 
-/** Reject workbook dimensions before a direct store or grid allocates JS/WASM buffers. */
+/**
+ * Reject workbook dimensions before a direct store or grid allocates JS/WASM
+ * buffers, and return the resolved limits the workbook met.
+ */
 export function assertWorkbookAllocationLimits(
   workbook: Workbook,
   options: SnapshotValidationOptions = {},
-): void {
+): Readonly<SnapshotResourceLimits> {
   const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) {
     throw new SheetwriteError(
@@ -982,6 +989,7 @@ export function assertWorkbookAllocationLimits(
       );
     }
   }
+  return limits;
 }
 
 function invalid(
@@ -1036,7 +1044,10 @@ function require_string(
   return undefined;
 }
 
-/** Reads one field of a record under validation: `ownValue`, or `walked_field` after the JSON-safety walk. */
+/**
+ * Reads one field of a record under validation: `ownValue`, or `walked_field`
+ * or `built_field` after the JSON-safety walk.
+ */
 type FieldReader = (record: PlainRecord, key: string) => unknown;
 
 function optional_string(
@@ -1809,14 +1820,15 @@ function validate_workbook_table_shape(
 }
 
 /**
- * `walked` says the JSON-safety walk accepted `value` in this validation, with
- * no code run since, so its cells may be accepted by `is_valid_walked_cell`.
+ * `walked` is given when the JSON-safety walk accepted `value` in this
+ * validation, with no code run since: its cells may then be accepted by
+ * `is_valid_walked_cell`, reading their fields with `walked`.
  */
 function validate_sheet_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
-  walked = false,
+  walked?: FieldReader,
 ): void {
   const sheet = record_at(value, path, errors);
   if (!sheet) return;
@@ -2013,7 +2025,7 @@ function validate_sheet_shape(
     }
     const cells = array_at(ownValue(block, "cells"), `${block_path}.cells`, errors);
     cells?.forEach((cell_entry, cell_index) => {
-      if (walked && is_valid_walked_cell(cell_entry, valid_styles)) return;
+      if (walked && is_valid_walked_cell(cell_entry, valid_styles, walked)) return;
       // Paths are read only by recorded errors, and almost every cell is valid,
       // so a cell's three path strings are built only to report the errors a
       // path-free pass already found.
@@ -2060,33 +2072,74 @@ function walked_field(record: PlainRecord, key: string): unknown {
 }
 
 /**
+ * `record[key]`, for a snapshot its caller built in this call from plain data
+ * (`builtByCaller`), whose own fields are all enumerable data properties. A
+ * direct read then gives the value `walked_field` gives, as long as
+ * `Object.prototype` has only its standard properties, none of them a
+ * snapshot field. It skips the property check that took a fifth of
+ * validating an imported workbook.
+ */
+function built_field(record: PlainRecord, key: string): unknown {
+  return record[key];
+}
+
+/** The own properties of an `Object.prototype` no code has added to. */
+const STANDARD_OBJECT_PROTOTYPE_KEYS: ReadonlySet<string> = new Set([
+  "constructor",
+  "toString",
+  "toLocaleString",
+  "valueOf",
+  "hasOwnProperty",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
+  "__defineGetter__",
+  "__defineSetter__",
+  "__lookupGetter__",
+  "__lookupSetter__",
+  "__proto__",
+]);
+
+/** The reader for cells the JSON-safety walk accepted: `built_field` when it is exact. */
+function walked_cell_reader(built_by_caller: boolean): FieldReader {
+  if (!built_by_caller) return walked_field;
+  const prototype_is_standard = Object.getOwnPropertyNames(Object.prototype).every((key) =>
+    STANDARD_OBJECT_PROTOTYPE_KEYS.has(key),
+  );
+  return prototype_is_standard ? built_field : walked_field;
+}
+
+/**
  * Whether `validate_cell_shape` accepts `entry`, decided with direct reads and
  * without building paths. Only for a cell the JSON-safety walk accepted in
  * this validation. False means "check fully", not "invalid": a reference
  * cell or a style that fails takes the full check, which reports the errors.
  * `valid_styles` holds the style objects already accepted in this validation.
  */
-function is_valid_walked_cell(entry: unknown, valid_styles: Set<unknown>): boolean {
+function is_valid_walked_cell(
+  entry: unknown,
+  valid_styles: Set<unknown>,
+  read: FieldReader,
+): boolean {
   if (!isPlainRecord(entry)) return false;
   if (
-    !non_negative_integer(walked_field(entry, "rowOffset")) ||
-    !non_negative_integer(walked_field(entry, "colOffset"))
+    !non_negative_integer(read(entry, "rowOffset")) ||
+    !non_negative_integer(read(entry, "colOffset"))
   ) {
     return false;
   }
-  const value = walked_field(entry, "value");
+  const value = read(entry, "value");
   if (!isPlainRecord(value)) return false;
-  const kind = walked_field(value, "kind");
+  const kind = read(value, "kind");
   const valid =
     kind === "literal"
-      ? scalar(walked_field(value, "value"))
-      : kind === "formula" && typeof walked_field(value, "src") === "string";
+      ? scalar(read(value, "value"))
+      : kind === "formula" && typeof read(value, "src") === "string";
   if (!valid) return false;
 
-  const style = walked_field(entry, "style");
+  const style = read(entry, "style");
   if (style === undefined || valid_styles.has(style)) return true;
   const style_errors: DocumentValidationError[] = [];
-  validate_cell_style(style, "", style_errors, walked_field);
+  validate_cell_style(style, "", style_errors, read);
   if (style_errors.length > 0) return false;
   valid_styles.add(style);
   return true;
@@ -3228,6 +3281,85 @@ function cell_block_in_sheet(block: SheetSnapshot["cells"][number], sheet: Sheet
   );
 }
 
+// The checks that visit every cell live in small functions of their own, out of
+// `validate_json_safe_snapshot`. JavaScriptCore optimizes a long loop in a
+// background compilation, and until that compilation is used or dropped it keeps
+// every value the function's variables held when it started. The large function
+// runs once per snapshot, so its loops ended before their compilation was ready,
+// and the compilation kept the whole imported workbook alive for dozens of
+// collections (35 MB after importing the XLSX benchmark corpus). A small
+// function compiles in time to be used, and its variables reach one block.
+
+/** What the cell checks of one block need from its sheet. */
+interface BlockCellScope {
+  /** Path of the block, such as `sheets[0].cells[2]`. */
+  readonly path: string;
+  readonly inBounds: boolean;
+  /** Addresses seen so far in the sheet; only a sheet with a duplicate address has one. */
+  readonly occupied: Set<number> | undefined;
+  readonly sheetWidth: number;
+  readonly errors: DocumentValidationError[];
+}
+
+/**
+ * Report each cell of `block` that lies outside the block and, when the sheet
+ * has a duplicate address, each cell whose address an earlier cell holds.
+ */
+function validate_block_cells(block: SheetSnapshot["cells"][number], scope: BlockCellScope): void {
+  const { path, inBounds: in_bounds, occupied, sheetWidth: sheet_width, errors } = scope;
+  for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+    const cell = block.cells[cell_index];
+    // The shape checks reject holes; this only narrows the type.
+    if (cell === undefined) continue;
+    if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
+      invalid(
+        errors,
+        `${path}.cells[${cell_index}]`,
+        "Cell offset lies outside its block",
+        "out-of-bounds",
+      );
+      continue;
+    }
+
+    if (!in_bounds || !occupied) continue;
+    const key = (block.startRow + cell.rowOffset) * sheet_width + block.startCol + cell.colOffset;
+    if (occupied.has(key)) {
+      invalid(
+        errors,
+        `${path}.cells[${cell_index}]`,
+        "A snapshot cell may appear only once",
+        "duplicate-id",
+      );
+    }
+
+    occupied.add(key);
+  }
+}
+
+/** Report each reference cell of `block`, at `path`, whose target is not in an existing sheet. */
+function validate_block_references(
+  block: SheetSnapshot["cells"][number],
+  path: string,
+  sheet_by_id: ReadonlyMap<string, SheetSnapshot>,
+  errors: DocumentValidationError[],
+): void {
+  for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+    const cell = block.cells[cell_index];
+    // The shape checks reject holes; this only narrows the type.
+    if (cell === undefined || cell.value.kind !== "ref") continue;
+    const target_sheet = sheet_by_id.get(cell.value.target.sheet);
+    const target_path = `${path}.cells[${cell_index}].value.target`;
+    if (!target_sheet) {
+      invalid(errors, target_path, "Cell reference sheet must exist", "missing-reference");
+    } else if (
+      cell.value.target.row >= target_sheet.rowCount ||
+      cell.value.target.col >= target_sheet.columns.length
+    ) {
+      invalid(errors, target_path, "Cell reference target lies outside the sheet", "out-of-bounds");
+    }
+  }
+}
+
 /**
  * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
  * replaces a Set entry per cell, which cost about 100 bytes each and made
@@ -3304,7 +3436,10 @@ function validate_snapshot_pivots(
   }
 }
 
-function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
+function validate_json_safe_snapshot(
+  input: unknown,
+  built_by_caller: boolean,
+): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
   const candidate = record_at(input, "$", errors);
   if (!candidate) return { ok: false, errors };
@@ -3364,9 +3499,10 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
     invalid(errors, "sheets", "At least one sheet is required");
   }
 
+  // `validate_snapshot` runs the JSON-safety walk over `input` first.
+  const cell_reader = walked_cell_reader(built_by_caller);
   sheets?.forEach((sheet, index) => {
-    // `validateWorkbookSnapshot` runs the JSON-safety walk over `input` first.
-    validate_sheet_shape(sheet, `sheets[${index}]`, errors, true);
+    validate_sheet_shape(sheet, `sheets[${index}]`, errors, cell_reader);
   });
 
   if (errors.length > 0) return { ok: false, errors };
@@ -3441,32 +3577,13 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
         invalid(errors, block_path, "Cell block lies outside the sheet", "out-of-bounds");
       }
 
-      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
-        const cell = block.cells[cell_index]!;
-        if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
-          invalid(
-            errors,
-            `${block_path}.cells[${cell_index}]`,
-            "Cell offset lies outside its block",
-            "out-of-bounds",
-          );
-          continue;
-        }
-
-        if (!block_in_bounds || !occupied) continue;
-        const key =
-          (block.startRow + cell.rowOffset) * sheet_width + block.startCol + cell.colOffset;
-        if (occupied.has(key)) {
-          invalid(
-            errors,
-            `${block_path}.cells[${cell_index}]`,
-            "A snapshot cell may appear only once",
-            "duplicate-id",
-          );
-        }
-
-        occupied.add(key);
-      }
+      validate_block_cells(block, {
+        path: block_path,
+        inBounds: block_in_bounds,
+        occupied,
+        sheetWidth: sheet_width,
+        errors,
+      });
     }
 
     const metadata_rows = new Set<number>();
@@ -3751,27 +3868,13 @@ function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
   const sheet_by_id = new Map(validated.sheets.map((sheet) => [sheet.id, sheet]));
   for (let sheet_index = 0; sheet_index < validated.sheets.length; sheet_index++) {
     const sheet = validated.sheets[sheet_index]!;
-    for (let block_index = 0; block_index < sheet.cells.length; block_index++) {
-      const block = sheet.cells[block_index]!;
-      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
-        const cell = block.cells[cell_index]!;
-        if (cell.value.kind !== "ref") continue;
-        const target_sheet = sheet_by_id.get(cell.value.target.sheet);
-        const target_path = `sheets[${sheet_index}].cells[${block_index}].cells[${cell_index}].value.target`;
-        if (!target_sheet) {
-          invalid(errors, target_path, "Cell reference sheet must exist", "missing-reference");
-        } else if (
-          cell.value.target.row >= target_sheet.rowCount ||
-          cell.value.target.col >= target_sheet.columns.length
-        ) {
-          invalid(
-            errors,
-            target_path,
-            "Cell reference target lies outside the sheet",
-            "out-of-bounds",
-          );
-        }
-      }
+    for (const [block_index, block] of sheet.cells.entries()) {
+      validate_block_references(
+        block,
+        `sheets[${sheet_index}].cells[${block_index}]`,
+        sheet_by_id,
+        errors,
+      );
     }
 
     for (const [link_index, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
@@ -3952,7 +4055,7 @@ function validate_snapshot(
     );
     if (issue) return { ok: false, errors: [issue] };
 
-    return validate_json_safe_snapshot(input);
+    return validate_json_safe_snapshot(input, built_by_caller);
   } catch (error) {
     const resource_failure = error instanceof RangeError;
     return {
