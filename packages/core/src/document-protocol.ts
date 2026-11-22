@@ -857,11 +857,14 @@ function preflight_snapshot_resources(
   return undefined;
 }
 
-/** Reject workbook dimensions before a direct store or grid allocates JS/WASM buffers. */
+/**
+ * Reject workbook dimensions before a direct store or grid allocates JS/WASM
+ * buffers, and return the resolved limits the workbook met.
+ */
 export function assertWorkbookAllocationLimits(
   workbook: Workbook,
   options: SnapshotValidationOptions = {},
-): void {
+): SnapshotResourceLimits {
   const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) {
     throw new SheetwriteError(
@@ -982,6 +985,7 @@ export function assertWorkbookAllocationLimits(
       );
     }
   }
+  return limits;
 }
 
 function invalid(
