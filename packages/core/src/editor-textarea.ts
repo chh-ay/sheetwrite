@@ -51,18 +51,29 @@ export function readEditorFieldMetrics(field: HTMLTextAreaElement): EditorFieldM
 }
 
 /**
- * Keep explicit lines visible, with scrolling after eight lines. No soft wrapping.
- * A caller that keeps the field's styles can pass metrics it read before, so
- * sizing reads only the field's own box after writing the height.
+ * The height that shows `lines` explicit lines, up to eight, and never less
+ * than `minimumHeight`. Past eight lines the field scrolls.
  */
-export function sizeEditorTextarea(
-  field: HTMLTextAreaElement,
+export function editorTextareaHeight(
+  lines: number,
   minimumHeight: number,
-  metrics: EditorFieldMetrics | null = readEditorFieldMetrics(field),
-): void {
+  metrics: EditorFieldMetrics,
+): number {
+  return Math.max(
+    minimumHeight,
+    Math.min(MAX_VISIBLE_EDITOR_LINES, lines) * metrics.lineHeight + metrics.inset,
+  );
+}
+
+/**
+ * Keep explicit lines visible, with scrolling after eight lines, and room for
+ * a classic horizontal scrollbar under the last line. No soft wrapping. Reads
+ * the field's computed style and its box: the formula bar sizes this way.
+ */
+export function sizeEditorTextarea(field: HTMLTextAreaElement, minimumHeight: number): void {
+  const metrics = readEditorFieldMetrics(field);
   if (metrics === null) return;
-  const lines = Math.min(MAX_VISIBLE_EDITOR_LINES, field.value.split("\n").length);
-  const height = Math.max(minimumHeight, lines * metrics.lineHeight + metrics.inset);
+  const height = editorTextareaHeight(editorLineCount(field.value), minimumHeight, metrics);
   field.style.height = `${height}px`;
   // Classic scrollbars consume a line's space; overlay scrollbars do not.
   const scrollbar_height = field.offsetHeight - field.clientHeight - metrics.borders;

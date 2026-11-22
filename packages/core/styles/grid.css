@@ -88,7 +88,12 @@
   padding: 0 calc(var(--sheetwrite-cell-pad, 6px) - 2px);
   box-sizing: border-box;
   z-index: 3;
-  overflow: auto;
+  /* A long line scrolls with the caret, as Excel's in-cell editor does,
+     without a scrollbar: a classic one would cover the line, and making room
+     for it means reading the editor's layout on every open (editor.ts). More
+     than eight lines scroll vertically. */
+  overflow-x: hidden;
+  overflow-y: auto;
   white-space: pre;
 }
 

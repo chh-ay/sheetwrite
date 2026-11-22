@@ -724,6 +724,26 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
     expect(await formula_in_g3()).toBe(source);
   }
 
+  // A long line scrolls with the caret, as in Excel: the cell editor shows no
+  // horizontal scrollbar, so it stays one cell high and is sized without
+  // reading its layout.
+  await select(page, "G3");
+  await page.keyboard.press("F2");
+  await cell_editor.fill("Short");
+  const one_line_height = await cell_editor.evaluate(
+    (field) => field.getBoundingClientRect().height,
+  );
+  await cell_editor.fill("A line far wider than its cell ".repeat(8));
+  await cell_editor.press("End");
+  const long_line = await cell_editor.evaluate((field) => ({
+    overflowX: getComputedStyle(field).overflowX,
+    height: field.getBoundingClientRect().height,
+    scrolled: field.scrollLeft > 0,
+  }));
+  expect(long_line).toEqual({ overflowX: "hidden", height: one_line_height, scrolled: true });
+  await cell_editor.press("Escape");
+  expect(await formula_in_g3()).toBe(source);
+
   // Pick From Drop-down List under the Region column, with the real Alt (Option
   // on a Mac) and arrow keys; the header is a text entry too, as in Excel.
   await select(page, "B50");
