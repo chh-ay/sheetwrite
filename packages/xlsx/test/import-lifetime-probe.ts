@@ -8,7 +8,7 @@
 // does not collect.
 import type { WorkbookSnapshot } from "@sheetwrite/core";
 
-import { collectFromFreshStacks } from "../../core/test/collect-garbage.js";
+import { collectUntilFreed } from "../../core/test/collect-garbage.js";
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 
 /**
@@ -34,7 +34,8 @@ async function import_weakly(bytes: Uint8Array): Promise<WeakRef<object>[]> {
 
 const bytes = new Uint8Array(await Bun.stdin.arrayBuffer());
 const refs = await import_weakly(bytes);
-await collectFromFreshStacks();
+// Five collections, without waiting for a compilation to let go.
+await collectUntilFreed(refs, 0);
 
 process.stdout.write(
   `${JSON.stringify({
