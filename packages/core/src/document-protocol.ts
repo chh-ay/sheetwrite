@@ -159,12 +159,13 @@ const TRANSACTION_RESOURCE_KEYS = [
  * caller-owned object. Every ceiling is an inclusive non-negative safe integer.
  *
  * @param overrides - Limits to change; the others keep their defaults.
- * @returns A frozen copy of the full set of limits.
+ * @returns The full set of limits, frozen.
  * @throws SheetwriteError with code `invalid-limits` when a value is not a non-negative safe integer.
  */
 export function resolveTransactionResourceLimits(
-  overrides: Partial<TransactionResourceLimits> = {},
+  overrides?: Partial<TransactionResourceLimits>,
 ): Readonly<TransactionResourceLimits> {
+  if (overrides === undefined) return DEFAULT_TRANSACTION_RESOURCE_LIMITS;
   const limits: TransactionResourceLimits = { ...DEFAULT_TRANSACTION_RESOURCE_LIMITS };
   for (const resource of TRANSACTION_RESOURCE_KEYS) {
     const value = overrides[resource];
@@ -556,7 +557,7 @@ export class SnapshotValidationError extends SheetwriteError {
 
 interface ResolvedSnapshotValidationOptions {
   readonly storage: SnapshotStorageMode;
-  readonly limits: SnapshotResourceLimits;
+  readonly limits: Readonly<SnapshotResourceLimits>;
 }
 
 const SNAPSHOT_RESOURCE_KEYS = [
@@ -655,6 +656,9 @@ function resolve_snapshot_validation_options(
       message: "Snapshot storage must be dense or paged",
     };
   }
+  // The defaults are within the engine's ceilings already.
+  if (options.resourceLimits === undefined)
+    return { storage, limits: DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
   const overrides: Partial<SnapshotResourceLimits> = {};
   for (const resource of SNAPSHOT_RESOURCE_KEYS) {
     const override = options.resourceLimits?.[resource];
@@ -864,7 +868,7 @@ function preflight_snapshot_resources(
 export function assertWorkbookAllocationLimits(
   workbook: Workbook,
   options: SnapshotValidationOptions = {},
-): SnapshotResourceLimits {
+): Readonly<SnapshotResourceLimits> {
   const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) {
     throw new SheetwriteError(
