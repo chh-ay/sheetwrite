@@ -1462,6 +1462,18 @@ struct SlotPair {
     slot: u32,
 }
 
+/// What [`PivotCache::update_values`] did with a row.
+enum RowUpdate {
+    /// The row kept its groups and its new values replaced the old ones.
+    InPlace,
+    /// A key moved the row; its keys, free of errors, are in `keys`, read
+    /// after the filters passed.
+    KeysRead,
+    /// The row was not grouped, a filter now drops it, or a key holds an
+    /// error; the caller reads the row again.
+    Skipped,
+}
+
 /// The kind and payload `value` contributes to a value field aggregated by
 /// `aggregation`. DISTINCTCOUNT text takes a reference to the id of its
 /// case fold, which the row releases when it stops contributing it.
@@ -1889,13 +1901,23 @@ impl PivotCache {
         let mut col_orphans = Vec::new();
         for &row in rows {
             let index = row as usize;
-            if self.update_values(index, source) {
-                continue;
-            }
+            let keys_read = match self.update_values(index, source) {
+                RowUpdate::InPlace => continue,
+                RowUpdate::KeysRead => true,
+                RowUpdate::Skipped => false,
+            };
             let row_leaf = self.row_leaf[index];
             let col_leaf = self.col_leaf[index];
             self.remove_row(index);
-            self.add_row(index, source);
+            if keys_read {
+                // The check passed the filters and left the row's keys,
+                // free of errors, in `self.keys`: enter them without a
+                // second read.
+                self.enter_keys(index, source);
+                self.apply_row(index, true, true);
+            } else {
+                self.add_row(index, source);
+            }
 
             // Keep the old axis membership until the replacement enters:
             // changing a singleton's value must not destroy its layout.
@@ -1950,26 +1972,38 @@ impl PivotCache {
         if !self.passes_filters(row, source) {
             return false;
         }
-
         // Read and check every key first, so a key error leaves both axes as
         // they were.
+        if let Err(error) = self.read_keys(row, source) {
+            self.key_errors.insert(row as u32, error);
+            return false;
+        }
+        self.enter_keys(row, source);
+        true
+    }
+
+    /// Reads `row`'s row and column keys into `self.keys`, stopping at the
+    /// first key that holds an error.
+    fn read_keys(&mut self, row: usize, source: &impl PivotSource) -> Result<(), FormulaError> {
         let mut keys = std::mem::take(&mut self.keys);
         keys.clear();
-        let mut key_error = None;
+        let mut result = Ok(());
         for &field in self.definition.rows.iter().chain(&self.definition.columns) {
             let value = source.value(row, field);
             if let Err(error) = key_part(&value) {
-                key_error = Some(error);
+                result = Err(error);
                 break;
             }
             keys.push(value);
         }
-        if let Some(error) = key_error {
-            self.keys = keys;
-            self.key_errors.insert(row as u32, error);
-            return false;
-        }
+        self.keys = keys;
+        result
+    }
 
+    /// [`Self::enter_row`] for a row that passed the filters and whose keys,
+    /// free of errors, are in `self.keys`.
+    fn enter_keys(&mut self, row: usize, source: &impl PivotSource) {
+        let keys = std::mem::take(&mut self.keys);
         let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
         let (row_leaf, row_changed) = self.row_axis.enter(row_keys, row as u32);
         let (col_leaf, col_changed) = self.col_axis.enter(col_keys, row as u32);
@@ -1989,8 +2023,6 @@ impl PivotCache {
             self.contribution_kinds[row * values + index] = kind;
             self.contribution_payloads[row * values + index] = payload;
         }
-
-        true
     }
 
     fn passes_filters(&mut self, row: usize, source: &impl PivotSource) -> bool {
@@ -2003,23 +2035,22 @@ impl PivotCache {
     /// Replaces the values `row` contributes when its keys and filter fields
     /// keep it in its groups: each pair on its paths takes the old values
     /// out and the new ones in with one lookup, where leaving and entering
-    /// the groups looks every pair up twice. Returns false, having changed
-    /// nothing, for any other row.
-    fn update_values(&mut self, row: usize, source: &impl PivotSource) -> bool {
+    /// the groups looks every pair up twice. Any other row changes nothing;
+    /// see [`RowUpdate`] for what it leaves behind.
+    fn update_values(&mut self, row: usize, source: &impl PivotSource) -> RowUpdate {
         let (row_leaf, col_leaf) = (self.row_leaf[row], self.col_leaf[row]);
         if row_leaf == NO_GROUP || !self.passes_filters(row, source) {
-            return false;
+            return RowUpdate::Skipped;
         }
-        let mut keys = std::mem::take(&mut self.keys);
-        keys.clear();
-        let fields = self.definition.rows.iter().chain(&self.definition.columns);
-        keys.extend(fields.map(|&field| source.value(row, field)));
-        let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
+        if self.read_keys(row, source).is_err() {
+            // The old path records the key error.
+            return RowUpdate::Skipped;
+        }
+        let (row_keys, col_keys) = self.keys.split_at(self.definition.rows.len());
         let kept = self.row_axis.selects(row_leaf, row_keys, row as u32)
             && self.col_axis.selects(col_leaf, col_keys, row as u32);
-        self.keys = keys;
         if !kept {
-            return false;
+            return RowUpdate::KeysRead;
         }
 
         let mut contributions = std::mem::take(&mut self.contributions);
@@ -2034,7 +2065,7 @@ impl PivotCache {
         }
         self.replace_contributions(row, &contributions);
         self.contributions = contributions;
-        true
+        RowUpdate::InPlace
     }
 
     /// Swaps `row`'s recorded contributions for `contributions` in every
