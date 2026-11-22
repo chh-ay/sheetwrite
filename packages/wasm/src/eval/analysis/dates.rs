@@ -148,9 +148,9 @@ fn holidays(values: &FuncAccumulator, weekend: &[bool; 7]) -> Result<Vec<i64>, F
             working_holidays.push(serial);
         }
     }
-    working_holidays.sort_unstable();
-    working_holidays.dedup();
-    Ok(working_holidays)
+    let mut sorted = crate::sorting::sort_i64(working_holidays);
+    sorted.dedup();
+    Ok(sorted)
 }
 
 fn workday_count(start: i64, end: i64, weekend: &[bool; 7], holidays: &[i64]) -> i64 {

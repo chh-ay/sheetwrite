@@ -4,6 +4,14 @@ import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 
 export const RENDER_PROTOCOL_VERSION = 1;
 export const RENDER_MINIMUM_SAMPLE_MS = 100;
+/**
+ * Untimed aggregate samples before each scenario's measured ones. With one,
+ * the scenario that ran first in a page was still on code the browser had not
+ * finished optimizing: edit-open on 0.7.0 with #1169 and #1172 measured 1.51×
+ * 0.6.1 first in the page and 1.16× second. With five, it measures 1.13–1.21×
+ * in either place.
+ */
+export const RENDER_WARMUP_SAMPLES = 5;
 export const RENDER_MAX_LAUNCH_ATTEMPTS = 2;
 export const RENDER_VIEWPORT = { width: 640, height: 480 } as const;
 export const RENDER_ORDER_SEED = 0x51c0ffee;
