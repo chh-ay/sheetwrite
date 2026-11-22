@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Fonts screenshot, scrolled to the comment in column G, starts at column C's gridline instead of mid-column B ("ger", "y Brooks"), now that a scroll into view moves by whole columns and rows.
 - The screenshots that show the ribbon are recaptured with its groups that don't fit folded into one labelled button, such as "Show/Hide ▾", instead of bare icons. The Fonts capture opens the folded Alignment menu, so Wrap Text and Top Align still show as on.
 - API pages of names that differ only in letter case no longer share an address. Each page's path is its name in kebab case, which drops letter case, so `ShownSuggestion` and `shownSuggestion` both became `shown-suggestion` and the generator refused the second. Now the first of such names keeps the plain path, values before types, and each other one adds its kind: the `ShownSuggestion` type is at `/docs/api/core-testing/shown-suggestion-interface/`. Every other page keeps its address. `docs:check` fails when two pages of one entry point still fold to the same path, compared without letter case.
 - The grid overview, selection, sort, status bar and validation screenshots are recaptured now that their fixes are in: the validation list keeps the cell's value in sight, the status totals use the active cell's number format, and the sheet tabs and status share the row by the new rules. The other screenshots are recaptured with the new sheet tab bar too. The Delivery size axis steps in round numbers of its unit (200, 400, 600 KiB) instead of 0.2 MiB shown as 204.8, 409.6 and 614.4 KiB.
