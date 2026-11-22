@@ -1,5 +1,6 @@
-# Dependencies
-node_modules/
+# Dependencies. No trailing slash, so the node_modules symlinks that
+# test/bundler-fixtures/first-paint/run.mjs creates are ignored too.
+node_modules
 
 # Build outputs
 dist/
