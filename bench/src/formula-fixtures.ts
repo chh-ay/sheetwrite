@@ -3254,10 +3254,7 @@ function subtotal_filtered_fixture(count: number): TimedFixture {
     numeric_column(count, (row) => row + 1),
     0,
   );
-  assert(
-    hide_every_other_block(store, sheet, count),
-    "subtotal-filtered: hidden rows rejected",
-  );
+  assert(hide_every_other_block(store, sheet, count), "subtotal-filtered: hidden rows rejected");
   store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
   store.recompute(sheet);
   return {
