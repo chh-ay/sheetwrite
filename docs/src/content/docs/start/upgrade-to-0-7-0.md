@@ -787,6 +787,9 @@ the sort on the table's header buttons.
 | On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. |
 | `GROUPBY` and `PIVOTBY` compute large sources that Excel computes: their source rows no longer count against the 2,000,000-operation limit. A call that places more than 16,777,216 rows into groups returns `#NUM!`. |
 | `GETPIVOTDATA` is no longer volatile. It recalculates when its pivot's output changes, as in Excel, not on every edit. |
+| A function that takes one value, such as `ABS`, `ROUND`, `LEN`, `UPPER`, `DATE`, or the full engine's `FACT` and `TEXTBEFORE`, runs once for each element when it gets an array or a range, and spills the results, as in Excel 365. `=ABS(A1:A3)` spills three results where it gave the first cell's, and shows `#SPILL!` where the cells below hold values. `=SUM(LEN(A1:A3))` adds every length instead of the first. |
+| `IF`, `IFERROR`, `IFNA`, `IFS`, `SWITCH` and `CHOOSE` take an array or a range: `=IF(A1:A3>1,"big","small")` spills one result per cell, where it gave `#VALUE!`. |
+| `=IF(FALSE,1)` gives `FALSE` instead of `0`, as in Excel. An empty branch, as in `=IF(TRUE,)`, `=IF(FALSE,1,)` or `=IFERROR(1/0,)`, gives `0` instead of an empty result. |
 
 ### Grid markup and loading
 
