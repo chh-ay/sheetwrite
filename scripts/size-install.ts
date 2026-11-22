@@ -1,12 +1,12 @@
 import { cp, lstat, mkdir, readdir, realpath, stat } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   assertPublishedFilePolicy,
   packBuiltPackages,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
-import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
+import { installCanonicalTarballs } from "./release-lock-integrity.mjs";
 import { captureProcess, readJson } from "./script-io.js";
 import {
   type ClosureReport,
@@ -202,18 +202,14 @@ export async function measureClosure(
 ): Promise<ClosureReport> {
   const consumer_root = join(temporaryRoot, `closure-${name}-${sequence}`);
   await cp(join(repositoryRoot, "test/release-locks", name), consumer_root, { recursive: true });
-  const artifact_root = join(consumer_root, "artifacts");
-  await mkdir(artifact_root, { recursive: true });
-
   const closure_tarballs = new Map<string, string>();
   for (const package_name of dependencyNames) {
     const tarball = packed.get(package_name);
     if (tarball === undefined) throw new Error(`No packed tarball for ${package_name}`);
     closure_tarballs.set(package_name, tarball);
-    await cp(tarball, join(artifact_root, basename(tarball)));
   }
 
-  await bindCanonicalTarballIntegrities(join(consumer_root, "package-lock.json"), closure_tarballs);
+  await installCanonicalTarballs(join(consumer_root, "package-lock.json"), closure_tarballs);
   await runCommand(
     ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
     consumer_root,
