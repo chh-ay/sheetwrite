@@ -195,6 +195,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/check-local-paths.test.ts",
   "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
+  "scripts/wasm-factory.test.ts",
   "scripts/wasm-function-sizes.test.ts",
   "scripts/wasm-relocations.test.ts",
   "scripts/snake-case-internals.test.ts",
