@@ -37,6 +37,10 @@ pub(crate) const MAX_PIVOT_GROUPS: usize = 100_000;
 
 /// A row outside the pivot: filtered out, or with an error in a key field.
 const NO_GROUP: u32 = u32::MAX;
+/// Value fields whose new contributions an in-place row update keeps on the
+/// stack. A pivot with more updates its rows by leaving and entering their
+/// groups.
+const IN_PLACE_VALUES: usize = 8;
 /// Between the aggregation and the field in a value field's caption.
 const CAPTION_JOIN: &str = " of ";
 /// Group 0 of each axis is the grand total.
@@ -527,6 +531,26 @@ impl Axis {
         self.live -= 1;
     }
 
+    /// Whether `keys`, one per level, still select `leaf` and its ancestors
+    /// for `row`, a member of them, and leave each label as it is: entering
+    /// the row again would change nothing.
+    fn selects(&self, leaf: u32, keys: &[Value], row: u32) -> bool {
+        let mut group = leaf;
+        for key in keys.iter().rev() {
+            let entry = &self.groups[group as usize];
+            let same = if entry.donor == row {
+                entry.label == *key
+            } else {
+                key_part(key).is_ok() && compare_group_values(&entry.label, key).is_eq()
+            };
+            if !same {
+                return false;
+            }
+            group = entry.parent;
+        }
+        true
+    }
+
     /// `group` and its ancestors, the root last.
     fn path(&self, mut group: u32, path: &mut Vec<u32>) {
         path.clear();
@@ -999,6 +1023,10 @@ fn number_from_ordered_bits(bits: u64) -> f64 {
 }
 
 impl Partial {
+    // Inline at each caller: a row added or removed, and a value replaced
+    // in place. With more than one caller wasm-opt keeps it out of line,
+    // and every edit then pays a call per aggregate.
+    #[inline(always)]
     fn update(
         &mut self,
         aggregation: Aggregation,
@@ -1436,6 +1464,49 @@ struct SlotPair {
     slot: u32,
 }
 
+/// What [`PivotCache::update_values`] did with a row.
+enum RowUpdate {
+    /// The row kept its groups and its new values replaced the old ones.
+    InPlace,
+    /// A key moved the row; its keys, free of errors, are in `keys`, read
+    /// after the filters passed.
+    KeysRead,
+    /// The row was not grouped, a filter now drops it, a key holds an error,
+    /// or the pivot has more than [`IN_PLACE_VALUES`] value fields; the
+    /// caller reads the row again.
+    Skipped,
+}
+
+/// The kind and payload `value` contributes to a value field aggregated by
+/// `aggregation`. DISTINCTCOUNT text takes a reference to the id of its
+/// case fold, which the row releases when it stops contributing it.
+fn contribution(
+    aggregation: Aggregation,
+    value: Value,
+    folded: &mut String,
+    texts: &mut TextIds,
+) -> (u8, u64) {
+    match value {
+        Value::Blank => (CONTRIBUTION_BLANK, 0),
+        number @ Value::Number(_) => match range_number(&number) {
+            Ok(Some(number)) => (CONTRIBUTION_NUMBER, number.to_bits()),
+            Ok(None) => (CONTRIBUTION_BLANK, 0),
+            Err(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
+        },
+        Value::Text(text) => (
+            CONTRIBUTION_TEXT,
+            if aggregation == Aggregation::DistinctCount {
+                fold_case(&text, folded);
+                u64::from(texts.acquire(folded))
+            } else {
+                0
+            },
+        ),
+        Value::Bool(boolean) => (CONTRIBUTION_BOOL, u64::from(boolean)),
+        Value::Error(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
+    }
+}
+
 impl PivotCache {
     /// Value definitions in output order.
     pub(crate) fn values(&self) -> &[PivotValue] {
@@ -1725,7 +1796,7 @@ impl PivotCache {
         };
 
         for row in 0..rows {
-            if cache.enter_row(row, source) {
+            if cache.enter_row(row, source, false) {
                 cache.apply_row(row, true, false);
             }
             if cache.group_count() > MAX_PIVOT_GROUPS {
@@ -1832,10 +1903,24 @@ impl PivotCache {
         let mut col_orphans = Vec::new();
         for &row in rows {
             let index = row as usize;
+            let keys_read = match self.update_values(index, source) {
+                RowUpdate::InPlace => continue,
+                RowUpdate::KeysRead => true,
+                RowUpdate::Skipped => false,
+            };
             let row_leaf = self.row_leaf[index];
             let col_leaf = self.col_leaf[index];
             self.remove_row(index);
-            self.add_row(index, source);
+            if keys_read {
+                // The check passed the filters and left the row's keys,
+                // free of errors, in `self.keys`: enter them without a
+                // second read.
+                if self.enter_row(index, source, true) {
+                    self.apply_row(index, true, true);
+                }
+            } else {
+                self.add_row(index, source);
+            }
 
             // Keep the old axis membership until the replacement enters:
             // changing a singleton's value must not destroy its layout.
@@ -1878,43 +1963,28 @@ impl PivotCache {
     }
 
     fn add_row(&mut self, row: usize, source: &impl PivotSource) {
-        if self.enter_row(row, source) {
+        if self.enter_row(row, source, false) {
             self.apply_row(row, true, true);
         }
     }
 
     /// Groups `row` on both axes and records its contributions, without
     /// adding them to any pair. Returns whether the row passed the filters
-    /// and its keys hold no error.
-    fn enter_row(&mut self, row: usize, source: &impl PivotSource) -> bool {
-        if !self
-            .definition
-            .filters
-            .iter()
-            .all(|filter| filter.keeps(&source.value(row, filter.field), &mut self.folded))
-        {
-            return false;
-        }
-
-        // Read and check every key first, so a key error leaves both axes as
-        // they were.
-        let mut keys = std::mem::take(&mut self.keys);
-        keys.clear();
-        let mut key_error = None;
-        for &field in self.definition.rows.iter().chain(&self.definition.columns) {
-            let value = source.value(row, field);
-            if let Err(error) = key_part(&value) {
-                key_error = Some(error);
-                break;
+    /// and its keys hold no error. With `keys_ready`, the caller has checked
+    /// both and left the keys in `self.keys`.
+    fn enter_row(&mut self, row: usize, source: &impl PivotSource, keys_ready: bool) -> bool {
+        if !keys_ready {
+            if !self.passes_filters(row, source) {
+                return false;
             }
-            keys.push(value);
+            // Read and check every key first, so a key error leaves both
+            // axes as they were.
+            if let Err(error) = self.read_keys(row, source) {
+                self.key_errors.insert(row as u32, error);
+                return false;
+            }
         }
-        if let Some(error) = key_error {
-            self.keys = keys;
-            self.key_errors.insert(row as u32, error);
-            return false;
-        }
-
+        let keys = std::mem::take(&mut self.keys);
         let (row_keys, col_keys) = keys.split_at(self.definition.rows.len());
         let (row_leaf, row_changed) = self.row_axis.enter(row_keys, row as u32);
         let (col_leaf, col_changed) = self.col_axis.enter(col_keys, row as u32);
@@ -1925,30 +1995,124 @@ impl PivotCache {
 
         let values = self.definition.values.len();
         for (index, value) in self.definition.values.iter().enumerate() {
-            let (kind, payload) = match source.value(row, value.field) {
-                Value::Blank => (CONTRIBUTION_BLANK, 0),
-                number @ Value::Number(_) => match range_number(&number) {
-                    Ok(Some(number)) => (CONTRIBUTION_NUMBER, number.to_bits()),
-                    Ok(None) => (CONTRIBUTION_BLANK, 0),
-                    Err(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
-                },
-                Value::Text(text) => (
-                    CONTRIBUTION_TEXT,
-                    if value.aggregation == Aggregation::DistinctCount {
-                        fold_case(&text, &mut self.folded);
-                        u64::from(self.texts.acquire(&self.folded))
-                    } else {
-                        0
-                    },
-                ),
-                Value::Bool(boolean) => (CONTRIBUTION_BOOL, u64::from(boolean)),
-                Value::Error(error) => (CONTRIBUTION_ERROR, error.slot() as u64),
-            };
+            let (kind, payload) = contribution(
+                value.aggregation,
+                source.value(row, value.field),
+                &mut self.folded,
+                &mut self.texts,
+            );
             self.contribution_kinds[row * values + index] = kind;
             self.contribution_payloads[row * values + index] = payload;
         }
-
         true
+    }
+
+    /// Reads `row`'s row and column keys into `self.keys`, stopping at the
+    /// first key that holds an error.
+    fn read_keys(&mut self, row: usize, source: &impl PivotSource) -> Result<(), FormulaError> {
+        let mut keys = std::mem::take(&mut self.keys);
+        keys.clear();
+        let mut result = Ok(());
+        for &field in self.definition.rows.iter().chain(&self.definition.columns) {
+            let value = source.value(row, field);
+            if let Err(error) = key_part(&value) {
+                result = Err(error);
+                break;
+            }
+            keys.push(value);
+        }
+        self.keys = keys;
+        result
+    }
+
+    fn passes_filters(&mut self, row: usize, source: &impl PivotSource) -> bool {
+        self.definition
+            .filters
+            .iter()
+            .all(|filter| filter.keeps(&source.value(row, filter.field), &mut self.folded))
+    }
+
+    /// Replaces the values `row` contributes when its keys and filter fields
+    /// keep it in its groups: each pair on its paths takes the old values
+    /// out and the new ones in with one lookup, where leaving and entering
+    /// the groups looks every pair up twice. Any other row changes nothing;
+    /// see [`RowUpdate`] for what it leaves behind.
+    fn update_values(&mut self, row: usize, source: &impl PivotSource) -> RowUpdate {
+        let (row_leaf, col_leaf) = (self.row_leaf[row], self.col_leaf[row]);
+        let values = self.definition.values.len();
+        if values > IN_PLACE_VALUES || row_leaf == NO_GROUP || !self.passes_filters(row, source) {
+            return RowUpdate::Skipped;
+        }
+        if self.read_keys(row, source).is_err() {
+            // The old path records the key error.
+            return RowUpdate::Skipped;
+        }
+        let (row_keys, col_keys) = self.keys.split_at(self.definition.rows.len());
+        let kept = self.row_axis.selects(row_leaf, row_keys, row as u32)
+            && self.col_axis.selects(col_leaf, col_keys, row as u32);
+        if !kept {
+            return RowUpdate::KeysRead;
+        }
+
+        let mut contributions = [(CONTRIBUTION_BLANK, 0); IN_PLACE_VALUES];
+        for (slot, value) in contributions.iter_mut().zip(&self.definition.values) {
+            *slot = contribution(
+                value.aggregation,
+                source.value(row, value.field),
+                &mut self.folded,
+                &mut self.texts,
+            );
+        }
+        self.replace_contributions(row, &contributions[..values]);
+        RowUpdate::InPlace
+    }
+
+    /// Swaps `row`'s recorded contributions for `contributions` in every
+    /// pair on its paths, then records them.
+    fn replace_contributions(&mut self, row: usize, contributions: &[(u8, u64)]) {
+        let mut row_path = std::mem::take(&mut self.row_path);
+        let mut col_path = std::mem::take(&mut self.col_path);
+        self.row_axis.path(self.row_leaf[row], &mut row_path);
+        self.col_axis.path(self.col_leaf[row], &mut col_path);
+        let values = self.definition.values.len();
+        for &row_group in &row_path {
+            for &col_group in &col_path {
+                let slot = self.pair_slot(row_group, col_group, false) as usize;
+                for (index, value) in self.definition.values.iter().enumerate() {
+                    let offset = row * values + index;
+                    let old = (
+                        self.contribution_kinds[offset],
+                        self.contribution_payloads[offset],
+                    );
+                    let partial = &mut self.partials[slot * values + index];
+                    partial.update(value.aggregation, old, row as u32, false);
+                    partial.update(value.aggregation, contributions[index], row as u32, true);
+                    #[cfg(test)]
+                    {
+                        self.aggregate_updates += 2;
+                    }
+                }
+                if !self.relayout {
+                    self.changed_pairs.push((row_group, col_group));
+                }
+            }
+        }
+        self.row_path = row_path;
+        self.col_path = col_path;
+
+        for (index, value) in self.definition.values.iter().enumerate() {
+            let offset = row * values + index;
+            if value.aggregation == Aggregation::DistinctCount
+                && self.contribution_kinds[offset] == CONTRIBUTION_TEXT
+            {
+                self.texts
+                    .release(self.contribution_payloads[offset] as u32);
+            }
+            (
+                self.contribution_kinds[offset],
+                self.contribution_payloads[offset],
+            ) = contributions[index];
+        }
     }
 
     fn remove_row(&mut self, row: usize) {
@@ -2031,6 +2195,8 @@ impl PivotCache {
         self.col_path = col_path;
     }
 
+    // Inline at both callers, as `Partial::update` is.
+    #[inline(always)]
     fn pair_slot(&mut self, row_group: u32, col_group: u32, adding: bool) -> u32 {
         if let Some(&slot) = self.pairs.get(&pair_key(row_group, col_group)) {
             if adding {
