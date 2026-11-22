@@ -112,6 +112,13 @@ a script nobody will run.
   This writes tarballs only; release preparation additionally builds, checks the
   toolchain/tree, and writes the canonical manifest. Existing `--artifacts`
   inputs continue to consume and verify those canonical tarballs.
+- **Release consumer fixtures have no versions.** `test/consumer`,
+  `test/release-locks/*` and the next, vite and webpack bundler fixtures name
+  each Sheetwrite package as a version-free tarball, such as
+  `file:artifacts/sheetwrite-core.tgz`. Their locks pin only third-party
+  packages; a Sheetwrite entry holds only that `resolved` path.
+  `installCanonicalTarballs` in `release-lock-integrity.mjs` copies the
+  canonical tarballs there and fills the entries, so a release changes no fixture.
 
 - **`docs:generate` owns `docs/src/generated/*`, the API, formula-function,
   Performance and generated reference pages, `docs/public/llms*.txt` and the

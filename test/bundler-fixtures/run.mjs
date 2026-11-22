@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
-import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-integrity.mjs";
+import { installCanonicalTarballs } from "../../scripts/release-lock-integrity.mjs";
 
 const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));
 const repositoryRoot = resolve(fixturesRoot, "../..");
@@ -238,32 +238,15 @@ if (artifactDirectory === undefined) {
 for (const fixture of ["vite", "webpack", "next"]) {
   const cwd = join(fixturesRoot, fixture);
   const lockPath = join(cwd, "package-lock.json");
-  const manifestPath = join(cwd, "package.json");
-  const [originalLock, originalManifest] = await Promise.all([
-    readFile(lockPath, "utf8"),
-    readFile(manifestPath, "utf8"),
-  ]);
-  const manifest = JSON.parse(originalManifest);
-  const fixtureTarballs = new Map();
-  for (const packageName of Object.keys({
-    ...manifest.dependencies,
-    ...manifest.devDependencies,
-  })) {
-    if (!packageName.startsWith("@sheetwrite/")) continue;
-    const tarball = canonicalTarballs.get(packageName);
-    if (tarball === undefined) throw new Error(`Missing canonical tarball for ${packageName}`);
-    fixtureTarballs.set(packageName, tarball);
-  }
+  const originalLock = await readFile(lockPath, "utf8");
   await rm(join(cwd, "node_modules"), { recursive: true, force: true });
   console.log(`\n=== ${fixture} bundler fixture ===`);
   try {
-    await bindCanonicalTarballIntegrities(lockPath, fixtureTarballs);
+    // Copies each tarball to its version-free name in `.packed` and fills the lock.
+    await installCanonicalTarballs(lockPath, canonicalTarballs);
     await run("npm", ["run", "build"], cwd);
   } finally {
-    await Promise.all([
-      writeFile(lockPath, originalLock),
-      writeFile(manifestPath, originalManifest),
-    ]);
+    await writeFile(lockPath, originalLock);
   }
 }
 
