@@ -17,7 +17,7 @@ import {
   MATRIX_IDS,
 } from "./gate-protocol.js";
 import { validateRenderGateArtifact } from "./render-gate.js";
-import type { RenderBenchmarkArtifact } from "./render-protocol.js";
+import { type RenderBenchmarkArtifact, RENDER_WARMUP_SAMPLES } from "./render-protocol.js";
 import { medianOfSorted, ms, summarizeFinite } from "./stats.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
@@ -25,8 +25,7 @@ const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
 const DEFAULT_BASELINE_PATH = resolve(BENCH_ROOT, "results/render-baseline.json");
 const DEFAULT_FRESH_PATH = resolve(BENCH_ROOT, "results/render-fresh.json");
 const FRESH_RESULT_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
-export const CONTROLLED_SAMPLING_FINGERPRINT =
-  "measured=3;warmup=1;minimum-sample-ms=100;order-seed=0x51c0ffee";
+export const CONTROLLED_SAMPLING_FINGERPRINT = `measured=3;warmup=${RENDER_WARMUP_SAMPLES};minimum-sample-ms=100;order-seed=0x51c0ffee`;
 
 export interface ControlledComparisonRow {
   readonly key: string;

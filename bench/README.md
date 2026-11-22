@@ -796,8 +796,13 @@ The browser bench adapts the four scenario families in Handsontable's official
 performance suite, [`handsontable/performance-lab`](https://github.com/handsontable/performance-lab)
 (`master`), but uses Sheetwrite's versioned auditable protocol. Each measured
 sample repeats one logical action until its aggregate measured duration reaches
-at least 100 ms. Declared aggregate warmups are excluded; every measured sample
-is retained, and median, linearly interpolated p95, and MAD use all valid samples.
+at least 100 ms. Five warm-up aggregates run first and are excluded. With one,
+the scenario that ran first in a page was still on code the browser had not
+finished optimizing, and a version comparison of a row moved with its place in
+the page (1.16× to 1.51× for edit-open); with five it moves much less (1.13× to
+1.21×).
+Every measured sample is retained, and median, linearly interpolated p95, and
+MAD use all valid samples.
 
 | Adapted spec | What we mirror |
 |---|---|

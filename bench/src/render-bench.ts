@@ -50,6 +50,7 @@ import {
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  RENDER_WARMUP_SAMPLES,
   type RenderResourceMetrics,
   type ScenarioId,
   type ScenarioResult,
@@ -1387,7 +1388,7 @@ function read_configuration(params: URLSearchParams): PageConfiguration {
     scenarios: requested_scenarios as ScenarioId[],
     rows: positive_integer(params.get("rows"), 100_000),
     measuredSamples: positive_integer(params.get("samples"), 3),
-    warmupSamples: non_negative_integer(params.get("warmups"), 1),
+    warmupSamples: non_negative_integer(params.get("warmups"), RENDER_WARMUP_SAMPLES),
     minimumSampleDurationMs: Math.max(
       RENDER_MINIMUM_SAMPLE_MS,
       positive_integer(params.get("minimumSampleMs"), RENDER_MINIMUM_SAMPLE_MS),

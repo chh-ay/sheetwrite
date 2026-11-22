@@ -26,6 +26,7 @@ import {
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  RENDER_WARMUP_SAMPLES,
   type RenderBenchmarkArtifact,
   type RenderRunConfig,
   renderBenchmarkMarkdown,
@@ -238,7 +239,7 @@ export function parseConfiguration(args: readonly string[]): DriverConfiguration
     windowTransfer: diagnostic && window_transfer_count > 0,
     rounds: positive_integer_argument(args, "--rounds", smoke ? 1 : 2),
     measuredSamples: positive_integer_argument(args, "--samples", smoke ? 1 : 3),
-    warmupSamples: non_negative_integer_argument(args, "--warmups", 1),
+    warmupSamples: non_negative_integer_argument(args, "--warmups", RENDER_WARMUP_SAMPLES),
     minimumSampleDurationMs: Math.max(
       RENDER_MINIMUM_SAMPLE_MS,
       positive_integer_argument(args, "--minimum-sample-ms", RENDER_MINIMUM_SAMPLE_MS),
