@@ -2,9 +2,9 @@ import {
   EDIT_SURFACE_ATTRIBUTE,
   type EditorFieldMetrics,
   editorLineCount as lineCount,
+  editorTextareaHeight,
   insertEditorLineBreak,
   readEditorFieldMetrics,
-  sizeEditorTextarea,
 } from "./editor-textarea.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
@@ -169,8 +169,9 @@ export class EditController {
   private ref_end = -1;
   private readonly assist: FormulaAssist | null;
   private assist_attached = false;
-  // Read once per open and again only when the editor's line height changes,
-  // so sizing reads only the textarea's own box, never its computed style.
+  // The textarea's line height and insets: read on the first multi-line sizing
+  // of an open, and again only after the line height changes. One line needs
+  // none of them, so opening the editor reads no style and no layout.
   private metrics: EditorFieldMetrics | null = null;
   private metrics_line_height = "";
   private sizing: EditorSizing | null = null;
@@ -311,7 +312,7 @@ export class EditController {
       const line_height = `${Math.max(1, rect.h - 4)}px`;
       if (line_height !== this.metrics_line_height) {
         ta.style.lineHeight = line_height;
-        this.metrics = readEditorFieldMetrics(ta);
+        this.metrics = null;
         this.metrics_line_height = line_height;
       }
       this.size(rect.h);
@@ -422,15 +423,22 @@ export class EditController {
     if (this.textarea && this.opts) this.size(this.opts.rect.h);
   }
 
+  /**
+   * Fit the explicit lines, up to eight. One line is the cell's height. The
+   * editor has no horizontal scrollbar (`overflow-x: hidden` in grid.css), so
+   * no line can hide under one and its box is never read back.
+   */
   private size(minimum_height: number): void {
     const ta = this.textarea;
     if (!ta) return;
-    sizeEditorTextarea(ta, minimum_height, this.metrics);
-    this.sizing = {
-      width: ta.style.width,
-      minimumHeight: minimum_height,
-      lines: lineCount(ta.value),
-    };
+    const lines = lineCount(ta.value);
+    if (lines > 1) this.metrics ??= readEditorFieldMetrics(ta);
+    const height =
+      lines > 1 && this.metrics !== null
+        ? editorTextareaHeight(lines, minimum_height, this.metrics)
+        : minimum_height;
+    ta.style.height = `${height}px`;
+    this.sizing = { width: ta.style.width, minimumHeight: minimum_height, lines };
   }
 
   /**
