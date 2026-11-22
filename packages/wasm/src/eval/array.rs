@@ -138,9 +138,11 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
             ast_produces_array(inner, _shapes)
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(func @ Func::Analysis(id), args, shape) => {
+        // Reached only for a call whose shape is decided when asked: a
+        // family with array hooks, or an argument whose shape is.
+        Ast::Func(func @ Func::Analysis(id), args, _) => {
             super::analysis::array_hooks(*id, args, _shapes).is_some()
-                || (shape.may_lift() && super::lift::lifts(*func, args, _shapes))
+                || super::lift::lifts(*func, args, _shapes)
         }
         Ast::Func(
             Func::Filter
