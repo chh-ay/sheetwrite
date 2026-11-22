@@ -35,13 +35,11 @@ enum CondPred {
 }
 
 /// A formula rule's parsed expression, written for the rule range's top-left
-/// cell, its [`relative_reach`]: how far its references can move before
-/// one leaves the sheet, and whether it holds alike at every cell of a row
-/// ([`same_across_row`]), so a window reads it once per row.
+/// cell, and its [`relative_reach`]: how far its references can move before
+/// one leaves the sheet.
 struct FormulaRule {
     ast: Ast,
     reach: (u32, u32),
-    same_across_row: bool,
 }
 
 /// Whether `ast` has one value at every cell of a row: no reference moves
@@ -148,6 +146,10 @@ struct CondRule {
     c1: u32,
     pred: CondPred,
     stop_if_true: bool,
+    /// A formula rule that holds alike at every cell of a row
+    /// ([`same_across_row`]), so a window reads it once per row. It sits in
+    /// the rule's padding, so a rule takes no more memory for it.
+    same_across_row: bool,
 }
 
 /// Parsed conditional-format rules per sheet handle, synced from the host and
@@ -262,16 +264,16 @@ impl CellStore {
                         .and_then(Clone::clone)
                         .unwrap_or(Ast::InvalidRef);
                     let reach = relative_reach(&ast);
-                    let row_invariant = same_across_row(&ast);
-                    CondPred::Formula(FormulaRule {
-                        ast,
-                        reach,
-                        same_across_row: row_invariant,
-                    })
+                    CondPred::Formula(FormulaRule { ast, reach })
                 }
                 _ => continue,
             };
 
+            let row_invariant = if let CondPred::Formula(formula) = &pred {
+                same_across_row(&formula.ast)
+            } else {
+                false
+            };
             rules.push(CondRule {
                 r0,
                 c0,
@@ -279,6 +281,7 @@ impl CellStore {
                 c1,
                 pred,
                 stop_if_true: flag & 2 != 0,
+                same_across_row: row_invariant,
             });
         }
 
@@ -558,7 +561,7 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                             target: (data_row, col),
                             shift: (data_row - rule.r0, col - rule.c0),
                         };
-                        if formula.same_across_row {
+                        if rule.same_across_row {
                             *row_holds[bit].get_or_insert_with(|| {
                                 formula.holds(store, sheet_index, cell, &mut results)
                             })
