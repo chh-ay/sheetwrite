@@ -21,7 +21,7 @@ import { dedupeCodePopovers } from "./dedupe-code-popovers.ts";
 import { scopeCopyButtonStates } from "./expressive-code-styles.ts";
 import { markGeneratedPages } from "./generated-content.ts";
 import { renderGridResults } from "./grid-result.ts";
-import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
+import { codeWords, SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
 import { exportOutline } from "./outline.ts";
 import { renderPerfBars } from "./perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./perf-compare.ts";
@@ -305,21 +305,40 @@ function childElements(node: HastNode | undefined, tagName: string): HastNode[] 
   return (node?.children ?? []).filter((child) => child.tagName === tagName);
 }
 
+/** The rows of a table, its heading row first. */
+function tableRows(table: HastNode): HastNode[] {
+  return ["thead", "tbody"].flatMap((part) =>
+    childElements(table, part).flatMap((section) => childElements(section, "tr")),
+  );
+}
+
+/** The characters a phone row holds side by side, at the table's text size, without scrolling. */
+const PHONE_ROW_CHARACTERS = 36;
+
 /**
- * Labels each body cell of a two-column table with its column's heading, so
- * a phone can stack each row (old, then new) under those labels. Returns
- * whether the table has two columns.
+ * Whether a phone stacks the table's rows, each cell under its column's
+ * heading, and labels each body cell with that heading when it does. A
+ * two-column table always stacks, so its second column (the replacement, the
+ * step to take) is never out of view. A three-column table stacks when its
+ * longest cells, side by side, would not fit a phone row; a short one, such as
+ * a few rows of data, stays a grid.
  */
-function labelPairCells(table: HastNode): boolean {
-  const [head] = childElements(table, "thead");
-  const [headRow] = childElements(head, "tr");
-  const labels = childElements(headRow, "th").map((cell) => textOf(cell).trim());
-  if (labels.length !== 2) return false;
-  for (const body of childElements(table, "tbody")) {
-    for (const row of childElements(body, "tr")) {
-      for (const [index, cell] of childElements(row, "td").entries()) {
-        cell.properties = { ...cell.properties, dataLabel: labels[index] };
-      }
+function stackOnPhones(table: HastNode): boolean {
+  const [heading, ...body] = tableRows(table);
+  const labels = childElements(heading, "th").map((cell) => textOf(cell).trim());
+  const widest = labels.map((label, column) =>
+    Math.max(
+      label.length,
+      ...body.map(
+        (row) => textOf(childElements(row, "td")[column] ?? { type: "text" }).trim().length,
+      ),
+    ),
+  );
+  const fits = widest.reduce((sum, length) => sum + length, 0) <= PHONE_ROW_CHARACTERS;
+  if (labels.length < 2 || labels.length > 3 || (labels.length === 3 && fits)) return false;
+  for (const row of body) {
+    for (const [index, cell] of childElements(row, "td").entries()) {
+      cell.properties = { ...cell.properties, dataLabel: labels[index] };
     }
   }
   return true;
@@ -328,8 +347,8 @@ function labelPairCells(table: HastNode): boolean {
 /**
  * Markdown tables get a scroll frame: a wide table scrolls inside the column
  * instead of widening the page, so short cells can stay on one line.
- * Two-column tables stack their rows on a phone instead, so the second
- * column is never out of view.
+ * Two-column tables, and three-column ones too wide for a phone, stack their
+ * rows on a phone instead, so no column is out of view.
  * Tables with their own class are designed layouts and keep their markup.
  */
 function wrapProseTables() {
@@ -341,8 +360,9 @@ function wrapProseTables() {
       node.children = node.children.map((child) => {
         if (child.tagName !== "table" || child.properties?.className) return child;
         markShortCells(child);
+        breakCodeAtWords(child);
         const className = ["sw-table-frame"];
-        if (labelPairCells(child)) className.push("sw-table-frame--pairs");
+        if (stackOnPhones(child)) className.push("sw-table-frame--stack");
         return {
           type: "element",
           tagName: "div",
@@ -353,6 +373,37 @@ function wrapProseTables() {
     };
     visit(tree);
   };
+}
+
+/**
+ * Cuts the inline code of a table into words that never break inside, with a
+ * `<wbr>` between the words of a name, so a long name in a narrow column
+ * breaks between its words (`Storage|Error`) or at a space, and nowhere else.
+ */
+function breakCodeAtWords(node: HastNode, inCode = false): void {
+  if (!node.children) return;
+  node.children = node.children.flatMap((child): HastNode[] => {
+    if (inCode && child.type === "text") return codeWordNodes(child.value ?? "");
+    if (child.tagName !== "pre") breakCodeAtWords(child, inCode || child.tagName === "code");
+    return [child];
+  });
+}
+
+/** Code text as unbreakable words with a `<wbr>` between the words of a name; spaces stay text. */
+function codeWordNodes(text: string): HastNode[] {
+  return text.split(/(\s+)/).flatMap((run): HastNode[] => {
+    if (run === "") return [];
+    if (/^\s/.test(run)) return [{ type: "text", value: run }];
+    return codeWords(run).flatMap((word, index) => [
+      ...(index === 0 ? [] : [{ type: "element", tagName: "wbr", properties: {}, children: [] }]),
+      {
+        type: "element",
+        tagName: "span",
+        properties: { className: ["sw-code-word"] },
+        children: [{ type: "text", value: word }],
+      },
+    ]);
+  });
 }
 
 /** Gives short inline code a class, so an identifier reads as one token. */

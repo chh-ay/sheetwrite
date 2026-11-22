@@ -237,33 +237,6 @@ export function HostImportDiagram() {
   );
 }
 
-/** Formatting: fonts that fall back, and number formats that change only what is shown. */
-export function FormattingDiagram() {
-  return (
-    <TileFigure
-      columns={2}
-      note="A number format changes the display, not the stored number."
-      text={{
-        title: "How fonts and number formats behave",
-        description:
-          "Georgia, Arial and Courier New sit beside the theme font, and a family the browser does not have falls back to it. A number format changes how a number is shown, not the stored number: a currency column shows its format, a cell can opt out with General, and a negative variance keeps its minus sign as well as its conditional fill.",
-      }}
-      tiles={[
-        {
-          title: "Fonts",
-          lines: ["Georgia, Arial and Courier New;", "a missing one uses the theme font"],
-        },
-        {
-          title: "Number formats",
-          code: ["stored: 1234.5"],
-          lines: ["Currency: $1,234.50; General: 1234.5"],
-          tone: "accent",
-        },
-      ]}
-    />
-  );
-}
-
 /** Data tools: what each guarded column does with an edit that breaks its rule. */
 export function DataGuardsDiagram() {
   return (

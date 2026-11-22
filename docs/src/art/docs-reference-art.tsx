@@ -103,34 +103,6 @@ export function ApiGateDiagram() {
   );
 }
 
-/** Reference › Compatibility and limits: one ceiling from each area, and what happens above it. */
-export function LimitsDiagram() {
-  return (
-    <FanFigure
-      source={{
-        title: "Every resource has a stated ceiling",
-        lines: ["One from each area, and what", "happens above it"],
-      }}
-      text={{
-        title: "A ceiling from each area and what happens above it",
-        description:
-          "Each area states its ceilings. A formula range above 1,000,000 cells resolves to #NUM!. A transaction above 10,000 operations is rejected. A snapshot above 256 sheets is rejected. Delimited text above 32 MiB of input throws. A remote version above 10,000 operations emits a protocol error and requires a reload.",
-      }}
-      tiles={[
-        { title: "Formulas", lines: ["Range above 1,000,000 cells: #NUM!"] },
-        { title: "Transactions", lines: ["Above 10,000 operations: rejected"] },
-        { title: "Snapshots", lines: ["Above 256 sheets: rejected"] },
-        { title: "Delimited text", lines: ["Above 32 MiB of input: throws"] },
-        {
-          title: "Sync",
-          lines: ["A version above 10,000", "operations needs a reload"],
-          tone: "muted",
-        },
-      ]}
-    />
-  );
-}
-
 /** Reference › Document operations: conservative rebase of pending local operations. */
 export function RebaseDiagram() {
   return (
@@ -198,7 +170,6 @@ export const REFERENCE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "libreoffice-round-trip": LibreOfficeRoundTripDiagram,
   "xlsx-exports": XlsxExportsDiagram,
   "api-gate": ApiGateDiagram,
-  limits: LimitsDiagram,
   rebase: RebaseDiagram,
   "event-direction": EventDirectionDiagram,
 };

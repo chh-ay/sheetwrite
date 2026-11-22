@@ -133,6 +133,25 @@ A pivot belongs to the sheet that holds its anchor cell. Commit the complete
 definition with `setPivot`. A second `setPivot` with the same `id` replaces the
 definition. Each call is one undo entry.
 
+For example, take four orders in A1:C5 of an Orders sheet:
+
+| Month | Region | Revenue |
+| --- | --- | ---: |
+| 2026-01 | Americas | 120 |
+| 2026-01 | EMEA | 80 |
+| 2026-02 | Americas | 140 |
+| 2026-02 | EMEA | 60 |
+
+A pivot of this range with Month as rows (`rows: [0]`), Region as columns
+(`columns: [1]`) and the sum of Revenue as values
+(`values: [{ field: 2, aggregation: "SUM" }]`) writes this at its anchor:
+
+| Month | Americas | EMEA | Total |
+| --- | ---: | ---: | ---: |
+| 2026-01 | 120 | 80 | 200 |
+| 2026-02 | 140 | 60 | 200 |
+| Total | 260 | 140 | 400 |
+
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.setPivot({
   id: "sales-by-region",

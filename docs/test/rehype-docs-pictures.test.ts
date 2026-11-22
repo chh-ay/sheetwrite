@@ -55,8 +55,8 @@ test("a lead placement follows the first paragraph", async () => {
 });
 
 test("a placement whose heading is gone fails the build", async () => {
-  await expect(compilePage("concepts/error-handling.md", "## Something else")).rejects.toThrow(
-    "/docs/concepts/error-handling/: no heading #recovery-by-boundary for the recovery diagram",
+  await expect(compilePage("concepts/runtime-ownership.md", "## Something else")).rejects.toThrow(
+    "/docs/concepts/runtime-ownership/: no heading #virtualization--scaled-scroll for the virtual-scroll diagram",
   );
 });
 

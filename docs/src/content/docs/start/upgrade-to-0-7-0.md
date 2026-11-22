@@ -15,6 +15,39 @@ is 0.6 code, and "after" code is 0.7.0 code.
 Install 0.7.0 for every `@sheetwrite/*` package that you use. Packages from
 different versions are not supported together.
 
+The main API changes, before and after: `setSort` and `sortByMulti` both
+become `setViewSort`, and `sortBy` now sorts the cells in place. The sections
+below show each change in full.
+
+Before:
+
+```js partial="0.6 code"
+grid.setSort(keys);
+grid.sortByMulti(keys);
+grid.sortBy(col); // sorted the view
+new RevisionCoordinator(options);
+import "@sheetwrite/xlsx/register";
+await initSheetwrite(source, engine);
+```
+
+After:
+
+```js partial="0.7.0 code; the sections below show each call in full"
+grid.setViewSort(keys);
+grid.sortBy(col); // sorts the cells
+await HistoryArchive.open({
+  documentId,
+  storage,
+});
+await initSheetwrite({
+  addons: [xlsxAddon()],
+});
+await initSheetwrite({
+  source,
+  engine,
+});
+```
+
 ## Sort
 
 Sort commands now move the cells, as Excel's Sort does. The display-only sort

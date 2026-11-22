@@ -411,74 +411,6 @@ export function ChartRangesDiagram() {
   );
 }
 
-/** Pivot tables: the source rows and the output setPivot writes at the anchor. */
-export function PivotOutputDiagram() {
-  return (
-    <FlowFigure
-      steps={[
-        {
-          title: "Source, Orders A1:C5",
-          sheet: {
-            cols: 3,
-            rows: 5,
-            cells: [
-              [0, 0, "Month"],
-              [1, 0, "Region"],
-              [2, 0, "Revenue"],
-              [0, 1, "2026-01"],
-              [1, 1, "Americas"],
-              [2, 1, "120"],
-              [0, 2, "2026-01"],
-              [1, 2, "EMEA"],
-              [2, 2, "80"],
-              [0, 3, "2026-02"],
-              [1, 3, "Americas"],
-              [2, 3, "140"],
-              [0, 4, "2026-02"],
-              [1, 4, "EMEA"],
-              [2, 4, "60"],
-            ],
-            ranges: [{ from: [0, 0], to: [2, 0], tone: "muted" }],
-          },
-        },
-        { title: "setPivot", code: ["rows: Month · columns: Region", "values: SUM(Revenue)"] },
-        {
-          title: "Output at the anchor",
-          sheet: {
-            cols: 4,
-            rows: 4,
-            cells: [
-              [0, 0, "Month"],
-              [1, 0, "Americas"],
-              [2, 0, "EMEA"],
-              [3, 0, "Total"],
-              [0, 1, "2026-01"],
-              [1, 1, "120"],
-              [2, 1, "80"],
-              [3, 1, "200"],
-              [0, 2, "2026-02"],
-              [1, 2, "140"],
-              [2, 2, "60"],
-              [3, 2, "200"],
-              [0, 3, "Total"],
-              [1, 3, "260"],
-              [2, 3, "140"],
-              [3, 3, "400"],
-            ],
-            ranges: [{ from: [1, 1], to: [3, 3], tone: "accent" }],
-          },
-          tone: "accent",
-        },
-      ]}
-      text={{
-        title: "From source rows to a pivot table",
-        description:
-          "Four orders: 2026-01 Americas 120, 2026-01 EMEA 80, 2026-02 Americas 140 and 2026-02 EMEA 60. A pivot with Month as rows, Region as columns and the sum of Revenue as values writes, at its anchor: 2026-01 120, 80, total 200; 2026-02 140, 60, total 200; and a total row of 260, 140 and 400.",
-      }}
-    />
-  );
-}
-
 /** The Analysis section: cells, the pivots over them and the charts over either. */
 export function AnalysisSectionDiagram() {
   return (
@@ -660,37 +592,6 @@ export function FormulasSectionDiagram() {
           title: "Cycles, volatiles",
           lines: ["Iteration, NOW,", "OFFSET, INDIRECT"],
         },
-      ]}
-    />
-  );
-}
-
-/** Grid methods: the handle createGrid returns, its methods grouped by task. */
-export function GridHandleDiagram() {
-  return (
-    <FanFigure
-      source={{
-        title: "createGrid(host, options) returns a Grid handle",
-        lines: ["Its methods, grouped by task"],
-      }}
-      text={{
-        title: "The Grid handle's methods by task",
-        description:
-          "createGrid returns a Grid handle. Document and sheets: applyTransaction, insertRows, styleRange, undo. Selection, editing and search: setSelection, beginEdit, search, findNext. Views: sortBy, setViewSort, filterBy, hideRows, groupRows. Layout and appearance: setFrozen, setZoom, setColumnWidth, setTheme. Lifecycle: on, refresh, destroy.",
-      }}
-      tiles={[
-        {
-          title: "Document",
-          code: ["applyTransaction · insertRows", "styleRange · undo · redo"],
-        },
-        { title: "Selection", code: ["setSelection · beginEdit", "search · findNext"] },
-        {
-          title: "Views",
-          code: ["sortBy · filterBy · hideRows", "setViewSort · groupRows"],
-          tone: "muted",
-        },
-        { title: "Layout", code: ["setFrozen · setZoom · setTheme", "setColumnWidth"] },
-        { title: "Lifecycle", code: ["on · refresh · destroy"] },
       ]}
     />
   );
@@ -986,7 +887,6 @@ export function ValidationAlertsDiagram() {
 
 /** Feature diagrams by the name a placement uses. */
 export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
-  "grid-handle": GridHandleDiagram,
   "touch-gestures": TouchGesturesDiagram,
   "editor-lifecycle": EditorLifecycleDiagram,
   "theme-layers": ThemeLayersDiagram,
@@ -1003,7 +903,6 @@ export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "number-format-codes": NumberFormatCodesDiagram,
   "formatting-section": FormattingSectionDiagram,
   "chart-ranges": ChartRangesDiagram,
-  "pivot-output": PivotOutputDiagram,
   "analysis-section": AnalysisSectionDiagram,
   "write-checks": WriteChecksDiagram,
   "data-section": DataSectionDiagram,
