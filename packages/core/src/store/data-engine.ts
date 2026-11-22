@@ -5455,9 +5455,20 @@ export class StoreDataEngine {
       const column = columns[col]!;
       const source = data.columns[column.key];
       const base = col * row_count;
+      if (source instanceof Float64Array) {
+        write_number_column(kinds, numbers, base, source, row_count);
+        continue;
+      }
       for (let row = 0; row < row_count; row++) {
-        const parsed = columnar_scalar(source?.[row], column.type);
+        const value = source?.[row];
         const offset = base + row;
+        // A number, the most common cell, needs no parsing.
+        if (typeof value === "number") {
+          kinds[offset] = KIND_NUMBER;
+          numbers[offset] = value;
+          continue;
+        }
+        const parsed = columnar_scalar(value, column.type);
         if (parsed && typeof parsed === "object") {
           if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
           else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
@@ -5510,6 +5521,22 @@ export class StoreDataEngine {
     this.note_range_mutation_ffi();
     this.wasm.compactStringStorage();
   }
+}
+
+/**
+ * Write a `Float64Array` column at `base`: every entry is a number cell, so
+ * the column is copied in one call. Rows past the end of `source` stay empty.
+ */
+function write_number_column(
+  kinds: Uint8Array,
+  numbers: Float64Array,
+  base: number,
+  source: Float64Array,
+  row_count: number,
+): void {
+  const length = Math.min(source.length, row_count);
+  numbers.set(source.subarray(0, length), base);
+  kinds.fill(KIND_NUMBER, base, base + length);
 }
 
 /**
