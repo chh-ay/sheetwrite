@@ -242,7 +242,7 @@ fn bind_names_in(ast: &mut Ast, resolve: &mut NameBinder<'_>, locals: &mut Vec<B
                 }
             }
         }
-        Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {
+        Ast::Func(Func::Let, args, _) if args.len() >= 3 && args.len() % 2 == 1 => {
             let outer = locals.len();
             let last = args.len() - 1;
             for index in (1..last).step_by(2) {
@@ -255,7 +255,7 @@ fn bind_names_in(ast: &mut Ast, resolve: &mut NameBinder<'_>, locals: &mut Vec<B
             locals.truncate(outer);
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args) => {
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args, _) => {
             let outer = locals.len();
             if let Some((body, parameters)) = args.split_last_mut() {
                 locals.extend(parameters.iter().filter_map(|parameter| match parameter {

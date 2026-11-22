@@ -24,7 +24,7 @@ family_functions! {
 )]
 pub(crate) fn ast_calls_pivot_data(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
-        Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
+        Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), ..) => true,
         Ast::DefinedName(id, _) => names.facts(*id).has(NameFacts::CALLS_PIVOT_DATA),
         _ => ast.any_child(&mut |child| ast_calls_pivot_data(child, names)),
     }

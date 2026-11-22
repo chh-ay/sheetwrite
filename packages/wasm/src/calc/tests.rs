@@ -57,7 +57,7 @@ fn a_space_before_any_reference_form_intersects() {
     }
     assert!(matches!(
         parse("=A1:B2 'Other Sheet'!B1"),
-        Ok(Ast::Func(Func::Intersect, operands)) if operands.len() == 2
+        Ok(Ast::Func(Func::Intersect, operands, _)) if operands.len() == 2
     ));
 }
 
@@ -154,7 +154,7 @@ fn heap_memory_stats_accounts_owning_ast_shapes() {
         ),
         (
             "function arguments",
-            Ast::Func(Func::Rept, (vec![Ast::Num(1.0)]).into()),
+            Ast::call(Func::Rept, (vec![Ast::Num(1.0)]).into()),
             boxed,
         ),
         (

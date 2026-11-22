@@ -396,14 +396,14 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
                 *ast = parameter(name, found);
             }
         }
-        Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) => {
+        Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments, _) => {
             if let Some(definition) = resolve_lambda(arguments, scopes) {
                 *ast = definition;
             }
         }
         // Already numbered when its own formula was entered.
         Ast::Lambda(_) => {}
-        Ast::Func(Func::Let, arguments) => resolve_let(arguments, scopes),
+        Ast::Func(Func::Let, arguments, _) => resolve_let(arguments, scopes),
         Ast::UnknownFunc(call) => {
             let crate::calc::UnknownCall {
                 name,

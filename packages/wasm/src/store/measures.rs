@@ -567,7 +567,7 @@ impl CellStore {
                 *expression = self.inlined_measure(measure, stack)?;
                 Ok(())
             }
-            Ast::Func(_, arguments) => arguments
+            Ast::Func(_, arguments, _) => arguments
                 .iter_mut()
                 .try_for_each(|argument| self.inline_references(argument, stack)),
             Ast::UnknownFunc(call) => call
@@ -860,7 +860,7 @@ impl CellStore {
                 | Func::Column
                 | Func::Cell
                 | Func::AnchorArray,
-                _,
+                ..,
             )
             | Ast::Parameter { .. }
             | Ast::Lambda(_)
@@ -879,7 +879,7 @@ impl CellStore {
             | Ast::InvalidRef
             | Ast::LetSlot { .. }
             | Ast::LetName { .. } => Err(FormulaError::Value),
-            Ast::Func(_, arguments) => arguments.iter_mut().try_for_each(|argument| {
+            Ast::Func(_, arguments, _) => arguments.iter_mut().try_for_each(|argument| {
                 self.name_columns(argument, columns, context, contexts, calculations)
             }),
             Ast::UnknownFunc(call) => call.args.iter_mut().try_for_each(|argument| {

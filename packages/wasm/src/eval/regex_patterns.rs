@@ -121,7 +121,7 @@ impl PatternIndex {
     /// Replaces the literal pattern arguments of the REGEX calls in `ast`
     /// with shared pattern nodes.
     pub(crate) fn bind(&mut self, ast: &mut Ast) {
-        if let Ast::Func(Func::Analysis(id), args) = ast {
+        if let Ast::Func(Func::Analysis(id), args, _) = ast {
             if is_regex_function(*id) {
                 self.bind_pattern(args);
             }

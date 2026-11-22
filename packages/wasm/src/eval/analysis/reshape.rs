@@ -159,7 +159,7 @@ fn source_extent(
     if !is_array_argument(ast, pass.shapes(store.name_scope(sheet))) {
         return Ok(Some((1, 1)));
     }
-    if let Ast::Func(Func::Analysis(id), args) = ast {
+    if let Ast::Func(Func::Analysis(id), args, _) = ast {
         if let Some(function) = reshape_function(*id) {
             return Ok(match estimate(store, function, args, sheet, pass)? {
                 Estimate::Exact { rows, cols } => Some((rows, cols)),

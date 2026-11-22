@@ -87,6 +87,7 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
 pub(crate) use let_slots::{resolve_let_names, LetFrame};
+pub(crate) use lift::call_may_lift;
 use lookup::option_code;
 pub(crate) use lookup::LookupStates;
 pub(crate) use matrix::range_from_ast as static_range;
@@ -548,10 +549,10 @@ fn expand_let_node<'a>(
                 body,
             }))
         }
-        Ast::Func(Func::Let, args) => {
+        Ast::Func(Func::Let, args, _) => {
             return expand_let_args(args, bindings, nodes, next_slot, lambdas)
         }
-        Ast::Func(func, args) => Ast::Func(
+        Ast::Func(func, args, _) => Ast::call(
             *func,
             args.iter()
                 .map(|arg| expand(arg, bindings, nodes, next_slot))
@@ -2072,7 +2073,7 @@ impl CellStore {
                 | Func::ChooseCols
                 | Func::ChooseRows
                 | Func::TrimRange,
-                _,
+                ..,
             ) => {
                 match self
                     .eval_dynamic_array(ast, sheet, pass, depth + 1)
@@ -2082,7 +2083,7 @@ impl CellStore {
                     Err(error) => Value::Error(error),
                 }
             }
-            Ast::Func(func, args) => self.eval_func(*func, args, sheet, pass, depth + 1),
+            Ast::Func(func, args, _) => self.eval_func(*func, args, sheet, pass, depth + 1),
         }
     }
 
@@ -2426,7 +2427,7 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+            } else if matches!(arg, Ast::Func(Func::Union, ..) | Ast::SheetSpan(_)) {
                 match self.eval_area_values(func, arg, sheet, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),

@@ -211,7 +211,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
-        if !matches!(call, Ast::Func(Func::Choose, _))
+        if !matches!(call, Ast::Func(Func::Choose, ..))
             && !ast_produces_array(call, pass.shapes(self.name_scope(sheet)))
         {
             return None;
@@ -229,7 +229,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let Ast::Func(func, args) = call else {
+        let Ast::Func(func, args, _) = call else {
             return Err(FormulaError::Value);
         };
         let kind = Branching::of(*func).ok_or(FormulaError::Value)?;
@@ -271,7 +271,7 @@ impl CellStore {
         formula_sheet: usize,
         pass: &mut EvalPass<'_>,
     ) -> Result<ArrayShape, FormulaError> {
-        let Ast::Func(func, args) = call else {
+        let Ast::Func(func, args, _) = call else {
             return Err(FormulaError::Value);
         };
         let kind = Branching::of(*func)

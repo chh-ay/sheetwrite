@@ -231,7 +231,7 @@ impl<'a> Parser<'a, '_> {
             let _ = self.next();
             operands.push(self.primary_at(depth)?);
         }
-        Ok(Ast::Func(Func::Intersect, operands.into()))
+        Ok(Ast::call(Func::Intersect, operands.into()))
     }
 
     /// A number, or the first row of a whole-row range such as `1:3`.
@@ -260,7 +260,7 @@ impl<'a> Parser<'a, '_> {
                         let _ = self.next();
                         areas.push(self.expr_at(depth + 1)?);
                     }
-                    Ast::Func(Func::Union, areas.into())
+                    Ast::call(Func::Union, areas.into())
                 } else {
                     first
                 };
@@ -469,7 +469,7 @@ impl<'a> Parser<'a, '_> {
         self.close_paren()?;
         let args: Box<[Ast]> = self.args.drain(first..).collect();
         Ok(if let Some(known) = func {
-            Ast::Func(known, args)
+            Ast::call(known, args)
         } else {
             self.features.names = true;
             Ast::UnknownFunc(Box::new(UnknownCall {
@@ -609,7 +609,7 @@ impl<'a> Parser<'a, '_> {
     fn spill_suffix(&mut self, anchor: Ast) -> Ast {
         if matches!(self.peek(), Some(Tok::Hash)) {
             let _ = self.next();
-            Ast::Func(Func::AnchorArray, (vec![anchor]).into())
+            Ast::call(Func::AnchorArray, (vec![anchor]).into())
         } else {
             anchor
         }
