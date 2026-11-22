@@ -666,6 +666,11 @@ fn missing_area_end(after: &str) -> String {
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let book_and_sheet = name.rfind('[').map_or(name, |start| &name[start..]);
+    // ASCII names, the common case, fold byte by byte; `char::to_lowercase`
+    // gives the same text for them.
+    if book_and_sheet.is_ascii() {
+        return book_and_sheet.to_ascii_lowercase();
+    }
     book_and_sheet
         .chars()
         .flat_map(char::to_lowercase)
