@@ -6,6 +6,7 @@ use crate::store::CellStore;
 use crate::types::{CellRange, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_NUMBER};
 
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
+use super::super::lift::ValueArgs;
 use super::super::matrix::{is_range_argument, range_from_ast};
 use super::super::range_reader::RangeReader;
 use super::super::value::aggregate_number;
@@ -28,6 +29,28 @@ family_functions! {
     SUMX2MY2,
     SUMX2PY2,
     SUMXMY2,
+}
+
+/// The arguments of `function` that take one value: every argument, except
+/// the number lists and the coefficients of SERIESSUM.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::SERIESSUM => ValueArgs::at(&[0, 1, 2]),
+        Function::MULTINOMIAL
+        | Function::SUMSQ
+        | Function::SUMX2MY2
+        | Function::SUMX2PY2
+        | Function::SUMXMY2 => ValueArgs::NONE,
+        Function::CEILING_MATH
+        | Function::COMBIN
+        | Function::COMBINA
+        | Function::FACT
+        | Function::FACTDOUBLE
+        | Function::FLOOR_MATH
+        | Function::PERMUT
+        | Function::PERMUTATIONA
+        | Function::SQRTPI => ValueArgs::ALL,
+    }
 }
 
 /// Functions whose arguments are number lists: a single-cell argument is a

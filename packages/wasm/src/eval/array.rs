@@ -138,10 +138,12 @@ fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
             ast_produces_array(inner, _shapes)
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(id), args, _) => super::analysis::family(*id)
-            .array
-            .as_ref()
-            .is_some_and(|hooks| (hooks.produces_array)(*id, args, _shapes)),
+        // Reached only for a call whose shape is decided when asked: a
+        // family with array hooks, or an argument whose shape is.
+        Ast::Func(func @ Func::Analysis(id), args, _) => {
+            super::analysis::array_hooks(*id, args, _shapes).is_some()
+                || super::lift::lifts(*func, args, _shapes)
+        }
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -378,16 +380,17 @@ impl CellStore {
                 })
             }
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(id), args, _) => {
-                let hooks = super::analysis::family(*id).array.as_ref()?;
-                if !(hooks.produces_array)(*id, args, pass.shapes(self.name_scope(formula_sheet))) {
-                    return None;
+            Ast::Func(func @ Func::Analysis(id), args, _) => {
+                let names = self.name_scope(formula_sheet);
+                if let Some(hooks) = super::analysis::array_hooks(*id, args, pass.shapes(names)) {
+                    return Some(runtime_reference_bound(
+                        ast,
+                        (hooks.bound)(self, *id, args, formula_sheet, pass),
+                        names,
+                    ));
                 }
-                Some(runtime_reference_bound(
-                    ast,
-                    (hooks.bound)(self, *id, args, formula_sheet, pass),
-                    self.name_scope(formula_sheet),
-                ))
+                super::lift::lifts(*func, args, pass.shapes(names))
+                    .then(|| self.lifted_bound(ast, formula_sheet, pass))
             }
             Ast::Range(..)
             | Ast::AbsRange(..)
@@ -598,11 +601,10 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args, _) => {
-                let hooks = super::analysis::family(*id).array.as_ref()?;
-                if !(hooks.produces_array)(*id, args, pass.shapes(self.name_scope(sheet))) {
-                    return None;
+                match super::analysis::array_hooks(*id, args, pass.shapes(self.name_scope(sheet))) {
+                    Some(hooks) => (hooks.evaluate)(self, *id, args, sheet, pass, depth + 1),
+                    None => self.eval_lifted_family(ast, sheet, pass, depth + 1)?,
                 }
-                (hooks.evaluate)(self, *id, args, sheet, pass, depth + 1)
             }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, pass, depth + 1)
@@ -808,14 +810,14 @@ impl CellStore {
                 );
             }
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(id), args, _) => {
-                let hooks = super::analysis::family(*id)
-                    .array
-                    .as_ref()
-                    .ok_or(FormulaError::Value)?;
-                if !(hooks.produces_array)(*id, args, pass.shapes(self.name_scope(formula_sheet))) {
+            Ast::Func(func @ Func::Analysis(id), args, _) => {
+                let shapes = pass.shapes(self.name_scope(formula_sheet));
+                let Some(hooks) = super::analysis::array_hooks(*id, args, shapes) else {
+                    if super::lift::lifts(*func, args, shapes) {
+                        return self.lifted_shape(*func, args, formula_sheet, pass);
+                    }
                     return Err(FormulaError::Value);
-                }
+                };
                 let (rows, cols, cells) = (hooks.shape)(self, *id, args, formula_sheet, pass)?;
                 let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
                 if cells != validated {

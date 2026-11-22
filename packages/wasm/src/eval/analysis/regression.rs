@@ -2,6 +2,7 @@
 
 use super::super::array::{ast_produces_array, Shapes};
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
+use super::super::lift::ValueArgs;
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
 use super::super::value::{aggregate_number, bool_from_value};
@@ -25,6 +26,24 @@ family_functions! {
     QUARTILE,
     RANK,
     TREND,
+}
+
+/// The arguments of `function` that take one value: `k`, `x` and the
+/// significance of PERCENTRANK, and the number and order of RANK. The other
+/// functions return arrays of their own or read whole ranges.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::PERCENTILE | Function::QUARTILE => ValueArgs::at(&[1]),
+        Function::PERCENTRANK => ValueArgs::at(&[1, 2]),
+        Function::RANK => ValueArgs::at(&[0, 2]),
+        Function::FREQUENCY
+        | Function::GROWTH
+        | Function::LINEST
+        | Function::LOGEST
+        | Function::MODE_MULT
+        | Function::PROB
+        | Function::TREND => ValueArgs::NONE,
+    }
 }
 
 const STATS_ROWS: usize = 5;

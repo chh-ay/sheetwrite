@@ -3,6 +3,7 @@
 use super::super::functions::{
     integer_arg, number_arg, numeric_entries, require_arity, FuncAccumulator, FuncValue,
 };
+use super::super::lift::ValueArgs;
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
 family_functions! {
@@ -25,6 +26,31 @@ family_functions! {
     SLOPE,
     STEYX,
     TRIMMEAN,
+}
+
+/// The arguments of `function` that take one value: `x` of FORECAST, `k`,
+/// the percent of TRIMMEAN, `x` and the significance of PERCENTRANK, and the
+/// number and order of RANK.AVG. The data are ranges or arrays.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::FORECAST | Function::FORECAST_LINEAR => ValueArgs::at(&[0]),
+        Function::PERCENTILE_EXC | Function::QUARTILE_EXC | Function::TRIMMEAN => {
+            ValueArgs::at(&[1])
+        }
+        Function::PERCENTRANK_EXC | Function::PERCENTRANK_INC => ValueArgs::at(&[1, 2]),
+        Function::RANK_AVG => ValueArgs::at(&[0, 2]),
+        Function::AVEDEV
+        | Function::DEVSQ
+        | Function::HARMEAN
+        | Function::INTERCEPT
+        | Function::KURT
+        | Function::PEARSON
+        | Function::RSQ
+        | Function::SKEW
+        | Function::SKEW_P
+        | Function::SLOPE
+        | Function::STEYX => ValueArgs::NONE,
+    }
 }
 
 /// Functions whose arguments are number lists: a single-cell argument is a

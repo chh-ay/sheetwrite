@@ -2,6 +2,7 @@
 
 use super::super::date::{date_parts, date_serial};
 use super::super::functions::{integer_arg, require_arity, text_arg, FuncAccumulator};
+use super::super::lift::ValueArgs;
 use super::super::value::{number_from_text, number_from_value};
 use crate::types::{EvalResult, FormulaError, Value};
 
@@ -11,6 +12,16 @@ family_functions! {
     NETWORKDAYS_INTL = "NETWORKDAYS.INTL",
     WORKDAY_INTL = "WORKDAY.INTL",
 }
+
+/// The arguments of `function` that take one value: every argument, except
+/// the holidays of NETWORKDAYS.INTL and WORKDAY.INTL, which are a range.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::DATEDIF | Function::ISOWEEKNUM => ValueArgs::ALL,
+        Function::NETWORKDAYS_INTL | Function::WORKDAY_INTL => ValueArgs::at(&[0, 1, 2]),
+    }
+}
+
 const MAX_SERIAL: i64 = 2_958_465;
 const DAYS_PER_WEEK: i64 = 7;
 const MONTHS_PER_YEAR: i64 = 12;

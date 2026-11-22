@@ -6,6 +6,7 @@ use regex_lite::{Captures, Regex};
 
 use super::super::regex_patterns::build_regex;
 
+use super::super::lift::ValueArgs;
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS};
 use super::super::number_format::{format_number, general_text, round_decimal, Rounding};
 use super::super::value::{bool_from_value, number_from_value, text_from_value};
@@ -26,6 +27,22 @@ family_functions! {
     TEXTBEFORE,
     TEXTSPLIT,
     VALUETOTEXT,
+}
+
+/// The arguments of `function` that take one value. The delimiters of
+/// TEXTBEFORE and TEXTAFTER are a list to match any of, as in TEXTSPLIT;
+/// ARRAYTOTEXT takes an array; REGEXEXTRACT and TEXTSPLIT return arrays of
+/// their own.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::DOLLAR
+        | Function::FIXED
+        | Function::REGEXREPLACE
+        | Function::REGEXTEST
+        | Function::VALUETOTEXT => ValueArgs::ALL,
+        Function::TEXTAFTER | Function::TEXTBEFORE => ValueArgs::at(&[0, 2, 3, 4, 5]),
+        Function::ARRAYTOTEXT | Function::REGEXEXTRACT | Function::TEXTSPLIT => ValueArgs::NONE,
+    }
 }
 const MAX_TEXT_CHARS: usize = 32_767;
 const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;

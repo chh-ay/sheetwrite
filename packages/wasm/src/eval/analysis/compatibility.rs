@@ -5,6 +5,7 @@
 //! that function. The other names keep their own argument order or tail.
 
 use super::super::functions::{apply_func, number_arg, require_arity, FuncAccumulator};
+use super::super::lift::ValueArgs;
 use super::discrete;
 use super::distributions::{
     self, beta_probability, binomial_inverse, degrees_arg, ensure, normal_cdf, student_tail,
@@ -43,6 +44,43 @@ family_functions! {
     VAR,
     VARP,
     WEIBULL,
+}
+
+/// The arguments of `function` that take one value: every argument of the
+/// distributions, none of the functions over number lists.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::COVAR
+        | Function::MODE
+        | Function::STDEV
+        | Function::STDEVP
+        | Function::VAR
+        | Function::VARP => ValueArgs::NONE,
+        Function::BETADIST
+        | Function::BETAINV
+        | Function::BINOMDIST
+        | Function::CHIDIST
+        | Function::CHIINV
+        | Function::CONFIDENCE
+        | Function::CRITBINOM
+        | Function::EXPONDIST
+        | Function::FDIST
+        | Function::FINV
+        | Function::GAMMADIST
+        | Function::GAMMAINV
+        | Function::HYPGEOMDIST
+        | Function::LOGINV
+        | Function::LOGNORMDIST
+        | Function::NEGBINOMDIST
+        | Function::NORMDIST
+        | Function::NORMINV
+        | Function::NORMSDIST
+        | Function::NORMSINV
+        | Function::POISSON
+        | Function::TDIST
+        | Function::TINV
+        | Function::WEIBULL => ValueArgs::ALL,
+    }
 }
 
 /// Functions whose arguments are number lists: a single-cell argument is a

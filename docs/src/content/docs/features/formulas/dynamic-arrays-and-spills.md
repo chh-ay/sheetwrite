@@ -101,6 +101,8 @@ Arguments that take a range are never expanded. `SUM(A1:A3)` adds the range. In 
 
 The arguments expand with the same rules as operators: a single row repeats down, a single column across, and an array with fewer rows or columns than the result, and more than one, gives `#N/A` in the cells outside it. An error stays in its own element: `=ISERROR(A1:A3)` tests each cell.
 
+The full engine (`@sheetwrite/formulas`) applies the same rule to its own functions: for example `=FACT({3,4})`, `=BITAND(A1:A3,12)`, `=TEXTBEFORE(A1:A3,"-")` and the statistical distributions spill one result for each element. Arguments that are lists are not expanded: the delimiters of `TEXTBEFORE` and `TEXTAFTER` are a set to match any of, and `IMSUM`, `SUMSQ` and the regression functions read their whole ranges.
+
 ## Dynamic arrays and spills
 
 `FILTER`, `SORT`, `UNIQUE`, `TRANSPOSE`, `SEQUENCE`, `TAKE`, `DROP`, `CHOOSECOLS`, and `CHOOSEROWS` return rectangular values. A direct range formula such as `=A1:B4` also spills:

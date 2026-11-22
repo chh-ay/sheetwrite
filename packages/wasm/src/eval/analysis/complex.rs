@@ -6,6 +6,7 @@
 //! when no argument has one.
 
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
+use super::super::lift::ValueArgs;
 use super::super::number_format::general_text;
 use crate::types::{EvalResult, FormulaError, Value};
 
@@ -36,6 +37,38 @@ family_functions! {
     IMSUB,
     IMSUM,
     IMTAN,
+}
+
+/// The arguments of `function` that take one value: every argument, except
+/// those of IMPRODUCT and IMSUM, which take ranges and arrays.
+pub(super) const fn value_args(function: Function) -> ValueArgs {
+    match function {
+        Function::IMPRODUCT | Function::IMSUM => ValueArgs::NONE,
+        Function::COMPLEX
+        | Function::IMABS
+        | Function::IMAGINARY
+        | Function::IMARGUMENT
+        | Function::IMCONJUGATE
+        | Function::IMCOS
+        | Function::IMCOSH
+        | Function::IMCOT
+        | Function::IMCSC
+        | Function::IMCSCH
+        | Function::IMDIV
+        | Function::IMEXP
+        | Function::IMLN
+        | Function::IMLOG10
+        | Function::IMLOG2
+        | Function::IMPOWER
+        | Function::IMREAL
+        | Function::IMSEC
+        | Function::IMSECH
+        | Function::IMSIN
+        | Function::IMSINH
+        | Function::IMSQRT
+        | Function::IMSUB
+        | Function::IMTAN => ValueArgs::ALL,
+    }
 }
 
 /// Excel accepts at most 255 arguments.
