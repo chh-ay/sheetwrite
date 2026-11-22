@@ -128,17 +128,33 @@ function manual_row_runs(
   return Uint32Array.from(runs);
 }
 
-/** Runs of the rows in `[0, row_count)` that the ascending `present` rows leave out. */
+/**
+ * Runs of the rows in `[0, row_count)` that the ascending `present` rows leave
+ * out. A filter can keep hundreds of thousands of rows, so the runs go
+ * straight into a typed array sized for the most runs there can be (one
+ * more than the kept rows, and never more than the hidden rows), and only
+ * the written part is kept.
+ */
 function missing_row_runs(present: Uint32Array, row_count: number): Uint32Array {
-  const runs: number[] = [];
+  const most_runs = Math.min(present.length + 1, Math.max(0, row_count - present.length));
+  const runs = new Uint32Array(most_runs * 2);
+  let at = 0;
   let next = 0;
-  for (const row of present) {
-    if (row > next) runs.push(next, row - 1);
+  for (let i = 0; i < present.length; i++) {
+    const row = present[i] ?? next;
+    if (row > next) {
+      runs[at] = next;
+      runs[at + 1] = row - 1;
+      at += 2;
+    }
     next = row + 1;
   }
-  if (next < row_count) runs.push(next, row_count - 1);
-
-  return runs.length === 0 ? EMPTY_RUNS : Uint32Array.from(runs);
+  if (next < row_count) {
+    runs[at] = next;
+    runs[at + 1] = row_count - 1;
+    at += 2;
+  }
+  return at === 0 ? EMPTY_RUNS : runs.slice(0, at);
 }
 
 function same_runs(left: Uint32Array, right: Uint32Array): boolean {
