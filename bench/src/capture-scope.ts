@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { cpus, hostname, release } from "node:os";
+import { cpus, release } from "node:os";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { machineLabel } from "./machine-label.js";
 import { RELEASE_SUITE_ARTIFACTS } from "./release-capture.js";
 
 const GIB_BYTES = 1024 ** 3;
@@ -259,7 +260,7 @@ async function main(): Promise<void> {
     harnessPatchSha256: harness_patch_sha256,
     purpose: values.rehearsal ? "rehearsal" : "capture",
     timestamp: new Date().toISOString(),
-    machine: hostname(),
+    machine: machineLabel(),
     cpu: cpus()[0]?.model ?? "unknown",
     bun: Bun.version,
     node: command_output(["node", "--version"]),

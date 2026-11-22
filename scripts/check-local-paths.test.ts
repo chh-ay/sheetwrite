@@ -16,6 +16,7 @@ const MAC_HOME = home_path("/", "", "Users", "someone", "sheetwrite");
 const WINDOWS_HOME = home_path("\\", "C:", "Users", "someone", "sheetwrite");
 const TILDE_CHECKOUT = home_path("/", "~", "learn", "sheetwrite");
 const HOST = ["zeph", "yrus"].join("");
+const MAC_HOST = ["Chh", "ayy"].join("");
 
 it("reports Linux, macOS, Windows and tilde home-directory paths with their line", () => {
   const contents = encode(
@@ -33,12 +34,15 @@ it("reports Linux, macOS, Windows and tilde home-directory paths with their line
   ]);
 });
 
-it("reports the benchmark machine's host name in any letter case", () => {
+it("reports the benchmark machines' host names in any letter case", () => {
   const contents = encode(
     [
       `"host": "${HOST}"`,
       "Linux benchmark machine (i9-12900H)",
       `ssh hypr-${HOST.toUpperCase()}`,
+      `"machine": "${MAC_HOST}.local"`,
+      `"machine": "${MAC_HOST.toLowerCase()}-2.LOCAL"`,
+      "local machine",
     ].join("\n"),
   );
 
@@ -50,6 +54,8 @@ it("reports the benchmark machine's host name in any letter case", () => {
   ).toEqual([
     { line: 1, kind: "host name" },
     { line: 3, kind: "host name" },
+    { line: 4, kind: "host name" },
+    { line: 5, kind: "host name" },
   ]);
 });
 

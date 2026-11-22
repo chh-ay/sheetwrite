@@ -1,6 +1,6 @@
 import "./dom-setup.js";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { cpus, hostname } from "node:os";
+import { cpus } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -23,6 +23,7 @@ import type {
   Sheet,
   Workbook,
 } from "../../packages/core/src/types.js";
+import { machineLabel } from "./machine-label.js";
 import { protocolCaptureMeta, type ProtocolCaptureMeta } from "./protocol-meta.js";
 import { now, summarize, type Stat } from "./stats.js";
 
@@ -532,7 +533,7 @@ export async function captureChartTracking(
     mode: smoke ? "smoke" : "full",
     meta: {
       ...protocolCaptureMeta(),
-      machine: hostname(),
+      machine: machineLabel(),
       cpu: cpus()[0]?.model ?? "unknown",
       memoryMax: process.env.BENCH_MEMORY_MAX ?? "6G",
     },

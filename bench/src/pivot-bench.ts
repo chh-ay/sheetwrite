@@ -1,9 +1,10 @@
 import { writeFileSync } from "node:fs";
-import { cpus, hostname } from "node:os";
+import { cpus } from "node:os";
 import { parseArgs } from "node:util";
 
 import { CellStore, load } from "@sheetwrite/formulas";
 
+import { machineLabel } from "./machine-label.js";
 import { writeNumberColumn } from "./packed-fixture.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { now, summarize } from "./stats.js";
@@ -213,7 +214,7 @@ try {
     mode: "full",
     meta: {
       ...protocolCaptureMeta(),
-      machine: hostname(),
+      machine: machineLabel(),
       cpu: cpus()[0]?.model ?? "unknown",
       memoryMax: process.env.BENCH_MEMORY_MAX ?? "6G",
     },
