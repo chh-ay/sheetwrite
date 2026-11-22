@@ -2205,26 +2205,30 @@ impl PivotCache {
     /// new layout, otherwise the row-major offsets in `layout` whose values
     /// may have changed.
     pub(crate) fn take_changes(&mut self, layout: &PivotLayout) -> Option<Vec<usize>> {
-        let mut pairs = std::mem::take(&mut self.changed_pairs);
+        let pairs = std::mem::take(&mut self.changed_pairs);
         if std::mem::replace(&mut self.relayout, false) || layout.header_rows == 0 {
             return None;
         }
 
-        pairs.sort_unstable();
-        pairs.dedup();
+        // In output order, so the offsets ascend and the dirty list takes
+        // their cells without sorting them.
+        let mut positions: Vec<(u32, u32)> = pairs
+            .into_iter()
+            .filter_map(|(row_group, col_group)| {
+                let row = shown_position(&layout.row_positions, row_group)?;
+                let col = shown_position(&layout.col_positions, col_group)?;
+                Some((row as u32, col as u32))
+            })
+            .collect();
+        positions.sort_unstable();
+        positions.dedup();
 
         let values = self.outputs.len();
-        let mut offsets = Vec::with_capacity(pairs.len() * values);
-        for (row_group, col_group) in pairs {
-            let (Some(row), Some(col)) = (
-                shown_position(&layout.row_positions, row_group),
-                shown_position(&layout.col_positions, col_group),
-            ) else {
-                continue;
-            };
-            let start = (layout.header_rows + row) * layout.cols
+        let mut offsets = Vec::with_capacity(positions.len() * values);
+        for (row, col) in positions {
+            let start = (layout.header_rows + row as usize) * layout.cols
                 + layout.label_cols
-                + col * layout.value_slots;
+                + col as usize * layout.value_slots;
             offsets.extend(start..start + values);
         }
         Some(offsets)
