@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { cpus, hostname } from "node:os";
+import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { type Browser, chromium } from "@playwright/test";
 
 import pageHtml from "./analytics-bench.html";
+import { machineLabel } from "./machine-label.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { summarize, type Stat } from "./stats.js";
 
@@ -215,7 +216,7 @@ async function main(): Promise<void> {
   const artifact = {
     schemaVersion: 1,
     protocol: "sheetwrite-analytics-v1",
-    meta: { ...protocolCaptureMeta(), machine: hostname(), cpu: cpus()[0]?.model ?? "unknown" },
+    meta: { ...protocolCaptureMeta(), machine: machineLabel(), cpu: cpus()[0]?.model ?? "unknown" },
     query: Object.fromEntries(query),
     runs: results,
   };

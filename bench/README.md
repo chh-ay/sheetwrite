@@ -939,6 +939,13 @@ reservation, not an override of that effective mask. Legacy records without
 an explicit override can use their recorded slot mask. The comparison rejects
 a same-suite affinity mismatch; different suites need not share one mask.
 
+The machine in a record, and in the analytics, chart-tracking, pivot and
+panel-read artifacts, is a label such as `linux-i9-12900h` or `mac-m5-pro`,
+built from the platform and CPU model (`src/machine-label.ts`), never the host
+name: these files are committed. Set `SHEETWRITE_BENCH_MACHINE` to choose the
+label. The comparison requires one label across every record, so set it on all
+of a release's captures or on none.
+
 Use the same recorder and cap for the fresh checkout of the previous release.
 Its engine captures (formula, formula-engines and formula-matched) measure
 that release's engine under the candidate's core and harness: run them from

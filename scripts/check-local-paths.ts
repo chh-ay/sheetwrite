@@ -6,8 +6,11 @@ import { gunzipSync } from "node:zlib";
 /** A home directory names one developer's machine; committed files must stay portable. */
 const HOME_PATH =
   /\/home\/[^/\s"'`]+\/|\/Users\/[^/\s"'`]+\/|[A-Za-z]:\\{1,2}Users\\{1,2}|~\/learn\//u;
-/** The benchmark machine's host name. Split so this file does not name it. */
-const HOST_NAME = new RegExp(["zeph", "yrus"].join(""), "iu");
+/** The benchmark machines' host names. Split so this file does not name them. */
+const HOST_NAME = new RegExp(
+  `${["zeph", "yrus"].join("")}|${["chh", "ayy"].join("")}(?:-2)?\\.local`,
+  "iu",
+);
 const LOCKFILE =
   /(?:^|\/)(?:bun\.lockb?|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock)$/u;
 const BINARY_BYTE = 0;
@@ -19,9 +22,10 @@ const REGULAR_FILE_MODE = /^100(?:644|755) /u;
 const SYMLINK_MODE = /^120000 /u;
 
 /**
- * Benchmark captures committed before this check covered host names. Each
- * records the capture machine's host name; home-directory paths are still
- * checked in them, and any other file that names the host fails.
+ * Benchmark captures committed before captures recorded a machine label
+ * (`bench/src/machine-label.ts`). Each records a capture machine's host name;
+ * home-directory paths are still checked in them, and any other file that
+ * names a host fails.
  */
 const HOST_NAME_CAPTURES: ReadonlySet<string> = new Set([
   "bench/results/capture-attempts/comparison-before-portability.json.gz",
@@ -54,6 +58,8 @@ const HOST_NAME_CAPTURES: ReadonlySet<string> = new Set([
   "bench/results/capture-runs/render-scale.json",
   "bench/results/capture-runs/xlsx.json",
   "bench/results/chart-tracking-results.json",
+  "bench/results/machines/mac/chart-tracking-results.json",
+  "bench/results/machines/mac/pivot-results.json",
   "bench/results/pivot-results.json",
   "bench/results/release-comparison.json",
   "bench/results/releases/0.5.4/capture-runs/core-paths.json",

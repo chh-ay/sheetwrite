@@ -7,7 +7,7 @@
 import "./dom-setup.js";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
-import { cpus, hostname } from "node:os";
+import { cpus } from "node:os";
 
 import * as formulas from "@sheetwrite/formulas";
 
@@ -27,6 +27,7 @@ import { insertChart } from "../../packages/core/src/panels/panel-controller.js"
 import { pivotPanel } from "../../packages/core/src/panels/pivot-panel.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import { requiredOption } from "./cli-options.js";
+import { machineLabel } from "./machine-label.js";
 import { summarize } from "./stats.js";
 
 const SOURCE_ROWS = 100_000;
@@ -250,7 +251,7 @@ try {
     JSON.stringify(
       {
         protocol: "sheetwrite-panel-read-v1",
-        host: hostname(),
+        host: machineLabel(),
         platform: process.platform,
         cpu: cpus()[0]?.model,
         rows: SOURCE_ROWS,
