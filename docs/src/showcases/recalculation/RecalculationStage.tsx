@@ -96,13 +96,16 @@ function RunBars(props: {
 /** The recalculation showcase's island: the 100,000-row model and its timed edits. */
 export function RecalculationStage(props: RecalculationStageProps) {
   const live = createLiveScenario<RecalculationScenario, RecalculationSnapshot>(() =>
-    import("./boot.js").then(({ createRecalculationScenario }) => createRecalculationScenario),
+    import("./boot.js").then(
+      ({ createRecalculationScenario: create_recalculation_scenario }) =>
+        create_recalculation_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
   createEffect(() => setFirstCalculationMs(live.snapshot()?.firstCalculationMs ?? null));
   const busy = () => action.disabled() || (live.snapshot()?.running ?? true);
   const runs = () => live.snapshot()?.runs ?? [];
-  const fanOut = () =>
+  const fan_out = () =>
     runs()
       .filter((entry) => entry.kind === "fan-out")
       .map((entry) => entry.recalcMs);
@@ -146,7 +149,7 @@ export function RecalculationStage(props: RecalculationStageProps) {
                 },
                 {
                   label: "Median of recent",
-                  value: fanOut().length > 0 ? milliseconds(median(fanOut())) : "…",
+                  value: fan_out().length > 0 ? milliseconds(median(fan_out())) : "…",
                 },
                 { label: "Total revenue", value: money(live.snapshot()?.revenue) },
               ]}

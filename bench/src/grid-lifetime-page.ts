@@ -14,27 +14,27 @@ const ROW_COUNT = 2_000;
 const DEFAULT_CYCLES = 100;
 const DEFAULT_WARMUP_CYCLES = 50;
 
-const status = requiredElement("#bench-status", HTMLOutputElement);
-const runButton = requiredElement("#bench-run", HTMLButtonElement);
-const host = requiredElement("#grid-host", HTMLDivElement);
+const status = required_element("#bench-status", HTMLOutputElement);
+const run_button = required_element("#bench-run", HTMLButtonElement);
+const host = required_element("#grid-host", HTMLDivElement);
 const params = new URLSearchParams(location.search);
 const cycles = Number(params.get("cycles") ?? DEFAULT_CYCLES);
-const warmupCycles = Number(params.get("warmup") ?? DEFAULT_WARMUP_CYCLES);
+const warmup_cycles = Number(params.get("warmup") ?? DEFAULT_WARMUP_CYCLES);
 // The status keeps one text node, so a status change adds no DOM node that the
 // driver's node count could mistake for a grid's.
-const statusText = document.createTextNode(status.textContent ?? "");
-status.replaceChildren(statusText);
+const status_text = document.createTextNode(status.textContent ?? "");
+status.replaceChildren(status_text);
 
-function requiredElement<T extends Element>(selector: string, type: new () => T): T {
+function required_element<T extends Element>(selector: string, type: new () => T): T {
   const element = document.querySelector(selector);
   if (!(element instanceof type)) throw new Error(`The benchmark page has no ${selector}.`);
 
   return element;
 }
 
-function setStatus(next: string): void {
+function set_status(next: string): void {
   status.dataset.status = next;
-  statusText.data = next;
+  status_text.data = next;
 }
 
 function workbook(): Workbook {
@@ -56,7 +56,7 @@ function workbook(): Workbook {
   };
 }
 
-function columnarRows(): ColumnarData {
+function columnar_rows(): ColumnarData {
   return {
     rowCount: ROW_COUNT,
     columns: {
@@ -68,7 +68,7 @@ function columnarRows(): ColumnarData {
   };
 }
 
-function nextFrame(): Promise<void> {
+function next_frame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
@@ -77,19 +77,19 @@ function nextFrame(): Promise<void> {
 // the body. A detached element keeps its whole subtree, and the subtree keeps
 // its root, so the top-level elements stand for all grid DOM. The driver asks
 // for the live count after a full collection; destroyed grids must leave 0.
-const warmupRefs: WeakRef<object>[] = [];
-const measuredRefs: WeakRef<object>[] = [];
-let phaseRefs = warmupRefs;
+const warmup_refs: WeakRef<object>[] = [];
+const measured_refs: WeakRef<object>[] = [];
+let phase_refs = warmup_refs;
 
-function trackGrid(grid: Grid, bodyBefore: ReadonlySet<Element>): void {
-  phaseRefs.push(new WeakRef(grid), new WeakRef(grid.store), new WeakRef(grid.actions));
-  for (const element of host.children) phaseRefs.push(new WeakRef(element));
+function track_grid(grid: Grid, body_before: ReadonlySet<Element>): void {
+  phase_refs.push(new WeakRef(grid), new WeakRef(grid.store), new WeakRef(grid.actions));
+  for (const element of host.children) phase_refs.push(new WeakRef(element));
   for (const element of document.body.children) {
-    if (!bodyBefore.has(element)) phaseRefs.push(new WeakRef(element));
+    if (!body_before.has(element)) phase_refs.push(new WeakRef(element));
   }
 }
 
-function liveCount(refs: readonly WeakRef<object>[]): number {
+function live_count(refs: readonly WeakRef<object>[]): number {
   let live = 0;
   for (const ref of refs) if (ref.deref() !== undefined) live += 1;
 
@@ -97,19 +97,19 @@ function liveCount(refs: readonly WeakRef<object>[]): number {
 }
 
 /** Create one grid with the default chrome, let it paint, then destroy it. */
-async function lifetimeCycle(): Promise<void> {
-  const bodyBefore = new Set(document.body.children);
-  const grid = createGrid(host, { workbook: workbook(), data: columnarRows() });
-  await nextFrame();
-  await nextFrame();
-  trackGrid(grid, bodyBefore);
+async function lifetime_cycle(): Promise<void> {
+  const body_before = new Set(document.body.children);
+  const grid = createGrid(host, { workbook: workbook(), data: columnar_rows() });
+  await next_frame();
+  await next_frame();
+  track_grid(grid, body_before);
   grid.destroy();
 }
 
 async function start(): Promise<void> {
   if (!Number.isSafeInteger(cycles) || cycles < 1) throw new Error(`Invalid cycles: ${cycles}`);
-  if (!Number.isSafeInteger(warmupCycles) || warmupCycles < 1) {
-    throw new Error(`Invalid warm-up cycles: ${warmupCycles}`);
+  if (!Number.isSafeInteger(warmup_cycles) || warmup_cycles < 1) {
+    throw new Error(`Invalid warm-up cycles: ${warmup_cycles}`);
   }
 
   await initSheetwrite();
@@ -125,39 +125,39 @@ async function start(): Promise<void> {
   // the first few dozen grids before they level off. The baseline holds all of
   // them, so the measured loop shows only what the grids themselves keep.
   let phase: "warm-up" | "measure" | "count" = "warm-up";
-  runButton.addEventListener("click", () => {
-    runButton.disabled = true;
+  run_button.addEventListener("click", () => {
+    run_button.disabled = true;
     if (phase === "warm-up") {
       phase = "measure";
-      setStatus("warming-up");
-      void runCycles(warmupCycles, "ready");
+      set_status("warming-up");
+      void run_cycles(warmup_cycles, "ready");
     } else if (phase === "measure") {
       phase = "count";
-      phaseRefs = measuredRefs;
-      setStatus("running");
-      void runCycles(cycles, "done");
+      phase_refs = measured_refs;
+      set_status("running");
+      void run_cycles(cycles, "done");
     } else {
-      status.dataset.trackedObjects = String(warmupRefs.length + measuredRefs.length);
-      status.dataset.liveObjects = String(liveCount(warmupRefs) + liveCount(measuredRefs));
-      setStatus("counted");
+      status.dataset.trackedObjects = String(warmup_refs.length + measured_refs.length);
+      status.dataset.liveObjects = String(live_count(warmup_refs) + live_count(measured_refs));
+      set_status("counted");
     }
   });
-  runButton.disabled = false;
-  setStatus("idle");
+  run_button.disabled = false;
+  set_status("idle");
 }
 
-async function runCycles(count: number, done: string): Promise<void> {
+async function run_cycles(count: number, done: string): Promise<void> {
   try {
-    for (let cycle = 0; cycle < count; cycle++) await lifetimeCycle();
-    runButton.disabled = false;
-    setStatus(done);
+    for (let cycle = 0; cycle < count; cycle++) await lifetime_cycle();
+    run_button.disabled = false;
+    set_status(done);
   } catch (error) {
     console.error("A grid lifetime cycle failed.", error);
-    setStatus("error");
+    set_status("error");
   }
 }
 
 start().catch((error: unknown) => {
   console.error("The grid lifetime benchmark page could not start.", error);
-  setStatus("error");
+  set_status("error");
 });

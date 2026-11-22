@@ -10,12 +10,12 @@ import type { RibbonCommandStates, RibbonContext, RibbonControlView } from "./ri
 import type { RibbonPopup } from "./ribbon-popup.js";
 
 /** One style read and one theme-font parse, shared by every value box. */
-function readFocus(grid: Grid): RibbonFocus {
-  const themeFont = fontShorthandParts(grid.getTheme().font);
+function read_focus(grid: Grid): RibbonFocus {
+  const theme_font = fontShorthandParts(grid.getTheme().font);
   return {
     style: grid.getFocusCellStyle(),
-    themeFontFamily: themeFont.family,
-    themeFontPx: themeFont.px,
+    themeFontFamily: theme_font.family,
+    themeFontPx: theme_font.px,
   };
 }
 
@@ -33,7 +33,7 @@ export function createCommandContext(options: CommandContextOptions): RibbonCont
   return {
     grid,
     popup: options.popup,
-    focus: () => readFocus(grid),
+    focus: () => read_focus(grid),
     focusGrid: options.focusGrid,
     ...(icons === undefined ? {} : { icons }),
     // A command run from a dropdown closes it first, as in Excel: a collapsed
@@ -42,13 +42,13 @@ export function createCommandContext(options: CommandContextOptions): RibbonCont
     // dropdown, the grid takes it.
     run: (key, command, control) => {
       const before = document.activeElement;
-      const fromPopup = options.popup.contains(before);
+      const from_popup = options.popup.contains(before);
       options.popup.closeAll(false);
       const feedback = actionFeedbackFor(grid);
       if (feedback) void feedback.run(`${options.feedbackScope}:${key}`, command, control);
       else command();
       const after = document.activeElement;
-      if (fromPopup && (after === null || after === before || after === document.body))
+      if (from_popup && (after === null || after === before || after === document.body))
         options.focusGrid();
     },
   };
@@ -64,7 +64,7 @@ export function refreshControls(
   const snapshot = {
     state,
     get focus(): RibbonFocus {
-      focus ??= readFocus(grid);
+      focus ??= read_focus(grid);
       return focus;
     },
   };

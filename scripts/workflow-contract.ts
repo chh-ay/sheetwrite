@@ -84,31 +84,31 @@ export const REVIEWED_ACTION_PINS: Readonly<Record<string, string>> = {
 
 const SHA_40 = /^[0-9a-f]{40}$/;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function is_record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function optionalString(value: unknown, label: string): asserts value is string | undefined {
+function optional_string(value: unknown, label: string): asserts value is string | undefined {
   if (value !== undefined && typeof value !== "string")
     throw new Error(`${label} must be a string`);
 }
 
-function optionalRecord(
+function optional_record(
   value: unknown,
   label: string,
 ): asserts value is Record<string, unknown> | undefined {
-  if (value !== undefined && !isRecord(value)) throw new Error(`${label} must be an object`);
+  if (value !== undefined && !is_record(value)) throw new Error(`${label} must be an object`);
 }
 
-function parseStep(value: unknown, label: string): WorkflowStep {
-  if (!isRecord(value)) throw new Error(`${label} must be an object`);
-  optionalString(value.id, `${label}.id`);
-  optionalString(value.name, `${label}.name`);
-  optionalString(value.run, `${label}.run`);
-  optionalString(value.if, `${label}.if`);
-  optionalRecord(value.env, `${label}.env`);
-  optionalString(value.uses, `${label}.uses`);
-  optionalRecord(value.with, `${label}.with`);
+function parse_step(value: unknown, label: string): WorkflowStep {
+  if (!is_record(value)) throw new Error(`${label} must be an object`);
+  optional_string(value.id, `${label}.id`);
+  optional_string(value.name, `${label}.name`);
+  optional_string(value.run, `${label}.run`);
+  optional_string(value.if, `${label}.if`);
+  optional_record(value.env, `${label}.env`);
+  optional_string(value.uses, `${label}.uses`);
+  optional_record(value.with, `${label}.with`);
   if (value.run !== undefined) {
     if (value.uses !== undefined) {
       throw new Error(`${label} cannot define both run and uses`);
@@ -137,12 +137,12 @@ function parseStep(value: unknown, label: string): WorkflowStep {
   throw new Error(`${label} must define run or uses`);
 }
 
-function parseJob(value: unknown, label: string): WorkflowJob {
-  if (!isRecord(value)) throw new Error(`${label} must be an object`);
-  optionalString(value.name, `${label}.name`);
-  optionalString(value["runs-on"], `${label}.runs-on`);
-  optionalString(value.if, `${label}.if`);
-  optionalString(value.uses, `${label}.uses`);
+function parse_job(value: unknown, label: string): WorkflowJob {
+  if (!is_record(value)) throw new Error(`${label} must be an object`);
+  optional_string(value.name, `${label}.name`);
+  optional_string(value["runs-on"], `${label}.runs-on`);
+  optional_string(value.if, `${label}.if`);
+  optional_string(value.uses, `${label}.uses`);
   if (
     value.needs !== undefined &&
     typeof value.needs !== "string" &&
@@ -150,8 +150,8 @@ function parseJob(value: unknown, label: string): WorkflowJob {
   ) {
     throw new Error(`${label}.needs must be a string or string array`);
   }
-  optionalRecord(value.permissions, `${label}.permissions`);
-  optionalRecord(value.outputs, `${label}.outputs`);
+  optional_record(value.permissions, `${label}.permissions`);
+  optional_record(value.outputs, `${label}.outputs`);
   if (
     value["timeout-minutes"] !== undefined &&
     (typeof value["timeout-minutes"] !== "number" || value["timeout-minutes"] <= 0)
@@ -162,7 +162,7 @@ function parseJob(value: unknown, label: string): WorkflowJob {
     if (!Array.isArray(value.steps) || value.steps.length === 0) {
       throw new Error(`${label}.steps must be a non-empty array`);
     }
-    value.steps.map((step, index) => parseStep(step, `${label}.steps[${index}]`));
+    value.steps.map((step, index) => parse_step(step, `${label}.steps[${index}]`));
   }
   if (value.uses !== undefined && value.steps !== undefined) {
     throw new Error(`${label} cannot define both uses and steps`);
@@ -182,18 +182,18 @@ export function parseWorkflowContract(source: string, label = "workflow"): Workf
       `${label} is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  if (!isRecord(raw)) throw new Error(`${label} must be an object`);
-  optionalString(raw.name, `${label}.name`);
-  optionalRecord(raw.on, `${label}.on`);
-  optionalRecord(raw.env, `${label}.env`);
-  optionalRecord(raw.concurrency, `${label}.concurrency`);
-  optionalRecord(raw.permissions, `${label}.permissions`);
-  if (!isRecord(raw.jobs) || Object.keys(raw.jobs).length === 0) {
+  if (!is_record(raw)) throw new Error(`${label} must be an object`);
+  optional_string(raw.name, `${label}.name`);
+  optional_record(raw.on, `${label}.on`);
+  optional_record(raw.env, `${label}.env`);
+  optional_record(raw.concurrency, `${label}.concurrency`);
+  optional_record(raw.permissions, `${label}.permissions`);
+  if (!is_record(raw.jobs) || Object.keys(raw.jobs).length === 0) {
     throw new Error(`${label}.jobs must be a non-empty object`);
   }
   const jobs: Record<string, WorkflowJob> = {};
-  for (const [jobName, job] of Object.entries(raw.jobs)) {
-    jobs[jobName] = parseJob(job, `${label}.jobs.${jobName}`);
+  for (const [job_name, job] of Object.entries(raw.jobs)) {
+    jobs[job_name] = parse_job(job, `${label}.jobs.${job_name}`);
   }
   return { ...(raw as unknown as WorkflowContract), jobs };
 }
@@ -208,17 +208,17 @@ interface ActionReference {
   readonly uses: string;
 }
 
-function actionReferences(named: NamedWorkflow): readonly ActionReference[] {
+function action_references(named: NamedWorkflow): readonly ActionReference[] {
   const references: ActionReference[] = [];
-  for (const [jobName, job] of Object.entries(named.workflow.jobs)) {
+  for (const [job_name, job] of Object.entries(named.workflow.jobs)) {
     if (job.uses) {
-      references.push({ workflow: named.name, location: `jobs.${jobName}`, uses: job.uses });
+      references.push({ workflow: named.name, location: `jobs.${job_name}`, uses: job.uses });
     }
     for (const [index, step] of (job.steps ?? []).entries()) {
       if (step.uses) {
         references.push({
           workflow: named.name,
-          location: `jobs.${jobName}.steps[${index}]`,
+          location: `jobs.${job_name}.steps[${index}]`,
           uses: step.uses,
         });
       }
@@ -231,9 +231,9 @@ export function assertReviewedActionPins(
   workflows: readonly NamedWorkflow[],
   reviewedPins: Readonly<Record<string, string>> = REVIEWED_ACTION_PINS,
 ): void {
-  const usedActions = new Set<string>();
+  const used_actions = new Set<string>();
   for (const named of workflows) {
-    for (const reference of actionReferences(named)) {
+    for (const reference of action_references(named)) {
       if (reference.uses.startsWith("./")) continue;
       const separator = reference.uses.lastIndexOf("@");
       if (separator <= 0 || separator === reference.uses.length - 1) {
@@ -259,11 +259,11 @@ export function assertReviewedActionPins(
           `${reference.workflow} ${reference.location} action ${action} uses unreviewed SHA ${commit}`,
         );
       }
-      usedActions.add(action);
+      used_actions.add(action);
     }
   }
-  const staleReviews = Object.keys(reviewedPins).filter((action) => !usedActions.has(action));
-  if (staleReviews.length > 0) {
-    throw new Error(`Reviewed action pins are unused: ${staleReviews.join(", ")}`);
+  const stale_reviews = Object.keys(reviewedPins).filter((action) => !used_actions.has(action));
+  if (stale_reviews.length > 0) {
+    throw new Error(`Reviewed action pins are unused: ${stale_reviews.join(", ")}`);
   }
 }

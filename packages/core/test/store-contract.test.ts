@@ -10,7 +10,7 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-function runFacadeContract(restoreBlock: boolean): void {
+function run_facade_contract(restore_block: boolean): void {
   const workbook = makeWorkbook(4);
   workbook.sheets[0]!.protectedRanges = [
     {
@@ -33,7 +33,7 @@ function runFacadeContract(restoreBlock: boolean): void {
   expect(store.queryCapability("s1")).toEqual({ status: "complete" });
 
   const range = { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } };
-  const blockRange = { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 2 } };
+  const block_range = { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 2 } };
   const block: PackedCellBlock = {
     rowCount: 1,
     colCount: 3,
@@ -58,9 +58,9 @@ function runFacadeContract(restoreBlock: boolean): void {
         { rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "range" } },
       ],
     },
-    restoreBlock
-      ? encodeRestoreBlock(blockRange, block)
-      : { op: "setBlock", range: blockRange, block },
+    restore_block
+      ? encodeRestoreBlock(block_range, block)
+      : { op: "setBlock", range: block_range, block },
     {
       op: "setRangeStyle",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 2 } },
@@ -73,25 +73,25 @@ function runFacadeContract(restoreBlock: boolean): void {
 
   const applied = store.applyTransaction(transaction);
   expect(applied).toMatchObject({ status: "applied", epoch: 1 });
-  const appliedPatches = applied.status === "applied" ? applied.transaction.patches : [];
+  const applied_patches = applied.status === "applied" ? applied.transaction.patches : [];
   expect(events).toHaveLength(1);
-  expect(events[0]?.transaction.patches).toBe(appliedPatches);
-  if (restoreBlock) {
+  expect(events[0]?.transaction.patches).toBe(applied_patches);
+  if (restore_block) {
     // Without a setBlock, the caller's operations are applied and emitted as they are.
-    expect(appliedPatches).toBe(patches);
+    expect(applied_patches).toBe(patches);
   } else {
     // The setBlock's cell arrays were read once into a copy: that copy is what
     // is stored and emitted, and the caller's array no longer reaches the store.
-    expect(appliedPatches).not.toBe(patches);
-    appliedPatches.forEach((operation, index) => {
+    expect(applied_patches).not.toBe(patches);
+    applied_patches.forEach((operation, index) => {
       if (operation.op !== "setBlock") expect(patches[index]).toBe(operation);
     });
-    const emittedBlock = appliedPatches.find((operation) => operation.op === "setBlock");
-    if (emittedBlock?.op !== "setBlock") throw new Error("expected the copied setBlock");
-    expect(emittedBlock.block.values).toEqual([4, null, null]);
-    expect(emittedBlock.block.values).not.toBe(block.values);
+    const emitted_block = applied_patches.find((operation) => operation.op === "setBlock");
+    if (emitted_block?.op !== "setBlock") throw new Error("expected the copied setBlock");
+    expect(emitted_block.block.values).toEqual([4, null, null]);
+    expect(emitted_block.block.values).not.toBe(block.values);
     block.values[0] = 99;
-    expect(emittedBlock.block.values[0]).toBe(4);
+    expect(emitted_block.block.values[0]).toBe(4);
     expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe(4);
   }
   expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(8);
@@ -112,7 +112,7 @@ function runFacadeContract(restoreBlock: boolean): void {
   });
 
   // A denied edit and an empty transaction reach no listener.
-  const beforeRejected = events.length;
+  const before_rejected = events.length;
   expect(
     store.applyTransaction({
       patches: [
@@ -125,7 +125,7 @@ function runFacadeContract(restoreBlock: boolean): void {
     }),
   ).toMatchObject({ status: "rejected" });
   expect(store.applyTransaction({ patches: [] })).toMatchObject({ status: "noop" });
-  expect(events).toHaveLength(beforeRejected);
+  expect(events).toHaveLength(before_rejected);
 
   const snapshot = store.exportSnapshot();
   const restored = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(snapshot)));
@@ -140,10 +140,10 @@ function runFacadeContract(restoreBlock: boolean): void {
 
 describe("SheetwriteStore facade contract", () => {
   it("applies a copied setBlock to paged cells and acknowledges them", () => {
-    runFacadeContract(false);
+    run_facade_contract(false);
   });
 
   it("preserves compressed restore payloads while applying and acknowledging paged cells", () => {
-    runFacadeContract(true);
+    run_facade_contract(true);
   });
 });

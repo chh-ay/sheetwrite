@@ -105,22 +105,22 @@ interface Eyebrow {
  * icon. None where it would repeat the title: on a tab's landing page, whose
  * title names the section, or when it reads the same as the title.
  */
-function eyebrowFor(
-  activeHref: string | undefined,
+function eyebrow_for(
+  active_href: string | undefined,
   title: string,
-  titlePackage: string | undefined,
+  title_package: string | undefined,
 ): Eyebrow | undefined {
-  const location = nearestNavigationItem(activeHref);
-  if (titlePackage !== undefined) {
-    const pkg = location?.ancestors.find((item) => item.label === titlePackage);
-    return { label: titlePackage, icon: pkg?.icon };
+  const location = nearestNavigationItem(active_href);
+  if (title_package !== undefined) {
+    const pkg = location?.ancestors.find((item) => item.label === title_package);
+    return { label: title_package, icon: pkg?.icon };
   }
-  if (DOCS_TABS.some((tab) => tab.href === activeHref)) return undefined;
+  if (DOCS_TABS.some((tab) => tab.href === active_href)) return undefined;
   if (location === undefined) return { label: "Documentation" };
   const group = location.ancestors.at(-1);
   // A group's own page is the group: the section names its place.
   const eyebrow =
-    group === undefined || group.href === activeHref
+    group === undefined || group.href === active_href
       ? { label: location.section, icon: location.sectionIcon }
       : { label: group.label, icon: group.icon };
   return eyebrow.label.toLowerCase() === title.toLowerCase() ? undefined : eyebrow;
@@ -160,10 +160,10 @@ function WrappableTitle(props: { readonly title: string }): JSX.Element {
 export function DocsShell(props: DocsShellProps) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as the eyebrow than as part of a display-size heading.
-  const [titleMain = props.title, titlePackage] = props.title.split(" | ", 2);
+  const [title_main = props.title, title_package] = props.title.split(" | ", 2);
   const tab = tabForHref(props.activeHref);
   const outline = props.outline ?? [];
-  const symbolCount = props.symbolCount ?? 0;
+  const symbol_count = props.symbolCount ?? 0;
 
   return (
     <div class={`sw-docs${props.kind === undefined ? "" : " sw-docs--api"}`}>
@@ -185,11 +185,11 @@ export function DocsShell(props: DocsShellProps) {
         data-pagefind-body
         // Attribute-value meta works regardless of element nesting; the h1
         // span below captures the clean symbol title.
-        data-pagefind-meta={titlePackage ? `package:${titlePackage}` : undefined}
+        data-pagefind-meta={title_package ? `package:${title_package}` : undefined}
         id="main-content"
       >
         <header class="sw-document__header">
-          <Show when={eyebrowFor(props.activeHref, titleMain, titlePackage)}>
+          <Show when={eyebrow_for(props.activeHref, title_main, title_package)}>
             {(eyebrow) => (
               <p class="sw-document__eyebrow" data-pagefind-ignore>
                 <Show when={eyebrow().icon}>{(icon) => <Icon name={icon()} />}</Show>
@@ -200,7 +200,7 @@ export function DocsShell(props: DocsShellProps) {
           <SectionArt href={props.activeHref} />
           <h1>
             <span data-pagefind-meta="title">
-              <WrappableTitle title={titleMain} />
+              <WrappableTitle title={title_main} />
             </span>
             <Show when={props.kind}>
               {(kind) => (
@@ -211,15 +211,15 @@ export function DocsShell(props: DocsShellProps) {
             </Show>
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
-          <Show when={titlePackage === undefined}>
+          <Show when={title_package === undefined}>
             <p class="sw-document__lead">{props.description}</p>
           </Show>
           <Show when={props.activeHref}>
-            {(activeHref) => (
+            {(active_href) => (
               <p class="sw-page-actions" data-pagefind-ignore>
                 <Show when={props.sourcePath}>
-                  {(sourcePath) => (
-                    <a class="sw-button" data-size="sm" href={editUrl(sourcePath())}>
+                  {(source_path) => (
+                    <a class="sw-button" data-size="sm" href={editUrl(source_path())}>
                       <Icon name="edit" />
                       Edit on GitHub
                     </a>
@@ -228,7 +228,7 @@ export function DocsShell(props: DocsShellProps) {
                 <a
                   class="sw-button"
                   data-size="sm"
-                  href={reportProblemUrl(props.title, activeHref())}
+                  href={reportProblemUrl(props.title, active_href())}
                 >
                   <Icon name="flag" />
                   Report a problem
@@ -237,12 +237,12 @@ export function DocsShell(props: DocsShellProps) {
             )}
           </Show>
         </header>
-        <Show when={symbolCount >= MINIMUM_FILTERABLE_CARDS}>
+        <Show when={symbol_count >= MINIMUM_FILTERABLE_CARDS}>
           <Island
             component={ApiSymbolFilter}
             hydrate="interaction"
             name="api-symbol-filter"
-            props={{ symbolCount }}
+            props={{ symbolCount: symbol_count }}
           />
         </Show>
         <Show when={props.reserveOutline === true}>

@@ -14,15 +14,15 @@ import {
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
-const originalRaf = globalThis.requestAnimationFrame;
-let restoreStubs: () => void;
+const original_raf = globalThis.requestAnimationFrame;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback): number => {
     cb(0);
     return 0;
@@ -30,8 +30,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
+  restore_stubs();
+  globalThis.requestAnimationFrame = original_raf;
 });
 
 // A renderer that records each paint with a snapshot of the frame's row
@@ -40,20 +40,20 @@ interface Recorder extends Renderer {
   readonly paints: Array<{ view: VisibleWindowView; rowHeights: number[] | null }>;
 }
 
-function makeRecorder(): Recorder {
+function make_recorder(): Recorder {
   const paints: Recorder["paints"] = [];
-  let lastViewport: Viewport | null = null;
+  let last_viewport: Viewport | null = null;
   return {
     paints,
     mount() {},
     setLayout() {},
     setViewport(viewport: Viewport) {
-      lastViewport = viewport;
+      last_viewport = viewport;
     },
     paint(view: VisibleWindowView) {
       paints.push({
         view,
-        rowHeights: lastViewport?.rowHeights ? Array.from(lastViewport.rowHeights) : null,
+        rowHeights: last_viewport?.rowHeights ? Array.from(last_viewport.rowHeights) : null,
       });
     },
     setTheme() {},
@@ -66,7 +66,7 @@ describe("view composition", () => {
   for (const source of ["transaction", "remote", "history"] as const) {
     it(`reconciles filtered rows before change listeners for ${source} commits`, () => {
       const { store, host, grid } = mountGridWithData(50);
-      const recorder = makeRecorder();
+      const recorder = make_recorder();
       expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
       scrollerOf(host).scrollTop = 200;
@@ -112,7 +112,7 @@ describe("view composition", () => {
     grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
     const selection = { kind: "cell" as const, addr: { sheet: "s1", row: 2, col: 0 } };
     grid.setSelection(selection);
-    const recorder = makeRecorder();
+    const recorder = make_recorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
 
     grid.setRowHeight(0, 30);
@@ -127,12 +127,12 @@ describe("view composition", () => {
     const { store, grid } = mountGridWithData(10);
     grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    const recorder = makeRecorder();
+    const recorder = make_recorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
-    let observedEnd: number | undefined;
+    let observed_end: number | undefined;
     grid.on("change", () => {
       grid.refresh();
-      observedEnd = recorder.paints.at(-1)?.view.rows.end;
+      observed_end = recorder.paints.at(-1)?.view.rows.end;
       expect(grid.getSelection()).toBeNull();
     });
 
@@ -143,7 +143,7 @@ describe("view composition", () => {
     ).toBe("applied");
 
     expect(store.viewRowCount("s1")).toBe(10);
-    expect(observedEnd).toBe(10);
+    expect(observed_end).toBe(10);
     grid.destroy();
   });
 
@@ -151,7 +151,7 @@ describe("view composition", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const grid = new GridImpl(mountHost(), { workbook }, store);
-    const recorder = makeRecorder();
+    const recorder = make_recorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
     const commit = (patches: DocumentOp[], count: number) => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
@@ -185,25 +185,25 @@ describe("row heights under views", () => {
 
     // Sort amount descending → view order [4,3,2,1,0]; view row 1 is data row 3.
     grid.setViewSort([{ col: 1, ascending: false }]);
-    const dataRow = store.dataRowAt("s1", 1);
-    expect(dataRow).toBe(3);
+    const data_row = store.dataRowAt("s1", 1);
+    expect(data_row).toBe(3);
 
-    const recorder = makeRecorder();
+    const recorder = make_recorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
 
     grid.setRowHeight(1, 60);
 
     // Persisted keyed by DATA row 3, never by the view row 1 (the pre-fix bug).
-    expect(workbook.sheets[0]!.rowHeights?.get(dataRow)).toBe(60);
+    expect(workbook.sheets[0]!.rowHeights?.get(data_row)).toBe(60);
     expect(workbook.sheets[0]!.rowHeights?.has(1)).toBe(false);
 
     grid.clearView();
 
     // Cleared view is identity, so data row 3 sits at view position 3. The
     // override must paint there.
-    const rowHeights = recorder.paints.at(-1)?.rowHeights;
-    expect(rowHeights?.[dataRow]).toBe(60);
-    expect(rowHeights?.[1]).not.toBe(60);
+    const row_heights = recorder.paints.at(-1)?.rowHeights;
+    expect(row_heights?.[data_row]).toBe(60);
+    expect(row_heights?.[1]).not.toBe(60);
 
     grid.destroy();
   });

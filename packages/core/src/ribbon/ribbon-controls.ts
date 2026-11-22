@@ -62,10 +62,10 @@ export interface RibbonControlView {
 }
 
 /** Mouse presses on ribbon chrome must not take focus or selection from the grid. */
-const keepFocus = (event: Event): void => event.preventDefault();
+const keep_focus = (event: Event): void => event.preventDefault();
 
 /** A click with `detail` 0 came from the keyboard (Enter or Space). */
-const fromKeyboard = (event: MouseEvent): boolean => event.detail === 0;
+const from_keyboard = (event: MouseEvent): boolean => event.detail === 0;
 
 export function isDisabled(availability: RibbonAvailability, states: RibbonCommandStates): boolean {
   if (availability === "view") return false;
@@ -87,9 +87,9 @@ function caret(): HTMLSpanElement {
 }
 
 /** A ribbon button that shows only a glyph; `label` is its accessible name and tooltip. */
-function iconButton(
+function icon_button(
   label: string,
-  iconName: IconName,
+  icon_name: IconName,
   overrides: IconOverrides | undefined,
 ): HTMLButtonElement {
   const button = document.createElement("button");
@@ -97,8 +97,8 @@ function iconButton(
   button.className = "sheetwrite-ribbon-button";
   button.title = label;
   button.setAttribute("aria-label", label);
-  button.append(icon(iconName, overrides));
-  button.addEventListener("mousedown", keepFocus);
+  button.append(icon(icon_name, overrides));
+  button.addEventListener("mousedown", keep_focus);
   return button;
 }
 
@@ -107,7 +107,7 @@ function iconButton(
  * stays with the word after it, or with the word before it when it ends the
  * label.
  */
-function tiedToPrevious(words: readonly string[], index: number): boolean {
+function tied_to_previous(words: readonly string[], index: number): boolean {
   return (
     words[index - 1]?.length === 1 || (words[index]?.length === 1 && index === words.length - 1)
   );
@@ -119,11 +119,11 @@ function tiedToPrevious(words: readonly string[], index: number): boolean {
  * button's label then breaks only between whole phrases, as Excel's two-line
  * labels do: "Sort" / "A to Z", never "Sort A to" / "Z".
  */
-function wrappedLabel(label: string): string {
+function wrapped_label(label: string): string {
   const words = label.split(" ");
   let text = words[0] ?? "";
   for (let index = 1; index < words.length; index += 1) {
-    text += `${tiedToPrevious(words, index) ? "\u00a0" : " "}${words[index] ?? ""}`;
+    text += `${tied_to_previous(words, index) ? "\u00a0" : " "}${words[index] ?? ""}`;
   }
   return text;
 }
@@ -131,42 +131,42 @@ function wrappedLabel(label: string): string {
 /**
  * A folded group's name on at most two lines, joined by a line feed: broken
  * at the space that keeps the longer line shortest, never at a space
- * {@link wrappedLabel} ties. "Get & Transform Data" reads "Get & Transform" /
+ * {@link wrapped_label} ties. "Get & Transform Data" reads "Get & Transform" /
  * "Data"; a one-word name stays on one line.
  */
 export function twoLineLabel(label: string): string {
   const words = label.split(" ");
-  let breakAt = -1;
+  let break_at = -1;
   let longest = Number.POSITIVE_INFINITY;
   for (let index = 1; index < words.length; index += 1) {
-    if (tiedToPrevious(words, index)) continue;
+    if (tied_to_previous(words, index)) continue;
     const first = words.slice(0, index).join(" ").length;
     const second = words.slice(index).join(" ").length;
     if (Math.max(first, second) >= longest) continue;
     longest = Math.max(first, second);
-    breakAt = index;
+    break_at = index;
   }
-  if (breakAt === -1) return label;
-  return `${words.slice(0, breakAt).join(" ")}\n${words.slice(breakAt).join(" ")}`;
+  if (break_at === -1) return label;
+  return `${words.slice(0, break_at).join(" ")}\n${words.slice(break_at).join(" ")}`;
 }
 
-function commandButton(
+function command_button(
   label: string,
-  iconName: IconName,
+  icon_name: IconName,
   large: boolean,
   overrides: IconOverrides | undefined,
 ): HTMLButtonElement {
-  const button = iconButton(label, iconName, overrides);
+  const button = icon_button(label, icon_name, overrides);
   if (large) button.dataset.large = "";
   const text = document.createElement("span");
   text.className = "sheetwrite-ribbon-label";
-  text.textContent = wrappedLabel(label);
+  text.textContent = wrapped_label(label);
   button.append(text);
   return button;
 }
 
 /** The tooltip: the description or label, and the shortcut when the grid binds one to the command. */
-function commandTitle(spec: RibbonButtonSpec, grid: Grid): string {
+function command_title(spec: RibbonButtonSpec, grid: Grid): string {
   const text = spec.description ?? spec.label;
   if (!isKeyboardAction(spec.id)) return text;
 
@@ -174,8 +174,8 @@ function commandTitle(spec: RibbonButtonSpec, grid: Grid): string {
   return shortcut === "" ? text : `${text} (${shortcut})`;
 }
 
-function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonControlView {
-  const button = commandButton(spec.label, spec.icon, spec.large === true, context.icons);
+function render_button(spec: RibbonButtonSpec, context: RibbonContext): RibbonControlView {
+  const button = command_button(spec.label, spec.icon, spec.large === true, context.icons);
   button.addEventListener("click", () =>
     context.run(spec.id, () => spec.run(context.grid), button),
   );
@@ -186,13 +186,13 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
     element: button,
     refresh({ state }) {
       button.disabled = isDisabled(spec.availability, state);
-      const title = commandTitle(spec, context.grid);
+      const title = command_title(spec, context.grid);
       if (button.title !== title) button.title = title;
 
-      const pressedBy = spec.toggle ? spec.availability : "view";
-      if (pressedBy === "edit" || pressedBy === "view") return;
+      const pressed_by = spec.toggle ? spec.availability : "view";
+      if (pressed_by === "edit" || pressed_by === "view") return;
 
-      const activity = state(pressedBy).activity;
+      const activity = state(pressed_by).activity;
       const next = activity === "mixed" ? "mixed" : String(activity === "active");
       if (next === pressed) return;
       pressed = next;
@@ -202,7 +202,7 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
 }
 
 /** A `role="menu"` surface whose items run once and close the menu. */
-function menuSurface(items: readonly RibbonMenuItem[], context: RibbonContext): HTMLElement {
+function menu_surface(items: readonly RibbonMenuItem[], context: RibbonContext): HTMLElement {
   const menu = document.createElement("div");
   menu.className = "sheetwrite-ribbon-menu";
   for (const entry of items) {
@@ -214,9 +214,9 @@ function menuSurface(items: readonly RibbonMenuItem[], context: RibbonContext): 
     if (entry.description !== undefined) item.title = entry.description;
     if (entry.icon !== undefined) item.appendChild(icon(entry.icon, context.icons));
     item.append(entry.label);
-    item.addEventListener("mousedown", keepFocus);
+    item.addEventListener("mousedown", keep_focus);
     item.addEventListener("click", (event) => {
-      const keyboard = fromKeyboard(event);
+      const keyboard = from_keyboard(event);
       context.popup.closeAll(keyboard);
       context.run(entry.label, () => entry.run(context.grid));
       if (!keyboard) context.focusGrid();
@@ -226,7 +226,7 @@ function menuSurface(items: readonly RibbonMenuItem[], context: RibbonContext): 
   return menu;
 }
 
-function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControlView {
+function render_menu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControlView {
   const large = spec.large === true;
   const open = (trigger: HTMLButtonElement, keyboard: boolean): void => {
     if (context.popup.isOpen(trigger)) {
@@ -234,26 +234,26 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
       return;
     }
     const items = typeof spec.items === "function" ? spec.items(context.grid) : spec.items;
-    context.popup.open(trigger, menuSurface(items, context), {
+    context.popup.open(trigger, menu_surface(items, context), {
       role: "menu",
       label: spec.label,
       focus: keyboard,
     });
   };
 
-  const arrowKeyOpens = (trigger: HTMLButtonElement) => (event: KeyboardEvent) => {
+  const arrow_key_opens = (trigger: HTMLButtonElement) => (event: KeyboardEvent) => {
     if (event.key !== "ArrowDown") return;
     event.preventDefault();
     open(trigger, true);
   };
 
   if (spec.run === undefined) {
-    const trigger = commandButton(spec.label, spec.icon, large, context.icons);
+    const trigger = command_button(spec.label, spec.icon, large, context.icons);
     trigger.appendChild(caret());
     trigger.setAttribute("aria-haspopup", "menu");
     trigger.setAttribute("aria-expanded", "false");
-    trigger.addEventListener("click", (event) => open(trigger, fromKeyboard(event)));
-    trigger.addEventListener("keydown", arrowKeyOpens(trigger));
+    trigger.addEventListener("click", (event) => open(trigger, from_keyboard(event)));
+    trigger.addEventListener("keydown", arrow_key_opens(trigger));
     return {
       element: trigger,
       refresh({ state }) {
@@ -267,7 +267,7 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   const split = document.createElement("div");
   split.className = "sheetwrite-ribbon-split";
   if (large) split.dataset.large = "";
-  const face = commandButton(spec.label, spec.icon, large, context.icons);
+  const face = command_button(spec.label, spec.icon, large, context.icons);
   face.addEventListener("click", () => context.run(spec.id, () => run(context.grid), face));
   const arrow = document.createElement("button");
   arrow.type = "button";
@@ -277,10 +277,10 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   arrow.setAttribute("aria-haspopup", "menu");
   arrow.setAttribute("aria-expanded", "false");
   arrow.appendChild(caret());
-  arrow.addEventListener("mousedown", keepFocus);
-  arrow.addEventListener("click", (event) => open(arrow, fromKeyboard(event)));
-  arrow.addEventListener("keydown", arrowKeyOpens(arrow));
-  face.addEventListener("keydown", arrowKeyOpens(arrow));
+  arrow.addEventListener("mousedown", keep_focus);
+  arrow.addEventListener("click", (event) => open(arrow, from_keyboard(event)));
+  arrow.addEventListener("keydown", arrow_key_opens(arrow));
+  face.addEventListener("keydown", arrow_key_opens(arrow));
   split.append(face, arrow);
   return {
     element: split,
@@ -292,11 +292,11 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   };
 }
 
-let comboSerial = 0;
+let combo_serial = 0;
 
-function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonControlView {
-  comboSerial += 1;
-  const listId = `sheetwrite-ribbon-list-${comboSerial}`;
+function render_combo(spec: RibbonComboSpec, context: RibbonContext): RibbonControlView {
+  combo_serial += 1;
+  const list_id = `sheetwrite-ribbon-list-${combo_serial}`;
   const box = document.createElement("div");
   box.className = "sheetwrite-ribbon-combo";
   box.style.width = `${spec.width}px`;
@@ -309,7 +309,7 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
   input.setAttribute("aria-label", spec.label);
   input.setAttribute("aria-autocomplete", "list");
   input.setAttribute("aria-expanded", "false");
-  input.setAttribute("aria-controls", listId);
+  input.setAttribute("aria-controls", list_id);
   input.spellcheck = false;
 
   const arrow = document.createElement("button");
@@ -318,7 +318,7 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
   arrow.tabIndex = -1;
   arrow.setAttribute("aria-label", `${spec.label} list`);
   arrow.appendChild(caret());
-  arrow.addEventListener("mousedown", keepFocus);
+  arrow.addEventListener("mousedown", keep_focus);
 
   // The box shows what the focus cell has, written only on change.
   const show = (value: string): void => {
@@ -336,9 +336,9 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
     context.focusGrid();
   };
 
-  const openList = (focus: boolean): void => {
+  const open_list = (focus: boolean): void => {
     const list = document.createElement("div");
-    list.id = listId;
+    list.id = list_id;
     list.className = "sheetwrite-ribbon-listbox";
     const current = input.value;
     for (const value of spec.options) {
@@ -354,16 +354,16 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
     }
 
     // One set of listeners for the whole list instead of one per option.
-    const optionOf = (target: EventTarget | null): HTMLElement | null =>
+    const option_of = (target: EventTarget | null): HTMLElement | null =>
       target instanceof HTMLElement ? target.closest<HTMLElement>('[role="option"]') : null;
-    list.addEventListener("mousedown", keepFocus);
+    list.addEventListener("mousedown", keep_focus);
     list.addEventListener("click", (event) => {
-      const option = optionOf(event.target);
+      const option = option_of(event.target);
       if (option?.textContent != null) commit(option.textContent);
     });
     list.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      const option = optionOf(event.target);
+      const option = option_of(event.target);
       if (option?.textContent == null) return;
       event.preventDefault();
       commit(option.textContent);
@@ -376,7 +376,7 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
 
   arrow.addEventListener("click", () => {
     if (context.popup.isOpen(input)) context.popup.closeFrom(input, false);
-    else openList(false);
+    else open_list(false);
   });
   input.addEventListener("focus", () => input.select());
   input.addEventListener("keydown", (event) => {
@@ -390,7 +390,7 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
       revert();
     } else if (event.key === "ArrowDown" && event.altKey) {
       event.preventDefault();
-      openList(true);
+      open_list(true);
     }
   });
   input.addEventListener("blur", () => {
@@ -429,11 +429,11 @@ function swatch(label: string, color: string | null): HTMLButtonElement {
   return button;
 }
 
-function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonControlView {
+function render_color(spec: RibbonColorSpec, context: RibbonContext): RibbonControlView {
   let current = spec.initial;
   const split = document.createElement("div");
   split.className = "sheetwrite-ribbon-split";
-  const face = commandButton(spec.label, spec.icon, false, context.icons);
+  const face = command_button(spec.label, spec.icon, false, context.icons);
   // The bar under the icon shows the color the face applies, as in Excel.
   const bar = document.createElement("span");
   bar.className = "sheetwrite-ribbon-color-bar";
@@ -463,7 +463,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
   arrow.setAttribute("aria-haspopup", "menu");
   arrow.setAttribute("aria-expanded", "false");
   arrow.appendChild(caret());
-  arrow.addEventListener("mousedown", keepFocus);
+  arrow.addEventListener("mousedown", keep_focus);
   arrow.addEventListener("click", (event) => {
     if (context.popup.isOpen(arrow)) {
       context.popup.closeFrom(arrow, false);
@@ -513,7 +513,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
     context.popup.open(arrow, palette, {
       role: "menu",
       label: spec.label,
-      focus: fromKeyboard(event),
+      focus: from_keyboard(event),
     });
   });
 
@@ -528,8 +528,8 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
   };
 }
 
-function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControlView {
-  const trigger = commandButton(spec.label, spec.icon, true, context.icons);
+function render_form(spec: RibbonFormSpec, context: RibbonContext): RibbonControlView {
+  const trigger = command_button(spec.label, spec.icon, true, context.icons);
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
@@ -584,7 +584,7 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
 }
 
 /** Whether the active sheet is a dashboard, where a pivot reads a table and takes a free box. */
-function activeDashboard(grid: Grid): boolean {
+function active_dashboard(grid: Grid): boolean {
   const sheet = grid.getActiveSheet();
   return isDashboard(grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet));
 }
@@ -593,7 +593,7 @@ function activeDashboard(grid: Grid): boolean {
  * On a dashboard, "Choose the table to analyze" replaces the place form: a
  * dashboard has no cells, and slicers filter tables, so its pivot reads a table.
  */
-function openTablePicker(
+function open_table_picker(
   spec: RibbonPlacementSpec,
   context: RibbonContext,
   trigger: HTMLButtonElement,
@@ -643,24 +643,24 @@ function openTablePicker(
   context.popup.open(trigger, form, { role: "dialog", label: spec.label, focus: true });
 }
 
-let placementSerial = 0;
+let placement_serial = 0;
 
 /**
  * Excel's "Choose where to place" form: a new sheet, or an existing sheet at
  * a cell typed as A1. The button stays disabled, with the reason as its
  * tooltip, when the command cannot run here at all.
  */
-function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): RibbonControlView {
-  const trigger = commandButton(spec.label, spec.icon, true, context.icons);
+function render_placement(spec: RibbonPlacementSpec, context: RibbonContext): RibbonControlView {
+  const trigger = command_button(spec.label, spec.icon, true, context.icons);
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
-    if (activeDashboard(context.grid)) {
-      openTablePicker(spec, context, trigger);
+    if (active_dashboard(context.grid)) {
+      open_table_picker(spec, context, trigger);
       return;
     }
-    placementSerial += 1;
-    const group = `sheetwrite-ribbon-placement-${placementSerial}`;
+    placement_serial += 1;
+    const group = `sheetwrite-ribbon-placement-${placement_serial}`;
     const form = document.createElement("form");
     form.className = "sheetwrite-ribbon-form";
 
@@ -679,7 +679,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       return radio;
     };
     choices.appendChild(legend);
-    const newSheet = choice("New worksheet", true);
+    const new_sheet = choice("New worksheet", true);
     const existing = choice("Existing worksheet", false);
 
     const location = document.createElement("label");
@@ -691,12 +691,12 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     field.spellcheck = false;
     field.placeholder = "A1";
     location.appendChild(field);
-    const pickExisting = (): void => {
+    const pick_existing = (): void => {
       field.disabled = !existing.checked;
       if (existing.checked) focusInSurface(form, field);
     };
-    newSheet.addEventListener("change", pickExisting);
-    existing.addEventListener("change", pickExisting);
+    new_sheet.addEventListener("change", pick_existing);
+    existing.addEventListener("change", pick_existing);
 
     const error = document.createElement("p");
     error.className = "sheetwrite-ribbon-form-error";
@@ -728,7 +728,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
       if (message !== null) {
         error.textContent = message;
         error.hidden = false;
-        focusInSurface(form, existing.checked ? field : newSheet);
+        focusInSurface(form, existing.checked ? field : new_sheet);
         return;
       }
       // The command moved focus into the panel it opened; leave it there.
@@ -743,7 +743,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
     refresh({ state }) {
       const next = spec.unavailable(context.grid);
       // A dashboard has no selection; its table picker needs only an editable grid.
-      const availability = activeDashboard(context.grid) ? "newDashboard" : "edit";
+      const availability = active_dashboard(context.grid) ? "newDashboard" : "edit";
       trigger.disabled = next !== null || isDisabled(availability, state);
       if (next === reason) return;
       reason = next;
@@ -762,7 +762,7 @@ function renderPlacement(spec: RibbonPlacementSpec, context: RibbonContext): Rib
  * accessible name and tooltip. The reset's name starts with the visible
  * percent, so a voice user can say what they see (WCAG 2.5.3).
  */
-function renderZoom(context: RibbonContext): RibbonControlView {
+function render_zoom(context: RibbonContext): RibbonControlView {
   const zoom = document.createElement("div");
   zoom.className = "sheetwrite-ribbon-zoom";
   zoom.setAttribute("role", "group");
@@ -775,26 +775,26 @@ function renderZoom(context: RibbonContext): RibbonControlView {
   reset.className = "sheetwrite-ribbon-zoom-readout";
   reset.title = "Zoom to 100%";
   reset.append(readout);
-  reset.addEventListener("mousedown", keepFocus);
+  reset.addEventListener("mousedown", keep_focus);
 
   // Written only on change: refreshes follow every selection move.
   const show = (): void => {
-    const zoomLevel = context.grid.getZoom();
-    const label = zoomLabel(zoomLevel);
+    const zoom_level = context.grid.getZoom();
+    const label = zoomLabel(zoom_level);
     if (readout.textContent !== label) {
       readout.textContent = label;
       reset.setAttribute("aria-label", `${label}, zoom to 100%`);
     }
-    const atReset = zoomLevel === ZOOM_RESET;
-    if (reset.disabled !== atReset) reset.disabled = atReset;
+    const at_reset = zoom_level === ZOOM_RESET;
+    if (reset.disabled !== at_reset) reset.disabled = at_reset;
   };
   reset.addEventListener("click", () => {
     context.grid.setZoom(ZOOM_RESET);
     show();
   });
 
-  const step = (label: string, iconName: IconName, direction: 1 | -1): HTMLButtonElement => {
-    const button = iconButton(label, iconName, context.icons);
+  const step = (label: string, icon_name: IconName, direction: 1 | -1): HTMLButtonElement => {
+    const button = icon_button(label, icon_name, context.icons);
     button.classList.add("sheetwrite-ribbon-zoom-step");
     button.addEventListener("click", () => {
       context.grid.setZoom(steppedZoom(context.grid.getZoom(), direction));
@@ -809,26 +809,26 @@ function renderZoom(context: RibbonContext): RibbonControlView {
 }
 
 export function renderControl(spec: RibbonControlSpec, context: RibbonContext): RibbonControlView {
-  const view = renderSpec(spec, context);
+  const view = render_spec(spec, context);
   view.element.dataset.command = spec.id;
   return view;
 }
 
-function renderSpec(spec: RibbonControlSpec, context: RibbonContext): RibbonControlView {
+function render_spec(spec: RibbonControlSpec, context: RibbonContext): RibbonControlView {
   switch (spec.kind) {
     case "button":
-      return renderButton(spec, context);
+      return render_button(spec, context);
     case "menu":
-      return renderMenu(spec, context);
+      return render_menu(spec, context);
     case "combo":
-      return renderCombo(spec, context);
+      return render_combo(spec, context);
     case "color":
-      return renderColor(spec, context);
+      return render_color(spec, context);
     case "form":
-      return renderForm(spec, context);
+      return render_form(spec, context);
     case "placement":
-      return renderPlacement(spec, context);
+      return render_placement(spec, context);
     case "zoom":
-      return renderZoom(context);
+      return render_zoom(context);
   }
 }

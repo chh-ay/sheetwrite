@@ -146,12 +146,12 @@ interface EditorSizing {
 export type EditorMode = Exclude<CellMode, "ready">;
 
 /** Whether focus moving to `target` keeps the edit open in another surface. */
-function isEditSurface(target: EventTarget | null): boolean {
+function is_edit_surface(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(`[${EDIT_SURFACE_ATTRIBUTE}]`) !== null;
 }
 
 /** Whether `event` typed text, not deleted, pasted or composed it. */
-function typedText(event: Event): boolean {
+function typed_text(event: Event): boolean {
   return event instanceof InputEvent && !event.isComposing && event.inputType === "insertText";
 }
 
@@ -164,15 +164,15 @@ export class EditController {
   private textarea: HTMLTextAreaElement | null = null;
   private opts: BeginEditOptions | null = null;
   private composing = false;
-  private tearingDown = false;
-  private refStart = -1;
-  private refEnd = -1;
+  private tearing_down = false;
+  private ref_start = -1;
+  private ref_end = -1;
   private readonly assist: FormulaAssist | null;
-  private assistAttached = false;
+  private assist_attached = false;
   // Read once per open and again only when the editor's line height changes,
   // so sizing reads only the textarea's own box, never its computed style.
   private metrics: EditorFieldMetrics | null = null;
-  private metricsLineHeight = "";
+  private metrics_line_height = "";
   private sizing: EditorSizing | null = null;
   /** Excel's Enter mode; see {@link BeginEditOptions.entering}. */
   private entering = false;
@@ -182,7 +182,7 @@ export class EditController {
    */
   private completion: string | null = null;
   /** The mode `onMode` last reported. */
-  private reportedMode: EditorMode | null = null;
+  private reported_mode: EditorMode | null = null;
   /** A refused formula's message is open: commits and blur wait for it. */
   private refusing = false;
 
@@ -205,14 +205,14 @@ export class EditController {
    * else Enter or Edit.
    */
   get mode(): EditorMode {
-    if (this.refStart >= 0) return "point";
+    if (this.ref_start >= 0) return "point";
     return this.entering ? "enter" : "edit";
   }
 
-  private reportMode(): void {
+  private report_mode(): void {
     const mode = this.mode;
-    if (this.textarea === null || mode === this.reportedMode) return;
-    this.reportedMode = mode;
+    if (this.textarea === null || mode === this.reported_mode) return;
+    this.reported_mode = mode;
     this.opts?.onMode?.(mode);
   }
 
@@ -254,12 +254,12 @@ export class EditController {
     this.entering = opts.entering;
     this.position(opts.rect);
 
-    ta.addEventListener("compositionstart", this.onCompositionStart);
-    ta.addEventListener("compositionend", this.onCompositionEnd);
-    ta.addEventListener("keydown", this.onKeyDown);
-    ta.addEventListener("focus", this.onFocus);
-    ta.addEventListener("blur", this.onBlur);
-    ta.addEventListener("input", this.onInput);
+    ta.addEventListener("compositionstart", this.on_composition_start);
+    ta.addEventListener("compositionend", this.on_composition_end);
+    ta.addEventListener("keydown", this.on_key_down);
+    ta.addEventListener("focus", this.on_focus);
+    ta.addEventListener("blur", this.on_blur);
+    ta.addEventListener("input", this.on_input);
 
     if (opts.focus) ta.focus();
     if (opts.selectAll) {
@@ -269,9 +269,9 @@ export class EditController {
       ta.setSelectionRange(end, end);
     }
     // The key that opened the editor is the first typed character.
-    if (opts.focus && opts.entering) this.autoComplete(ta);
-    if (opts.focus) this.attachAssist();
-    this.reportMode();
+    if (opts.focus && opts.entering) this.auto_complete(ta);
+    if (opts.focus) this.attach_assist();
+    this.report_mode();
   }
 
   /**
@@ -283,14 +283,14 @@ export class EditController {
     if (!ta || this.isFocused) return;
     if (ta.value !== value) {
       ta.value = value;
-      this.refStart = -1;
+      this.ref_start = -1;
       this.completion = null;
       // Mirrored text resizes only when it gains or loses a line, so typing
       // in the other surface lays this one out only at a line break.
       if (this.sizing?.lines !== lineCount(value)) this.resize();
     }
     ta.setSelectionRange(selectionStart, selectionEnd);
-    this.reportMode();
+    this.report_mode();
   }
 
   /** Follow the cell. A move that keeps the cell's size only writes the position. */
@@ -308,11 +308,11 @@ export class EditController {
       sizing.lines !== lineCount(ta.value)
     ) {
       ta.style.width = width;
-      const lineHeight = `${Math.max(1, rect.h - 4)}px`;
-      if (lineHeight !== this.metricsLineHeight) {
-        ta.style.lineHeight = lineHeight;
+      const line_height = `${Math.max(1, rect.h - 4)}px`;
+      if (line_height !== this.metrics_line_height) {
+        ta.style.lineHeight = line_height;
         this.metrics = readEditorFieldMetrics(ta);
-        this.metricsLineHeight = lineHeight;
+        this.metrics_line_height = line_height;
       }
       this.size(rect.h);
     }
@@ -332,101 +332,105 @@ export class EditController {
   setReference(ref: string): void {
     const ta = this.textarea;
     if (!ta) return;
-    const start = this.refStart >= 0 ? this.refStart : (ta.selectionStart ?? ta.value.length);
-    const end = this.refStart >= 0 ? this.refEnd : (ta.selectionEnd ?? start);
+    const start = this.ref_start >= 0 ? this.ref_start : (ta.selectionStart ?? ta.value.length);
+    const end = this.ref_start >= 0 ? this.ref_end : (ta.selectionEnd ?? start);
     ta.value = ta.value.slice(0, start) + ref + ta.value.slice(end);
-    this.refStart = start;
-    this.refEnd = start + ref.length;
-    ta.setSelectionRange(this.refEnd, this.refEnd);
-    if (!isEditSurface(document.activeElement)) ta.focus();
+    this.ref_start = start;
+    this.ref_end = start + ref.length;
+    ta.setSelectionRange(this.ref_end, this.ref_end);
+    if (!is_edit_surface(document.activeElement)) ta.focus();
     this.resize();
-    if (this.assistAttached) this.assist?.update();
+    if (this.assist_attached) this.assist?.update();
     this.opts?.onText(ta.value);
-    this.reportMode();
+    this.report_mode();
   }
 
   /** Finish a reference pick; the next pick inserts fresh at the caret. */
   endReference(): void {
-    this.refStart = -1;
-    this.refEnd = -1;
-    this.reportMode();
+    this.ref_start = -1;
+    this.ref_end = -1;
+    this.report_mode();
   }
 
   /** Whether the last change was a picked reference, which the next pick or arrow replaces. */
   get isPointing(): boolean {
-    return this.refStart >= 0;
+    return this.ref_start >= 0;
   }
 
   /** Whether an arrow key would point at a cell: in a formula, after an operator or a picked reference. */
-  private canPoint(): boolean {
+  private can_point(): boolean {
     const ta = this.textarea;
     if (!ta?.value.startsWith("=")) return false;
-    if (this.refStart >= 0) return true;
+    if (this.ref_start >= 0) return true;
     if (ta.selectionStart !== ta.selectionEnd) return false;
     return POINTABLE.test(ta.value.slice(0, ta.selectionStart));
   }
 
   /** F4: cycle the reference at the caret through A1, $A$1, A$1 and $A1. */
-  private toggleAnchors(): void {
+  private toggle_anchors(): void {
     const ta = this.textarea;
     if (!ta?.value.startsWith("=")) return;
     const toggled = toggleReferenceAnchors(ta.value, ta.selectionStart);
     if (toggled === null) return;
     ta.value = toggled.text;
     ta.setSelectionRange(toggled.caret, toggled.caret);
-    this.refStart = -1;
+    this.ref_start = -1;
     this.resize();
-    if (this.assistAttached) this.assist?.update();
+    if (this.assist_attached) this.assist?.update();
     this.opts?.onText(ta.value);
-    this.reportMode();
+    this.report_mode();
   }
 
-  private readonly onInput = (event: Event): void => {
+  private readonly on_input = (event: Event): void => {
     const ta = this.textarea;
     if (!ta) return;
-    this.refStart = -1;
+    this.ref_start = -1;
     this.completion = null;
     if (!this.composing) {
-      if (typedText(event)) this.autoComplete(ta);
+      if (typed_text(event)) this.auto_complete(ta);
       else this.opts?.complete?.complete(ta, false);
     }
     this.resize();
-    if (this.assistAttached) this.assist?.update();
+    if (this.assist_attached) this.assist?.update();
     this.opts?.onText(ta.value);
-    this.reportMode();
+    this.report_mode();
   };
 
   /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
-  private autoComplete(ta: HTMLTextAreaElement): void {
+  private auto_complete(ta: HTMLTextAreaElement): void {
     this.completion = this.opts?.complete?.complete(ta, true) ?? null;
   }
 
   /** The user moved into the cell editor: formula help follows the caret here. */
-  private readonly onFocus = (): void => {
-    this.attachAssist();
+  private readonly on_focus = (): void => {
+    this.attach_assist();
   };
 
-  private attachAssist(): void {
-    if (!this.assist || !this.textarea || !this.opts || this.assistAttached) return;
+  private attach_assist(): void {
+    if (!this.assist || !this.textarea || !this.opts || this.assist_attached) return;
     this.assist.attach(this.textarea, this.opts.theme);
-    this.assistAttached = true;
+    this.assist_attached = true;
   }
 
-  private detachAssist(): void {
-    if (!this.assistAttached) return;
+  private detach_assist(): void {
+    if (!this.assist_attached) return;
     this.assist?.detach();
-    this.assistAttached = false;
+    this.assist_attached = false;
   }
 
   private resize(): void {
     if (this.textarea && this.opts) this.size(this.opts.rect.h);
   }
 
-  private size(minimumHeight: number): void {
+  private size(minimum_height: number): void {
     const ta = this.textarea;
     if (!ta) return;
-    sizeEditorTextarea(ta, minimumHeight, this.metrics);
-    this.sizing = { width: ta.style.width, minimumHeight, lines: lineCount(ta.value) };
+    sizeEditorTextarea(ta, minimum_height, this.metrics);
+    this.sizing = {
+      width: ta.style.width,
+      minimumHeight: minimum_height,
+      lines: lineCount(ta.value),
+    };
   }
 
   /**
@@ -468,7 +472,7 @@ export class EditController {
     if (ta === null) return;
     const active = document.activeElement;
     const field =
-      isEditSurface(active) &&
+      is_edit_surface(active) &&
       (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)
         ? active
         : ta;
@@ -501,12 +505,12 @@ export class EditController {
     this.teardown();
   }
 
-  private readonly onCompositionStart = (): void => {
+  private readonly on_composition_start = (): void => {
     this.composing = true;
     this.completion = null;
   };
 
-  private readonly onCompositionEnd = (): void => {
+  private readonly on_composition_end = (): void => {
     this.composing = false;
     // Browsers differ on whether the composed text's input event comes before
     // or after compositionend; complete once both have passed.
@@ -524,13 +528,13 @@ export class EditController {
     const ta = this.textarea;
     if (ta === null || this.composing || this.completion !== null) return;
     const before = ta.value;
-    this.autoComplete(ta);
+    this.auto_complete(ta);
     if (ta.value === before) return;
     this.resize();
     this.opts?.onText(ta.value);
   }
 
-  private readonly onKeyDown = (e: KeyboardEvent): void => {
+  private readonly on_key_down = (e: KeyboardEvent): void => {
     // While the IME is composing, every keystroke belongs to the composition.
     if (this.composing || e.isComposing) {
       e.stopPropagation();
@@ -546,7 +550,7 @@ export class EditController {
       e.stopPropagation();
       return;
     }
-    if (this.assistAttached && this.assist?.handleKeyDown(e)) {
+    if (this.assist_attached && this.assist?.handleKeyDown(e)) {
       e.stopPropagation();
       return;
     }
@@ -568,14 +572,14 @@ export class EditController {
       // F2 switches between Enter mode (arrows leave the cell) and Edit mode (arrows move the caret).
       e.preventDefault();
       this.entering = !this.entering;
-      this.reportMode();
+      this.report_mode();
     } else if (e.key === "F4" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
-      this.toggleAnchors();
+      this.toggle_anchors();
     } else if (this.entering && !e.ctrlKey && !e.metaKey && !e.altKey) {
       // Enter mode: an arrow points at a cell in a formula, or commits and moves.
       const step = ARROW_STEPS[e.key];
-      if (step && this.canPoint()) {
+      if (step && this.can_point()) {
         e.preventDefault();
         this.opts?.onPoint?.(step[0], step[1], e.shiftKey);
       } else if (step && !e.shiftKey) {
@@ -587,11 +591,11 @@ export class EditController {
     e.stopPropagation();
   };
 
-  private readonly onBlur = (event: FocusEvent): void => {
-    if (!this.textarea || this.tearingDown || this.refusing) return;
+  private readonly on_blur = (event: FocusEvent): void => {
+    if (!this.textarea || this.tearing_down || this.refusing) return;
     // Moving into a formula bar keeps the edit open there, as in Excel.
-    if (isEditSurface(event.relatedTarget)) {
-      this.detachAssist();
+    if (is_edit_surface(event.relatedTarget)) {
+      this.detach_assist();
       return;
     }
     this.commit("none");
@@ -600,28 +604,28 @@ export class EditController {
   private teardown(): void {
     const ta = this.textarea;
     if (!ta) return;
-    this.tearingDown = true;
-    this.detachAssist();
+    this.tearing_down = true;
+    this.detach_assist();
     this.opts?.complete?.close();
-    ta.removeEventListener("compositionstart", this.onCompositionStart);
-    ta.removeEventListener("compositionend", this.onCompositionEnd);
-    ta.removeEventListener("keydown", this.onKeyDown);
-    ta.removeEventListener("focus", this.onFocus);
-    ta.removeEventListener("blur", this.onBlur);
-    ta.removeEventListener("input", this.onInput);
+    ta.removeEventListener("compositionstart", this.on_composition_start);
+    ta.removeEventListener("compositionend", this.on_composition_end);
+    ta.removeEventListener("keydown", this.on_key_down);
+    ta.removeEventListener("focus", this.on_focus);
+    ta.removeEventListener("blur", this.on_blur);
+    ta.removeEventListener("input", this.on_input);
     ta.remove();
     this.textarea = null;
     this.opts = null;
     this.composing = false;
-    this.refStart = -1;
-    this.refEnd = -1;
+    this.ref_start = -1;
+    this.ref_end = -1;
     this.metrics = null;
-    this.metricsLineHeight = "";
+    this.metrics_line_height = "";
     this.sizing = null;
     this.entering = false;
     this.completion = null;
-    this.reportedMode = null;
+    this.reported_mode = null;
     this.refusing = false;
-    this.tearingDown = false;
+    this.tearing_down = false;
   }
 }

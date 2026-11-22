@@ -58,10 +58,10 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
     !/^[A-Za-z0-9+/]*={0,2}$/.test(operation.data)
   )
     invalidRestoreBlock();
-  const compressed = decodeCanonicalBase64(operation.data);
+  const compressed = decode_canonical_base64(operation.data);
   // fflate's fixed output buffer does not report truncation. Independently walk
   // the stream first, checking its exact expansion without allocating output.
-  inspectDeflate(compressed, operation.decodedBytes);
+  inspect_deflate(compressed, operation.decodedBytes);
   const bytes = inflateSync(compressed, { out: new Uint8Array(operation.decodedBytes) });
   if (bytes.length !== operation.decodedBytes) invalidRestoreBlock();
   const block = JSON.parse(
@@ -83,13 +83,13 @@ type NativeBase64Decoder = (
  * padding position and length. Only the canonical spelling of those bytes is
  * accepted, so one compressed stream has exactly one wire form.
  */
-function decodeCanonicalBase64(data: string): Uint8Array {
+function decode_canonical_base64(data: string): Uint8Array {
   // Native since Chromium 140, Firefox 133 and Safari 18.2; "strict" rejects
   // nonzero padding bits, which is what makes an encoding non-canonical.
-  const fromBase64: NativeBase64Decoder | undefined = Reflect.get(Uint8Array, "fromBase64");
-  if (typeof fromBase64 === "function") {
+  const from_base64: NativeBase64Decoder | undefined = Reflect.get(Uint8Array, "fromBase64");
+  if (typeof from_base64 === "function") {
     try {
-      return fromBase64.call(Uint8Array, data, { lastChunkHandling: "strict" });
+      return from_base64.call(Uint8Array, data, { lastChunkHandling: "strict" });
     } catch (error) {
       invalidRestoreBlock(error);
     }
@@ -100,7 +100,7 @@ function decodeCanonicalBase64(data: string): Uint8Array {
 }
 
 type Huffman = { codes: Map<number, number>[]; max: number };
-function huffman(lengths: readonly number[], allowSingleOrEmpty = false): Huffman {
+function huffman(lengths: readonly number[], allow_single_or_empty = false): Huffman {
   const counts = new Array<number>(16).fill(0);
   for (const length of lengths) {
     if (length < 0 || length > 15) invalidRestoreBlock();
@@ -124,7 +124,7 @@ function huffman(lengths: readonly number[], allowSingleOrEmpty = false): Huffma
     level.set(code, symbol);
     next[length] = code + 1;
   });
-  if (left !== 0 && !(allowSingleOrEmpty && max <= 1)) invalidRestoreBlock();
+  if (left !== 0 && !(allow_single_or_empty && max <= 1)) invalidRestoreBlock();
   return { codes, max };
 }
 
@@ -151,7 +151,7 @@ const FIXED_DISTANCE = huffman(new Array<number>(32).fill(5));
 // RFC 1951 Huffman symbols are read most-significant-bit first, whereas other
 // fields are little-endian. Tracking output length validates back-reference
 // distances without retaining decompressed bytes.
-function inspectDeflate(data: Uint8Array, expected: number): void {
+function inspect_deflate(data: Uint8Array, expected: number): void {
   let bit = 0;
   let output = 0;
   const bits = (count: number): number => {

@@ -22,17 +22,17 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 const disposers: (() => void)[] = [];
 
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -260,7 +260,7 @@ describe("Data Validation command", () => {
 
 describe("the work a data validation check does", () => {
   /** `count` list rules over A1:A`rows`, each taking its items from C1:C`rows`. */
-  function listRules(count: number, rows: number, policy: DataValidationRule["policy"] = "warn") {
+  function list_rules(count: number, rows: number, policy: DataValidationRule["policy"] = "warn") {
     return Array.from({ length: count }, (_, index): DocumentOp => ({
       op: "setValidationRule",
       sheet: "s1",
@@ -274,7 +274,7 @@ describe("the work a data validation check does", () => {
   }
 
   /** A fill of A1:A`rows`, Berlin in every other row and Paris between. */
-  function berlinOrParis(rows: number): DocumentOp {
+  function berlin_or_paris(rows: number): DocumentOp {
     return {
       op: "setRange",
       range: range(0, 0, rows - 1, 0),
@@ -287,13 +287,13 @@ describe("the work a data validation check does", () => {
   }
 
   /** Count the reads of the source column C, rows 1 to `rows`, in `store`. */
-  function countSourceReads(store: Store, rows: number): () => number {
+  function count_source_reads(store: Store, rows: number): () => number {
     const engine = storeEngine(store) as unknown as {
-      windowReader: {
+      window_reader: {
         read(sheet: string, span: { start: number; end: number }, cols: number[]): unknown;
       };
     };
-    const reader = engine.windowReader;
+    const reader = engine.window_reader;
     const read = reader.read.bind(reader) as (...args: unknown[]) => unknown;
     let reads = 0;
     reader.read = (...args: Parameters<typeof reader.read>) => {
@@ -306,37 +306,37 @@ describe("the work a data validation check does", () => {
 
   it("reads a list source once for an entry under 300 rules, in the grid's check and the store's", async () => {
     const { grid, host, store } = mountGridWithData(1_000);
-    store.applyTransaction({ patches: listRules(300, 1_000) });
-    const sourceReads = countSourceReads(store, 1_000);
+    store.applyTransaction({ patches: list_rules(300, 1_000) });
+    const source_reads = count_source_reads(store, 1_000);
 
     // C holds Phnom Penh, Tokyo and Berlin; an entry from the list raises no alert.
     enter(host, grid, 0, 0, "Tokyo");
     await settle();
     expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Tokyo");
-    expect(sourceReads()).toBe(1);
+    expect(source_reads()).toBe(1);
     grid.destroy();
   });
 
   it("reads a list source once for a 10,000-row fill", () => {
     const rows = 10_000;
     const store = new SheetwriteStore(makeWorkbook(rows), makeColumnarData(rows));
-    store.applyTransaction({ patches: listRules(1, rows) });
-    const sourceReads = countSourceReads(store, rows);
+    store.applyTransaction({ patches: list_rules(1, rows) });
+    const source_reads = count_source_reads(store, rows);
 
-    const result = store.applyTransaction({ patches: [berlinOrParis(rows)] });
+    const result = store.applyTransaction({ patches: [berlin_or_paris(rows)] });
     expect(result.status).toBe("applied");
     expect(result.status === "applied" ? result.warnings : []).toHaveLength(rows / 2);
-    expect(sourceReads()).toBe(1);
+    expect(source_reads()).toBe(1);
     store.dispose();
   });
 
   it("checks a fill against 300 list rules and reports every refused cell", () => {
     const rows = 4_000;
     const store = new SheetwriteStore(makeWorkbook(rows), makeColumnarData(rows));
-    store.applyTransaction({ patches: listRules(300, rows) });
+    store.applyTransaction({ patches: list_rules(300, rows) });
 
-    const result = store.applyTransaction({ patches: [berlinOrParis(rows)] });
+    const result = store.applyTransaction({ patches: [berlin_or_paris(rows)] });
     // 300 warnings for each of the 2,000 cells outside the list.
     expect(result.status).toBe("applied");
     expect(result.status === "applied" ? (result.warnings ?? []).length : 0).toBe(600_000);
@@ -384,7 +384,7 @@ describe("the work a data validation check does", () => {
 
   it(`limits a sheet to ${MAX_VALIDATION_RULES} rules in snapshots and operations`, () => {
     const rules = (
-      listRules(MAX_VALIDATION_RULES + 1, 10) as Array<{ rule: DataValidationRule }>
+      list_rules(MAX_VALIDATION_RULES + 1, 10) as Array<{ rule: DataValidationRule }>
     ).map(({ rule }) => rule);
     const crowded = makeWorkbook(10);
     crowded.sheets[0]!.validationRules = rules;
@@ -398,7 +398,7 @@ describe("the work a data validation check does", () => {
     expect(() => new SheetwriteStore(crowded)).toThrow();
 
     const store = new SheetwriteStore(makeWorkbook(10));
-    const patches = listRules(MAX_VALIDATION_RULES + 1, 10);
+    const patches = list_rules(MAX_VALIDATION_RULES + 1, 10);
     expect(store.applyTransaction({ patches: patches.slice(0, -1) }).status).toBe("applied");
     // A peer's operation past the limit is refused, as a local one is.
     for (const source of ["remote", "local"] as const) {

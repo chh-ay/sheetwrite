@@ -9,39 +9,39 @@ const COPIED_LOADERS: readonly string[] = ENGINE_LOADER_FILES;
 /** Build output directories that the canonical tarballs carry. */
 const GENERATED_DIRECTORIES = ["dist", "pkg", "pkg-history"] as const;
 
-const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
-const repositoryRoot = resolve(import.meta.dir, "..");
-const manifest = await verifyReleaseArtifacts(artifactRoot);
+const artifact_root = resolve(process.argv[2] ?? "test-results/release-artifacts");
+const repository_root = resolve(import.meta.dir, "..");
+const manifest = await verifyReleaseArtifacts(artifact_root);
 let hydrated = 0;
 
 for (const artifact of manifest.packages) {
   const directory = artifact.name.slice("@sheetwrite/".length);
-  const packageRoot = join(repositoryRoot, "packages", directory);
+  const package_root = join(repository_root, "packages", directory);
   // Engine packages other than `@sheetwrite/wasm` get their loaders copied at build time.
-  const generatedFiles = artifact.files.filter(
+  const generated_files = artifact.files.filter(
     (file) =>
       GENERATED_DIRECTORIES.some((root) => file === root || file.startsWith(`${root}/`)) ||
       (directory !== "wasm" && COPIED_LOADERS.includes(file)),
   );
-  if (generatedFiles.length === 0) continue;
+  if (generated_files.length === 0) continue;
   for (const root of GENERATED_DIRECTORIES) {
-    await rm(join(packageRoot, root), { recursive: true, force: true });
+    await rm(join(package_root, root), { recursive: true, force: true });
   }
-  await mkdir(packageRoot, { recursive: true });
+  await mkdir(package_root, { recursive: true });
   const child = Bun.spawn(
     [
       "tar",
       "-xzf",
-      join(artifactRoot, artifact.path),
+      join(artifact_root, artifact.path),
       "-C",
-      packageRoot,
+      package_root,
       "--strip-components=1",
-      ...generatedFiles.map((file) => `package/${file}`),
+      ...generated_files.map((file) => `package/${file}`),
     ],
     { stdout: "pipe", stderr: "pipe" },
   );
-  const [stderr, exitCode] = await Promise.all([new Response(child.stderr).text(), child.exited]);
-  if (exitCode !== 0) throw new Error(`Could not hydrate ${artifact.name}: ${stderr}`);
+  const [stderr, exit_code] = await Promise.all([new Response(child.stderr).text(), child.exited]);
+  if (exit_code !== 0) throw new Error(`Could not hydrate ${artifact.name}: ${stderr}`);
   hydrated += 1;
 }
 

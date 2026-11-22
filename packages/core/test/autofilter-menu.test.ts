@@ -125,11 +125,11 @@ describe("AutoFilter dropdown", () => {
 
   it("applies a Number Filters condition through the Custom AutoFilter form", () => {
     const { dialog, applied, key } = open({ kind: "number", values: [1, 2, 30] });
-    const menuButton = [...dialog.querySelectorAll("button")].find(
+    const menu_button = [...dialog.querySelectorAll("button")].find(
       (button) => button.textContent === "Number Filters",
     );
-    menuButton?.click();
-    expect(menuButton?.getAttribute("aria-expanded")).toBe("true");
+    menu_button?.click();
+    expect(menu_button?.getAttribute("aria-expanded")).toBe("true");
     const between = [...dialog.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
       (item) => item.textContent === "Between…",
     );
@@ -146,7 +146,7 @@ describe("AutoFilter dropdown", () => {
     expect(dialog.querySelector("form")).toBeNull();
 
     // Opened again, it submits the two conditions joined by And.
-    menuButton?.click();
+    menu_button?.click();
     between?.click();
     const again = dialog.querySelector<HTMLFormElement>("form");
     const [from, to] = [...(again?.querySelectorAll<HTMLInputElement>('input[type="text"]') ?? [])];

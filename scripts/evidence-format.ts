@@ -65,8 +65,8 @@ function readableId(id: string): string {
  */
 function readableText(text: string): string {
   const grouped = text.replaceAll(/\b\d{5,}\b/g, (digits) => formatCount(Number(digits)));
-  const firstWord = grouped.split(" ", 1)[0] ?? "";
-  return /^[a-z]+$/.test(firstWord) ? capitalized(grouped) : grouped;
+  const first_word = grouped.split(" ", 1)[0] ?? "";
+  return /^[a-z]+$/.test(first_word) ? capitalized(grouped) : grouped;
 }
 
 function formatCount(value: number): string {

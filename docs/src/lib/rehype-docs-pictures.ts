@@ -29,7 +29,7 @@ const PICTURE_MODULE = new URL("../art/DocsPicture.tsx", import.meta.url).pathna
 const ART_STYLESHEET = new URL("../art/art.css", import.meta.url).pathname;
 
 /** The docs address of a content file: `start/index.md` is `/docs/start/`. */
-function pageAddress(path: string): string | undefined {
+function page_address(path: string): string | undefined {
   const index = path.indexOf(CONTENT_ROOT);
   if (index < 0) return undefined;
   const page = path
@@ -53,37 +53,37 @@ function picture(attributes: Record<string, string>, flow: boolean): HastNode {
 }
 
 /** The `<use href>` target of an `<svg>` that draws one sprite or file symbol. */
-function useHref(node: HastNode): string | undefined {
+function use_href(node: HastNode): string | undefined {
   const use = node.children?.find((child) => child.tagName === "use");
   const href = use?.properties?.href;
   return typeof href === "string" ? href : undefined;
 }
 
-function hasClass(node: HastNode, name: string): boolean {
-  const className = node.properties?.className;
-  return Array.isArray(className) && className.includes(name);
+function has_class(node: HastNode, name: string): boolean {
+  const class_name = node.properties?.className;
+  return Array.isArray(class_name) && class_name.includes(name);
 }
 
 /** Swaps card illustrations and replaced figure images; returns whether any changed. */
-function replaceImages(node: HastNode): boolean {
+function replace_images(node: HastNode): boolean {
   let changed = false;
   node.children = node.children?.map((child) => {
-    if (child.tagName === "svg" && hasClass(child, "sw-card__art")) {
-      const name = /\/figures\/illustrations\/([\w-]+)\.svg#art$/.exec(useHref(child) ?? "")?.[1];
+    if (child.tagName === "svg" && has_class(child, "sw-card__art")) {
+      const name = /\/figures\/illustrations\/([\w-]+)\.svg#art$/.exec(use_href(child) ?? "")?.[1];
       if (name !== undefined && CARD_ART_NAMES.has(name)) {
         changed = true;
         return picture({ card: name }, false);
       }
     }
-    if (child.tagName === "svg" && hasClass(child, "sw-diagram")) {
-      const name = /\/figures\/diagrams\/([\w-]+)\.svg#fig$/.exec(useHref(child) ?? "")?.[1];
+    if (child.tagName === "svg" && has_class(child, "sw-diagram")) {
+      const name = /\/figures\/diagrams\/([\w-]+)\.svg#fig$/.exec(use_href(child) ?? "")?.[1];
       const replacement = name === undefined ? undefined : REPLACED_DIAGRAMS[name];
       if (replacement !== undefined) {
         changed = true;
         return picture({ name: replacement, bare: "true" }, true);
       }
     }
-    if (replaceImages(child)) changed = true;
+    if (replace_images(child)) changed = true;
     return child;
   });
   return changed;
@@ -96,7 +96,7 @@ interface Placed {
 }
 
 /** Where a placement goes in the body's children: the index to insert at, or -1 when its anchor is missing. */
-function insertionIndex(children: readonly HastNode[], after: string): number {
+function insertion_index(children: readonly HastNode[], after: string): number {
   if (after === AT_START) return children.findIndex((child) => child.type === "element");
   const anchor =
     after === AFTER_LEAD
@@ -108,12 +108,12 @@ function insertionIndex(children: readonly HastNode[], after: string): number {
 }
 
 /** Inserts each placed diagram or screenshot at the top, after its heading, or after the lead paragraph. */
-function placePictures(tree: HastNode, address: string): Placed {
+function place_pictures(tree: HastNode, address: string): Placed {
   const placements = DOCS_PICTURE_PLACEMENTS[address] ?? [];
   const children = tree.children ?? [];
   for (const placement of placements) {
     const { after } = placement;
-    const index = insertionIndex(children, after);
+    const index = insertion_index(children, after);
     const what =
       "picture" in placement ? `${placement.picture} diagram` : `${placement.shot.name} screenshot`;
     if (index < 0) {
@@ -145,7 +145,7 @@ function esm(body: unknown[]): HastNode {
 const literal = (value: string) => ({ type: "Literal", value, raw: JSON.stringify(value) });
 
 /** `import <name> from "<sheet>?url"`, as an import declaration. */
-function stylesheetImport(name: string, sheet: string) {
+function stylesheet_import(name: string, sheet: string) {
   return {
     type: "ImportDeclaration",
     specifiers: [{ type: "ImportDefaultSpecifier", local: { type: "Identifier", name } }],
@@ -158,7 +158,7 @@ function stylesheetImport(name: string, sheet: string) {
  * figures stylesheet when it places screenshots, and adds those stylesheets to
  * the page's `stylesheets` export.
  */
-function linkPictures(
+function link_pictures(
   tree: HastNode,
   { art, shots }: Readonly<{ art: boolean; shots: boolean }>,
 ): void {
@@ -173,12 +173,12 @@ function linkPictures(
         ],
         source: literal(PICTURE_MODULE),
       },
-      stylesheetImport("artStylesheet", ART_STYLESHEET),
+      stylesheet_import("artStylesheet", ART_STYLESHEET),
     );
     sheets.push({ type: "Identifier", name: "artStylesheet" });
   }
   if (shots) {
-    declarations.push(stylesheetImport("shotStylesheet", FIGURES_STYLESHEET));
+    declarations.push(stylesheet_import("shotStylesheet", FIGURES_STYLESHEET));
     sheets.push({ type: "Identifier", name: "shotStylesheet" });
   }
   const imports = esm(declarations);
@@ -203,7 +203,7 @@ function linkPictures(
     tree.children = [imports, ...children];
     return;
   }
-  const exportSheets = esm([
+  const export_sheets = esm([
     {
       type: "ExportNamedDeclaration",
       specifiers: [],
@@ -221,17 +221,17 @@ function linkPictures(
       },
     },
   ]);
-  tree.children = [imports, exportSheets, ...children];
+  tree.children = [imports, export_sheets, ...children];
 }
 
 /** The rehype plugin: art and screenshots in the docs pages that have them. */
 export function rehypeDocsPictures() {
   return (tree: HastNode, file: { path?: string }): void => {
-    const address = pageAddress(file.path ?? "");
+    const address = page_address(file.path ?? "");
     if (address === undefined) return;
-    const replaced = replaceImages(tree);
-    const placed = placePictures(tree, address);
+    const replaced = replace_images(tree);
+    const placed = place_pictures(tree, address);
     if (replaced || placed.diagrams || placed.shots)
-      linkPictures(tree, { art: replaced || placed.diagrams, shots: placed.shots });
+      link_pictures(tree, { art: replaced || placed.diagrams, shots: placed.shots });
   };
 }

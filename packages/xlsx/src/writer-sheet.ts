@@ -65,7 +65,7 @@ const VML_REL = `${RELATIONSHIPS_NS}/vmlDrawing`;
 const TABLE_REL = `${RELATIONSHIPS_NS}/table`;
 const HYPERLINK_REL = `${RELATIONSHIPS_NS}/hyperlink`;
 
-function commentsXml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
+function comments_xml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
@@ -82,7 +82,7 @@ function commentsXml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arra
   return xml.finish();
 }
 
-function commentsVml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
+function comments_vml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8"?>');
   xml.append(
@@ -97,16 +97,16 @@ function commentsVml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arra
   return xml.finish();
 }
 
-function validationXml(
+function validation_xml(
   rule: DataValidationRule,
   context: XlsxCodecContext,
   sheet: string,
 ): string | null {
   const condition = rule.condition;
   // XLSX keeps a validation formula without its leading `=`.
-  const formulaText = (formula: string): string => formula.slice(1);
-  const operandText = (operand: DataValidationOperand): string =>
-    typeof operand === "number" ? String(operand) : formulaText(operand);
+  const formula_text = (formula: string): string => formula.slice(1);
+  const operand_text = (operand: DataValidationOperand): string =>
+    typeof operand === "number" ? String(operand) : formula_text(operand);
   let type: string;
   let operator = "";
   let formulas: string[];
@@ -115,20 +115,20 @@ function validationXml(
     formulas = [];
   } else if (condition.kind === "custom") {
     type = "custom";
-    formulas = [formulaText(condition.formula)];
+    formulas = [formula_text(condition.formula)];
   } else if (condition.kind === "list" && "source" in condition) {
     type = "list";
-    formulas = [formulaText(condition.source)];
+    formulas = [formula_text(condition.source)];
   } else if (condition.kind === "list" || condition.kind === "checkbox") {
     const values =
       condition.kind === "list"
         ? condition.values
         : [condition.checkedValue ?? true, condition.uncheckedValue ?? false];
-    const textValues = values.map((value) =>
+    const text_values = values.map((value) =>
       value === null ? "" : typeof value === "boolean" ? (value ? "TRUE" : "FALSE") : String(value),
     );
-    if (textValues.some((value) => /[,\r\n]/.test(value))) return null;
-    const list = textValues.join(",").replaceAll('"', '""');
+    if (text_values.some((value) => /[,\r\n]/.test(value))) return null;
+    const list = text_values.join(",").replaceAll('"', '""');
     if (Array.from(list).length + 2 > 255) return null;
     type = "list";
     formulas = [`"${list}"`];
@@ -140,7 +140,7 @@ function validationXml(
         "value" in condition.comparison
           ? [condition.comparison.value]
           : [condition.comparison.min, condition.comparison.max]
-      ).map(operandText);
+      ).map(operand_text);
     } else {
       const bounds = [condition.min, condition.max].filter(
         (value): value is number => value !== undefined,
@@ -163,20 +163,20 @@ function validationXml(
     ["promptTitle", rule.inputTitle, 32],
     ["prompt", rule.inputMessage, 255],
   ] as const;
-  const textAttributes: string[] = [];
-  for (const [attribute, text, maxLength] of texts) {
+  const text_attributes: string[] = [];
+  for (const [attribute, text, max_length] of texts) {
     if (!text) continue;
-    if (Array.from(text).length > maxLength) {
+    if (Array.from(text).length > max_length) {
       emitWarning(context, {
         code: "validation-loss",
-        message: `Validation rule "${rule.id}" ${attribute} exceeded ${maxLength} characters and was omitted from native XLSX`,
+        message: `Validation rule "${rule.id}" ${attribute} exceeded ${max_length} characters and was omitted from native XLSX`,
         sheet,
       });
       continue;
     }
-    textAttributes.push(`${attribute}="${escapeXml(encodeXstring(text))}"`);
+    text_attributes.push(`${attribute}="${escapeXml(encodeXstring(text))}"`);
   }
-  const errorStyle = rule.errorStyle ?? (rule.policy === "warn" ? "warning" : "stop");
+  const error_style = rule.errorStyle ?? (rule.policy === "warn" ? "warning" : "stop");
   const attributes = [
     `type="${type}"`,
     ...(operator ? [`operator="${operator}"`] : []),
@@ -187,13 +187,13 @@ function validationXml(
     `showInputMessage="${rule.showInputMessage === false ? 0 : 1}"`,
     `showErrorMessage="${rule.policy === "allow" ? 0 : 1}"`,
     // Stop is the schema default, so Excel writes the style only when it is another.
-    ...(errorStyle === "stop" ? [] : [`errorStyle="${errorStyle}"`]),
-    ...textAttributes,
+    ...(error_style === "stop" ? [] : [`errorStyle="${error_style}"`]),
+    ...text_attributes,
   ].join(" ");
   return `<dataValidation ${attributes}>${formulas.map((formula, index) => `<formula${index + 1}>${escapeXml(encodeXstring(String(formula)))}</formula${index + 1}>`).join("")}</dataValidation>`;
 }
 
-function conditionalScalar(value: unknown): string | null {
+function conditional_scalar(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
@@ -201,33 +201,33 @@ function conditionalScalar(value: unknown): string | null {
   return null;
 }
 
-function conditionalFormatXml(
+function conditional_format_xml(
   rule: ConditionalFormatRule,
-  dxfId: number,
+  dxf_id: number,
   priority: number,
 ): string | null {
-  const startCol = Math.min(rule.range.start.col, rule.range.end.col);
-  const startRow = Math.min(rule.range.start.row, rule.range.end.row);
+  const start_col = Math.min(rule.range.start.col, rule.range.end.col);
+  const start_row = Math.min(rule.range.start.row, rule.range.end.row);
   const range = areaA1(rule.range);
-  const stopIfTrue = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
+  const stop_if_true = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
   if (rule.when.kind === "formula") {
     const source = rule.when.source.startsWith("=") ? rule.when.source.slice(1) : rule.when.source;
-    return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>${escapeXml(encodeXstring(source))}</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>${escapeXml(encodeXstring(source))}</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "contains") {
     const text = rule.when.text;
-    const formulaText = text.replaceAll('"', '""');
-    const anchor = cellA1(startRow, startCol);
+    const formula_text = text.replaceAll('"', '""');
+    const anchor = cellA1(start_row, start_col);
     if (rule.when.matchCase) {
-      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formulaText))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
+      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formula_text))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
     }
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formulaText))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxf_id}" priority="${priority}"${stop_if_true} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formula_text))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "equal" && rule.when.value === null) {
-    const anchor = cellA1(startRow, startCol);
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
+    const anchor = cellA1(start_row, start_col);
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
   }
-  const formula = conditionalScalar(rule.when.value);
+  const formula = conditional_scalar(rule.when.value);
   if (formula === null) return null;
   const operator =
     rule.when.kind === "greaterThan"
@@ -235,29 +235,29 @@ function conditionalFormatXml(
       : rule.when.kind === "lessThan"
         ? "lessThan"
         : "equal";
-  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
+  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxf_id}" priority="${priority}"${stop_if_true} operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
 }
 
-function indexSheetRows(sheet: SheetSnapshot) {
-  const byRow = new Map<number, AbsoluteCell[]>();
+function index_sheet_rows(sheet: SheetSnapshot) {
+  const by_row = new Map<number, AbsoluteCell[]>();
   // Blocks list their cells row by row, so most cells join the previous cell's row.
-  let lastRow = -1;
-  let rowCells: AbsoluteCell[] = [];
+  let last_row = -1;
+  let row_cells: AbsoluteCell[] = [];
   for (const block of sheet.cells) {
     for (const source of block.cells) {
       const row = block.startRow + source.rowOffset;
       const col = block.startCol + source.colOffset;
       if (row < 0 || row >= sheet.rowCount || col < 0 || col >= sheet.columns.length) continue;
-      if (row !== lastRow) {
-        lastRow = row;
-        const known = byRow.get(row);
-        rowCells = known ?? [];
-        if (known === undefined) byRow.set(row, rowCells);
+      if (row !== last_row) {
+        last_row = row;
+        const known = by_row.get(row);
+        row_cells = known ?? [];
+        if (known === undefined) by_row.set(row, row_cells);
       }
-      rowCells.push({ row, col, source });
+      row_cells.push({ row, col, source });
     }
   }
-  return byRow;
+  return by_row;
 }
 
 /**
@@ -266,34 +266,34 @@ function indexSheetRows(sheet: SheetSnapshot) {
  * column index is built once and kept up to date, so many spills on one row
  * cost no more than their cells.
  */
-function addSpillValues(
+function add_spill_values(
   sheet: SheetSnapshot,
-  byRow: Map<number, AbsoluteCell[]>,
+  by_row: Map<number, AbsoluteCell[]>,
   spills: readonly SpillOutput[],
   context: XlsxCodecContext,
 ): void {
-  const columnIndexes = new Map<number, Map<number, number>>();
+  const column_indexes = new Map<number, Map<number, number>>();
   let written = 0;
   for (const spill of spills) {
-    const rowEnd = Math.min(spill.row + spill.rows, sheet.rowCount);
-    const colEnd = Math.min(spill.col + spill.cols, sheet.columns.length);
-    for (let row = spill.row; row < rowEnd; row++) {
-      let cells = byRow.get(row);
+    const row_end = Math.min(spill.row + spill.rows, sheet.rowCount);
+    const col_end = Math.min(spill.col + spill.cols, sheet.columns.length);
+    for (let row = spill.row; row < row_end; row++) {
+      let cells = by_row.get(row);
       if (cells === undefined) {
         cells = [];
-        byRow.set(row, cells);
+        by_row.set(row, cells);
       }
-      let indexByCol = columnIndexes.get(row);
-      if (indexByCol === undefined) {
-        indexByCol = new Map(cells.map((cell, index) => [cell.col, index]));
-        columnIndexes.set(row, indexByCol);
+      let index_by_col = column_indexes.get(row);
+      if (index_by_col === undefined) {
+        index_by_col = new Map(cells.map((cell, index) => [cell.col, index]));
+        column_indexes.set(row, index_by_col);
       }
-      for (let col = spill.col; col < colEnd; col++) {
+      for (let col = spill.col; col < col_end; col++) {
         if (row === spill.row && col === spill.col) continue;
         written += 1;
         if ((written & 4_095) === 0) checkAbort(context);
         const value = spill.values[(row - spill.row) * spill.cols + col - spill.col] ?? null;
-        const index = indexByCol.get(col);
+        const index = index_by_col.get(col);
         const existing = index === undefined ? undefined : cells[index];
         if (index !== undefined && existing !== undefined) {
           cells[index] = {
@@ -301,7 +301,7 @@ function addSpillValues(
             source: { ...existing.source, value: { kind: "literal", value } },
           };
         } else if (value !== null) {
-          indexByCol.set(col, cells.length);
+          index_by_col.set(col, cells.length);
           cells.push({
             row,
             col,
@@ -312,7 +312,7 @@ function addSpillValues(
     }
   }
   // A row the spills only passed with empty values writes no `<row>`.
-  for (const row of columnIndexes.keys()) if (byRow.get(row)?.length === 0) byRow.delete(row);
+  for (const row of column_indexes.keys()) if (by_row.get(row)?.length === 0) by_row.delete(row);
 }
 
 interface WorksheetOutlines {
@@ -321,51 +321,55 @@ interface WorksheetOutlines {
   readonly collapsedSummaries: ReadonlySet<number>;
 }
 
-function sheetOutlines(sheet: SheetSnapshot, context: XlsxCodecContext): WorksheetOutlines {
-  const outlineLevels = new Map<number, number>();
-  const collapsedOutlineRows = new Set<number>();
-  const collapsedSummaries = new Set<number>();
-  const outlineSpan = (sheet.rowGroups ?? []).reduce(
+function sheet_outlines(sheet: SheetSnapshot, context: XlsxCodecContext): WorksheetOutlines {
+  const outline_levels = new Map<number, number>();
+  const collapsed_outline_rows = new Set<number>();
+  const collapsed_summaries = new Set<number>();
+  const outline_span = (sheet.rowGroups ?? []).reduce(
     (total, group) => total + (group.end - group.start + 1),
     0,
   );
-  assertResource(context, "maxEntryUncompressedBytes", outlineSpan * 24);
+  assertResource(context, "maxEntryUncompressedBytes", outline_span * 24);
   for (const group of sheet.rowGroups ?? []) {
     for (let row = group.start; row <= group.end; row++) {
-      outlineLevels.set(row, Math.min(7, (outlineLevels.get(row) ?? 0) + 1));
-      if (group.collapsed) collapsedOutlineRows.add(row);
+      outline_levels.set(row, Math.min(7, (outline_levels.get(row) ?? 0) + 1));
+      if (group.collapsed) collapsed_outline_rows.add(row);
     }
     if (group.collapsed && group.end + 1 < sheet.rowCount) {
-      collapsedSummaries.add(group.end + 1);
+      collapsed_summaries.add(group.end + 1);
     }
   }
-  return { outlineLevels, collapsedOutlineRows, collapsedSummaries };
+  return {
+    outlineLevels: outline_levels,
+    collapsedOutlineRows: collapsed_outline_rows,
+    collapsedSummaries: collapsed_summaries,
+  };
 }
 
-function appendSheetHeader(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesRegistry): void {
+function append_sheet_header(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesRegistry): void {
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}">`);
-  // `tabColor` comes before `outlinePr` in `sheetPr`.
-  const tabColor =
+  // `tab_color` comes before `outlinePr` in `sheetPr`.
+  const tab_color =
     sheet.tabColor && /^#[\dA-Fa-f]{6}$/u.test(sheet.tabColor)
       ? `<tabColor rgb="FF${sheet.tabColor.slice(1).toUpperCase()}"/>`
       : "";
   const outline = sheet.rowGroups?.length ? '<outlinePr summaryBelow="1"/>' : "";
-  if (tabColor || outline) xml.append(`<sheetPr>${tabColor}${outline}</sheetPr>`);
-  const maxRow = Math.max(1, sheet.rowCount);
-  const maxCol = Math.max(0, sheet.columns.length - 1);
-  xml.append(`<dimension ref="A1:${cellA1(maxRow - 1, maxCol)}"/>`);
+  if (tab_color || outline) xml.append(`<sheetPr>${tab_color}${outline}</sheetPr>`);
+  const max_row = Math.max(1, sheet.rowCount);
+  const max_col = Math.max(0, sheet.columns.length - 1);
+  xml.append(`<dimension ref="A1:${cellA1(max_row - 1, max_col)}"/>`);
   xml.append('<sheetViews><sheetView workbookViewId="0">');
   if ((sheet.frozenRows ?? 0) > 0 || (sheet.frozenCols ?? 0) > 0) {
-    const topLeft = cellA1(sheet.frozenRows ?? 0, sheet.frozenCols ?? 0);
-    const activePane =
+    const top_left = cellA1(sheet.frozenRows ?? 0, sheet.frozenCols ?? 0);
+    const active_pane =
       sheet.frozenRows && sheet.frozenCols
         ? "bottomRight"
         : sheet.frozenRows
           ? "bottomLeft"
           : "topRight";
     xml.append(
-      `<pane${sheet.frozenCols ? ` xSplit="${sheet.frozenCols}"` : ""}${sheet.frozenRows ? ` ySplit="${sheet.frozenRows}"` : ""} topLeftCell="${topLeft}" activePane="${activePane}" state="frozen"/>`,
+      `<pane${sheet.frozenCols ? ` xSplit="${sheet.frozenCols}"` : ""}${sheet.frozenRows ? ` ySplit="${sheet.frozenRows}"` : ""} topLeftCell="${top_left}" activePane="${active_pane}" state="frozen"/>`,
     );
   }
   xml.append('</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>');
@@ -375,52 +379,58 @@ function appendSheetHeader(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesR
       // The stored character width includes OOXML's five-pixel padding.
       const width = columnWidthCharacters(column.width);
       // A `text` column is Excel's Text format, so typing there keeps text.
-      const numberFormat =
+      const number_format =
         column.cellStyle?.numberFormat ??
         column.numberFormat ??
         (column.type === "text" ? "@" : undefined);
-      const styleId = styles.register(column.cellStyle, numberFormat);
+      const style_id = styles.register(column.cellStyle, number_format);
       xml.append(
-        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${styleId ? ` style="${styleId}"` : ""}/>`,
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${style_id ? ` style="${style_id}"` : ""}/>`,
       );
     }
     xml.append("</cols>");
   }
 }
 
-function* writeSheetRows(
+function* write_sheet_rows(
   xml: XmlBuffer,
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
   rows: ReadonlySet<number>,
-  byRow: ReadonlyMap<number, AbsoluteCell[]>,
-  rowMetadata: ReadonlyMap<number, NonNullable<SheetSnapshot["rowMeta"]>[number][1]>,
+  by_row: ReadonlyMap<number, AbsoluteCell[]>,
+  row_metadata: ReadonlyMap<number, NonNullable<SheetSnapshot["rowMeta"]>[number][1]>,
   outlines: WorksheetOutlines,
   /** Rows the AutoFilter hides, which Excel stores hidden. */
   filtered: ReadonlySet<number>,
   hook: WorkbookWriteHook | undefined,
   arrays: SheetDynamicArrays,
 ): Generator<Uint8Array> {
-  const { collapsedOutlineRows, outlineLevels, collapsedSummaries } = outlines;
+  const {
+    collapsedOutlineRows: collapsed_outline_rows,
+    outlineLevels: outline_levels,
+    collapsedSummaries: collapsed_summaries,
+  } = outlines;
   xml.append("<sheetData>");
   let processed = 0;
-  const sourceRows =
+  const source_rows =
     hook?.cellRows?.(sheet) ??
     [...rows]
       .sort((left, right) => left - right)
       .map((row) => ({
         row,
-        cells: (byRow.get(row) ?? []).sort((left, right) => left.col - right.col),
+        cells: (by_row.get(row) ?? []).sort((left, right) => left.col - right.col),
       }));
-  const styledRows = sheet.hyperlinks?.length ? hyperlinkStyledRows(sheet, sourceRows) : sourceRows;
-  for (const { row, cells } of styledRows) {
-    const meta = rowMetadata.get(row);
-    const hidden = meta?.hidden || collapsedOutlineRows.has(row) || filtered.has(row);
-    const outlineLevel = outlineLevels.get(row);
+  const styled_rows = sheet.hyperlinks?.length
+    ? hyperlinkStyledRows(sheet, source_rows)
+    : source_rows;
+  for (const { row, cells } of styled_rows) {
+    const meta = row_metadata.get(row);
+    const hidden = meta?.hidden || collapsed_outline_rows.has(row) || filtered.has(row);
+    const outline_level = outline_levels.get(row);
     xml.append(
-      `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outlineLevel ? ` outlineLevel="${outlineLevel}"` : ""}${collapsedSummaries.has(row) ? ' collapsed="1"' : ""}>`,
+      `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outline_level ? ` outlineLevel="${outline_level}"` : ""}${collapsed_summaries.has(row) ? ' collapsed="1"' : ""}>`,
     );
     for (const cell of cells) {
       processed += 1;
@@ -436,21 +446,21 @@ function* writeSheetRows(
   xml.append("</sheetData>");
 }
 
-function appendSheetFormats(
+function append_sheet_formats(
   xml: XmlBuffer,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
 ): void {
-  const maxRow = Math.max(1, sheet.rowCount);
-  const maxCol = Math.max(0, sheet.columns.length - 1);
+  const max_row = Math.max(1, sheet.rowCount);
+  const max_col = Math.max(0, sheet.columns.length - 1);
   if (sheet.autoFilter) xml.append(autoFilterXml(sheet, sheet.autoFilter));
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
-    const reference = `A1:${cellA1(maxRow - 1, maxCol)}`;
+    const reference = `A1:${cellA1(max_row - 1, max_col)}`;
     xml.append(`<sortState ref="${reference}">`);
     for (const key of sheet.sortKeys) {
       xml.append(
-        `<sortCondition ref="${cellA1(0, key.col)}:${cellA1(maxRow - 1, key.col)}"${key.ascending ? "" : ' descending="1"'}/>`,
+        `<sortCondition ref="${cellA1(0, key.col)}:${cellA1(max_row - 1, key.col)}"${key.ascending ? "" : ' descending="1"'}/>`,
       );
     }
     xml.append("</sortState>");
@@ -475,7 +485,7 @@ function appendSheetFormats(
   }
   if (sheet.conditionalFormats?.length) {
     for (const [index, rule] of sheet.conditionalFormats.entries()) {
-      const encoded = conditionalFormatXml(
+      const encoded = conditional_format_xml(
         rule,
         styles.registerDifferential(rule.style),
         index + 1,
@@ -493,7 +503,7 @@ function appendSheetFormats(
   if (sheet.validationRules?.length) {
     const validations: string[] = [];
     for (const rule of sheet.validationRules) {
-      const encoded = validationXml(rule, context, sheet.name);
+      const encoded = validation_xml(rule, context, sheet.name);
       if (encoded) validations.push(encoded);
       else
         emitWarning(context, {
@@ -525,43 +535,43 @@ function appendSheetFormats(
   }
 }
 
-function appendSheetRelationships(
+function append_sheet_relationships(
   xml: XmlBuffer,
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
-  sheetNumber: number,
-  tableStartId: number,
+  sheet_number: number,
+  table_start_id: number,
   hook: WorkbookWriteHook | undefined,
-  pivotRelationships: readonly ExtraRelationship[],
-  pivotCharts: ReadonlyMap<string, PivotChartData> | undefined,
+  pivot_relationships: readonly ExtraRelationship[],
+  pivot_charts: ReadonlyMap<string, PivotChartData> | undefined,
 ): Omit<SheetWriteResult, "dynamicArrays"> {
   let comments: Uint8Array | undefined;
   let vml: Uint8Array | undefined;
-  const relationshipEntries: {
+  const relationship_entries: {
     id: string;
     type: string;
     target: string;
     external?: boolean;
   }[] = [];
-  let nextRelationshipId = 1;
-  let legacyDrawingId: string | undefined;
+  let next_relationship_id = 1;
+  let legacy_drawing_id: string | undefined;
   if (sheet.notes?.length) {
-    const commentsId = `rId${nextRelationshipId++}`;
-    legacyDrawingId = `rId${nextRelationshipId++}`;
-    relationshipEntries.push(
-      { id: commentsId, type: COMMENTS_REL, target: `../comments${sheetNumber}.xml` },
+    const comments_id = `rId${next_relationship_id++}`;
+    legacy_drawing_id = `rId${next_relationship_id++}`;
+    relationship_entries.push(
+      { id: comments_id, type: COMMENTS_REL, target: `../comments${sheet_number}.xml` },
       {
-        id: legacyDrawingId,
+        id: legacy_drawing_id,
         type: VML_REL,
-        target: `../drawings/vmlDrawing${sheetNumber}.vml`,
+        target: `../drawings/vmlDrawing${sheet_number}.vml`,
       },
     );
-    comments = commentsXml(sheet, context);
-    vml = commentsVml(sheet, context);
+    comments = comments_xml(sheet, context);
+    vml = comments_vml(sheet, context);
   }
-  const hyperlinkElements: string[] = [];
+  const hyperlink_elements: string[] = [];
   for (const hyperlink of sheet.hyperlinks ?? []) {
     const source = rangeA1(hyperlink.range.start, hyperlink.range.end);
     const display =
@@ -569,95 +579,95 @@ function appendSheetRelationships(
         ? ""
         : ` display="${escapeXml(encodeXstring(hyperlink.display))}"`;
     if (hyperlink.target.kind === "external") {
-      const relationshipId = `rId${nextRelationshipId++}`;
-      relationshipEntries.push({
-        id: relationshipId,
+      const relationship_id = `rId${next_relationship_id++}`;
+      relationship_entries.push({
+        id: relationship_id,
         type: HYPERLINK_REL,
         target: hyperlink.target.url,
         external: true,
       });
-      hyperlinkElements.push(`<hyperlink ref="${source}" r:id="${relationshipId}"${display}/>`);
+      hyperlink_elements.push(`<hyperlink ref="${source}" r:id="${relationship_id}"${display}/>`);
       continue;
     }
-    const internalTarget = hyperlink.target;
-    const targetSheet = snapshot.sheets.find(
-      (candidate) => candidate.id === internalTarget.range.sheet,
+    const internal_target = hyperlink.target;
+    const target_sheet = snapshot.sheets.find(
+      (candidate) => candidate.id === internal_target.range.sheet,
     );
-    if (!targetSheet) {
+    if (!target_sheet) {
       throw new TypeError(
         boundedErrorText(
-          `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
+          `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internal_target.range.sheet}`,
         ),
       );
     }
-    const location = `${quotedSheet(targetSheet.name)}!${rangeA1(internalTarget.range.start, internalTarget.range.end)}`;
-    hyperlinkElements.push(
+    const location = `${quotedSheet(target_sheet.name)}!${rangeA1(internal_target.range.start, internal_target.range.end)}`;
+    hyperlink_elements.push(
       `<hyperlink ref="${source}" location="${escapeXml(encodeXstring(location))}"${display}/>`,
     );
   }
-  if (hyperlinkElements.length > 0) {
-    xml.append(`<hyperlinks>${hyperlinkElements.join("")}</hyperlinks>`);
+  if (hyperlink_elements.length > 0) {
+    xml.append(`<hyperlinks>${hyperlink_elements.join("")}</hyperlinks>`);
   }
-  const sheetHook = hook?.sheet?.(sheet, {
-    sheetNumber,
-    name: `xl/worksheets/sheet${sheetNumber}.xml`,
+  const sheet_hook = hook?.sheet?.(sheet, {
+    sheetNumber: sheet_number,
+    name: `xl/worksheets/sheet${sheet_number}.xml`,
   });
-  const extraIds = (sheetHook?.relationships ?? []).map((relationship) => {
-    const id = `rId${nextRelationshipId++}`;
-    relationshipEntries.push({ ...relationship, id });
+  const extra_ids = (sheet_hook?.relationships ?? []).map((relationship) => {
+    const id = `rId${next_relationship_id++}`;
+    relationship_entries.push({ ...relationship, id });
     return id;
   });
   // Pivot tables have no worksheet element; Excel finds them through relationships.
-  for (const relationship of pivotRelationships) {
-    relationshipEntries.push({ ...relationship, id: `rId${nextRelationshipId++}` });
+  for (const relationship of pivot_relationships) {
+    relationship_entries.push({ ...relationship, id: `rId${next_relationship_id++}` });
   }
   // Kept parts may use any name, including the ones generated for charts here.
-  const keptParts = new Set(
+  const kept_parts = new Set(
     sheet.charts?.length
       ? (hook?.contentTypeOverrides ?? []).map((override) => override.part.toLowerCase())
       : [],
   );
-  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context, pivotCharts);
-  const chartParts: ZipPart[] = charts?.parts ?? [];
-  const chartOverrides: ContentTypeOverride[] = charts?.overrides ?? [];
+  const charts = writeCharts(snapshot, sheet, sheet_number, kept_parts, context, pivot_charts);
+  const chart_parts: ZipPart[] = charts?.parts ?? [];
+  const chart_overrides: ContentTypeOverride[] = charts?.overrides ?? [];
   if (charts && !hook?.appendCharts?.(sheet, charts.charts)) {
-    const drawingPart = freePartName(`xl/drawings/sheetwrite-drawing${sheetNumber}`, keptParts);
-    const drawing = chartDrawingParts(drawingPart, charts.charts, context);
-    chartParts.push(...drawing.parts);
-    chartOverrides.push(drawing.override);
-    const id = `rId${nextRelationshipId++}`;
-    relationshipEntries.push({ id, type: DRAWING_REL, target: `/${drawingPart}` });
+    const drawing_part = freePartName(`xl/drawings/sheetwrite-drawing${sheet_number}`, kept_parts);
+    const drawing = chartDrawingParts(drawing_part, charts.charts, context);
+    chart_parts.push(...drawing.parts);
+    chart_overrides.push(drawing.override);
+    const id = `rId${next_relationship_id++}`;
+    relationship_entries.push({ id, type: DRAWING_REL, target: `/${drawing_part}` });
     // CT_Worksheet places `<drawing>` after `<hyperlinks>` and before `<legacyDrawing>`.
     xml.append(`<drawing r:id="${id}"/>`);
   }
-  xml.append(sheetHook?.beforeLegacyDrawing?.(extraIds) ?? "");
-  if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
-  nextRelationshipId = Math.max(nextRelationshipId, 3);
-  const tableRelationshipIds: string[] = [];
+  xml.append(sheet_hook?.beforeLegacyDrawing?.(extra_ids) ?? "");
+  if (legacy_drawing_id) xml.append(`<legacyDrawing r:id="${legacy_drawing_id}"/>`);
+  next_relationship_id = Math.max(next_relationship_id, 3);
+  const table_relationship_ids: string[] = [];
   const tables = (sheet.tables ?? []).map((table, index) => {
-    const nativeId = tableStartId + index;
-    const relationshipId = `rId${nextRelationshipId++}`;
-    tableRelationshipIds.push(relationshipId);
-    relationshipEntries.push({
-      id: relationshipId,
+    const native_id = table_start_id + index;
+    const relationship_id = `rId${next_relationship_id++}`;
+    table_relationship_ids.push(relationship_id);
+    relationship_entries.push({
+      id: relationship_id,
       type: TABLE_REL,
-      target: `../tables/table${nativeId}.xml`,
+      target: `../tables/table${native_id}.xml`,
     });
     const binding = hook?.queryTable?.(table);
     return {
-      part: `xl/tables/table${nativeId}.xml`,
-      xml: tableXml(table, nativeId, sheet.name, context, styles, binding !== undefined),
+      part: `xl/tables/table${native_id}.xml`,
+      xml: tableXml(table, native_id, sheet.name, context, styles, binding !== undefined),
       ...(binding
         ? {
             queryTable: {
-              part: `xl/queryTables/queryTable${nativeId}.xml`,
-              xml: queryTableXml(table, nativeId, binding),
+              part: `xl/queryTables/queryTable${native_id}.xml`,
+              xml: queryTableXml(table, native_id, binding),
               rels: relationshipsXml(
                 [
                   {
                     id: "rId1",
                     type: QUERY_TABLE_REL,
-                    target: `../queryTables/queryTable${nativeId}.xml`,
+                    target: `../queryTables/queryTable${native_id}.xml`,
                   },
                 ],
                 context,
@@ -669,14 +679,21 @@ function appendSheetRelationships(
   });
   if (tables.length > 0) {
     xml.append(`<tableParts count="${tables.length}">`);
-    for (const relationshipId of tableRelationshipIds) {
-      xml.append(`<tablePart r:id="${relationshipId}"/>`);
+    for (const relationship_id of table_relationship_ids) {
+      xml.append(`<tablePart r:id="${relationship_id}"/>`);
     }
     xml.append("</tableParts>");
   }
   const relationships =
-    relationshipEntries.length > 0 ? relationshipsXml(relationshipEntries, context) : undefined;
-  return { relationships, comments, vml, tables, chartParts, chartOverrides };
+    relationship_entries.length > 0 ? relationshipsXml(relationship_entries, context) : undefined;
+  return {
+    relationships,
+    comments,
+    vml,
+    tables,
+    chartParts: chart_parts,
+    chartOverrides: chart_overrides,
+  };
 }
 
 export function* writeSheet(
@@ -693,44 +710,44 @@ export function* writeSheet(
   /** The sheet's installed spills, whose values the export writes in the covered cells. */
   spills: readonly SpillOutput[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
-  const byRow = indexSheetRows(sheet);
-  addSpillValues(sheet, byRow, spills, context);
+  const by_row = index_sheet_rows(sheet);
+  add_spill_values(sheet, by_row, spills, context);
   const arrays: SheetDynamicArrays = {
     spills: new Map(spills.map((spill) => [spillKey(spill.row, spill.col), spill])),
     written: false,
   };
-  const rowMetadata = new Map(sheet.rowMeta ?? []);
+  const row_metadata = new Map(sheet.rowMeta ?? []);
 
-  const outlines = sheetOutlines(sheet, context);
+  const outlines = sheet_outlines(sheet, context);
   const rows = new Set([
-    ...byRow.keys(),
-    ...rowMetadata.keys(),
+    ...by_row.keys(),
+    ...row_metadata.keys(),
     ...outlines.outlineLevels.keys(),
     ...outlines.collapsedSummaries,
     ...filteredRows,
   ]);
 
   const xml = new XmlBuffer(context);
-  appendSheetHeader(xml, sheet, styles);
+  append_sheet_header(xml, sheet, styles);
 
-  yield* writeSheetRows(
+  yield* write_sheet_rows(
     xml,
     snapshot,
     sheet,
     styles,
     context,
     rows,
-    byRow,
-    rowMetadata,
+    by_row,
+    row_metadata,
     outlines,
     new Set(filteredRows),
     hook,
     arrays,
   );
 
-  appendSheetFormats(xml, sheet, styles, context);
+  append_sheet_formats(xml, sheet, styles, context);
 
-  const result = appendSheetRelationships(
+  const result = append_sheet_relationships(
     xml,
     snapshot,
     sheet,

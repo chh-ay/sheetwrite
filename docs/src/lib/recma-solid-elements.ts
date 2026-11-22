@@ -27,57 +27,57 @@ interface EstreeNode {
   [key: string]: unknown;
 }
 
-function isNode(value: unknown): value is EstreeNode {
+function is_node(value: unknown): value is EstreeNode {
   return (
     typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
   );
 }
 
-function intrinsicName(name: unknown): string | undefined {
-  if (!isNode(name) || name.type !== "JSXMemberExpression") return undefined;
+function intrinsic_name(name: unknown): string | undefined {
+  if (!is_node(name) || name.type !== "JSXMemberExpression") return undefined;
   const { object, property } = name;
-  if (!isNode(object) || object.type !== "JSXIdentifier" || object.name !== "_components") {
+  if (!is_node(object) || object.type !== "JSXIdentifier" || object.name !== "_components") {
     return undefined;
   }
-  if (!isNode(property) || typeof property.name !== "string") return undefined;
+  if (!is_node(property) || typeof property.name !== "string") return undefined;
   const tag = property.name;
   return /^[a-z]/.test(tag) ? tag : undefined;
 }
 
 /** `fontSize` → `font-size`, `msTransform` → `-ms-transform`; custom properties stay. */
-function cssPropertyName(name: string): string {
+function css_property_name(name: string): string {
   if (name.startsWith("--")) return name;
   const dashed = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
   return dashed.startsWith("ms-") ? `-${dashed}` : dashed;
 }
 
-function cssStyleObject(value: unknown): void {
-  if (!isNode(value) || value.type !== "JSXExpressionContainer") return;
+function css_style_object(value: unknown): void {
+  if (!is_node(value) || value.type !== "JSXExpressionContainer") return;
   const { expression } = value;
-  if (!isNode(expression) || expression.type !== "ObjectExpression") return;
+  if (!is_node(expression) || expression.type !== "ObjectExpression") return;
   if (!Array.isArray(expression.properties)) return;
   for (const property of expression.properties) {
-    if (!isNode(property) || property.type !== "Property" || property.computed) continue;
+    if (!is_node(property) || property.type !== "Property" || property.computed) continue;
     const { key } = property;
-    if (!isNode(key)) continue;
+    if (!is_node(key)) continue;
     const name = key.type === "Identifier" ? key.name : key.value;
     if (typeof name !== "string") continue;
-    const cssName = cssPropertyName(name);
-    property.key = { type: "Literal", value: cssName, raw: JSON.stringify(cssName) };
+    const css_name = css_property_name(name);
+    property.key = { type: "Literal", value: css_name, raw: JSON.stringify(css_name) };
   }
 }
 
 /** `dangerouslySetInnerHTML={{ __html: x }}` → `innerHTML={x}`. */
-function innerHtmlAttribute(attribute: EstreeNode): void {
+function inner_html_attribute(attribute: EstreeNode): void {
   const { value } = attribute;
-  if (!isNode(value) || value.type !== "JSXExpressionContainer" || !isNode(value.expression)) {
+  if (!is_node(value) || value.type !== "JSXExpressionContainer" || !is_node(value.expression)) {
     throw new Error("dangerouslySetInnerHTML without an { __html } object");
   }
   const properties = value.expression.properties;
   const html = Array.isArray(properties)
     ? properties.find(
         (property): property is EstreeNode =>
-          isNode(property) && isNode(property.key) && property.key.name === "__html",
+          is_node(property) && is_node(property.key) && property.key.name === "__html",
       )
     : undefined;
   if (html === undefined) throw new Error("dangerouslySetInnerHTML without __html");
@@ -86,20 +86,20 @@ function innerHtmlAttribute(attribute: EstreeNode): void {
 }
 
 /** Rewrites the element's React attributes in place. */
-function solidAttributes(element: EstreeNode): void {
+function solid_attributes(element: EstreeNode): void {
   if (!Array.isArray(element.attributes)) return;
   element.attributes = element.attributes.filter((attribute: unknown) => {
-    if (!isNode(attribute) || attribute.type !== "JSXAttribute" || !isNode(attribute.name)) {
+    if (!is_node(attribute) || attribute.type !== "JSXAttribute" || !is_node(attribute.name)) {
       return true;
     }
     switch (attribute.name.name) {
       case "suppressHydrationWarning":
         return false;
       case "dangerouslySetInnerHTML":
-        innerHtmlAttribute(attribute);
+        inner_html_attribute(attribute);
         return true;
       case "style":
-        cssStyleObject(attribute.value);
+        css_style_object(attribute.value);
         return true;
       default:
         if (attribute.value === null && /^(?:aria|data)-/.test(String(attribute.name.name))) {
@@ -112,14 +112,14 @@ function solidAttributes(element: EstreeNode): void {
 
 function visit(node: EstreeNode): void {
   if (node.type === "JSXOpeningElement" || node.type === "JSXClosingElement") {
-    const tag = intrinsicName(node.name);
+    const tag = intrinsic_name(node.name);
     if (tag !== undefined) node.name = { type: "JSXIdentifier", name: tag };
   }
-  if (node.type === "JSXOpeningElement") solidAttributes(node);
+  if (node.type === "JSXOpeningElement") solid_attributes(node);
   for (const value of Object.values(node)) {
     if (Array.isArray(value)) {
-      for (const child of value) if (isNode(child)) visit(child);
-    } else if (isNode(value)) {
+      for (const child of value) if (is_node(child)) visit(child);
+    } else if (is_node(value)) {
       visit(value);
     }
   }

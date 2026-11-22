@@ -91,18 +91,18 @@ interface SessionCallbacks {
   autosave(): boolean;
 }
 
-let nextMutation = 1;
+let next_mutation = 1;
 
-function createMutationId(): string {
-  return `dbx-${Date.now().toString(36)}-${nextMutation++}`;
+function create_mutation_id(): string {
+  return `dbx-${Date.now().toString(36)}-${next_mutation++}`;
 }
 
-function resolveDatabaseGridTheme(host: HTMLElement): Partial<Theme> {
+function resolve_database_grid_theme(host: HTMLElement): Partial<Theme> {
   host.dataset.gridTheme = siteColorScheme();
   return siteGridTheme(host);
 }
 
-function mountDatabaseGrid(host: HTMLElement, snapshot: unknown): Grid {
+function mount_database_grid(host: HTMLElement, snapshot: unknown): Grid {
   return createGridFromSnapshot(host, snapshot, {
     presentation: "data-grid",
     config: {
@@ -114,41 +114,41 @@ function mountDatabaseGrid(host: HTMLElement, snapshot: unknown): Grid {
         { action: "exportXlsx", label: "Export database workbook" },
       ],
     },
-    theme: resolveDatabaseGridTheme(host),
+    theme: resolve_database_grid_theme(host),
   });
 }
 
 /** Attaches the storage-gauge and sync-event listeners one session needs. */
-function wireSession(
+function wire_session(
   session: DatabaseSession,
   callbacks: SessionCallbacks,
-  isCurrent: () => boolean = () => true,
+  is_current: () => boolean = () => true,
 ): void {
   const { adapter, sync } = session;
   // A failed send puts the commit back in the durable queue without a new
   // "pending" event, so autosave must resume the queue by itself. Without this
   // the record waits for another edit (or an explicit retry) before it moves.
-  let resumeTimer: number | undefined;
-  const resumeSend = () => {
-    if (resumeTimer !== undefined) return;
-    resumeTimer = window.setTimeout(() => {
-      resumeTimer = undefined;
-      if (!isCurrent() || !callbacks.autosave()) return;
+  let resume_timer: number | undefined;
+  const resume_send = () => {
+    if (resume_timer !== undefined) return;
+    resume_timer = window.setTimeout(() => {
+      resume_timer = undefined;
+      if (!is_current() || !callbacks.autosave()) return;
       if (sync.pendingCount === 0 || sync.state.activity === "sending") return;
       void sync.flush().catch(() => {
         // The next "error" event schedules another resume.
       });
     }, AUTO_RESUME_MS);
   };
-  session.disposers.push(() => clearTimeout(resumeTimer));
+  session.disposers.push(() => clearTimeout(resume_timer));
   session.disposers.push(
     adapter.subscribeStats((next) => {
-      if (isCurrent()) callbacks.onStats(next);
+      if (is_current()) callbacks.onStats(next);
     }),
   );
   session.disposers.push(
     sync.on((event) => {
-      if (!isCurrent()) return;
+      if (!is_current()) return;
       switch (event.type) {
         case "state":
           callbacks.onSyncState(event.state);
@@ -197,7 +197,7 @@ function wireSession(
           } else {
             callbacks.onLog("error", errorText(event.error));
           }
-          resumeSend();
+          resume_send();
           break;
         default:
           break;
@@ -213,7 +213,7 @@ function wireSession(
  * or the boot is cancelled, every resource that is already open closes,
  * newest first, so a failed boot leaves no database connection or Grid behind.
  */
-async function openSession(
+async function open_session(
   host: HTMLElement,
   callbacks: SessionCallbacks,
   signal: AbortSignal,
@@ -227,27 +227,27 @@ async function openSession(
     { databaseName: DOCUMENT_DATABASE, compaction: COMPACTION, maxConflictTailVersions: 16 },
   );
   const opened: Array<() => void> = [() => adapter.close()];
-  const closeOpened = () => {
+  const close_opened = () => {
     for (const close of opened.reverse()) close();
     opened.length = 0;
   };
 
   try {
-    const session = await startSession(host, callbacks, signal, adapter, opened);
-    if (!session) closeOpened();
+    const session = await start_session(host, callbacks, signal, adapter, opened);
+    if (!session) close_opened();
     return session;
   } catch (error) {
-    closeOpened();
+    close_opened();
     throw error;
   }
 }
 
 /**
- * The steps of {@link openSession} after the document database opens. Each
+ * The steps of {@link open_session} after the document database opens. Each
  * resource adds its close step to `opened` as soon as it exists; the caller
  * runs them when this returns `null` (cancelled) or throws.
  */
-async function startSession(
+async function start_session(
   host: HTMLElement,
   callbacks: SessionCallbacks,
   signal: AbortSignal,
@@ -258,7 +258,7 @@ async function startSession(
   if (signal.aborted) return null;
 
   host.replaceChildren();
-  const grid = mountDatabaseGrid(host, snapshot);
+  const grid = mount_database_grid(host, snapshot);
   opened.push(() => grid.destroy());
   const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE });
   opened.push(() => storage.close());
@@ -267,7 +267,7 @@ async function startSession(
     documentId: DATABASE_DOCUMENT_ID,
     serverVersion: snapshot.version ?? 0,
     pendingStorage: storage,
-    createMutationId,
+    createMutationId: create_mutation_id,
   });
   opened.push(() => sync.destroy());
   const session: DatabaseSession = { adapter, link, storage, grid, sync, disposers: [] };
@@ -275,7 +275,7 @@ async function startSession(
     for (const dispose of session.disposers) dispose();
     session.disposers.length = 0;
   });
-  wireSession(session, callbacks, () => !signal.aborted);
+  wire_session(session, callbacks, () => !signal.aborted);
   if (signal.aborted) return null;
 
   await sync.ready();
@@ -290,19 +290,19 @@ async function startSession(
   return session;
 }
 
-function disposeSession(session: DatabaseSession, keepStores = false): void {
+function dispose_session(session: DatabaseSession, keep_stores = false): void {
   for (const dispose of session.disposers) dispose();
   session.disposers.length = 0;
   session.sync.destroy();
   session.grid.destroy();
-  if (!keepStores) {
+  if (!keep_stores) {
     session.storage.close();
     session.adapter.close();
   }
 }
 
 /** Sheet for the tight-limit proof: one oversized receipt beside a small note. */
-function makeTightLimitSnapshot() {
+function make_tight_limit_snapshot() {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: TIGHT_LIMIT_SHEET },
@@ -362,14 +362,14 @@ export interface DatabaseEngine {
 /** Creates the page's database engine around the ledger's host element. */
 export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
   let session: DatabaseSession | null = null;
-  let autosaveOn = autosave();
-  let snapshotVersion: number | null = null;
+  let autosave_on = autosave();
+  let snapshot_version: number | null = null;
   let restored = 0;
-  let bootQueue: Promise<void> = Promise.resolve();
-  let limitGrid: Grid | null = null;
+  let boot_queue: Promise<void> = Promise.resolve();
+  let limit_grid: Grid | null = null;
   const mount = new AbortController();
 
-  const readTotal = () => {
+  const read_total = () => {
     if (!session) return;
     const resolved = session.grid.store.getCell(DATABASE_TOTAL_CELL).resolved;
     setTotal(
@@ -379,28 +379,28 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
 
   const callbacks: SessionCallbacks = {
     onStats: (next) => {
-      if (snapshotVersion !== null && next.snapshotVersion > snapshotVersion) {
+      if (snapshot_version !== null && next.snapshotVersion > snapshot_version) {
         pushLog(
           "info",
           `Compacted: operation tail folded into snapshot v${next.snapshotVersion}, tail length ${next.tailLength}`,
         );
       }
-      snapshotVersion = next.snapshotVersion;
+      snapshot_version = next.snapshotVersion;
       setStats(next);
-      readTotal();
+      read_total();
     },
     onSyncState: (state) => {
       setSyncState(state);
-      readTotal();
+      read_total();
     },
     onLog: pushLog,
     onConflict: (response) => {
-      void recoverFromConflict(response);
+      void recover_from_conflict(response);
     },
     onRestored: (count) => {
       restored = count;
     },
-    autosave: () => autosaveOn,
+    autosave: () => autosave_on,
   };
 
   /**
@@ -409,32 +409,32 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
    */
   const boot = (announce: string | null, recovered: string): Promise<void> => {
     const signal = mount.signal;
-    const nextBoot = bootQueue.then(async () => {
+    const next_boot = boot_queue.then(async () => {
       if (signal.aborted) return;
       setStatus("loading");
       setStatusDetail("Opening IndexedDB…");
       try {
         restored = 0;
-        const opened = await openSession(host, callbacks, signal);
+        const opened = await open_session(host, callbacks, signal);
         if (!opened || signal.aborted) return;
         session = opened;
-        snapshotVersion = opened.adapter.stats().snapshotVersion;
+        snapshot_version = opened.adapter.stats().snapshotVersion;
         setStatus("ready");
         setStatusDetail("Live against real IndexedDB");
         setRecoveryState(recovered);
-        readTotal();
+        read_total();
         if (announce) pushLog("info", announce);
         const crash = sessionStorage.getItem(CRASH_TEST_KEY);
         if (crash) {
           sessionStorage.removeItem(CRASH_TEST_KEY);
-          const { expected, totalBefore } = JSON.parse(crash) as {
+          const { expected, totalBefore: total_before } = JSON.parse(crash) as {
             expected: number;
             totalBefore: string;
           };
           setCrashReport({
             expected,
             restored,
-            totalBefore,
+            totalBefore: total_before,
             totalAfter: String(opened.grid.store.getCell(DATABASE_TOTAL_CELL).resolved ?? "–"),
           });
         }
@@ -444,8 +444,8 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
         setStatusDetail(errorText(error));
       }
     });
-    bootQueue = nextBoot;
-    return nextBoot;
+    boot_queue = next_boot;
+    return next_boot;
   };
 
   /**
@@ -457,41 +457,41 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
    * returns a snapshot instead of a tail (a very long gap) still remounts.
    * Rebase conflicts keep the queue intact for manual review.
    */
-  const recoverFromConflict = async (response: ConflictResponse) => {
+  const recover_from_conflict = async (response: ConflictResponse) => {
     const current = session;
     if (!current) return;
     const pending = current.sync.pendingCommits();
-    const remoteOperations =
+    const remote_operations =
       response.operationsSinceBase?.flatMap((entry) => [...entry.operations]) ?? [];
-    if (remoteOperations.length === 0 && !response.snapshot) {
+    if (remote_operations.length === 0 && !response.snapshot) {
       pushLog("error", "Manual review required: the conflict returned no operation tail");
       return;
     }
-    const rebasedBatches: DocumentOp[][] = [];
+    const rebased_batches: DocumentOp[][] = [];
     for (const record of pending) {
-      const result = rebaseDocumentOperations(record.operations, remoteOperations);
+      const result = rebaseDocumentOperations(record.operations, remote_operations);
       if (result.status === "conflict") {
         pushLog("error", `Manual review required: ${result.conflict.message}`);
         return;
       }
-      rebasedBatches.push([...result.operations]);
+      rebased_batches.push([...result.operations]);
     }
     for (const record of pending) {
       await current.storage.remove(DATABASE_DOCUMENT_ID, record.clientMutationId);
     }
 
     let grid = current.grid;
-    if (remoteOperations.length > 0) {
-      const applied = grid.applyRemoteOperations(remoteOperations);
+    if (remote_operations.length > 0) {
+      const applied = grid.applyRemoteOperations(remote_operations);
       if (applied.status !== "applied") {
         pushLog("error", `The missed server versions were not applied: ${applied.status}`);
         return;
       }
     } else if (response.snapshot) {
-      disposeSession(current, true);
+      dispose_session(current, true);
       session = null;
       host.replaceChildren();
-      grid = mountDatabaseGrid(host, response.snapshot);
+      grid = mount_database_grid(host, response.snapshot);
     }
 
     // A fresh coordinator owns the advanced head; the Grid keeps its cells.
@@ -502,7 +502,7 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
       documentId: DATABASE_DOCUMENT_ID,
       serverVersion: response.currentVersion,
       pendingStorage: current.storage,
-      createMutationId,
+      createMutationId: create_mutation_id,
     });
     const next: DatabaseSession = {
       adapter: current.adapter,
@@ -512,10 +512,10 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
       sync,
       disposers: [],
     };
-    wireSession(next, callbacks);
+    wire_session(next, callbacks);
     session = next;
     await sync.ready();
-    for (const batch of rebasedBatches) {
+    for (const batch of rebased_batches) {
       const outcome = grid.applyTransaction({ patches: batch });
       if (outcome.status !== "applied") {
         pushLog("error", `Rebased local transaction was not applied: ${outcome.status}`);
@@ -524,14 +524,14 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
     }
     await sync.flush();
     callbacks.onSyncState(sync.state);
-    readTotal();
+    read_total();
     pushLog(
       "commit",
-      `Recovered at v${response.currentVersion}: applied ${remoteOperations.length} missed operation${remoteOperations.length === 1 ? "" : "s"} and resubmitted ${rebasedBatches.length} rebased commit${rebasedBatches.length === 1 ? "" : "s"} as new mutations`,
+      `Recovered at v${response.currentVersion}: applied ${remote_operations.length} missed operation${remote_operations.length === 1 ? "" : "s"} and resubmitted ${rebased_batches.length} rebased commit${rebased_batches.length === 1 ? "" : "s"} as new mutations`,
     );
   };
 
-  const bumpSeat = (current: DatabaseSession) => {
+  const bump_seat = (current: DatabaseSession) => {
     const row = (current.sync.serverVersion + current.sync.pendingCount) % SAMPLE_ROWS;
     const value = current.grid.store.getCell({ sheet: "ledger", row, col: 1 }).resolved;
     return current.grid.applyTransaction({
@@ -545,15 +545,15 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
     });
   };
 
-  const stopTheme = observeSiteTheme(() => {
-    session?.grid.replaceTheme(resolveDatabaseGridTheme(host));
+  const stop_theme = observeSiteTheme(() => {
+    session?.grid.replaceTheme(resolve_database_grid_theme(host));
   });
 
   return {
     boot,
     async commitSampleEdit() {
       if (!session) return;
-      const outcome = bumpSeat(session);
+      const outcome = bump_seat(session);
       if (outcome.status !== "applied") {
         pushLog("error", `Sample edit was not applied: ${outcome.status}`);
       }
@@ -562,7 +562,7 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
       await session?.sync.flush();
     },
     setAutosave(on) {
-      autosaveOn = on;
+      autosave_on = on;
       setAutosave(on);
     },
     async loseNextAck() {
@@ -587,7 +587,7 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
     },
     async reopenSession() {
       if (!session) return;
-      disposeSession(session);
+      dispose_session(session);
       session = null;
       await boot(
         "Session closed and reopened: committed state and the durable queue came back from IndexedDB",
@@ -601,10 +601,10 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
     async reloadWithUnsavedEdits() {
       const current = session;
       if (!current) return;
-      autosaveOn = false;
+      autosave_on = false;
       setAutosave(false);
       const expected = current.sync.pendingCount + CRASH_TEST_EDITS;
-      for (let edit = 0; edit < CRASH_TEST_EDITS; edit++) bumpSeat(current);
+      for (let edit = 0; edit < CRASH_TEST_EDITS; edit++) bump_seat(current);
       // Durable puts are asynchronous. Reload only when every edit is stored
       // ("pending" with the full queue); otherwise report the problem and stay.
       const deadline = performance.now() + 5_000;
@@ -637,7 +637,7 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
       const response = await session.adapter.commit({
         documentId: DATABASE_DOCUMENT_ID,
         baseVersion: version,
-        clientMutationId: `external-${Date.now().toString(36)}-${nextMutation++}`,
+        clientMutationId: `external-${Date.now().toString(36)}-${next_mutation++}`,
         operations: [
           {
             op: "set",
@@ -666,10 +666,10 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
         await current.sync.flush();
         const before = Number(current.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
         const restores: Extract<DocumentOp, { op: "restoreBlock" }>[] = [];
-        let undoSteps = 0;
+        let undo_steps = 0;
         const stop = current.grid.on("change", (event) => {
           if (event.commitReason !== "undo") return;
-          undoSteps += 1;
+          undo_steps += 1;
           for (const operation of event.transaction.patches) {
             if (operation.op === "restoreBlock") restores.push(operation);
           }
@@ -679,39 +679,39 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
             patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
           });
           if (cleared.status !== "applied") throw new Error(`Usage clear was ${cleared.status}.`);
-          const clearedTotal = Number(current.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const cleared_total = Number(current.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
           await current.sync.flush();
-          const versionBeforeUndo = current.sync.serverVersion;
+          const version_before_undo = current.sync.serverVersion;
           current.grid.undo();
           await current.sync.flush();
           const after = Number(current.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const decodedBytes = restores.reduce(
+          const decoded_bytes = restores.reduce(
             (bytes, operation) => bytes + operation.decodedBytes,
             0,
           );
-          const wireBytes = new TextEncoder().encode(JSON.stringify(restores)).length;
-          const versions = current.sync.serverVersion - versionBeforeUndo;
+          const wire_bytes = new TextEncoder().encode(JSON.stringify(restores)).length;
+          const versions = current.sync.serverVersion - version_before_undo;
           const passed =
-            clearedTotal === 0 &&
+            cleared_total === 0 &&
             after === before &&
             restores.length > 0 &&
-            undoSteps === 1 &&
+            undo_steps === 1 &&
             versions === 1 &&
             current.sync.pendingCount === 0;
           setUndoReport({
             before,
-            cleared: clearedTotal,
+            cleared: cleared_total,
             after,
-            decodedBytes,
-            wireBytes,
+            decodedBytes: decoded_bytes,
+            wireBytes: wire_bytes,
             versions,
-            undoSteps,
+            undoSteps: undo_steps,
             passed,
           });
           if (passed) {
             pushLog(
               "commit",
-              `Undo restored 100,000 usage cells in one history step: restoreBlock committed as v${current.sync.serverVersion} (${formatBytes(decodedBytes, { kib: 0, mib: 1, groupKib: true })} decoded → ${formatBytes(wireBytes, { kib: 0, mib: 1, groupKib: true })} wire)`,
+              `Undo restored 100,000 usage cells in one history step: restoreBlock committed as v${current.sync.serverVersion} (${formatBytes(decoded_bytes, { kib: 0, mib: 1, groupKib: true })} decoded → ${formatBytes(wire_bytes, { kib: 0, mib: 1, groupKib: true })} wire)`,
             );
           }
         } finally {
@@ -726,20 +726,20 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
      * of the oversized receipt is rejected with `resource-limit` and that
      * entry is dropped; the older note edit is still undoable.
      */
-    tryTightUndo(limitHost) {
-      limitGrid?.destroy();
-      limitHost.replaceChildren();
-      const grid = createGridFromSnapshot(limitHost, makeTightLimitSnapshot(), {
+    tryTightUndo(limit_host) {
+      limit_grid?.destroy();
+      limit_host.replaceChildren();
+      const grid = createGridFromSnapshot(limit_host, make_tight_limit_snapshot(), {
         presentation: "data-grid",
         config: { contextMenu: [{ action: "copy", label: "Copy receipt value" }] },
         transactionResourceLimits: { maxEncodedBytes: TIGHT_LIMIT_BYTES },
       });
-      limitGrid = grid;
+      limit_grid = grid;
       let rejected = false;
       const stop = grid.on("mutation-rejected", (event) => {
         rejected = event.issues.some((issue) => issue.kind === "resource-limit");
       });
-      const noteEdit = grid.applyTransaction({
+      const note_edit = grid.applyTransaction({
         patches: [
           {
             op: "set",
@@ -757,30 +757,30 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
           },
         ],
       });
-      const clearedReceipt = grid.store.getCell(TIGHT_LIMIT_RECEIPT_CELL).resolved;
+      const cleared_receipt = grid.store.getCell(TIGHT_LIMIT_RECEIPT_CELL).resolved;
       // First undo: the oversized receipt restore is rejected and dropped.
       grid.undo();
-      const receiptStayedCleared =
-        grid.store.getCell(TIGHT_LIMIT_RECEIPT_CELL).resolved === clearedReceipt;
+      const receipt_stayed_cleared =
+        grid.store.getCell(TIGHT_LIMIT_RECEIPT_CELL).resolved === cleared_receipt;
       // Second undo: the older note edit is untouched and still undoable.
       grid.undo();
-      const noteRestored = grid.store.getCell(TIGHT_LIMIT_NOTE_CELL).resolved === TIGHT_LIMIT_NOTE;
+      const note_restored = grid.store.getCell(TIGHT_LIMIT_NOTE_CELL).resolved === TIGHT_LIMIT_NOTE;
       stop();
       setLimitReport({
         rejected,
-        clearedStayedCleared: receiptStayedCleared,
-        olderEditRestored: noteRestored,
+        clearedStayedCleared: receipt_stayed_cleared,
+        olderEditRestored: note_restored,
         passed:
-          noteEdit.status === "applied" &&
+          note_edit.status === "applied" &&
           cleared.status === "applied" &&
           rejected &&
-          receiptStayedCleared &&
-          noteRestored,
+          receipt_stayed_cleared &&
+          note_restored,
       });
     },
     async resetDemo() {
       if (session) {
-        disposeSession(session);
+        dispose_session(session);
         session = null;
       }
       await deleteShowcaseDatabase(DOCUMENT_DATABASE);
@@ -792,10 +792,10 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
     },
     dispose() {
       mount.abort();
-      stopTheme();
-      limitGrid?.destroy();
+      stop_theme();
+      limit_grid?.destroy();
       if (session) {
-        disposeSession(session);
+        dispose_session(session);
         session = null;
       }
     },

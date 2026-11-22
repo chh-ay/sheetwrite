@@ -27,23 +27,23 @@ import {
  * rejects the file.
  */
 export function workbookCalculation(workbookRoot: XmlElement): CalculationSettings | undefined {
-  const calcPr = xmlChild(workbookRoot, "calcPr");
-  if (!calcPr) return undefined;
+  const calc_pr = xmlChild(workbookRoot, "calcPr");
+  if (!calc_pr) return undefined;
 
-  const iterate = xmlBoolean(xmlAttribute(calcPr, "iterate"));
+  const iterate = xmlBoolean(xmlAttribute(calc_pr, "iterate"));
 
-  const count = Number(xmlAttribute(calcPr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
-  const maxIterations = Number.isInteger(count)
+  const count = Number(xmlAttribute(calc_pr, "iterateCount") ?? DEFAULT_MAX_ITERATIONS);
+  const max_iterations = Number.isInteger(count)
     ? Math.min(Math.max(count, 1), MAX_ITERATIONS)
     : DEFAULT_MAX_ITERATIONS;
 
-  const delta = Number(xmlAttribute(calcPr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
-  const maxChange = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
+  const delta = Number(xmlAttribute(calc_pr, "iterateDelta") ?? DEFAULT_MAX_CHANGE);
+  const max_change = Number.isFinite(delta) && delta >= 0 ? delta : DEFAULT_MAX_CHANGE;
 
-  if (!iterate && maxIterations === DEFAULT_MAX_ITERATIONS && maxChange === DEFAULT_MAX_CHANGE) {
+  if (!iterate && max_iterations === DEFAULT_MAX_ITERATIONS && max_change === DEFAULT_MAX_CHANGE) {
     return undefined;
   }
-  return { iterate, maxIterations, maxChange };
+  return { iterate, maxIterations: max_iterations, maxChange: max_change };
 }
 
 export function parseNativeDefinedNames(
@@ -56,9 +56,9 @@ export function parseNativeDefinedNames(
   if (!definitions) return undefined;
   const ranges: NonNullable<WorkbookSnapshot["workbook"]["namedRanges"]> = [];
   for (const definition of xmlChildren(definitions, "definedName")) {
-    const rawName = xmlAttribute(definition, "name");
-    if (!rawName) continue;
-    const name = decodeXstring(rawName);
+    const raw_name = xmlAttribute(definition, "name");
+    if (!raw_name) continue;
+    const name = decodeXstring(raw_name);
     if (name.startsWith("_xlnm.")) {
       emitWarning(context, {
         code: "unsupported-feature",
@@ -73,17 +73,17 @@ export function parseNativeDefinedNames(
       });
       continue;
     }
-    const localSheetId = xmlAttribute(definition, "localSheetId");
+    const local_sheet_id = xmlAttribute(definition, "localSheetId");
     let scope: string | undefined;
-    if (localSheetId !== undefined) {
-      const scopeIndex = /^\d+$/.test(localSheetId) ? Number(localSheetId) : Number.NaN;
-      const scopeSheet =
-        Number.isSafeInteger(scopeIndex) && scopeIndex >= 0 ? sheets[scopeIndex] : undefined;
-      scope = scopeSheet ? sheetIds.get(sheetNameKey(scopeSheet.name)) : undefined;
+    if (local_sheet_id !== undefined) {
+      const scope_index = /^\d+$/.test(local_sheet_id) ? Number(local_sheet_id) : Number.NaN;
+      const scope_sheet =
+        Number.isSafeInteger(scope_index) && scope_index >= 0 ? sheets[scope_index] : undefined;
+      scope = scope_sheet ? sheetIds.get(sheetNameKey(scope_sheet.name)) : undefined;
       if (!scope) {
         emitWarning(context, {
           code: "unsupported-feature",
-          message: `Defined name ${name} had invalid localSheetId ${localSheetId} and was dropped`,
+          message: `Defined name ${name} had invalid localSheetId ${local_sheet_id} and was dropped`,
         });
         continue;
       }
@@ -98,8 +98,8 @@ export function parseNativeDefinedNames(
       ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
       continue;
     }
-    const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
-    const sheet = sheetIds.get(sheetNameKey(sheetName));
+    const sheet_name = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
+    const sheet = sheetIds.get(sheetNameKey(sheet_name));
     if (sheet === undefined) {
       ranges.push({ name, ...(scope ? { scope } : {}), formula: `=${source.replace(/^=/, "")}` });
       continue;
@@ -153,26 +153,26 @@ export function workbookActiveSheet(
   sourceReferences: readonly WorkbookSheetReference[],
   sheets: readonly SheetSnapshot[],
 ): string {
-  const workbookViews = xmlChildren(
+  const workbook_views = xmlChildren(
     xmlChild(workbookRoot, "bookViews") ?? workbookRoot,
     "workbookView",
   );
-  const activeTab = Number(xmlAttribute(workbookViews.at(-1) ?? workbookRoot, "activeTab") ?? 0);
-  const requestedReference =
-    Number.isInteger(activeTab) && activeTab >= 0 && activeTab < references.length
-      ? references[activeTab]
+  const active_tab = Number(xmlAttribute(workbook_views.at(-1) ?? workbookRoot, "activeTab") ?? 0);
+  const requested_reference =
+    Number.isInteger(active_tab) && active_tab >= 0 && active_tab < references.length
+      ? references[active_tab]
       : undefined;
-  const requestedActive = requestedReference ? sourceReferences.indexOf(requestedReference) : -1;
-  const requestedSheet = sourceReferences[requestedActive];
-  const activeIndex =
-    requestedSheet && requestedSheet.state !== "hidden" && requestedSheet.state !== "veryHidden"
-      ? requestedActive
+  const requested_active = requested_reference ? sourceReferences.indexOf(requested_reference) : -1;
+  const requested_sheet = sourceReferences[requested_active];
+  const active_index =
+    requested_sheet && requested_sheet.state !== "hidden" && requested_sheet.state !== "veryHidden"
+      ? requested_active
       : sourceReferences.findIndex(
           (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
         );
-  const activeSheet = sheets[activeIndex];
-  if (!activeSheet) return readerFailure("workbook requires at least one visible worksheet");
-  return activeSheet.id;
+  const active_sheet = sheets[active_index];
+  if (!active_sheet) return readerFailure("workbook requires at least one visible worksheet");
+  return active_sheet.id;
 }
 
 export function reconcileDefinedNames(
@@ -180,12 +180,12 @@ export function reconcileDefinedNames(
   sheets: SheetSnapshot[],
   context: XlsxCodecContext,
 ): void {
-  const definedNameKeys = new Map(
+  const defined_name_keys = new Map(
     (namedRanges ?? []).map((named) => [named.name.normalize("NFC").toUpperCase(), named.name]),
   );
   for (const sheet of sheets) {
     const tables = sheet.tables?.filter((table) => {
-      const collision = definedNameKeys.get(table.name.normalize("NFC").toUpperCase());
+      const collision = defined_name_keys.get(table.name.normalize("NFC").toUpperCase());
       if (collision === undefined) return true;
       emitWarning(context, {
         code: "invalid-metadata",
@@ -197,10 +197,10 @@ export function reconcileDefinedNames(
     if (tables?.length) sheet.tables = tables;
     else delete sheet.tables;
   }
-  for (const namedRange of namedRanges ?? []) {
-    if (namedRange.range === undefined) continue;
-    const range = namedRange.range;
+  for (const named_range of namedRanges ?? []) {
+    if (named_range.range === undefined) continue;
+    const range = named_range.range;
     const sheet = sheets.find((candidate) => candidate.id === range.sheet);
-    if (sheet) extendSheet(sheet, namedRange.range.end.row, namedRange.range.end.col);
+    if (sheet) extendSheet(sheet, named_range.range.end.row, named_range.range.end.col);
   }
 }

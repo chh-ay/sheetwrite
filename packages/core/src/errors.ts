@@ -274,41 +274,41 @@ interface ContextInspection {
 }
 
 /**
- * Cut text to at most `maxBytes` UTF-8 bytes. The start and the end stay,
+ * Cut text to at most `max_bytes` UTF-8 bytes. The start and the end stay,
  * because a message names the failure after the data it quotes. No cut splits
  * a code point.
  */
-function boundedErrorText(text: string, maxBytes: number = MAX_ERROR_TEXT_BYTES): string {
-  if (text.length * MAX_UTF8_BYTES_PER_UNIT <= maxBytes) return text;
+function bounded_error_text(text: string, max_bytes: number = MAX_ERROR_TEXT_BYTES): string {
+  if (text.length * MAX_UTF8_BYTES_PER_UNIT <= max_bytes) return text;
 
-  const whole = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(maxBytes));
+  const whole = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(max_bytes));
   if (whole.read === text.length) return text;
 
-  const keptEndBytes = Math.floor(maxBytes / 2) - ELLIPSIS.length * MAX_UTF8_BYTES_PER_UNIT;
-  if (keptEndBytes <= 0) return ELLIPSIS;
-  const head = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(keptEndBytes));
+  const kept_end_bytes = Math.floor(max_bytes / 2) - ELLIPSIS.length * MAX_UTF8_BYTES_PER_UNIT;
+  if (kept_end_bytes <= 0) return ELLIPSIS;
+  const head = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(kept_end_bytes));
   // Each tail unit encodes to at most three bytes, so the tail fits in its half.
-  let tailStart = text.length - Math.floor(keptEndBytes / MAX_UTF8_BYTES_PER_UNIT);
-  const first = text.charCodeAt(tailStart);
-  if (first >= LOW_SURROGATE_MIN && first <= LOW_SURROGATE_MAX) tailStart += 1;
-  return `${text.slice(0, head.read)}${ELLIPSIS}${text.slice(tailStart)}`;
+  let tail_start = text.length - Math.floor(kept_end_bytes / MAX_UTF8_BYTES_PER_UNIT);
+  const first = text.charCodeAt(tail_start);
+  if (first >= LOW_SURROGATE_MIN && first <= LOW_SURROGATE_MAX) tail_start += 1;
+  return `${text.slice(0, head.read)}${ELLIPSIS}${text.slice(tail_start)}`;
 }
 
-function isPlainContextObject(value: object): boolean {
+function is_plain_context_object(value: object): boolean {
   if (Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   if (prototype === null) return true;
-  const constructorDescriptor = Object.getOwnPropertyDescriptor(prototype, "constructor");
+  const constructor_descriptor = Object.getOwnPropertyDescriptor(prototype, "constructor");
   return (
     Object.getPrototypeOf(prototype) === null &&
-    constructorDescriptor !== undefined &&
-    "value" in constructorDescriptor &&
-    typeof constructorDescriptor.value === "function" &&
-    constructorDescriptor.value.name === "Object"
+    constructor_descriptor !== undefined &&
+    "value" in constructor_descriptor &&
+    typeof constructor_descriptor.value === "function" &&
+    constructor_descriptor.value.name === "Object"
   );
 }
 
-function hasUnsafeToJSON(value: object): boolean {
+function has_unsafe_to_json(value: object): boolean {
   let current: object | null = value;
   while (current !== null) {
     const descriptor = Object.getOwnPropertyDescriptor(current, "toJSON");
@@ -322,15 +322,15 @@ function hasUnsafeToJSON(value: object): boolean {
 
 type ContextFailure = typeof INVALID_CONTEXT_VALUE | typeof OVERSIZED_CONTEXT;
 
-function isContextFailure(value: unknown): value is ContextFailure {
+function is_context_failure(value: unknown): value is ContextFailure {
   return value === INVALID_CONTEXT_VALUE || value === OVERSIZED_CONTEXT;
 }
 
 /** Keep a context string inside the error's remaining text budget. */
-function budgetedContextText(text: string, inspection: ContextInspection): string {
+function budgeted_context_text(text: string, inspection: ContextInspection): string {
   if (inspection.textBudget === undefined) return text;
 
-  const kept = boundedErrorText(text, inspection.textBudget);
+  const kept = bounded_error_text(text, inspection.textBudget);
   inspection.textBudget = Math.max(
     0,
     inspection.textBudget - ERROR_TEXT_ENCODER.encode(kept).byteLength,
@@ -338,12 +338,12 @@ function budgetedContextText(text: string, inspection: ContextInspection): strin
   return kept;
 }
 
-function inspectContextValue(
+function inspect_context_value(
   value: unknown,
   depth: number,
   inspection: ContextInspection,
 ): SheetwriteErrorContextValue | ContextFailure {
-  if (typeof value === "string") return budgetedContextText(value, inspection);
+  if (typeof value === "string") return budgeted_context_text(value, inspection);
   if (value === null || typeof value === "boolean") return value;
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : INVALID_CONTEXT_VALUE;
@@ -352,15 +352,15 @@ function inspectContextValue(
   if (depth > MAX_ERROR_CONTEXT_DEPTH) return OVERSIZED_CONTEXT;
 
   const source = value;
-  const isArray = Array.isArray(source);
-  if ((!isArray && !isPlainContextObject(source)) || hasUnsafeToJSON(source)) {
+  const is_array = Array.isArray(source);
+  if ((!is_array && !is_plain_context_object(source)) || has_unsafe_to_json(source)) {
     return INVALID_CONTEXT_VALUE;
   }
   if (inspection.active.has(source)) return INVALID_CONTEXT_VALUE;
 
   let target = inspection.clones?.get(source);
   if (inspection.clones && inspection.snapshots && target === undefined) {
-    target = isArray
+    target = is_array
       ? (Object.setPrototypeOf([], null) as SheetwriteErrorContextValue[])
       : (Object.create(null) as Record<string, SheetwriteErrorContextValue>);
     inspection.clones.set(source, target);
@@ -369,11 +369,11 @@ function inspectContextValue(
 
   inspection.active.add(source);
   try {
-    if (isArray) {
+    if (is_array) {
       if (source.length > MAX_ERROR_CONTEXT_WIDTH) return OVERSIZED_CONTEXT;
-      const ownKeys = Reflect.ownKeys(source);
-      if (ownKeys.length !== source.length + 1) return INVALID_CONTEXT_VALUE;
-      for (const key of ownKeys) {
+      const own_keys = Reflect.ownKeys(source);
+      if (own_keys.length !== source.length + 1) return INVALID_CONTEXT_VALUE;
+      for (const key of own_keys) {
         if (key === "length") continue;
         if (
           typeof key !== "string" ||
@@ -391,8 +391,8 @@ function inspectContextValue(
       for (let index = 0; index < source.length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(source, String(index));
         if (descriptor === undefined || !("value" in descriptor)) return INVALID_CONTEXT_VALUE;
-        const child = inspectContextValue(descriptor.value, depth + 1, inspection);
-        if (isContextFailure(child)) return child;
+        const child = inspect_context_value(descriptor.value, depth + 1, inspection);
+        if (is_context_failure(child)) return child;
         if (target) (target as SheetwriteErrorContextValue[])[index] = child;
       }
     } else {
@@ -407,8 +407,8 @@ function inspectContextValue(
         if (descriptor === undefined || !descriptor.enumerable || !("value" in descriptor)) {
           return INVALID_CONTEXT_VALUE;
         }
-        const child = inspectContextValue(descriptor.value, depth + 1, inspection);
-        if (isContextFailure(child)) return child;
+        const child = inspect_context_value(descriptor.value, depth + 1, inspection);
+        if (is_context_failure(child)) return child;
         if (target) {
           (target as Record<string, SheetwriteErrorContextValue>)[key] = child;
         }
@@ -420,7 +420,7 @@ function inspectContextValue(
   }
 }
 
-function inspectSheetwriteErrorContext(
+function inspect_sheetwrite_error_context(
   context: unknown,
   snapshot: boolean,
 ): SheetwriteErrorContext | ContextFailure {
@@ -436,15 +436,15 @@ function inspectSheetwriteErrorContext(
   };
   let inspected: SheetwriteErrorContextValue | ContextFailure;
   try {
-    if (!isPlainContextObject(context)) return INVALID_CONTEXT_VALUE;
-    inspected = inspectContextValue(context, 0, inspection);
+    if (!is_plain_context_object(context)) return INVALID_CONTEXT_VALUE;
+    inspected = inspect_context_value(context, 0, inspection);
   } catch {
     // A throwing getter or proxy trap makes a value unusable as context. The
     // result is a typed failure: the guard reports "not a Sheetwrite error",
     // and the constructor reports a bad context, instead of the host's error.
     return INVALID_CONTEXT_VALUE;
   }
-  if (isContextFailure(inspected)) return inspected;
+  if (is_context_failure(inspected)) return inspected;
   if (Array.isArray(inspected)) return INVALID_CONTEXT_VALUE;
 
   if (snapshots) {
@@ -460,8 +460,10 @@ function inspectSheetwriteErrorContext(
  * `{ truncated: true }`, so a large failure still builds its error. A context
  * that is not JSON-safe is a bug in the caller.
  */
-function snapshotSheetwriteErrorContext(context: SheetwriteErrorContext): SheetwriteErrorContext {
-  const snapshot = inspectSheetwriteErrorContext(context, true);
+function snapshot_sheetwrite_error_context(
+  context: SheetwriteErrorContext,
+): SheetwriteErrorContext {
+  const snapshot = inspect_sheetwrite_error_context(context, true);
   if (snapshot === OVERSIZED_CONTEXT) return TRUNCATED_CONTEXT;
   if (snapshot === INVALID_CONTEXT_VALUE) {
     throw new TypeError("SheetwriteError context must be a record of JSON-safe values");
@@ -469,8 +471,8 @@ function snapshotSheetwriteErrorContext(context: SheetwriteErrorContext): Sheetw
   return snapshot;
 }
 
-function isSheetwriteErrorContext(context: unknown): context is SheetwriteErrorContext {
-  return !isContextFailure(inspectSheetwriteErrorContext(context, false));
+function is_sheetwrite_error_context(context: unknown): context is SheetwriteErrorContext {
+  return !is_context_failure(inspect_sheetwrite_error_context(context, false));
 }
 
 /**
@@ -497,12 +499,14 @@ export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     options: SheetwriteErrorOptions = {},
   ) {
     super(
-      boundedErrorText(message),
+      bounded_error_text(message),
       options.cause === undefined ? undefined : { cause: options.cause },
     );
     Object.defineProperty(this, "context", {
       value:
-        options.context === undefined ? undefined : snapshotSheetwriteErrorContext(options.context),
+        options.context === undefined
+          ? undefined
+          : snapshot_sheetwrite_error_context(options.context),
       enumerable: true,
       writable: false,
       configurable: false,
@@ -547,7 +551,7 @@ export function isSheetwriteError(value: unknown): value is SheetwriteErrorEnvel
       candidate.code.length > 0 &&
       typeof candidate.operation === "string" &&
       candidate.operation.length > 0 &&
-      (candidate.context === undefined || isSheetwriteErrorContext(candidate.context)) &&
+      (candidate.context === undefined || is_sheetwrite_error_context(candidate.context)) &&
       (candidate.retryable === undefined || typeof candidate.retryable === "boolean")
     );
   } catch {

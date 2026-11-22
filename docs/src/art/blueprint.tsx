@@ -60,7 +60,7 @@ const LETTERS = "ABCDEFGHIJ";
 const SHEET_SPACE = 8;
 
 /** The height a small sheet takes in its box, with the room above and below it. */
-const sheetHeight = (sheet: BlueprintSheet) => CELL.head + sheet.rows * CELL.h + 2 * SHEET_SPACE;
+const sheet_height = (sheet: BlueprintSheet) => CELL.head + sheet.rows * CELL.h + 2 * SHEET_SPACE;
 
 /** One connector, from a point on one box's side to a point on another's. */
 export interface BlueprintEdge {
@@ -176,7 +176,7 @@ const MAX_LINE_LENGTH = 36;
 const MAX_CODE_LENGTH = 30;
 
 /** How wide `text` sets in `face`, from the measured advances, rounded up. */
-function setWidth(text: string, face: Face): number {
+function set_width(text: string, face: Face): number {
   const ems = [...(face.isUppercase ? text.toUpperCase() : text)].reduce((sum, char) => {
     const advance = face.isMono
       ? MONO_EM
@@ -188,7 +188,7 @@ function setWidth(text: string, face: Face): number {
 
 /** The width a connector's label takes, with its halo: layouts leave room for it. */
 export function labelWidth(text: string): number {
-  return setWidth(text, LABEL.face) + 2 * LABEL.halo;
+  return set_width(text, LABEL.face) + 2 * LABEL.halo;
 }
 
 /**
@@ -208,7 +208,7 @@ type Row =
 type TextFields = Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code" | "sheet">;
 
 /** A box's rows: eyebrow, title, code, then the sheet the code reads, then the caption. */
-function rowsOf(node: TextFields): Row[] {
+function rows_of(node: TextFields): Row[] {
   return [
     ...(node.eyebrow ? [{ kind: "eyebrow" as const, text: node.eyebrow }] : []),
     ...(node.title === "" ? [] : [{ kind: "title" as const, text: node.title }]),
@@ -218,29 +218,30 @@ function rowsOf(node: TextFields): Row[] {
   ];
 }
 
-const rowStep = (row: Row) => (row.kind === "sheet" ? sheetHeight(row.sheet) : TEXT[row.kind].step);
-const rowBox = (row: Row) => (row.kind === "sheet" ? sheetHeight(row.sheet) : TEXT[row.kind].box);
+const row_step = (row: Row) =>
+  row.kind === "sheet" ? sheet_height(row.sheet) : TEXT[row.kind].step;
+const row_box = (row: Row) => (row.kind === "sheet" ? sheet_height(row.sheet) : TEXT[row.kind].box);
 
 /** The height of a box's text, from the top of its first line's box to the bottom of its last. */
-function blockHeight(rows: readonly Row[]): number {
+function block_height(rows: readonly Row[]): number {
   const first = rows[0];
   const last = rows.at(-1);
   if (first === undefined || last === undefined) return 0;
-  const steps = rows.reduce((sum, row) => sum + rowStep(row), 0);
-  return steps - (rowStep(first) - rowBox(first)) / 2 - (rowStep(last) - rowBox(last)) / 2;
+  const steps = rows.reduce((sum, row) => sum + row_step(row), 0);
+  return steps - (row_step(first) - row_box(first)) / 2 - (row_step(last) - row_box(last)) / 2;
 }
 
 /** The height a box needs: its text and the inset above and below. */
 export function nodeHeight(node: TextFields, isCard = false): number {
-  return blockHeight(rowsOf(node)) + 2 * (isCard ? SPACING.card.insetY : SPACING.inset);
+  return block_height(rows_of(node)) + 2 * (isCard ? SPACING.card.insetY : SPACING.inset);
 }
 
 /** The width of a box's widest line, or its sheet: a box adds its inset on each side. */
 export function nodeTextWidth(node: TextFields): number {
-  const widths = rowsOf(node).map((row) =>
+  const widths = rows_of(node).map((row) =>
     row.kind === "sheet"
       ? CELL.gutter + row.sheet.cols * CELL.w
-      : setWidth(row.text, TEXT[row.kind].face),
+      : set_width(row.text, TEXT[row.kind].face),
   );
   return Math.max(0, ...widths);
 }
@@ -251,7 +252,7 @@ export function nodeWidth(node: TextFields): number {
 }
 
 /** Fails the build when a box holds more text than it can show plainly. */
-function checkText(node: BlueprintNode): void {
+function check_text(node: BlueprintNode): void {
   const lines = node.lines ?? [];
   const code = node.code ?? [];
   const name = node.title || code[0] || node.id;
@@ -356,18 +357,18 @@ function Sheet(
 
 /** A box, its text centred in it: each line's box is centred on its `y`, and the block on the box. */
 function Node(props: Readonly<{ node: BlueprintNode }>) {
-  checkText(props.node);
+  check_text(props.node);
   const { x, y, w, h } = props.node.rect;
-  const rows = rowsOf(props.node);
+  const rows = rows_of(props.node);
   const centre = x + w / 2;
   const first = rows[0];
   let top =
     y +
-    (h - blockHeight(rows)) / 2 -
-    (first === undefined ? 0 : (rowStep(first) - rowBox(first)) / 2);
+    (h - block_height(rows)) / 2 -
+    (first === undefined ? 0 : (row_step(first) - row_box(first)) / 2);
   const placed = rows.map((row) => {
-    const middle = top + rowStep(row) / 2;
-    top += rowStep(row);
+    const middle = top + row_step(row) / 2;
+    top += row_step(row);
     return { row, middle };
   });
   return (
@@ -387,7 +388,7 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
               centre={centre}
               sheet={row.sheet}
               width={w - 2 * SPACING.inset}
-              y={middle - sheetHeight(row.sheet) / 2 + SHEET_SPACE}
+              y={middle - sheet_height(row.sheet) / 2 + SHEET_SPACE}
             />
           ) : (
             <text
@@ -417,24 +418,24 @@ const SNAP_INSET = 6;
  * direction, one end moves onto the other's line, if that line meets its side.
  */
 function straighten(
-  fromRect: Rect,
+  from_rect: Rect,
   start: Point,
-  toRect: Rect,
+  to_rect: Rect,
   end: Point,
-  fromSide: BoxSide,
-  toSide: BoxSide,
+  from_side: BoxSide,
+  to_side: BoxSide,
 ): { start: Point; end: Point } {
   const horizontal = (side: BoxSide) => side === "left" || side === "right";
-  if (horizontal(fromSide) !== horizontal(toSide)) return { start, end };
-  const across = horizontal(fromSide) ? "y" : "x";
+  if (horizontal(from_side) !== horizontal(to_side)) return { start, end };
+  const across = horizontal(from_side) ? "y" : "x";
   const offset = Math.abs(end[across] - start[across]);
   if (offset < 0.5 || offset >= SNAP) return { start, end };
   const fits = (rect: Rect, value: number) =>
     across === "y"
       ? value >= rect.y + SNAP_INSET && value <= rect.y + rect.h - SNAP_INSET
       : value >= rect.x + SNAP_INSET && value <= rect.x + rect.w - SNAP_INSET;
-  if (fits(toRect, start[across])) return { start, end: { ...end, [across]: start[across] } };
-  if (fits(fromRect, end[across])) return { start: { ...start, [across]: end[across] }, end };
+  if (fits(to_rect, start[across])) return { start, end: { ...end, [across]: start[across] } };
+  if (fits(from_rect, end[across])) return { start: { ...start, [across]: end[across] }, end };
   return { start, end };
 }
 
@@ -455,22 +456,22 @@ interface EdgeGeometry {
 }
 
 /** A connector's ends on its boxes and the side it enters by. */
-function edgeEnds(edge: BlueprintEdge, nodes: ReadonlyMap<string, BlueprintNode>) {
+function edge_ends(edge: BlueprintEdge, nodes: ReadonlyMap<string, BlueprintNode>) {
   const from = nodes.get(edge.from);
   const to = nodes.get(edge.to);
   if (from === undefined || to === undefined) {
     throw new Error(`A connector joins ${edge.from} and ${edge.to}, which aren't both boxes`);
   }
-  const toSide = edge.toSide ?? opposite(edge.fromSide);
+  const to_side = edge.toSide ?? opposite(edge.fromSide);
   const { start, end } = straighten(
     from.rect,
     anchor(from.rect, edge.fromSide, edge.t ?? 0.5),
     to.rect,
-    anchor(to.rect, toSide, edge.toT ?? edge.t ?? 0.5),
+    anchor(to.rect, to_side, edge.toT ?? edge.t ?? 0.5),
     edge.fromSide,
-    toSide,
+    to_side,
   );
-  return { start, end, toSide };
+  return { start, end, toSide: to_side };
 }
 
 /** A straight piece of a connector's route: its ends, its middle, and whether it runs up or down. */
@@ -482,7 +483,7 @@ interface Leg {
 }
 
 /** The longest straight leg of a connector's route: its label names it there. */
-function longestLeg(points: readonly Point[]): Leg {
+function longest_leg(points: readonly Point[]): Leg {
   const legs = points.slice(1).map((b, index) => {
     const a = points[index] ?? b;
     return { a, b, length: Math.hypot(b.x - a.x, b.y - a.y) };
@@ -497,19 +498,19 @@ function longestLeg(points: readonly Point[]): Leg {
 }
 
 /** A label's place beside `leg`: above a level leg, right of an upright one; flipped, below or left. */
-function placeLabel(text: string, leg: Leg, isFlipped: boolean) {
+function place_label(text: string, leg: Leg, is_flipped: boolean) {
   const { middle } = leg;
-  const anchorAt = leg.isUpright ? (isFlipped ? "end" : "start") : "middle";
-  const x = leg.isUpright ? middle.x + (isFlipped ? -1 : 1) * SPACING.label : middle.x;
+  const anchor_at = leg.isUpright ? (is_flipped ? "end" : "start") : "middle";
+  const x = leg.isUpright ? middle.x + (is_flipped ? -1 : 1) * SPACING.label : middle.x;
   // Labels are centred on `y` (dominant-baseline: central), like box text.
   const y = leg.isUpright
     ? middle.y
-    : middle.y + (isFlipped ? 1 : -1) * (SPACING.label + LABEL.box / 2);
+    : middle.y + (is_flipped ? 1 : -1) * (SPACING.label + LABEL.box / 2);
   const width = labelWidth(text);
   const left =
-    anchorAt === "start"
+    anchor_at === "start"
       ? x - LABEL.halo
-      : anchorAt === "end"
+      : anchor_at === "end"
         ? x + LABEL.halo - width
         : x - width / 2;
   const box = {
@@ -518,7 +519,7 @@ function placeLabel(text: string, leg: Leg, isFlipped: boolean) {
     w: width,
     h: LABEL.box + 2 * LABEL.halo,
   };
-  return { text, x, y, anchor: anchorAt, box } as const;
+  return { text, x, y, anchor: anchor_at, box } as const;
 }
 
 /** Whether a straight leg passes through a box. */
@@ -533,21 +534,22 @@ function crosses(leg: Leg, box: Rect): boolean {
  * `label`. A label that would cross the other connector of a parallel pair
  * between the same two boxes moves to its own connector's outer side.
  */
-function edgeGeometries(
+function edge_geometries(
   edges: readonly BlueprintEdge[],
   nodes: ReadonlyMap<string, BlueprintNode>,
 ): { edge: BlueprintEdge; geometry: EdgeGeometry }[] {
   const placed = edges.map((edge) => {
-    const { start, end, toSide } = edgeEnds(edge, nodes);
-    const points = routePoints(start, edge.fromSide, end, toSide);
-    return { edge, start, end, toSide, points, leg: longestLeg(points) };
+    const { start, end, toSide: to_side } = edge_ends(edge, nodes);
+    const points = routePoints(start, edge.fromSide, end, to_side);
+    return { edge, start, end, toSide: to_side, points, leg: longest_leg(points) };
   });
-  return placed.map(({ edge, start, end, toSide, points, leg }, index) => {
-    if (edge.label === undefined) return { edge, geometry: { start, end, toSide, points } };
-    const label = placeLabel(edge.label, leg, false);
-    const isCrossingPair = placed.some(
-      (other, otherIndex) =>
-        otherIndex !== index &&
+  return placed.map(({ edge, start, end, toSide: to_side, points, leg }, index) => {
+    if (edge.label === undefined)
+      return { edge, geometry: { start, end, toSide: to_side, points } };
+    const label = place_label(edge.label, leg, false);
+    const is_crossing_pair = placed.some(
+      (other, other_index) =>
+        other_index !== index &&
         ((other.edge.from === edge.from && other.edge.to === edge.to) ||
           (other.edge.from === edge.to && other.edge.to === edge.from)) &&
         other.leg.isUpright === leg.isUpright &&
@@ -558,21 +560,21 @@ function edgeGeometries(
       geometry: {
         start,
         end,
-        toSide,
+        toSide: to_side,
         points,
-        label: isCrossingPair ? placeLabel(edge.label, leg, true) : label,
+        label: is_crossing_pair ? place_label(edge.label, leg, true) : label,
       },
     };
   });
 }
 
 function Edge(props: Readonly<{ edge: BlueprintEdge; geometry: EdgeGeometry }>) {
-  const { start, end, toSide, label } = props.geometry;
+  const { start, end, toSide: to_side, label } = props.geometry;
   return (
     <>
       <path
         class="bp-edge"
-        d={`${route(start, props.edge.fromSide, end, toSide)}${arrowHead(end, toSide)}`}
+        d={`${route(start, props.edge.fromSide, end, to_side)}${arrowHead(end, to_side)}`}
         data-kind={props.edge.kind}
       />
       <Show when={label}>
@@ -598,7 +600,7 @@ function Edge(props: Readonly<{ edge: BlueprintEdge; geometry: EdgeGeometry }>) 
  * labels, `pad` wider on every side, and for a card widened or heightened
  * about its centre to the card's shape.
  */
-function frameOf(layout: BlueprintLayout, geometry: readonly EdgeGeometry[], pad: number): Rect {
+function frame_of(layout: BlueprintLayout, geometry: readonly EdgeGeometry[], pad: number): Rect {
   const rects: Rect[] = [
     ...layout.nodes.map((node) => node.rect),
     ...geometry.flatMap(({ points, label }) => [
@@ -630,22 +632,22 @@ function frameOf(layout: BlueprintLayout, geometry: readonly EdgeGeometry[], pad
  * coordinates: Chromium reports SVG text above the origin as taller than its
  * own box, which reads as clipped content.
  */
-function placeLayout(layout: BlueprintLayout, pad: number) {
-  const byId = (nodes: readonly BlueprintNode[]) => new Map(nodes.map((node) => [node.id, node]));
-  const first = frameOf(
+function place_layout(layout: BlueprintLayout, pad: number) {
+  const by_id = (nodes: readonly BlueprintNode[]) => new Map(nodes.map((node) => [node.id, node]));
+  const first = frame_of(
     layout,
-    edgeGeometries(layout.edges, byId(layout.nodes)).map(({ geometry }) => geometry),
+    edge_geometries(layout.edges, by_id(layout.nodes)).map(({ geometry }) => geometry),
     pad,
   );
   const nodes = layout.nodes.map((node) => ({
     ...node,
     rect: { ...node.rect, x: node.rect.x - first.x, y: node.rect.y - first.y },
   }));
-  const edges = edgeGeometries(layout.edges, byId(nodes));
+  const edges = edge_geometries(layout.edges, by_id(nodes));
   return {
     nodes,
     edges,
-    frame: frameOf(
+    frame: frame_of(
       { ...layout, nodes },
       edges.map(({ geometry }) => geometry),
       pad,
@@ -654,7 +656,7 @@ function placeLayout(layout: BlueprintLayout, pad: number) {
 }
 
 function Drawing(props: Readonly<{ layout: BlueprintLayout; text: BlueprintText; id: string }>) {
-  const { nodes, edges, frame } = placeLayout(props.layout, SPACING.frame);
+  const { nodes, edges, frame } = place_layout(props.layout, SPACING.frame);
   return (
     <svg
       aria-labelledby={`${props.id}-title ${props.id}-desc`}
@@ -703,7 +705,7 @@ export function BlueprintDiagram(
 ): JSX.Element {
   const id = createUniqueId();
   // Half a unit of slack absorbs rounding in layouts that fill the room exactly.
-  const fits = placeLayout(props.wide, SPACING.frame).frame.w <= WIDEST.wide + 0.5;
+  const fits = place_layout(props.wide, SPACING.frame).frame.w <= WIDEST.wide + 0.5;
   const wide = fits ? props.wide : props.narrow;
   return (
     <div class="sw-art-diagram">
@@ -731,7 +733,7 @@ export function BlueprintCard(
   props: Readonly<{ layout: BlueprintLayout; class?: string }>,
 ): JSX.Element {
   const dots = `bp-dots-${createUniqueId()}`;
-  const { nodes, edges, frame } = placeLayout(props.layout, SPACING.card.frame);
+  const { nodes, edges, frame } = place_layout(props.layout, SPACING.card.frame);
   return (
     <svg
       aria-hidden="true"

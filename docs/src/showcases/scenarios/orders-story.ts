@@ -261,7 +261,7 @@ interface PendingOrder {
  * Smooth weighted round robin. Over any run of picks, each item gets its
  * share of the weights, with no randomness.
  */
-function weightedRotation(weights: readonly number[]): () => number {
+function weighted_rotation(weights: readonly number[]): () => number {
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   const current = new Float64Array(weights.length);
 
@@ -284,23 +284,23 @@ function apportion(weights: readonly number[], total: number): number[] {
   const counts = exact.map(Math.floor);
 
   const assigned = counts.reduce((acc, count) => acc + count, 0);
-  const byRemainder = exact
+  const by_remainder = exact
     .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
     .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
-  for (const { index } of byRemainder.slice(0, total - assigned)) {
+  for (const { index } of by_remainder.slice(0, total - assigned)) {
     counts[index] = (counts[index] ?? 0) + 1;
   }
 
   return counts;
 }
 
-function daysInStoryMonth(monthIndex: number): number {
-  const year = STORY_FIRST_YEAR + Math.floor(monthIndex / MONTHS_PER_YEAR);
-  return new Date(Date.UTC(year, (monthIndex % MONTHS_PER_YEAR) + 1, 0)).getUTCDate();
+function days_in_story_month(month_index: number): number {
+  const year = STORY_FIRST_YEAR + Math.floor(month_index / MONTHS_PER_YEAR);
+  return new Date(Date.UTC(year, (month_index % MONTHS_PER_YEAR) + 1, 0)).getUTCDate();
 }
 
 /** Mean order size multiplier of a region, with each account weighted by its orders. */
-function meanAccountScale(accounts: readonly StoryAccount[]): number {
+function mean_account_scale(accounts: readonly StoryAccount[]): number {
   const weight = accounts.reduce((sum, item) => sum + item.weight, 0);
   return accounts.reduce((sum, item) => sum + item.weight * item.scale, 0) / weight;
 }
@@ -311,27 +311,32 @@ function meanAccountScale(accounts: readonly StoryAccount[]): number {
  * larger `rows` gives a denser sample of the same story.
  */
 export function generateStoryOrders(window: StoryWindow): StoryOrders {
-  const scales = ACCOUNTS.map(meanAccountScale);
+  const scales = ACCOUNTS.map(mean_account_scale);
 
   const cells: StoryCell[] = [];
   for (let offset = 0; offset < window.months; offset++) {
-    const monthIndex = window.firstMonth + offset;
-    for (let regionIndex = 0; regionIndex < STORY_REGIONS.length; regionIndex++) {
-      const region = STORY_REGIONS[regionIndex] ?? DIP_REGION;
-      for (let productIndex = 0; productIndex < STORY_PRODUCTS.length; productIndex++) {
-        const item = STORY_PRODUCTS[productIndex] ?? STORY_PRODUCTS[0];
-        const ramp = item.name === LAUNCH_PRODUCT ? launchRamp(monthIndex) : 1;
+    const month_index = window.firstMonth + offset;
+    for (let region_index = 0; region_index < STORY_REGIONS.length; region_index++) {
+      const region = STORY_REGIONS[region_index] ?? DIP_REGION;
+      for (let product_index = 0; product_index < STORY_PRODUCTS.length; product_index++) {
+        const item = STORY_PRODUCTS[product_index] ?? STORY_PRODUCTS[0];
+        const ramp = item.name === LAUNCH_PRODUCT ? launchRamp(month_index) : 1;
         const units =
           (item.revenueWeight / item.listPrice) *
-          (REGION_DEMAND[regionIndex] ?? 0) *
-          storyDemandIndex(monthIndex) *
+          (REGION_DEMAND[region_index] ?? 0) *
+          storyDemandIndex(month_index) *
           ramp *
-          regionUnitFactor(region, monthIndex);
+          regionUnitFactor(region, month_index);
 
         // Large accounts place larger orders, so a region with large accounts
         // needs fewer orders for the same units.
-        const ordersWeight = units / (item.orderUnits * (scales[regionIndex] ?? 1));
-        cells.push({ monthIndex, regionIndex, productIndex, weight: ordersWeight });
+        const orders_weight = units / (item.orderUnits * (scales[region_index] ?? 1));
+        cells.push({
+          monthIndex: month_index,
+          regionIndex: region_index,
+          productIndex: product_index,
+          weight: orders_weight,
+        });
       }
     }
   }
@@ -342,39 +347,39 @@ export function generateStoryOrders(window: StoryWindow): StoryOrders {
   );
 
   const random = seededRandom(STORY_SEED);
-  const accountTurn = ACCOUNTS.map((accounts) =>
-    weightedRotation(accounts.map((item) => item.weight)),
+  const account_turn = ACCOUNTS.map((accounts) =>
+    weighted_rotation(accounts.map((item) => item.weight)),
   );
-  const channelTurn = CHANNEL_MIX.map((mix) => weightedRotation(mix));
+  const channel_turn = CHANNEL_MIX.map((mix) => weighted_rotation(mix));
 
-  const orders = emptyOrders(window.rows);
+  const orders = empty_orders(window.rows);
   let row = 0;
-  let cellIndex = 0;
+  let cell_index = 0;
   for (let offset = 0; offset < window.months; offset++) {
-    const monthIndex = window.firstMonth + offset;
-    const days = daysInStoryMonth(monthIndex);
+    const month_index = window.firstMonth + offset;
+    const days = days_in_story_month(month_index);
     const pending: PendingOrder[] = [];
 
     for (let index = 0; index < STORY_REGIONS.length * STORY_PRODUCTS.length; index++) {
-      const cell = cells[cellIndex];
-      const count = counts[cellIndex] ?? 0;
-      cellIndex++;
+      const cell = cells[cell_index];
+      const count = counts[cell_index] ?? 0;
+      cell_index++;
       if (!cell) continue;
 
       const region = STORY_REGIONS[cell.regionIndex] ?? DIP_REGION;
       const item = STORY_PRODUCTS[cell.productIndex] ?? STORY_PRODUCTS[0];
       const accounts = ACCOUNTS[cell.regionIndex] ?? [];
-      const phase = (cellIndex * DAY_PHASE_STEP) % 1;
+      const phase = (cell_index * DAY_PHASE_STEP) % 1;
 
       for (let order = 0; order < count; order++) {
-        const buyer = accounts[accountTurn[cell.regionIndex]?.() ?? 0];
-        const channelIndex = channelTurn[cell.regionIndex]?.() ?? 0;
+        const buyer = accounts[account_turn[cell.regionIndex]?.() ?? 0];
+        const channel_index = channel_turn[cell.regionIndex]?.() ?? 0;
         const variation = 1 + ORDER_SIZE_VARIATION * (2 * random() - 1);
         const units = Math.max(1, Math.round(item.orderUnits * (buyer?.scale ?? 1) * variation));
-        const unitPrice = Math.round(
+        const unit_price = Math.round(
           item.listPrice *
             regionPriceFactor(region, cell.monthIndex) *
-            (CHANNEL_PRICE[channelIndex] ?? 1),
+            (CHANNEL_PRICE[channel_index] ?? 1),
         );
 
         pending.push({
@@ -382,9 +387,9 @@ export function generateStoryOrders(window: StoryWindow): StoryOrders {
           region,
           product: item.name,
           account: buyer?.name ?? "",
-          channel: STORY_CHANNELS[channelIndex] ?? "Online",
+          channel: STORY_CHANNELS[channel_index] ?? "Online",
           units,
-          unitPrice,
+          unitPrice: unit_price,
         });
       }
     }
@@ -392,12 +397,12 @@ export function generateStoryOrders(window: StoryWindow): StoryOrders {
     // Orders of all cells arrive spread over the month, so one day mixes regions and products.
     pending.sort((a, b) => a.time - b.time);
 
-    const monthKey = storyMonthKey(monthIndex);
+    const month_key = storyMonthKey(month_index);
     for (const order of pending) {
       const day = 1 + Math.floor(order.time * days);
       orders.orderId[row] = `SO-${String(row + 1).padStart(5, "0")}`;
-      orders.date[row] = `${monthKey}-${String(day).padStart(2, "0")}`;
-      orders.month[row] = monthKey;
+      orders.date[row] = `${month_key}-${String(day).padStart(2, "0")}`;
+      orders.month[row] = month_key;
       orders.region[row] = order.region;
       orders.product[row] = order.product;
       orders.account[row] = order.account;
@@ -412,7 +417,7 @@ export function generateStoryOrders(window: StoryWindow): StoryOrders {
   return orders;
 }
 
-function emptyOrders(rows: number): StoryOrders {
+function empty_orders(rows: number): StoryOrders {
   return {
     rowCount: rows,
     orderId: new Array<string>(rows),

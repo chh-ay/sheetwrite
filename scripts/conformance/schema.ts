@@ -141,7 +141,7 @@ const CALCULATION_KEYS = ["iterate", "maxIterations", "maxChange"] as const;
 const MAX_CASE_ITERATIONS = 32_767;
 const EMPTY_ARTIFACTS = new Set<string>();
 
-function functionInvocationContains(formula: string, name: string, marker: string): boolean {
+function function_invocation_contains(formula: string, name: string, marker: string): boolean {
   let start = formula.indexOf(`${name}(`);
   while (start >= 0) {
     let depth = 0;
@@ -161,7 +161,7 @@ function functionInvocationContains(formula: string, name: string, marker: strin
   return false;
 }
 
-function canonicalFormula(formula: string): string {
+function canonical_formula(formula: string): string {
   let canonical = "";
   let quoted = false;
   for (let index = 0; index < formula.length; index += 1) {
@@ -270,7 +270,7 @@ export function validateResult(value: unknown, path: string, issues: string[]): 
   }
 }
 
-function validateDivergence(value: unknown, path: string, issues: string[]): void {
+function validate_divergence(value: unknown, path: string, issues: string[]): void {
   if (!isObject(value)) {
     issues.push(`${path}: expected exact divergence object`);
     return;
@@ -302,7 +302,7 @@ interface InventoryDenominator {
   operators: Map<string, { family: string; token: string; fixity: string }>;
 }
 
-function validateInventory(value: unknown, issues: string[]): InventoryDenominator {
+function validate_inventory(value: unknown, issues: string[]): InventoryDenominator {
   const denominator: InventoryDenominator = {
     inventory: undefined,
     functions: new Map(),
@@ -378,7 +378,7 @@ function validateInventory(value: unknown, issues: string[]): InventoryDenominat
   return denominator;
 }
 
-function sourcePayload(source: Record<string, unknown>): Record<string, unknown> {
+function source_payload(source: Record<string, unknown>): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const key of ["title", "section", "url", "license", "authorship", "notice"] as const) {
     if (source[key] !== undefined) payload[key] = source[key];
@@ -386,7 +386,7 @@ function sourcePayload(source: Record<string, unknown>): Record<string, unknown>
   return payload;
 }
 
-function validateSource(value: unknown, path: string, issues: string[]): string | undefined {
+function validate_source(value: unknown, path: string, issues: string[]): string | undefined {
   if (!isObject(value)) {
     issues.push(`${path}: required`);
     return undefined;
@@ -403,18 +403,18 @@ function validateSource(value: unknown, path: string, issues: string[]): string 
   }
   if (!SHA256_PATTERN.test(String(value.sha256 ?? ""))) {
     issues.push(`${path}.sha256: source descriptor checksum required`);
-  } else if (sha256(sourcePayload(value)) !== value.sha256) {
+  } else if (sha256(source_payload(value)) !== value.sha256) {
     issues.push(`${path}.sha256: source descriptor checksum drift`);
   }
   return typeof value.authorship === "string" ? value.authorship : undefined;
 }
 
-function validateEvidence(
+function validate_evidence(
   value: unknown,
   authorship: string | undefined,
   observations: unknown,
   path: string,
-  verifiedArtifacts: ReadonlySet<string>,
+  verified_artifacts: ReadonlySet<string>,
   issues: string[],
 ): void {
   if (!isObject(value)) {
@@ -429,26 +429,26 @@ function validateEvidence(
     issues.push(`${path}.basis: invalid`);
   }
   if (!isNonemptyString(value.oracle)) issues.push(`${path}.oracle: required`);
-  const producerBasis =
+  const producer_basis =
     value.kind === "pinned-observation" || value.basis === "producer-observation";
-  if (producerBasis) {
+  if (producer_basis) {
     if (value.kind !== "pinned-observation" || value.basis !== "producer-observation") {
       issues.push(`${path}: pinned observation kind/basis must be declared together`);
     }
     if (authorship !== "producer-observation") {
       issues.push(`${path}: pinned observation requires producer-observation provenance`);
     }
-    const reviewedExternal = Array.isArray(observations)
+    const reviewed_external = Array.isArray(observations)
       ? observations.some(
           (observation) =>
             isObject(observation) &&
             observation.status === "reviewed" &&
             observation.producer !== "sheetwrite" &&
             SHA256_PATTERN.test(String(observation.artifactSha256 ?? "")) &&
-            verifiedArtifacts.has(String(observation.artifactSha256)),
+            verified_artifacts.has(String(observation.artifactSha256)),
         )
       : false;
-    if (!reviewedExternal) {
+    if (!reviewed_external) {
       issues.push(`${path}: pinned observation requires a verified reviewed external capture`);
     }
   } else {
@@ -466,7 +466,7 @@ function validateEvidence(
   }
 }
 
-function validateCaseTolerance(value: unknown, path: string, issues: string[]): void {
+function validate_case_tolerance(value: unknown, path: string, issues: string[]): void {
   if (!isObject(value)) {
     issues.push(`${path}: required`);
     return;
@@ -487,7 +487,7 @@ function validateCaseTolerance(value: unknown, path: string, issues: string[]): 
   }
 }
 
-function validateManifest(
+function validate_manifest(
   value: unknown,
   corpus: Record<string, unknown>,
   denominator: InventoryDenominator,
@@ -525,16 +525,16 @@ function validateManifest(
   if (!Array.isArray(value.caseSha256)) {
     issues.push("manifest.caseSha256: per-record canonical checksums required");
   } else {
-    const caseChecksums = value.caseSha256;
+    const case_checksums = value.caseSha256;
     const cases = Array.isArray(corpus.cases) ? corpus.cases : [];
-    if (caseChecksums.length !== cases.length) {
+    if (case_checksums.length !== cases.length) {
       issues.push("manifest.caseSha256: checksum denominator drift");
     }
     cases.forEach((entry, index) => {
       try {
         if (
-          !SHA256_PATTERN.test(String(caseChecksums[index] ?? "")) ||
-          caseChecksums[index] !== sha256(entry)
+          !SHA256_PATTERN.test(String(case_checksums[index] ?? "")) ||
+          case_checksums[index] !== sha256(entry)
         ) {
           issues.push(`manifest.caseSha256[${index}]: altered record or unstable checksum`);
         }
@@ -558,7 +558,7 @@ function validateManifest(
     if (value.categoriesSha256 !== sha256([...REQUIRED_CATEGORIES].sort())) {
       issues.push("manifest.categoriesSha256: semantic category denominator drift");
     }
-    const operationShapes = (Array.isArray(corpus.cases) ? corpus.cases : [])
+    const operation_shapes = (Array.isArray(corpus.cases) ? corpus.cases : [])
       .filter(
         (entry) => isObject(entry) && (entry.area === "mutation" || entry.area === "workbook"),
       )
@@ -570,21 +570,21 @@ function validateManifest(
             )
           : [],
       }));
-    if (value.operationShapesSha256 !== sha256(operationShapes)) {
+    if (value.operationShapesSha256 !== sha256(operation_shapes)) {
       issues.push("manifest.operationShapesSha256: operation-shape denominator drift");
     }
-    const featureCounts: Record<string, number> = {};
-    for (const shape of operationShapes) {
+    const feature_counts: Record<string, number> = {};
+    for (const shape of operation_shapes) {
       for (const feature of shape.operations) {
-        featureCounts[feature] = (featureCounts[feature] ?? 0) + 1;
+        feature_counts[feature] = (feature_counts[feature] ?? 0) + 1;
       }
     }
-    const sortedFeatureCounts = Object.fromEntries(
-      Object.entries(featureCounts).sort(([left], [right]) =>
+    const sorted_feature_counts = Object.fromEntries(
+      Object.entries(feature_counts).sort(([left], [right]) =>
         left < right ? -1 : left > right ? 1 : 0,
       ),
     );
-    if (canonicalJson(value.featureCounts) !== canonicalJson(sortedFeatureCounts)) {
+    if (canonicalJson(value.featureCounts) !== canonicalJson(sorted_feature_counts)) {
       issues.push("manifest.featureCounts: operation feature denominator drift");
     }
     if (denominator.inventory) {
@@ -630,7 +630,7 @@ function validateManifest(
  * Validates a case's iterative calculation and returns its canonical form, which
  * every case of the corpus must share because producers set it per workbook.
  */
-function validateCaseCalculation(value: unknown, path: string, issues: string[]): string {
+function validate_case_calculation(value: unknown, path: string, issues: string[]): string {
   if (!isObject(value)) {
     issues.push(`${path}: expected object`);
     return "";
@@ -638,16 +638,16 @@ function validateCaseCalculation(value: unknown, path: string, issues: string[])
 
   rejectUnknownKeys(value, CALCULATION_KEYS, path, issues);
   if (value.iterate !== true) issues.push(`${path}.iterate: expected true`);
-  const { maxIterations, maxChange } = value;
+  const { maxIterations: max_iterations, maxChange: max_change } = value;
   if (
-    typeof maxIterations !== "number" ||
-    !Number.isInteger(maxIterations) ||
-    maxIterations < 1 ||
-    maxIterations > MAX_CASE_ITERATIONS
+    typeof max_iterations !== "number" ||
+    !Number.isInteger(max_iterations) ||
+    max_iterations < 1 ||
+    max_iterations > MAX_CASE_ITERATIONS
   ) {
     issues.push(`${path}.maxIterations: expected an integer from 1 to ${MAX_CASE_ITERATIONS}`);
   }
-  if (typeof maxChange !== "number" || !Number.isFinite(maxChange) || maxChange < 0) {
+  if (typeof max_change !== "number" || !Number.isFinite(max_change) || max_change < 0) {
     issues.push(`${path}.maxChange: expected a finite number of at least 0`);
   }
   return canonicalJson(value);
@@ -665,21 +665,21 @@ export function validateCorpus(
   rejectUnknownKeys(value, CORPUS_KEYS, "corpus", issues);
   if (value.protocol !== 1) issues.push("protocol: expected 1");
   if (!isNonemptyString(value.license)) issues.push("license: required");
-  const denominator = validateInventory(inventory, issues);
+  const denominator = validate_inventory(inventory, issues);
   if (!Array.isArray(value.cases)) return [...issues, "cases: expected array"];
   const ids = new Set<string>();
-  const coveredFunctions = new Set<string>();
-  const coveredOperators = new Set<string>();
-  const functionCategories = new Map<string, Set<string>>();
-  const operatorCategories = new Map<string, Set<string>>();
-  const subjectCategoryFormulas = new Map<string, Set<string>>();
+  const covered_functions = new Set<string>();
+  const covered_operators = new Set<string>();
+  const function_categories = new Map<string, Set<string>>();
+  const operator_categories = new Map<string, Set<string>>();
+  const subject_category_formulas = new Map<string, Set<string>>();
   const categories = new Set<string>();
   const calculations = new Set<string>();
-  const operationShapes = {
+  const operation_shapes = {
     mutation: new Set<string>(),
     workbook: new Set<string>(),
   };
-  const featureCounts = new Map<string, number>();
+  const feature_counts = new Map<string, number>();
   const counts = {
     formula: 0,
     mutation: 0,
@@ -707,8 +707,8 @@ export function validateCorpus(
       issues.push(`${path}.category: missing or invalid semantic category`);
     } else categories.add(String(entry.category));
     if (!isNonemptyString(entry.family)) issues.push(`${path}.family: required`);
-    const authorship = validateSource(entry.source, `${path}.source`, issues);
-    validateEvidence(
+    const authorship = validate_source(entry.source, `${path}.source`, issues);
+    validate_evidence(
       entry.evidence,
       authorship,
       entry.observations,
@@ -716,7 +716,7 @@ export function validateCorpus(
       verifiedArtifacts,
       issues,
     );
-    validateCaseTolerance(entry.tolerance, `${path}.tolerance`, issues);
+    validate_case_tolerance(entry.tolerance, `${path}.tolerance`, issues);
     if (entry.localCanary === true) counts.localCanary += 1;
     else if (entry.localCanary !== undefined)
       issues.push(`${path}.localCanary: expected true or absent`);
@@ -738,26 +738,28 @@ export function validateCorpus(
       }
       if (!Array.isArray(entry.inputs)) issues.push(`${path}.inputs: required`);
       if (entry.calculation !== undefined) {
-        calculations.add(validateCaseCalculation(entry.calculation, `${path}.calculation`, issues));
+        calculations.add(
+          validate_case_calculation(entry.calculation, `${path}.calculation`, issues),
+        );
       }
       if (Array.isArray(entry.inputs)) {
-        const inputCells = new Set<string>();
-        entry.inputs.forEach((input, inputIndex) => {
+        const input_cells = new Set<string>();
+        entry.inputs.forEach((input, input_index) => {
           if (!isObject(input)) {
-            issues.push(`${path}.inputs[${inputIndex}]: expected object`);
+            issues.push(`${path}.inputs[${input_index}]: expected object`);
             return;
           }
-          rejectUnknownKeys(input, INPUT_KEYS, `${path}.inputs[${inputIndex}]`, issues);
+          rejectUnknownKeys(input, INPUT_KEYS, `${path}.inputs[${input_index}]`, issues);
           if (!isNonemptyString(input.cell) || !CELL.test(input.cell)) {
-            issues.push(`${path}.inputs[${inputIndex}].cell: invalid A1 cell`);
-          } else if (inputCells.has(input.cell)) {
-            issues.push(`${path}.inputs[${inputIndex}].cell: duplicate input cell`);
-          } else inputCells.add(input.cell);
+            issues.push(`${path}.inputs[${input_index}].cell: invalid A1 cell`);
+          } else if (input_cells.has(input.cell)) {
+            issues.push(`${path}.inputs[${input_index}].cell: duplicate input cell`);
+          } else input_cells.add(input.cell);
           if (
             input.value !== null &&
             !["string", "number", "boolean"].includes(typeof input.value)
           ) {
-            issues.push(`${path}.inputs[${inputIndex}].value: invalid scalar`);
+            issues.push(`${path}.inputs[${input_index}].value: invalid scalar`);
           }
         });
       }
@@ -767,11 +769,11 @@ export function validateCorpus(
         rejectUnknownKeys(entry.subject, SUBJECT_KEYS, `${path}.subject`, issues);
         const name = String(entry.subject.name ?? "");
         if (entry.subject.kind === "function") {
-          const functionContract = denominator.functions.get(name);
-          if (!functionContract) {
+          const function_contract = denominator.functions.get(name);
+          if (!function_contract) {
             issues.push(`${path}.subject: unsupported-as-supported function ${name}`);
           } else {
-            const family = functionContract.family;
+            const family = function_contract.family;
             if (entry.family !== family)
               issues.push(`${path}.family: inventory family is ${family}`);
             if (
@@ -785,10 +787,10 @@ export function validateCorpus(
               isObject(entry.expected) &&
               entry.expected.type !== "unsupported"
             ) {
-              coveredFunctions.add(name);
-              const covered = functionCategories.get(name) ?? new Set<string>();
+              covered_functions.add(name);
+              const covered = function_categories.get(name) ?? new Set<string>();
               covered.add(String(entry.category));
-              functionCategories.set(name, covered);
+              function_categories.set(name, covered);
             }
           }
         } else if (entry.subject.kind === "operator") {
@@ -809,22 +811,22 @@ export function validateCorpus(
               isObject(entry.expected) &&
               entry.expected.type !== "unsupported"
             ) {
-              coveredOperators.add(name);
-              const covered = operatorCategories.get(name) ?? new Set<string>();
+              covered_operators.add(name);
+              const covered = operator_categories.get(name) ?? new Set<string>();
               covered.add(String(entry.category));
-              operatorCategories.set(name, covered);
+              operator_categories.set(name, covered);
             }
           }
         } else issues.push(`${path}.subject.kind: invalid`);
         if (isNonemptyString(entry.formula) && isNonemptyString(entry.category)) {
-          const subjectKey = `${String(entry.subject.kind)}:${name}:${entry.category}`;
-          const canonical = canonicalFormula(entry.formula);
-          const formulas = subjectCategoryFormulas.get(subjectKey) ?? new Set<string>();
+          const subject_key = `${String(entry.subject.kind)}:${name}:${entry.category}`;
+          const canonical = canonical_formula(entry.formula);
+          const formulas = subject_category_formulas.get(subject_key) ?? new Set<string>();
           if (formulas.has(canonical)) {
             issues.push(`${path}.formula: duplicate canonical subject/category formula`);
           }
           formulas.add(canonical);
-          subjectCategoryFormulas.set(subjectKey, formulas);
+          subject_category_formulas.set(subject_key, formulas);
           if (
             entry.category !== "normal" &&
             entry.unsupported !== true &&
@@ -838,7 +840,7 @@ export function validateCorpus(
                   : "C1";
             const consumes =
               entry.subject.kind === "function"
-                ? functionInvocationContains(entry.formula, name, marker)
+                ? function_invocation_contains(entry.formula, name, marker)
                 : entry.formula.includes(marker);
             if (!consumes) {
               issues.push(
@@ -849,46 +851,47 @@ export function validateCorpus(
         }
       }
     } else if (entry.kind === "mutation" || entry.kind === "workbook") {
-      const expectedArea = entry.kind;
-      counts[expectedArea] += 1;
-      if (entry.area !== expectedArea)
+      const expected_area = entry.kind;
+      counts[expected_area] += 1;
+      if (entry.area !== expected_area)
         issues.push(`${path}.area: ${entry.kind} kind requires matching area`);
       if (!Array.isArray(entry.operations) || entry.operations.length === 0) {
         issues.push(`${path}.operations: non-empty sequence required`);
       }
-      const matrixFeature = entry.kind === "mutation" ? "mutation-matrix" : "workbook-matrix";
-      if (entry.localCanary !== true && entry.feature !== matrixFeature) {
-        issues.push(`${path}.feature: required ${matrixFeature}`);
+      const matrix_feature = entry.kind === "mutation" ? "mutation-matrix" : "workbook-matrix";
+      if (entry.localCanary !== true && entry.feature !== matrix_feature) {
+        issues.push(`${path}.feature: required ${matrix_feature}`);
       }
-      if (entry.feature === matrixFeature && Array.isArray(entry.operations)) {
+      if (entry.feature === matrix_feature && Array.isArray(entry.operations)) {
         const allowed =
           entry.kind === "mutation"
             ? (MUTATION_FEATURES as readonly string[])
             : (WORKBOOK_FEATURES as readonly string[]);
         const shape: string[] = [];
-        const seenOperations = new Set<string>();
-        entry.operations.forEach((operation, operationIndex) => {
-          const operationPath = `${path}.operations[${operationIndex}]`;
+        const seen_operations = new Set<string>();
+        entry.operations.forEach((operation, operation_index) => {
+          const operation_path = `${path}.operations[${operation_index}]`;
           if (!isObject(operation)) {
-            issues.push(`${operationPath}: expected object`);
+            issues.push(`${operation_path}: expected object`);
             return;
           }
-          rejectUnknownKeys(operation, OPERATION_KEYS, operationPath, issues);
+          rejectUnknownKeys(operation, OPERATION_KEYS, operation_path, issues);
           if (!isNonemptyString(operation.op) || !allowed.includes(operation.op)) {
-            issues.push(`${operationPath}.op: unsupported concrete operation`);
+            issues.push(`${operation_path}.op: unsupported concrete operation`);
             return;
           }
-          if (seenOperations.has(operation.op)) {
-            issues.push(`${operationPath}.op: duplicate operation in shape`);
+          if (seen_operations.has(operation.op)) {
+            issues.push(`${operation_path}.op: duplicate operation in shape`);
           }
-          seenOperations.add(operation.op);
+          seen_operations.add(operation.op);
           shape.push(operation.op);
-          featureCounts.set(operation.op, (featureCounts.get(operation.op) ?? 0) + 1);
+          feature_counts.set(operation.op, (feature_counts.get(operation.op) ?? 0) + 1);
         });
-        const shapeKey = shape.join(",");
-        const areaShapes = operationShapes[entry.kind];
-        if (areaShapes.has(shapeKey)) issues.push(`${path}.operations: duplicate operation shape`);
-        else areaShapes.add(shapeKey);
+        const shape_key = shape.join(",");
+        const area_shapes = operation_shapes[entry.kind];
+        if (area_shapes.has(shape_key))
+          issues.push(`${path}.operations: duplicate operation shape`);
+        else area_shapes.add(shape_key);
       }
       if (entry.kind === "mutation") {
         if (entry.category !== "mutation")
@@ -906,7 +909,7 @@ export function validateCorpus(
 
     validateResult(entry.expected, `${path}.expected`, issues);
     if (entry.knownDivergence !== undefined) {
-      validateDivergence(entry.knownDivergence, `${path}.knownDivergence`, issues);
+      validate_divergence(entry.knownDivergence, `${path}.knownDivergence`, issues);
     }
     if (
       entry.unsupported === true &&
@@ -924,38 +927,42 @@ export function validateCorpus(
     }
     if (!Array.isArray(entry.observations)) issues.push(`${path}.observations: required`);
     else {
-      entry.observations.forEach((observation, observationIndex) => {
-        const observationPath = `${path}.observations[${observationIndex}]`;
+      entry.observations.forEach((observation, observation_index) => {
+        const observation_path = `${path}.observations[${observation_index}]`;
         if (!isObject(observation)) {
-          issues.push(`${observationPath}: expected object`);
+          issues.push(`${observation_path}: expected object`);
           return;
         }
-        rejectUnknownKeys(observation, OBSERVATION_KEYS, observationPath, issues);
+        rejectUnknownKeys(observation, OBSERVATION_KEYS, observation_path, issues);
         if (!CONFORMANCE_PRODUCERS.includes(observation.producer as ConformanceProducer)) {
-          issues.push(`${observationPath}.producer: invalid`);
+          issues.push(`${observation_path}.producer: invalid`);
         }
         if (!isNonemptyString(observation.producerVersion)) {
-          issues.push(`${observationPath}.producerVersion: required`);
+          issues.push(`${observation_path}.producerVersion: required`);
         }
         if (
           !isNonemptyString(observation.capturedAt) ||
           Number.isNaN(Date.parse(observation.capturedAt))
         ) {
-          issues.push(`${observationPath}.capturedAt: invalid timestamp`);
+          issues.push(`${observation_path}.capturedAt: invalid timestamp`);
         }
         if (observation.status === "reviewed" || observation.status === "provisional") {
-          validateResult(observation.result, `${observationPath}.result`, issues);
-          const artifactHash = String(observation.artifactSha256 ?? "");
-          if (!SHA256_PATTERN.test(artifactHash)) {
-            issues.push(`${observationPath}.artifactSha256: required`);
-          } else if (observation.status === "reviewed" && !verifiedArtifacts.has(artifactHash)) {
-            issues.push(`${observationPath}.artifactSha256: no verified immutable capture binding`);
+          validateResult(observation.result, `${observation_path}.result`, issues);
+          const artifact_hash = String(observation.artifactSha256 ?? "");
+          if (!SHA256_PATTERN.test(artifact_hash)) {
+            issues.push(`${observation_path}.artifactSha256: required`);
+          } else if (observation.status === "reviewed" && !verifiedArtifacts.has(artifact_hash)) {
+            issues.push(
+              `${observation_path}.artifactSha256: no verified immutable capture binding`,
+            );
           }
         } else if (observation.status === "unavailable") {
           if (!isNonemptyString(observation.notes) || observation.result !== undefined) {
-            issues.push(`${observationPath}: unavailable observations require notes and no result`);
+            issues.push(
+              `${observation_path}: unavailable observations require notes and no result`,
+            );
           }
-        } else issues.push(`${observationPath}.status: invalid`);
+        } else issues.push(`${observation_path}.status: invalid`);
       });
     }
   });
@@ -983,13 +990,13 @@ export function validateCorpus(
       `coverage.localCanary: expected seven local canaries, received ${counts.localCanary}`,
     );
   }
-  for (const [name, functionContract] of denominator.functions) {
-    if (!coveredFunctions.has(name)) issues.push(`coverage.function: missing supported ${name}`);
-    const covered = functionCategories.get(name);
+  for (const [name, function_contract] of denominator.functions) {
+    if (!covered_functions.has(name)) issues.push(`coverage.function: missing supported ${name}`);
+    const covered = function_categories.get(name);
     for (const category of REQUIRED_CATEGORIES) {
       if (
         category !== "mutation" &&
-        (functionContract.signature !== "zero" || category === "normal") &&
+        (function_contract.signature !== "zero" || category === "normal") &&
         !covered?.has(category)
       ) {
         issues.push(`coverage.function.${name}: missing category ${category}`);
@@ -997,8 +1004,8 @@ export function validateCorpus(
     }
   }
   for (const name of denominator.operators.keys()) {
-    if (!coveredOperators.has(name)) issues.push(`coverage.operator: missing supported ${name}`);
-    const covered = operatorCategories.get(name);
+    if (!covered_operators.has(name)) issues.push(`coverage.operator: missing supported ${name}`);
+    const covered = operator_categories.get(name);
     for (const category of REQUIRED_CATEGORIES) {
       if (category !== "mutation" && !covered?.has(category)) {
         issues.push(`coverage.operator.${name}: missing category ${category}`);
@@ -1006,14 +1013,14 @@ export function validateCorpus(
     }
   }
   for (const feature of [...MUTATION_FEATURES, ...WORKBOOK_FEATURES]) {
-    const count = featureCounts.get(feature) ?? 0;
+    const count = feature_counts.get(feature) ?? 0;
     if (count < FEATURE_MINIMUM) {
       issues.push(
         `coverage.feature.${feature}: required denominator ${FEATURE_MINIMUM}, received ${count}`,
       );
     }
   }
-  validateManifest(
+  validate_manifest(
     value === undefined ? undefined : manifest,
     value,
     denominator,

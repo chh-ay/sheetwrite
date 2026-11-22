@@ -55,7 +55,7 @@ export function staticCell(
  * Whether the values of `content` fit in a box of `w` × `h` grid cells.
  * Larger output is written in full, with a warning.
  */
-function fitsBox(content: DashboardItemExport, w: number, h: number): boolean {
+function fits_box(content: DashboardItemExport, w: number, h: number): boolean {
   return content.cells.length <= h && content.cells.every((row) => row.length <= w);
 }
 
@@ -71,16 +71,16 @@ export function staticDashboard(
 ): StaticDashboard {
   const cells = new Map<number, SnapshotCell>();
   // The values of each pivot item and its box, so a chart over that pivot can read them.
-  const pivotCells = new Map<string, PivotCells>();
+  const pivot_cells = new Map<string, PivotCells>();
   const views: ChartView[] = [];
-  const chartDefinitions: ChartDefinition[] = [];
-  let rowCount = 1;
-  let colCount = GRID_COLUMNS;
+  const chart_definitions: ChartDefinition[] = [];
+  let row_count = 1;
+  let col_count = GRID_COLUMNS;
   for (const item of sheet.dashboard?.items ?? []) {
-    rowCount = Math.max(rowCount, item.box.y + item.box.h);
+    row_count = Math.max(row_count, item.box.y + item.box.h);
     const exported = content?.items.find((candidate) => candidate.id === item.id);
     if (exported === undefined) continue;
-    if (!fitsBox(exported, item.box.w, item.box.h)) {
+    if (!fits_box(exported, item.box.w, item.box.h)) {
       emitWarning(context, {
         code: "format-loss",
         message: `Dashboard item ${item.id} has more values than its box; all of them were written from the top-left of the box`,
@@ -93,16 +93,16 @@ export function staticDashboard(
         const format = exported.numberFormats[row]?.[col] ?? null;
         if (value === null && format === null) continue;
         const target = { row: item.box.y + row, col: item.box.x + col };
-        rowCount = Math.max(rowCount, target.row + 1);
-        colCount = Math.max(colCount, target.col + 1);
+        row_count = Math.max(row_count, target.row + 1);
+        col_count = Math.max(col_count, target.col + 1);
         const offset = target.row * 0x4000 + target.col;
         if (cells.has(offset)) continue;
         cells.set(offset, staticCell(target.row, target.col, value, format, row === 0));
       }
     }
 
-    if (item.kind === "pivot" && !pivotCells.has(item.pivot)) {
-      pivotCells.set(item.pivot, {
+    if (item.kind === "pivot" && !pivot_cells.has(item.pivot)) {
+      pivot_cells.set(item.pivot, {
         cells: exported.cells,
         origin: { row: item.box.y, col: item.box.x },
       });
@@ -110,10 +110,10 @@ export function staticDashboard(
 
     if (exported.chart !== undefined) {
       // The view shares the store's read-only definition; the written chart gets its own arrays.
-      const { pivot: _pivot, pivotValues, ...chart } = exported.chart.chart;
-      chartDefinitions.push({
+      const { pivot: _pivot, pivotValues: pivot_values, ...chart } = exported.chart.chart;
+      chart_definitions.push({
         ...chart,
-        ...(pivotValues === undefined ? {} : { pivotValues: [...pivotValues] }),
+        ...(pivot_values === undefined ? {} : { pivotValues: [...pivot_values] }),
         anchor: {
           row: item.box.y,
           col: item.box.x,
@@ -130,7 +130,7 @@ export function staticDashboard(
 
   const charts = new Map<string, PivotChartData>();
   for (const view of views) {
-    const written = view.chart.pivot === undefined ? undefined : pivotCells.get(view.chart.pivot);
+    const written = view.chart.pivot === undefined ? undefined : pivot_cells.get(view.chart.pivot);
     charts.set(view.chart.id, written === undefined ? { view } : { view, cells: written });
   }
   return {
@@ -139,22 +139,22 @@ export function staticDashboard(
       name: sheet.name,
       order: sheet.order,
       ...(sheet.visibility ? { visibility: sheet.visibility } : {}),
-      rowCount,
-      columns: Array.from({ length: colCount }, (_, col) => ({
+      rowCount: row_count,
+      columns: Array.from({ length: col_count }, (_, col) => ({
         key: `column${col + 1}`,
         header: "",
         width: COLUMN_WIDTH,
         type: "general" as const,
       })),
-      ...(chartDefinitions.length > 0 ? { charts: chartDefinitions } : {}),
+      ...(chart_definitions.length > 0 ? { charts: chart_definitions } : {}),
       cells:
         cells.size > 0
           ? [
               {
                 startRow: 0,
                 startCol: 0,
-                rowCount,
-                colCount,
+                rowCount: row_count,
+                colCount: col_count,
                 cells: [...cells.entries()]
                   .sort(([left], [right]) => left - right)
                   .map(([, cell]) => cell),

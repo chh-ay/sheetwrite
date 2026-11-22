@@ -57,18 +57,18 @@ function bounded(bytes: Uint8Array, label: string): Uint8Array {
   }
   return bytes;
 }
-function rangeKey(entry: {
+function range_key(entry: {
   range: { sheet: string; start: { row: number; col: number }; end: { row: number; col: number } };
 }): string {
   const { sheet, start, end } = entry.range;
   return `${sheet}:${start.row}:${start.col}:${end.row}:${end.col}:${JSON.stringify(entry)}`;
 }
 
-function sortedRanges<T extends Parameters<typeof rangeKey>[0]>(
+function sorted_ranges<T extends Parameters<typeof range_key>[0]>(
   entries: readonly T[] | undefined,
 ): T[] | undefined {
   return entries
-    ? [...entries].sort((left, right) => rangeKey(left).localeCompare(rangeKey(right)))
+    ? [...entries].sort((left, right) => range_key(left).localeCompare(range_key(right)))
     : undefined;
 }
 
@@ -77,7 +77,7 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
   // Preserved XLSX parts are opaque producer bytes, so a resave by another
   // application changes or adds them by design. Their loss is checked
   // separately by `retainedGraphLosses`, which allows additions.
-  const { xlsxSource: _preservedParts, ...workbook } = snapshot.workbook;
+  const { xlsxSource: _preserved_parts, ...workbook } = snapshot.workbook;
   return {
     schemaVersion: snapshot.schemaVersion,
     documentId: snapshot.documentId,
@@ -90,7 +90,7 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
         const columns = sheet.columns.map(({ visible, ...column }) =>
           visible === true ? column : { ...column, visible },
         );
-        const comparableCells = cells.flatMap((block) =>
+        const comparable_cells = cells.flatMap((block) =>
           block.cells.map((cell) => ({
             row: block.startRow + cell.rowOffset,
             col: block.startCol + cell.colOffset,
@@ -98,7 +98,7 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
             ...(cell.style === undefined ? {} : { style: cell.style }),
           })),
         );
-        const hyperlinks = sheet.hyperlinks?.map(({ id: _generatedId, style, ...link }) => {
+        const hyperlinks = sheet.hyperlinks?.map(({ id: _generated_id, style, ...link }) => {
           // Relationship ids are import-local identities, not workbook behavior.
           // LibreOffice stores link presentation in cell fonts instead of link
           // metadata. Compare that presentation, never discard a missing style.
@@ -110,7 +110,7 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
           const c0 = Math.min(link.range.start.col, link.range.end.col);
           const c1 = Math.max(link.range.start.col, link.range.end.col);
           let covered = 0;
-          for (const cell of comparableCells) {
+          for (const cell of comparable_cells) {
             if (cell.row < r0 || cell.row > r1 || cell.col < c0 || cell.col > c1) continue;
             cell.style = { ...cell.style, ...style };
             covered += 1;
@@ -121,10 +121,10 @@ export function workbookFeatureState(snapshot: WorkbookSnapshot): unknown {
           ...metadata,
           visibility: sheet.visibility ?? "visible",
           columns,
-          tables: sortedRanges(sheet.tables),
-          hyperlinks: sortedRanges(hyperlinks),
-          conditionalFormats: sortedRanges(sheet.conditionalFormats),
-          cells: comparableCells.sort(
+          tables: sorted_ranges(sheet.tables),
+          hyperlinks: sorted_ranges(hyperlinks),
+          conditionalFormats: sorted_ranges(sheet.conditionalFormats),
+          cells: comparable_cells.sort(
             (left, right) => left.row - right.row || left.col - right.col,
           ),
         };
@@ -146,7 +146,7 @@ function normalized(value: unknown): unknown {
 }
 
 /** Kind of a retained graph: who links to it and through which relationship. */
-function retainedGraphKind(graph: XlsxSourceGraph): string {
+function retained_graph_kind(graph: XlsxSourceGraph): string {
   return `${graph.owner}${graph.sheetId === undefined ? "" : `:${graph.sheetId}`} ${graph.type}`;
 }
 
@@ -163,11 +163,11 @@ export function retainedGraphLosses(
 ): string[] {
   const remaining = new Map<string, number>();
   for (const graph of expected.workbook.xlsxSource?.graphs ?? []) {
-    const kind = retainedGraphKind(graph);
+    const kind = retained_graph_kind(graph);
     remaining.set(kind, (remaining.get(kind) ?? 0) + 1);
   }
   for (const graph of actual.workbook.xlsxSource?.graphs ?? []) {
-    const kind = retainedGraphKind(graph);
+    const kind = retained_graph_kind(graph);
     const count = remaining.get(kind);
     if (count !== undefined) remaining.set(kind, count - 1);
   }
@@ -193,10 +193,10 @@ export function structuralDifferences(expected: unknown, actual: unknown): strin
       return;
     }
     if (left && right && typeof left === "object" && typeof right === "object") {
-      const leftRecord = left as Record<string, unknown>;
-      const rightRecord = right as Record<string, unknown>;
-      const keys = [...new Set([...Object.keys(leftRecord), ...Object.keys(rightRecord)])].sort();
-      for (const key of keys) visit(leftRecord[key], rightRecord[key], `${path}.${key}`);
+      const left_record = left as Record<string, unknown>;
+      const right_record = right as Record<string, unknown>;
+      const keys = [...new Set([...Object.keys(left_record), ...Object.keys(right_record)])].sort();
+      for (const key of keys) visit(left_record[key], right_record[key], `${path}.${key}`);
       return;
     }
     differences.push(`${path}: ${JSON.stringify(left)} != ${JSON.stringify(right)}`);
@@ -205,7 +205,7 @@ export function structuralDifferences(expected: unknown, actual: unknown): strin
   return differences;
 }
 
-function sheetwriteWorkbook(): WorkbookSnapshot {
+function sheetwrite_workbook(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "data" },
@@ -339,7 +339,7 @@ function sheetwriteWorkbook(): WorkbookSnapshot {
   };
 }
 
-async function importWorkbook(bytes: Uint8Array): Promise<{
+async function import_workbook(bytes: Uint8Array): Promise<{
   snapshot: WorkbookSnapshot;
   warnings: XlsxWorkbookWarning[];
 }> {
@@ -356,10 +356,10 @@ async function chain(
   input: Uint8Array,
   expected: WorkbookSnapshot,
   resaver: WorkbookRoundtripResaver,
-  initialWarnings: readonly XlsxWorkbookWarning[] = [],
+  initial_warnings: readonly XlsxWorkbookWarning[] = [],
 ): Promise<WorkbookRoundtripChain> {
-  const producerBytes = bounded(await resaver.resave(input, id), `${id} producer output`);
-  const imported = await importWorkbook(producerBytes);
+  const producer_bytes = bounded(await resaver.resave(input, id), `${id} producer output`);
+  const imported = await import_workbook(producer_bytes);
   const differences = [
     ...structuralDifferences(
       workbookFeatureState(expected),
@@ -370,38 +370,38 @@ async function chain(
   // LibreOffice substitutes its own inactive default threshold for Excel's
   // default. Record that exact rewrite; custom limits and enabled iteration
   // remain strict even when the producer would treat them as inactive.
-  const originalCalculation = expected.workbook.calculation;
-  const importedCalculation = imported.snapshot.workbook.calculation;
-  const defaultIterationRewrite =
-    (originalCalculation === undefined ||
-      (!originalCalculation.iterate &&
-        originalCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
-        originalCalculation.maxChange === DEFAULT_MAX_CHANGE)) &&
-    importedCalculation?.iterate === false &&
-    importedCalculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
-    importedCalculation.maxChange === LIBREOFFICE_DEFAULT_MAX_CHANGE;
-  const knownProducerDifferences = differences.filter(
+  const original_calculation = expected.workbook.calculation;
+  const imported_calculation = imported.snapshot.workbook.calculation;
+  const default_iteration_rewrite =
+    (original_calculation === undefined ||
+      (!original_calculation.iterate &&
+        original_calculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+        original_calculation.maxChange === DEFAULT_MAX_CHANGE)) &&
+    imported_calculation?.iterate === false &&
+    imported_calculation.maxIterations === DEFAULT_MAX_ITERATIONS &&
+    imported_calculation.maxChange === LIBREOFFICE_DEFAULT_MAX_CHANGE;
+  const known_producer_differences = differences.filter(
     (difference) =>
       /^\$workbook\.sheets\[\d+\]\.conditionalFormats\[\d+\]\.stopIfTrue: true != undefined$/.test(
         difference,
       ) ||
-      (defaultIterationRewrite &&
+      (default_iteration_rewrite &&
         /^\$workbook\.workbook\.calculation(?:\.(?:maxIterations|maxChange))?:/.test(difference)),
   );
-  const unexpectedDifferences = differences.filter(
-    (difference) => !knownProducerDifferences.includes(difference),
+  const unexpected_differences = differences.filter(
+    (difference) => !known_producer_differences.includes(difference),
   );
   return {
     id,
     direction,
     inputSha256: sha256(input),
     inputBytes: input.byteLength,
-    producerSha256: sha256(producerBytes),
-    producerBytes: producerBytes.byteLength,
-    importWarnings: [...initialWarnings, ...imported.warnings],
-    differences: unexpectedDifferences,
-    knownProducerDifferences,
-    status: unexpectedDifferences.length === 0 ? "pass" : "divergent",
+    producerSha256: sha256(producer_bytes),
+    producerBytes: producer_bytes.byteLength,
+    importWarnings: [...initial_warnings, ...imported.warnings],
+    differences: unexpected_differences,
+    knownProducerDifferences: known_producer_differences,
+    status: unexpected_differences.length === 0 ? "pass" : "divergent",
   };
 }
 
@@ -409,37 +409,37 @@ export async function runWorkbookRoundtrips(
   resaver: WorkbookRoundtripResaver,
   options: { capturedAt?: Date; libreOfficeFixture?: Uint8Array } = {},
 ): Promise<WorkbookRoundtripArtifact> {
-  const source = sheetwriteWorkbook();
-  const sourceBytes = bounded(
+  const source = sheetwrite_workbook();
+  const source_bytes = bounded(
     await sheetwriteWorkbookBackend.toXlsxWorkbook(source),
     "Sheetwrite workbook",
   );
-  const sourceImport = await importWorkbook(sourceBytes);
+  const source_import = await import_workbook(source_bytes);
   const first = await chain(
     "sheetwrite-libreoffice-sheetwrite",
     "sheetwrite-producer-sheetwrite",
-    sourceBytes,
-    sourceImport.snapshot,
+    source_bytes,
+    source_import.snapshot,
     resaver,
-    sourceImport.warnings,
+    source_import.warnings,
   );
 
-  const fixtureBytes = bounded(
+  const fixture_bytes = bounded(
     options.libreOfficeFixture ?? new Uint8Array(await readFile(LIBREOFFICE_FIXTURE)),
     "LibreOffice fixture",
   );
-  const fixtureImport = await importWorkbook(fixtureBytes);
-  const sheetwriteBytes = bounded(
-    await sheetwriteWorkbookBackend.toXlsxWorkbook(fixtureImport.snapshot),
+  const fixture_import = await import_workbook(fixture_bytes);
+  const sheetwrite_bytes = bounded(
+    await sheetwriteWorkbookBackend.toXlsxWorkbook(fixture_import.snapshot),
     "Sheetwrite re-export",
   );
   const second = await chain(
     "libreoffice-sheetwrite-libreoffice-sheetwrite",
     "producer-sheetwrite-producer-sheetwrite",
-    sheetwriteBytes,
-    fixtureImport.snapshot,
+    sheetwrite_bytes,
+    fixture_import.snapshot,
     resaver,
-    fixtureImport.warnings,
+    fixture_import.warnings,
   );
   const chains = [first, second];
   return {
@@ -457,16 +457,16 @@ export async function runWorkbookRoundtrips(
   };
 }
 
-async function runProcess(command: readonly string[]): Promise<string> {
+async function run_process(command: readonly string[]): Promise<string> {
   const process = Bun.spawn([...command], { stdout: "pipe", stderr: "pipe" });
   const timer = setTimeout(() => process.kill(), 120_000);
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(process.stdout).text(),
     new Response(process.stderr).text(),
     process.exited,
   ]).finally(() => clearTimeout(timer));
-  if (exitCode !== 0) {
-    throw new Error(`${command[0]} exited ${exitCode}: ${(stderr || stdout).trim()}`);
+  if (exit_code !== 0) {
+    throw new Error(`${command[0]} exited ${exit_code}: ${(stderr || stdout).trim()}`);
   }
   return stdout.trim();
 }
@@ -474,7 +474,7 @@ async function runProcess(command: readonly string[]): Promise<string> {
 export async function createLibreOfficeResaver(): Promise<
   WorkbookRoundtripResaver & { dispose(): Promise<void> }
 > {
-  const version = await runProcess(["libreoffice", "--version"]);
+  const version = await run_process(["libreoffice", "--version"]);
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-libreoffice-roundtrip-"));
   const profile = join(root, "profile");
   await mkdir(profile, { recursive: true });
@@ -483,30 +483,30 @@ export async function createLibreOfficeResaver(): Promise<
     producerVersion: version.replace(/^LibreOffice\s+/i, ""),
     async resave(bytes, id) {
       bounded(bytes, `${id} input`);
-      const inputDirectory = join(root, `${id}-input`);
-      const outputDirectory = join(root, `${id}-output`);
+      const input_directory = join(root, `${id}-input`);
+      const output_directory = join(root, `${id}-output`);
       await Promise.all([
-        mkdir(inputDirectory, { recursive: true }),
-        mkdir(outputDirectory, { recursive: true }),
+        mkdir(input_directory, { recursive: true }),
+        mkdir(output_directory, { recursive: true }),
       ]);
-      const inputPath = join(inputDirectory, `${id}.xlsx`);
-      await writeFile(inputPath, bytes);
-      await runProcess([
+      const input_path = join(input_directory, `${id}.xlsx`);
+      await writeFile(input_path, bytes);
+      await run_process([
         "libreoffice",
         `-env:UserInstallation=${pathToFileURL(profile).href}`,
         "--headless",
         "--convert-to",
         "xlsx",
         "--outdir",
-        outputDirectory,
-        inputPath,
+        output_directory,
+        input_path,
       ]);
-      const outputPath = join(outputDirectory, basename(inputPath));
-      const metadata = await stat(outputPath);
+      const output_path = join(output_directory, basename(input_path));
+      const metadata = await stat(output_path);
       if (metadata.size > MAX_ROUNDTRIP_BYTES) {
         throw new Error(`${id} producer output exceeds ${MAX_ROUNDTRIP_BYTES} bytes`);
       }
-      return new Uint8Array(await readFile(outputPath));
+      return new Uint8Array(await readFile(output_path));
     },
     async dispose() {
       await rm(root, { recursive: true, force: true });

@@ -46,11 +46,14 @@ describe("IndexNow discovery submission", () => {
       body: { host: "www.sheetwrite.dev", urlList: urls },
     });
     // IndexNow verifies ownership by fetching keyLocation; the deployed file must hold the key.
-    const { key, keyLocation } = request!.body as { key: string; keyLocation: string };
-    const keyFile = new URL(keyLocation);
-    expect(keyFile.origin).toBe("https://www.sheetwrite.dev");
+    const { key, keyLocation: key_location } = request!.body as {
+      key: string;
+      keyLocation: string;
+    };
+    const key_file = new URL(key_location);
+    expect(key_file.origin).toBe("https://www.sheetwrite.dev");
     const served = readFileSync(
-      new URL(`../docs/public${keyFile.pathname}`, import.meta.url),
+      new URL(`../docs/public${key_file.pathname}`, import.meta.url),
       "utf8",
     );
     expect(served.trim()).toBe(key);

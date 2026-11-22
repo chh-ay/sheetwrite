@@ -31,11 +31,11 @@ async function open(page: Page): Promise<void> {
 }
 
 /** The settings disclosure keeps its state across task tabs. */
-async function openAdapterSettings(page: Page): Promise<void> {
+async function open_adapter_settings(page: Page): Promise<void> {
   await page.getByRole("tab", { name: "Renderer", exact: true }).click();
   const summary = page.getByText("Adapter settings", { exact: true });
-  const isOpen = await summary.evaluate((element) => element.closest("details")?.open === true);
-  if (!isOpen) await summary.click();
+  const is_open = await summary.evaluate((element) => element.closest("details")?.open === true);
+  if (!is_open) await summary.click();
 }
 
 test("sheet tabs and the command toolbar stay keyboard-operable at any width, and the host syncs every change @portability", async ({
@@ -46,20 +46,20 @@ test("sheet tabs and the command toolbar stay keyboard-operable at any width, an
 
   // Sheet tabs rename, add and reorder by keyboard, and the host syncs every
   // change. Insert comes first in the sheet menu, as in Excel.
-  const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
-  const insertOption = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
-  const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
-  await ordersOptions.focus();
+  const orders_options = page.getByRole("button", { name: "Options for Orders sheet" });
+  const insert_option = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
+  const rename_option = page.getByRole("menuitem", { name: "Rename Orders sheet" });
+  await orders_options.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(insertOption).toBeFocused();
+  await expect(insert_option).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(ordersOptions).toBeFocused();
-  await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
+  await expect(orders_options).toBeFocused();
+  await expect(orders_options).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("ArrowDown");
-  await expect(insertOption).toBeFocused();
+  await expect(insert_option).toBeFocused();
   // A pointer press on a focused menu must not close it first (WebKit does not
   // focus pressed buttons).
-  await renameOption.click();
+  await rename_option.click();
   const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
   await editor.fill("Suppliers");
   await editor.press("Enter");
@@ -130,10 +130,10 @@ test("sheet tabs and the command toolbar stay keyboard-operable at any width, an
 test("mutation policy is reset-bound, and read-only is a live option", async ({ page }) => {
   await open(page);
   // Read-only disables mutation without a new generation.
-  await openAdapterSettings(page);
-  const readOnly = page.getByTestId("readonly");
-  await readOnly.click();
-  await expect(readOnly).toHaveAttribute("aria-pressed", "true");
+  await open_adapter_settings(page);
+  const read_only = page.getByTestId("readonly");
+  await read_only.click();
+  await expect(read_only).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(`${GRID} [role="grid"]`)).toHaveAttribute("aria-readonly", "true");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
   await page.evaluate(() => {
@@ -142,8 +142,8 @@ test("mutation policy is reset-bound, and read-only is a live option", async ({ 
     grid?.beginEdit(4, 3, "Approved");
   });
   await expect(page.locator(`${GRID} .sheetwrite-editor`)).toHaveCount(0);
-  await readOnly.click();
-  await expect(readOnly).toHaveAttribute("aria-pressed", "false");
+  await read_only.click();
+  await expect(read_only).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("generation")).toHaveText("1 · initial");
 
   // A synced local edit, then a policy change: the grid rebuilds from the
@@ -162,7 +162,7 @@ test("mutation policy is reset-bound, and read-only is a live option", async ({ 
   await page.getByRole("tab", { name: "Persistence", exact: true }).click();
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");
-  await openAdapterSettings(page);
+  await open_adapter_settings(page);
   await page.getByTestId("mutation-policy").click();
   await expect(page.getByTestId("generation")).toHaveText("2 · input-reset", { timeout: 15_000 });
   await expect(page.getByTestId("feed")).toContainText(":mutation-policy");

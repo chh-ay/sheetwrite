@@ -37,7 +37,7 @@ const MACHINE_LABELS: Readonly<Record<PerfMachine, string>> = {
   mac: "Mac · Apple Silicon",
 };
 
-function parseValue(text: string, where: string): { unit: PerfUnit; stat: PerfStat } {
+function parse_value(text: string, where: string): { unit: PerfUnit; stat: PerfStat } {
   const match = VALUE.exec(text.trim());
   const unit = match?.[3] === undefined ? undefined : UNITS[match[3]];
   if (match === null || unit === undefined) {
@@ -85,14 +85,14 @@ export function parsePerfCompare(html: string, id: string): PerfFigure {
       if (cells.length !== 3 || !label || !before || !after) {
         throw new Error(`<perf-compare> line "${line}" needs: operation | ${base} | ${measured}`);
       }
-      const baseValue = parseValue(before, label);
-      const measuredValue = parseValue(after, label);
-      units.add(baseValue.unit).add(measuredValue.unit);
+      const base_value = parse_value(before, label);
+      const measured_value = parse_value(after, label);
+      units.add(base_value.unit).add(measured_value.unit);
       return {
         label,
         bars: [
-          { label: base, role: "base" as const, stat: baseValue.stat },
-          { label: measured, role: "measured" as const, stat: measuredValue.stat },
+          { label: base, role: "base" as const, stat: base_value.stat },
+          { label: measured, role: "measured" as const, stat: measured_value.stat },
         ],
       };
     });

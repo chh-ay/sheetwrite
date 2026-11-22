@@ -284,7 +284,7 @@ export function admitTransactionResources(
   measuredOperations: readonly DocumentOp[] = operations,
 ): AdmittedTransactionResources | undefined {
   if (measurement.operationCount !== operations.length) return undefined;
-  if (!sameOperations(measuredOperations, operations)) return undefined;
+  if (!same_operations(measuredOperations, operations)) return undefined;
   return {
     operations,
     operationCount: measurement.operationCount,
@@ -307,7 +307,7 @@ export function resolveTransactionResourceValidation(
   readonly result: TransactionResourceValidationResult;
   readonly admitted?: AdmittedTransactionResources;
 } {
-  if (admitted !== undefined && admittedCovers(admitted, operations, limits)) {
+  if (admitted !== undefined && admitted_covers(admitted, operations, limits)) {
     return {
       result: {
         ok: true,
@@ -322,9 +322,9 @@ export function resolveTransactionResourceValidation(
   return { result, admitted: admitTransactionResources(operations, limits, result) };
 }
 
-const admittedResourcesByTransaction = new WeakMap<object, AdmittedTransactionResources>();
+const admitted_resources_by_transaction = new WeakMap<object, AdmittedTransactionResources>();
 /** Transactions an engine layer built from operations it already took in. */
-const engineBuiltTransactions = new WeakSet<object>();
+const engine_built_transactions = new WeakSet<object>();
 
 /**
  * Attach one measurement to the engine-built transaction that is about to be
@@ -335,8 +335,8 @@ export function withAdmittedTransactionResources<T extends object>(
   transaction: T,
   admitted: AdmittedTransactionResources | undefined,
 ): T {
-  engineBuiltTransactions.add(transaction);
-  if (admitted !== undefined) admittedResourcesByTransaction.set(transaction, admitted);
+  engine_built_transactions.add(transaction);
+  if (admitted !== undefined) admitted_resources_by_transaction.set(transaction, admitted);
   return transaction;
 }
 
@@ -346,7 +346,7 @@ export function withAdmittedTransactionResources<T extends object>(
  * layer's ingress, and the layer matches results to them by identity.
  */
 export function isEngineBuiltTransaction(transaction: object): boolean {
-  return engineBuiltTransactions.has(transaction);
+  return engine_built_transactions.has(transaction);
 }
 
 /**
@@ -357,12 +357,12 @@ export function isEngineBuiltTransaction(transaction: object): boolean {
 export function takeAdmittedTransactionResources(
   transaction: object,
 ): AdmittedTransactionResources | undefined {
-  const admitted = admittedResourcesByTransaction.get(transaction);
-  if (admitted !== undefined) admittedResourcesByTransaction.delete(transaction);
+  const admitted = admitted_resources_by_transaction.get(transaction);
+  if (admitted !== undefined) admitted_resources_by_transaction.delete(transaction);
   return admitted;
 }
 
-function admittedCovers(
+function admitted_covers(
   admitted: AdmittedTransactionResources,
   operations: readonly DocumentOp[],
   limits: Readonly<TransactionResourceLimits>,
@@ -370,11 +370,11 @@ function admittedCovers(
   return (
     admitted.operations === operations &&
     admitted.operationCount === operations.length &&
-    sameTransactionResourceLimits(admitted.limits, limits)
+    same_transaction_resource_limits(admitted.limits, limits)
   );
 }
 
-function sameTransactionResourceLimits(
+function same_transaction_resource_limits(
   left: Readonly<TransactionResourceLimits>,
   right: Readonly<TransactionResourceLimits>,
 ): boolean {
@@ -385,7 +385,7 @@ function sameTransactionResourceLimits(
 }
 
 /** True when both arrays reference the same operations in the same order. */
-function sameOperations(left: readonly DocumentOp[], right: readonly DocumentOp[]): boolean {
+function same_operations(left: readonly DocumentOp[], right: readonly DocumentOp[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index++) {
@@ -587,15 +587,15 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "cells",
 ] as const;
 
-function nonNegativeInteger(value: unknown): value is number {
+function non_negative_integer(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function finiteNumber(value: unknown): value is number {
+function finite_number(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function childPath(path: string, key: string): string {
+function child_path(path: string, key: string): string {
   if (path === "$") {
     return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : `[${JSON.stringify(key)}]`;
   }
@@ -604,34 +604,34 @@ function childPath(path: string, key: string): string {
     : `${path}[${JSON.stringify(key)}]`;
 }
 
-function jsonPath(segments: readonly (string | number)[]): string {
+function json_path(segments: readonly (string | number)[]): string {
   let path = "$";
   for (const segment of segments) {
-    path = typeof segment === "number" ? `${path}[${segment}]` : childPath(path, segment);
+    path = typeof segment === "number" ? `${path}[${segment}]` : child_path(path, segment);
   }
   return path;
 }
 
-/** The first value of `input` that JSON cannot carry, or the point where it passes `maxBytes`. */
-function findJsonSafetyIssue(
+/** The first value of `input` that JSON cannot carry, or the point where it passes `max_bytes`. */
+function find_json_safety_issue(
   input: unknown,
-  maxBytes: number,
-  builtByCaller: boolean,
+  max_bytes: number,
+  built_by_caller: boolean,
 ): DocumentValidationError | undefined {
-  const { issue } = measureJson(input, maxBytes, { builtByCaller });
+  const { issue } = measureJson(input, max_bytes, { builtByCaller: built_by_caller });
   if (issue === undefined) return undefined;
 
-  const path = jsonPath(issue.segments);
+  const path = json_path(issue.segments);
   return issue.kind === "limit"
     ? {
         path,
         code: "resource-limit",
-        message: `Snapshot maxSerializedBytes limit ${maxBytes} exceeded`,
+        message: `Snapshot maxSerializedBytes limit ${max_bytes} exceeded`,
       }
     : { path, code: "non-serializable", message: issue.message };
 }
 
-function resourceValidationError(
+function resource_validation_error(
   resource: keyof SnapshotResourceLimits,
   limit: number,
   actual: number,
@@ -644,7 +644,7 @@ function resourceValidationError(
   };
 }
 
-function resolveSnapshotValidationOptions(
+function resolve_snapshot_validation_options(
   options: SnapshotValidationOptions,
 ): ResolvedSnapshotValidationOptions | DocumentValidationError {
   const storage = options.storage ?? "dense";
@@ -659,7 +659,7 @@ function resolveSnapshotValidationOptions(
   for (const resource of SNAPSHOT_RESOURCE_KEYS) {
     const override = options.resourceLimits?.[resource];
     if (override === undefined) continue;
-    if (!nonNegativeInteger(override)) {
+    if (!non_negative_integer(override)) {
       return {
         path: `options.resourceLimits.${resource}`,
         code: "invalid-value",
@@ -704,7 +704,7 @@ interface DenseStorageCells {
  * `maxDenseCells`, else in local pages while the local sheets fit
  * `maxLocalPagedCells`. Returns whether it fits either.
  */
-function placeDenseStorageSheet(
+function place_dense_storage_sheet(
   placed: DenseStorageCells,
   cells: number,
   limits: Readonly<SnapshotResourceLimits>,
@@ -715,16 +715,16 @@ function placeDenseStorageSheet(
   return true;
 }
 
-function arrayDataValue(array: unknown[], index: number): unknown {
+function array_data_value(array: unknown[], index: number): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
   return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
-function productExceeds(left: number, right: number, limit: number): boolean {
+function product_exceeds(left: number, right: number, limit: number): boolean {
   return left !== 0 && right > Math.floor(limit / left);
 }
 
-function preflightSnapshotResources(
+function preflight_snapshot_resources(
   input: unknown,
   options: ResolvedSnapshotValidationOptions,
 ): DocumentValidationError | undefined {
@@ -733,20 +733,20 @@ function preflightSnapshotResources(
   if (!Array.isArray(sheets)) return undefined;
   const { limits } = options;
   if (sheets.length > limits.maxSheets) {
-    return resourceValidationError("maxSheets", limits.maxSheets, sheets.length, "sheets");
+    return resource_validation_error("maxSheets", limits.maxSheets, sheets.length, "sheets");
   }
 
-  let metadataEntries = 0;
+  let metadata_entries = 0;
   const workbook = ownValue(input, "workbook");
   if (isPlainRecord(workbook)) {
-    const namedRanges = ownValue(workbook, "namedRanges");
-    if (Array.isArray(namedRanges)) {
-      metadataEntries = namedRanges.length;
-      if (metadataEntries > limits.maxMetadataEntries) {
-        return resourceValidationError(
+    const named_ranges = ownValue(workbook, "namedRanges");
+    if (Array.isArray(named_ranges)) {
+      metadata_entries = named_ranges.length;
+      if (metadata_entries > limits.maxMetadataEntries) {
+        return resource_validation_error(
           "maxMetadataEntries",
           limits.maxMetadataEntries,
-          metadataEntries,
+          metadata_entries,
           "workbook.namedRanges",
         );
       }
@@ -754,24 +754,24 @@ function preflightSnapshotResources(
   }
 
   const placed: DenseStorageCells = { dense: 0, local: 0 };
-  let tableCount = 0;
-  for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
-    const sheet = arrayDataValue(sheets, sheetIndex);
+  let table_count = 0;
+  for (let sheet_index = 0; sheet_index < sheets.length; sheet_index++) {
+    const sheet = array_data_value(sheets, sheet_index);
     if (!isPlainRecord(sheet)) continue;
-    const path = `sheets[${sheetIndex}]`;
-    const rowCount = ownValue(sheet, "rowCount");
+    const path = `sheets[${sheet_index}]`;
+    const row_count = ownValue(sheet, "rowCount");
     const columns = ownValue(sheet, "columns");
-    if (nonNegativeInteger(rowCount) && rowCount > limits.maxRowsPerSheet) {
-      return resourceValidationError(
+    if (non_negative_integer(row_count) && row_count > limits.maxRowsPerSheet) {
+      return resource_validation_error(
         "maxRowsPerSheet",
         limits.maxRowsPerSheet,
-        rowCount,
+        row_count,
         `${path}.rowCount`,
       );
     }
 
     if (Array.isArray(columns) && columns.length > limits.maxColumnsPerSheet) {
-      return resourceValidationError(
+      return resource_validation_error(
         "maxColumnsPerSheet",
         limits.maxColumnsPerSheet,
         columns.length,
@@ -779,21 +779,21 @@ function preflightSnapshotResources(
       );
     }
 
-    if (nonNegativeInteger(rowCount) && Array.isArray(columns)) {
-      if (productExceeds(rowCount, columns.length, limits.maxLogicalCellsPerSheet)) {
-        return resourceValidationError(
+    if (non_negative_integer(row_count) && Array.isArray(columns)) {
+      if (product_exceeds(row_count, columns.length, limits.maxLogicalCellsPerSheet)) {
+        return resource_validation_error(
           "maxLogicalCellsPerSheet",
           limits.maxLogicalCellsPerSheet,
-          rowCount * columns.length,
+          row_count * columns.length,
           path,
         );
       }
 
       if (options.storage === "dense") {
         // The logical-cell check above keeps the product exact.
-        const cells = rowCount * columns.length;
-        if (!placeDenseStorageSheet(placed, cells, limits)) {
-          return resourceValidationError(
+        const cells = row_count * columns.length;
+        if (!place_dense_storage_sheet(placed, cells, limits)) {
+          return resource_validation_error(
             "maxLocalPagedCells",
             limits.maxLocalPagedCells,
             placed.local + cells,
@@ -806,49 +806,49 @@ function preflightSnapshotResources(
     for (const key of SHEET_METADATA_ARRAY_KEYS) {
       const entries = ownValue(sheet, key);
       if (!Array.isArray(entries)) continue;
-      if (entries.length > limits.maxMetadataEntries - metadataEntries) {
-        return resourceValidationError(
+      if (entries.length > limits.maxMetadataEntries - metadata_entries) {
+        return resource_validation_error(
           "maxMetadataEntries",
           limits.maxMetadataEntries,
-          metadataEntries + entries.length,
+          metadata_entries + entries.length,
           `${path}.${key}`,
         );
       }
 
-      metadataEntries += entries.length;
+      metadata_entries += entries.length;
       if (key === "tables") {
-        tableCount += entries.length;
-        if (tableCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+        table_count += entries.length;
+        if (table_count > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
           return {
             path: `${path}.tables`,
             code: "resource-limit",
-            message: `Workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables} exceeded by ${tableCount}`,
+            message: `Workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables} exceeded by ${table_count}`,
           };
         }
 
-        for (let tableIndex = 0; tableIndex < entries.length; tableIndex++) {
-          const table = arrayDataValue(entries, tableIndex);
+        for (let table_index = 0; table_index < entries.length; table_index++) {
+          const table = array_data_value(entries, table_index);
           if (!isPlainRecord(table)) continue;
           const columns = ownValue(table, "columns");
           if (!Array.isArray(columns)) continue;
           if (columns.length > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
             return {
-              path: `${path}.tables[${tableIndex}].columns`,
+              path: `${path}.tables[${table_index}].columns`,
               code: "resource-limit",
               message: `Workbook table column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable} exceeded by ${columns.length}`,
             };
           }
 
-          if (columns.length > limits.maxMetadataEntries - metadataEntries) {
-            return resourceValidationError(
+          if (columns.length > limits.maxMetadataEntries - metadata_entries) {
+            return resource_validation_error(
               "maxMetadataEntries",
               limits.maxMetadataEntries,
-              metadataEntries + columns.length,
-              `${path}.tables[${tableIndex}].columns`,
+              metadata_entries + columns.length,
+              `${path}.tables[${table_index}].columns`,
             );
           }
 
-          metadataEntries += columns.length;
+          metadata_entries += columns.length;
         }
       }
     }
@@ -862,7 +862,7 @@ export function assertWorkbookAllocationLimits(
   workbook: Workbook,
   options: SnapshotValidationOptions = {},
 ): void {
-  const resolved = resolveSnapshotValidationOptions(options);
+  const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) {
     throw new SheetwriteError(
       resolved.path === "options.storage" ? "invalid-argument" : "invalid-limits",
@@ -907,24 +907,24 @@ export function assertWorkbookAllocationLimits(
       );
     }
 
-    const chartCount = sheet.charts?.length ?? 0;
-    if (chartCount > MAX_CHARTS_PER_SHEET) {
-      throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chartCount);
+    const chart_count = sheet.charts?.length ?? 0;
+    if (chart_count > MAX_CHARTS_PER_SHEET) {
+      throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chart_count);
     }
   }
 
   const placed: DenseStorageCells = { dense: 0, local: 0 };
-  let metadataEntries = workbook.namedRanges?.length ?? 0;
-  if (metadataEntries > limits.maxMetadataEntries) {
+  let metadata_entries = workbook.namedRanges?.length ?? 0;
+  if (metadata_entries > limits.maxMetadataEntries) {
     throw new SnapshotResourceError(
       "maxMetadataEntries",
       limits.maxMetadataEntries,
-      metadataEntries,
+      metadata_entries,
     );
   }
 
   for (const sheet of workbook.sheets) {
-    if (!nonNegativeInteger(sheet.rowCount) || sheet.rowCount > limits.maxRowsPerSheet) {
+    if (!non_negative_integer(sheet.rowCount) || sheet.rowCount > limits.maxRowsPerSheet) {
       throw new SnapshotResourceError("maxRowsPerSheet", limits.maxRowsPerSheet, sheet.rowCount);
     }
 
@@ -936,7 +936,7 @@ export function assertWorkbookAllocationLimits(
       );
     }
 
-    if (productExceeds(sheet.rowCount, sheet.columns.length, limits.maxLogicalCellsPerSheet)) {
+    if (product_exceeds(sheet.rowCount, sheet.columns.length, limits.maxLogicalCellsPerSheet)) {
       throw new SnapshotResourceError(
         "maxLogicalCellsPerSheet",
         limits.maxLogicalCellsPerSheet,
@@ -946,7 +946,7 @@ export function assertWorkbookAllocationLimits(
 
     if (resolved.storage === "dense") {
       const cells = sheet.rowCount * sheet.columns.length;
-      if (!placeDenseStorageSheet(placed, cells, limits)) {
+      if (!place_dense_storage_sheet(placed, cells, limits)) {
         throw new SnapshotResourceError(
           "maxLocalPagedCells",
           limits.maxLocalPagedCells,
@@ -955,7 +955,7 @@ export function assertWorkbookAllocationLimits(
       }
     }
 
-    metadataEntries +=
+    metadata_entries +=
       (sheet.rowHeights?.size ?? 0) +
       (sheet.hiddenRows?.size ?? 0) +
       (sheet.merges?.length ?? 0) +
@@ -974,11 +974,11 @@ export function assertWorkbookAllocationLimits(
       (sheet.pivots?.length ?? 0) +
       (sheet.pivots?.reduce((count, pivot) => count + (pivot.savedOutput?.cells.length ?? 0), 0) ??
         0);
-    if (metadataEntries > limits.maxMetadataEntries) {
+    if (metadata_entries > limits.maxMetadataEntries) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
         limits.maxMetadataEntries,
-        metadataEntries,
+        metadata_entries,
       );
     }
   }
@@ -993,7 +993,7 @@ function invalid(
   errors.push({ path, code, message });
 }
 
-function recordAt(
+function record_at(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -1003,7 +1003,7 @@ function recordAt(
   return undefined;
 }
 
-function arrayAt(
+function array_at(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -1013,33 +1013,33 @@ function arrayAt(
   return undefined;
 }
 
-function optionalArray(
+function optional_array(
   record: PlainRecord,
   key: string,
   path: string,
   errors: DocumentValidationError[],
 ): unknown[] | undefined {
   const value = ownValue(record, key);
-  return value === undefined ? undefined : arrayAt(value, `${path}.${key}`, errors);
+  return value === undefined ? undefined : array_at(value, `${path}.${key}`, errors);
 }
 
-function requireString(
+function require_string(
   record: PlainRecord,
   key: string,
   path: string,
   errors: DocumentValidationError[],
-  nonEmpty = false,
+  non_empty = false,
 ): string | undefined {
   const value = ownValue(record, key);
-  if (typeof value === "string" && (!nonEmpty || value.length > 0)) return value;
-  invalid(errors, `${path}.${key}`, `${key} must be ${nonEmpty ? "a non-empty " : "a "}string`);
+  if (typeof value === "string" && (!non_empty || value.length > 0)) return value;
+  invalid(errors, `${path}.${key}`, `${key} must be ${non_empty ? "a non-empty " : "a "}string`);
   return undefined;
 }
 
-/** Reads one field of a record under validation: `ownValue`, or `walkedField` after the JSON-safety walk. */
+/** Reads one field of a record under validation: `ownValue`, or `walked_field` after the JSON-safety walk. */
 type FieldReader = (record: PlainRecord, key: string) => unknown;
 
-function optionalString(
+function optional_string(
   record: PlainRecord,
   key: string,
   path: string,
@@ -1052,7 +1052,7 @@ function optionalString(
   }
 }
 
-function optionalBoolean(
+function optional_boolean(
   record: PlainRecord,
   key: string,
   path: string,
@@ -1065,21 +1065,21 @@ function optionalBoolean(
   }
 }
 
-function requireNonNegativeInteger(
+function require_non_negative_integer(
   record: PlainRecord,
   key: string,
   path: string,
   errors: DocumentValidationError[],
   positive = false,
-  negativeIsOutOfBounds = false,
+  negative_is_out_of_bounds = false,
 ): number | undefined {
   const value = ownValue(record, key);
-  if (nonNegativeInteger(value) && (!positive || value > 0)) return value;
+  if (non_negative_integer(value) && (!positive || value > 0)) return value;
   invalid(
     errors,
     `${path}.${key}`,
     `${key} must be a ${positive ? "positive" : "non-negative"} integer`,
-    negativeIsOutOfBounds && typeof value === "number" && Number.isInteger(value) && value < 0
+    negative_is_out_of_bounds && typeof value === "number" && Number.isInteger(value) && value < 0
       ? "out-of-bounds"
       : "invalid-value",
   );
@@ -1088,21 +1088,24 @@ function requireNonNegativeInteger(
 
 function scalar(value: unknown): boolean {
   return (
-    value === null || typeof value === "string" || typeof value === "boolean" || finiteNumber(value)
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    finite_number(value)
   );
 }
 
-function validateCellBorder(
+function validate_cell_border(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
   read: FieldReader,
 ): void {
-  const border = recordAt(value, path, errors);
+  const border = record_at(value, path, errors);
   if (!border) return;
-  optionalString(border, "color", path, errors, read);
+  optional_string(border, "color", path, errors, read);
   const width = read(border, "width");
-  if (width !== undefined && (!finiteNumber(width) || width < 0)) {
+  if (width !== undefined && (!finite_number(width) || width < 0)) {
     invalid(errors, `${path}.width`, "Border width must be finite and non-negative");
   }
   const style = read(border, "style");
@@ -1111,24 +1114,24 @@ function validateCellBorder(
   }
 }
 
-function validateCellStyle(
+function validate_cell_style(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
   read: FieldReader = ownValue,
 ): void {
-  const style = recordAt(value, path, errors);
+  const style = record_at(value, path, errors);
   if (!style) return;
   for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"]) {
-    optionalBoolean(style, key, path, errors, read);
+    optional_boolean(style, key, path, errors, read);
   }
 
   for (const key of ["color", "backgroundColor"]) {
-    optionalString(style, key, path, errors, read);
+    optional_string(style, key, path, errors, read);
   }
 
-  const fontSize = read(style, "fontSize");
-  if (fontSize !== undefined && (!finiteNumber(fontSize) || fontSize < 0)) {
+  const font_size = read(style, "fontSize");
+  if (font_size !== undefined && (!finite_number(font_size) || font_size < 0)) {
     invalid(errors, `${path}.fontSize`, "fontSize must be finite and non-negative");
   }
 
@@ -1137,15 +1140,15 @@ function validateCellStyle(
     invalid(errors, `${path}.align`, "align must be left, center, or right");
   }
 
-  const verticalAlign = read(style, "verticalAlign");
-  if (verticalAlign !== undefined && !isCellVerticalAlign(verticalAlign)) {
+  const vertical_align = read(style, "verticalAlign");
+  if (vertical_align !== undefined && !isCellVerticalAlign(vertical_align)) {
     invalid(errors, `${path}.verticalAlign`, "verticalAlign must be top, middle, or bottom");
   }
 
-  const fontFamily = read(style, "fontFamily");
+  const font_family = read(style, "fontFamily");
   if (
-    fontFamily !== undefined &&
-    (typeof fontFamily !== "string" || !isCellFontFamily(fontFamily))
+    font_family !== undefined &&
+    (typeof font_family !== "string" || !isCellFontFamily(font_family))
   ) {
     invalid(
       errors,
@@ -1154,10 +1157,10 @@ function validateCellStyle(
     );
   }
 
-  const numberFormat = read(style, "numberFormat");
+  const number_format = read(style, "numberFormat");
   if (
-    numberFormat !== undefined &&
-    (typeof numberFormat !== "string" || !isCellNumberFormat(numberFormat))
+    number_format !== undefined &&
+    (typeof number_format !== "string" || !isCellNumberFormat(number_format))
   ) {
     invalid(
       errors,
@@ -1168,12 +1171,12 @@ function validateCellStyle(
 
   const borders = read(style, "border");
   if (borders !== undefined) {
-    const borderRecord = recordAt(borders, `${path}.border`, errors);
-    if (borderRecord) {
+    const border_record = record_at(borders, `${path}.border`, errors);
+    if (border_record) {
       for (const side of ["all", "top", "right", "bottom", "left"]) {
-        const border = read(borderRecord, side);
+        const border = read(border_record, side);
         if (border !== undefined) {
-          validateCellBorder(border, `${path}.border.${side}`, errors, read);
+          validate_cell_border(border, `${path}.border.${side}`, errors, read);
         }
       }
     }
@@ -1184,7 +1187,7 @@ function validateCellStyle(
  * A shifting `moveCells` (Insert or Delete with Shift cells) stays on its
  * sheet and moves along one axis.
  */
-function validateCellShift(
+function validate_cell_shift(
   operation: PlainRecord,
   path: string,
   errors: DocumentValidationError[],
@@ -1202,44 +1205,48 @@ function validateCellShift(
   const end = ownValue(range, "end");
   if (!isPlainRecord(start) || !isPlainRecord(end)) return;
   const first = (key: string) => Math.min(Number(ownValue(start, key)), Number(ownValue(end, key)));
-  const sameSheet = ownValue(range, "sheet") === ownValue(to, "sheet");
+  const same_sheet = ownValue(range, "sheet") === ownValue(to, "sheet");
   if (
-    !sameSheet ||
+    !same_sheet ||
     (first("row") !== ownValue(to, "row") && first("col") !== ownValue(to, "col"))
   ) {
     invalid(errors, `${path}.shift`, "A shift moves cells along one row or column of their sheet");
   }
 }
 
-function validateAddress(value: unknown, path: string, errors: DocumentValidationError[]): void {
-  const address = recordAt(value, path, errors);
+function validate_address(value: unknown, path: string, errors: DocumentValidationError[]): void {
+  const address = record_at(value, path, errors);
   if (!address) return;
-  requireString(address, "sheet", path, errors, true);
-  requireNonNegativeInteger(address, "row", path, errors, false, true);
-  requireNonNegativeInteger(address, "col", path, errors, false, true);
+  require_string(address, "sheet", path, errors, true);
+  require_non_negative_integer(address, "row", path, errors, false, true);
+  require_non_negative_integer(address, "col", path, errors, false, true);
 }
 
-function validateRangeShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
-  const range = recordAt(value, path, errors);
+function validate_range_shape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const range = record_at(value, path, errors);
   if (!range) return;
-  requireString(range, "sheet", path, errors, true);
+  require_string(range, "sheet", path, errors, true);
   for (const end of ["start", "end"]) {
-    const coordinatePath = `${path}.${end}`;
-    const coordinate = recordAt(ownValue(range, end), coordinatePath, errors);
+    const coordinate_path = `${path}.${end}`;
+    const coordinate = record_at(ownValue(range, end), coordinate_path, errors);
     if (!coordinate) continue;
-    requireNonNegativeInteger(coordinate, "row", coordinatePath, errors, false, true);
-    requireNonNegativeInteger(coordinate, "col", coordinatePath, errors, false, true);
+    require_non_negative_integer(coordinate, "row", coordinate_path, errors, false, true);
+    require_non_negative_integer(coordinate, "col", coordinate_path, errors, false, true);
   }
 }
 
 /** True when `operation` carries every field of a `restoreBlock` operation. */
-function isRestoreBlockShape(
+function is_restore_block_shape(
   operation: PlainRecord,
 ): operation is PlainRecord & Extract<DocumentOp, { op: "restoreBlock" }> {
-  const rangeErrors: DocumentValidationError[] = [];
-  validateRangeShape(ownValue(operation, "range"), "range", rangeErrors);
+  const range_errors: DocumentValidationError[] = [];
+  validate_range_shape(ownValue(operation, "range"), "range", range_errors);
   return (
-    rangeErrors.length === 0 &&
+    range_errors.length === 0 &&
     ownValue(operation, "op") === "restoreBlock" &&
     ownValue(operation, "encoding") === "deflate-json-v1" &&
     typeof ownValue(operation, "decodedBytes") === "number" &&
@@ -1247,41 +1254,41 @@ function isRestoreBlockShape(
   );
 }
 
-function validateCellValueShape(
+function validate_cell_value_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const cellValue = recordAt(value, path, errors);
-  if (!cellValue) return;
-  const kind = ownValue(cellValue, "kind");
+  const cell_value = record_at(value, path, errors);
+  if (!cell_value) return;
+  const kind = ownValue(cell_value, "kind");
   if (kind === "literal") {
-    const literal = ownValue(cellValue, "value");
+    const literal = ownValue(cell_value, "value");
     if (!scalar(literal)) invalid(errors, `${path}.value`, "Literal values must be JSON scalars");
     return;
   }
   if (kind === "formula") {
-    requireString(cellValue, "src", path, errors);
+    require_string(cell_value, "src", path, errors);
     return;
   }
   if (kind === "ref") {
-    validateAddress(ownValue(cellValue, "target"), `${path}.target`, errors);
+    validate_address(ownValue(cell_value, "target"), `${path}.target`, errors);
     return;
   }
   invalid(errors, `${path}.kind`, "Cell value kind must be literal, formula, or ref");
 }
 
-function validateColumnShape(
+function validate_column_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const column = recordAt(value, path, errors);
+  const column = record_at(value, path, errors);
   if (!column) return;
-  requireString(column, "key", path, errors, true);
-  requireString(column, "header", path, errors);
+  require_string(column, "key", path, errors, true);
+  require_string(column, "header", path, errors);
   const width = ownValue(column, "width");
-  if (!finiteNumber(width) || width < 0) {
+  if (!finite_number(width) || width < 0) {
     invalid(errors, `${path}.width`, "Column width must be finite and non-negative");
   }
   const type = ownValue(column, "type");
@@ -1289,26 +1296,26 @@ function validateColumnShape(
     invalid(errors, `${path}.type`, "Column type is invalid");
   }
   for (const key of ["numberFormat", "numberLocale", "renderer"]) {
-    optionalString(column, key, path, errors);
+    optional_string(column, key, path, errors);
   }
-  optionalBoolean(column, "visible", path, errors);
+  optional_boolean(column, "visible", path, errors);
   for (const key of ["headerStyle", "cellStyle"]) {
     const style = ownValue(column, key);
-    if (style !== undefined) validateCellStyle(style, `${path}.${key}`, errors);
+    if (style !== undefined) validate_cell_style(style, `${path}.${key}`, errors);
   }
 }
 
-function validateConditionalPredicate(
+function validate_conditional_predicate(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const predicate = recordAt(value, path, errors);
+  const predicate = record_at(value, path, errors);
   if (!predicate) return;
 
   const kind = ownValue(predicate, "kind");
   if (kind === "greaterThan" || kind === "lessThan") {
-    if (!finiteNumber(ownValue(predicate, "value"))) {
+    if (!finite_number(ownValue(predicate, "value"))) {
       invalid(errors, `${path}.value`, "Conditional comparison value must be finite");
     }
   } else if (kind === "equal") {
@@ -1316,8 +1323,8 @@ function validateConditionalPredicate(
       invalid(errors, `${path}.value`, "Conditional equality value must be a scalar");
     }
   } else if (kind === "contains") {
-    requireString(predicate, "text", path, errors);
-    optionalBoolean(predicate, "matchCase", path, errors);
+    require_string(predicate, "text", path, errors);
+    optional_boolean(predicate, "matchCase", path, errors);
   } else if (kind === "formula") {
     const source = ownValue(predicate, "source");
     if (
@@ -1337,8 +1344,12 @@ function validateConditionalPredicate(
   }
 }
 
-function validateChartShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
-  const chart = recordAt(value, path, errors);
+function validate_chart_shape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const chart = record_at(value, path, errors);
   if (!chart) return;
 
   // A series count over the bound is a resource rejection, not a malformed value.
@@ -1362,12 +1373,12 @@ function validateChartShape(value: unknown, path: string, errors: DocumentValida
   }
 }
 
-function validateHyperlinkShape(
+function validate_hyperlink_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const hyperlink = recordAt(value, path, errors);
+  const hyperlink = record_at(value, path, errors);
   if (!hyperlink) return;
   const id = ownValue(hyperlink, "id");
   if (typeof id === "string" && !isValidHyperlinkId(id)) {
@@ -1379,8 +1390,8 @@ function validateHyperlinkShape(
     );
   }
 
-  requireString(hyperlink, "id", path, errors, true);
-  validateRangeShape(ownValue(hyperlink, "range"), `${path}.range`, errors);
+  require_string(hyperlink, "id", path, errors, true);
+  validate_range_shape(ownValue(hyperlink, "range"), `${path}.range`, errors);
   const display = ownValue(hyperlink, "display");
   if (
     display !== undefined &&
@@ -1395,9 +1406,9 @@ function validateHyperlinkShape(
   }
 
   const style = ownValue(hyperlink, "style");
-  if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
-  const targetPath = `${path}.target`;
-  const target = recordAt(ownValue(hyperlink, "target"), targetPath, errors);
+  if (style !== undefined) validate_cell_style(style, `${path}.style`, errors);
+  const target_path = `${path}.target`;
+  const target = record_at(ownValue(hyperlink, "target"), target_path, errors);
   if (!target) return;
   const kind = ownValue(target, "kind");
   if (kind === "external") {
@@ -1405,15 +1416,15 @@ function validateHyperlinkShape(
     if (typeof url !== "string" || !isSafeExternalHyperlink(url)) {
       invalid(
         errors,
-        `${targetPath}.url`,
+        `${target_path}.url`,
         "Hyperlink external target must be an absolute HTTPS or mailto URL",
         "invalid-value",
       );
     }
   } else if (kind === "internal") {
-    validateRangeShape(ownValue(target, "range"), `${targetPath}.range`, errors);
+    validate_range_shape(ownValue(target, "range"), `${target_path}.range`, errors);
   } else {
-    invalid(errors, `${targetPath}.kind`, "Hyperlink target kind is invalid");
+    invalid(errors, `${target_path}.kind`, "Hyperlink target kind is invalid");
   }
 
   if (!isValidCellHyperlink(value)) {
@@ -1430,7 +1441,7 @@ function validateHyperlinkShape(
 export const MAX_VALIDATION_FORMULA_LENGTH = 255;
 
 /** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
-function validationFormula(value: unknown): value is string {
+function validation_formula(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length > 1 &&
@@ -1439,13 +1450,13 @@ function validationFormula(value: unknown): value is string {
   );
 }
 
-function validateValidationComparison(
+function validate_validation_comparison(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
-  textLength: boolean,
+  text_length: boolean,
 ): void {
-  const comparison = recordAt(value, path, errors);
+  const comparison = record_at(value, path, errors);
   if (!comparison) return;
   const operator = ownValue(comparison, "operator");
   const interval = operator === "between" || operator === "notBetween";
@@ -1462,19 +1473,19 @@ function validateValidationComparison(
     return;
   }
 
-  const validateOperand = (key: "min" | "max" | "value"): number | undefined => {
+  const validate_operand = (key: "min" | "max" | "value"): number | undefined => {
     const operand = ownValue(comparison, key);
     // A formula bound is checked when a value is, in its cell.
-    if (validationFormula(operand)) return undefined;
-    if (textLength) {
-      if (nonNegativeInteger(operand)) return operand;
-    } else if (finiteNumber(operand)) {
+    if (validation_formula(operand)) return undefined;
+    if (text_length) {
+      if (non_negative_integer(operand)) return operand;
+    } else if (finite_number(operand)) {
       return operand;
     }
     invalid(
       errors,
       `${path}.${key}`,
-      textLength
+      text_length
         ? "Text length comparison operands must be non-negative integers or formulas"
         : "Validation comparison operands must be finite numbers or formulas",
     );
@@ -1482,8 +1493,8 @@ function validateValidationComparison(
   };
 
   if (interval) {
-    const min = validateOperand("min");
-    const max = validateOperand("max");
+    const min = validate_operand("min");
+    const max = validate_operand("max");
     if (ownValue(comparison, "value") !== undefined) {
       invalid(errors, path, "Interval validation comparisons may not define value");
     }
@@ -1493,32 +1504,32 @@ function validateValidationComparison(
     return;
   }
 
-  validateOperand("value");
+  validate_operand("value");
   if (ownValue(comparison, "min") !== undefined || ownValue(comparison, "max") !== undefined) {
     invalid(errors, path, "Single-value validation comparisons may not define min or max");
   }
 }
 
-function validateValidationCondition(
+function validate_validation_condition(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const condition = recordAt(value, path, errors);
+  const condition = record_at(value, path, errors);
   if (!condition) return;
   const kind = ownValue(condition, "kind");
   if (kind === "any") return;
   if (kind === "custom") {
-    if (!validationFormula(ownValue(condition, "formula"))) {
+    if (!validation_formula(ownValue(condition, "formula"))) {
       invalid(errors, `${path}.formula`, "A custom validation needs a formula that starts with =");
     }
     return;
   }
   if (kind === "list") {
-    optionalBoolean(condition, "allowCustom", path, errors);
+    optional_boolean(condition, "allowCustom", path, errors);
     if (ownValue(condition, "source") !== undefined) {
       if (
-        !validationFormula(ownValue(condition, "source")) ||
+        !validation_formula(ownValue(condition, "source")) ||
         ownValue(condition, "values") !== undefined
       ) {
         invalid(
@@ -1529,7 +1540,7 @@ function validateValidationCondition(
       }
       return;
     }
-    const values = arrayAt(ownValue(condition, "values"), `${path}.values`, errors);
+    const values = array_at(ownValue(condition, "values"), `${path}.values`, errors);
     if (values && values.length === 0) {
       invalid(errors, `${path}.values`, "List validation needs at least one value");
     }
@@ -1552,22 +1563,22 @@ function validateValidationCondition(
     }
 
     if (comparison !== undefined) {
-      validateValidationComparison(comparison, `${path}.comparison`, errors, false);
+      validate_validation_comparison(comparison, `${path}.comparison`, errors, false);
     }
 
-    if (min !== undefined && !finiteNumber(min)) {
+    if (min !== undefined && !finite_number(min)) {
       invalid(errors, `${path}.min`, "Validation minimum must be finite");
     }
 
-    if (max !== undefined && !finiteNumber(max)) {
+    if (max !== undefined && !finite_number(max)) {
       invalid(errors, `${path}.max`, "Validation maximum must be finite");
     }
 
-    if (finiteNumber(min) && finiteNumber(max) && min > max) {
+    if (finite_number(min) && finite_number(max) && min > max) {
       invalid(errors, path, "Validation minimum may not exceed maximum");
     }
 
-    if (kind === "number") optionalBoolean(condition, "integer", path, errors);
+    if (kind === "number") optional_boolean(condition, "integer", path, errors);
     return;
   }
 
@@ -1580,18 +1591,18 @@ function validateValidationCondition(
     }
 
     if (comparison !== undefined) {
-      validateValidationComparison(comparison, `${path}.comparison`, errors, true);
+      validate_validation_comparison(comparison, `${path}.comparison`, errors, true);
     }
 
-    if (min !== undefined && !nonNegativeInteger(min)) {
+    if (min !== undefined && !non_negative_integer(min)) {
       invalid(errors, `${path}.min`, "Text length minimum must be a non-negative integer");
     }
 
-    if (max !== undefined && !nonNegativeInteger(max)) {
+    if (max !== undefined && !non_negative_integer(max)) {
       invalid(errors, `${path}.max`, "Text length maximum must be a non-negative integer");
     }
 
-    if (nonNegativeInteger(min) && nonNegativeInteger(max) && min > max) {
+    if (non_negative_integer(min) && non_negative_integer(max) && min > max) {
       invalid(errors, path, "Text length minimum may not exceed maximum");
     }
 
@@ -1612,29 +1623,29 @@ function validateValidationCondition(
   invalid(errors, `${path}.kind`, "Validation condition kind is invalid");
 }
 
-function validateFilterShape(
+function validate_filter_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const filter = recordAt(value, path, errors);
+  const filter = record_at(value, path, errors);
   if (!filter) return;
   const kind = ownValue(filter, "kind");
   if (kind === "values") {
-    const values = arrayAt(ownValue(filter, "values"), `${path}.values`, errors);
+    const values = array_at(ownValue(filter, "values"), `${path}.values`, errors);
     values?.forEach((entry, index) => {
       if (!scalar(entry))
         invalid(errors, `${path}.values[${index}]`, "Filter values must be scalars");
     });
   } else if (kind === "contains") {
-    requireString(filter, "text", path, errors);
-    optionalBoolean(filter, "matchCase", path, errors);
+    require_string(filter, "text", path, errors);
+    optional_boolean(filter, "matchCase", path, errors);
   } else if (kind === "compare") {
     const operation = ownValue(filter, "op");
     if (!["gt", "gte", "lt", "lte", "eq", "neq"].includes(String(operation))) {
       invalid(errors, `${path}.op`, "Filter comparison operation is invalid");
     }
-    if (!finiteNumber(ownValue(filter, "value"))) {
+    if (!finite_number(ownValue(filter, "value"))) {
       invalid(errors, `${path}.value`, "Filter comparison value must be finite");
     }
   } else if (kind === "custom") {
@@ -1642,13 +1653,13 @@ function validateFilterShape(
     if (join !== "and" && join !== "or") {
       invalid(errors, `${path}.join`, "Custom filter join must be and or or");
     }
-    const conditions = arrayAt(ownValue(filter, "conditions"), `${path}.conditions`, errors);
+    const conditions = array_at(ownValue(filter, "conditions"), `${path}.conditions`, errors);
     if (conditions && (conditions.length < 1 || conditions.length > 2)) {
       invalid(errors, `${path}.conditions`, "Custom filters have one or two conditions");
     }
     conditions?.forEach((entry, index) => {
-      const conditionPath = `${path}.conditions[${index}]`;
-      const condition = recordAt(entry, conditionPath, errors);
+      const condition_path = `${path}.conditions[${index}]`;
+      const condition = record_at(entry, condition_path, errors);
       if (
         condition &&
         !validFilterCondition({
@@ -1656,7 +1667,7 @@ function validateFilterShape(
           value: ownValue(condition, "value"),
         })
       ) {
-        invalid(errors, conditionPath, "Filter condition operation or value is invalid");
+        invalid(errors, condition_path, "Filter condition operation or value is invalid");
       }
     });
   } else if (kind === "dynamic") {
@@ -1668,13 +1679,13 @@ function validateFilterShape(
   }
 }
 
-function validateAutoFilterShape(
+function validate_auto_filter_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const autoFilter = recordAt(value, path, errors);
-  if (autoFilter) validateRangeShape(ownValue(autoFilter, "range"), `${path}.range`, errors);
+  const auto_filter = record_at(value, path, errors);
+  if (auto_filter) validate_range_shape(ownValue(auto_filter, "range"), `${path}.range`, errors);
 }
 
 const TABLE_UNSUPPORTED_FEATURES = [
@@ -1687,20 +1698,20 @@ const TABLE_UNSUPPORTED_FEATURES = [
   "extensions",
 ] as const;
 
-function validateWorkbookTableColumnShape(
+function validate_workbook_table_column_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const column = recordAt(value, path, errors);
+  const column = record_at(value, path, errors);
   if (!column) return;
-  requireString(column, "id", path, errors, true);
-  requireString(column, "name", path, errors, true);
-  optionalString(column, "totalsRowLabel", path, errors);
-  const totalsFunction = ownValue(column, "totalsRowFunction");
+  require_string(column, "id", path, errors, true);
+  require_string(column, "name", path, errors, true);
+  optional_string(column, "totalsRowLabel", path, errors);
+  const totals_function = ownValue(column, "totalsRowFunction");
   if (
-    totalsFunction !== undefined &&
-    (typeof totalsFunction !== "string" ||
+    totals_function !== undefined &&
+    (typeof totals_function !== "string" ||
       ![
         "none",
         "sum",
@@ -1712,7 +1723,7 @@ function validateWorkbookTableColumnShape(
         "stdDev",
         "var",
         "custom",
-      ].includes(totalsFunction))
+      ].includes(totals_function))
   ) {
     invalid(errors, `${path}.totalsRowFunction`, "Invalid table totals-row function");
   }
@@ -1725,27 +1736,27 @@ function validateWorkbookTableColumnShape(
   }
 }
 
-function validateWorkbookTableShape(
+function validate_workbook_table_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
   partial = false,
 ): void {
-  const table = recordAt(value, path, errors);
+  const table = record_at(value, path, errors);
   if (!table) return;
-  if (partial) optionalString(table, "name", path, errors);
+  if (partial) optional_string(table, "name", path, errors);
   else {
-    requireString(table, "id", path, errors, true);
-    requireString(table, "name", path, errors, true);
+    require_string(table, "id", path, errors, true);
+    require_string(table, "name", path, errors, true);
   }
 
   const range = ownValue(table, "range");
-  if (range !== undefined || !partial) validateRangeShape(range, `${path}.range`, errors);
-  const columnsValue = ownValue(table, "columns");
-  if (columnsValue !== undefined || !partial) {
-    const columns = arrayAt(columnsValue, `${path}.columns`, errors);
+  if (range !== undefined || !partial) validate_range_shape(range, `${path}.range`, errors);
+  const columns_value = ownValue(table, "columns");
+  if (columns_value !== undefined || !partial) {
+    const columns = array_at(columns_value, `${path}.columns`, errors);
     columns?.forEach((column, index) => {
-      validateWorkbookTableColumnShape(column, `${path}.columns[${index}]`, errors);
+      validate_workbook_table_column_shape(column, `${path}.columns[${index}]`, errors);
     });
   }
 
@@ -1763,28 +1774,28 @@ function validateWorkbookTableShape(
     }
   }
 
-  const styleValue = ownValue(table, "style");
-  if (styleValue !== undefined && styleValue !== null) {
-    const stylePath = `${path}.style`;
-    const style = recordAt(styleValue, stylePath, errors);
+  const style_value = ownValue(table, "style");
+  if (style_value !== undefined && style_value !== null) {
+    const style_path = `${path}.style`;
+    const style = record_at(style_value, style_path, errors);
     if (style) {
-      optionalString(style, "name", stylePath, errors);
+      optional_string(style, "name", style_path, errors);
       for (const key of [
         "showFirstColumn",
         "showLastColumn",
         "showRowStripes",
         "showColumnStripes",
       ]) {
-        optionalBoolean(style, key, stylePath, errors);
+        optional_boolean(style, key, style_path, errors);
       }
     }
-  } else if (!partial && styleValue === null) {
+  } else if (!partial && style_value === null) {
     invalid(errors, `${path}.style`, "Table style may not be null");
   }
 
-  const unsupportedValue = ownValue(table, "unsupportedFeatures");
-  if (unsupportedValue !== undefined) {
-    const features = arrayAt(unsupportedValue, `${path}.unsupportedFeatures`, errors);
+  const unsupported_value = ownValue(table, "unsupportedFeatures");
+  if (unsupported_value !== undefined) {
+    const features = array_at(unsupported_value, `${path}.unsupportedFeatures`, errors);
     features?.forEach((feature, index) => {
       if (!TABLE_UNSUPPORTED_FEATURES.includes(feature as never)) {
         invalid(
@@ -1799,20 +1810,20 @@ function validateWorkbookTableShape(
 
 /**
  * `walked` says the JSON-safety walk accepted `value` in this validation, with
- * no code run since, so its cells may be accepted by `isValidWalkedCell`.
+ * no code run since, so its cells may be accepted by `is_valid_walked_cell`.
  */
-function validateSheetShape(
+function validate_sheet_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
   walked = false,
 ): void {
-  const sheet = recordAt(value, path, errors);
+  const sheet = record_at(value, path, errors);
   if (!sheet) return;
-  requireString(sheet, "id", path, errors, true);
-  requireString(sheet, "name", path, errors);
-  requireNonNegativeInteger(sheet, "order", path, errors);
-  requireNonNegativeInteger(sheet, "rowCount", path, errors);
+  require_string(sheet, "id", path, errors, true);
+  require_string(sheet, "name", path, errors);
+  require_non_negative_integer(sheet, "order", path, errors);
+  require_non_negative_integer(sheet, "rowCount", path, errors);
   const visibility = ownValue(sheet, "visibility");
   if (
     visibility !== undefined &&
@@ -1823,48 +1834,48 @@ function validateSheetShape(
     invalid(errors, `${path}.visibility`, "Sheet visibility is invalid");
   }
 
-  const columns = arrayAt(ownValue(sheet, "columns"), `${path}.columns`, errors);
+  const columns = array_at(ownValue(sheet, "columns"), `${path}.columns`, errors);
   // A dashboard has no columns; `validateSheetKindShape` checks it.
   if (columns && columns.length === 0 && ownValue(sheet, "kind") !== "dashboard") {
     invalid(errors, `${path}.columns`, "A sheet needs at least one column");
   }
   columns?.forEach((column, index) => {
-    validateColumnShape(column, `${path}.columns[${index}]`, errors);
+    validate_column_shape(column, `${path}.columns[${index}]`, errors);
   });
 
-  validateTabColor(ownValue(sheet, "tabColor"), `${path}.tabColor`, errors);
+  validate_tab_color(ownValue(sheet, "tabColor"), `${path}.tabColor`, errors);
 
   for (const key of ["frozenRows", "frozenCols"]) {
     const frozen = ownValue(sheet, key);
-    if (frozen !== undefined && !nonNegativeInteger(frozen)) {
+    if (frozen !== undefined && !non_negative_integer(frozen)) {
       invalid(errors, `${path}.${key}`, `${key} must be a non-negative integer`);
     }
   }
 
-  const rowMeta = optionalArray(sheet, "rowMeta", path, errors);
-  rowMeta?.forEach((entry, index) => {
-    const entryPath = `${path}.rowMeta[${index}]`;
+  const row_meta = optional_array(sheet, "rowMeta", path, errors);
+  row_meta?.forEach((entry, index) => {
+    const entry_path = `${path}.rowMeta[${index}]`;
     if (!Array.isArray(entry) || entry.length !== 2) {
-      invalid(errors, entryPath, "Row metadata must be a [row, metadata] tuple");
+      invalid(errors, entry_path, "Row metadata must be a [row, metadata] tuple");
       return;
     }
-    if (!nonNegativeInteger(entry[0])) {
-      invalid(errors, `${entryPath}[0]`, "Row metadata index must be a non-negative integer");
+    if (!non_negative_integer(entry[0])) {
+      invalid(errors, `${entry_path}[0]`, "Row metadata index must be a non-negative integer");
     }
-    const metadata = recordAt(entry[1], `${entryPath}[1]`, errors);
+    const metadata = record_at(entry[1], `${entry_path}[1]`, errors);
     if (!metadata) return;
     const height = ownValue(metadata, "height");
-    if (height !== undefined && (!finiteNumber(height) || height <= 0)) {
-      invalid(errors, `${entryPath}[1].height`, "Row height must be finite and positive");
+    if (height !== undefined && (!finite_number(height) || height <= 0)) {
+      invalid(errors, `${entry_path}[1].height`, "Row height must be finite and positive");
     }
-    optionalBoolean(metadata, "hidden", `${entryPath}[1]`, errors);
+    optional_boolean(metadata, "hidden", `${entry_path}[1]`, errors);
   });
 
-  const merges = optionalArray(sheet, "merges", path, errors);
+  const merges = optional_array(sheet, "merges", path, errors);
   merges?.forEach((entry, index) => {
-    validateMergeShape(entry, `${path}.merges[${index}]`, errors);
+    validate_merge_shape(entry, `${path}.merges[${index}]`, errors);
   });
-  const hyperlinks = optionalArray(sheet, "hyperlinks", path, errors);
+  const hyperlinks = optional_array(sheet, "hyperlinks", path, errors);
   if (hyperlinks && hyperlinks.length > MAX_HYPERLINKS_PER_SHEET) {
     invalid(
       errors,
@@ -1874,11 +1885,11 @@ function validateSheetShape(
     );
   }
   hyperlinks?.forEach((entry, index) => {
-    validateHyperlinkShape(entry, `${path}.hyperlinks[${index}]`, errors);
+    validate_hyperlink_shape(entry, `${path}.hyperlinks[${index}]`, errors);
   });
 
-  const conditionalFormats = optionalArray(sheet, "conditionalFormats", path, errors);
-  if (conditionalFormats && conditionalFormats.length > MAX_CONDITIONAL_FORMAT_RULES) {
+  const conditional_formats = optional_array(sheet, "conditionalFormats", path, errors);
+  if (conditional_formats && conditional_formats.length > MAX_CONDITIONAL_FORMAT_RULES) {
     invalid(
       errors,
       `${path}.conditionalFormats`,
@@ -1886,12 +1897,12 @@ function validateSheetShape(
       "resource-limit",
     );
   }
-  conditionalFormats?.forEach((entry, index) => {
-    validateConditionalFormatShape(entry, `${path}.conditionalFormats[${index}]`, errors, true);
+  conditional_formats?.forEach((entry, index) => {
+    validate_conditional_format_shape(entry, `${path}.conditionalFormats[${index}]`, errors, true);
   });
 
-  const validationRules = optionalArray(sheet, "validationRules", path, errors);
-  if (validationRules && validationRules.length > MAX_VALIDATION_RULES) {
+  const validation_rules = optional_array(sheet, "validationRules", path, errors);
+  if (validation_rules && validation_rules.length > MAX_VALIDATION_RULES) {
     invalid(
       errors,
       `${path}.validationRules`,
@@ -1899,76 +1910,77 @@ function validateSheetShape(
       "resource-limit",
     );
   }
-  validationRules?.forEach((entry, index) => {
-    validateValidationRuleShape(entry, `${path}.validationRules[${index}]`, errors);
+  validation_rules?.forEach((entry, index) => {
+    validate_validation_rule_shape(entry, `${path}.validationRules[${index}]`, errors);
   });
 
-  const protectedRanges = optionalArray(sheet, "protectedRanges", path, errors);
-  protectedRanges?.forEach((entry, index) => {
-    validateProtectedRangeShape(entry, `${path}.protectedRanges[${index}]`, errors);
+  const protected_ranges = optional_array(sheet, "protectedRanges", path, errors);
+  protected_ranges?.forEach((entry, index) => {
+    validate_protected_range_shape(entry, `${path}.protectedRanges[${index}]`, errors);
   });
 
-  const notes = optionalArray(sheet, "notes", path, errors);
+  const notes = optional_array(sheet, "notes", path, errors);
   notes?.forEach((entry, index) => {
-    const notePath = `${path}.notes[${index}]`;
-    const note = recordAt(entry, notePath, errors);
+    const note_path = `${path}.notes[${index}]`;
+    const note = record_at(entry, note_path, errors);
     if (!note) return;
-    validateAddress(ownValue(note, "addr"), `${notePath}.addr`, errors);
-    requireString(note, "text", notePath, errors, true);
+    validate_address(ownValue(note, "addr"), `${note_path}.addr`, errors);
+    require_string(note, "text", note_path, errors, true);
   });
 
-  const sortKeys = optionalArray(sheet, "sortKeys", path, errors);
-  sortKeys?.forEach((entry, index) => {
-    const sortPath = `${path}.sortKeys[${index}]`;
-    const sortKey = recordAt(entry, sortPath, errors);
-    if (!sortKey) return;
-    requireNonNegativeInteger(sortKey, "col", sortPath, errors);
-    const ascending = ownValue(sortKey, "ascending");
+  const sort_keys = optional_array(sheet, "sortKeys", path, errors);
+  sort_keys?.forEach((entry, index) => {
+    const sort_path = `${path}.sortKeys[${index}]`;
+    const sort_key = record_at(entry, sort_path, errors);
+    if (!sort_key) return;
+    require_non_negative_integer(sort_key, "col", sort_path, errors);
+    const ascending = ownValue(sort_key, "ascending");
     if (typeof ascending !== "boolean") {
-      invalid(errors, `${sortPath}.ascending`, "ascending must be a boolean");
+      invalid(errors, `${sort_path}.ascending`, "ascending must be a boolean");
     }
   });
 
-  const sortState = ownValue(sheet, "sortState");
-  if (sortState !== undefined && !validWorkbookTableXmlElement(sortState, "sortState")) {
+  const sort_state = ownValue(sheet, "sortState");
+  if (sort_state !== undefined && !validWorkbookTableXmlElement(sort_state, "sortState")) {
     invalid(errors, `${path}.sortState`, "Sort state must be a valid sortState element");
   }
 
-  const filters = optionalArray(sheet, "filters", path, errors);
+  const filters = optional_array(sheet, "filters", path, errors);
   filters?.forEach((entry, index) => {
-    const filterPath = `${path}.filters[${index}]`;
+    const filter_path = `${path}.filters[${index}]`;
     if (!Array.isArray(entry) || entry.length !== 2) {
-      invalid(errors, filterPath, "Filters must be [column, filter] tuples");
+      invalid(errors, filter_path, "Filters must be [column, filter] tuples");
       return;
     }
-    if (!nonNegativeInteger(entry[0])) {
-      invalid(errors, `${filterPath}[0]`, "Filter column must be a non-negative integer");
+    if (!non_negative_integer(entry[0])) {
+      invalid(errors, `${filter_path}[0]`, "Filter column must be a non-negative integer");
     }
-    validateFilterShape(entry[1], `${filterPath}[1]`, errors);
+    validate_filter_shape(entry[1], `${filter_path}[1]`, errors);
   });
 
-  const autoFilter = ownValue(sheet, "autoFilter");
-  if (autoFilter !== undefined) validateAutoFilterShape(autoFilter, `${path}.autoFilter`, errors);
+  const auto_filter = ownValue(sheet, "autoFilter");
+  if (auto_filter !== undefined)
+    validate_auto_filter_shape(auto_filter, `${path}.autoFilter`, errors);
 
-  const rowGroups = optionalArray(sheet, "rowGroups", path, errors);
-  rowGroups?.forEach((entry, index) => {
-    const groupPath = `${path}.rowGroups[${index}]`;
-    const group = recordAt(entry, groupPath, errors);
+  const row_groups = optional_array(sheet, "rowGroups", path, errors);
+  row_groups?.forEach((entry, index) => {
+    const group_path = `${path}.rowGroups[${index}]`;
+    const group = record_at(entry, group_path, errors);
     if (!group) return;
-    requireNonNegativeInteger(group, "start", groupPath, errors);
-    requireNonNegativeInteger(group, "end", groupPath, errors);
+    require_non_negative_integer(group, "start", group_path, errors);
+    require_non_negative_integer(group, "end", group_path, errors);
     const collapsed = ownValue(group, "collapsed");
     if (typeof collapsed !== "boolean") {
-      invalid(errors, `${groupPath}.collapsed`, "collapsed must be a boolean");
+      invalid(errors, `${group_path}.collapsed`, "collapsed must be a boolean");
     }
   });
 
-  const tables = optionalArray(sheet, "tables", path, errors);
+  const tables = optional_array(sheet, "tables", path, errors);
   tables?.forEach((table, index) => {
-    validateWorkbookTableShape(table, `${path}.tables[${index}]`, errors);
+    validate_workbook_table_shape(table, `${path}.tables[${index}]`, errors);
   });
 
-  const charts = optionalArray(sheet, "charts", path, errors);
+  const charts = optional_array(sheet, "charts", path, errors);
   if (charts && charts.length > MAX_CHARTS_PER_SHEET) {
     invalid(
       errors,
@@ -1978,60 +1990,64 @@ function validateSheetShape(
     );
   } else {
     charts?.forEach((chart, index) => {
-      validateChartShape(chart, `${path}.charts[${index}]`, errors);
+      validate_chart_shape(chart, `${path}.charts[${index}]`, errors);
     });
   }
-  const pivots = optionalArray(sheet, "pivots", path, errors);
+  const pivots = optional_array(sheet, "pivots", path, errors);
   pivots?.forEach((pivot, index) => {
     validatePivotShape(pivot, `${path}.pivots[${index}]`, errors);
   });
 
-  const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
+  const blocks = array_at(ownValue(sheet, "cells"), `${path}.cells`, errors);
   // Cells can share a style object; each one is checked once per sheet.
-  const validStyles = new Set<unknown>();
-  blocks?.forEach((entry, blockIndex) => {
-    const blockPath = `${path}.cells[${blockIndex}]`;
-    const block = recordAt(entry, blockPath, errors);
+  const valid_styles = new Set<unknown>();
+  blocks?.forEach((entry, block_index) => {
+    const block_path = `${path}.cells[${block_index}]`;
+    const block = record_at(entry, block_path, errors);
     if (!block) return;
     for (const key of ["startRow", "startCol"]) {
-      requireNonNegativeInteger(block, key, blockPath, errors);
+      require_non_negative_integer(block, key, block_path, errors);
     }
     for (const key of ["rowCount", "colCount"]) {
-      requireNonNegativeInteger(block, key, blockPath, errors, true);
+      require_non_negative_integer(block, key, block_path, errors, true);
     }
-    const cells = arrayAt(ownValue(block, "cells"), `${blockPath}.cells`, errors);
-    cells?.forEach((cellEntry, cellIndex) => {
-      if (walked && isValidWalkedCell(cellEntry, validStyles)) return;
+    const cells = array_at(ownValue(block, "cells"), `${block_path}.cells`, errors);
+    cells?.forEach((cell_entry, cell_index) => {
+      if (walked && is_valid_walked_cell(cell_entry, valid_styles)) return;
       // Paths are read only by recorded errors, and almost every cell is valid,
       // so a cell's three path strings are built only to report the errors a
       // path-free pass already found.
-      const errorCount = errors.length;
-      validateCellShape(cellEntry, "", errors);
-      if (errors.length === errorCount) return;
-      errors.length = errorCount;
-      validateCellShape(cellEntry, `${blockPath}.cells[${cellIndex}]`, errors);
+      const error_count = errors.length;
+      validate_cell_shape(cell_entry, "", errors);
+      if (errors.length === error_count) return;
+      errors.length = error_count;
+      validate_cell_shape(cell_entry, `${block_path}.cells[${cell_index}]`, errors);
     });
   });
 
   validateSheetKindShape(sheet, path, errors);
 }
 
-function validateOperationSheetId(
+function validate_operation_sheet_id(
   operation: PlainRecord,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  requireString(operation, "sheet", path, errors, true);
+  require_string(operation, "sheet", path, errors, true);
 }
 
-function validateCellShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
-  const cell = recordAt(entry, path, errors);
+function validate_cell_shape(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const cell = record_at(entry, path, errors);
   if (!cell) return;
-  requireNonNegativeInteger(cell, "rowOffset", path, errors);
-  requireNonNegativeInteger(cell, "colOffset", path, errors);
-  validateCellValueShape(ownValue(cell, "value"), `${path}.value`, errors);
+  require_non_negative_integer(cell, "rowOffset", path, errors);
+  require_non_negative_integer(cell, "colOffset", path, errors);
+  validate_cell_value_shape(ownValue(cell, "value"), `${path}.value`, errors);
   const style = ownValue(cell, "style");
-  if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+  if (style !== undefined) validate_cell_style(style, `${path}.style`, errors);
 }
 
 /**
@@ -2039,85 +2055,89 @@ function validateCellShape(entry: unknown, path: string, errors: DocumentValidat
  * same value as `ownValue` for a record the JSON-safety walk accepted, whose
  * own enumerable properties are all data properties.
  */
-function walkedField(record: PlainRecord, key: string): unknown {
+function walked_field(record: PlainRecord, key: string): unknown {
   return Object.prototype.propertyIsEnumerable.call(record, key) ? record[key] : undefined;
 }
 
 /**
- * Whether `validateCellShape` accepts `entry`, decided with direct reads and
+ * Whether `validate_cell_shape` accepts `entry`, decided with direct reads and
  * without building paths. Only for a cell the JSON-safety walk accepted in
  * this validation. False means "check fully", not "invalid": a reference
  * cell or a style that fails takes the full check, which reports the errors.
- * `validStyles` holds the style objects already accepted in this validation.
+ * `valid_styles` holds the style objects already accepted in this validation.
  */
-function isValidWalkedCell(entry: unknown, validStyles: Set<unknown>): boolean {
+function is_valid_walked_cell(entry: unknown, valid_styles: Set<unknown>): boolean {
   if (!isPlainRecord(entry)) return false;
   if (
-    !nonNegativeInteger(walkedField(entry, "rowOffset")) ||
-    !nonNegativeInteger(walkedField(entry, "colOffset"))
+    !non_negative_integer(walked_field(entry, "rowOffset")) ||
+    !non_negative_integer(walked_field(entry, "colOffset"))
   ) {
     return false;
   }
-  const value = walkedField(entry, "value");
+  const value = walked_field(entry, "value");
   if (!isPlainRecord(value)) return false;
-  const kind = walkedField(value, "kind");
+  const kind = walked_field(value, "kind");
   const valid =
     kind === "literal"
-      ? scalar(walkedField(value, "value"))
-      : kind === "formula" && typeof walkedField(value, "src") === "string";
+      ? scalar(walked_field(value, "value"))
+      : kind === "formula" && typeof walked_field(value, "src") === "string";
   if (!valid) return false;
 
-  const style = walkedField(entry, "style");
-  if (style === undefined || validStyles.has(style)) return true;
-  const styleErrors: DocumentValidationError[] = [];
-  validateCellStyle(style, "", styleErrors, walkedField);
-  if (styleErrors.length > 0) return false;
-  validStyles.add(style);
+  const style = walked_field(entry, "style");
+  if (style === undefined || valid_styles.has(style)) return true;
+  const style_errors: DocumentValidationError[] = [];
+  validate_cell_style(style, "", style_errors, walked_field);
+  if (style_errors.length > 0) return false;
+  valid_styles.add(style);
   return true;
 }
 
-function validateMergeShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
-  const merge = recordAt(entry, path, errors);
+function validate_merge_shape(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const merge = record_at(entry, path, errors);
   if (!merge) return;
   for (const key of ["r0", "c0", "r1", "c1"]) {
-    requireNonNegativeInteger(merge, key, path, errors);
+    require_non_negative_integer(merge, key, path, errors);
   }
 }
 
-function validateConditionalFormatShape(
+function validate_conditional_format_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
-  validateStopIfTrue = false,
+  validate_stop_if_true = false,
 ): void {
-  const format = recordAt(entry, path, errors);
+  const format = record_at(entry, path, errors);
   if (!format) return;
-  validateRangeShape(ownValue(format, "range"), `${path}.range`, errors);
-  validateConditionalPredicate(ownValue(format, "when"), `${path}.when`, errors);
-  validateCellStyle(ownValue(format, "style"), `${path}.style`, errors);
+  validate_range_shape(ownValue(format, "range"), `${path}.range`, errors);
+  validate_conditional_predicate(ownValue(format, "when"), `${path}.when`, errors);
+  validate_cell_style(ownValue(format, "style"), `${path}.style`, errors);
   // Snapshot validation checks this field; operation validation historically does not.
-  if (validateStopIfTrue) optionalBoolean(format, "stopIfTrue", path, errors);
+  if (validate_stop_if_true) optional_boolean(format, "stopIfTrue", path, errors);
 }
 
-function validateValidationRuleShape(
+function validate_validation_rule_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const rule = recordAt(entry, path, errors);
+  const rule = record_at(entry, path, errors);
   if (!rule) return;
-  requireString(rule, "id", path, errors, true);
-  validateRangeShape(ownValue(rule, "range"), `${path}.range`, errors);
-  validateValidationCondition(ownValue(rule, "condition"), `${path}.condition`, errors);
+  require_string(rule, "id", path, errors, true);
+  validate_range_shape(ownValue(rule, "range"), `${path}.range`, errors);
+  validate_validation_condition(ownValue(rule, "condition"), `${path}.condition`, errors);
   const policy = ownValue(rule, "policy");
   if (!["reject", "warn", "allow"].includes(String(policy))) {
     invalid(errors, `${path}.policy`, "Validation policy is invalid");
   }
-  const errorStyle = ownValue(rule, "errorStyle");
-  if (errorStyle !== undefined) {
-    if (!["stop", "warning", "information"].includes(String(errorStyle))) {
+  const error_style = ownValue(rule, "errorStyle");
+  if (error_style !== undefined) {
+    if (!["stop", "warning", "information"].includes(String(error_style))) {
       invalid(errors, `${path}.errorStyle`, "Validation error style is invalid");
-    } else if ((policy === "reject") !== (errorStyle === "stop") && policy !== "allow") {
+    } else if ((policy === "reject") !== (error_style === "stop") && policy !== "allow") {
       invalid(
         errors,
         `${path}.errorStyle`,
@@ -2125,46 +2145,46 @@ function validateValidationRuleShape(
       );
     }
   }
-  optionalBoolean(rule, "allowBlank", path, errors);
-  optionalBoolean(rule, "inCellDropdown", path, errors);
-  optionalString(rule, "helpText", path, errors);
-  optionalString(rule, "errorTitle", path, errors);
-  optionalBoolean(rule, "showInputMessage", path, errors);
-  optionalString(rule, "inputTitle", path, errors);
-  optionalString(rule, "inputMessage", path, errors);
+  optional_boolean(rule, "allowBlank", path, errors);
+  optional_boolean(rule, "inCellDropdown", path, errors);
+  optional_string(rule, "helpText", path, errors);
+  optional_string(rule, "errorTitle", path, errors);
+  optional_boolean(rule, "showInputMessage", path, errors);
+  optional_string(rule, "inputTitle", path, errors);
+  optional_string(rule, "inputMessage", path, errors);
 }
 
-function validateProtectedRangeShape(
+function validate_protected_range_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const protectedRange = recordAt(entry, path, errors);
-  if (!protectedRange) return;
-  requireString(protectedRange, "id", path, errors, true);
-  validateRangeShape(ownValue(protectedRange, "range"), `${path}.range`, errors);
-  optionalString(protectedRange, "label", path, errors);
-  optionalString(protectedRange, "permissionKey", path, errors);
+  const protected_range = record_at(entry, path, errors);
+  if (!protected_range) return;
+  require_string(protected_range, "id", path, errors, true);
+  validate_range_shape(ownValue(protected_range, "range"), `${path}.range`, errors);
+  optional_string(protected_range, "label", path, errors);
+  optional_string(protected_range, "permissionKey", path, errors);
 }
 
-function validateCalculationShape(
+function validate_calculation_shape(
   value: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const calculation = recordAt(value, path, errors);
+  const calculation = record_at(value, path, errors);
   if (!calculation) return;
 
   if (typeof ownValue(calculation, "iterate") !== "boolean") {
     invalid(errors, `${path}.iterate`, "iterate must be a boolean");
   }
 
-  const maxIterations = ownValue(calculation, "maxIterations");
+  const max_iterations = ownValue(calculation, "maxIterations");
   if (
-    typeof maxIterations !== "number" ||
-    !Number.isInteger(maxIterations) ||
-    maxIterations < 1 ||
-    maxIterations > MAX_ITERATIONS
+    typeof max_iterations !== "number" ||
+    !Number.isInteger(max_iterations) ||
+    max_iterations < 1 ||
+    max_iterations > MAX_ITERATIONS
   ) {
     invalid(
       errors,
@@ -2173,20 +2193,20 @@ function validateCalculationShape(
     );
   }
 
-  const maxChange = ownValue(calculation, "maxChange");
-  if (!finiteNumber(maxChange) || maxChange < 0) {
+  const max_change = ownValue(calculation, "maxChange");
+  if (!finite_number(max_change) || max_change < 0) {
     invalid(errors, `${path}.maxChange`, "maxChange must be a finite number >= 0");
   }
 }
 
-function validateNamedRangeShape(
+function validate_named_range_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const namedRange = recordAt(entry, path, errors);
-  if (!namedRange) return;
-  const name = requireString(namedRange, "name", path, errors, true);
+  const named_range = record_at(entry, path, errors);
+  if (!named_range) return;
+  const name = require_string(named_range, "name", path, errors, true);
   if (
     name !== undefined &&
     (name !== name.normalize("NFC") ||
@@ -2196,12 +2216,12 @@ function validateNamedRangeShape(
   ) {
     invalid(errors, `${path}.name`, "Named range name must be formula-safe");
   }
-  optionalString(namedRange, "scope", path, errors);
+  optional_string(named_range, "scope", path, errors);
 
-  const formula = ownValue(namedRange, "formula");
+  const formula = ownValue(named_range, "formula");
   if (formula === undefined) {
-    validateRangeShape(ownValue(namedRange, "range"), `${path}.range`, errors);
-  } else if (ownValue(namedRange, "range") !== undefined) {
+    validate_range_shape(ownValue(named_range, "range"), `${path}.range`, errors);
+  } else if (ownValue(named_range, "range") !== undefined) {
     invalid(errors, path, "A defined name has a range or a formula, not both");
   } else if (
     typeof formula !== "string" ||
@@ -2220,20 +2240,20 @@ function validateNamedRangeShape(
 /** Excel's limit on the length of a formula, which a defined name's formula shares. */
 const MAX_NAMED_FORMULA_LENGTH = 8_192;
 
-function validateOperationSortKey(
+function validate_operation_sort_key(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const sortKey = recordAt(entry, path, errors);
-  if (!sortKey) return;
-  requireNonNegativeInteger(sortKey, "col", path, errors);
-  if (typeof ownValue(sortKey, "ascending") !== "boolean") {
+  const sort_key = record_at(entry, path, errors);
+  if (!sort_key) return;
+  require_non_negative_integer(sort_key, "col", path, errors);
+  if (typeof ownValue(sort_key, "ascending") !== "boolean") {
     invalid(errors, `${path}.ascending`, "ascending must be a boolean");
   }
 }
 
-function validateOperationFilterTuple(
+function validate_operation_filter_tuple(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -2242,21 +2262,21 @@ function validateOperationFilterTuple(
     invalid(errors, path, "Filters must be [column, filter] tuples");
     return;
   }
-  if (!nonNegativeInteger(entry[0])) {
+  if (!non_negative_integer(entry[0])) {
     invalid(errors, `${path}[0]`, "Filter column must be a non-negative integer");
   }
-  validateFilterShape(entry[1], `${path}[1]`, errors);
+  validate_filter_shape(entry[1], `${path}[1]`, errors);
 }
 
-function validateOperationRowGroup(
+function validate_operation_row_group(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
 ): void {
-  const group = recordAt(entry, path, errors);
+  const group = record_at(entry, path, errors);
   if (!group) return;
-  requireNonNegativeInteger(group, "start", path, errors);
-  requireNonNegativeInteger(group, "end", path, errors);
+  require_non_negative_integer(group, "start", path, errors);
+  require_non_negative_integer(group, "end", path, errors);
   if (typeof ownValue(group, "collapsed") !== "boolean") {
     invalid(errors, `${path}.collapsed`, "collapsed must be a boolean");
   }
@@ -2271,7 +2291,7 @@ export function validateDocumentOperationShape(
   path = "operation",
 ): readonly DocumentValidationError[] {
   const errors: DocumentValidationError[] = [];
-  const operation = recordAt(value, path, errors);
+  const operation = record_at(value, path, errors);
   if (!operation) return errors;
   const kind = ownValue(operation, "op");
   if (typeof kind !== "string") {
@@ -2279,130 +2299,136 @@ export function validateDocumentOperationShape(
     return errors;
   }
 
-  const operationKind = kind as DocumentOp["op"];
+  const operation_kind = kind as DocumentOp["op"];
 
-  switch (operationKind) {
+  switch (operation_kind) {
     case "set": {
-      validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);
-      validateCellValueShape(ownValue(operation, "value"), `${path}.value`, errors);
+      validate_address(ownValue(operation, "addr"), `${path}.addr`, errors);
+      validate_cell_value_shape(ownValue(operation, "value"), `${path}.value`, errors);
       const style = ownValue(operation, "style");
-      if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+      if (style !== undefined) validate_cell_style(style, `${path}.style`, errors);
       break;
     }
 
     case "setRange": {
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
-      const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
+      const cells = array_at(ownValue(operation, "cells"), `${path}.cells`, errors);
       cells?.forEach((cell, index) => {
-        validateCellShape(cell, `${path}.cells[${index}]`, errors);
+        validate_cell_shape(cell, `${path}.cells[${index}]`, errors);
       });
 
       break;
     }
 
     case "setBlock": {
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
-      const blockPath = `${path}.block`;
-      const block = recordAt(ownValue(operation, "block"), blockPath, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
+      const block_path = `${path}.block`;
+      const block = record_at(ownValue(operation, "block"), block_path, errors);
       if (!block) break;
-      const rowCount = requireNonNegativeInteger(block, "rowCount", blockPath, errors, true);
-      const colCount = requireNonNegativeInteger(block, "colCount", blockPath, errors, true);
-      const values = arrayAt(ownValue(block, "values"), `${blockPath}.values`, errors);
+      const row_count = require_non_negative_integer(block, "rowCount", block_path, errors, true);
+      const col_count = require_non_negative_integer(block, "colCount", block_path, errors, true);
+      const values = array_at(ownValue(block, "values"), `${block_path}.values`, errors);
       values?.forEach((entry, index) => {
         if (!scalar(entry)) {
-          invalid(errors, `${blockPath}.values[${index}]`, "Block values must be scalars");
+          invalid(errors, `${block_path}.values[${index}]`, "Block values must be scalars");
         }
       });
 
-      const cellCount =
-        rowCount !== undefined &&
-        colCount !== undefined &&
-        !productExceeds(rowCount, colCount, Number.MAX_SAFE_INTEGER)
-          ? rowCount * colCount
+      const cell_count =
+        row_count !== undefined &&
+        col_count !== undefined &&
+        !product_exceeds(row_count, col_count, Number.MAX_SAFE_INTEGER)
+          ? row_count * col_count
           : undefined;
-      if (cellCount === undefined && rowCount !== undefined && colCount !== undefined) {
-        invalid(errors, blockPath, "Block dimensions exceed safe integer capacity");
-      } else if (values && cellCount !== undefined && values.length !== cellCount) {
-        invalid(errors, `${blockPath}.values`, "Block values must match its dimensions");
+      if (cell_count === undefined && row_count !== undefined && col_count !== undefined) {
+        invalid(errors, block_path, "Block dimensions exceed safe integer capacity");
+      } else if (values && cell_count !== undefined && values.length !== cell_count) {
+        invalid(errors, `${block_path}.values`, "Block values must match its dimensions");
       }
 
-      const sourceOffsets = new Set<number>();
+      const source_offsets = new Set<number>();
       const formulas = ownValue(block, "formulas");
       if (formulas !== undefined) {
-        const entries = arrayAt(formulas, `${blockPath}.formulas`, errors);
+        const entries = array_at(formulas, `${block_path}.formulas`, errors);
         entries?.forEach((entry, index) => {
-          const entryPath = `${blockPath}.formulas[${index}]`;
+          const entry_path = `${block_path}.formulas[${index}]`;
           if (!Array.isArray(entry) || entry.length !== 2) {
-            invalid(errors, entryPath, "Block formulas must be [offset, source] tuples");
+            invalid(errors, entry_path, "Block formulas must be [offset, source] tuples");
             return;
           }
 
-          if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
-            invalid(errors, `${entryPath}[0]`, "Formula offset is outside the block");
+          if (
+            !non_negative_integer(entry[0]) ||
+            (cell_count !== undefined && entry[0] >= cell_count)
+          ) {
+            invalid(errors, `${entry_path}[0]`, "Formula offset is outside the block");
           }
 
           if (typeof entry[0] === "number") {
-            if (sourceOffsets.has(entry[0])) {
-              invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
+            if (source_offsets.has(entry[0])) {
+              invalid(errors, `${entry_path}[0]`, "Block source offsets must be unique");
             }
 
-            sourceOffsets.add(entry[0]);
+            source_offsets.add(entry[0]);
           }
 
           if (typeof entry[1] !== "string") {
-            invalid(errors, `${entryPath}[1]`, "Formula source must be a string");
+            invalid(errors, `${entry_path}[1]`, "Formula source must be a string");
           }
         });
       }
 
       const refs = ownValue(block, "refs");
       if (refs !== undefined) {
-        const entries = arrayAt(refs, `${blockPath}.refs`, errors);
+        const entries = array_at(refs, `${block_path}.refs`, errors);
         entries?.forEach((entry, index) => {
-          const entryPath = `${blockPath}.refs[${index}]`;
+          const entry_path = `${block_path}.refs[${index}]`;
           if (!Array.isArray(entry) || entry.length !== 2) {
-            invalid(errors, entryPath, "Block refs must be [offset, address] tuples");
+            invalid(errors, entry_path, "Block refs must be [offset, address] tuples");
             return;
           }
 
-          if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
-            invalid(errors, `${entryPath}[0]`, "Reference offset is outside the block");
+          if (
+            !non_negative_integer(entry[0]) ||
+            (cell_count !== undefined && entry[0] >= cell_count)
+          ) {
+            invalid(errors, `${entry_path}[0]`, "Reference offset is outside the block");
           }
 
           if (typeof entry[0] === "number") {
-            if (sourceOffsets.has(entry[0])) {
-              invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
+            if (source_offsets.has(entry[0])) {
+              invalid(errors, `${entry_path}[0]`, "Block source offsets must be unique");
             }
 
-            sourceOffsets.add(entry[0]);
+            source_offsets.add(entry[0]);
           }
 
-          validateAddress(entry[1], `${entryPath}[1]`, errors);
+          validate_address(entry[1], `${entry_path}[1]`, errors);
         });
       }
 
-      const styleTableValue = ownValue(block, "styleTable");
-      const styleTable =
-        styleTableValue === undefined
+      const style_table_value = ownValue(block, "styleTable");
+      const style_table =
+        style_table_value === undefined
           ? undefined
-          : arrayAt(styleTableValue, `${blockPath}.styleTable`, errors);
-      styleTable?.forEach((style, index) => {
-        validateCellStyle(style, `${blockPath}.styleTable[${index}]`, errors);
+          : array_at(style_table_value, `${block_path}.styleTable`, errors);
+      style_table?.forEach((style, index) => {
+        validate_cell_style(style, `${block_path}.styleTable[${index}]`, errors);
       });
 
-      const styleIdsValue = ownValue(block, "styleIds");
-      if (styleIdsValue !== undefined) {
-        const styleIds = arrayAt(styleIdsValue, `${blockPath}.styleIds`, errors);
-        if (styleIds && cellCount !== undefined && styleIds.length !== cellCount) {
-          invalid(errors, `${blockPath}.styleIds`, "Block style IDs must match its dimensions");
+      const style_ids_value = ownValue(block, "styleIds");
+      if (style_ids_value !== undefined) {
+        const style_ids = array_at(style_ids_value, `${block_path}.styleIds`, errors);
+        if (style_ids && cell_count !== undefined && style_ids.length !== cell_count) {
+          invalid(errors, `${block_path}.styleIds`, "Block style IDs must match its dimensions");
         }
 
-        styleIds?.forEach((styleId, index) => {
+        style_ids?.forEach((style_id, index) => {
           if (
-            !nonNegativeInteger(styleId) ||
-            (styleTable !== undefined && styleId >= styleTable.length)
+            !non_negative_integer(style_id) ||
+            (style_table !== undefined && style_id >= style_table.length)
           ) {
-            invalid(errors, `${blockPath}.styleIds[${index}]`, "Block style ID is invalid");
+            invalid(errors, `${block_path}.styleIds[${index}]`, "Block style ID is invalid");
           }
         });
       }
@@ -2411,15 +2437,15 @@ export function validateDocumentOperationShape(
     }
 
     case "restoreBlock": {
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
       const encoding = ownValue(operation, "encoding");
-      const decodedBytes = ownValue(operation, "decodedBytes");
+      const decoded_bytes = ownValue(operation, "decodedBytes");
       const data = ownValue(operation, "data");
       if (encoding !== "deflate-json-v1") {
         invalid(errors, `${path}.encoding`, "Restore block encoding is invalid");
       }
 
-      if (typeof decodedBytes !== "number") {
+      if (typeof decoded_bytes !== "number") {
         invalid(errors, `${path}.decodedBytes`, "Restore block decoded bytes must be a number");
       }
 
@@ -2427,7 +2453,7 @@ export function validateDocumentOperationShape(
         invalid(errors, `${path}.data`, "Restore block data must be a string");
       }
 
-      if (errors.length || !isRestoreBlockShape(operation)) break;
+      if (errors.length || !is_restore_block_shape(operation)) break;
       try {
         const prepared = preparedRestore(operation, validateDocumentOperationShape);
         errors.push(
@@ -2454,20 +2480,20 @@ export function validateDocumentOperationShape(
     }
 
     case "setRangeStyle": {
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
       const style = ownValue(operation, "style");
-      if (style !== null) validateCellStyle(style, `${path}.style`, errors);
+      if (style !== null) validate_cell_style(style, `${path}.style`, errors);
       break;
     }
 
     case "clearRange":
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
-      optionalBoolean(operation, "contents", path, errors);
-      optionalBoolean(operation, "style", path, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
+      optional_boolean(operation, "contents", path, errors);
+      optional_boolean(operation, "style", path, errors);
       break;
 
     case "permuteRows":
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
       if (ownValue(operation, "encoding") !== ROW_ORDER_ENCODING) {
         invalid(errors, `${path}.encoding`, "Row order encoding is invalid");
       }
@@ -2478,74 +2504,74 @@ export function validateDocumentOperationShape(
       break;
 
     case "moveCells":
-      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
-      validateAddress(ownValue(operation, "to"), `${path}.to`, errors);
-      validateCellShift(operation, path, errors);
+      validate_range_shape(ownValue(operation, "range"), `${path}.range`, errors);
+      validate_address(ownValue(operation, "to"), `${path}.to`, errors);
+      validate_cell_shift(operation, path, errors);
       break;
 
     case "addRows":
     case "removeRows":
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "at", path, errors);
-      requireNonNegativeInteger(operation, "count", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "at", path, errors);
+      require_non_negative_integer(operation, "count", path, errors, true);
       break;
 
     case "moveRows":
     case "moveColumns":
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "from", path, errors);
-      requireNonNegativeInteger(operation, "count", path, errors, true);
-      requireNonNegativeInteger(operation, "to", path, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "from", path, errors);
+      require_non_negative_integer(operation, "count", path, errors, true);
+      require_non_negative_integer(operation, "to", path, errors);
       break;
 
     case "addColumns": {
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "at", path, errors);
-      const columns = arrayAt(ownValue(operation, "columns"), `${path}.columns`, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "at", path, errors);
+      const columns = array_at(ownValue(operation, "columns"), `${path}.columns`, errors);
       columns?.forEach((column, index) => {
-        validateColumnShape(column, `${path}.columns[${index}]`, errors);
+        validate_column_shape(column, `${path}.columns[${index}]`, errors);
       });
 
       break;
     }
 
     case "removeColumns":
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "at", path, errors);
-      requireNonNegativeInteger(operation, "count", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "at", path, errors);
+      require_non_negative_integer(operation, "count", path, errors, true);
       break;
 
     case "setColumn": {
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "col", path, errors);
-      const patchPath = `${path}.patch`;
-      const patch = recordAt(ownValue(operation, "patch"), patchPath, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "col", path, errors);
+      const patch_path = `${path}.patch`;
+      const patch = record_at(ownValue(operation, "patch"), patch_path, errors);
       if (!patch) break;
       const key = ownValue(patch, "key");
       if (key !== undefined && (typeof key !== "string" || key.length === 0)) {
-        invalid(errors, `${patchPath}.key`, "Column key must be a non-empty string");
+        invalid(errors, `${patch_path}.key`, "Column key must be a non-empty string");
       }
 
-      optionalString(patch, "header", patchPath, errors);
+      optional_string(patch, "header", patch_path, errors);
       const width = ownValue(patch, "width");
-      if (width !== undefined && (!finiteNumber(width) || width < 0)) {
-        invalid(errors, `${patchPath}.width`, "Column width must be finite and non-negative");
+      if (width !== undefined && (!finite_number(width) || width < 0)) {
+        invalid(errors, `${patch_path}.width`, "Column width must be finite and non-negative");
       }
 
       const type = ownValue(patch, "type");
       if (type !== undefined && !COLUMN_TYPES.includes(String(type))) {
-        invalid(errors, `${patchPath}.type`, "Column type is invalid");
+        invalid(errors, `${patch_path}.type`, "Column type is invalid");
       }
 
       for (const field of ["numberFormat", "numberLocale", "renderer"]) {
-        optionalString(patch, field, patchPath, errors);
+        optional_string(patch, field, patch_path, errors);
       }
 
-      optionalBoolean(patch, "visible", patchPath, errors);
+      optional_boolean(patch, "visible", patch_path, errors);
       for (const field of ["headerStyle", "cellStyle"]) {
         const style = ownValue(patch, field);
         if (style !== undefined) {
-          validateCellStyle(style, `${patchPath}.${field}`, errors);
+          validate_cell_style(style, `${patch_path}.${field}`, errors);
         }
       }
 
@@ -2553,48 +2579,48 @@ export function validateDocumentOperationShape(
     }
 
     case "setRowMeta": {
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "row", path, errors);
-      const metaValue = ownValue(operation, "meta");
-      if (metaValue === null) break;
-      const metaPath = `${path}.meta`;
-      const meta = recordAt(metaValue, metaPath, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "row", path, errors);
+      const meta_value = ownValue(operation, "meta");
+      if (meta_value === null) break;
+      const meta_path = `${path}.meta`;
+      const meta = record_at(meta_value, meta_path, errors);
       if (!meta) break;
       const height = ownValue(meta, "height");
-      if (height !== undefined && (!finiteNumber(height) || height <= 0)) {
-        invalid(errors, `${metaPath}.height`, "Row height must be finite and positive");
+      if (height !== undefined && (!finite_number(height) || height <= 0)) {
+        invalid(errors, `${meta_path}.height`, "Row height must be finite and positive");
       }
 
-      optionalBoolean(meta, "hidden", metaPath, errors);
+      optional_boolean(meta, "hidden", meta_path, errors);
       break;
     }
 
     case "addMerge":
     case "removeMerge":
-      validateOperationSheetId(operation, path, errors);
-      validateMergeShape(ownValue(operation, "merge"), `${path}.merge`, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      validate_merge_shape(ownValue(operation, "merge"), `${path}.merge`, errors);
       break;
 
     case "addSheet":
-      validateSheetShape(ownValue(operation, "sheet"), `${path}.sheet`, errors);
+      validate_sheet_shape(ownValue(operation, "sheet"), `${path}.sheet`, errors);
       break;
 
     case "removeSheet":
-      validateOperationSheetId(operation, path, errors);
+      validate_operation_sheet_id(operation, path, errors);
       break;
 
     case "renameSheet":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "name", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "name", path, errors, true);
       break;
 
     case "moveSheet":
-      validateOperationSheetId(operation, path, errors);
-      requireNonNegativeInteger(operation, "to", path, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      require_non_negative_integer(operation, "to", path, errors);
       break;
 
     case "setSheetVisibility": {
-      validateOperationSheetId(operation, path, errors);
+      validate_operation_sheet_id(operation, path, errors);
       const visibility = ownValue(operation, "visibility");
       if (visibility !== "visible" && visibility !== "hidden" && visibility !== "veryHidden") {
         invalid(errors, `${path}.visibility`, "Sheet visibility is invalid");
@@ -2604,104 +2630,104 @@ export function validateDocumentOperationShape(
     }
 
     case "addTable":
-      validateWorkbookTableShape(ownValue(operation, "table"), `${path}.table`, errors);
+      validate_workbook_table_shape(ownValue(operation, "table"), `${path}.table`, errors);
       break;
 
     case "updateTable":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "tableId", path, errors, true);
-      validateWorkbookTableShape(ownValue(operation, "patch"), `${path}.patch`, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "tableId", path, errors, true);
+      validate_workbook_table_shape(ownValue(operation, "patch"), `${path}.patch`, errors, true);
       break;
 
     case "removeTable":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "tableId", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "tableId", path, errors, true);
       break;
 
     case "setSheetMeta": {
-      validateOperationSheetId(operation, path, errors);
-      const patchPath = `${path}.patch`;
-      const patch = recordAt(ownValue(operation, "patch"), patchPath, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      const patch_path = `${path}.patch`;
+      const patch = record_at(ownValue(operation, "patch"), patch_path, errors);
       if (!patch) break;
       for (const field of ["frozenRows", "frozenCols"]) {
         const count = ownValue(patch, field);
-        if (count !== undefined && !nonNegativeInteger(count)) {
-          invalid(errors, `${patchPath}.${field}`, `${field} must be a non-negative integer`);
+        if (count !== undefined && !non_negative_integer(count)) {
+          invalid(errors, `${patch_path}.${field}`, `${field} must be a non-negative integer`);
         }
       }
 
-      const conditionalFormats = ownValue(patch, "conditionalFormats");
-      if (conditionalFormats !== undefined) {
-        const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
+      const conditional_formats = ownValue(patch, "conditionalFormats");
+      if (conditional_formats !== undefined) {
+        const entries = array_at(conditional_formats, `${patch_path}.conditionalFormats`, errors);
         entries?.forEach((entry, index) => {
-          validateConditionalFormatShape(
+          validate_conditional_format_shape(
             entry,
-            `${patchPath}.conditionalFormats[${index}]`,
+            `${patch_path}.conditionalFormats[${index}]`,
             errors,
           );
         });
       }
 
-      const rowGroups = ownValue(patch, "rowGroups");
-      if (rowGroups !== undefined) {
-        const entries = arrayAt(rowGroups, `${patchPath}.rowGroups`, errors);
+      const row_groups = ownValue(patch, "rowGroups");
+      if (row_groups !== undefined) {
+        const entries = array_at(row_groups, `${patch_path}.rowGroups`, errors);
         entries?.forEach((entry, index) => {
-          validateOperationRowGroup(entry, `${patchPath}.rowGroups[${index}]`, errors);
+          validate_operation_row_group(entry, `${patch_path}.rowGroups[${index}]`, errors);
         });
       }
 
-      const sortKeys = ownValue(patch, "sortKeys");
-      if (sortKeys !== undefined) {
-        const entries = arrayAt(sortKeys, `${patchPath}.sortKeys`, errors);
+      const sort_keys = ownValue(patch, "sortKeys");
+      if (sort_keys !== undefined) {
+        const entries = array_at(sort_keys, `${patch_path}.sortKeys`, errors);
         entries?.forEach((entry, index) => {
-          validateOperationSortKey(entry, `${patchPath}.sortKeys[${index}]`, errors);
+          validate_operation_sort_key(entry, `${patch_path}.sortKeys[${index}]`, errors);
         });
       }
 
       const filters = ownValue(patch, "filters");
       if (filters !== undefined) {
-        const entries = arrayAt(filters, `${patchPath}.filters`, errors);
+        const entries = array_at(filters, `${patch_path}.filters`, errors);
         entries?.forEach((entry, index) => {
-          validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors);
+          validate_operation_filter_tuple(entry, `${patch_path}.filters[${index}]`, errors);
         });
       }
 
-      const autoFilter = ownValue(patch, "autoFilter");
-      if (autoFilter !== undefined && autoFilter !== null) {
-        validateAutoFilterShape(autoFilter, `${patchPath}.autoFilter`, errors);
+      const auto_filter = ownValue(patch, "autoFilter");
+      if (auto_filter !== undefined && auto_filter !== null) {
+        validate_auto_filter_shape(auto_filter, `${patch_path}.autoFilter`, errors);
       }
 
       // `null` gives the tab its default look back.
-      const tabColor = ownValue(patch, "tabColor");
-      if (tabColor !== null) validateTabColor(tabColor, `${patchPath}.tabColor`, errors);
+      const tab_color = ownValue(patch, "tabColor");
+      if (tab_color !== null) validate_tab_color(tab_color, `${patch_path}.tabColor`, errors);
 
       break;
     }
 
     case "setHyperlink":
-      validateOperationSheetId(operation, path, errors);
-      validateHyperlinkShape(ownValue(operation, "hyperlink"), `${path}.hyperlink`, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      validate_hyperlink_shape(ownValue(operation, "hyperlink"), `${path}.hyperlink`, errors);
       break;
 
     case "removeHyperlink":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "id", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setValidationRule":
-      validateOperationSheetId(operation, path, errors);
-      validateValidationRuleShape(ownValue(operation, "rule"), `${path}.rule`, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      validate_validation_rule_shape(ownValue(operation, "rule"), `${path}.rule`, errors);
       break;
 
     case "removeValidationRule":
     case "removeProtectedRange":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "id", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setProtectedRange":
-      validateOperationSheetId(operation, path, errors);
-      validateProtectedRangeShape(
+      validate_operation_sheet_id(operation, path, errors);
+      validate_protected_range_shape(
         ownValue(operation, "protectedRange"),
         `${path}.protectedRange`,
         errors,
@@ -2709,7 +2735,7 @@ export function validateDocumentOperationShape(
       break;
 
     case "setNote": {
-      validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);
+      validate_address(ownValue(operation, "addr"), `${path}.addr`, errors);
       const text = ownValue(operation, "text");
       if (text !== null && typeof text !== "string") {
         invalid(errors, `${path}.text`, "Note text must be a string or null");
@@ -2719,16 +2745,16 @@ export function validateDocumentOperationShape(
     }
 
     case "setNamedRange":
-      validateNamedRangeShape(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
+      validate_named_range_shape(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
       break;
 
     case "removeNamedRange":
-      requireString(operation, "name", path, errors, true);
-      optionalString(operation, "scope", path, errors);
+      require_string(operation, "name", path, errors, true);
+      optional_string(operation, "scope", path, errors);
       break;
 
     case "setCalculation":
-      validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
+      validate_calculation_shape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
     case "setExternalLinks":
@@ -2740,7 +2766,7 @@ export function validateDocumentOperationShape(
       break;
 
     case "removeMeasure":
-      requireString(operation, "id", path, errors, true);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setRelationship":
@@ -2752,7 +2778,7 @@ export function validateDocumentOperationShape(
       break;
 
     case "removeRelationship":
-      requireString(operation, "id", path, errors, true);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setQuery":
@@ -2760,33 +2786,33 @@ export function validateDocumentOperationShape(
       break;
 
     case "removeQuery":
-      requireString(operation, "id", path, errors, true);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setChart":
-      validateOperationSheetId(operation, path, errors);
-      validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
+      validate_operation_sheet_id(operation, path, errors);
+      validate_chart_shape(ownValue(operation, "chart"), `${path}.chart`, errors);
       break;
 
     case "setPivot":
-      validateOperationSheetId(operation, path, errors);
+      validate_operation_sheet_id(operation, path, errors);
       validatePivotShape(ownValue(operation, "pivot"), `${path}.pivot`, errors);
       break;
 
     case "removeChart":
     case "removePivot":
     case "removeDashboardItem":
-      validateOperationSheetId(operation, path, errors);
-      requireString(operation, "id", path, errors, true);
+      validate_operation_sheet_id(operation, path, errors);
+      require_string(operation, "id", path, errors, true);
       break;
 
     case "setDashboardItem":
-      validateOperationSheetId(operation, path, errors);
+      validate_operation_sheet_id(operation, path, errors);
       validateDashboardItemShape(ownValue(operation, "item"), `${path}.item`, errors);
       break;
 
     default: {
-      const unsupported: never = operationKind;
+      const unsupported: never = operation_kind;
       invalid(errors, `${path}.op`, `Document operation kind ${String(unsupported)} is invalid`);
     }
   }
@@ -2814,12 +2840,12 @@ export interface MergeScanStats {
   nodeVisits: number;
 }
 
-function mergeNodeHeight(node: MergeIntervalNode | null): number {
+function merge_node_height(node: MergeIntervalNode | null): number {
   return node?.height ?? 0;
 }
 
-function updateMergeNode(node: MergeIntervalNode): MergeIntervalNode {
-  node.height = Math.max(mergeNodeHeight(node.left), mergeNodeHeight(node.right)) + 1;
+function update_merge_node(node: MergeIntervalNode): MergeIntervalNode {
+  node.height = Math.max(merge_node_height(node.left), merge_node_height(node.right)) + 1;
   node.maxC1 = Math.max(node.rect.c1, node.left?.maxC1 ?? -1, node.right?.maxC1 ?? -1);
   node.minIndex = Math.min(
     node.rect.index,
@@ -2830,43 +2856,43 @@ function updateMergeNode(node: MergeIntervalNode): MergeIntervalNode {
   return node;
 }
 
-function rotateMergeRight(root: MergeIntervalNode): MergeIntervalNode {
+function rotate_merge_right(root: MergeIntervalNode): MergeIntervalNode {
   const pivot = root.left!;
   root.left = pivot.right;
-  pivot.right = updateMergeNode(root);
-  return updateMergeNode(pivot);
+  pivot.right = update_merge_node(root);
+  return update_merge_node(pivot);
 }
 
-function rotateMergeLeft(root: MergeIntervalNode): MergeIntervalNode {
+function rotate_merge_left(root: MergeIntervalNode): MergeIntervalNode {
   const pivot = root.right!;
   root.right = pivot.left;
-  pivot.left = updateMergeNode(root);
-  return updateMergeNode(pivot);
+  pivot.left = update_merge_node(root);
+  return update_merge_node(pivot);
 }
 
-function balanceMergeNode(node: MergeIntervalNode): MergeIntervalNode {
-  updateMergeNode(node);
-  const balance = mergeNodeHeight(node.left) - mergeNodeHeight(node.right);
+function balance_merge_node(node: MergeIntervalNode): MergeIntervalNode {
+  update_merge_node(node);
+  const balance = merge_node_height(node.left) - merge_node_height(node.right);
   if (balance > 1) {
-    if (mergeNodeHeight(node.left!.left) < mergeNodeHeight(node.left!.right)) {
-      node.left = rotateMergeLeft(node.left!);
+    if (merge_node_height(node.left!.left) < merge_node_height(node.left!.right)) {
+      node.left = rotate_merge_left(node.left!);
     }
-    return rotateMergeRight(node);
+    return rotate_merge_right(node);
   }
   if (balance < -1) {
-    if (mergeNodeHeight(node.right!.right) < mergeNodeHeight(node.right!.left)) {
-      node.right = rotateMergeRight(node.right!);
+    if (merge_node_height(node.right!.right) < merge_node_height(node.right!.left)) {
+      node.right = rotate_merge_right(node.right!);
     }
-    return rotateMergeLeft(node);
+    return rotate_merge_left(node);
   }
   return node;
 }
 
-function compareIndexedMerge(left: IndexedMerge, right: IndexedMerge): number {
+function compare_indexed_merge(left: IndexedMerge, right: IndexedMerge): number {
   return left.c0 - right.c0 || left.index - right.index;
 }
 
-function insertMergeNode(node: MergeIntervalNode | null, rect: IndexedMerge): MergeIntervalNode {
+function insert_merge_node(node: MergeIntervalNode | null, rect: IndexedMerge): MergeIntervalNode {
   if (!node) {
     return {
       rect,
@@ -2878,60 +2904,60 @@ function insertMergeNode(node: MergeIntervalNode | null, rect: IndexedMerge): Me
       maxIndex: rect.index,
     };
   }
-  if (compareIndexedMerge(rect, node.rect) < 0) node.left = insertMergeNode(node.left, rect);
-  else node.right = insertMergeNode(node.right, rect);
-  return balanceMergeNode(node);
+  if (compare_indexed_merge(rect, node.rect) < 0) node.left = insert_merge_node(node.left, rect);
+  else node.right = insert_merge_node(node.right, rect);
+  return balance_merge_node(node);
 }
 
-function removeMergeNode(
+function remove_merge_node(
   node: MergeIntervalNode | null,
   rect: IndexedMerge,
 ): MergeIntervalNode | null {
   if (!node) return null;
-  const order = compareIndexedMerge(rect, node.rect);
-  if (order < 0) node.left = removeMergeNode(node.left, rect);
-  else if (order > 0) node.right = removeMergeNode(node.right, rect);
+  const order = compare_indexed_merge(rect, node.rect);
+  if (order < 0) node.left = remove_merge_node(node.left, rect);
+  else if (order > 0) node.right = remove_merge_node(node.right, rect);
   else {
     if (!node.left) return node.right;
     if (!node.right) return node.left;
     let successor = node.right;
     while (successor.left) successor = successor.left;
     node.rect = successor.rect;
-    node.right = removeMergeNode(node.right, successor.rect);
+    node.right = remove_merge_node(node.right, successor.rect);
   }
-  return balanceMergeNode(node);
+  return balance_merge_node(node);
 }
 
-function lowerIndexOverlap(
+function lower_index_overlap(
   node: MergeIntervalNode | null,
   rect: IndexedMerge,
   stats: MergeScanStats | undefined,
 ): IndexedMerge | null {
   if (!node || node.maxC1 < rect.c0 || node.minIndex >= rect.index) return null;
   if (stats) stats.nodeVisits += 1;
-  const left = lowerIndexOverlap(node.left, rect, stats);
+  const left = lower_index_overlap(node.left, rect, stats);
   if (left) return left;
   if (node.rect.index < rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
     return node.rect;
   }
   if (node.rect.c0 > rect.c1) return null;
-  return lowerIndexOverlap(node.right, rect, stats);
+  return lower_index_overlap(node.right, rect, stats);
 }
 
-function higherIndexOverlap(
+function higher_index_overlap(
   node: MergeIntervalNode | null,
   rect: IndexedMerge,
   stats: MergeScanStats | undefined,
 ): IndexedMerge | null {
   if (!node || node.maxC1 < rect.c0 || node.maxIndex <= rect.index) return null;
   if (stats) stats.nodeVisits += 1;
-  const left = higherIndexOverlap(node.left, rect, stats);
+  const left = higher_index_overlap(node.left, rect, stats);
   if (left) return left;
   if (node.rect.index > rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
     return node.rect;
   }
   if (node.rect.c0 > rect.c1) return null;
-  return higherIndexOverlap(node.right, rect, stats);
+  return higher_index_overlap(node.right, rect, stats);
 }
 
 /** Flags every merge that overlaps another merge, in O(n log n) with an interval tree. */
@@ -2949,31 +2975,31 @@ export function overlappingMergeIndices(
   const overlapping = new Array<boolean>(merges.length).fill(false);
   let active: MergeIntervalNode | null = null;
   let unflagged: MergeIntervalNode | null = null;
-  let endIndex = 0;
+  let end_index = 0;
 
   for (const rect of starts) {
-    while ((ends[endIndex]?.r1 ?? Number.POSITIVE_INFINITY) < rect.r0) {
-      const expired = ends[endIndex++]!;
-      active = removeMergeNode(active, expired);
-      unflagged = removeMergeNode(unflagged, expired);
+    while ((ends[end_index]?.r1 ?? Number.POSITIVE_INFINITY) < rect.r0) {
+      const expired = ends[end_index++]!;
+      active = remove_merge_node(active, expired);
+      unflagged = remove_merge_node(unflagged, expired);
     }
 
-    if (lowerIndexOverlap(active, rect, stats)) overlapping[rect.index] = true;
-    let later = higherIndexOverlap(unflagged, rect, stats);
+    if (lower_index_overlap(active, rect, stats)) overlapping[rect.index] = true;
+    let later = higher_index_overlap(unflagged, rect, stats);
     while (later) {
       overlapping[later.index] = true;
-      unflagged = removeMergeNode(unflagged, later);
-      later = higherIndexOverlap(unflagged, rect, stats);
+      unflagged = remove_merge_node(unflagged, later);
+      later = higher_index_overlap(unflagged, rect, stats);
     }
 
-    active = insertMergeNode(active, rect);
-    if (!overlapping[rect.index]) unflagged = insertMergeNode(unflagged, rect);
+    active = insert_merge_node(active, rect);
+    if (!overlapping[rect.index]) unflagged = insert_merge_node(unflagged, rect);
   }
 
   return overlapping;
 }
 
-function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
+function range_in_sheet(range: Range, sheet: SheetSnapshot): boolean {
   return (
     range.sheet === sheet.id &&
     Math.max(range.start.row, range.end.row) < sheet.rowCount &&
@@ -2998,7 +3024,7 @@ const TAB_COLOR = /^#[\dA-Fa-f]{6}$/u;
 const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
 
 /** A sheet's tab color, when present, is `#RRGGBB`. */
-function validateTabColor(value: unknown, path: string, errors: DocumentValidationError[]): void {
+function validate_tab_color(value: unknown, path: string, errors: DocumentValidationError[]): void {
   if (value !== undefined && !(typeof value === "string" && TAB_COLOR.test(value))) {
     invalid(errors, path, "tabColor must be a #RRGGBB color");
   }
@@ -3010,7 +3036,7 @@ const RELATIONSHIP_TYPE_PATTERN = /^https?:\/\/[^\s<>"'&]+$/;
 const FIRST_PRINTABLE_CHARACTER = 0x20;
 
 /** Package-relative OPC part names only; anything a writer could misinterpret is refused. */
-function safeXlsxPartName(value: unknown): value is string {
+function safe_xlsx_part_name(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > MAX_XLSX_PART_NAME_LENGTH) {
     return false;
   }
@@ -3027,17 +3053,18 @@ function safeXlsxPartName(value: unknown): value is string {
   );
 }
 
-function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): void {
+function validate_xlsx_source(value: unknown, errors: DocumentValidationError[]): void {
   if (value === undefined) return;
   const path = "workbook.xlsxSource";
-  const source = recordAt(value, path, errors);
+  const source = record_at(value, path, errors);
   if (!source) return;
-  const parts = arrayAt(ownValue(source, "parts"), `${path}.parts`, errors);
-  const graphs = arrayAt(ownValue(source, "graphs"), `${path}.graphs`, errors);
-  const dropped = optionalArray(source, "dropped", path, errors);
+  const parts = array_at(ownValue(source, "parts"), `${path}.parts`, errors);
+  const graphs = array_at(ownValue(source, "graphs"), `${path}.graphs`, errors);
+  const dropped = optional_array(source, "dropped", path, errors);
   if (
     dropped &&
-    (dropped.length > MAX_XLSX_SOURCE_ENTRIES || !dropped.every((part) => safeXlsxPartName(part)))
+    (dropped.length > MAX_XLSX_SOURCE_ENTRIES ||
+      !dropped.every((part) => safe_xlsx_part_name(part)))
   ) {
     invalid(errors, `${path}.dropped`, "dropped must list safe part names");
   }
@@ -3049,69 +3076,69 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
   }
 
   const names = new Set<string>();
-  let compressedBytes = 0;
+  let compressed_bytes = 0;
   for (let index = 0; index < parts.length; index++) {
-    const partPath = `${path}.parts[${index}]`;
-    const part = recordAt(parts[index], partPath, errors);
+    const part_path = `${path}.parts[${index}]`;
+    const part = record_at(parts[index], part_path, errors);
     if (!part) continue;
     const name = ownValue(part, "name");
-    const contentType = ownValue(part, "contentType");
+    const content_type = ownValue(part, "contentType");
     const method = ownValue(part, "method");
     const crc32 = ownValue(part, "crc32");
     const size = ownValue(part, "uncompressedSize");
     const data = ownValue(part, "data");
     // OPC part names compare case-insensitively.
-    if (!safeXlsxPartName(name) || names.has(name.toLowerCase())) {
-      invalid(errors, `${partPath}.name`, "Part name must be a unique safe OPC name");
+    if (!safe_xlsx_part_name(name) || names.has(name.toLowerCase())) {
+      invalid(errors, `${part_path}.name`, "Part name must be a unique safe OPC name");
     } else names.add(name.toLowerCase());
 
     if (
-      typeof contentType !== "string" ||
-      contentType.length > MAX_XLSX_CONTENT_TYPE_LENGTH ||
-      !CONTENT_TYPE_PATTERN.test(contentType)
+      typeof content_type !== "string" ||
+      content_type.length > MAX_XLSX_CONTENT_TYPE_LENGTH ||
+      !CONTENT_TYPE_PATTERN.test(content_type)
     ) {
-      invalid(errors, `${partPath}.contentType`, "contentType must be a MIME type");
+      invalid(errors, `${part_path}.contentType`, "contentType must be a MIME type");
     }
 
     if (method !== 0 && method !== 8)
-      invalid(errors, `${partPath}.method`, "method must be 0 or 8");
-    if (!nonNegativeInteger(crc32) || crc32 > 0xffffffff) {
-      invalid(errors, `${partPath}.crc32`, "crc32 must be an unsigned 32-bit integer");
+      invalid(errors, `${part_path}.method`, "method must be 0 or 8");
+    if (!non_negative_integer(crc32) || crc32 > 0xffffffff) {
+      invalid(errors, `${part_path}.crc32`, "crc32 must be an unsigned 32-bit integer");
     }
 
-    if (!nonNegativeInteger(size) || size > 0xffffffff) {
-      invalid(errors, `${partPath}.uncompressedSize`, "uncompressedSize must fit ZIP32");
+    if (!non_negative_integer(size) || size > 0xffffffff) {
+      invalid(errors, `${part_path}.uncompressedSize`, "uncompressedSize must fit ZIP32");
     }
 
     if (typeof data !== "string" || data.length % 4 !== 0) {
-      invalid(errors, `${partPath}.data`, "data must be base64");
+      invalid(errors, `${part_path}.data`, "data must be base64");
       continue;
     }
 
-    compressedBytes += (data.length / 4) * 3;
-    if (compressedBytes > MAX_XLSX_SOURCE_COMPRESSED_BYTES) {
+    compressed_bytes += (data.length / 4) * 3;
+    if (compressed_bytes > MAX_XLSX_SOURCE_COMPRESSED_BYTES) {
       invalid(errors, path, "xlsxSource exceeds 256 MiB of compressed data");
       return;
     }
 
-    if (!BASE64_PATTERN.test(data)) invalid(errors, `${partPath}.data`, "data must be base64");
+    if (!BASE64_PATTERN.test(data)) invalid(errors, `${part_path}.data`, "data must be base64");
   }
 
   for (let index = 0; index < graphs.length; index++) {
-    const graphPath = `${path}.graphs[${index}]`;
-    const graph = recordAt(graphs[index], graphPath, errors);
+    const graph_path = `${path}.graphs[${index}]`;
+    const graph = record_at(graphs[index], graph_path, errors);
     if (!graph) continue;
     const owner = ownValue(graph, "owner");
     const type = ownValue(graph, "type");
     const target = ownValue(graph, "target");
-    const cacheId = ownValue(graph, "cacheId");
+    const cache_id = ownValue(graph, "cacheId");
     if (owner !== "root" && owner !== "workbook" && owner !== "sheet") {
-      invalid(errors, `${graphPath}.owner`, "owner must be root, workbook, or sheet");
+      invalid(errors, `${graph_path}.owner`, "owner must be root, workbook, or sheet");
     }
 
-    if (owner === "sheet") requireString(graph, "sheetId", graphPath, errors, true);
+    if (owner === "sheet") require_string(graph, "sheetId", graph_path, errors, true);
     else if (ownValue(graph, "sheetId") !== undefined) {
-      invalid(errors, `${graphPath}.sheetId`, "Only sheet-owned graphs name a sheet");
+      invalid(errors, `${graph_path}.sheetId`, "Only sheet-owned graphs name a sheet");
     }
 
     if (
@@ -3119,80 +3146,80 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       type.length > MAX_XLSX_PART_NAME_LENGTH ||
       !RELATIONSHIP_TYPE_PATTERN.test(type)
     ) {
-      invalid(errors, `${graphPath}.type`, "type must be a relationship type URI");
+      invalid(errors, `${graph_path}.type`, "type must be a relationship type URI");
     }
 
-    if (cacheId !== undefined && (typeof cacheId !== "string" || !/^\d{1,10}$/.test(cacheId))) {
-      invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
+    if (cache_id !== undefined && (typeof cache_id !== "string" || !/^\d{1,10}$/.test(cache_id))) {
+      invalid(errors, `${graph_path}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
     for (const key of ["queries", "externalLink"]) {
       const digest = ownValue(graph, key);
       if (digest !== undefined && (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest))) {
-        invalid(errors, `${graphPath}.${key}`, `${key} must be a 64-bit hex digest`);
+        invalid(errors, `${graph_path}.${key}`, `${key} must be a 64-bit hex digest`);
       }
     }
 
-    const unsupportedPath = `${graphPath}.unsupportedQueries`;
+    const unsupported_path = `${graph_path}.unsupportedQueries`;
     const unsupported = ownValue(graph, "unsupportedQueries");
-    const kept = unsupported === undefined ? [] : arrayAt(unsupported, unsupportedPath, errors);
+    const kept = unsupported === undefined ? [] : array_at(unsupported, unsupported_path, errors);
     if (kept && kept.length > MAX_UNSUPPORTED_QUERIES) {
-      invalid(errors, unsupportedPath, "unsupportedQueries holds too many members");
+      invalid(errors, unsupported_path, "unsupportedQueries holds too many members");
     }
-    kept?.forEach((entry: unknown, entryIndex) => {
-      const entryPath = `${unsupportedPath}[${entryIndex}]`;
-      const record = recordAt(entry, entryPath, errors);
+    kept?.forEach((entry: unknown, entry_index) => {
+      const entry_path = `${unsupported_path}[${entry_index}]`;
+      const record = record_at(entry, entry_path, errors);
       if (!record) return;
-      const member = requireString(record, "member", entryPath, errors, true);
+      const member = require_string(record, "member", entry_path, errors, true);
       if (member && member.length > MAX_QUERY_MEMBER_LENGTH)
-        invalid(errors, `${entryPath}.member`, "member is too long");
-      const reason = requireString(record, "reason", entryPath, errors, true);
+        invalid(errors, `${entry_path}.member`, "member is too long");
+      const reason = require_string(record, "reason", entry_path, errors, true);
       if (reason && reason.length > MAX_QUERY_REASON_LENGTH)
-        invalid(errors, `${entryPath}.reason`, "reason is too long");
+        invalid(errors, `${entry_path}.reason`, "reason is too long");
     });
 
-    const members = arrayAt(ownValue(graph, "parts"), `${graphPath}.parts`, errors);
+    const members = array_at(ownValue(graph, "parts"), `${graph_path}.parts`, errors);
     if (
       !members ||
       members.length > MAX_XLSX_SOURCE_ENTRIES ||
-      !members.every((name) => safeXlsxPartName(name) && names.has(name.toLowerCase())) ||
-      !safeXlsxPartName(target) ||
+      !members.every((name) => safe_xlsx_part_name(name) && names.has(name.toLowerCase())) ||
+      !safe_xlsx_part_name(target) ||
       !members.some((name) => name === target)
     ) {
-      invalid(errors, `${graphPath}.parts`, "Graph parts must be retained and include target");
+      invalid(errors, `${graph_path}.parts`, "Graph parts must be retained and include target");
     }
 
-    const dependencies = arrayAt(
+    const dependencies = array_at(
       ownValue(graph, "dependencies"),
-      `${graphPath}.dependencies`,
+      `${graph_path}.dependencies`,
       errors,
     );
     if (!dependencies) continue;
     if (dependencies.length > MAX_XLSX_SOURCE_ENTRIES) {
-      invalid(errors, `${graphPath}.dependencies`, "Too many graph dependencies");
+      invalid(errors, `${graph_path}.dependencies`, "Too many graph dependencies");
       continue;
     }
 
-    for (let dependencyIndex = 0; dependencyIndex < dependencies.length; dependencyIndex++) {
-      const dependencyPath = `${graphPath}.dependencies[${dependencyIndex}]`;
-      const dependency = recordAt(dependencies[dependencyIndex], dependencyPath, errors);
+    for (let dependency_index = 0; dependency_index < dependencies.length; dependency_index++) {
+      const dependency_path = `${graph_path}.dependencies[${dependency_index}]`;
+      const dependency = record_at(dependencies[dependency_index], dependency_path, errors);
       if (!dependency) continue;
-      requireString(dependency, "sheetId", dependencyPath, errors, true);
-      requireString(dependency, "name", dependencyPath, errors, true);
+      require_string(dependency, "sheetId", dependency_path, errors, true);
+      require_string(dependency, "name", dependency_path, errors, true);
       const scope = ownValue(dependency, "scope");
       if (scope !== "layout" && scope !== "values") {
-        invalid(errors, `${dependencyPath}.scope`, "scope must be layout or values");
+        invalid(errors, `${dependency_path}.scope`, "scope must be layout or values");
       }
 
       const digest = ownValue(dependency, "digest");
       if (typeof digest !== "string" || !/^[\da-f]{16}$/.test(digest)) {
-        invalid(errors, `${dependencyPath}.digest`, "digest must be 16 lowercase hex digits");
+        invalid(errors, `${dependency_path}.digest`, "digest must be 16 lowercase hex digits");
       }
     }
   }
 }
 
-function cellBlockInSheet(block: SheetSnapshot["cells"][number], sheet: SheetSnapshot): boolean {
+function cell_block_in_sheet(block: SheetSnapshot["cells"][number], sheet: SheetSnapshot): boolean {
   return (
     block.startRow <= sheet.rowCount &&
     block.rowCount <= sheet.rowCount - block.startRow &&
@@ -3208,21 +3235,21 @@ function cellBlockInSheet(block: SheetSnapshot["cells"][number], sheet: SheetSna
  * In-bounds cells have col < columns.length, so row * width + col is unique
  * and, under the logical-cell limit, exact as a double.
  */
-function hasDuplicateCellAddress(sheet: SheetSnapshot): boolean {
+function has_duplicate_cell_address(sheet: SheetSnapshot): boolean {
   const width = sheet.columns.length;
-  let cellCount = 0;
-  for (const block of sheet.cells) cellCount += block.cells.length;
-  const keys = new Float64Array(cellCount);
-  let keyCount = 0;
+  let cell_count = 0;
+  for (const block of sheet.cells) cell_count += block.cells.length;
+  const keys = new Float64Array(cell_count);
+  let key_count = 0;
   for (const block of sheet.cells) {
-    if (!cellBlockInSheet(block, sheet)) continue;
+    if (!cell_block_in_sheet(block, sheet)) continue;
     for (const cell of block.cells) {
       if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) continue;
-      keys[keyCount++] =
+      keys[key_count++] =
         (block.startRow + cell.rowOffset) * width + block.startCol + cell.colOffset;
     }
   }
-  const sorted = keys.subarray(0, keyCount).sort();
+  const sorted = keys.subarray(0, key_count).sort();
   for (let index = 1; index < sorted.length; index++) {
     if (sorted[index] === sorted[index - 1]) return true;
   }
@@ -3233,29 +3260,29 @@ function hasDuplicateCellAddress(sheet: SheetSnapshot): boolean {
  * Pivot references may point at any sheet or table, including ones listed
  * later, so they are checked after every sheet and table is known.
  */
-function validateSnapshotPivots(
+function validate_snapshot_pivots(
   sheets: readonly SheetSnapshot[],
   tables: readonly WorkbookTable[],
   errors: DocumentValidationError[],
 ): void {
-  const sheetSizes = new Map(
+  const sheet_sizes = new Map(
     sheets.map((sheet) => [sheet.id, { rows: sheet.rowCount, cols: sheet.columns.length }]),
   );
-  const tableWidths = new Map(tables.map((table) => [table.id, table.columns.length]));
+  const table_widths = new Map(tables.map((table) => [table.id, table.columns.length]));
   const scope = {
-    sheetSize: (id: string) => sheetSizes.get(id),
-    tableWidth: (id: string) => tableWidths.get(id),
+    sheetSize: (id: string) => sheet_sizes.get(id),
+    tableWidth: (id: string) => table_widths.get(id),
   };
   const ids = new Set<string>();
 
-  for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
-    const sheet = sheets[sheetIndex];
+  for (let sheet_index = 0; sheet_index < sheets.length; sheet_index++) {
+    const sheet = sheets[sheet_index];
     if (!sheet?.pivots) continue;
-    const ownerSize = { rows: sheet.rowCount, cols: sheet.columns.length };
+    const owner_size = { rows: sheet.rowCount, cols: sheet.columns.length };
     for (let index = 0; index < sheet.pivots.length; index++) {
       const pivot = sheet.pivots[index];
       if (!pivot) continue;
-      const path = `sheets[${sheetIndex}].pivots[${index}]`;
+      const path = `sheets[${sheet_index}].pivots[${index}]`;
       if (ids.has(pivot.id)) {
         errors.push({
           path: `${path}.id`,
@@ -3272,53 +3299,53 @@ function validateSnapshotPivots(
         });
         return;
       }
-      validatePivotReferences(pivot, ownerSize, scope, path, errors);
+      validatePivotReferences(pivot, owner_size, scope, path, errors);
     }
   }
 }
 
-function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
+function validate_json_safe_snapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
-  const candidate = recordAt(input, "$", errors);
+  const candidate = record_at(input, "$", errors);
   if (!candidate) return { ok: false, errors };
 
-  const schemaVersion = ownValue(candidate, "schemaVersion");
-  if (schemaVersion !== WORKBOOK_SCHEMA_VERSION) {
+  const schema_version = ownValue(candidate, "schemaVersion");
+  if (schema_version !== WORKBOOK_SCHEMA_VERSION) {
     invalid(
       errors,
       "schemaVersion",
-      `Unsupported workbook schema version: ${String(schemaVersion)}`,
+      `Unsupported workbook schema version: ${String(schema_version)}`,
       "unsupported-schema",
     );
   }
 
-  const documentId = ownValue(candidate, "documentId");
-  if (documentId !== undefined && typeof documentId !== "string") {
+  const document_id = ownValue(candidate, "documentId");
+  if (document_id !== undefined && typeof document_id !== "string") {
     invalid(errors, "documentId", "documentId must be a string");
   }
 
   const version = ownValue(candidate, "version");
-  if (version !== undefined && !nonNegativeInteger(version)) {
+  if (version !== undefined && !non_negative_integer(version)) {
     invalid(errors, "version", "version must be a non-negative integer");
   }
 
-  const workbook = recordAt(ownValue(candidate, "workbook"), "workbook", errors);
+  const workbook = record_at(ownValue(candidate, "workbook"), "workbook", errors);
   if (workbook) {
-    requireString(workbook, "activeSheet", "workbook", errors, true);
-    validateXlsxSource(ownValue(workbook, "xlsxSource"), errors);
-    const namedRanges = optionalArray(workbook, "namedRanges", "workbook", errors);
-    namedRanges?.forEach((entry, index) => {
-      validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);
+    require_string(workbook, "activeSheet", "workbook", errors, true);
+    validate_xlsx_source(ownValue(workbook, "xlsxSource"), errors);
+    const named_ranges = optional_array(workbook, "namedRanges", "workbook", errors);
+    named_ranges?.forEach((entry, index) => {
+      validate_named_range_shape(entry, `workbook.namedRanges[${index}]`, errors);
     });
 
     const calculation = ownValue(workbook, "calculation");
     if (calculation !== undefined) {
-      validateCalculationShape(calculation, "workbook.calculation", errors);
+      validate_calculation_shape(calculation, "workbook.calculation", errors);
     }
 
-    const dataModel = ownValue(workbook, "dataModel");
-    if (dataModel !== undefined) {
-      validateDataModelShape(dataModel, "workbook.dataModel", errors);
+    const data_model = ownValue(workbook, "dataModel");
+    if (data_model !== undefined) {
+      validateDataModelShape(data_model, "workbook.dataModel", errors);
     }
 
     const queries = ownValue(workbook, "queries");
@@ -3326,20 +3353,20 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       validateSavedQueriesShape(queries, "workbook.queries", errors);
     }
 
-    const externalLinks = ownValue(workbook, "externalLinks");
-    if (externalLinks !== undefined) {
-      validateExternalLinksShape(externalLinks, "workbook.externalLinks", errors);
+    const external_links = ownValue(workbook, "externalLinks");
+    if (external_links !== undefined) {
+      validateExternalLinksShape(external_links, "workbook.externalLinks", errors);
     }
   }
 
-  const sheets = arrayAt(ownValue(candidate, "sheets"), "sheets", errors);
+  const sheets = array_at(ownValue(candidate, "sheets"), "sheets", errors);
   if (sheets && sheets.length === 0) {
     invalid(errors, "sheets", "At least one sheet is required");
   }
 
   sheets?.forEach((sheet, index) => {
     // `validateWorkbookSnapshot` runs the JSON-safety walk over `input` first.
-    validateSheetShape(sheet, `sheets[${index}]`, errors, true);
+    validate_sheet_shape(sheet, `sheets[${index}]`, errors, true);
   });
 
   if (errors.length > 0) return { ok: false, errors };
@@ -3348,12 +3375,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const validated = input as WorkbookSnapshot;
   const ids = new Set<string>();
   const orders = new Set<number>();
-  const normalizedSheets: SheetSnapshot[] = [];
-  const acceptedTables: WorkbookTable[] = [];
+  const normalized_sheets: SheetSnapshot[] = [];
+  const accepted_tables: WorkbookTable[] = [];
 
-  for (let sheetIndex = 0; sheetIndex < validated.sheets.length; sheetIndex++) {
-    const sheet = validated.sheets[sheetIndex]!;
-    const path = `sheets[${sheetIndex}]`;
+  for (let sheet_index = 0; sheet_index < validated.sheets.length; sheet_index++) {
+    const sheet = validated.sheets[sheet_index]!;
+    const path = `sheets[${sheet_index}]`;
     if (ids.has(sheet.id)) {
       invalid(errors, `${path}.id`, "Sheet IDs must be unique", "duplicate-id");
     }
@@ -3365,38 +3392,38 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 
     orders.add(sheet.order);
 
-    const columnKeys = new Set<string>();
-    for (let columnIndex = 0; columnIndex < sheet.columns.length; columnIndex++) {
-      const column = sheet.columns[columnIndex]!;
-      if (columnKeys.has(column.key)) {
+    const column_keys = new Set<string>();
+    for (let column_index = 0; column_index < sheet.columns.length; column_index++) {
+      const column = sheet.columns[column_index]!;
+      if (column_keys.has(column.key)) {
         invalid(
           errors,
-          `${path}.columns[${columnIndex}].key`,
+          `${path}.columns[${column_index}].key`,
           "Column keys must be unique and stable",
           "duplicate-id",
         );
       }
 
-      columnKeys.add(column.key);
+      column_keys.add(column.key);
     }
 
     const merges: MergeRange[] = [];
-    for (const [mergeIndex, sourceMerge] of (sheet.merges ?? []).entries()) {
-      const merge = normalizeMerge(sourceMerge);
-      const mergePath = `${path}.merges[${mergeIndex}]`;
+    for (const [merge_index, source_merge] of (sheet.merges ?? []).entries()) {
+      const merge = normalizeMerge(source_merge);
+      const merge_path = `${path}.merges[${merge_index}]`;
       if (merge.r1 >= sheet.rowCount || merge.c1 >= sheet.columns.length) {
-        invalid(errors, mergePath, "Merge lies outside the sheet", "out-of-bounds");
+        invalid(errors, merge_path, "Merge lies outside the sheet", "out-of-bounds");
       }
 
       merges.push(merge);
     }
 
-    const overlappingMerges = overlappingMergeIndices(merges);
-    for (let mergeIndex = 0; mergeIndex < overlappingMerges.length; mergeIndex++) {
-      if (!overlappingMerges[mergeIndex]) continue;
+    const overlapping_merges = overlappingMergeIndices(merges);
+    for (let merge_index = 0; merge_index < overlapping_merges.length; merge_index++) {
+      if (!overlapping_merges[merge_index]) continue;
       invalid(
         errors,
-        `${path}.merges[${mergeIndex}]`,
+        `${path}.merges[${merge_index}]`,
         "Merged regions may not overlap",
         "overlapping-merge",
       );
@@ -3404,35 +3431,35 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 
     // Only a sheet with a duplicate address pays for the Set that names each
     // duplicate in cell order.
-    const occupied = hasDuplicateCellAddress(sheet) ? new Set<number>() : undefined;
-    const sheetWidth = sheet.columns.length;
-    for (let blockIndex = 0; blockIndex < sheet.cells.length; blockIndex++) {
-      const block = sheet.cells[blockIndex]!;
-      const blockPath = `${path}.cells[${blockIndex}]`;
-      const blockInBounds = cellBlockInSheet(block, sheet);
-      if (!blockInBounds) {
-        invalid(errors, blockPath, "Cell block lies outside the sheet", "out-of-bounds");
+    const occupied = has_duplicate_cell_address(sheet) ? new Set<number>() : undefined;
+    const sheet_width = sheet.columns.length;
+    for (let block_index = 0; block_index < sheet.cells.length; block_index++) {
+      const block = sheet.cells[block_index]!;
+      const block_path = `${path}.cells[${block_index}]`;
+      const block_in_bounds = cell_block_in_sheet(block, sheet);
+      if (!block_in_bounds) {
+        invalid(errors, block_path, "Cell block lies outside the sheet", "out-of-bounds");
       }
 
-      for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
-        const cell = block.cells[cellIndex]!;
+      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+        const cell = block.cells[cell_index]!;
         if (cell.rowOffset >= block.rowCount || cell.colOffset >= block.colCount) {
           invalid(
             errors,
-            `${blockPath}.cells[${cellIndex}]`,
+            `${block_path}.cells[${cell_index}]`,
             "Cell offset lies outside its block",
             "out-of-bounds",
           );
           continue;
         }
 
-        if (!blockInBounds || !occupied) continue;
+        if (!block_in_bounds || !occupied) continue;
         const key =
-          (block.startRow + cell.rowOffset) * sheetWidth + block.startCol + cell.colOffset;
+          (block.startRow + cell.rowOffset) * sheet_width + block.startCol + cell.colOffset;
         if (occupied.has(key)) {
           invalid(
             errors,
-            `${blockPath}.cells[${cellIndex}]`,
+            `${block_path}.cells[${cell_index}]`,
             "A snapshot cell may appear only once",
             "duplicate-id",
           );
@@ -3442,7 +3469,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       }
     }
 
-    const metadataRows = new Set<number>();
+    const metadata_rows = new Set<number>();
     for (const [index, meta] of (sheet.rowMeta ?? []).entries()) {
       const row = meta[0];
       if (row >= sheet.rowCount) {
@@ -3452,7 +3479,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "Row metadata lies outside the sheet",
           "out-of-bounds",
         );
-      } else if (metadataRows.has(row)) {
+      } else if (metadata_rows.has(row)) {
         invalid(
           errors,
           `${path}.rowMeta[${index}][0]`,
@@ -3461,7 +3488,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      metadataRows.add(row);
+      metadata_rows.add(row);
     }
 
     for (const [field, value, limit] of [
@@ -3485,7 +3512,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
 
     for (const [index, rule] of (sheet.conditionalFormats ?? []).entries()) {
-      if (!rangeInSheet(rule.range, sheet)) {
+      if (!range_in_sheet(rule.range, sheet)) {
         invalid(
           errors,
           `${path}.conditionalFormats[${index}].range`,
@@ -3495,32 +3522,32 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       }
     }
 
-    const hyperlinkIds = new Set<string>();
+    const hyperlink_ids = new Set<string>();
     for (const [index, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
-      const hyperlinkPath = `${path}.hyperlinks[${index}]`;
-      if (hyperlinkIds.has(hyperlink.id)) {
+      const hyperlink_path = `${path}.hyperlinks[${index}]`;
+      if (hyperlink_ids.has(hyperlink.id)) {
         invalid(
           errors,
-          `${hyperlinkPath}.id`,
+          `${hyperlink_path}.id`,
           "Hyperlink IDs must be unique within a sheet",
           "duplicate-id",
         );
       }
 
-      hyperlinkIds.add(hyperlink.id);
-      if (hyperlink.range.sheet !== sheet.id || !rangeInSheet(hyperlink.range, sheet)) {
+      hyperlink_ids.add(hyperlink.id);
+      if (hyperlink.range.sheet !== sheet.id || !range_in_sheet(hyperlink.range, sheet)) {
         invalid(
           errors,
-          `${hyperlinkPath}.range`,
+          `${hyperlink_path}.range`,
           "Hyperlink source range lies outside its sheet",
           "out-of-bounds",
         );
       }
     }
 
-    const validationIds = new Set<string>();
+    const validation_ids = new Set<string>();
     for (const [index, rule] of (sheet.validationRules ?? []).entries()) {
-      if (validationIds.has(rule.id)) {
+      if (validation_ids.has(rule.id)) {
         invalid(
           errors,
           `${path}.validationRules[${index}].id`,
@@ -3529,8 +3556,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      validationIds.add(rule.id);
-      if (!rangeInSheet(rule.range, sheet)) {
+      validation_ids.add(rule.id);
+      if (!range_in_sheet(rule.range, sheet)) {
         invalid(
           errors,
           `${path}.validationRules[${index}].range`,
@@ -3540,9 +3567,9 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       }
     }
 
-    const protectionIds = new Set<string>();
-    for (const [index, protectedRange] of (sheet.protectedRanges ?? []).entries()) {
-      if (protectionIds.has(protectedRange.id)) {
+    const protection_ids = new Set<string>();
+    for (const [index, protected_range] of (sheet.protectedRanges ?? []).entries()) {
+      if (protection_ids.has(protected_range.id)) {
         invalid(
           errors,
           `${path}.protectedRanges[${index}].id`,
@@ -3551,8 +3578,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      protectionIds.add(protectedRange.id);
-      if (!rangeInSheet(protectedRange.range, sheet)) {
+      protection_ids.add(protected_range.id);
+      if (!range_in_sheet(protected_range.range, sheet)) {
         invalid(
           errors,
           `${path}.protectedRanges[${index}].range`,
@@ -3562,7 +3589,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       }
     }
 
-    const noteAddresses = new Set<string>();
+    const note_addresses = new Set<string>();
     for (const [index, note] of (sheet.notes ?? []).entries()) {
       const key = `${note.addr.row}:${note.addr.col}`;
       if (
@@ -3576,7 +3603,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "Note address lies outside the sheet",
           "out-of-bounds",
         );
-      } else if (noteAddresses.has(key)) {
+      } else if (note_addresses.has(key)) {
         invalid(
           errors,
           `${path}.notes[${index}].addr`,
@@ -3585,10 +3612,10 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      noteAddresses.add(key);
+      note_addresses.add(key);
     }
 
-    const sortColumns = new Set<number>();
+    const sort_columns = new Set<number>();
     for (const [index, key] of (sheet.sortKeys ?? []).entries()) {
       if (key.col >= sheet.columns.length) {
         invalid(
@@ -3597,7 +3624,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "Sort column lies outside the sheet",
           "out-of-bounds",
         );
-      } else if (sortColumns.has(key.col)) {
+      } else if (sort_columns.has(key.col)) {
         invalid(
           errors,
           `${path}.sortKeys[${index}].col`,
@@ -3606,10 +3633,10 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      sortColumns.add(key.col);
+      sort_columns.add(key.col);
     }
 
-    const filterColumns = new Set<number>();
+    const filter_columns = new Set<number>();
     for (const [index, filter] of (sheet.filters ?? []).entries()) {
       const column = filter[0];
       if (column >= sheet.columns.length) {
@@ -3619,7 +3646,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "Filter column lies outside the sheet",
           "out-of-bounds",
         );
-      } else if (filterColumns.has(column)) {
+      } else if (filter_columns.has(column)) {
         invalid(
           errors,
           `${path}.filters[${index}][0]`,
@@ -3628,16 +3655,16 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
 
-      filterColumns.add(column);
+      filter_columns.add(column);
     }
 
-    const autoFilterRange = sheet.autoFilter?.range;
+    const auto_filter_range = sheet.autoFilter?.range;
     if (
-      autoFilterRange &&
-      (autoFilterRange.sheet !== sheet.id ||
-        autoFilterRange.start.row > autoFilterRange.end.row ||
-        autoFilterRange.start.col > autoFilterRange.end.col ||
-        !rangeInSheet(autoFilterRange, sheet))
+      auto_filter_range &&
+      (auto_filter_range.sheet !== sheet.id ||
+        auto_filter_range.start.row > auto_filter_range.end.row ||
+        auto_filter_range.start.col > auto_filter_range.end.col ||
+        !range_in_sheet(auto_filter_range, sheet))
     ) {
       invalid(
         errors,
@@ -3648,18 +3675,18 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     }
 
     for (const [index, table] of (sheet.tables ?? []).entries()) {
-      if (!validWorkbookTable(table, sheet, acceptedTables)) {
+      if (!validWorkbookTable(table, sheet, accepted_tables)) {
         invalid(
           errors,
           `${path}.tables[${index}]`,
           "Workbook table must have unique stable IDs/names, canonical in-bounds non-overlapping range, and one unique column identity per range column",
         );
       } else {
-        acceptedTables.push(table);
+        accepted_tables.push(table);
       }
     }
 
-    const normalizedSheet: SheetSnapshot = {
+    const normalized_sheet: SheetSnapshot = {
       ...sheet,
       merges: merges.length > 0 ? merges : undefined,
       conditionalFormats: sheet.conditionalFormats
@@ -3700,45 +3727,46 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       })),
     };
 
-    if (normalizedSheet.merges === undefined) delete normalizedSheet.merges;
-    if (normalizedSheet.conditionalFormats === undefined) delete normalizedSheet.conditionalFormats;
-    if (normalizedSheet.hyperlinks === undefined) delete normalizedSheet.hyperlinks;
-    if (normalizedSheet.validationRules === undefined) delete normalizedSheet.validationRules;
-    if (normalizedSheet.protectedRanges === undefined) delete normalizedSheet.protectedRanges;
-    if (normalizedSheet.notes === undefined) delete normalizedSheet.notes;
-    if (normalizedSheet.filters === undefined) delete normalizedSheet.filters;
-    if (normalizedSheet.autoFilter === undefined) delete normalizedSheet.autoFilter;
-    if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
-    if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
-    if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;
-    if (normalizedSheet.pivots === undefined) delete normalizedSheet.pivots;
-    if (normalizedSheet.dashboard === undefined) delete normalizedSheet.dashboard;
-    normalizedSheets.push(normalizedSheet);
+    if (normalized_sheet.merges === undefined) delete normalized_sheet.merges;
+    if (normalized_sheet.conditionalFormats === undefined)
+      delete normalized_sheet.conditionalFormats;
+    if (normalized_sheet.hyperlinks === undefined) delete normalized_sheet.hyperlinks;
+    if (normalized_sheet.validationRules === undefined) delete normalized_sheet.validationRules;
+    if (normalized_sheet.protectedRanges === undefined) delete normalized_sheet.protectedRanges;
+    if (normalized_sheet.notes === undefined) delete normalized_sheet.notes;
+    if (normalized_sheet.filters === undefined) delete normalized_sheet.filters;
+    if (normalized_sheet.autoFilter === undefined) delete normalized_sheet.autoFilter;
+    if (normalized_sheet.rowMeta === undefined) delete normalized_sheet.rowMeta;
+    if (normalized_sheet.tables === undefined) delete normalized_sheet.tables;
+    if (normalized_sheet.charts === undefined) delete normalized_sheet.charts;
+    if (normalized_sheet.pivots === undefined) delete normalized_sheet.pivots;
+    if (normalized_sheet.dashboard === undefined) delete normalized_sheet.dashboard;
+    normalized_sheets.push(normalized_sheet);
   }
 
   if (!ids.has(validated.workbook.activeSheet)) {
     invalid(errors, "workbook.activeSheet", "Active sheet must exist", "missing-reference");
   }
 
-  const sheetById = new Map(validated.sheets.map((sheet) => [sheet.id, sheet]));
-  for (let sheetIndex = 0; sheetIndex < validated.sheets.length; sheetIndex++) {
-    const sheet = validated.sheets[sheetIndex]!;
-    for (let blockIndex = 0; blockIndex < sheet.cells.length; blockIndex++) {
-      const block = sheet.cells[blockIndex]!;
-      for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
-        const cell = block.cells[cellIndex]!;
+  const sheet_by_id = new Map(validated.sheets.map((sheet) => [sheet.id, sheet]));
+  for (let sheet_index = 0; sheet_index < validated.sheets.length; sheet_index++) {
+    const sheet = validated.sheets[sheet_index]!;
+    for (let block_index = 0; block_index < sheet.cells.length; block_index++) {
+      const block = sheet.cells[block_index]!;
+      for (let cell_index = 0; cell_index < block.cells.length; cell_index++) {
+        const cell = block.cells[cell_index]!;
         if (cell.value.kind !== "ref") continue;
-        const targetSheet = sheetById.get(cell.value.target.sheet);
-        const targetPath = `sheets[${sheetIndex}].cells[${blockIndex}].cells[${cellIndex}].value.target`;
-        if (!targetSheet) {
-          invalid(errors, targetPath, "Cell reference sheet must exist", "missing-reference");
+        const target_sheet = sheet_by_id.get(cell.value.target.sheet);
+        const target_path = `sheets[${sheet_index}].cells[${block_index}].cells[${cell_index}].value.target`;
+        if (!target_sheet) {
+          invalid(errors, target_path, "Cell reference sheet must exist", "missing-reference");
         } else if (
-          cell.value.target.row >= targetSheet.rowCount ||
-          cell.value.target.col >= targetSheet.columns.length
+          cell.value.target.row >= target_sheet.rowCount ||
+          cell.value.target.col >= target_sheet.columns.length
         ) {
           invalid(
             errors,
-            targetPath,
+            target_path,
             "Cell reference target lies outside the sheet",
             "out-of-bounds",
           );
@@ -3746,22 +3774,22 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       }
     }
 
-    for (const [linkIndex, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
+    for (const [link_index, hyperlink] of (sheet.hyperlinks ?? []).entries()) {
       if (hyperlink.target.kind !== "internal") continue;
       const target = hyperlink.target.range;
-      const targetSheet = sheetById.get(target.sheet);
-      const targetPath = `sheets[${sheetIndex}].hyperlinks[${linkIndex}].target.range`;
-      if (!targetSheet) {
+      const target_sheet = sheet_by_id.get(target.sheet);
+      const target_path = `sheets[${sheet_index}].hyperlinks[${link_index}].target.range`;
+      if (!target_sheet) {
         invalid(
           errors,
-          targetPath,
+          target_path,
           "Internal hyperlink target sheet must exist",
           "missing-reference",
         );
-      } else if (!rangeInSheet(target, targetSheet)) {
+      } else if (!range_in_sheet(target, target_sheet)) {
         invalid(
           errors,
-          targetPath,
+          target_path,
           "Internal hyperlink target lies outside the sheet",
           "out-of-bounds",
         );
@@ -3772,58 +3800,60 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (sheet.charts && !validSheetCharts(sheet.charts, sheet, validated.sheets)) {
       invalid(
         errors,
-        `sheets[${sheetIndex}].charts`,
+        `sheets[${sheet_index}].charts`,
         "Charts must have unique IDs, an in-sheet anchor, and sources inside existing sheets",
         "out-of-bounds",
       );
     }
   }
 
-  const namedRangeIds = new Set<string>();
-  for (const [index, namedRange] of (validated.workbook.namedRanges ?? []).entries()) {
-    const namedPath = `workbook.namedRanges[${index}]`;
-    const id = `${namedRange.scope ?? ""}\u0000${formulaNameKey(namedRange.name)}`;
+  const named_range_ids = new Set<string>();
+  for (const [index, named_range] of (validated.workbook.namedRanges ?? []).entries()) {
+    const named_path = `workbook.namedRanges[${index}]`;
+    const id = `${named_range.scope ?? ""}\u0000${formulaNameKey(named_range.name)}`;
     if (
-      acceptedTables.some((table) => formulaNameKey(table.name) === formulaNameKey(namedRange.name))
+      accepted_tables.some(
+        (table) => formulaNameKey(table.name) === formulaNameKey(named_range.name),
+      )
     ) {
       invalid(
         errors,
-        `${namedPath}.name`,
+        `${named_path}.name`,
         "Named range name conflicts with a workbook table name",
         "duplicate-id",
       );
     }
 
-    if (namedRangeIds.has(id)) {
+    if (named_range_ids.has(id)) {
       invalid(
         errors,
-        `${namedPath}.name`,
+        `${named_path}.name`,
         "Named range names must be unique within their scope",
         "duplicate-id",
       );
     }
 
-    namedRangeIds.add(id);
-    if (namedRange.scope !== undefined && !sheetById.has(namedRange.scope)) {
+    named_range_ids.add(id);
+    if (named_range.scope !== undefined && !sheet_by_id.has(named_range.scope)) {
       invalid(
         errors,
-        `${namedPath}.scope`,
+        `${named_path}.scope`,
         "Named range scope sheet must exist",
         "missing-reference",
       );
     }
 
     // The engine checks a formula name's references when the store loads it.
-    if (namedRange.range === undefined) continue;
-    const targetSheet = sheetById.get(namedRange.range.sheet);
-    if (!targetSheet) {
-      invalid(errors, `${namedPath}.range`, "Named range sheet must exist", "missing-reference");
-    } else if (!rangeInSheet(namedRange.range, targetSheet)) {
-      invalid(errors, `${namedPath}.range`, "Named range lies outside the sheet", "out-of-bounds");
+    if (named_range.range === undefined) continue;
+    const target_sheet = sheet_by_id.get(named_range.range.sheet);
+    if (!target_sheet) {
+      invalid(errors, `${named_path}.range`, "Named range sheet must exist", "missing-reference");
+    } else if (!range_in_sheet(named_range.range, target_sheet)) {
+      invalid(errors, `${named_path}.range`, "Named range lies outside the sheet", "out-of-bounds");
     }
   }
 
-  validateSnapshotPivots(validated.sheets, acceptedTables, errors);
+  validate_snapshot_pivots(validated.sheets, accepted_tables, errors);
 
   if (errors.length > 0) return { ok: false, errors };
   return {
@@ -3831,7 +3861,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     value: {
       ...validated,
       schemaVersion: WORKBOOK_SCHEMA_VERSION,
-      sheets: normalizedSheets.sort((a, b) => a.order - b.order),
+      sheets: normalized_sheets.sort((a, b) => a.order - b.order),
     },
   };
 }
@@ -3859,15 +3889,15 @@ export function recheckSnapshotResources(
   checked: CheckedSnapshot,
   options: SnapshotValidationOptions = {},
 ): DocumentValidationResult {
-  const resolved = resolveSnapshotValidationOptions(options);
+  const resolved = resolve_snapshot_validation_options(options);
   if ("code" in resolved) return { ok: false, errors: [resolved] };
   if (checked.serializedBytes > resolved.limits.maxSerializedBytes) {
     return validateWorkbookSnapshot(checked.snapshot, options);
   }
 
-  const resourceIssue = preflightSnapshotResources(checked.snapshot, resolved);
-  return resourceIssue
-    ? { ok: false, errors: [resourceIssue] }
+  const resource_issue = preflight_snapshot_resources(checked.snapshot, resolved);
+  return resource_issue
+    ? { ok: false, errors: [resource_issue] }
     : { ok: true, value: checked.snapshot };
 }
 
@@ -3882,7 +3912,7 @@ export function validateWorkbookSnapshot(
   input: unknown,
   options: SnapshotValidationOptions = {},
 ): DocumentValidationResult {
-  return validateSnapshot(input, options, false);
+  return validate_snapshot(input, options, false);
 }
 
 /**
@@ -3902,32 +3932,36 @@ export function validateBuiltWorkbookSnapshot(
   input: unknown,
   options: SnapshotValidationOptions = {},
 ): DocumentValidationResult {
-  return validateSnapshot(input, options, true);
+  return validate_snapshot(input, options, true);
 }
 
-function validateSnapshot(
+function validate_snapshot(
   input: unknown,
   options: SnapshotValidationOptions,
-  builtByCaller: boolean,
+  built_by_caller: boolean,
 ): DocumentValidationResult {
   try {
-    const resolved = resolveSnapshotValidationOptions(options);
+    const resolved = resolve_snapshot_validation_options(options);
     if ("code" in resolved) return { ok: false, errors: [resolved] };
-    const resourceIssue = preflightSnapshotResources(input, resolved);
-    if (resourceIssue) return { ok: false, errors: [resourceIssue] };
-    const issue = findJsonSafetyIssue(input, resolved.limits.maxSerializedBytes, builtByCaller);
+    const resource_issue = preflight_snapshot_resources(input, resolved);
+    if (resource_issue) return { ok: false, errors: [resource_issue] };
+    const issue = find_json_safety_issue(
+      input,
+      resolved.limits.maxSerializedBytes,
+      built_by_caller,
+    );
     if (issue) return { ok: false, errors: [issue] };
 
-    return validateJsonSafeSnapshot(input);
+    return validate_json_safe_snapshot(input);
   } catch (error) {
-    const resourceFailure = error instanceof RangeError;
+    const resource_failure = error instanceof RangeError;
     return {
       ok: false,
       errors: [
         {
           path: "$",
-          code: resourceFailure ? "resource-limit" : "invalid-value",
-          message: resourceFailure
+          code: resource_failure ? "resource-limit" : "invalid-value",
+          message: resource_failure
             ? "Snapshot inspection exceeded a safe resource limit"
             : "Snapshot could not be inspected safely",
         },

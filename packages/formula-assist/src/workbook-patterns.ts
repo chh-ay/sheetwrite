@@ -81,13 +81,13 @@ interface SheetCount {
 export type BuildMode = "idle" | "now";
 
 /** Runs `work` when the page is idle. */
-function whenIdle(work: () => void): void {
+function when_idle(work: () => void): void {
   if (typeof requestIdleCallback === "function") requestIdleCallback(work);
   else setTimeout(work, 0);
 }
 
 /** The sheet a cell operation writes to; null for operations without one. */
-function sheetOf(op: DocumentOp): SheetId | null {
+function sheet_of(op: DocumentOp): SheetId | null {
   if ("addr" in op) return op.addr.sheet;
   if ("range" in op) return op.range.sheet;
   if ("sheet" in op) return typeof op.sheet === "string" ? op.sheet : op.sheet.id;
@@ -103,17 +103,17 @@ export class WorkbookPatterns {
   private readonly totals = new Map<string, Shape>();
   private readonly sheets = new Map<SheetId, SheetCount>();
   private cells = 0;
-  private byCount: (readonly [string, number])[] | null = [];
+  private by_count: (readonly [string, number])[] | null = [];
   private scheduled = false;
   private disposed = false;
-  private readonly stopListening: () => void;
+  private readonly stop_listening: () => void;
 
   constructor(
     private readonly store: Store,
     private readonly mode: BuildMode,
   ) {
-    this.stopListening = store.on("change", (event) => this.changed(event));
-    this.followSheets();
+    this.stop_listening = store.on("change", (event) => this.changed(event));
+    this.follow_sheets();
   }
 
   /** How many formulas of the visible sheets have `shape`, counted so far. */
@@ -123,16 +123,16 @@ export class WorkbookPatterns {
 
   /** The shapes counted so far, the most common first. */
   common(): readonly (readonly [string, number])[] {
-    this.byCount ??= [...this.totals.values()]
+    this.by_count ??= [...this.totals.values()]
       .map((shape) => [shape.text, shape.count] as const)
       .sort((left, right) => right[1] - left[1]);
-    return this.byCount;
+    return this.by_count;
   }
 
   /** Stop counting and forget the workbook. */
   dispose(): void {
     this.disposed = true;
-    this.stopListening();
+    this.stop_listening();
     this.totals.clear();
     this.sheets.clear();
   }
@@ -160,7 +160,7 @@ export class WorkbookPatterns {
   }
 
   /** Count every visible sheet that isn't yet, and forget those that are gone or hidden. */
-  private followSheets(): void {
+  private follow_sheets(): void {
     const visible = new Map<SheetId, { rows: number; cols: number }>();
     for (const sheet of this.store.getWorkbook().sheets) {
       if ((sheet.visibility ?? "visible") === "visible") {
@@ -190,7 +190,7 @@ export class WorkbookPatterns {
   private release(shape: Shape): void {
     shape.count--;
     if (shape.count === 0) this.totals.delete(shape.text);
-    this.byCount = null;
+    this.by_count = null;
   }
 
   /** Count `formula` of `row`, `col` on `sheet`, unless a limit is reached or it is broken. */
@@ -207,7 +207,7 @@ export class WorkbookPatterns {
     shape.count++;
     sheet.shapes.set(row * COLUMNS + col, shape);
     this.cells++;
-    this.byCount = null;
+    this.by_count = null;
   }
 
   /** Stop counting the formula of `row`, `col` on `sheet`, if it is counted. */
@@ -224,29 +224,29 @@ export class WorkbookPatterns {
   private changed(event: ChangeEvent): void {
     if (this.disposed) return;
     const recount = new Set<SheetId>();
-    let sheetsChanged = false;
+    let sheets_changed = false;
     for (const op of event.transaction.patches) {
       if (op.op === "set" || CONTENT_KEPT.has(op.op)) continue;
-      const sheet = sheetOf(op);
+      const sheet = sheet_of(op);
       // A renamed sheet changes the formulas that name it, on any sheet.
       if (op.op === "renameSheet" || sheet === null) {
         for (const id of this.sheets.keys()) recount.add(id);
       } else recount.add(sheet);
-      sheetsChanged ||=
+      sheets_changed ||=
         op.op === "addSheet" || op.op === "removeSheet" || op.op === "setSheetVisibility";
     }
-    if (sheetsChanged) this.followSheets();
+    if (sheets_changed) this.follow_sheets();
     for (const id of recount) {
       const sheet = this.sheets.get(id);
       if (sheet !== undefined) this.recount(id, sheet);
     }
     // A cell the count hasn't read yet is read with its new formula when the count gets there.
-    for (const { addr, newValue } of event.changes) {
+    for (const { addr, newValue: new_value } of event.changes) {
       const sheet = this.sheets.get(addr.sheet);
       if (sheet === undefined) continue;
       this.remove(sheet, addr.row, addr.col);
       const read = addr.row < sheet.row || (addr.row === sheet.row && addr.col < sheet.col);
-      if (read && newValue.kind === "formula") this.add(sheet, newValue.src, addr.row, addr.col);
+      if (read && new_value.kind === "formula") this.add(sheet, new_value.src, addr.row, addr.col);
     }
   }
 
@@ -258,7 +258,7 @@ export class WorkbookPatterns {
     }
     if (this.scheduled) return;
     this.scheduled = true;
-    whenIdle(() => {
+    when_idle(() => {
       this.scheduled = false;
       if (!this.disposed && this.step(performance.now() + SLICE_MS)) this.wake();
     });

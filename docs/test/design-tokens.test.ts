@@ -8,7 +8,7 @@ const TEXT_CONTRAST = 4.5;
 /** WCAG 2.2 AA minimum for icons, field edges and other non-text marks. */
 const UI_CONTRAST = 3;
 
-function relativeLuminance(hex: string): number {
+function relative_luminance(hex: string): number {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255);
   const [red = 0, green = 0, blue = 0] = channels.map((channel) =>
     channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
@@ -16,8 +16,8 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-function contrastRatio(foreground: string, background: string): number {
-  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
+function contrast_ratio(foreground: string, background: string): number {
+  const [lighter, darker] = [relative_luminance(foreground), relative_luminance(background)].sort(
     (a, b) => b - a,
   );
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
@@ -46,7 +46,7 @@ interface ColourPair {
 }
 
 /** Every text and icon pairing the stylesheets use, with its WCAG minimum. */
-function measuredPairs(): ColourPair[] {
+function measured_pairs(): ColourPair[] {
   const pairs: ColourPair[] = [];
   const add = (foreground: string, background: string, minimum = TEXT_CONTRAST) =>
     pairs.push({ foreground, background, minimum });
@@ -76,9 +76,9 @@ function measuredPairs(): ColourPair[] {
 describe.each(["light", "dark"] as const)("%s theme colour tokens", (theme) => {
   const tokens = themeTokens(theme);
   it.each(
-    measuredPairs().map((pair) => [`${pair.foreground} on ${pair.background}`, pair] as const),
+    measured_pairs().map((pair) => [`${pair.foreground} on ${pair.background}`, pair] as const),
   )("%s meets WCAG AA", (_label, pair) => {
-    const ratio = contrastRatio(
+    const ratio = contrast_ratio(
       tokenColour(tokens, pair.foreground),
       tokenColour(tokens, pair.background),
     );

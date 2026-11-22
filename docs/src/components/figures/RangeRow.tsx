@@ -61,13 +61,13 @@ export function RangeRow({
     `${primary.label}: ${primary.valueText}`,
     ...others.map((mark) => `${mark.label}: ${mark.valueText}`),
   ].join("; ");
-  const tipId = `${id}-values`;
+  const tip_id = `${id}-values`;
   return (
     <li className="fig-range-row">
       {/* The name opens the value panel: on hover and focus, and on a tap where there is no hover. */}
       <button
-        aria-controls={tipId}
-        aria-describedby={tipId}
+        aria-controls={tip_id}
+        aria-describedby={tip_id}
         aria-expanded="false"
         className="fig-range-row__name"
         type="button"
@@ -136,7 +136,7 @@ export function RangeRow({
           {chip.text}
         </span>
       )}
-      <dl className="fig-tip" id={tipId} role="tooltip">
+      <dl className="fig-tip" id={tip_id} role="tooltip">
         {details.map(([term, value]) => (
           <div key={term}>
             <dt>{term}</dt>

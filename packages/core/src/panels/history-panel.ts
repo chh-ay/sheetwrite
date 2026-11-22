@@ -23,17 +23,17 @@ class HistoryPanel {
   private preview: Grid | undefined;
   private comparison: AbortController | undefined;
   private versions: HistoryVersion[] = [];
-  private listCursor: string | undefined;
+  private list_cursor: string | undefined;
   private selected: HistoryVersion | undefined;
   private readonly status = document.createElement("p");
   private readonly list = document.createElement("div");
   private readonly detail = document.createElement("div");
   private readonly name = document.createElement("input");
-  private readonly nameForm = document.createElement("form");
+  private readonly name_form = document.createElement("form");
   private readonly pending = document.createElement("p");
   private readonly more = document.createElement("button");
   private readonly sync: SyncCoordinator | undefined;
-  private readonly disposeSync: (() => void) | undefined;
+  private readonly dispose_sync: (() => void) | undefined;
 
   constructor(
     private readonly grid: Grid,
@@ -50,12 +50,12 @@ class HistoryPanel {
     this.name.type = "text";
     this.name.maxLength = 256;
     this.name.required = true;
-    const nameField = panelField("Version name", this.name, "version-name");
-    this.nameForm.append(
-      nameField.element,
+    const name_field = panelField("Version name", this.name, "version-name");
+    this.name_form.append(
+      name_field.element,
       this.button("Save Version", () => this.save()),
     );
-    this.nameForm.addEventListener(
+    this.name_form.addEventListener(
       "submit",
       (event) => {
         event.preventDefault();
@@ -63,14 +63,14 @@ class HistoryPanel {
       },
       { signal: this.lifetime.signal },
     );
-    this.nameForm.hidden = !save;
+    this.name_form.hidden = !save;
     this.more.type = "button";
     this.more.textContent = "More versions";
-    this.more.addEventListener("click", () => void this.run(() => this.loadVersions(false)), {
+    this.more.addEventListener("click", () => void this.run(() => this.load_versions(false)), {
       signal: this.lifetime.signal,
     });
     const create = this.button("Save a version…", async () => {
-      this.nameForm.hidden = false;
+      this.name_form.hidden = false;
       this.name.focus();
     });
     body.classList.add("sheetwrite-history");
@@ -78,16 +78,16 @@ class HistoryPanel {
       this.styles(),
       this.pending,
       create,
-      this.nameForm,
+      this.name_form,
       this.status,
       this.list,
       this.more,
       this.detail,
     );
-    this.disposeSync = this.sync?.on(() => this.showPending());
-    this.showPending();
+    this.dispose_sync = this.sync?.on(() => this.show_pending());
+    this.show_pending();
     void this.run(async () => {
-      await this.loadVersions(true);
+      await this.load_versions(true);
       if (save) this.name.focus();
     });
   }
@@ -97,7 +97,7 @@ class HistoryPanel {
     this.request?.abort();
     this.comparison?.abort();
     this.preview?.destroy();
-    this.disposeSync?.();
+    this.dispose_sync?.();
     this.options.archive.releaseMemory?.();
     this.body.classList.remove("sheetwrite-history");
   }
@@ -147,7 +147,7 @@ class HistoryPanel {
     }
   }
 
-  private showPending(): void {
+  private show_pending(): void {
     if (!this.sync) {
       this.pending.textContent = "Local version archive. Only committed changes are saved.";
       return;
@@ -187,15 +187,15 @@ class HistoryPanel {
       this.lifetime.signal,
     );
     this.name.value = "";
-    this.nameForm.hidden = true;
-    await this.loadVersions(true);
+    this.name_form.hidden = true;
+    await this.load_versions(true);
     this.status.textContent = `Saved “${name}”.`;
   }
 
-  private async loadVersions(reset: boolean): Promise<void> {
+  private async load_versions(reset: boolean): Promise<void> {
     const page = await this.options.archive.listVersions({
       maxEntries: PAGE_SIZE,
-      ...(reset || !this.listCursor ? {} : { cursor: this.listCursor }),
+      ...(reset || !this.list_cursor ? {} : { cursor: this.list_cursor }),
       signal: this.lifetime.signal,
     });
     this.lifetime.signal.throwIfAborted();
@@ -204,7 +204,7 @@ class HistoryPanel {
       this.list.replaceChildren();
     }
     this.versions.push(...page.versions);
-    this.listCursor = page.cursor;
+    this.list_cursor = page.cursor;
     this.more.hidden = !page.cursor;
     for (const version of page.versions) {
       const button = this.button(version.name ?? "Automatic version", () => this.select(version));
@@ -237,12 +237,12 @@ class HistoryPanel {
     const heading = document.createElement("h3");
     heading.textContent = version.name ?? "Automatic version";
     const signal = AbortSignal.any([this.lifetime.signal, this.request.signal]);
-    const sheets = await this.historicalSheets(version, signal);
+    const sheets = await this.historical_sheets(version, signal);
     signal.throwIfAborted();
     this.detail.append(
       heading,
-      this.button("Preview read-only", () => this.showPreview(version)),
-      this.restoreForm(version, sheets),
+      this.button("Preview read-only", () => this.show_preview(version)),
+      this.restore_form(version, sheets),
     );
     const later = this.versions.filter(
       (candidate) => candidate.revision >= version.revision && candidate.id !== version.id,
@@ -258,28 +258,28 @@ class HistoryPanel {
     const diff = document.createElement("section");
     target.addEventListener(
       "change",
-      () => void this.run(() => this.showDiff(version, target.value, diff)),
+      () => void this.run(() => this.show_diff(version, target.value, diff)),
       { signal: this.lifetime.signal },
     );
     this.detail.append(field.element, diff);
-    await this.showDiff(version, target.value, diff);
+    await this.show_diff(version, target.value, diff);
   }
 
   /** Keep only sheet geometry after replay; no historical cells stay in the panel. */
-  private async historicalSheets(
+  private async historical_sheets(
     version: HistoryVersion,
     signal: AbortSignal,
   ): Promise<RangeTextSheet[]> {
     const snapshot = await this.options.archive.readVersion(version.id, signal);
-    return snapshot.sheets.map(({ id, name, rowCount, columns }) => ({
+    return snapshot.sheets.map(({ id, name, rowCount: row_count, columns }) => ({
       id,
       name,
-      rowCount,
+      rowCount: row_count,
       columns: { length: columns.length },
     }));
   }
 
-  private async showPreview(version: HistoryVersion): Promise<void> {
+  private async show_preview(version: HistoryVersion): Promise<void> {
     const signal = AbortSignal.any([
       this.lifetime.signal,
       this.request?.signal ?? this.lifetime.signal,
@@ -300,7 +300,7 @@ class HistoryPanel {
     this.status.textContent = "Read-only preview. The live document has not changed.";
   }
 
-  private async showDiff(
+  private async show_diff(
     from: HistoryVersion,
     to: string,
     host: HTMLElement,
@@ -326,9 +326,9 @@ class HistoryPanel {
     const heading = document.createElement("h3");
     heading.textContent = "Changes";
     host.append(heading);
-    this.renderDiff(page, host);
+    this.render_diff(page, host);
     if (page.cursor) {
-      host.append(this.button("Next changes", () => this.showDiff(from, to, host, page.cursor)));
+      host.append(this.button("Next changes", () => this.show_diff(from, to, host, page.cursor)));
     }
     const changed = page.cells.flags.length;
     const cells = changed === 1 ? "1 changed cell" : `${changed} changed cells`;
@@ -338,7 +338,7 @@ class HistoryPanel {
         : `${cells}.${page.logComplete ? "" : " Some earlier authors are not known because the log is no longer retained."}`;
   }
 
-  private renderDiff(page: HistoryDiffPage, host: HTMLElement): void {
+  private render_diff(page: HistoryDiffPage, host: HTMLElement): void {
     const list = document.createElement("ul");
     list.className = "history-diff";
     for (const sheet of page.sheets) {
@@ -397,7 +397,7 @@ class HistoryPanel {
     host.append(list);
   }
 
-  private restoreForm(version: HistoryVersion, sheets: readonly RangeTextSheet[]): HTMLElement {
+  private restore_form(version: HistoryVersion, sheets: readonly RangeTextSheet[]): HTMLElement {
     const form = document.createElement("div");
     const scope = selectOf(
       [
@@ -414,11 +414,11 @@ class HistoryPanel {
       sheets.map((item) => [item.id, item.name]),
       active,
     );
-    const sheetField = panelField("Sheet", sheet, "restore-sheet");
+    const sheet_field = panelField("Sheet", sheet, "restore-sheet");
     const range = document.createElement("input");
     range.type = "text";
     range.placeholder = "A1:B10";
-    const rangeField = panelField("Range (data rows)", range, "restore-range");
+    const range_field = panelField("Range (data rows)", range, "restore-range");
     const selection = this.grid.getSelection();
     if (selection?.kind === "range") {
       const { start, end } = selection.range;
@@ -428,8 +428,8 @@ class HistoryPanel {
     }
     const note = document.createElement("p");
     const update = (): void => {
-      sheetField.element.hidden = scope.value === "workbook";
-      rangeField.element.hidden = scope.value !== "range";
+      sheet_field.element.hidden = scope.value === "workbook";
+      range_field.element.hidden = scope.value !== "range";
       note.textContent =
         scope.value === "range"
           ? "Values, formulas, styles, notes, merges and links in this range are restored. Sheet size, rules and objects outside it stay current."
@@ -448,13 +448,13 @@ class HistoryPanel {
         target =
           scope.value === "sheet" ? { kind: "sheet", sheet: sheet.value } : { kind: "workbook" };
       }
-      this.confirmRestore(version, target, confirm);
+      this.confirm_restore(version, target, confirm);
     });
-    form.append(field.element, sheetField.element, rangeField.element, note, restore, confirm);
+    form.append(field.element, sheet_field.element, range_field.element, note, restore, confirm);
     return form;
   }
 
-  private confirmRestore(
+  private confirm_restore(
     version: HistoryVersion,
     scope: HistoryRestoreScope,
     host: HTMLElement,

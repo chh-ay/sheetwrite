@@ -141,22 +141,22 @@ export interface ReaderGatePair {
   candidate: ReaderRunResult[];
 }
 
-function asRecord(value: unknown, path: string): Record<string, unknown> {
+function as_record(value: unknown, path: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${path} must be an object`);
   }
   return value as Record<string, unknown>;
 }
 
-function positiveNumber(value: unknown, path: string): number {
+function positive_number(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     throw new Error(`${path} must be a finite positive number`);
   }
   return value;
 }
 
-function positiveInteger(value: unknown, path: string): number {
-  const parsed = positiveNumber(value, path);
+function positive_integer(value: unknown, path: string): number {
+  const parsed = positive_number(value, path);
   if (!Number.isSafeInteger(parsed)) throw new Error(`${path} must be an integer`);
   return parsed;
 }
@@ -166,7 +166,7 @@ function text(value: unknown, path: string): string {
   return value;
 }
 
-function arrayOf(value: unknown, path: string): unknown[] {
+function array_of(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
   return value;
 }
@@ -200,43 +200,45 @@ export function noiseFloorLimit(aaRatios: readonly number[]): number {
 
 /** Parse and validate the noise floor: one row per harness reader, no others. */
 export function parseReaderNoiseFloor(value: unknown, path: string): ReaderNoiseFloor {
-  const floor = asRecord(value, path);
-  const measuredAt = text(floor.measuredAt, `${path}.measuredAt`);
-  if (Number.isNaN(Date.parse(measuredAt))) throw new Error(`${path}.measuredAt is not a date`);
+  const floor = as_record(value, path);
+  const measured_at = text(floor.measuredAt, `${path}.measuredAt`);
+  if (Number.isNaN(Date.parse(measured_at))) throw new Error(`${path}.measuredAt is not a date`);
 
-  const rawSource = asRecord(floor.source, `${path}.source`);
+  const raw_source = as_record(floor.source, `${path}.source`);
   const source = {
-    sha: text(rawSource.sha, `${path}.source.sha`),
-    engineSha256: text(rawSource.engineSha256, `${path}.source.engineSha256`),
-    cpus: text(rawSource.cpus, `${path}.source.cpus`),
+    sha: text(raw_source.sha, `${path}.source.sha`),
+    engineSha256: text(raw_source.engineSha256, `${path}.source.engineSha256`),
+    cpus: text(raw_source.cpus, `${path}.source.cpus`),
   };
-  const gatePairs = positiveInteger(floor.gatePairs, `${path}.gatePairs`);
-  if (gatePairs !== GATE_PAIRS) {
-    throw new Error(`${path}.gatePairs is ${gatePairs}; the gate resamples at ${GATE_PAIRS}`);
+  const gate_pairs = positive_integer(floor.gatePairs, `${path}.gatePairs`);
+  if (gate_pairs !== GATE_PAIRS) {
+    throw new Error(`${path}.gatePairs is ${gate_pairs}; the gate resamples at ${GATE_PAIRS}`);
   }
 
-  const rawRows = asRecord(floor.rows, `${path}.rows`);
-  validateExactMatrix(`${path} rows`, READER_CASE_NAMES, Object.keys(rawRows));
+  const raw_rows = as_record(floor.rows, `${path}.rows`);
+  validateExactMatrix(`${path} rows`, READER_CASE_NAMES, Object.keys(raw_rows));
   const rows: Record<string, ReaderNoiseFloorRow> = {};
-  for (const [name, rawRow] of Object.entries(rawRows)) {
-    const rowPath = `${path}.rows[${JSON.stringify(name)}]`;
-    const row = asRecord(rawRow, rowPath);
-    const aaRatios = arrayOf(row.aaRatios, `${rowPath}.aaRatios`).map((ratio, index) =>
-      positiveNumber(ratio, `${rowPath}.aaRatios[${index}]`),
+  for (const [name, raw_row] of Object.entries(raw_rows)) {
+    const row_path = `${path}.rows[${JSON.stringify(name)}]`;
+    const row = as_record(raw_row, row_path);
+    const aa_ratios = array_of(row.aaRatios, `${row_path}.aaRatios`).map((ratio, index) =>
+      positive_number(ratio, `${row_path}.aaRatios[${index}]`),
     );
-    if (aaRatios.length < MINIMUM_AA_PAIRS) {
-      throw new Error(`${rowPath} has ${aaRatios.length} A/A pairs; it needs ${MINIMUM_AA_PAIRS}`);
+    if (aa_ratios.length < MINIMUM_AA_PAIRS) {
+      throw new Error(
+        `${row_path} has ${aa_ratios.length} A/A pairs; it needs ${MINIMUM_AA_PAIRS}`,
+      );
     }
 
     // Recompute the limit so a hand-edited or loosened row cannot load.
-    const limit = positiveNumber(row.limit, `${rowPath}.limit`);
-    const measured = noiseFloorLimit(aaRatios);
+    const limit = positive_number(row.limit, `${row_path}.limit`);
+    const measured = noiseFloorLimit(aa_ratios);
     if (limit !== measured) {
-      throw new Error(`${rowPath}.limit must equal the resampled limit ${measured}`);
+      throw new Error(`${row_path}.limit must equal the resampled limit ${measured}`);
     }
-    rows[name] = { aaRatios, limit };
+    rows[name] = { aaRatios: aa_ratios, limit };
   }
-  return { measuredAt, source, gatePairs, rows };
+  return { measuredAt: measured_at, source, gatePairs: gate_pairs, rows };
 }
 
 /**
@@ -246,36 +248,36 @@ export function parseReaderNoiseFloor(value: unknown, path: string): ReaderNoise
  * the floor.
  */
 export function noiseFloorFromAaResults(value: unknown, path: string): ReaderNoiseFloor {
-  const results = asRecord(value, path);
+  const results = as_record(value, path);
   if (results.verdict !== null) throw new Error(`${path} has a verdict; it is not an A/A report`);
 
-  const meta = asRecord(results.meta, `${path}.meta`);
+  const meta = as_record(results.meta, `${path}.meta`);
   const sha = text(meta.baseSha, `${path}.meta.baseSha`);
   if (text(meta.candidateSha, `${path}.meta.candidateSha`) !== sha) {
     throw new Error(`${path} compares two commits; a floor needs one commit against itself`);
   }
-  const engines = asRecord(meta.engineSha256, `${path}.meta.engineSha256`);
-  const engineSha256 = text(engines.base, `${path}.meta.engineSha256.base`);
-  if (text(engines.candidate, `${path}.meta.engineSha256.candidate`) !== engineSha256) {
+  const engines = as_record(meta.engineSha256, `${path}.meta.engineSha256`);
+  const engine_sha256 = text(engines.base, `${path}.meta.engineSha256.base`);
+  if (text(engines.candidate, `${path}.meta.engineSha256.candidate`) !== engine_sha256) {
     throw new Error(`${path} compares two engine builds; a floor needs one build against itself`);
   }
   if (meta.readerFilter !== null) {
     throw new Error(`${path} ran a READER_CASES subset; a floor needs every reader`);
   }
 
-  const summary = arrayOf(results.summary, `${path}.summary`).map((rawEntry, index) => {
-    const entryPath = `${path}.summary[${index}]`;
-    const entry = asRecord(rawEntry, entryPath);
-    const aaRatios = arrayOf(entry.perPair, `${entryPath}.perPair`).map((pair, pairIndex) =>
-      positiveNumber(
-        asRecord(pair, `${entryPath}.perPair[${pairIndex}]`).ratio,
-        `${entryPath}.perPair[${pairIndex}].ratio`,
+  const summary = array_of(results.summary, `${path}.summary`).map((raw_entry, index) => {
+    const entry_path = `${path}.summary[${index}]`;
+    const entry = as_record(raw_entry, entry_path);
+    const aa_ratios = array_of(entry.perPair, `${entry_path}.perPair`).map((pair, pair_index) =>
+      positive_number(
+        as_record(pair, `${entry_path}.perPair[${pair_index}]`).ratio,
+        `${entry_path}.perPair[${pair_index}].ratio`,
       ),
     );
-    if (positiveInteger(entry.pairs, `${entryPath}.pairs`) !== aaRatios.length) {
-      throw new Error(`${entryPath}.pairs does not match its per-pair ratios`);
+    if (positive_integer(entry.pairs, `${entry_path}.pairs`) !== aa_ratios.length) {
+      throw new Error(`${entry_path}.pairs does not match its per-pair ratios`);
     }
-    return [text(entry.name, `${entryPath}.name`), aaRatios] as const;
+    return [text(entry.name, `${entry_path}.name`), aa_ratios] as const;
   });
   validateExactMatrix(
     `${path} summary`,
@@ -287,10 +289,13 @@ export function noiseFloorFromAaResults(value: unknown, path: string): ReaderNoi
   return parseReaderNoiseFloor(
     {
       measuredAt: text(meta.measuredAt, `${path}.meta.measuredAt`),
-      source: { sha, engineSha256, cpus: text(meta.cpus, `${path}.meta.cpus`) },
+      source: { sha, engineSha256: engine_sha256, cpus: text(meta.cpus, `${path}.meta.cpus`) },
       gatePairs: GATE_PAIRS,
       rows: Object.fromEntries(
-        summary.map(([name, aaRatios]) => [name, { aaRatios, limit: noiseFloorLimit(aaRatios) }]),
+        summary.map(([name, aa_ratios]) => [
+          name,
+          { aaRatios: aa_ratios, limit: noiseFloorLimit(aa_ratios) },
+        ]),
       ),
     },
     path,
@@ -298,40 +303,40 @@ export function noiseFloorFromAaResults(value: unknown, path: string): ReaderNoi
 }
 
 /** Median 0.5.x-vs-tip ratio per reader from the documentation-only reference summary. */
-function referenceRatios(path: string): Map<string, number> {
+function reference_ratios(path: string): Map<string, number> {
   if (!existsSync(path)) return new Map();
-  const reference = asRecord(JSON.parse(readFileSync(path, "utf8")), path);
+  const reference = as_record(JSON.parse(readFileSync(path, "utf8")), path);
   return new Map(
-    arrayOf(reference.summary, `${path}.summary`).map((rawEntry, index) => {
-      const entry = asRecord(rawEntry, `${path}.summary[${index}]`);
+    array_of(reference.summary, `${path}.summary`).map((raw_entry, index) => {
+      const entry = as_record(raw_entry, `${path}.summary[${index}]`);
       return [
         text(entry.name, `${path}.summary[${index}].name`),
-        positiveNumber(entry.medianRatio, `${path}.summary[${index}].medianRatio`),
+        positive_number(entry.medianRatio, `${path}.summary[${index}].medianRatio`),
       ] as const;
     }),
   );
 }
 
-function parseCalibration(
+function parse_calibration(
   line: string,
   side: Side,
   names: readonly string[],
 ): Record<string, number> {
-  const calibration = asRecord(JSON.parse(line), `${side} calibration`);
+  const calibration = as_record(JSON.parse(line), `${side} calibration`);
   validateExactMatrix(`reader gate ${side} calibration`, names, Object.keys(calibration));
   const iterations: Record<string, number> = {};
   for (const [name, count] of Object.entries(calibration)) {
-    iterations[name] = positiveInteger(count, `${side} calibration ${name}`);
+    iterations[name] = positive_integer(count, `${side} calibration ${name}`);
   }
   return iterations;
 }
 
-function parseRun(line: string, side: Side, names: readonly string[]): ReaderRunResult[] {
-  const run = asRecord(JSON.parse(line), `${side} run`);
-  const results = arrayOf(run.results, `${side} run.results`).map((rawResult, index) => {
+function parse_run(line: string, side: Side, names: readonly string[]): ReaderRunResult[] {
+  const run = as_record(JSON.parse(line), `${side} run`);
+  const results = array_of(run.results, `${side} run.results`).map((raw_result, index) => {
     const path = `${side} run.results[${index}]`;
-    const result = asRecord(rawResult, path);
-    const group = READER_GROUPS.find((readerGroup) => readerGroup === result.group);
+    const result = as_record(raw_result, path);
+    const group = READER_GROUPS.find((reader_group) => reader_group === result.group);
     if (group === undefined) throw new Error(`${path}.group is not a reader group`);
 
     const digest = result.digest;
@@ -342,11 +347,11 @@ function parseRun(line: string, side: Side, names: readonly string[]): ReaderRun
       name: text(result.name, `${path}.name`),
       group,
       fixture: text(result.fixture, `${path}.fixture`),
-      iterations: positiveInteger(result.iterations, `${path}.iterations`),
-      sampleMs: arrayOf(result.sampleMs, `${path}.sampleMs`).map((sample, sampleIndex) =>
-        positiveNumber(sample, `${path}.sampleMs[${sampleIndex}]`),
+      iterations: positive_integer(result.iterations, `${path}.iterations`),
+      sampleMs: array_of(result.sampleMs, `${path}.sampleMs`).map((sample, sample_index) =>
+        positive_number(sample, `${path}.sampleMs[${sample_index}]`),
       ),
-      medianSampleMs: positiveNumber(result.medianSampleMs, `${path}.medianSampleMs`),
+      medianSampleMs: positive_number(result.medianSampleMs, `${path}.medianSampleMs`),
       digest,
     };
   });
@@ -365,7 +370,7 @@ export function summarizeReaderPairs(
 ): ReaderSummaryRow[] {
   if (pairs.length === 0) throw new Error("Reader gate has no pairs");
   return names.map((name) => {
-    const perPair = pairs.map((pair, index): ReaderPairRatio => {
+    const per_pair = pairs.map((pair, index): ReaderPairRatio => {
       const base = pair.base.find((result) => result.name === name);
       const candidate = pair.candidate.find((result) => result.name === name);
       if (base === undefined || candidate === undefined) {
@@ -387,21 +392,21 @@ export function summarizeReaderPairs(
     const first = pairs[0]?.base.find((result) => result.name === name);
     if (first === undefined) throw new Error(`Reader gate has no ${name}`);
 
-    const ratios = perPair.map((entry) => entry.ratio);
+    const ratios = per_pair.map((entry) => entry.ratio);
     return {
       name,
       group: first.group,
       fixture: first.fixture,
       iterationsPerSample: first.iterations,
-      baseMedianMs: median(perPair.map((entry) => entry.baseMs)),
-      candidateMedianMs: median(perPair.map((entry) => entry.candidateMs)),
+      baseMedianMs: median(per_pair.map((entry) => entry.baseMs)),
+      candidateMedianMs: median(per_pair.map((entry) => entry.candidateMs)),
       medianRatio: median(ratios),
       minRatio: Math.min(...ratios),
       maxRatio: Math.max(...ratios),
       candidateSlowerPairs: ratios.filter((ratio) => ratio > PARITY_RATIO).length,
-      pairs: perPair.length,
-      digestsMatch: perPair.every((entry) => entry.digestsMatch),
-      perPair,
+      pairs: per_pair.length,
+      digestsMatch: per_pair.every((entry) => entry.digestsMatch),
+      perPair: per_pair,
     };
   });
 }
@@ -424,7 +429,7 @@ export function judgeReaderRows(
       throw new Error(`${row.name} ran ${row.pairs} pairs; its limit is for ${floor.gatePairs}`);
     }
 
-    const referenceRatio = reference.get(row.name);
+    const reference_ratio = reference.get(row.name);
     return {
       name: row.name,
       medianRatio: row.medianRatio,
@@ -432,7 +437,7 @@ export function judgeReaderRows(
       candidateSlowerPairs: row.candidateSlowerPairs,
       pairs: row.pairs,
       digestsMatch: row.digestsMatch,
-      ...(referenceRatio === undefined ? {} : { referenceRatio }),
+      ...(reference_ratio === undefined ? {} : { referenceRatio: reference_ratio }),
       passed: row.digestsMatch && row.medianRatio <= limit,
     };
   });
@@ -440,7 +445,7 @@ export function judgeReaderRows(
 }
 
 /** Run this checkout's harness against the engine built in `checkout`; returns its JSON line. */
-function runHarness(checkout: string, args: readonly string[]): string {
+function run_harness(checkout: string, args: readonly string[]): string {
   const command = [process.execPath, HARNESS, checkout, ...args];
   const child = Bun.spawnSync(command, { stdout: "pipe", stderr: "inherit" });
   if (child.exitCode !== 0) {
@@ -455,7 +460,7 @@ function runHarness(checkout: string, args: readonly string[]): string {
   return line;
 }
 
-function gitHead(checkout: string): string {
+function git_head(checkout: string): string {
   const child = Bun.spawnSync(["git", "-C", checkout, "rev-parse", "HEAD"], {
     stdout: "pipe",
     stderr: "pipe",
@@ -480,7 +485,7 @@ export function engineSha256(checkout: string): string {
 }
 
 /** The CPUs this process and its harness children may run on: the bench slot under taskset. */
-function cpuAffinity(): string {
+function cpu_affinity(): string {
   if (!existsSync(PROC_STATUS)) return UNKNOWN_CPUS;
   const field = readFileSync(PROC_STATUS, "utf8")
     .split("\n")
@@ -488,7 +493,7 @@ function cpuAffinity(): string {
   return field?.slice(CPUS_FIELD.length).trim() ?? UNKNOWN_CPUS;
 }
 
-function formatRatio(ratio: number | undefined): string {
+function format_ratio(ratio: number | undefined): string {
   return ratio === undefined ? "-" : ratio.toFixed(RATIO_DIGITS);
 }
 
@@ -501,11 +506,12 @@ function report(
     "| Reader | Base ms | Candidate ms | Median ratio | Min-max ratio | Candidate-slower pairs | Limit | 0.5.x reference ratio | Verdict |",
     "| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- |",
     ...summary.map((row) => {
-      const rowVerdict = verdicts.get(row.name);
+      const row_verdict = verdicts.get(row.name);
       let outcome = "A/A";
-      if (rowVerdict !== undefined && !rowVerdict.digestsMatch) outcome = "FAIL (readers disagree)";
-      else if (rowVerdict !== undefined) outcome = rowVerdict.passed ? "pass" : "FAIL";
-      return `| ${row.name} | ${row.baseMedianMs.toFixed(MS_DIGITS)} | ${row.candidateMedianMs.toFixed(MS_DIGITS)} | ${formatRatio(row.medianRatio)} | ${formatRatio(row.minRatio)}-${formatRatio(row.maxRatio)} | ${row.candidateSlowerPairs}/${row.pairs} | ${rowVerdict?.limit.toFixed(LIMIT_DIGITS) ?? "-"} | ${formatRatio(rowVerdict?.referenceRatio)} | ${outcome} |`;
+      if (row_verdict !== undefined && !row_verdict.digestsMatch)
+        outcome = "FAIL (readers disagree)";
+      else if (row_verdict !== undefined) outcome = row_verdict.passed ? "pass" : "FAIL";
+      return `| ${row.name} | ${row.baseMedianMs.toFixed(MS_DIGITS)} | ${row.candidateMedianMs.toFixed(MS_DIGITS)} | ${format_ratio(row.medianRatio)} | ${format_ratio(row.minRatio)}-${format_ratio(row.maxRatio)} | ${row.candidateSlowerPairs}/${row.pairs} | ${row_verdict?.limit.toFixed(LIMIT_DIGITS) ?? "-"} | ${format_ratio(row_verdict?.referenceRatio)} | ${outcome} |`;
     }),
     "",
     verdict === undefined
@@ -516,10 +522,10 @@ function report(
   return lines.join("\n");
 }
 
-function writeFloor(aaResultsPath: string): void {
+function write_floor(aa_results_path: string): void {
   const floor = noiseFloorFromAaResults(
-    JSON.parse(readFileSync(aaResultsPath, "utf8")),
-    aaResultsPath,
+    JSON.parse(readFileSync(aa_results_path, "utf8")),
+    aa_results_path,
   );
   writeFileSync(NOISE_FLOOR_PATH, `${JSON.stringify(floor, null, 2)}\n`);
   process.stdout.write(
@@ -527,25 +533,29 @@ function writeFloor(aaResultsPath: string): void {
   );
 }
 
-/** Run `pairCount` ABBA pairs, one fresh harness process per side per pair. */
-function capturePairs(
+/** Run `pair_count` ABBA pairs, one fresh harness process per side per pair. */
+function capture_pairs(
   checkouts: Readonly<Record<Side, string>>,
   names: readonly string[],
   iterations: Readonly<Record<string, number>>,
-  pairCount: number,
+  pair_count: number,
 ): ReaderGatePair[] {
-  const workDir = mkdtempSync(join(tmpdir(), "reader-gate-"));
+  const work_dir = mkdtempSync(join(tmpdir(), "reader-gate-"));
   try {
-    const iterationsPath = join(workDir, "iterations.json");
-    writeFileSync(iterationsPath, `${JSON.stringify(iterations)}\n`);
-    return Array.from({ length: pairCount }, (_, index): ReaderGatePair => {
+    const iterations_path = join(work_dir, "iterations.json");
+    writeFileSync(iterations_path, `${JSON.stringify(iterations)}\n`);
+    return Array.from({ length: pair_count }, (_, index): ReaderGatePair => {
       // ABBA: even pairs run base first, odd pairs candidate first.
       const order: readonly [Side, Side] =
         index % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"];
       const outputs: Partial<Record<Side, ReaderRunResult[]>> = {};
       for (const side of order) {
-        outputs[side] = parseRun(runHarness(checkouts[side], ["run", iterationsPath]), side, names);
-        process.stderr.write(`reader gate: pair ${index + 1}/${pairCount} ${side} done\n`);
+        outputs[side] = parse_run(
+          run_harness(checkouts[side], ["run", iterations_path]),
+          side,
+          names,
+        );
+        process.stderr.write(`reader gate: pair ${index + 1}/${pair_count} ${side} done\n`);
       }
 
       if (outputs.base === undefined || outputs.candidate === undefined) {
@@ -554,42 +564,42 @@ function capturePairs(
       return { order, base: outputs.base, candidate: outputs.candidate };
     });
   } finally {
-    rmSync(workDir, { recursive: true, force: true });
+    rmSync(work_dir, { recursive: true, force: true });
   }
 }
 
 /** The stored 0.5.x reference names the only base an A/B run may use. */
-function assertReferenceBase(base: string): void {
-  const stored = asRecord(JSON.parse(readFileSync(REFERENCE_PATH, "utf8")), REFERENCE_PATH);
-  const meta = asRecord(stored.meta, `${REFERENCE_PATH}.meta`);
+function assert_reference_base(base: string): void {
+  const stored = as_record(JSON.parse(readFileSync(REFERENCE_PATH, "utf8")), REFERENCE_PATH);
+  const meta = as_record(stored.meta, `${REFERENCE_PATH}.meta`);
   const expected = text(meta.baseSha, `${REFERENCE_PATH}.meta.baseSha`);
-  const actual = gitHead(base);
+  const actual = git_head(base);
   if (actual !== expected) {
     throw new Error(`Reader gate needs the stored 0.5.x baseline ${expected}; --base is ${actual}`);
   }
 }
 
-function runGate(args: readonly string[]): number {
-  const basePath = optionValue(args, "--base");
-  if (basePath === undefined) throw new Error("--base requires a checkout with a built engine");
+function run_gate(args: readonly string[]): number {
+  const base_path = optionValue(args, "--base");
+  if (base_path === undefined) throw new Error("--base requires a checkout with a built engine");
   const checkouts: Record<Side, string> = {
-    base: resolve(basePath),
+    base: resolve(base_path),
     candidate: resolve(optionValue(args, "--candidate") ?? HARNESS_ROOT),
   };
-  const isNoiseRun = checkouts.base === checkouts.candidate;
-  if (!isNoiseRun) assertReferenceBase(checkouts.base);
+  const is_noise_run = checkouts.base === checkouts.candidate;
+  if (!is_noise_run) assert_reference_base(checkouts.base);
 
-  const floor = isNoiseRun
+  const floor = is_noise_run
     ? undefined
     : parseReaderNoiseFloor(JSON.parse(readFileSync(NOISE_FLOOR_PATH, "utf8")), NOISE_FLOOR_PATH);
-  const pairCount = Number(optionValue(args, "--pairs") ?? GATE_PAIRS);
-  if (!Number.isInteger(pairCount) || pairCount < GATE_PAIRS) {
+  const pair_count = Number(optionValue(args, "--pairs") ?? GATE_PAIRS);
+  if (!Number.isInteger(pair_count) || pair_count < GATE_PAIRS) {
     throw new Error(`--pairs must be an integer of at least ${GATE_PAIRS}`);
   }
 
-  const outputPath = optionValue(args, "--output");
+  const output_path = optionValue(args, "--output");
   const names = selectedReaderCaseNames();
-  const measuredAt = new Date().toISOString();
+  const measured_at = new Date().toISOString();
   const engines = {
     base: engineSha256(checkouts.base),
     candidate: engineSha256(checkouts.candidate),
@@ -598,8 +608,12 @@ function runGate(args: readonly string[]): number {
   // Both sides run the max calibrated count, so every sample on either side
   // does identical work and reaches the harness's sample-time target.
   const calibration = {
-    base: parseCalibration(runHarness(checkouts.base, ["calibrate"]), "base", names),
-    candidate: parseCalibration(runHarness(checkouts.candidate, ["calibrate"]), "candidate", names),
+    base: parse_calibration(run_harness(checkouts.base, ["calibrate"]), "base", names),
+    candidate: parse_calibration(
+      run_harness(checkouts.candidate, ["calibrate"]),
+      "candidate",
+      names,
+    ),
   };
   const iterations = Object.fromEntries(
     names.map((name) => [
@@ -608,7 +622,7 @@ function runGate(args: readonly string[]): number {
     ]),
   );
 
-  const pairs = capturePairs(checkouts, names, iterations, pairCount);
+  const pairs = capture_pairs(checkouts, names, iterations, pair_count);
   for (const side of ["base", "candidate"] as const) {
     if (engineSha256(checkouts[side]) !== engines[side]) {
       throw new Error(`Reader gate ${side} engine changed during the comparison`);
@@ -619,16 +633,16 @@ function runGate(args: readonly string[]): number {
   const verdict =
     floor === undefined
       ? undefined
-      : judgeReaderRows(summary, floor, referenceRatios(REFERENCE_PATH));
-  if (outputPath !== undefined) {
+      : judgeReaderRows(summary, floor, reference_ratios(REFERENCE_PATH));
+  if (output_path !== undefined) {
     const meta = {
-      measuredAt,
-      baseSha: gitHead(checkouts.base),
-      candidateSha: gitHead(checkouts.candidate),
+      measuredAt: measured_at,
+      baseSha: git_head(checkouts.base),
+      candidateSha: git_head(checkouts.candidate),
       engineSha256: engines,
-      cpus: cpuAffinity(),
+      cpus: cpu_affinity(),
       bun: Bun.version,
-      pairs: pairCount,
+      pairs: pair_count,
       order:
         "ABBA (even pairs base first, odd pairs candidate first); one process per side per pair",
       readerFilter: process.env.READER_CASES ?? null,
@@ -636,7 +650,7 @@ function runGate(args: readonly string[]): number {
       iterations,
     };
     writeFileSync(
-      outputPath,
+      output_path,
       `${JSON.stringify({ meta, summary, verdict: verdict ?? null }, null, 2)}\n`,
     );
   }
@@ -647,10 +661,10 @@ function runGate(args: readonly string[]): number {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const aaResultsPath = optionValue(args, "--write-floor");
-  if (aaResultsPath === undefined) {
-    process.exitCode = runGate(args);
+  const aa_results_path = optionValue(args, "--write-floor");
+  if (aa_results_path === undefined) {
+    process.exitCode = run_gate(args);
   } else {
-    writeFloor(aaResultsPath);
+    write_floor(aa_results_path);
   }
 }

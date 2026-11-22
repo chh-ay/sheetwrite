@@ -31,7 +31,7 @@ const SHEET_QUALIFIER = /(?:'((?:[^']|'')*)'|([\p{L}\p{N}_.\\]+))(?=!)/gu;
 const WORKBOOK_SCOPE = -1;
 
 /** `'[book]sheet'`: a sheet of a linked workbook, quoted as a formula writes it. */
-function linkSheet(book: string, sheet: string): string {
+function link_sheet(book: string, sheet: string): string {
   return `'${`[${book}]${sheet}`.replaceAll("'", "''")}'`;
 }
 
@@ -40,11 +40,11 @@ export interface ExternalLinkIssueSink {
   push(...issues: { path: string; code: "invalid-value"; message: string }[]): number;
 }
 
-function isName(value: unknown): value is string {
+function is_name(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_NAME_LENGTH;
 }
 
-function isIndex(value: unknown, limit: number): value is number {
+function is_index(value: unknown, limit: number): value is number {
   return Number.isInteger(value) && typeof value === "number" && value >= 0 && value < limit;
 }
 
@@ -67,27 +67,27 @@ export function validateExternalLinksShape(
     value.every((link: unknown) => {
       const book = isPlainRecord(link) ? ownValue(link, "book") : undefined;
       const sheets = isPlainRecord(link) ? ownValue(link, "sheets") : undefined;
-      const unique = isName(book) && !/[[\]]/.test(book) && !books.has(book.toLowerCase());
+      const unique = is_name(book) && !/[[\]]/.test(book) && !books.has(book.toLowerCase());
       if (unique) books.add(book.toLowerCase());
       return (
         unique &&
         isPlainRecord(link) &&
-        isName(ownValue(link, "target")) &&
+        is_name(ownValue(link, "target")) &&
         Array.isArray(sheets) &&
         sheets.every(
           (sheet: unknown) =>
             isPlainRecord(sheet) &&
-            isName(ownValue(sheet, "name")) &&
+            is_name(ownValue(sheet, "name")) &&
             Array.isArray(ownValue(sheet, "cells")),
         ) &&
-        validNames(ownValue(link, "names"))
+        valid_names(ownValue(link, "names"))
       );
     });
   if (!valid) issues.push({ path, code: "invalid-value", message: "invalid external links" });
 }
 
 /** An absent list, or at most `MAX_EXTERNAL_NAMES` names that each have a name, a reference and an optional sheet. */
-function validNames(names: unknown): boolean {
+function valid_names(names: unknown): boolean {
   return (
     names === undefined ||
     (Array.isArray(names) &&
@@ -96,9 +96,9 @@ function validNames(names: unknown): boolean {
         const sheet = isPlainRecord(entry) ? ownValue(entry, "sheet") : undefined;
         return (
           isPlainRecord(entry) &&
-          isName(ownValue(entry, "name")) &&
-          isName(ownValue(entry, "refersTo")) &&
-          (sheet === undefined || isName(sheet))
+          is_name(ownValue(entry, "name")) &&
+          is_name(ownValue(entry, "refersTo")) &&
+          (sheet === undefined || is_name(sheet))
         );
       }))
   );
@@ -137,14 +137,14 @@ interface SheetExtent {
 }
 
 /** The extent of `sheet`'s saved cells, or `null` at the first cell outside the sheet limits or with a value formulas cannot hold. */
-function sheetExtent(sheet: ExternalLinkSheet): SheetExtent | null {
+function sheet_extent(sheet: ExternalLinkSheet): SheetExtent | null {
   let rows = 1;
   let columns = 1;
   for (const cell of sheet.cells) {
     const value: unknown = cell.value;
     const valid =
-      isIndex(cell.row, MAX_ROWS) &&
-      isIndex(cell.col, MAX_COLUMNS) &&
+      is_index(cell.row, MAX_ROWS) &&
+      is_index(cell.col, MAX_COLUMNS) &&
       (typeof value === "number"
         ? Number.isFinite(value)
         : typeof value === "string" ||
@@ -157,7 +157,7 @@ function sheetExtent(sheet: ExternalLinkSheet): SheetExtent | null {
   return { rows, columns };
 }
 
-function writeCell(engine: ExternalLinkEngine, handle: number, cell: ExternalLinkCell): void {
+function write_cell(engine: ExternalLinkEngine, handle: number, cell: ExternalLinkCell): void {
   const { row, col, value } = cell;
   if (typeof value === "number") engine.setNumber(handle, row, col, value, 0);
   else if (typeof value === "string") engine.setString(handle, row, col, value, 0);
@@ -167,7 +167,7 @@ function writeCell(engine: ExternalLinkEngine, handle: number, cell: ExternalLin
   else engine.setFormula(handle, row, col, `={${value.error}}`, 0);
 }
 
-function sameValue(left: ExternalLinkValue, right: ExternalLinkValue): boolean {
+function same_value(left: ExternalLinkValue, right: ExternalLinkValue): boolean {
   if (typeof left === "object" || typeof right === "object") {
     return typeof left === "object" && typeof right === "object" && left.error === right.error;
   }
@@ -180,7 +180,7 @@ function sameValue(left: ExternalLinkValue, right: ExternalLinkValue): boolean {
  * cells that `next` leaves out are cleared, so only the formulas that read
  * them recalculate.
  */
-function rewriteCells(
+function rewrite_cells(
   engine: ExternalLinkEngine,
   handle: number,
   previous: readonly ExternalLinkCell[],
@@ -193,7 +193,7 @@ function rewriteCells(
     const key = position(cell);
     const value = old.get(key);
     old.delete(key);
-    if (value === undefined || !sameValue(value, cell.value)) writeCell(engine, handle, cell);
+    if (value === undefined || !same_value(value, cell.value)) write_cell(engine, handle, cell);
   }
   for (const key of old.keys()) {
     engine.clearCell(handle, Math.floor(key / MAX_COLUMNS), key % MAX_COLUMNS, 0);
@@ -207,11 +207,11 @@ function rewriteCells(
  * sheets. A reference to a sheet the link does not hold reads `#REF!`, as
  * in Excel.
  */
-function installNames(engine: ExternalLinkEngine, link: ExternalLink): void {
-  for (const { name, refersTo, sheet } of link.names ?? []) {
-    const qualified = `${linkSheet(link.book, sheet ?? "")}!${name}`;
-    const source = refersTo.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>
-      linkSheet(link.book, quoted?.replaceAll("''", "'") ?? plain ?? ""),
+function install_names(engine: ExternalLinkEngine, link: ExternalLink): void {
+  for (const { name, refersTo: refers_to, sheet } of link.names ?? []) {
+    const qualified = `${link_sheet(link.book, sheet ?? "")}!${name}`;
+    const source = refers_to.replace(SHEET_QUALIFIER, (_, quoted?: string, plain?: string) =>
+      link_sheet(link.book, quoted?.replaceAll("''", "'") ?? plain ?? ""),
     );
     engine.setNamedFormula(
       qualified,
@@ -228,7 +228,7 @@ function installNames(engine: ExternalLinkEngine, link: ExternalLink): void {
  * sheets the engine holds for that previous link, which have the same
  * extents: only its changed cells are written. Every other link is added.
  */
-function writeLinks(
+function write_links(
   engine: ExternalLinkEngine,
   links: readonly ExternalLink[],
   kept: ReadonlyMap<ExternalLink, ExternalLink>,
@@ -237,7 +237,7 @@ function writeLinks(
   for (const link of links) {
     const previous = kept.get(link);
     for (const [index, sheet] of link.sheets.entries()) {
-      const extent = sheetExtent(sheet);
+      const extent = sheet_extent(sheet);
       total += sheet.cells.length;
       if (
         extent === null ||
@@ -248,16 +248,16 @@ function writeLinks(
       }
 
       const handle = engine.addExternalSheet(link.book, sheet.name, extent.columns, extent.rows);
-      const previousCells = previous?.sheets[index]?.cells;
-      if (previousCells) {
-        rewriteCells(engine, handle, previousCells, sheet.cells);
+      const previous_cells = previous?.sheets[index]?.cells;
+      if (previous_cells) {
+        rewrite_cells(engine, handle, previous_cells, sheet.cells);
       } else {
-        for (const cell of sheet.cells) writeCell(engine, handle, cell);
+        for (const cell of sheet.cells) write_cell(engine, handle, cell);
         engine.recompute(handle);
       }
     }
 
-    if (!previous) installNames(engine, link);
+    if (!previous) install_names(engine, link);
   }
   return true;
 }
@@ -272,19 +272,19 @@ export function installExternalLinks(
   engine: ExternalLinkEngine,
   links: readonly ExternalLink[],
 ): boolean {
-  return writeLinks(engine, links, new Map());
+  return write_links(engine, links, new Map());
 }
 
 /** Whether `next` names the same sheets, with the same extents, and the same names as `previous`. */
-function keepsSheets(previous: ExternalLink, next: ExternalLink): boolean {
+function keeps_sheets(previous: ExternalLink, next: ExternalLink): boolean {
   return (
     previous.book === next.book &&
     previous.sheets.length === next.sheets.length &&
     previous.sheets.every((sheet, index) => {
       const other = next.sheets[index];
       if (other === undefined || other.name !== sheet.name) return false;
-      const before = sheetExtent(sheet);
-      const after = sheetExtent(other);
+      const before = sheet_extent(sheet);
+      const after = sheet_extent(other);
       return (
         before !== null &&
         after !== null &&
@@ -309,17 +309,17 @@ export function replaceExternalLinks(
   previous: readonly ExternalLink[],
   next: readonly ExternalLink[],
 ): boolean {
-  const byBook = new Map(previous.map((link) => [link.book, link]));
+  const by_book = new Map(previous.map((link) => [link.book, link]));
   const kept = new Map<ExternalLink, ExternalLink>();
   for (const link of next) {
-    const old = byBook.get(link.book);
-    if (old !== undefined && keepsSheets(old, link)) kept.set(link, old);
+    const old = by_book.get(link.book);
+    if (old !== undefined && keeps_sheets(old, link)) kept.set(link, old);
   }
 
-  const keptPrevious = new Set(kept.values());
+  const kept_previous = new Set(kept.values());
   removeExternalLinks(
     engine,
-    previous.filter((link) => !keptPrevious.has(link)),
+    previous.filter((link) => !kept_previous.has(link)),
   );
-  return writeLinks(engine, next, kept);
+  return write_links(engine, next, kept);
 }

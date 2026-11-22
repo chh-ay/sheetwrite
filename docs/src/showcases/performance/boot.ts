@@ -72,7 +72,7 @@ export async function startScaleGrid(host: HTMLElement, options: ScaleGridOption
           },
         },
       ],
-      keyboard: (event, mountedGrid) => {
+      keyboard: (event, mounted_grid) => {
         if (
           event.key !== "PageUp" ||
           event.shiftKey ||
@@ -82,16 +82,16 @@ export async function startScaleGrid(host: HTMLElement, options: ScaleGridOption
         ) {
           return false;
         }
-        const selected = mountedGrid.getSelection();
+        const selected = mounted_grid.getSelection();
         if (selected?.kind !== "cell") return false;
         const visible = options.visibleRows();
-        const pageRows = Math.max(1, visible.lastRow - visible.firstRow + 1);
-        const selectedAddr = {
+        const page_rows = Math.max(1, visible.lastRow - visible.firstRow + 1);
+        const selected_addr = {
           ...selected.addr,
-          row: Math.max(0, visible.firstRow - pageRows),
+          row: Math.max(0, visible.firstRow - page_rows),
         };
-        mountedGrid.setSelection({ kind: "cell", addr: selectedAddr });
-        mountedGrid.scrollToCell(selectedAddr);
+        mounted_grid.setSelection({ kind: "cell", addr: selected_addr });
+        mounted_grid.scrollToCell(selected_addr);
         event.preventDefault();
         return true;
       },

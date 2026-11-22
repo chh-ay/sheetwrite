@@ -83,7 +83,7 @@ export interface Rect {
   c1: number;
 }
 
-function emptyPlan(): RestorePlan {
+function empty_plan(): RestorePlan {
   return {
     removals: [],
     sheets: [],
@@ -102,7 +102,7 @@ function emptyPlan(): RestorePlan {
  * as a manual delete does; the restore's undo sets these sources again after
  * the rows come back.
  */
-function referenceGuards(
+function reference_guards(
   live: Store,
   current: Workbook,
   shrinking: ReadonlySet<SheetId>,
@@ -176,7 +176,7 @@ function flatten(plan: RestorePlan): DocumentOp[] {
   ];
 }
 
-function invalidScope(message: string): HistoryError {
+function invalid_scope(message: string): HistoryError {
   return new HistoryError("invalid-scope", message);
 }
 
@@ -202,7 +202,7 @@ function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function rangeRect(range: Range): Rect {
+function range_rect(range: Range): Rect {
   return {
     r0: Math.min(range.start.row, range.end.row),
     c0: Math.min(range.start.col, range.end.col),
@@ -211,11 +211,11 @@ function rangeRect(range: Range): Rect {
   };
 }
 
-function mergeRect(merge: MergeRange): Rect {
+function merge_rect(merge: MergeRange): Rect {
   return { r0: merge.r0, c0: merge.c0, r1: merge.r1, c1: merge.c1 };
 }
 
-function rectRange(sheet: SheetId, rect: Rect): Range {
+function rect_range(sheet: SheetId, rect: Rect): Range {
   return {
     sheet,
     start: { row: rect.r0, col: rect.c0 },
@@ -244,19 +244,19 @@ function contains(outer: Rect, inner: Rect): boolean {
   );
 }
 
-function cellInside(rect: Rect, row: number, col: number): boolean {
+function cell_inside(rect: Rect, row: number, col: number): boolean {
   return row >= rect.r0 && row <= rect.r1 && col >= rect.c0 && col <= rect.c1;
 }
 
 /** Sorted rows of `rect` that hold a historical cell. */
-function occupiedRows(sheet: SheetSnapshot, rect: Rect): number[] {
+function occupied_rows(sheet: SheetSnapshot, rect: Rect): number[] {
   const rows = new Set<number>();
 
   for (const block of sheet.cells) {
     for (const cell of block.cells) {
       const row = block.startRow + cell.rowOffset;
       const col = block.startCol + cell.colOffset;
-      if (cellInside(rect, row, col)) {
+      if (cell_inside(rect, row, col)) {
         rows.add(row);
       }
     }
@@ -271,14 +271,14 @@ function occupiedRows(sheet: SheetSnapshot, rect: Rect): number[] {
  * does not produce blocks of empty rows. The capture is the engine's undo
  * capture: formula sources, references and styles come back exactly.
  */
-function cellBands(
+function cell_bands(
   store: SheetwriteStore,
   sheet: SheetId,
   rect: Rect,
   rows: readonly number[],
 ): DocumentOp[] {
   const width = rect.c1 - rect.c0 + 1;
-  const bandRows = Math.max(1, Math.floor(BAND_CELLS / width));
+  const band_rows = Math.max(1, Math.floor(BAND_CELLS / width));
 
   const operations: DocumentOp[] = [];
   let index = 0;
@@ -287,12 +287,12 @@ function cellBands(
     const start = rows[index] ?? 0;
     let end = start;
 
-    while (index < rows.length && (rows[index] ?? 0) - start < bandRows) {
+    while (index < rows.length && (rows[index] ?? 0) - start < band_rows) {
       end = rows[index] ?? end;
       index++;
     }
 
-    const range = rectRange(sheet, { r0: start, c0: rect.c0, r1: end, c1: rect.c1 });
+    const range = rect_range(sheet, { r0: start, c0: rect.c0, r1: end, c1: rect.c1 });
     const capture = store.captureRangeHistory(range);
     if (!capture) {
       throw new HistoryError("integrity", "Historical cells could not be read");
@@ -309,7 +309,7 @@ function cellBands(
 }
 
 /** First index of `rows` (sorted) at or after `row`. */
-function lowerBound(rows: readonly number[], row: number): number {
+function lower_bound(rows: readonly number[], row: number): number {
   let low = 0;
   let high = rows.length;
   while (low < high) {
@@ -329,7 +329,7 @@ function lowerBound(rows: readonly number[], row: number): number {
  * `BAND_GAP_ROWS` share one band, so scattered edits make few operations and
  * a large change makes one band.
  */
-function differingBands(rect: Rect, rows: readonly number[]): Rect[] {
+function differing_bands(rect: Rect, rows: readonly number[]): Rect[] {
   const bands: Rect[] = [];
   for (const row of rows) {
     const last = bands[bands.length - 1];
@@ -348,7 +348,7 @@ function differingBands(rect: Rect, rows: readonly number[]): Rect[] {
  * or only the parts that `rewrite` says can differ from the live cells. Cells
  * outside those parts already hold the historical sources and styles.
  */
-function rewriteCells(
+function rewrite_cells(
   plan: RestorePlan,
   store: SheetwriteStore,
   historical: SheetSnapshot,
@@ -357,50 +357,50 @@ function rewriteCells(
 ): void {
   const id = historical.id;
   const bands = rewrite(id, rect) ?? [rect];
-  const occupied = occupiedRows(historical, rect);
+  const occupied = occupied_rows(historical, rect);
 
   for (const band of bands) {
     plan.content.push({
       op: "clearRange",
-      range: rectRange(id, band),
+      range: rect_range(id, band),
       contents: true,
       style: true,
     });
-    const rows = occupied.slice(lowerBound(occupied, band.r0), lowerBound(occupied, band.r1 + 1));
-    plan.content.push(...cellBands(store, id, band, rows));
+    const rows = occupied.slice(lower_bound(occupied, band.r0), lower_bound(occupied, band.r1 + 1));
+    plan.content.push(...cell_bands(store, id, band, rows));
   }
 }
 
-function currentRowMeta(sheet: Sheet): number[] {
+function current_row_meta(sheet: Sheet): number[] {
   const rows = new Set<number>([...(sheet.rowHeights?.keys() ?? []), ...(sheet.hiddenRows ?? [])]);
   return [...rows];
 }
 
-function noteKey(note: CellNote): string {
+function note_key(note: CellNote): string {
   return `${note.addr.row}:${note.addr.col}`;
 }
 
 /** Notes of `current` inside `rect` that the historical notes do not keep. */
-function noteOperations(
+function note_operations(
   sheet: SheetId,
   current: readonly CellNote[],
   historical: readonly CellNote[],
   rect: Rect,
 ): { clear: DocumentOp[]; set: DocumentOp[] } {
-  const inside = (note: CellNote) => cellInside(rect, note.addr.row, note.addr.col);
-  const kept = new Map(historical.filter(inside).map((note) => [noteKey(note), note]));
+  const inside = (note: CellNote) => cell_inside(rect, note.addr.row, note.addr.col);
+  const kept = new Map(historical.filter(inside).map((note) => [note_key(note), note]));
 
   const clear: DocumentOp[] = [];
   for (const note of current.filter(inside)) {
-    if (kept.get(noteKey(note))?.text !== note.text) {
+    if (kept.get(note_key(note))?.text !== note.text) {
       clear.push({ op: "setNote", addr: { ...note.addr, sheet }, text: null });
     }
   }
 
   const set: DocumentOp[] = [];
-  const currentByKey = new Map(current.filter(inside).map((note) => [noteKey(note), note]));
+  const current_by_key = new Map(current.filter(inside).map((note) => [note_key(note), note]));
   for (const note of kept.values()) {
-    if (currentByKey.get(noteKey(note))?.text !== note.text) {
+    if (current_by_key.get(note_key(note))?.text !== note.text) {
       set.push({ op: "setNote", addr: { ...note.addr, sheet }, text: note.text });
     }
   }
@@ -408,7 +408,7 @@ function noteOperations(
   return { clear, set };
 }
 
-function rowMetaOf(sheet: Sheet, row: number): RowMetadata | null {
+function row_meta_of(sheet: Sheet, row: number): RowMetadata | null {
   const height = sheet.rowHeights?.get(row);
   const hidden = sheet.hiddenRows?.has(row) ?? false;
   if (height === undefined && !hidden) {
@@ -419,24 +419,24 @@ function rowMetaOf(sheet: Sheet, row: number): RowMetadata | null {
 }
 
 /** Remove or replace each keyed object of a sheet: tables, charts, pivots, rules. */
-function keyedObjects<T extends { id: string }>(
+function keyed_objects<T extends { id: string }>(
   current: readonly T[],
   historical: readonly T[],
   remove: (id: string) => DocumentOp,
   set: (item: T, existed: boolean) => DocumentOp,
   plan: RestorePlan,
 ): void {
-  const historicalIds = new Set(historical.map((item) => item.id));
-  const currentById = new Map(current.map((item) => [item.id, item]));
+  const historical_ids = new Set(historical.map((item) => item.id));
+  const current_by_id = new Map(current.map((item) => [item.id, item]));
 
   for (const item of current) {
-    if (!historicalIds.has(item.id)) {
+    if (!historical_ids.has(item.id)) {
       plan.removals.push(remove(item.id));
     }
   }
 
   for (const item of historical) {
-    const existing = currentById.get(item.id);
+    const existing = current_by_id.get(item.id);
     if (!existing || !same(existing, item)) {
       plan.additions.push(set(item, existing !== undefined));
     }
@@ -447,21 +447,25 @@ function keyedObjects<T extends { id: string }>(
  * Bring a dashboard to its historical items and pivots in place. It has no
  * cells, rows, columns or sheet formats to restore.
  */
-function planDashboardInPlace(current: Sheet, historical: SheetSnapshot, plan: RestorePlan): void {
+function plan_dashboard_in_place(
+  current: Sheet,
+  historical: SheetSnapshot,
+  plan: RestorePlan,
+): void {
   const id = current.id;
 
-  keyedObjects(
+  keyed_objects(
     current.pivots ?? [],
     historical.pivots ?? [],
-    (pivotId) => ({ op: "removePivot", sheet: id, id: pivotId }),
+    (pivot_id) => ({ op: "removePivot", sheet: id, id: pivot_id }),
     (pivot) => ({ op: "setPivot", sheet: id, pivot }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.dashboard?.items ?? [],
     historical.dashboard?.items ?? [],
-    (itemId) => ({ op: "removeDashboardItem", sheet: id, id: itemId }),
+    (item_id) => ({ op: "removeDashboardItem", sheet: id, id: item_id }),
     (item) => ({ op: "setDashboardItem", sheet: id, item }),
     plan,
   );
@@ -477,7 +481,7 @@ function planDashboardInPlace(current: Sheet, historical: SheetSnapshot, plan: R
  * so formulas on other sheets keep their references. Rows and columns change
  * only at the end.
  */
-function planSheetInPlace(
+function plan_sheet_in_place(
   current: Sheet,
   historical: SheetSnapshot,
   store: SheetwriteStore,
@@ -488,12 +492,12 @@ function planSheetInPlace(
 
   // A sheet keeps its kind for its whole life, so only a removed and re-added sheet can differ.
   if (isDashboard(current) !== isDashboard(historical)) {
-    throw invalidScope(
+    throw invalid_scope(
       `Sheet ${current.name} changed between a worksheet and a dashboard since this version`,
     );
   }
   if (isDashboard(current)) {
-    planDashboardInPlace(current, historical, plan);
+    plan_dashboard_in_place(current, historical, plan);
     return;
   }
 
@@ -501,50 +505,50 @@ function planSheetInPlace(
     plan.removals.push({ op: "removeMerge", sheet: id, merge });
   }
 
-  keyedObjects(
+  keyed_objects(
     current.validationRules ?? [],
     historical.validationRules ?? [],
-    (ruleId) => ({ op: "removeValidationRule", sheet: id, id: ruleId }),
+    (rule_id) => ({ op: "removeValidationRule", sheet: id, id: rule_id }),
     (rule) => ({ op: "setValidationRule", sheet: id, rule }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.hyperlinks ?? [],
     historical.hyperlinks ?? [],
-    (linkId) => ({ op: "removeHyperlink", sheet: id, id: linkId }),
+    (link_id) => ({ op: "removeHyperlink", sheet: id, id: link_id }),
     (hyperlink) => ({ op: "setHyperlink", sheet: id, hyperlink }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.protectedRanges ?? [],
     historical.protectedRanges ?? [],
-    (rangeId) => ({ op: "removeProtectedRange", sheet: id, id: rangeId }),
-    (protectedRange) => ({ op: "setProtectedRange", sheet: id, protectedRange }),
+    (range_id) => ({ op: "removeProtectedRange", sheet: id, id: range_id }),
+    (protected_range) => ({ op: "setProtectedRange", sheet: id, protectedRange: protected_range }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.charts ?? [],
     historical.charts ?? [],
-    (chartId) => ({ op: "removeChart", sheet: id, id: chartId }),
+    (chart_id) => ({ op: "removeChart", sheet: id, id: chart_id }),
     (chart) => ({ op: "setChart", sheet: id, chart }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.pivots ?? [],
     historical.pivots ?? [],
-    (pivotId) => ({ op: "removePivot", sheet: id, id: pivotId }),
+    (pivot_id) => ({ op: "removePivot", sheet: id, id: pivot_id }),
     (pivot) => ({ op: "setPivot", sheet: id, pivot }),
     plan,
   );
 
-  keyedObjects(
+  keyed_objects(
     current.tables ?? [],
     historical.tables ?? [],
-    (tableId) => ({ op: "removeTable", sheet: id, tableId }),
+    (table_id) => ({ op: "removeTable", sheet: id, tableId: table_id }),
     (table, existed) =>
       existed
         ? {
@@ -585,7 +589,7 @@ function planSheetInPlace(
     });
   }
 
-  const sharedColumns = Math.min(current.columns.length, historical.columns.length);
+  const shared_columns = Math.min(current.columns.length, historical.columns.length);
   if (historical.columns.length < current.columns.length) {
     plan.shrinking.add(id);
     plan.structure.push({
@@ -596,7 +600,7 @@ function planSheetInPlace(
     });
   }
 
-  for (let col = 0; col < sharedColumns; col++) {
+  for (let col = 0; col < shared_columns; col++) {
     const column = historical.columns[col];
     if (column && !same(current.columns[col], column)) {
       plan.structure.push({ op: "setColumn", sheet: id, col, patch: { ...column } });
@@ -623,11 +627,11 @@ function planSheetInPlace(
   };
 
   if (historical.rowCount > 0) {
-    const notes = noteOperations(id, current.notes ?? [], historical.notes ?? [], extent);
+    const notes = note_operations(id, current.notes ?? [], historical.notes ?? [], extent);
     plan.content.push(...notes.clear);
-    const sameShape =
+    const same_shape =
       current.rowCount === historical.rowCount && same(current.columns, historical.columns);
-    rewriteCells(plan, store, historical, extent, sameShape ? rewrite : REWRITE_ALL);
+    rewrite_cells(plan, store, historical, extent, same_shape ? rewrite : REWRITE_ALL);
     plan.content.push(...notes.set);
   }
 
@@ -647,15 +651,15 @@ function planSheetInPlace(
     },
   });
 
-  const historicalMeta = new Map(historical.rowMeta ?? []);
-  for (const row of currentRowMeta(current)) {
-    if (row < historical.rowCount && !historicalMeta.has(row)) {
+  const historical_meta = new Map(historical.rowMeta ?? []);
+  for (const row of current_row_meta(current)) {
+    if (row < historical.rowCount && !historical_meta.has(row)) {
       plan.additions.push({ op: "setRowMeta", sheet: id, row, meta: null });
     }
   }
 
-  for (const [row, meta] of historicalMeta) {
-    if (!same(rowMetaOf(current, row), meta)) {
+  for (const [row, meta] of historical_meta) {
+    if (!same(row_meta_of(current, row), meta)) {
       plan.additions.push({ op: "setRowMeta", sheet: id, row, meta });
     }
   }
@@ -671,27 +675,27 @@ function planSheetInPlace(
 }
 
 /** Restore one sheet; a sheet removed since the version comes back with its ID. */
-function planSheet(
+function plan_sheet(
   current: Workbook,
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
-  sheetId: SheetId,
+  sheet_id: SheetId,
   rewrite: CellRewrite,
 ): RestorePlan {
-  const target = historical.sheets.find((sheet) => sheet.id === sheetId);
+  const target = historical.sheets.find((sheet) => sheet.id === sheet_id);
   if (!target) {
-    throw invalidScope(`Sheet ${sheetId} did not exist in this version`);
+    throw invalid_scope(`Sheet ${sheet_id} did not exist in this version`);
   }
 
-  const plan = emptyPlan();
+  const plan = empty_plan();
   const owner = current.sheets.find(
     (sheet) => sheet.name.toLowerCase() === target.name.toLowerCase(),
   );
-  if (owner && owner.id !== sheetId) {
-    throw invalidScope(`Another sheet is named ${target.name}; rename it before restoring`);
+  if (owner && owner.id !== sheet_id) {
+    throw invalid_scope(`Another sheet is named ${target.name}; rename it before restoring`);
   }
 
-  const live = current.sheets.find((sheet) => sheet.id === sheetId);
+  const live = current.sheets.find((sheet) => sheet.id === sheet_id);
   if (!live) {
     plan.sheets.push({
       op: "addSheet",
@@ -702,44 +706,44 @@ function planSheet(
   }
 
   if (live.name !== target.name) {
-    plan.sheets.push({ op: "renameSheet", sheet: sheetId, name: target.name });
+    plan.sheets.push({ op: "renameSheet", sheet: sheet_id, name: target.name });
   }
 
-  planSheetInPlace(live, target, store, plan, rewrite);
+  plan_sheet_in_place(live, target, store, plan, rewrite);
 
   return plan;
 }
 
-function nameKey(name: NamedRangeSnapshot | { name: string; scope?: SheetId }): string {
+function name_key(name: NamedRangeSnapshot | { name: string; scope?: SheetId }): string {
   return `${name.scope ?? ""}\u0000${name.name.toLowerCase()}`;
 }
 
 /** Restore every sheet, their order, workbook names, relationships and calculation options. */
-function planWorkbook(
+function plan_workbook(
   current: Workbook,
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
   rewrite: CellRewrite,
 ): RestorePlan {
-  const plan = emptyPlan();
-  const historicalIds = new Set(historical.sheets.map((sheet) => sheet.id));
-  const currentIds = new Set(current.sheets.map((sheet) => sheet.id));
-  const historicalNames = new Set(historical.sheets.map((sheet) => sheet.name.toLowerCase()));
+  const plan = empty_plan();
+  const historical_ids = new Set(historical.sheets.map((sheet) => sheet.id));
+  const current_ids = new Set(current.sheets.map((sheet) => sheet.id));
+  const historical_names = new Set(historical.sheets.map((sheet) => sheet.name.toLowerCase()));
 
   // Relationships name tables, so they go before tables and come back after them.
-  const historicalRelationships = historical.workbook.dataModel?.relationships ?? [];
-  const relationshipIds = new Set(historicalRelationships.map((relationship) => relationship.id));
+  const historical_relationships = historical.workbook.dataModel?.relationships ?? [];
+  const relationship_ids = new Set(historical_relationships.map((relationship) => relationship.id));
   for (const relationship of current.dataModel?.relationships ?? []) {
-    if (!relationshipIds.has(relationship.id)) {
+    if (!relationship_ids.has(relationship.id)) {
       plan.removals.push({ op: "removeRelationship", id: relationship.id });
     }
   }
 
   // Measure names are unique, so removed measures leave before others take their names.
-  const historicalMeasures = historical.workbook.dataModel?.measures ?? [];
-  const measureIds = new Set(historicalMeasures.map((measure) => measure.id));
+  const historical_measures = historical.workbook.dataModel?.measures ?? [];
+  const measure_ids = new Set(historical_measures.map((measure) => measure.id));
   for (const measure of current.dataModel?.measures ?? []) {
-    if (!measureIds.has(measure.id)) {
+    if (!measure_ids.has(measure.id)) {
       plan.removals.push({ op: "removeMeasure", id: measure.id });
     }
   }
@@ -747,13 +751,13 @@ function planWorkbook(
   // A current sheet holding a name that another sheet takes back moves to a free name first.
   let free = 1;
   const taken = new Set([
-    ...historicalNames,
+    ...historical_names,
     ...current.sheets.map((sheet) => sheet.name.toLowerCase()),
   ]);
   for (const sheet of current.sheets) {
     const target = historical.sheets.find((candidate) => candidate.id === sheet.id);
     const moves = target === undefined || target.name !== sheet.name;
-    if (moves && historicalNames.has(sheet.name.toLowerCase())) {
+    if (moves && historical_names.has(sheet.name.toLowerCase())) {
       while (taken.has(`restore ${free}`)) {
         free++;
       }
@@ -765,7 +769,7 @@ function planWorkbook(
   }
 
   for (const target of historical.sheets) {
-    if (!currentIds.has(target.id)) {
+    if (!current_ids.has(target.id)) {
       plan.sheets.push({
         op: "addSheet",
         sheet: { ...target, order: current.sheets.length },
@@ -774,7 +778,7 @@ function planWorkbook(
   }
 
   for (const sheet of current.sheets) {
-    if (!historicalIds.has(sheet.id)) {
+    if (!historical_ids.has(sheet.id)) {
       plan.sheets.push({ op: "removeSheet", sheet: sheet.id });
     }
   }
@@ -793,15 +797,15 @@ function planWorkbook(
   for (const target of historical.sheets) {
     const live = current.sheets.find((sheet) => sheet.id === target.id);
     if (live) {
-      planSheetInPlace(live, target, store, plan, rewrite);
+      plan_sheet_in_place(live, target, store, plan, rewrite);
     }
   }
 
-  const historicalNamesByKey = new Map(
-    (historical.workbook.namedRanges ?? []).map((name) => [nameKey(name), name]),
+  const historical_names_by_key = new Map(
+    (historical.workbook.namedRanges ?? []).map((name) => [name_key(name), name]),
   );
   for (const name of current.namedRanges ?? []) {
-    if (!historicalNamesByKey.has(nameKey(name))) {
+    if (!historical_names_by_key.has(name_key(name))) {
       plan.removals.push({
         op: "removeNamedRange",
         name: name.name,
@@ -810,27 +814,27 @@ function planWorkbook(
     }
   }
 
-  const currentNames = new Map((current.namedRanges ?? []).map((name) => [nameKey(name), name]));
-  for (const [key, name] of historicalNamesByKey) {
-    if (!same(currentNames.get(key), name)) {
+  const current_names = new Map((current.namedRanges ?? []).map((name) => [name_key(name), name]));
+  for (const [key, name] of historical_names_by_key) {
+    if (!same(current_names.get(key), name)) {
       plan.names.push({ op: "setNamedRange", namedRange: name });
     }
   }
 
-  const currentRelationships = new Map(
+  const current_relationships = new Map(
     (current.dataModel?.relationships ?? []).map((relationship) => [relationship.id, relationship]),
   );
-  for (const relationship of historicalRelationships) {
-    if (!same(currentRelationships.get(relationship.id), relationship)) {
+  for (const relationship of historical_relationships) {
+    if (!same(current_relationships.get(relationship.id), relationship)) {
       plan.additions.push({ op: "setRelationship", relationship });
     }
   }
 
-  const currentMeasures = new Map(
+  const current_measures = new Map(
     (current.dataModel?.measures ?? []).map((measure) => [measure.id, measure]),
   );
-  for (const measure of historicalMeasures) {
-    if (!same(currentMeasures.get(measure.id), measure)) {
+  for (const measure of historical_measures) {
+    if (!same(current_measures.get(measure.id), measure)) {
       plan.additions.push({ op: "setMeasure", measure });
     }
   }
@@ -856,11 +860,11 @@ function planWorkbook(
 }
 
 /** Merges and hyperlinks that a range restore would cut, from either side of the restore. */
-function assertWhole(rect: Rect, objects: ReadonlyArray<{ rect: Rect; label: string }>): void {
+function assert_whole(rect: Rect, objects: ReadonlyArray<{ rect: Rect; label: string }>): void {
   for (const object of objects) {
     if (intersects(rect, object.rect) && !contains(rect, object.rect)) {
       const { r0, c0, r1, c1 } = object.rect;
-      throw invalidScope(
+      throw invalid_scope(
         `The range cuts a ${object.label} at rows ${r0 + 1}-${r1 + 1}, columns ${c0 + 1}-${c1 + 1}; widen the range to include it`,
       );
     }
@@ -872,7 +876,7 @@ function assertWhole(rect: Rect, objects: ReadonlyArray<{ rect: Rect; label: str
  * sheet. Sheet dimensions, rules, tables, charts, pivots and workbook names
  * stay current.
  */
-function planRange(
+function plan_range(
   current: Workbook,
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
@@ -882,58 +886,63 @@ function planRange(
   const live = current.sheets.find((sheet) => sheet.id === range.sheet);
   const target = historical.sheets.find((sheet) => sheet.id === range.sheet);
   if (!live || !target) {
-    throw invalidScope("The range's sheet must exist now and in this version");
+    throw invalid_scope("The range's sheet must exist now and in this version");
   }
 
-  const rect = rangeRect(range);
+  const rect = range_rect(range);
   const fits = (rows: number, cols: number) =>
     rect.r0 >= 0 && rect.c0 >= 0 && rect.r1 < rows && rect.c1 < cols;
   if (!fits(live.rowCount, live.columns.length) || !fits(target.rowCount, target.columns.length)) {
-    throw invalidScope("The range must lie inside the sheet now and in this version");
+    throw invalid_scope("The range must lie inside the sheet now and in this version");
   }
 
   const merges = (items: readonly MergeRange[] | undefined) =>
-    (items ?? []).map((merge) => ({ rect: mergeRect(merge), label: "merged cell", merge }));
+    (items ?? []).map((merge) => ({ rect: merge_rect(merge), label: "merged cell", merge }));
   const links = (items: readonly CellHyperlink[] | undefined) =>
     (items ?? []).map((hyperlink) => ({
-      rect: rangeRect(hyperlink.range),
+      rect: range_rect(hyperlink.range),
       label: "hyperlink",
       hyperlink,
     }));
 
-  const currentMerges = merges(live.merges);
-  const historicalMerges = merges(target.merges);
-  const currentLinks = links(live.hyperlinks);
-  const historicalLinks = links(target.hyperlinks);
-  assertWhole(rect, [...currentMerges, ...historicalMerges, ...currentLinks, ...historicalLinks]);
+  const current_merges = merges(live.merges);
+  const historical_merges = merges(target.merges);
+  const current_links = links(live.hyperlinks);
+  const historical_links = links(target.hyperlinks);
+  assert_whole(rect, [
+    ...current_merges,
+    ...historical_merges,
+    ...current_links,
+    ...historical_links,
+  ]);
 
-  const plan = emptyPlan();
+  const plan = empty_plan();
   const id = range.sheet;
 
-  for (const { rect: area, merge } of currentMerges) {
+  for (const { rect: area, merge } of current_merges) {
     if (contains(rect, area)) {
       plan.removals.push({ op: "removeMerge", sheet: id, merge });
     }
   }
 
-  for (const { rect: area, hyperlink } of currentLinks) {
+  for (const { rect: area, hyperlink } of current_links) {
     if (contains(rect, area)) {
       plan.removals.push({ op: "removeHyperlink", sheet: id, id: hyperlink.id });
     }
   }
 
-  const notes = noteOperations(id, live.notes ?? [], target.notes ?? [], rect);
+  const notes = note_operations(id, live.notes ?? [], target.notes ?? [], rect);
   plan.content.push(...notes.clear);
-  rewriteCells(plan, store, target, rect, rewrite);
+  rewrite_cells(plan, store, target, rect, rewrite);
   plan.content.push(...notes.set);
 
-  for (const { rect: area, merge } of historicalMerges) {
+  for (const { rect: area, merge } of historical_merges) {
     if (contains(rect, area)) {
       plan.additions.push({ op: "addMerge", sheet: id, merge });
     }
   }
 
-  for (const { rect: area, hyperlink } of historicalLinks) {
+  for (const { rect: area, hyperlink } of historical_links) {
     if (contains(rect, area)) {
       plan.additions.push({ op: "setHyperlink", sheet: id, hyperlink });
     }
@@ -955,7 +964,7 @@ export interface RestoreCommit {
  * can rewrite formula sources outside their own cells, so the restore then
  * rewrites every cell of the scope, after them, from the version.
  */
-function cellsRestoreAlone(
+function cells_restore_alone(
   current: Workbook,
   historical: WorkbookSnapshot,
   scope: HistoryRestoreScope,
@@ -969,10 +978,10 @@ function cellsRestoreAlone(
       ? historical.sheets
       : historical.sheets.filter((sheet) => sheet.id === scope.sheet);
   if (scope.kind === "workbook") {
-    const sameSheets =
+    const same_sheets =
       targets.length === current.sheets.length &&
       same(historical.workbook.dataModel ?? null, current.dataModel ?? null);
-    if (!sameSheets) {
+    if (!same_sheets) {
       return false;
     }
   }
@@ -991,7 +1000,7 @@ function cellsRestoreAlone(
 }
 
 /** The plan of `scope` with `rewrite` choosing which cells to write again. */
-function planScope(
+function plan_scope(
   live: Store,
   historical: WorkbookSnapshot,
   store: SheetwriteStore,
@@ -1001,14 +1010,14 @@ function planScope(
   const current = live.getWorkbook();
   const plan =
     scope.kind === "workbook"
-      ? planWorkbook(current, historical, store, rewrite)
+      ? plan_workbook(current, historical, store, rewrite)
       : scope.kind === "sheet"
-        ? planSheet(current, historical, store, scope.sheet, rewrite)
-        : planRange(current, historical, store, scope.range, rewrite);
+        ? plan_sheet(current, historical, store, scope.sheet, rewrite)
+        : plan_range(current, historical, store, scope.range, rewrite);
 
   return {
     operations: flatten(plan),
-    guards: referenceGuards(live, current, plan.shrinking),
+    guards: reference_guards(live, current, plan.shrinking),
   };
 }
 
@@ -1026,19 +1035,19 @@ export function planRestore(
 ): RestoreCommit {
   const current = live.getWorkbook();
   const historical = store.exportSnapshot();
-  const liveEngine = storeEngine(live);
-  const versionEngine = storeEngine(store);
+  const live_engine = storeEngine(live);
+  const version_engine = storeEngine(store);
 
   const rewrite: CellRewrite =
-    liveEngine && versionEngine && cellsRestoreAlone(current, historical, scope)
+    live_engine && version_engine && cells_restore_alone(current, historical, scope)
       ? (sheet, rect) =>
           // A paged datasource sheet can hold cells that are not loaded.
-          liveEngine.isPaged(sheet)
+          live_engine.isPaged(sheet)
             ? undefined
-            : differingBands(rect, compareRows(liveEngine, versionEngine, sheet, rect))
+            : differing_bands(rect, compareRows(live_engine, version_engine, sheet, rect))
       : REWRITE_ALL;
 
-  return planScope(live, historical, store, scope, rewrite);
+  return plan_scope(live, historical, store, scope, rewrite);
 }
 
 /**
@@ -1047,7 +1056,7 @@ export function planRestore(
  * the version can differ, and `store` is a sparse version that holds those
  * cells. `undefined` when the scope needs cells outside them: a sheet that
  * changes size or columns, a paged datasource sheet, or a change that rewrites
- * the whole scope (see `cellsRestoreAlone`).
+ * the whole scope (see `cells_restore_alone`).
  */
 export function planPageRestore(
   live: Store,
@@ -1057,22 +1066,22 @@ export function planPageRestore(
 ): RestoreCommit | undefined {
   const current = live.getWorkbook();
   const historical = store.exportSnapshot();
-  const liveEngine = storeEngine(live);
-  if (!liveEngine || !cellsRestoreAlone(current, historical, scope)) {
+  const live_engine = storeEngine(live);
+  if (!live_engine || !cells_restore_alone(current, historical, scope)) {
     return undefined;
   }
 
-  const inScope =
+  const in_scope =
     scope.kind === "workbook"
       ? historical.sheets
       : historical.sheets.filter(
           (sheet) => sheet.id === (scope.kind === "sheet" ? scope.sheet : scope.range.sheet),
         );
-  const fits = inScope.every((target) => {
+  const fits = in_scope.every((target) => {
     const sheet = current.sheets.find((candidate) => candidate.id === target.id);
     return (
       sheet !== undefined &&
-      !liveEngine.isPaged(target.id) &&
+      !live_engine.isPaged(target.id) &&
       sheet.rowCount === target.rowCount &&
       same(sheet.columns, target.columns)
     );
@@ -1081,7 +1090,7 @@ export function planPageRestore(
     return undefined;
   }
 
-  return planScope(live, historical, store, scope, (sheet, rect) =>
+  return plan_scope(live, historical, store, scope, (sheet, rect) =>
     (changed.get(sheet) ?? []).flatMap((part) => {
       const inside = intersection(part, rect);
       return inside ? [inside] : [];

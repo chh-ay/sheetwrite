@@ -73,7 +73,7 @@ export interface EvictionWatch {
 type TileResidence = DatasourceTile["state"] | "resident" | "evicted" | "dirty";
 export type ResidentTile = DatasourceTile & { residence: TileResidence };
 
-function selectionA1(selection: Selection | null): string {
+function selection_a1(selection: Selection | null): string {
   if (!selection) return "A1";
   if (selection.kind === "cell") return cellA1(selection.addr.row, selection.addr.col);
   if (selection.kind === "range")
@@ -84,7 +84,7 @@ function selectionA1(selection: Selection | null): string {
   return first ? cellA1(first.row, first.col) : "A1";
 }
 
-function selectedCellAddress(selection: Selection | null): CellAddress | null {
+function selected_cell_address(selection: Selection | null): CellAddress | null {
   if (!selection) return null;
   if (selection.kind === "cell") return selection.addr;
   if (selection.kind === "range") return { sheet: FEED_SHEET, ...selection.range.start };
@@ -101,14 +101,14 @@ export function columnBandsLabel(columns: readonly DatasourceTile["columns"][num
     .join(", ");
 }
 
-function tileResidence(grid: Grid | null, tile: DatasourceTile): TileResidence {
+function tile_residence(grid: Grid | null, tile: DatasourceTile): TileResidence {
   if (tile.state !== "returned" || !grid?.store.getCellLoadState) return tile.state;
-  const firstBand = tile.columns[0];
-  if (!firstBand) return "evicted";
+  const first_band = tile.columns[0];
+  if (!first_band) return "evicted";
   const state = grid.store.getCellLoadState({
     sheet: tile.sheet,
     row: tile.start,
-    col: firstBand.start,
+    col: first_band.start,
   });
   if (state === "unloaded") return "evicted";
   if (state === "local-edit") return "dirty";
@@ -148,12 +148,12 @@ const EMPTY_WINDOW: VisibleWindow = {
   lastColumn: 0,
 };
 
-let mountedGrid: Grid | null = null;
+let mounted_grid: Grid | null = null;
 /** The engine module, once the Grid has loaded it. */
 let engine: typeof import("./boot.js") | null = null;
-let hostElement: HTMLElement | null = null;
-let visibleNow: VisibleWindow = EMPTY_WINDOW;
-let zoomNow = 1;
+let host_element: HTMLElement | null = null;
+let visible_now: VisibleWindow = EMPTY_WINDOW;
+let zoom_now = 1;
 
 export const [renderer, setRenderer] = createSignal<RenderingMode>("canvas");
 export const [rendererState, setRendererState] = createSignal<RendererState | null>(null);
@@ -166,7 +166,7 @@ export const [stats, setStats] = createSignal<LiveStats>({
 });
 export const [visible, setVisible] = createSignal<VisibleWindow>(EMPTY_WINDOW);
 export const [selection, setSelection] = createSignal("A1");
-const [selectedAddress, setSelectedAddress] = createSignal<CellAddress>({
+const [selected_address, set_selected_address] = createSignal<CellAddress>({
   sheet: FEED_SHEET,
   row: 0,
   col: 0,
@@ -182,7 +182,7 @@ export const [resourceDelta, setResourceDelta] = createSignal<RuntimeResourcePha
 );
 export const [evictionWatch, setEvictionWatch] = createSignal<EvictionWatch | null>(null);
 
-export const grid = (): Grid | null => mountedGrid;
+export const grid = (): Grid | null => mounted_grid;
 /** The paged store's sample for the scale sheet, once the engine has loaded. */
 export const pagedStats = (current: Grid): PagedStoreStats | null =>
   engine?.pagedStatsOf(current, FEED_SHEET) ?? null;
@@ -211,7 +211,7 @@ export const recentTiles = (): ResidentTile[] => {
   stats();
   return telemetry().recentTiles.map((tile) => ({
     ...tile,
-    residence: tileResidence(mountedGrid, tile),
+    residence: tile_residence(mounted_grid, tile),
   }));
 };
 export const recentEvictions = () =>
@@ -234,7 +234,7 @@ export const changedResourceOwners = () =>
   ) ?? [];
 export const selectedFormula = () => {
   stats();
-  return mountedGrid?.store.getFormula(selectedAddress()) ?? null;
+  return mounted_grid?.store.getFormula(selected_address()) ?? null;
 };
 
 /**
@@ -243,22 +243,22 @@ export const selectedFormula = () => {
  * island, which owns the Grid's lifetime.
  */
 export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) => () => void) {
-  hostElement = host;
-  const [near, setNear] = createSignal(false);
-  onCleanup(whenNear(() => setNear(true)));
+  host_element = host;
+  const [near, set_near] = createSignal(false);
+  onCleanup(whenNear(() => set_near(true)));
 
   createEffect(
-    on([near, renderer, evictionStress], ([isNear, mode, stressed]) => {
-      if (!isNear) return;
+    on([near, renderer, evictionStress], ([is_near, mode, stressed]) => {
+      if (!is_near) return;
       let disposed = false;
       let created: Grid | null = null;
       const unsubscribes: Array<() => void> = [];
       // Flights fire a scroll event and several tile updates every frame. Each
       // readout redraws at once when idle and at most ten times a second during
       // a burst, always ending on the latest value.
-      const visibleUpdates = throttled(setVisible);
-      const telemetryUpdates = throttled(setTelemetry);
-      unsubscribes.push(visibleUpdates.cancel, telemetryUpdates.cancel);
+      const visible_updates = throttled(setVisible);
+      const telemetry_updates = throttled(setTelemetry);
+      unsubscribes.push(visible_updates.cancel, telemetry_updates.cancel);
       setGridState("loading");
       setTelemetry(emptyTelemetry());
       setEvictionWatch(null);
@@ -271,8 +271,8 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
             renderer: mode,
             storage: stressed ? SCALE_EVICTION_STRESS_STORAGE : SCALE_STORAGE,
             overscan: stressed ? 0 : SCALE_OVERSCAN,
-            onTelemetry: (update) => telemetryUpdates.push(update),
-            visibleRows: () => visibleNow,
+            onTelemetry: (update) => telemetry_updates.push(update),
+            visibleRows: () => visible_now,
           });
         })
         .then((next) => {
@@ -281,37 +281,37 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
             return;
           }
           created = next;
-          mountedGrid = next;
+          mounted_grid = next;
           window.__sheetwriteScaleGrid = next;
-          next.setZoom(zoomNow);
+          next.setZoom(zoom_now);
           setRendererState({ requested: mode, active: next.rendererKind(), fallback: null });
-          setSelection(selectionA1(next.getSelection()));
-          setSelectedAddress(
-            selectedCellAddress(next.getSelection()) ?? { sheet: FEED_SHEET, row: 0, col: 0 },
+          setSelection(selection_a1(next.getSelection()));
+          set_selected_address(
+            selected_cell_address(next.getSelection()) ?? { sheet: FEED_SHEET, row: 0, col: 0 },
           );
           unsubscribes.push(
             next.on("scroll", (event) => {
-              const nextVisible = {
+              const next_visible = {
                 firstRow: event.firstRow,
                 lastRow: event.lastRow,
                 scrollLeft: event.scrollLeft,
                 firstColumn: event.firstVisibleColumn ?? 0,
                 lastColumn: event.lastVisibleColumn ?? event.firstVisibleColumn ?? 0,
               };
-              visibleNow = nextVisible;
-              visibleUpdates.push(nextVisible);
+              visible_now = next_visible;
+              visible_updates.push(next_visible);
             }),
             next.on("selection", ({ selection: chosen }) => {
-              setSelection(selectionA1(chosen));
-              const address = selectedCellAddress(chosen);
-              if (address) setSelectedAddress(address);
+              setSelection(selection_a1(chosen));
+              const address = selected_cell_address(chosen);
+              if (address) set_selected_address(address);
             }),
             next.on("edit-commit", ({ addr }) => {
-              const cleanRow =
+              const clean_row =
                 addr.row >= SCALE_STORAGE.chunkRows
                   ? addr.row - SCALE_STORAGE.chunkRows
                   : Math.min(SCALE_ROWS - 1, addr.row + SCALE_STORAGE.chunkRows);
-              const clean = { ...addr, row: cleanRow };
+              const clean = { ...addr, row: clean_row };
               setEvictionWatch({
                 dirty: addr,
                 clean,
@@ -350,8 +350,8 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
       onCleanup(() => {
         disposed = true;
         for (const unsubscribe of unsubscribes) unsubscribe();
-        if (mountedGrid === created) {
-          mountedGrid = null;
+        if (mounted_grid === created) {
+          mounted_grid = null;
           delete window.__sheetwriteScaleGrid;
         }
         created?.destroy();
@@ -361,12 +361,12 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
 
   onCleanup(
     observeSiteTheme(() => {
-      if (engine) mountedGrid?.replaceTheme(engine.scaleTheme());
+      if (engine) mounted_grid?.replaceTheme(engine.scaleTheme());
     }),
   );
 
   const timer = window.setInterval(() => {
-    const current = mountedGrid;
+    const current = mounted_grid;
     if (!current || !engine) return;
     setStats({
       paged: engine.pagedStatsOf(current, FEED_SHEET),
@@ -375,15 +375,15 @@ export function mountWorkbench(host: HTMLElement, whenNear: (start: () => void) 
     });
     const watch = evictionWatch();
     if (!watch) return;
-    const dirtyState = current.store.getCellLoadState?.(watch.dirty) ?? "unavailable";
-    const cleanState = current.store.getCellLoadState?.(watch.clean) ?? "unavailable";
+    const dirty_state = current.store.getCellLoadState?.(watch.dirty) ?? "unavailable";
+    const clean_state = current.store.getCellLoadState?.(watch.clean) ?? "unavailable";
     const value = String(current.store.getCell(watch.dirty).resolved ?? "");
     if (
-      dirtyState !== watch.dirtyState ||
-      cleanState !== watch.cleanState ||
+      dirty_state !== watch.dirtyState ||
+      clean_state !== watch.cleanState ||
       value !== watch.value
     ) {
-      setEvictionWatch({ ...watch, dirtyState, cleanState, value });
+      setEvictionWatch({ ...watch, dirtyState: dirty_state, cleanState: clean_state, value });
     }
   }, STATS_INTERVAL_MS);
   onCleanup(() => window.clearInterval(timer));
@@ -394,76 +394,77 @@ export function jumpTo(
   column: number,
   source: "form" | "overview" | "column-overview" | "landmark",
 ): void {
-  const current = mountedGrid;
+  const current = mounted_grid;
   if (!current) return;
-  const resolvedRow = Math.min(Math.max(Math.round(row), 0), SCALE_ROWS - 1);
-  const resolvedColumn = Math.min(Math.max(Math.round(column), 0), SCALE_COLUMNS - 1);
-  const addr = { sheet: FEED_SHEET, row: resolvedRow, col: resolvedColumn };
+  const resolved_row = Math.min(Math.max(Math.round(row), 0), SCALE_ROWS - 1);
+  const resolved_column = Math.min(Math.max(Math.round(column), 0), SCALE_COLUMNS - 1);
+  const addr = { sheet: FEED_SHEET, row: resolved_row, col: resolved_column };
   current.setSelection({ kind: "cell", addr });
   current.scrollToCell(addr);
-  if (source === "form") hostElement?.focus({ preventScroll: true });
+  if (source === "form") host_element?.focus({ preventScroll: true });
   if (source !== "overview" && source !== "column-overview") {
     setStatus(
-      `${source === "form" ? "Exact jump" : "Overview landmark"}: ${cellA1(resolvedRow, resolvedColumn)} is selected; its rectangular tile is requested on demand.`,
+      `${source === "form" ? "Exact jump" : "Overview landmark"}: ${cellA1(resolved_row, resolved_column)} is selected; its rectangular tile is requested on demand.`,
     );
   }
 }
 
 /** Zooms around the visible window, so the cells in view stay in view. */
 export function zoomTo(nextZoom: number): void {
-  const current = mountedGrid;
-  const host = hostElement;
+  const current = mounted_grid;
+  const host = host_element;
   if (!current || !host) return;
-  const anchor = visibleNow;
+  const anchor = visible_now;
   current.setZoom(nextZoom);
 
   const theme = current.getEffectiveTheme();
-  const bodyRows = Math.max(
+  const body_rows = Math.max(
     1,
     Math.floor(Math.max(theme.rowHeight, host.clientHeight - theme.headerHeight) / theme.rowHeight),
   );
   const sheet = current.store.getWorkbook().sheets.find((candidate) => candidate.id === FEED_SHEET);
-  const availableWidth = Math.max(1, host.clientWidth - theme.rowHeaderWidth);
-  let anchorRight = anchor.firstColumn;
-  let coveredWidth = 0;
-  while (anchorRight < SCALE_COLUMNS) {
-    coveredWidth += (sheet?.columns[anchorRight]?.width ?? 96) * current.getZoom();
-    if (coveredWidth >= availableWidth) break;
-    anchorRight += 1;
+  const available_width = Math.max(1, host.clientWidth - theme.rowHeaderWidth);
+  let anchor_right = anchor.firstColumn;
+  let covered_width = 0;
+  while (anchor_right < SCALE_COLUMNS) {
+    covered_width += (sheet?.columns[anchor_right]?.width ?? 96) * current.getZoom();
+    if (covered_width >= available_width) break;
+    anchor_right += 1;
   }
 
-  const bodyColumns = Math.max(1, anchorRight - anchor.firstColumn + 1);
-  const forceRow =
+  const body_columns = Math.max(1, anchor_right - anchor.firstColumn + 1);
+  const force_row =
     anchor.firstRow === 0
-      ? Math.min(SCALE_ROWS - 1, bodyRows + SCALE_OVERSCAN + 1)
-      : Math.max(0, anchor.firstRow - bodyRows - SCALE_OVERSCAN - 1);
-  const forceColumn =
+      ? Math.min(SCALE_ROWS - 1, body_rows + SCALE_OVERSCAN + 1)
+      : Math.max(0, anchor.firstRow - body_rows - SCALE_OVERSCAN - 1);
+  const force_column =
     anchor.firstColumn === 0
-      ? Math.min(SCALE_COLUMNS - 1, anchorRight + 1)
-      : Math.max(0, anchor.firstColumn - bodyColumns - 1);
-  current.scrollToCell({ sheet: FEED_SHEET, row: forceRow, col: forceColumn });
+      ? Math.min(SCALE_COLUMNS - 1, anchor_right + 1)
+      : Math.max(0, anchor.firstColumn - body_columns - 1);
+  current.scrollToCell({ sheet: FEED_SHEET, row: force_row, col: force_column });
   current.scrollToCell({
     sheet: FEED_SHEET,
     row:
       anchor.firstRow === 0
         ? 0
-        : Math.min(SCALE_ROWS - 1, anchor.firstRow + SCALE_OVERSCAN + bodyRows),
-    col: anchor.firstColumn === 0 ? 0 : Math.min(SCALE_COLUMNS - 1, anchorRight),
+        : Math.min(SCALE_ROWS - 1, anchor.firstRow + SCALE_OVERSCAN + body_rows),
+    col: anchor.firstColumn === 0 ? 0 : Math.min(SCALE_COLUMNS - 1, anchor_right),
   });
-  zoomNow = current.getZoom();
-  setZoom(zoomNow);
+  zoom_now = current.getZoom();
+  setZoom(zoom_now);
 }
 
 export function runScan(): void {
-  if (mountedGrid && engine) setScan(engine.attemptColumnScan(mountedGrid, 3, "sum"));
+  if (mounted_grid && engine) setScan(engine.attemptColumnScan(mounted_grid, 3, "sum"));
 }
 
 export function runExport(): void {
-  if (mountedGrid && engine) setExportAttempt(engine.attemptFullCsvExport(mountedGrid, FEED_SHEET));
+  if (mounted_grid && engine)
+    setExportAttempt(engine.attemptFullCsvExport(mounted_grid, FEED_SHEET));
 }
 
 export function runCrossings(kind: "values" | "styles"): void {
-  const current = mountedGrid;
+  const current = mounted_grid;
   if (!current || !engine) return;
   const before = current.getRuntimeResourceSnapshot("edit", "before");
   const report = engine.measureBulkMutation(current, kind, 20_000);

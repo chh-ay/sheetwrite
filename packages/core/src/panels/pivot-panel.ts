@@ -80,11 +80,11 @@ export function pivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true)
   return {
     title: "PivotTable Fields",
     focus,
-    render: (body) => renderPivotPanel(body, grid, sheet, id),
+    render: (body) => render_pivot_panel(body, grid, sheet, id),
   };
 }
 
-function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
+function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: string): () => void {
   const read = (): PivotDefinition | null =>
     grid.getPivots(sheet).find((pivot) => pivot.id === id) ?? null;
   // The panel's lifetime: its grid listener and the document listener of an open menu.
@@ -95,35 +95,35 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   // The value field whose number format form is open.
   let formatting: number | null = null;
   /** Definition, data model and message the panel was built from, as JSON. */
-  let renderedStructure = "";
-  let renderedFields: readonly PivotSourceField[] = [];
+  let rendered_structure = "";
+  let rendered_fields: readonly PivotSourceField[] = [];
   /** Sheets the pivot reads cells from, as of the last definition read; empty without a pivot. */
-  let sourceSheets: ReadonlySet<SheetId> = new Set();
+  let source_sheets: ReadonlySet<SheetId> = new Set();
   /**
    * Whether the source sheets hold literal cells only, so that only writes to
    * them change the fields. Undefined until checked; a write to one clears it.
    */
-  let sourcesAreLiteral: boolean | undefined;
+  let sources_are_literal: boolean | undefined;
 
   /**
    * Distinct values of one source field, at most one more than a filter may
    * keep, so an overflow is visible without reading every row twice.
    */
-  const distinctValues = (pivot: PivotDefinition, field: number): CellScalar[] => {
+  const distinct_values = (pivot: PivotDefinition, field: number): CellScalar[] => {
     const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
-    const modelField = "model" in pivot.source ? pivot.source.model.fields[field] : undefined;
-    const source = modelField ? { table: modelField.table } : pivot.source;
+    const model_field = "model" in pivot.source ? pivot.source.model.fields[field] : undefined;
+    const source = model_field ? { table: model_field.table } : pivot.source;
     const range = sourceDataRange(source, tables);
     if (range === null) return [];
-    const offset = modelField
+    const offset = model_field
       ? (tables
-          .find((table) => table.id === modelField.table)
-          ?.columns.findIndex((column) => column.id === modelField.column) ?? -1)
+          .find((table) => table.id === model_field.table)
+          ?.columns.findIndex((column) => column.id === model_field.column) ?? -1)
       : field;
     if (offset < 0) return [];
 
     // Related fields can be blank because a fact key has no matching row.
-    const seen = new Set<CellScalar>(modelField ? [null] : []);
+    const seen = new Set<CellScalar>(model_field ? [null] : []);
     const col = range.start.col + offset;
     const keep = (value: CellScalar): boolean => {
       seen.add(value);
@@ -154,12 +154,12 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     return [...seen].sort(compareScalars);
   };
 
-  /** Commit one edit, then rebuild with focus on `focusKey` when given. */
-  const commit = (next: PivotDefinition, focusKey?: string): void => {
+  /** Commit one edit, then rebuild with focus on `focus_key` when given. */
+  const commit = (next: PivotDefinition, focus_key?: string): void => {
     message = rejectionMessage(grid.setPivot(next, sheet));
     refresh(true);
-    if (focusKey !== undefined)
-      body.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
+    if (focus_key !== undefined)
+      body.querySelector<HTMLElement>(`[data-focus-key="${focus_key}"]`)?.focus();
   };
 
   /** Move a field, refusing a filter whose keep-list would pass the limit. */
@@ -173,7 +173,8 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   ): void => {
     const type = fields.find((candidate) => candidate.index === field)?.type;
     // Only a new filter reads the source; a moved filter keeps its keep-list.
-    const values = to === "filters" && from?.area !== "filters" ? distinctValues(pivot, field) : [];
+    const values =
+      to === "filters" && from?.area !== "filters" ? distinct_values(pivot, field) : [];
     if (values.length > MAX_FILTER_VALUES) {
       message = TOO_MANY_VALUES;
       refresh(true);
@@ -189,11 +190,11 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
    * Add `column` of a related table to `to`. A table source becomes a model
    * source in the same change, so it stays one undo step.
    */
-  const addRelated = (pivot: PivotDefinition, column: TableColumnRef, to: PivotArea): void => {
+  const add_related = (pivot: PivotDefinition, column: TableColumnRef, to: PivotArea): void => {
     const tables = grid.store.getWorkbook().sheets.flatMap((candidate) => candidate.tables ?? []);
     const added = withModelField(pivot, tables, column);
     if (added === null) return;
-    const values = distinctValues(added.pivot, added.field);
+    const values = distinct_values(added.pivot, added.field);
     if (to === "filters" && values.length > MAX_FILTER_VALUES) {
       message = TOO_MANY_VALUES;
       refresh(true);
@@ -211,7 +212,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
    * does not show yet, as Excel's Field List lists measures under their
    * home table. A measure goes to Values only.
    */
-  const appendMeasures = (target: HTMLElement, pivot: PivotDefinition): void => {
+  const append_measures = (target: HTMLElement, pivot: PivotDefinition): void => {
     if (baseTable(pivot.source) === undefined) return;
     const workbook = grid.store.getWorkbook();
     const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
@@ -262,7 +263,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
    * One section per table that the pivot's base table reaches through
    * relationships, with the columns the pivot does not read yet.
    */
-  const appendRelatedTables = (target: HTMLElement, pivot: PivotDefinition): void => {
+  const append_related_tables = (target: HTMLElement, pivot: PivotDefinition): void => {
     const base = baseTable(pivot.source);
     if (base === undefined) return;
     const workbook = grid.store.getWorkbook();
@@ -287,9 +288,9 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           `${label} field actions`,
           `related-${table.id}-${column.id}-menu`,
           () =>
-            PIVOT_AREAS.map(([area, areaLabel]) => ({
-              label: `Add to ${areaLabel}`,
-              run: () => addRelated(pivot, ref, area),
+            PIVOT_AREAS.map(([area, area_label]) => ({
+              label: `Add to ${area_label}`,
+              run: () => add_related(pivot, ref, area),
             })),
           lifetime.signal,
         );
@@ -327,10 +328,10 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     };
 
     // Source fields. Dropping an entry here removes it from its area.
-    const fieldSection = panelSection("Fields");
-    const fieldList = document.createElement("ul");
-    fieldList.className = "sheetwrite-panel-fields";
-    fieldList.setAttribute("aria-label", "Fields");
+    const field_section = panelSection("Fields");
+    const field_list = document.createElement("ul");
+    field_list.className = "sheetwrite-panel-fields";
+    field_list.setAttribute("aria-label", "Fields");
     const used = new Set(PIVOT_AREAS.flatMap(([area]) => areaFields(pivot, area)));
     for (const field of fields) {
       const item = document.createElement("li");
@@ -362,26 +363,26 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
       item.addEventListener("dragend", () => {
         drag = null;
       });
-      fieldList.appendChild(item);
+      field_list.appendChild(item);
     }
-    fieldList.addEventListener("dragover", (event) => {
+    field_list.addEventListener("dragover", (event) => {
       if (drag?.from !== null && drag !== null) event.preventDefault();
     });
-    fieldList.addEventListener("drop", (event) => {
+    field_list.addEventListener("drop", (event) => {
       const source = drag;
       drag = null;
       if (source?.from == null) return;
       event.preventDefault();
       commit(removeField(pivot, source.from));
     });
-    fieldSection.appendChild(fieldList);
-    target.appendChild(fieldSection);
-    appendRelatedTables(target, pivot);
-    appendMeasures(target, pivot);
+    field_section.appendChild(field_list);
+    target.appendChild(field_section);
+    append_related_tables(target, pivot);
+    append_measures(target, pivot);
 
     for (const [area, label] of PIVOT_AREAS) {
       target.appendChild(
-        areaSection(area, label, pivot, header, {
+        area_section(area, label, pivot, header, {
           dragState: () => drag,
           startDrag: (state) => {
             drag = state;
@@ -393,7 +394,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           },
           move: (field, to, from, at) => move(pivot, fields, field, to, from, at),
           commit,
-          distinctValues: (field) => distinctValues(pivot, field),
+          distinctValues: (field) => distinct_values(pivot, field),
           formatting: () => formatting,
           editFormat: (index) => {
             formatting = index;
@@ -401,10 +402,11 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
             const focus = index === null ? `values-${index}-menu` : `values-${index}-format`;
             body.querySelector<HTMLElement>(`[data-focus-key="${focus}"]`)?.focus();
           },
-          measureName: (measureId) =>
+          measureName: (measure_id) =>
             grid.store
               .getWorkbook()
-              .dataModel?.measures?.find((measure) => measure.id === measureId)?.name ?? measureId,
+              .dataModel?.measures?.find((measure) => measure.id === measure_id)?.name ??
+            measure_id,
           signal: lifetime.signal,
         }),
       );
@@ -416,11 +418,11 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     const pivot = read();
     const fields = pivot === null ? [] : grid.getPivotFields(sheet, id);
     const structure = JSON.stringify([pivot, grid.store.getWorkbook().dataModel, message]);
-    sourceSheets = pivot === null ? new Set() : pivotSourceSheets(grid, pivot.source);
-    sourcesAreLiteral = undefined;
-    if (!force && structure === renderedStructure && sameFields(fields, renderedFields)) return;
-    renderedStructure = structure;
-    renderedFields = fields;
+    source_sheets = pivot === null ? new Set() : pivot_source_sheets(grid, pivot.source);
+    sources_are_literal = undefined;
+    if (!force && structure === rendered_structure && same_fields(fields, rendered_fields)) return;
+    rendered_structure = structure;
+    rendered_fields = fields;
     rebuildPanel(body, build);
   };
 
@@ -429,21 +431,21 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
    * model are as they were, so only the fields' names and types can change,
    * and only when a written cell or a formula is on a source sheet.
    */
-  const refreshFields = (patches: readonly DocumentOp[]): void => {
-    if (sourceSheets.size === 0) return;
-    const writesSource = patches.some((patch) => {
+  const refresh_fields = (patches: readonly DocumentOp[]): void => {
+    if (source_sheets.size === 0) return;
+    const writes_source = patches.some((patch) => {
       const written = patchSheetId(patch);
-      return written === null || sourceSheets.has(written);
+      return written === null || source_sheets.has(written);
     });
-    if (writesSource) {
-      sourcesAreLiteral = undefined;
+    if (writes_source) {
+      sources_are_literal = undefined;
     } else {
-      sourcesAreLiteral ??= holdsLiteralsOnly(grid, sourceSheets, { sheet, id });
-      if (sourcesAreLiteral) return;
+      sources_are_literal ??= holds_literals_only(grid, source_sheets, { sheet, id });
+      if (sources_are_literal) return;
     }
     const fields = grid.getPivotFields(sheet, id);
-    if (sameFields(fields, renderedFields)) return;
-    renderedFields = fields;
+    if (same_fields(fields, rendered_fields)) return;
+    rendered_fields = fields;
     rebuildPanel(body, build);
   };
 
@@ -451,7 +453,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   lifetime.add(
     grid.on("change", (event) => {
       const { patches } = event.transaction;
-      if (patches.every(writesCellsOnly)) refreshFields(patches);
+      if (patches.every(writes_cells_only)) refresh_fields(patches);
       else refresh();
     }),
   );
@@ -463,7 +465,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
  * table and, through relationships, other tables, so it counts every sheet
  * that holds a table.
  */
-function pivotSourceSheets(grid: Grid, source: PivotSource): Set<SheetId> {
+function pivot_source_sheets(grid: Grid, source: PivotSource): Set<SheetId> {
   if ("range" in source) return new Set([source.range.sheet]);
   const sheets = grid.store.getWorkbook().sheets;
   return new Set(
@@ -476,7 +478,7 @@ function pivotSourceSheets(grid: Grid, source: PivotSource): Set<SheetId> {
  * reference or other pivot's output. Their values then change only through
  * writes to them. `own` is the panel's pivot, whose output follows its source.
  */
-function holdsLiteralsOnly(
+function holds_literals_only(
   grid: Grid,
   sheets: ReadonlySet<SheetId>,
   own: { readonly sheet: SheetId; readonly id: string },
@@ -485,10 +487,10 @@ function holdsLiteralsOnly(
   if (!engine) return false;
   for (const sheet of sheets) {
     if (engine.isPaged(sheet)) return false;
-    const otherPivot = grid
+    const other_pivot = grid
       .getPivots(sheet)
       .some((pivot) => sheet !== own.sheet || pivot.id !== own.id);
-    if (otherPivot) return false;
+    if (other_pivot) return false;
     const sources = engine.captureSheetSources(sheet);
     if (
       sources === null ||
@@ -505,7 +507,7 @@ function holdsLiteralsOnly(
  * Whether `patch` changes only cell content or formatting. Such a commit
  * leaves pivot definitions, tables and the data model as they were.
  */
-function writesCellsOnly(patch: DocumentOp): boolean {
+function writes_cells_only(patch: DocumentOp): boolean {
   switch (patch.op) {
     case "set":
     case "setRange":
@@ -522,7 +524,7 @@ function writesCellsOnly(patch: DocumentOp): boolean {
   }
 }
 
-function sameFields(
+function same_fields(
   left: readonly PivotSourceField[],
   right: readonly PivotSourceField[],
 ): boolean {
@@ -565,7 +567,7 @@ interface AreaActions {
   signal: AbortSignal;
 }
 
-function areaSection(
+function area_section(
   area: PivotArea,
   label: string,
   pivot: PivotDefinition,
@@ -593,8 +595,8 @@ function areaSection(
     const value = area === "values" ? pivot.values[index] : undefined;
     // A measure value has no source field, so it cannot move to another
     // area or shift by field; the list can only remove it.
-    const isMeasure = value !== undefined && "measure" in value;
-    item.draggable = !isMeasure;
+    const is_measure = value !== undefined && "measure" in value;
+    item.draggable = !is_measure;
 
     const name = document.createElement("span");
     name.className = "sheetwrite-panel-field-name";
@@ -614,15 +616,15 @@ function areaSection(
       run: () => actions.commit(removeField(pivot, placement)),
     };
     // Excel opens Number Format from a value field's settings.
-    const numberFormat: PanelMenuItem[] =
+    const number_format: PanelMenuItem[] =
       area === "values" ? [{ label: "Number Format…", run: () => actions.editFormat(index) }] : [];
-    const menuItems = (): PanelMenuItem[] =>
-      isMeasure
-        ? [...numberFormat, remove]
+    const menu_items = (): PanelMenuItem[] =>
+      is_measure
+        ? [...number_format, remove]
         : [
-            ...numberFormat,
-            ...PIVOT_AREAS.map(([to, toLabel]) => ({
-              label: `Move to ${toLabel}`,
+            ...number_format,
+            ...PIVOT_AREAS.map(([to, to_label]) => ({
+              label: `Move to ${to_label}`,
               disabled: to === area,
               run: () => actions.move(field, to, placement),
             })),
@@ -631,7 +633,7 @@ function areaSection(
               disabled: index === 0,
               run: () =>
                 actions.commit(
-                  shiftField(pivot, placement, -1, noFacts),
+                  shiftField(pivot, placement, -1, no_facts),
                   `${area}-${index - 1}-menu`,
                 ),
             },
@@ -640,15 +642,17 @@ function areaSection(
               disabled: index === entries.length - 1,
               run: () =>
                 actions.commit(
-                  shiftField(pivot, placement, 1, noFacts),
+                  shiftField(pivot, placement, 1, no_facts),
                   `${area}-${index + 1}-menu`,
                 ),
             },
             remove,
           ];
     // The area is part of the name: a field can sit in two areas at once.
-    const actionsLabel = `${name.textContent} in ${label} actions`;
-    item.appendChild(menuButton(actionsLabel, `${area}-${index}-menu`, menuItems, actions.signal));
+    const actions_label = `${name.textContent} in ${label} actions`;
+    item.appendChild(
+      menuButton(actions_label, `${area}-${index}-menu`, menu_items, actions.signal),
+    );
 
     if (area === "values" && value && "aggregation" in value) {
       const select = selectOf(AGGREGATION_LABELS, value.aggregation);
@@ -673,16 +677,16 @@ function areaSection(
       );
       item.appendChild(select);
     } else if (area === "filters") {
-      item.appendChild(filterValues(pivot, index, field, header(field), actions));
+      item.appendChild(filter_values(pivot, index, field, header(field), actions));
     }
 
     if (area === "values" && value && actions.formatting() === index) {
       item.appendChild(
-        numberFormatForm(pivot, index, value.numberFormat, name.textContent, actions),
+        number_format_form(pivot, index, value.numberFormat, name.textContent, actions),
       );
     }
 
-    if (!isMeasure)
+    if (!is_measure)
       item.addEventListener("dragstart", (event) => {
         actions.startDrag({ field, from: placement });
         event.dataTransfer?.setData("text/plain", header(field));
@@ -716,10 +720,10 @@ function areaSection(
 }
 
 /** Up and Down keep an entry in its area, so it needs no type or values. */
-const noFacts: FieldFacts = { type: undefined, distinctValues: () => [] };
+const no_facts: FieldFacts = { type: undefined, distinctValues: () => [] };
 
 /** The keep-list of one filter as checkboxes; each toggle is one change. */
-function filterValues(
+function filter_values(
   pivot: PivotDefinition,
   index: number,
   field: number,
@@ -727,13 +731,13 @@ function filterValues(
   actions: AreaActions,
 ): HTMLElement {
   const kept = pivot.filters?.[index]?.values ?? [];
-  const keptSet = new Set(kept);
+  const kept_set = new Set(kept);
   const all = [...new Set([...actions.distinctValues(field), ...kept])].sort(compareScalars);
 
   const details = document.createElement("details");
   details.className = "sheetwrite-panel-filter";
   const summary = document.createElement("summary");
-  summary.textContent = `${keptSet.size} of ${all.length} shown`;
+  summary.textContent = `${kept_set.size} of ${all.length} shown`;
   summary.dataset.focusKey = `filters-${index}-values`;
   details.appendChild(summary);
 
@@ -745,7 +749,7 @@ function filterValues(
     label.className = "sheetwrite-panel-check";
     const box = document.createElement("input");
     box.type = "checkbox";
-    box.checked = keptSet.has(value);
+    box.checked = kept_set.has(value);
     box.dataset.focusKey = `filters-${index}-value-${position}`;
     box.addEventListener("change", () => {
       const next = box.checked ? [...kept, value] : kept.filter((candidate) => candidate !== value);
@@ -762,7 +766,7 @@ function filterValues(
  * Excel's Number Format for one value field: a category, or a custom code
  * typed in the field. OK commits one change; Cancel closes the form.
  */
-function numberFormatForm(
+function number_format_form(
   pivot: PivotDefinition,
   index: number,
   current: string | undefined,

@@ -90,21 +90,21 @@ export const [batchReport, setBatchReport] = createSignal<BatchReport | null>(nu
 export const [restoreRunning, setRestoreRunning] = createSignal(false);
 
 /** The guard of the page's edits, server commits and reset. */
-const [actionState, setActionState] = createSignal<ActionState>({ pending: false, error: null });
-export const action = createActionGuard(setActionState);
-export const actionPending = () => actionState().pending;
-export const actionError = () => actionState().error;
+const [action_state, set_action_state] = createSignal<ActionState>({ pending: false, error: null });
+export const action = createActionGuard(set_action_state);
+export const actionPending = () => action_state().pending;
+export const actionError = () => action_state().error;
 
 /** The chaos run's own guard: it runs alongside the other actions. */
-const [chaosState, setChaosState] = createSignal<ActionState>({ pending: false, error: null });
-export const chaosAction = createActionGuard(setChaosState);
-export const chaosPending = () => chaosState().pending;
-export const chaosError = () => chaosState().error;
+const [chaos_state, set_chaos_state] = createSignal<ActionState>({ pending: false, error: null });
+export const chaosAction = createActionGuard(set_chaos_state);
+export const chaosPending = () => chaos_state().pending;
+export const chaosError = () => chaos_state().error;
 
-let logId = 0;
+let log_id = 0;
 export const nextLogId = (): number => {
-  logId += 1;
-  return logId;
+  log_id += 1;
+  return log_id;
 };
 
 export function patchView(key: ClientKey, patch: Partial<ClientView>): void {

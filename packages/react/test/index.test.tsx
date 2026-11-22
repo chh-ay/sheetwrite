@@ -17,7 +17,7 @@ import { mountReact, renderReactSimple } from "./mount.js";
 runSharedAdapterLifecycleContract("React", mountReact);
 runSimpleAdapterSizeContract("React", renderReactSimple);
 
-function mountRoot() {
+function mount_root() {
   const host = document.body.appendChild(document.createElement("div"));
   return { host, root: createRoot(host), gridRef: createRef<Grid>() };
 }
@@ -40,13 +40,13 @@ describe("SheetwriteGrid React lifecycle", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
-    const [stdout, stderr, exitCode] = await Promise.all([
+    const [stdout, stderr, exit_code] = await Promise.all([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
       child.exited,
     ]);
 
-    expect(exitCode, stderr).toBe(0);
+    expect(exit_code, stderr).toBe(0);
     const result = JSON.parse(stdout) as { errors: string[]; html: string };
     expect(result.errors).toEqual([]);
     expect(result.html).toStartWith("<div");
@@ -54,14 +54,14 @@ describe("SheetwriteGrid React lifecycle", () => {
 
   it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
     const workbook = makeConformanceWorkbook();
-    const { root, gridRef } = mountRoot();
+    const { root, gridRef: grid_ref } = mount_root();
     const calls: string[] = [];
     const suspended = Promise.withResolvers<void>();
-    let suspendedRenders = 0;
+    let suspended_renders = 0;
 
     function SuspendAfterGrid({ active }: { active: boolean }): ReactElement | null {
       if (!active) return null;
-      suspendedRenders += 1;
+      suspended_renders += 1;
       throw suspended.promise;
     }
 
@@ -69,7 +69,7 @@ describe("SheetwriteGrid React lifecycle", () => {
       return (
         <Suspense fallback={null}>
           <SheetwriteGrid
-            ref={gridRef}
+            ref={grid_ref}
             workbook={workbook}
             onViewportChange={() => calls.push(callback)}
           />
@@ -79,16 +79,16 @@ describe("SheetwriteGrid React lifecycle", () => {
     }
 
     await act(async () => root.render(<Harness callback="committed" suspend={false} />));
-    const committedGrid = present(gridRef.current, "committed grid");
+    const committed_grid = present(grid_ref.current, "committed grid");
 
     await act(async () => {
       startTransition(() => root.render(<Harness callback="abandoned" suspend />));
       await Promise.resolve();
     });
-    expect(suspendedRenders).toBeGreaterThan(0);
-    expectSame(gridRef.current, committedGrid);
+    expect(suspended_renders).toBeGreaterThan(0);
+    expectSame(grid_ref.current, committed_grid);
     calls.length = 0;
-    committedGrid.refresh();
+    committed_grid.refresh();
     expect(calls).toContain("committed");
     expect(calls).not.toContain("abandoned");
 
@@ -97,28 +97,28 @@ describe("SheetwriteGrid React lifecycle", () => {
   });
 
   it("builds an uncontrolled data-first grid and resets on defaultRows identity", async () => {
-    const { root, gridRef } = mountRoot();
+    const { root, gridRef: grid_ref } = mount_root();
     const columns = [
       { key: "name", title: "Name" },
       { key: "price", title: "Price", type: "currency" as const },
     ] as const;
-    const firstRows = [{ name: "Notebook", price: 12.5 }];
+    const first_rows = [{ name: "Notebook", price: 12.5 }];
     const ready: Array<{ generation: number; reason: string }> = [];
-    const render = (defaultRows: typeof firstRows) =>
+    const render = (default_rows: typeof first_rows) =>
       act(async () => {
         root.render(
           <Sheetwrite
-            ref={gridRef}
+            ref={grid_ref}
             columns={columns}
-            defaultRows={defaultRows}
+            defaultRows={default_rows}
             height={200}
             onReady={({ generation, reason }) => ready.push({ generation, reason })}
           />,
         );
       });
 
-    await render(firstRows);
-    const first = present(gridRef.current, "first grid");
+    await render(first_rows);
+    const first = present(grid_ref.current, "first grid");
     first.applyTransaction({
       patches: [
         {
@@ -128,11 +128,11 @@ describe("SheetwriteGrid React lifecycle", () => {
         },
       ],
     });
-    expect(firstRows[0]?.name).toBe("Notebook");
+    expect(first_rows[0]?.name).toBe("Notebook");
 
     await render([{ name: "Pen", price: 2.25 }]);
-    expectDifferent(gridRef.current, first);
-    expect(gridRef.current?.store.getCell({ sheet: "sheet1", row: 0, col: 0 }).resolved).toBe(
+    expectDifferent(grid_ref.current, first);
+    expect(grid_ref.current?.store.getCell({ sheet: "sheet1", row: 0, col: 0 }).resolved).toBe(
       "Pen",
     );
     expect(ready).toEqual([

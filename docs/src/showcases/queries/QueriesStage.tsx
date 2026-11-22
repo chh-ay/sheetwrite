@@ -52,7 +52,9 @@ export interface QueriesStageProps {
 
 export function QueriesStage(props: QueriesStageProps) {
   const live = createLiveScenario<QueriesScenario, QueriesSnapshot>(() =>
-    import("./boot.js").then(({ createQueriesScenario }) => createQueriesScenario),
+    import("./boot.js").then(
+      ({ createQueriesScenario: create_queries_scenario }) => create_queries_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
   const busy = () => action.disabled() || (live.snapshot()?.refreshing ?? true);

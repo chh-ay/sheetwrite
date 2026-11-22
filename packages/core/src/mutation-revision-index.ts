@@ -25,11 +25,11 @@ export class MutationRevisionIndex {
   private readonly points = new Map<string, number>();
   private rectangles: RevisionRectangle[] = [];
   private readonly retained = new Map<number, number>();
-  private retainedRequests = 0;
+  private retained_requests = 0;
 
   retainRevision(revision: number): () => void {
     this.retained.set(revision, (this.retained.get(revision) ?? 0) + 1);
-    this.retainedRequests += 1;
+    this.retained_requests += 1;
     this.prune();
 
     let released = false;
@@ -40,23 +40,23 @@ export class MutationRevisionIndex {
       if (count === undefined) return;
       if (count === 1) this.retained.delete(revision);
       else this.retained.set(revision, count - 1);
-      this.retainedRequests -= 1;
+      this.retained_requests -= 1;
       this.prune();
     };
   }
 
   record(operations: readonly DocumentOp[], revision: number): void {
-    if (this.retainedRequests === 0) return;
+    if (this.retained_requests === 0) return;
 
     for (const operation of operations) {
       switch (operation.op) {
         case "set":
-          this.recordPoint(operation.addr, revision);
+          this.record_point(operation.addr, revision);
           break;
         case "setRange": {
           const range = normalizedRange(operation.range);
           for (const cell of operation.cells) {
-            this.recordPoint(
+            this.record_point(
               {
                 sheet: range.sheet,
                 row: range.start.row + cell.rowOffset,
@@ -83,7 +83,7 @@ export class MutationRevisionIndex {
   }
 
   isNewerThan(address: CellAddress, revision: number): boolean {
-    if ((this.points.get(pointKey(address)) ?? -1) > revision) return true;
+    if ((this.points.get(point_key(address)) ?? -1) > revision) return true;
     for (const rectangle of this.rectangles) {
       if (rectangle.revision <= revision || rectangle.range.sheet !== address.sheet) continue;
       if (
@@ -102,25 +102,25 @@ export class MutationRevisionIndex {
     this.points.clear();
     this.rectangles = [];
     this.retained.clear();
-    this.retainedRequests = 0;
+    this.retained_requests = 0;
   }
 
   stats(): MutationRevisionStats {
     return {
       points: this.points.size,
       rectangles: this.rectangles.length,
-      retainedRequests: this.retainedRequests,
+      retainedRequests: this.retained_requests,
       retainedRevisions: this.retained.size,
     };
   }
 
-  private recordPoint(address: CellAddress, revision: number): void {
-    const key = pointKey(address);
+  private record_point(address: CellAddress, revision: number): void {
+    const key = point_key(address);
     if ((this.points.get(key) ?? -1) < revision) this.points.set(key, revision);
   }
 
   private prune(): void {
-    if (this.retainedRequests === 0) {
+    if (this.retained_requests === 0) {
       this.points.clear();
       this.rectangles = [];
       return;
@@ -134,6 +134,6 @@ export class MutationRevisionIndex {
   }
 }
 
-function pointKey(address: CellAddress): string {
+function point_key(address: CellAddress): string {
   return `${address.sheet}:${address.row}:${address.col}`;
 }

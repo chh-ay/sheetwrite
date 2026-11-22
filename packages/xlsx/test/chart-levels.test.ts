@@ -27,11 +27,11 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-const chartPart = (bytes: Uint8Array) =>
+const chart_part = (bytes: Uint8Array) =>
   partText(bytes, partNames(bytes).find((name) => /^xl\/charts\/[^/]+\.xml$/u.test(name)) ?? "");
 
 /** Regions in A1:A4 (blank where a group continues), segments in B1:B4, amounts in C1:C4. */
-function rangeSnapshot(chart: Partial<ChartDefinition> = {}): WorkbookSnapshot {
+function range_snapshot(chart: Partial<ChartDefinition> = {}): WorkbookSnapshot {
   return book([
     sheet(
       "data",
@@ -61,20 +61,20 @@ function rangeSnapshot(chart: Partial<ChartDefinition> = {}): WorkbookSnapshot {
 
 describe("multi-level categories over a cell range", () => {
   it("writes a category range of two columns as c:multiLvlStrRef and reads it back", async () => {
-    const bytes = await backend.toXlsxWorkbook(rangeSnapshot());
-    expect(chartPart(bytes)).toContain(
+    const bytes = await backend.toXlsxWorkbook(range_snapshot());
+    expect(chart_part(bytes)).toContain(
       "<c:cat><c:multiLvlStrRef><c:f>&apos;Data&apos;!$A$1:$B$4</c:f></c:multiLvlStrRef></c:cat>",
     );
-    expect(chartPart(bytes)).not.toContain("noMultiLvlLbl");
+    expect(chart_part(bytes)).not.toContain("noMultiLvlLbl");
     const reopened = sheetAt(await backend.fromXlsxWorkbook(withoutSidecar(bytes)));
     expect(reopened.charts?.[0]?.series[0]?.categories).toEqual(range(reopened.id, 0, 0, 3, 1));
   });
 
   it("keeps Multi-level Category Labels cleared through c:noMultiLvlLbl", async () => {
     const bytes = await backend.toXlsxWorkbook(
-      rangeSnapshot({ axes: { multiLevelLabels: false } }),
+      range_snapshot({ axes: { multiLevelLabels: false } }),
     );
-    expect(chartPart(bytes)).toContain('<c:noMultiLvlLbl val="1"/>');
+    expect(chart_part(bytes)).toContain('<c:noMultiLvlLbl val="1"/>');
     const reopened = await backend.fromXlsxWorkbook(withoutSidecar(bytes));
     expect(sheetAt(reopened).charts?.[0]?.axes).toEqual({ multiLevelLabels: false });
   });
@@ -85,7 +85,7 @@ describe("multi-level categories over a cell range", () => {
       '<c:lvl><c:pt idx="0"><c:v>Retail</c:v></c:pt><c:pt idx="1"><c:v>Online</c:v></c:pt><c:pt idx="2"><c:v>Retail</c:v></c:pt><c:pt idx="3"><c:v>Online</c:v></c:pt></c:lvl>' +
       '<c:lvl><c:pt idx="0"><c:v>East</c:v></c:pt><c:pt idx="2"><c:v>West</c:v></c:pt></c:lvl>' +
       "</c:multiLvlStrCache></c:multiLvlStrRef></c:cat>";
-    const bytes = await backend.toXlsxWorkbook(rangeSnapshot());
+    const bytes = await backend.toXlsxWorkbook(range_snapshot());
     const name = partNames(bytes).find((part) => /^xl\/charts\/[^/]+\.xml$/u.test(part)) ?? "";
     const edited = editParts(withoutSidecar(bytes), {
       [name]: (xml) =>
@@ -120,7 +120,7 @@ const PIVOT_CHART: ChartDefinition = {
   pivot: "sales",
 };
 
-const pivotSnapshot = (layout: "compact" | "tabular") =>
+const pivot_snapshot = (layout: "compact" | "tabular") =>
   book([
     sheet(
       "data",
@@ -199,21 +199,21 @@ const OUTPUTS = {
   ],
 } as const;
 
-async function exportPivotChart(layout: "compact" | "tabular", withOutput = true) {
+async function export_pivot_chart(layout: "compact" | "tabular", with_output = true) {
   const cells = OUTPUTS[layout].map((row) => [...row]);
-  const pivotOutputs: DashboardExport[] = [
+  const pivot_outputs: DashboardExport[] = [
     {
       sheet: "data",
       items: [{ id: "sales", cells, numberFormats: cells.map((row) => row.map(() => null)) }],
     },
   ];
-  const bytes = await backend.toXlsxWorkbook(pivotSnapshot(layout), undefined, {
+  const bytes = await backend.toXlsxWorkbook(pivot_snapshot(layout), undefined, {
     pivotCharts: new Map([
       ["data", new Map([[PIVOT_CHART.id, { chart: PIVOT_CHART, series: [PIVOT_SERIES] }]])],
     ]),
-    ...(withOutput ? { pivotOutputs } : {}),
+    ...(with_output ? { pivotOutputs: pivot_outputs } : {}),
   });
-  return { bytes, chart: chartPart(bytes) };
+  return { bytes, chart: chart_part(bytes) };
 }
 
 const LEVELS_CACHE =
@@ -224,7 +224,7 @@ const LEVELS_CACHE =
 
 describe("multi-level categories of a chart over a pivot with two row fields", () => {
   it("reads the label and value cells of a tabular pivot as an Excel PivotChart of it", async () => {
-    const { bytes, chart } = await exportPivotChart("tabular");
+    const { bytes, chart } = await export_pivot_chart("tabular");
     expect(chart).toContain(
       '<c:pivotSource><c:name>[]Data!Sales</c:name><c:fmtId val="0"/></c:pivotSource>',
     );
@@ -240,7 +240,7 @@ describe("multi-level categories of a chart over a pivot with two row fields", (
   });
 
   it("spans the rows of a compact pivot, where outer items have their own rows", async () => {
-    const { chart } = await exportPivotChart("compact");
+    const { chart } = await export_pivot_chart("compact");
     expect(chart).toContain("<c:pivotSource>");
     expect(chart).toContain(
       `<c:cat><c:multiLvlStrRef><c:f>&apos;Data&apos;!$E$3:$E$6</c:f>${LEVELS_CACHE}</c:multiLvlStrRef></c:cat>`,
@@ -249,7 +249,7 @@ describe("multi-level categories of a chart over a pivot with two row fields", (
   });
 
   it("keeps the levels in a cache with no written cells", async () => {
-    const { chart } = await exportPivotChart("tabular", false);
+    const { chart } = await export_pivot_chart("tabular", false);
     expect(chart).not.toContain("<c:pivotSource>");
     expect(chart).toContain(
       `<c:cat><c:multiLvlStrRef><c:f>#REF!</c:f>${LEVELS_CACHE}</c:multiLvlStrRef></c:cat>`,

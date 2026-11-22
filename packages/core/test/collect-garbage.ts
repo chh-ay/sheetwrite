@@ -7,12 +7,12 @@ const SETTLE_DEADLINE_MS = 2_000;
 const SETTLE_DELAY_MS = 10;
 
 /** Collect from a timer callback, so no caller frame still holds a referent. */
-function collectInFreshStack(delayMs = 0): Promise<void> {
+function collect_in_fresh_stack(delay_ms = 0): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(() => {
     Bun.gc(true);
     resolve();
-  }, delayMs);
+  }, delay_ms);
   return promise;
 }
 
@@ -25,10 +25,10 @@ function collectInFreshStack(delayMs = 0): Promise<void> {
  * deadline.
  */
 export async function collectUntilFreed(refs: readonly WeakRef<object>[]): Promise<void> {
-  for (let turn = 0; turn < GC_TURNS; turn++) await collectInFreshStack();
+  for (let turn = 0; turn < GC_TURNS; turn++) await collect_in_fresh_stack();
 
   const deadline = performance.now() + SETTLE_DEADLINE_MS;
   while (refs.some((ref) => ref.deref() !== undefined) && performance.now() < deadline) {
-    await collectInFreshStack(SETTLE_DELAY_MS);
+    await collect_in_fresh_stack(SETTLE_DELAY_MS);
   }
 }

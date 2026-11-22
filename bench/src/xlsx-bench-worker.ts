@@ -27,7 +27,7 @@ interface WorkerResult {
   readonly rejection?: string;
 }
 
-function maximumRssBytes(): number {
+function maximum_rss_bytes(): number {
   try {
     const status = readFileSync("/proc/self/status", "utf8");
     const match = /^VmHWM:\s+(\d+)\s+kB$/m.exec(status);
@@ -44,26 +44,26 @@ function sha256(bytes: Uint8Array | string): string {
   return hasher.digest("hex");
 }
 
-function snapshotSentinel(snapshot: WorkbookSnapshot): string {
-  let populatedCells = 0;
-  let styledCells = 0;
-  let formulaCells = 0;
-  let firstValue: unknown;
-  let lastValue: unknown;
+function snapshot_sentinel(snapshot: WorkbookSnapshot): string {
+  let populated_cells = 0;
+  let styled_cells = 0;
+  let formula_cells = 0;
+  let first_value: unknown;
+  let last_value: unknown;
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {
       for (const cell of block.cells) {
-        populatedCells++;
-        if (cell.style) styledCells++;
-        if (cell.value.kind === "formula") formulaCells++;
+        populated_cells++;
+        if (cell.style) styled_cells++;
+        if (cell.value.kind === "formula") formula_cells++;
         const value =
           cell.value.kind === "literal"
             ? cell.value.value
             : cell.value.kind === "formula"
               ? cell.value.src
               : cell.value.target;
-        if (firstValue === undefined) firstValue = value;
-        lastValue = value;
+        if (first_value === undefined) first_value = value;
+        last_value = value;
       }
     }
   }
@@ -76,28 +76,28 @@ function snapshotSentinel(snapshot: WorkbookSnapshot): string {
       merges: sheet.merges?.length ?? 0,
       notes: sheet.notes?.length ?? 0,
     })),
-    populatedCells,
-    styledCells,
-    formulaCells,
-    firstValue,
-    lastValue,
+    populatedCells: populated_cells,
+    styledCells: styled_cells,
+    formulaCells: formula_cells,
+    firstValue: first_value,
+    lastValue: last_value,
   });
 }
 
 async function backend(engine: "current" | "baseline", root: string): Promise<XlsxWorkbookBackend> {
-  const modulePath = resolve(root, "packages/xlsx/src/workbook.ts");
+  const module_path = resolve(root, "packages/xlsx/src/workbook.ts");
   // The root is selected at runtime so the same worker can load an independent detached baseline.
-  const loaded = (await import(pathToFileURL(modulePath).href)) as {
+  const loaded = (await import(pathToFileURL(module_path).href)) as {
     readonly sheetwriteWorkbookBackend?: XlsxWorkbookBackend;
     readonly excelJsWorkbookBackend?: XlsxWorkbookBackend;
   };
   const implementation =
     engine === "current" ? loaded.sheetwriteWorkbookBackend : loaded.excelJsWorkbookBackend;
-  if (!implementation) throw new Error(`${engine} XLSX backend was not exported by ${modulePath}`);
+  if (!implementation) throw new Error(`${engine} XLSX backend was not exported by ${module_path}`);
   return implementation;
 }
 
-async function measureOperation(
+async function measure_operation(
   implementation: XlsxWorkbookBackend,
   operation: WorkerResult["operation"],
   scenario: string,
@@ -109,7 +109,7 @@ async function measureOperation(
 > {
   const started = performance.now();
   let ended = started;
-  let outputBytes = 0;
+  let output_bytes = 0;
   let checksum = "";
   let rejection: string | undefined;
   if (operation === "export") {
@@ -117,15 +117,15 @@ async function measureOperation(
       maxCells: 1_000_000,
     });
     ended = performance.now();
-    outputBytes = output.byteLength;
+    output_bytes = output.byteLength;
     checksum = sha256(output);
   } else if (operation === "import") {
     const snapshot = await implementation.fromXlsxWorkbook(input as Uint8Array, {
       maxCells: 1_000_000,
     });
     ended = performance.now();
-    const sentinel = snapshotSentinel(snapshot);
-    outputBytes = Buffer.byteLength(sentinel);
+    const sentinel = snapshot_sentinel(snapshot);
+    output_bytes = Buffer.byteLength(sentinel);
     checksum = sha256(sentinel);
   } else {
     try {
@@ -142,13 +142,13 @@ async function measureOperation(
       const message = error instanceof Error ? `${error.name}:${error.message}` : String(error);
       rejection = message;
       if (message.includes("was accepted")) throw error;
-      outputBytes = Buffer.byteLength(message);
+      output_bytes = Buffer.byteLength(message);
       checksum = sha256(message);
     }
   }
   return {
     durationMs: ended - started,
-    outputBytes,
+    outputBytes: output_bytes,
     checksum,
     ...(rejection ? { rejection } : {}),
     after: process.memoryUsage(),
@@ -160,7 +160,7 @@ async function measureOperation(
  * conservatively, so old values in the frame of `main` can keep dead codec objects alive. A timer
  * callback starts on a new stack after this frame is suspended.
  */
-function retainedUsage(): Promise<NodeJS.MemoryUsage> {
+function retained_usage(): Promise<NodeJS.MemoryUsage> {
   const { promise, resolve } = Promise.withResolvers<NodeJS.MemoryUsage>();
   setTimeout(() => {
     Bun.gc(true);
@@ -184,35 +184,36 @@ async function main(): Promise<WorkerResult> {
   if (mode !== "smoke" && mode !== "full") throw new Error(`invalid mode ${mode}`);
 
   const implementation = await backend(engine, root);
-  let inputBytes = 0;
+  let input_bytes = 0;
   let input: Uint8Array | WorkbookSnapshot;
   if (operation === "export") {
     const corpus = createXlsxCorpus(mode);
     const snapshot = corpus.scenarios[scenario as XlsxCorpusScenario];
     if (!snapshot) throw new Error(`unknown export scenario ${scenario}`);
     input = snapshot;
-    inputBytes = Buffer.byteLength(JSON.stringify(snapshot));
+    input_bytes = Buffer.byteLength(JSON.stringify(snapshot));
   } else {
     input = new Uint8Array(await Bun.file(fixture).arrayBuffer());
-    inputBytes = input.byteLength;
+    input_bytes = input.byteLength;
   }
 
   Bun.gc(true);
   const before = process.memoryUsage();
-  const { durationMs, outputBytes, checksum, rejection, after } = await measureOperation(
-    implementation,
-    operation,
-    scenario,
-    input,
-  );
-  const retained = await retainedUsage();
+  const {
+    durationMs: duration_ms,
+    outputBytes: output_bytes,
+    checksum,
+    rejection,
+    after,
+  } = await measure_operation(implementation, operation, scenario, input);
+  const retained = await retained_usage();
   return {
     engine,
     operation,
     scenario,
-    durationMs,
+    durationMs: duration_ms,
     // Linux updates VmHWM lazily, so the observed final RSS can already exceed it.
-    maxRssBytes: Math.max(maximumRssBytes(), after.rss),
+    maxRssBytes: Math.max(maximum_rss_bytes(), after.rss),
     rssBeforeBytes: before.rss,
     rssAfterBytes: after.rss,
     heapBeforeBytes: before.heapUsed,
@@ -221,8 +222,8 @@ async function main(): Promise<WorkerResult> {
     arrayBuffersAfterBytes: after.arrayBuffers,
     heapRetainedBytes: retained.heapUsed,
     arrayBuffersRetainedBytes: retained.arrayBuffers,
-    inputBytes,
-    outputBytes,
+    inputBytes: input_bytes,
+    outputBytes: output_bytes,
     checksum,
     ...(rejection ? { rejection } : {}),
   };

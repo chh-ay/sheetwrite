@@ -115,17 +115,17 @@ export interface WorkbookWriteHook {
   queryTable?(table: WorkbookTable): QueryTableBinding | undefined;
 }
 
-function canonicalJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+function canonical_json_value(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical_json_value);
   if (value === null || typeof value !== "object") return value;
   const output: Record<string, unknown> = {};
   for (const key of Object.keys(value).sort()) {
-    output[key] = canonicalJsonValue(Reflect.get(value, key));
+    output[key] = canonical_json_value(Reflect.get(value, key));
   }
   return output;
 }
 
-function hasExactBorderWidth(style: CellStyle | undefined): boolean {
+function has_exact_border_width(style: CellStyle | undefined): boolean {
   return Object.values(style?.border ?? {}).some(
     (border) => border.width !== undefined && border.width !== 1 && border.width !== 2,
   );
@@ -138,10 +138,10 @@ function hasExactBorderWidth(style: CellStyle | undefined): boolean {
 /** The output written as cells for each pivot kept in metadata, by pivot ID. */
 type KeptOutputs = ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
 
-function metadataSnapshot(
+function metadata_snapshot(
   snapshot: WorkbookSnapshot,
-  nativePivots: ReadonlySet<string>,
-  keptOutputs: KeptOutputs,
+  native_pivots: ReadonlySet<string>,
+  kept_outputs: KeptOutputs,
 ): WorkbookSnapshot {
   const { xlsxSource: _source, ...workbook } = snapshot.workbook;
   return {
@@ -155,9 +155,9 @@ function metadataSnapshot(
             pivots: sheet.pivots.map((pivot) => {
               // The cells written for a kept pivot are its saved output, so
               // the reader can tell them from user values.
-              const kept = keptOutputs.get(pivot.id);
+              const kept = kept_outputs.get(pivot.id);
               if (kept) return { ...pivot, savedOutput: kept };
-              if (!pivot.savedOutput || !nativePivots.has(pivot.id)) return pivot;
+              if (!pivot.savedOutput || !native_pivots.has(pivot.id)) return pivot;
               const { savedOutput: _saved, ...definition } = pivot;
               return definition;
             }),
@@ -165,7 +165,7 @@ function metadataSnapshot(
         : {}),
       cells: sheet.cells.flatMap((block) => {
         const preserved = block.cells
-          .filter((cell) => cell.value.kind === "ref" || hasExactBorderWidth(cell.style))
+          .filter((cell) => cell.value.kind === "ref" || has_exact_border_width(cell.style))
           .map((cell) => ({
             rowOffset: cell.rowOffset,
             colOffset: cell.colOffset,
@@ -173,7 +173,7 @@ function metadataSnapshot(
               cell.value.kind === "ref"
                 ? structuredClone(cell.value)
                 : ({ kind: "literal", value: null } as const),
-            ...(hasExactBorderWidth(cell.style) ? { style: structuredClone(cell.style) } : {}),
+            ...(has_exact_border_width(cell.style) ? { style: structuredClone(cell.style) } : {}),
           }));
         return preserved.length > 0 ? [{ ...block, cells: preserved }] : [];
       }),
@@ -181,7 +181,7 @@ function metadataSnapshot(
   };
 }
 
-function metadataSheetName(snapshot: WorkbookSnapshot): string {
+function metadata_sheet_name(snapshot: WorkbookSnapshot): string {
   const names = new Set(snapshot.sheets.map((sheet) => sheetNameKey(sheet.name)));
   let name = META_STEM;
   let suffix = 2;
@@ -191,7 +191,7 @@ function metadataSheetName(snapshot: WorkbookSnapshot): string {
   return name;
 }
 
-function validateNames(snapshot: WorkbookSnapshot): void {
+function validate_names(snapshot: WorkbookSnapshot): void {
   const names: string[] = [];
   for (const sheet of snapshot.sheets) {
     const validated = validateSheetName(sheet.name, names);
@@ -221,7 +221,7 @@ function validateNames(snapshot: WorkbookSnapshot): void {
   }
 }
 
-function preflightSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext): void {
+function preflight_snapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext): void {
   assertResource(context, "maxSheets", snapshot.sheets.length);
   let cells = 0;
   let merges = 0;
@@ -237,40 +237,40 @@ function preflightSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext
   }
 }
 
-function metadataSheetXml(
+function metadata_sheet_xml(
   snapshot: WorkbookSnapshot,
-  nativePivots: ReadonlySet<string>,
-  keptOutputs: KeptOutputs,
+  native_pivots: ReadonlySet<string>,
+  kept_outputs: KeptOutputs,
   context: XlsxCodecContext,
 ): Uint8Array {
   const json = JSON.stringify(
-    canonicalJsonValue(metadataSnapshot(snapshot, nativePivots, keptOutputs)),
+    canonical_json_value(metadata_snapshot(snapshot, native_pivots, kept_outputs)),
   );
   const chunks = [META_MARKER];
-  let chunkParts: string[] = [];
-  let chunkBytes = 0;
+  let chunk_parts: string[] = [];
+  let chunk_bytes = 0;
   for (const character of json) {
     const encoded = encodeXstring(character);
-    const codeUnit = character.charCodeAt(0);
+    const code_unit = character.charCodeAt(0);
     const bytes =
       encoded.length !== character.length
         ? encoded.length
         : character.length === 2
           ? 4
-          : codeUnit <= 0x7f
+          : code_unit <= 0x7f
             ? 1
-            : codeUnit <= 0x7ff
+            : code_unit <= 0x7ff
               ? 2
               : 3;
-    if (chunkBytes + bytes > META_CHUNK && chunkParts.length > 0) {
-      chunks.push(chunkParts.join(""));
-      chunkParts = [];
-      chunkBytes = 0;
+    if (chunk_bytes + bytes > META_CHUNK && chunk_parts.length > 0) {
+      chunks.push(chunk_parts.join(""));
+      chunk_parts = [];
+      chunk_bytes = 0;
     }
-    chunkParts.push(character);
-    chunkBytes += bytes;
+    chunk_parts.push(character);
+    chunk_bytes += bytes;
   }
-  if (chunkParts.length > 0) chunks.push(chunkParts.join(""));
+  if (chunk_parts.length > 0) chunks.push(chunk_parts.join(""));
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
@@ -287,34 +287,34 @@ function metadataSheetXml(
   return xml.finish();
 }
 
-function workbookXml(
+function workbook_xml(
   snapshot: WorkbookSnapshot,
   ordered: readonly SheetSnapshot[],
-  metadataName: string,
+  metadata_name: string,
   context: XlsxCodecContext,
-  pivotCaches: readonly string[],
-  externalReferences: readonly string[],
+  pivot_caches: readonly string[],
+  external_references: readonly string[],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-  const requestedActive = ordered.findIndex((sheet) => sheet.id === snapshot.workbook.activeSheet);
-  const activeSheet = ordered[requestedActive];
-  const activeTab =
-    activeSheet?.visibility === "hidden" || activeSheet?.visibility === "veryHidden"
+  const requested_active = ordered.findIndex((sheet) => sheet.id === snapshot.workbook.activeSheet);
+  const active_sheet = ordered[requested_active];
+  const active_tab =
+    active_sheet?.visibility === "hidden" || active_sheet?.visibility === "veryHidden"
       ? ordered.findIndex(
           (sheet) => sheet.visibility !== "hidden" && sheet.visibility !== "veryHidden",
         )
-      : Math.max(0, requestedActive);
-  if (activeTab !== requestedActive) {
+      : Math.max(0, requested_active);
+  if (active_tab !== requested_active) {
     emitWarning(context, {
       code: "unsupported-feature",
       message:
         "A hidden active sheet was preserved, but native Excel activation moved to the first visible sheet",
-      sheet: activeSheet?.name,
+      sheet: active_sheet?.name,
     });
   }
   xml.append(
-    `<workbook xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><bookViews><workbookView activeTab="${activeTab}"/></bookViews><sheets>`,
+    `<workbook xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><bookViews><workbookView activeTab="${active_tab}"/></bookViews><sheets>`,
   );
   for (const [index, sheet] of ordered.entries()) {
     const state =
@@ -326,16 +326,16 @@ function workbookXml(
     );
   }
   xml.append(
-    `<sheet name="${escapeXml(encodeXstring(metadataName))}" sheetId="${ordered.length + 1}" state="veryHidden" r:id="rId${ordered.length + 1}"/></sheets>`,
+    `<sheet name="${escapeXml(encodeXstring(metadata_name))}" sheetId="${ordered.length + 1}" state="veryHidden" r:id="rId${ordered.length + 1}"/></sheets>`,
   );
   // CT_Workbook places `<externalReferences>` after `<sheets>`, before `<definedNames>`.
-  if (externalReferences.length > 0) {
-    xml.append(`<externalReferences>${externalReferences.join("")}</externalReferences>`);
+  if (external_references.length > 0) {
+    xml.append(`<externalReferences>${external_references.join("")}</externalReferences>`);
   }
   if (snapshot.workbook.namedRanges?.length || ordered.some((sheet) => sheet.autoFilter)) {
     xml.append("<definedNames>");
     for (const named of snapshot.workbook.namedRanges ?? []) {
-      const scopeIndex =
+      const scope_index =
         named.scope === undefined
           ? undefined
           : ordered.findIndex((candidate) => candidate.id === named.scope);
@@ -352,7 +352,7 @@ function workbookXml(
         source = `${quotedSheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`;
       }
       xml.append(
-        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scopeIndex !== undefined && scopeIndex >= 0 ? ` localSheetId="${scopeIndex}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
+        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scope_index !== undefined && scope_index >= 0 ? ` localSheetId="${scope_index}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
       );
     }
     // Excel names each worksheet AutoFilter's range `_xlnm._FilterDatabase`.
@@ -366,9 +366,9 @@ function workbookXml(
     }
     xml.append("</definedNames>");
   }
-  xml.append(`<calcPr fullCalcOnLoad="1"${iterationAttributes(snapshot)} forceFullCalc="1"/>`);
+  xml.append(`<calcPr fullCalcOnLoad="1"${iteration_attributes(snapshot)} forceFullCalc="1"/>`);
   // CT_Workbook places `<pivotCaches>` directly after `<calcPr>`.
-  if (pivotCaches.length > 0) xml.append(`<pivotCaches>${pivotCaches.join("")}</pivotCaches>`);
+  if (pivot_caches.length > 0) xml.append(`<pivotCaches>${pivot_caches.join("")}</pivotCaches>`);
   xml.append("</workbook>");
   return xml.finish();
 }
@@ -378,7 +378,7 @@ function workbookXml(
  * off so a later "Enable iterative calculation" in Excel keeps them; default
  * workbooks write none, which Excel reads as the same defaults.
  */
-function iterationAttributes(snapshot: WorkbookSnapshot): string {
+function iteration_attributes(snapshot: WorkbookSnapshot): string {
   const calculation = snapshot.workbook.calculation;
   if (
     !calculation ||
@@ -410,10 +410,10 @@ export interface EngineContent {
  * pivot at the pivot's anchor: the cells written for a pivot kept in
  * metadata, or the cells Excel lays out when it refreshes a native pivot.
  */
-function worksheetPivotCharts(
+function worksheet_pivot_charts(
   sheet: SheetSnapshot,
   content: EngineContent,
-  nativeIds: ReadonlySet<string> | undefined,
+  native_ids: ReadonlySet<string> | undefined,
 ): ReadonlyMap<string, PivotChartData> | undefined {
   const views = content.pivotCharts?.get(sheet.id);
   if (views === undefined) return undefined;
@@ -428,7 +428,7 @@ function worksheetPivotCharts(
       continue;
     }
 
-    const native = nativeIds?.has(pivot.id) === true;
+    const native = native_ids?.has(pivot.id) === true;
     const cells = {
       cells: output.cells,
       origin: pivot.anchor,
@@ -440,17 +440,17 @@ function worksheetPivotCharts(
 }
 
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
-function* writeWorkbookParts(
+function* write_workbook_parts(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
-  resolveHook?: WorkbookWriteHookResolver,
+  resolve_hook?: WorkbookWriteHookResolver,
   content: EngineContent = {},
 ): Generator<ZipPart> {
   const dashboards = content.dashboards ?? [];
-  preflightSnapshot(snapshot, context);
+  preflight_snapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
-  validateNames(snapshot);
+  validate_names(snapshot);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
@@ -460,7 +460,7 @@ function* writeWorkbookParts(
     );
   }
   snapshot = checked.value;
-  const hook = resolveHook?.(snapshot);
+  const hook = resolve_hook?.(snapshot);
   const links = new ExternalLinkExport(
     snapshot.workbook.externalLinks ?? [],
     hook?.externalBooks ?? [],
@@ -470,20 +470,20 @@ function* writeWorkbookParts(
   if (ordered.some((sheet) => sheet.kind === "dashboard")) warnStaticDashboards(context);
   const styles = new StylesRegistry(context);
   const pivots = preparePivots(snapshot, ordered, styles, context, content.pivotOutputs);
-  const metadataName = metadataSheetName(snapshot);
+  const metadata_name = metadata_sheet_name(snapshot);
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
   ];
-  const workbookRelationships = [];
-  let nextTableId = 1;
-  let dynamicArrays = false;
+  const workbook_relationships = [];
+  let next_table_id = 1;
+  let dynamic_arrays = false;
   for (const [index, sheet] of ordered.entries()) {
     checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
     let result: SheetWriteResult | undefined;
-    const sheetTableId = nextTableId;
+    const sheet_table_id = next_table_id;
     // Excel has no dashboard sheet: it gets a worksheet of the dashboard's current values.
     const dashboard =
       sheet.kind === "dashboard"
@@ -493,27 +493,27 @@ function* writeWorkbookParts(
             context,
           )
         : undefined;
-    function* chunks(exportSheet: SheetSnapshot): Generator<Uint8Array> {
+    function* chunks(export_sheet: SheetSnapshot): Generator<Uint8Array> {
       result = yield* writeSheet(
         snapshot,
-        exportSheet,
+        export_sheet,
         styles,
         context,
         number,
-        sheetTableId,
+        sheet_table_id,
         hook,
-        pivots?.sheetRelationships(exportSheet.id),
-        dashboard?.charts ?? worksheetPivotCharts(sheet, content, pivots?.nativeIds),
+        pivots?.sheetRelationships(export_sheet.id),
+        dashboard?.charts ?? worksheet_pivot_charts(sheet, content, pivots?.nativeIds),
         content.filteredRows?.get(sheet.id),
         content.spills?.get(sheet.id),
       );
     }
-    const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);
-    yield { name: part, data: chunks(exportSheet) };
+    const export_sheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);
+    yield { name: part, data: chunks(export_sheet) };
     if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
-    dynamicArrays ||= result.dynamicArrays;
+    dynamic_arrays ||= result.dynamicArrays;
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
-    workbookRelationships.push({
+    workbook_relationships.push({
       id: `rId${number}`,
       type: WORKSHEET_REL,
       target: `worksheets/sheet${number}.xml`,
@@ -537,51 +537,51 @@ function* writeWorkbookParts(
         overrides.push({ part: table.queryTable.part, contentType: QUERY_TABLE_CONTENT });
       }
     }
-    nextTableId += result.tables.length;
+    next_table_id += result.tables.length;
     for (const part of result.chartParts ?? []) yield part;
     overrides.push(...(result.chartOverrides ?? []));
   }
   for (const part of pivots?.parts ?? []) yield part;
   overrides.push(...(pivots?.overrides ?? []));
-  const metadataNumber = ordered.length + 1;
-  const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;
+  const metadata_number = ordered.length + 1;
+  const metadata_part = `xl/worksheets/sheet${metadata_number}.xml`;
   yield {
-    name: metadataPart,
-    data: metadataSheetXml(
+    name: metadata_part,
+    data: metadata_sheet_xml(
       snapshot,
       pivots?.nativeIds ?? new Set(),
       pivots?.keptOutputs ?? new Map(),
       context,
     ),
   };
-  overrides.push({ part: metadataPart, contentType: WORKSHEET_CONTENT });
-  workbookRelationships.push({
-    id: `rId${metadataNumber}`,
+  overrides.push({ part: metadata_part, contentType: WORKSHEET_CONTENT });
+  workbook_relationships.push({
+    id: `rId${metadata_number}`,
     type: WORKSHEET_REL,
-    target: `worksheets/sheet${metadataNumber}.xml`,
+    target: `worksheets/sheet${metadata_number}.xml`,
   });
-  workbookRelationships.push({
-    id: `rId${metadataNumber + 1}`,
+  workbook_relationships.push({
+    id: `rId${metadata_number + 1}`,
     type: STYLES_REL,
     target: "styles.xml",
   });
-  const extraIds = (hook?.workbookRelationships ?? []).map((relationship, index) => {
-    const id = `rId${metadataNumber + 2 + index}`;
-    workbookRelationships.push({ ...relationship, id });
+  const extra_ids = (hook?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadata_number + 2 + index}`;
+    workbook_relationships.push({ ...relationship, id });
     return id;
   });
-  const pivotIds = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
-    const id = `rId${metadataNumber + 2 + extraIds.length + index}`;
-    workbookRelationships.push({ ...relationship, id });
+  const pivot_ids = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadata_number + 2 + extra_ids.length + index}`;
+    workbook_relationships.push({ ...relationship, id });
     return id;
   });
   // A defined name can name a book that no cell names, so its link is known before the parts.
   for (const named of snapshot.workbook.namedRanges ?? []) {
     if (named.range === undefined) links.fileFormula(context.formulas?.get(named.formula) ?? "");
   }
-  const externalReferences = [...(hook?.workbookXml?.(extraIds).externalReferences ?? [])];
+  const external_references = [...(hook?.workbookXml?.(extra_ids).externalReferences ?? [])];
   for (const [index, link] of links.written.entries()) {
-    const id = `rId${metadataNumber + 2 + extraIds.length + pivotIds.length + index}`;
+    const id = `rId${metadata_number + 2 + extra_ids.length + pivot_ids.length + index}`;
     const name = `externalLinks/sheetwriteLink${index + 1}.xml`;
     const xml = externalLinkPartXml(link);
     yield { name: `xl/${name}`, data: TEXT_ENCODER.encode(xml.part) };
@@ -590,18 +590,18 @@ function* writeWorkbookParts(
       data: TEXT_ENCODER.encode(xml.relationships),
     };
     overrides.push({ part: `xl/${name}`, contentType: EXTERNAL_LINK_CONTENT });
-    workbookRelationships.push({ id, type: EXTERNAL_LINK_REL, target: name });
-    externalReferences.push(`<externalReference r:id="${id}"/>`);
+    workbook_relationships.push({ id, type: EXTERNAL_LINK_REL, target: name });
+    external_references.push(`<externalReference r:id="${id}"/>`);
   }
-  const pivotCaches = [
-    ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
-    ...(pivots?.pivotCaches(pivotIds) ?? []),
+  const pivot_caches = [
+    ...(hook?.workbookXml?.(extra_ids).pivotCaches ?? []),
+    ...(pivots?.pivotCaches(pivot_ids) ?? []),
   ];
-  if (dynamicArrays) {
+  if (dynamic_arrays) {
     yield { name: "xl/metadata.xml", data: TEXT_ENCODER.encode(DYNAMIC_ARRAY_METADATA) };
     overrides.push({ part: "xl/metadata.xml", contentType: SHEET_METADATA_CONTENT });
-    workbookRelationships.push({
-      id: `rId${workbookRelationships.length + 1}`,
+    workbook_relationships.push({
+      id: `rId${workbook_relationships.length + 1}`,
       type: SHEET_METADATA_REL,
       target: "metadata.xml",
     });
@@ -609,11 +609,18 @@ function* writeWorkbookParts(
   yield { name: "xl/styles.xml", data: styles.toXml() };
   yield {
     name: "xl/workbook.xml",
-    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches, externalReferences),
+    data: workbook_xml(
+      snapshot,
+      ordered,
+      metadata_name,
+      context,
+      pivot_caches,
+      external_references,
+    ),
   };
   yield {
     name: "xl/_rels/workbook.xml.rels",
-    data: relationshipsXml(workbookRelationships, context),
+    data: relationshipsXml(workbook_relationships, context),
   };
   yield {
     name: "_rels/.rels",
@@ -628,11 +635,12 @@ function* writeWorkbookParts(
       context,
     ),
   };
-  const overrideMap = new Map(overrides.map((override) => [override.part, override]));
-  for (const override of hook?.contentTypeOverrides ?? []) overrideMap.set(override.part, override);
+  const override_map = new Map(overrides.map((override) => [override.part, override]));
+  for (const override of hook?.contentTypeOverrides ?? [])
+    override_map.set(override.part, override);
   yield {
     name: "[Content_Types].xml",
-    data: contentTypesXml([...overrideMap.values()], context, hook?.contentTypeDefaults),
+    data: contentTypesXml([...override_map.values()], context, hook?.contentTypeDefaults),
   };
   yield* hook?.parts?.() ?? [];
 }
@@ -643,9 +651,14 @@ export async function writeWorkbook(
   hook?: WorkbookWriteHookResolver,
   content?: EngineContent,
 ): Promise<Uint8Array> {
-  const { formulas, arrayFormulas } = await exportWorkbookFormulas(snapshot);
+  const { formulas, arrayFormulas: array_formulas } = await exportWorkbookFormulas(snapshot);
   return writeZip(
-    writeWorkbookParts(snapshot, { ...context, formulas, arrayFormulas }, hook, content),
+    write_workbook_parts(
+      snapshot,
+      { ...context, formulas, arrayFormulas: array_formulas },
+      hook,
+      content,
+    ),
     context,
   );
 }
@@ -656,9 +669,14 @@ export async function* streamWorkbook(
   hook?: WorkbookWriteHookResolver,
   content?: EngineContent,
 ): AsyncGenerator<Uint8Array> {
-  const { formulas, arrayFormulas } = await exportWorkbookFormulas(snapshot);
+  const { formulas, arrayFormulas: array_formulas } = await exportWorkbookFormulas(snapshot);
   yield* zipChunks(
-    writeWorkbookParts(snapshot, { ...context, formulas, arrayFormulas }, hook, content),
+    write_workbook_parts(
+      snapshot,
+      { ...context, formulas, arrayFormulas: array_formulas },
+      hook,
+      content,
+    ),
     context,
   );
 }

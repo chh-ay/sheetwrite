@@ -16,7 +16,7 @@ export function rejectionMessage(result: ApplyTransactionResult): string | null 
   return NOT_APPLIED;
 }
 
-let fieldSerial = 0;
+let field_serial = 0;
 
 /** A `<label>` over one control, with an optional inline error under it. */
 export interface PanelField<T extends HTMLElement> {
@@ -31,8 +31,8 @@ export function panelField<T extends HTMLInputElement | HTMLSelectElement>(
   control: T,
   focusKey: string,
 ): PanelField<T> {
-  fieldSerial += 1;
-  const errorId = `sheetwrite-panel-error-${fieldSerial}`;
+  field_serial += 1;
+  const error_id = `sheetwrite-panel-error-${field_serial}`;
 
   const element = document.createElement("label");
   element.className = "sheetwrite-panel-field";
@@ -43,7 +43,7 @@ export function panelField<T extends HTMLInputElement | HTMLSelectElement>(
   control.dataset.focusKey = focusKey;
   const error = document.createElement("span");
   error.className = "sheetwrite-panel-error";
-  error.id = errorId;
+  error.id = error_id;
   error.hidden = true;
   element.append(text, control, error);
 
@@ -58,7 +58,7 @@ export function panelField<T extends HTMLInputElement | HTMLSelectElement>(
         control.removeAttribute("aria-describedby");
       } else {
         control.setAttribute("aria-invalid", "true");
-        control.setAttribute("aria-describedby", errorId);
+        control.setAttribute("aria-describedby", error_id);
       }
     },
   };
@@ -70,9 +70,9 @@ export function selectOf(
   value: string,
 ): HTMLSelectElement {
   const select = document.createElement("select");
-  for (const [optionValue, label] of options) {
+  for (const [option_value, label] of options) {
     const option = document.createElement("option");
-    option.value = optionValue;
+    option.value = option_value;
     option.textContent = label;
     select.appendChild(option);
   }

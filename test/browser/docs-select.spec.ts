@@ -58,7 +58,7 @@ test("the engine filter opens once on an input made before its code arrives, the
   }
 
   // Choosing an option filters the table, and focus stays on the field.
-  const defaultRows = await page.locator('tr[data-engine="default"]').count();
+  const default_rows = await page.locator('tr[data-engine="default"]').count();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
@@ -66,12 +66,12 @@ test("the engine filter opens once on an input made before its code arrives, the
   await expect(field).toBeFocused();
   await expect(field).toHaveText("Default and full");
   await expect(page.locator(".sw-formula-filter").getByRole("status")).toHaveText(
-    `${defaultRows} functions`,
+    `${default_rows} functions`,
   );
   await expect(page.locator('tr[data-engine="full"]:visible')).toHaveCount(0);
 });
 
-function engineFilter(page: Page) {
+function engine_filter(page: Page) {
   const field = page.getByRole("combobox", { name: "Available in" });
   const list = page.getByRole("listbox", { name: "Available in", includeHidden: true });
   return {
@@ -99,7 +99,7 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
 }) => {
   await page.goto(FORMULA_PAGE);
   await waitForHydration(page);
-  const { field, list, status, option, activeOption } = engineFilter(page);
+  const { field, list, status, option, activeOption: active_option } = engine_filter(page);
   await expect(field).toMatchAriaSnapshot(`- combobox "Available in": Either engine`);
   await expect(field).toHaveAttribute("aria-expanded", "false");
   await expect(field).not.toHaveAttribute("aria-activedescendant");
@@ -113,7 +113,7 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
       - option "Default and full"
       - option "Full only"
   `);
-  await expect.poll(activeOption).toBe("Either engine");
+  await expect.poll(active_option).toBe("Either engine");
   for (const [key, expected] of [
     ["ArrowDown", "Default and full"],
     ["ArrowDown", "Full only"],
@@ -125,7 +125,7 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
     ["PageDown", "Full only"],
   ] as const) {
     await page.keyboard.press(key);
-    await expect.poll(activeOption, `${key} moves to ${expected}`).toBe(expected);
+    await expect.poll(active_option, `${key} moves to ${expected}`).toBe(expected);
   }
   await expect(field).toHaveText("Either engine");
 
@@ -137,7 +137,7 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
   await expect(option("Default and full")).toHaveAttribute("aria-selected", "true");
   await expect(option("Either engine")).toHaveAttribute("aria-selected", "false");
   await page.keyboard.press(" ");
-  await expect.poll(activeOption).toBe("Default and full");
+  await expect.poll(active_option).toBe("Default and full");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press(" ");
   await expect(list).toBeHidden();
@@ -153,10 +153,10 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
   // Typing opens on the matching option; a second letter within the window extends the search.
   await page.keyboard.press("e");
   await expect(list).toBeVisible();
-  await expect.poll(activeOption).toBe("Either engine");
+  await expect.poll(active_option).toBe("Either engine");
   await page.keyboard.press("Escape");
   await page.keyboard.type("de");
-  await expect.poll(activeOption).toBe("Default and full");
+  await expect.poll(active_option).toBe("Default and full");
   // Tab picks the active option, as the pattern does, and moves focus on.
   await page.keyboard.press("Tab");
   await expect(list).toBeHidden();
@@ -175,27 +175,27 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
   await expect(field).toHaveText("Default and full");
 
   // A viewport that ends just under the field: the list opens above it.
-  const fieldBottom = await field.evaluate((element) => {
+  const field_bottom = await field.evaluate((element) => {
     window.scrollTo({ top: 0, behavior: "instant" });
     return element.getBoundingClientRect().bottom;
   });
-  await page.setViewportSize({ width: 1280, height: Math.ceil(fieldBottom) + ROOM_BELOW_PX });
+  await page.setViewportSize({ width: 1280, height: Math.ceil(field_bottom) + ROOM_BELOW_PX });
   await field.click();
   await expect(list).toHaveAttribute("data-placement", "above");
-  const [fieldBox, listBox] = await Promise.all([field.boundingBox(), list.boundingBox()]);
-  if (fieldBox === null || listBox === null) throw new Error("The field or its list has no box.");
-  expect(listBox.y + listBox.height).toBeLessThanOrEqual(fieldBox.y);
-  expect(listBox.y).toBeGreaterThanOrEqual(0);
+  const [field_box, list_box] = await Promise.all([field.boundingBox(), list.boundingBox()]);
+  if (field_box === null || list_box === null) throw new Error("The field or its list has no box.");
+  expect(list_box.y + list_box.height).toBeLessThanOrEqual(field_box.y);
+  expect(list_box.y).toBeGreaterThanOrEqual(0);
   await page.keyboard.press("Escape");
 
   // A list too short for every option scrolls the active one into view.
   await page.addStyleTag({ content: ".sw-select__list { max-height: 3rem; }" });
   await page.keyboard.press("Enter");
-  const inView = (name: string) =>
+  const in_view = (name: string) =>
     list.evaluate(
-      (element, { optionName, rounding }) => {
+      (element, { optionName: option_name, rounding }) => {
         const target = [...element.querySelectorAll('[role="option"]')].find(
-          (candidate) => candidate.textContent === optionName,
+          (candidate) => candidate.textContent === option_name,
         );
         if (target === undefined) return false;
         const outer = element.getBoundingClientRect();
@@ -205,9 +205,9 @@ test("the engine filter follows the select-only combobox pattern: state, keys, t
       { optionName: name, rounding: BOX_ROUNDING_PX },
     );
   await page.keyboard.press("End");
-  await expect.poll(() => inView("Full only")).toBe(true);
+  await expect.poll(() => in_view("Full only")).toBe(true);
   await page.keyboard.press("Home");
-  await expect.poll(() => inView("Either engine")).toBe(true);
+  await expect.poll(() => in_view("Either engine")).toBe(true);
 });
 
 test.describe("on a phone", () => {
@@ -217,13 +217,13 @@ test.describe("on a phone", () => {
   test("tapping opens the list and tapping an option chooses it @portability", async ({ page }) => {
     await page.goto(FORMULA_PAGE);
     await waitForHydration(page);
-    const { field, list, status, option } = engineFilter(page);
-    const fullRows = await page.locator('tr[data-engine="full"]').count();
+    const { field, list, status, option } = engine_filter(page);
+    const full_rows = await page.locator('tr[data-engine="full"]').count();
     await field.tap();
     await expect(list).toBeVisible();
     await option("Full only").tap();
     await expect(list).toBeHidden();
     await expect(field).toHaveText("Full only");
-    await expect(status).toHaveText(`${fullRows} functions`);
+    await expect(status).toHaveText(`${full_rows} functions`);
   });
 });

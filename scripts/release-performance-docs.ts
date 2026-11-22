@@ -183,11 +183,11 @@ export function validateChartTrackingArtifact(
     keys.add(key);
   }
 
-  const coldKeys = new Set<string>();
+  const cold_keys = new Set<string>();
   for (const row of artifact.coldRows ?? []) {
     const key = `${row.chartCount}/${row.source}/${row.scenario}`;
     if (
-      coldKeys.has(key) ||
+      cold_keys.has(key) ||
       !Number.isInteger(row.chartCount) ||
       row.chartCount < 0 ||
       !["literal", "formula"].includes(row.source) ||
@@ -197,7 +197,7 @@ export function validateChartTrackingArtifact(
     ) {
       return "chart-tracking capture contains invalid or duplicate cold measurements";
     }
-    coldKeys.add(key);
+    cold_keys.add(key);
   }
 
   return artifact;
@@ -239,9 +239,9 @@ export function validatePivotArtifact(value: Record<string, unknown>): PivotEvid
   return artifact;
 }
 
-function provenance(meta: CaptureMeta, source: string, timeLabel = "Captured"): string[] {
+function provenance(meta: CaptureMeta, source: string, time_label = "Captured"): string[] {
   return provenanceList([
-    [timeLabel, `${formatCaptureTime(meta.timestamp)} UTC`],
+    [time_label, `${formatCaptureTime(meta.timestamp)} UTC`],
     ["Commit", `${shortHash(meta.commit)} clean worktree`],
     ...(meta.cpu === undefined ? [] : [["CPU", html(meta.cpu)] as [string, string]]),
     ...(meta.machine === undefined ? [] : [["Machine", html(meta.machine)] as [string, string]]),
@@ -436,22 +436,22 @@ const RELEASE_VERSION = /^\d+\.\d+\.\d+$/u;
  * either alone or as `<baseline> engine (WASM) under <line> core and harness`.
  * All of them must agree, so the page cannot name a pair the evidence does not.
  */
-function releasePairOf(protocol: unknown, labels: readonly string[]): ReleasePair | undefined {
+function release_pair_of(protocol: unknown, labels: readonly string[]): ReleasePair | undefined {
   const captured = typeof protocol === "string" ? CAPTURE_METADATA_PROTOCOL.exec(protocol) : null;
   const candidate = captured?.[1];
-  const candidateLine = captured?.[2];
-  if (candidate === undefined || candidateLine === undefined) return undefined;
+  const candidate_line = captured?.[2];
+  if (candidate === undefined || candidate_line === undefined) return undefined;
 
   const bases = new Set<string>();
   for (const label of labels) {
     const engine = parseEngineBaselineLabel(label);
-    if (engine !== undefined && engine.harnessVersion !== candidateLine) return undefined;
+    if (engine !== undefined && engine.harnessVersion !== candidate_line) return undefined;
     bases.add(engine?.engineVersion ?? label);
   }
   const [base] = bases;
   if (bases.size !== 1 || base === undefined || !RELEASE_VERSION.test(base)) return undefined;
 
-  return { base, candidate, candidateLine };
+  return { base, candidate, candidateLine: candidate_line };
 }
 
 export function validateReleaseComparisonArtifact(
@@ -511,7 +511,7 @@ export function validateReleaseComparisonArtifact(
     }
   }
 
-  const releases = releasePairOf(
+  const releases = release_pair_of(
     artifact.captureMetadata.protocol,
     artifact.suites.map((suite) => suite.comparisonLabel),
   );
@@ -520,7 +520,7 @@ export function validateReleaseComparisonArtifact(
   return { ...artifact, releases };
 }
 
-function comparisonCell(value: string): string {
+function comparison_cell(value: string): string {
   return html(value).replaceAll("|", "&#124;").replaceAll("\n", " ");
 }
 
@@ -545,7 +545,7 @@ const CONTAINER_SEGMENTS = new Set([
  * A metric key as words: `workloads[id=countif-100k;size=100000].allocationStat.retainedBytes`
  * reads "Countif 100k · 100,000 · allocation stat · retained bytes". The raw key stays in the title.
  */
-function metricLabel(key: string): string {
+function metric_label(key: string): string {
   const parts: string[] = [];
   for (const segment of key.split(/\.(?![^[]*\])/u)) {
     const selector = /^\w+\[(.*)\]$/u.exec(segment);
@@ -570,7 +570,7 @@ function metricLabel(key: string): string {
 }
 
 /** A value in the unit a reader expects: µs/ms/s, ns, MiB, whole counts. */
-function metricValue(value: number, unit: ComparisonMetric["unit"]): string {
+function metric_value(value: number, unit: ComparisonMetric["unit"]): string {
   if (unit === "ms") return formatMs(value);
   if (unit === "ns")
     return value < 1000 ? `${value.toFixed(value < 10 ? 2 : 1)} ns` : formatMs(value / 1e6);
@@ -579,10 +579,10 @@ function metricValue(value: number, unit: ComparisonMetric["unit"]): string {
   return value.toFixed(3);
 }
 
-function metricStat(stat: ComparisonMetric["base"], unit: ComparisonMetric["unit"]): string {
+function metric_stat(stat: ComparisonMetric["base"], unit: ComparisonMetric["unit"]): string {
   if (stat === null) return "—";
-  const median = metricValue(stat.median, unit);
-  const p95 = metricValue(stat.p95, unit);
+  const median = metric_value(stat.median, unit);
+  const p95 = metric_value(stat.p95, unit);
   return median === p95 ? median : `${median} / ${p95}`;
 }
 
@@ -600,20 +600,20 @@ const VERDICT_LABELS: Readonly<Record<string, string>> = {
  * The verdict a reader can check against the shown values: an unbudgeted faster or
  * slower row whose values are equal once rounded for display reads unchanged.
  */
-function shownVerdict(metric: ComparisonMetric): string {
+function shown_verdict(metric: ComparisonMetric): string {
   if (metric.verdict !== "faster" && metric.verdict !== "slower") return metric.verdict;
   const same =
-    metricStat(metric.base, metric.unit) === metricStat(metric.candidate, metric.unit) &&
+    metric_stat(metric.base, metric.unit) === metric_stat(metric.candidate, metric.unit) &&
     (metric.medianRatio === null || formatRatio(metric.medianRatio) === formatRatio(1));
   return same ? "unchanged" : metric.verdict;
 }
 
-function metricRow(
+function metric_row(
   metric: ComparisonMetric,
   releases: ReleasePair,
   leading: string[] = [],
 ): string {
-  const label = `<span title="${html(metric.key)}">${comparisonCell(metricLabel(metric.key))}</span>`;
+  const label = `<span title="${html(metric.key)}">${comparison_cell(metric_label(metric.key))}</span>`;
   // A row can be flagged on its p95 alone, so show that ratio when it tells a different story.
   const p95 =
     metric.p95Ratio !== null &&
@@ -624,25 +624,25 @@ function metricRow(
   const change = metric.medianRatio === null ? "—" : `${formatRatio(metric.medianRatio)}${p95}`;
   // Bytes and counts get smaller or larger, not faster or slower.
   const sized = metric.unit === "bytes" || metric.unit === "count";
-  const shown = shownVerdict(metric);
-  const verdictLabel =
+  const shown = shown_verdict(metric);
+  const verdict_label =
     sized && shown === "faster"
       ? "Smaller"
       : sized && shown === "slower"
         ? "Larger"
         : shown === "new-only"
           ? `New in ${releases.candidateLine}`
-          : (VERDICT_LABELS[shown] ?? comparisonCell(shown));
+          : (VERDICT_LABELS[shown] ?? comparison_cell(shown));
   const verdict = [
-    verdictLabel,
-    ...(metric.note === undefined ? [] : [comparisonCell(metric.note)]),
+    verdict_label,
+    ...(metric.note === undefined ? [] : [comparison_cell(metric.note)]),
     ...(metric.ceilingPassed === false ? ["ceiling failed"] : []),
   ].join(" · ");
-  return `| ${[...leading, label, metricStat(metric.base, metric.unit), metricStat(metric.candidate, metric.unit), change, verdict].join(" | ")} |`;
+  return `| ${[...leading, label, metric_stat(metric.base, metric.unit), metric_stat(metric.candidate, metric.unit), change, verdict].join(" | ")} |`;
 }
 
 /** A suite's artifact as a name: "formula-default-results.json" reads "Formula default". */
-function suiteName(artifact: string): string {
+function suite_name(artifact: string): string {
   return readableId(artifact.replace(/(-results)?\.json$/u, ""));
 }
 
@@ -650,7 +650,7 @@ function suiteName(artifact: string): string {
  * Rows that do not measure a Sheetwrite change of their own: Handsontable control
  * runs, and full-engine rows that repeat the formula tables' workloads.
  */
-function isControlOrRepeat(key: string): boolean {
+function is_control_or_repeat(key: string): boolean {
   return /engine=handsontable/u.test(key) || /\.shared\.workloads\[/u.test(key);
 }
 
@@ -660,7 +660,7 @@ export function renderReleaseComparisonSection(
 ): string[] {
   // A text stamp may lack its own timestamp (the promoted render baseline); then
   // the receipt's scope start is the closest bound time, and is labeled as such.
-  const captureLabel = (
+  const capture_label = (
     stamp: { commit: string; timestamp: string | null } | null,
     scope: { timestamp: string } | null,
   ): string => {
@@ -672,10 +672,10 @@ export function renderReleaseComparisonSection(
   };
   const count = (suite: ReleaseComparisonEvidence["suites"][number], ...verdicts: string[]) =>
     suite.metrics.filter(
-      (metric) => !isControlOrRepeat(metric.key) && verdicts.includes(shownVerdict(metric)),
+      (metric) => !is_control_or_repeat(metric.key) && verdicts.includes(shown_verdict(metric)),
     ).length;
   const others = (suite: ReleaseComparisonEvidence["suites"][number]) =>
-    suite.metrics.filter((metric) => isControlOrRepeat(metric.key)).length;
+    suite.metrics.filter((metric) => is_control_or_repeat(metric.key)).length;
   const flags = evidence.suites.flatMap((suite) =>
     suite.metrics
       .filter((metric) => metric.verdict === "regression")
@@ -684,17 +684,17 @@ export function renderReleaseComparisonSection(
   const affinities = Object.entries(evidence.meta.effectiveCpuAffinityBySuite).sort(
     ([left], [right]) => left.localeCompare(right),
   );
-  const { base, candidate, candidateLine } = evidence.releases;
+  const { base, candidate, candidateLine: candidate_line } = evidence.releases;
   const header = `| Measurement | ${base} median / p95 | ${candidate} median / p95 | Change | Result |`;
   // Each suite's spread of time changes: the lowest and highest median ratio
   // among Sheetwrite's own timed rows, the same Change values its table lists.
-  const timeLanes = evidence.suites.flatMap((suite) => {
+  const time_lanes = evidence.suites.flatMap((suite) => {
     const ratios = suite.metrics
       .filter(
         (metric) =>
           (metric.unit === "ms" || metric.unit === "ns") &&
           metric.medianRatio !== null &&
-          !isControlOrRepeat(metric.key),
+          !is_control_or_repeat(metric.key),
       )
       .map((metric) => (metric.medianRatio ?? Number.NaN).toFixed(2));
     if (ratios.length === 0) return [];
@@ -702,7 +702,7 @@ export function renderReleaseComparisonSection(
     const low = sorted[0];
     const high = sorted.at(-1);
     const words = low === high ? `${low} of the time` : `${low}–${high} of the time`;
-    return [`${suiteName(suite.artifact)} · ${ratios.length} timed rows | Linux: ${words}`];
+    return [`${suite_name(suite.artifact)} · ${ratios.length} timed rows | Linux: ${words}`];
   });
 
   return [
@@ -718,16 +718,16 @@ export function renderReleaseComparisonSection(
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...evidence.suites.map(
       (suite) =>
-        `| ${suiteName(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "new-only")} | ${count(suite, "regression")} | ${others(suite)} |`,
+        `| ${suite_name(suite.artifact)} | ${suite.metrics.length} | ${count(suite, "faster", "improvement")} | ${count(suite, "slower")} | ${count(suite, "unchanged", "within-noise")} | ${count(suite, "new-only")} | ${count(suite, "regression")} | ${others(suite)} |`,
     ),
     "",
-    ...(timeLanes.length === 0
+    ...(time_lanes.length === 0
       ? []
       : [
           `Each suite's timed rows changed by the range below: the lowest and the highest median ratio of ${candidate} to ${base}, as its table lists them.`,
           "",
           `\`\`\`perf-lanes diagram title="Median time of ${candidate} against ${base}, lowest to highest row per suite" base="${base}"`,
-          ...timeLanes,
+          ...time_lanes,
           "```",
           "",
         ]),
@@ -738,8 +738,8 @@ export function renderReleaseComparisonSection(
     `| Suite | Measurement | ${base} median / p95 | ${candidate} median / p95 | Change | Result |`,
     "| --- | --- | ---: | ---: | ---: | --- |",
     ...flags.map(({ suite, metric }) =>
-      metricRow(metric, evidence.releases, [
-        `${suiteName(suite.artifact)}${isControlOrRepeat(metric.key) ? (/engine=handsontable/u.test(metric.key) ? " · Handsontable control" : " · repeat of formula table") : ""}`,
+      metric_row(metric, evidence.releases, [
+        `${suite_name(suite.artifact)}${is_control_or_repeat(metric.key) ? (/engine=handsontable/u.test(metric.key) ? " · Handsontable control" : " · repeat of formula table") : ""}`,
       ]),
     ),
     "",
@@ -754,11 +754,11 @@ export function renderReleaseComparisonSection(
     "",
     "| Suite | Effective CPU mask |",
     "| --- | --- |",
-    ...affinities.map(([suite, mask]) => `| ${suiteName(suite)} | ${html(mask)} |`),
+    ...affinities.map(([suite, mask]) => `| ${suite_name(suite)} | ${html(mask)} |`),
     "",
     "For data captures, a full garbage collection runs between samples, untimed. Each ingest sample also gets a fresh happy-dom document after the prior sample has released its store or grid. Both versions use data protocol v2. Mixed protocol versions are rejected.",
     "",
-    `Formula tables compare the ${base} engine (WASM) under the ${candidateLine} core and harness with the ${candidateLine} engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are ${candidateLine}-only and have no version ratio.`,
+    `Formula tables compare the ${base} engine (WASM) under the ${candidate_line} core and harness with the ${candidate_line} engine under that same core and harness. They isolate the engine difference only. The source records both commits and the hashes of the loaded binaries. Grid constant edits and Node initialization time current-core paths, so those measurements are ${candidate_line}-only and have no version ratio.`,
     "",
     ...provenance(evidence.meta, source, "Comparison generated"),
     `Comparison base: <code>${html(evidence.base.ref)}</code> at ${shortHash(evidence.base.commit)}. Candidate: ${shortHash(evidence.candidate.commit)}.`,
@@ -770,15 +770,15 @@ export function renderReleaseComparisonSection(
     ...evidence.suites.flatMap((suite) => {
       const flagged = count(suite, "regression");
       return [
-        `<details class="bench-all"><summary>${html(suiteName(suite.artifact))} · ${suite.metrics.length} measurements${flagged === 0 ? "" : ` · ${flagged} flagged`}</summary>`,
+        `<details class="bench-all"><summary>${html(suite_name(suite.artifact))} · ${suite.metrics.length} measurements${flagged === 0 ? "" : ` · ${flagged} flagged`}</summary>`,
         "",
-        `Artifact <code>bench/results/${html(suite.artifact)}</code>. Baseline: ${html(suite.comparisonLabel)}, ${captureLabel(suite.base, suite.baselineCapture)}. Candidate: ${captureLabel(suite.candidate, suite.candidateCapture)}.`,
+        `Artifact <code>bench/results/${html(suite.artifact)}</code>. Baseline: ${html(suite.comparisonLabel)}, ${capture_label(suite.base, suite.baselineCapture)}. Candidate: ${capture_label(suite.candidate, suite.candidateCapture)}.`,
         "",
         `Threshold: **${html(suite.threshold.kind)}**. ${html(suite.threshold.description)} Source: <code>${html(suite.threshold.source)}</code>.`,
         "",
         header,
         "| --- | ---: | ---: | ---: | --- |",
-        ...suite.metrics.map((metric) => metricRow(metric, evidence.releases)),
+        ...suite.metrics.map((metric) => metric_row(metric, evidence.releases)),
         "",
         "</details>",
         "",

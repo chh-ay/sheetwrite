@@ -37,7 +37,7 @@ import {
 } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
-function makeFakeStore(
+function make_fake_store(
   workbook: Workbook,
   hooks: { onGetCell?: () => void; onWindow?: () => void } = {},
 ): Store {
@@ -73,28 +73,28 @@ function makeFakeStore(
   };
 }
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
-let restoreXlsxSlots = keepXlsxSlots();
+let restore_xlsx_slots = keepXlsxSlots();
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
-  restoreXlsxSlots = keepXlsxSlots();
+  restore_stubs = installCanvasTestStubs();
+  restore_xlsx_slots = keepXlsxSlots();
 });
 
 afterEach(() => {
-  restoreStubs();
-  restoreXlsxSlots();
+  restore_stubs();
+  restore_xlsx_slots();
 });
 
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
 
-function expectEditor(host: HTMLElement): HTMLTextAreaElement {
+function expect_editor(host: HTMLElement): HTMLTextAreaElement {
   const node = host.querySelector("textarea.sheetwrite-editor");
   expect(node).toBeInstanceOf(HTMLTextAreaElement);
   if (!(node instanceof HTMLTextAreaElement)) {
@@ -105,7 +105,7 @@ function expectEditor(host: HTMLElement): HTMLTextAreaElement {
 }
 
 /** Serves `text` from navigator.clipboard while `run` runs, then puts the clipboard back. */
-async function withClipboardText(text: string, run: () => Promise<void>): Promise<void> {
+async function with_clipboard_text(text: string, run: () => Promise<void>): Promise<void> {
   const descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -119,10 +119,10 @@ async function withClipboardText(text: string, run: () => Promise<void>): Promis
   }
 }
 
-function typeIntoFocusedCell(host: HTMLElement, value: string, key = "F2"): void {
+function type_into_focused_cell(host: HTMLElement, value: string, key = "F2"): void {
   host.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 
-  const editor = expectEditor(host);
+  const editor = expect_editor(host);
   editor.value = value;
   editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 }
@@ -131,25 +131,25 @@ describe("Grid editing (Layer 3)", () => {
   it("pastes across hidden columns without changing them and undoes in one step", async () => {
     const workbook = makeWorkbook(2);
     const sheet = workbook.sheets[0];
-    const hiddenColumn = sheet?.columns[1];
-    if (!hiddenColumn) throw new Error("expected the amount column in the fixture");
-    hiddenColumn.visible = false;
+    const hidden_column = sheet?.columns[1];
+    if (!hidden_column) throw new Error("expected the amount column in the fixture");
+    hidden_column.visible = false;
     const grid = createGrid(mountHost(), { workbook, data: makeColumnarData(2) });
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
-    const readCells = () =>
+    const read_cells = () =>
       [0, 1].map((row) =>
         [0, 1, 2].map((col) => grid.store.getCell({ sheet: "s1", row, col }).resolved),
       );
-    await withClipboardText("Alice\tParis\nBob\tTokyo", async () => {
+    await with_clipboard_text("Alice\tParis\nBob\tTokyo", async () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
       expect(await grid.actions.paste()).toBe("done");
-      expect(readCells()).toEqual([
+      expect(read_cells()).toEqual([
         ["Alice", 0.5, "Paris"],
         ["Bob", 10.5, "Tokyo"],
       ]);
       grid.undo();
-      expect(readCells()).toEqual([
+      expect(read_cells()).toEqual([
         ["Customer 0", 0.5, "Phnom Penh"],
         ["Customer 1", 10.5, "Tokyo"],
       ]);
@@ -165,7 +165,7 @@ describe("Grid editing (Layer 3)", () => {
     ).join("\n");
     const grid = createGrid(mountHost(), { workbook: makeWorkbook(3), data: makeColumnarData(3) });
     const sheet = () => grid.store.getWorkbook().sheets[0]!;
-    await withClipboardText(text, async () => {
+    await with_clipboard_text(text, async () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
       expect(await grid.actions.paste()).toBe("done");
       expect(sheet().rowCount).toBe(6);
@@ -257,7 +257,7 @@ describe("Grid editing (Layer 3)", () => {
     const reference = build();
     const fitted = new GridImpl(mountHost(), { workbook: reference.workbook }, reference.store);
     fitted.autoFitColumns([0]);
-    const expectedWidth = reference.workbook.sheets[0]!.columns[0]!.width;
+    const expected_width = reference.workbook.sheets[0]!.columns[0]!.width;
     fitted.destroy();
 
     const { workbook, store } = build();
@@ -272,7 +272,7 @@ describe("Grid editing (Layer 3)", () => {
           bubbles: true,
         }),
       );
-      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expected_width);
     } finally {
       grid.destroy();
     }
@@ -305,7 +305,7 @@ describe("Grid editing (Layer 3)", () => {
     const addr = { sheet: "s1", row: 2, col: 1 };
 
     grid.setSelection({ kind: "cell", addr });
-    typeIntoFocusedCell(host, "7");
+    type_into_focused_cell(host, "7");
     expect(store.getFormula(addr)).toBeNull();
     expect(store.getCell(addr).resolved).toBe(7);
 
@@ -350,13 +350,13 @@ describe("Grid editing (Layer 3)", () => {
 });
 
 describe("Grid transaction resource ingress", () => {
-  const rowsAfterTop = [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5];
+  const rows_after_top = [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5];
   it.each<{ remote: DocumentOp; localReplay?: boolean; col?: number; expected: CellScalar[] }>([
-    { remote: { op: "addRows", sheet: "s1", at: 0, count: 1 }, expected: rowsAfterTop },
+    { remote: { op: "addRows", sheet: "s1", at: 0, count: 1 }, expected: rows_after_top },
     {
       remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
       localReplay: true,
-      expected: rowsAfterTop,
+      expected: rows_after_top,
     },
     {
       remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
@@ -378,7 +378,7 @@ describe("Grid transaction resource ingress", () => {
     },
   ])(
     "undoes a local edit that a remote $remote.op moved",
-    ({ remote, localReplay, col = 1, expected }) => {
+    ({ remote, localReplay: local_replay, col = 1, expected }) => {
       const grid = new GridImpl(mountHost(), {
         workbook: makeWorkbook(6),
         data: makeColumnarData(6),
@@ -389,7 +389,9 @@ describe("Grid transaction resource ingress", () => {
         value: { kind: "literal", value: 999 },
       } as const;
       expect(grid.applyTransaction({ patches: [edit] }).status).toBe("applied");
-      expect(grid.applyRemoteOperations([remote], { localReplay }).status).toBe("applied");
+      expect(grid.applyRemoteOperations([remote], { localReplay: local_replay }).status).toBe(
+        "applied",
+      );
       grid.undo();
       const values = expected.map(
         (_, row) => grid.store.getCell({ sheet: "s1", row, col }).resolved,
@@ -549,20 +551,20 @@ describe("Grid transaction resource ingress", () => {
 
 describe("setBlock arrays at every entry point", () => {
   const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
-  const setBlock = (values: CellScalar[], styleIds?: number[]): DocumentOp => ({
+  const set_block = (values: CellScalar[], style_ids?: number[]): DocumentOp => ({
     op: "setBlock",
     range,
     block: {
       rowCount: 1,
       colCount: 2,
       values,
-      ...(styleIds ? { styleTable: [{}, { bold: true }], styleIds } : {}),
+      ...(style_ids ? { styleTable: [{}, { bold: true }], styleIds: style_ids } : {}),
     },
   });
-  const cellAt = (grid: GridImpl, col: number) =>
+  const cell_at = (grid: GridImpl, col: number) =>
     grid.store.getCell({ sheet: "s1", row: 0, col }).resolved;
   /** An array whose entry `index` is a getter that counts its reads. */
-  const withGetter = <T>(entries: T[], index: number, read: (count: number) => T) => {
+  const with_getter = <T>(entries: T[], index: number, read: (count: number) => T) => {
     const counter = { reads: 0 };
     Object.defineProperty(entries, index, {
       enumerable: true,
@@ -573,25 +575,25 @@ describe("setBlock arrays at every entry point", () => {
     });
     return { entries, counter };
   };
-  /** Text over the byte limit of `limitedGrid`. */
-  const overLimit = "kept, now longer than the byte limit allows";
-  /** A grid whose byte limit fits `setBlock(["kept", "text"])` exactly. */
-  const limitedGrid = (workbook = makeWorkbook(4)) => {
-    const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+  /** Text over the byte limit of `limited_grid`. */
+  const over_limit = "kept, now longer than the byte limit allows";
+  /** A grid whose byte limit fits `set_block(["kept", "text"])` exactly. */
+  const limited_grid = (workbook = makeWorkbook(4)) => {
+    const exact = validateTransactionResources([set_block(["kept", "text"])]);
     if (!exact.ok) throw new Error("expected a measurable block");
     return new GridImpl(mountHost(), {
       workbook,
       transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes },
     });
   };
-  /** Entry 0 becomes a getter that reads 1 the first time and `overLimit` after. */
-  const smallThenOverLimit = (operation: DocumentOp | undefined) => {
+  /** Entry 0 becomes a getter that reads 1 the first time and `over_limit` after. */
+  const small_then_over_limit = (operation: DocumentOp | undefined) => {
     if (operation?.op !== "setBlock") throw new Error("expected a setBlock");
-    return withGetter<CellScalar>(operation.block.values, 0, (count) =>
-      count === 1 ? 1 : overLimit,
+    return with_getter<CellScalar>(operation.block.values, 0, (count) =>
+      count === 1 ? 1 : over_limit,
     ).counter;
   };
-  const entryPoints: Array<
+  const entry_points: Array<
     [string, (grid: GridImpl, patches: DocumentOp[]) => ApplyTransactionResult]
   > = [
     ["grid.applyTransaction", (grid, patches) => grid.applyTransaction({ patches })],
@@ -599,19 +601,19 @@ describe("setBlock arrays at every entry point", () => {
     ["store.applyTransaction", (grid, patches) => grid.store.applyTransaction({ patches })],
   ];
 
-  for (const [name, apply] of entryPoints) {
+  for (const [name, apply] of entry_points) {
     it(`${name} reads each values and styleIds entry once and uses that value everywhere`, () => {
       const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
       const emitted: DocumentOp[] = [];
       grid.on("change", (event) => emitted.push(...event.transaction.patches));
       // Each read returns a new number, so any second read would store a different value.
-      const values = withGetter<CellScalar>(["kept", 0], 1, (count) => count * 10);
-      const styleIds = withGetter([0, 0], 1, (count) => count);
+      const values = with_getter<CellScalar>(["kept", 0], 1, (count) => count * 10);
+      const style_ids = with_getter([0, 0], 1, (count) => count);
 
-      expect(apply(grid, [setBlock(values.entries, styleIds.entries)]).status).toBe("applied");
+      expect(apply(grid, [set_block(values.entries, style_ids.entries)]).status).toBe("applied");
       expect(values.counter.reads).toBe(1);
-      expect(styleIds.counter.reads).toBe(1);
-      expect(cellAt(grid, 1)).toBe(10);
+      expect(style_ids.counter.reads).toBe(1);
+      expect(cell_at(grid, 1)).toBe(10);
       expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toMatchObject({
         bold: true,
       });
@@ -623,9 +625,9 @@ describe("setBlock arrays at every entry point", () => {
       if (name === "grid.applyTransaction") {
         // History keeps the measured value too.
         grid.undo();
-        expect(cellAt(grid, 1)).toBeNull();
+        expect(cell_at(grid, 1)).toBeNull();
         grid.redo();
-        expect(cellAt(grid, 1)).toBe(10);
+        expect(cell_at(grid, 1)).toBe(10);
       }
       expect(values.counter.reads).toBe(1);
       grid.destroy();
@@ -638,19 +640,19 @@ describe("setBlock arrays at every entry point", () => {
         changes++;
       });
       const cause = new Error("entry unavailable");
-      const values = withGetter<CellScalar>(["kept", 0], 1, () => {
+      const values = with_getter<CellScalar>(["kept", 0], 1, () => {
         throw cause;
       });
 
       let failure: unknown;
       try {
-        apply(grid, [setBlock(values.entries)]);
+        apply(grid, [set_block(values.entries)]);
       } catch (error) {
         failure = error;
       }
       expect(failure).toBeInstanceOf(SheetwriteError);
       expect(failure).toMatchObject({ code: "invalid-argument", operation: "transaction", cause });
-      expect(cellAt(grid, 0)).toBeNull();
+      expect(cell_at(grid, 0)).toBeNull();
       expect(changes).toBe(0);
       grid.destroy();
     });
@@ -659,15 +661,15 @@ describe("setBlock arrays at every entry point", () => {
       const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
       const holey: CellScalar[] = ["kept"];
       holey.length = 2;
-      let otherReads = 0;
+      let other_reads = 0;
       const counted = <T>(value: T) => ({
         enumerable: true,
         get() {
-          otherReads++;
+          other_reads++;
           return value;
         },
       });
-      const blockAccessor = Object.defineProperty(
+      const block_accessor = Object.defineProperty(
         { rowCount: 1, colCount: 2 },
         "values",
         counted(["a", "b"]),
@@ -675,59 +677,61 @@ describe("setBlock arrays at every entry point", () => {
       const formulas: Array<[number, string]> = [[0, "=1"]];
       Object.defineProperty(formulas, 0, counted([0, "=1"]));
       const start = Object.defineProperty({ col: 0 }, "row", counted(0));
-      const setRangeCells = [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 1 } }];
-      Object.defineProperty(setRangeCells, 0, counted(setRangeCells[0]));
+      const set_range_cells = [
+        { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 1 } },
+      ];
+      Object.defineProperty(set_range_cells, 0, counted(set_range_cells[0]));
       const invalid = [
-        setBlock(holey),
-        setBlock(["kept", Number.NaN]),
-        setBlock(["kept", Number.POSITIVE_INFINITY]),
-        { op: "setBlock", range, block: blockAccessor },
+        set_block(holey),
+        set_block(["kept", Number.NaN]),
+        set_block(["kept", Number.POSITIVE_INFINITY]),
+        { op: "setBlock", range, block: block_accessor },
         { op: "setBlock", range, block: { rowCount: 1, colCount: 2, values: [1, 2], formulas } },
         {
           op: "setBlock",
           range: { ...range, start },
           block: { rowCount: 1, colCount: 2, values: [1, 2] },
         },
-        { op: "setRange", range, cells: setRangeCells },
+        { op: "setRange", range, cells: set_range_cells },
       ] as unknown as DocumentOp[];
       for (const operation of invalid) {
         expect(apply(grid, [operation]).status).toBe("rejected");
       }
-      expect(otherReads).toBe(0);
-      expect(cellAt(grid, 0)).toBeNull();
+      expect(other_reads).toBe(0);
+      expect(cell_at(grid, 0)).toBeNull();
       grid.destroy();
     });
 
     it(`${name} applies a block at the byte limit, rejects it one byte below, and stores the measured values when an operation from a change event is sent again`, () => {
-      const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+      const exact = validateTransactionResources([set_block(["kept", "text"])]);
       if (!exact.ok) throw new Error("expected a measurable block");
-      const belowLimit = new GridImpl(mountHost(), {
+      const below_limit = new GridImpl(mountHost(), {
         workbook: makeWorkbook(4),
         transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes - 1 },
       });
       let rejections = 0;
-      belowLimit.on("mutation-rejected", () => {
+      below_limit.on("mutation-rejected", () => {
         rejections += 1;
       });
-      expect(apply(belowLimit, [setBlock(["kept", "text"])])).toMatchObject({
+      expect(apply(below_limit, [set_block(["kept", "text"])])).toMatchObject({
         status: "rejected",
         issues: [{ kind: "resource-limit", resource: "encoded-bytes" }],
       });
       // A host or remote resource-limit rejection returns its issues and emits no event.
       expect(rejections).toBe(0);
-      belowLimit.destroy();
+      below_limit.destroy();
 
-      const grid = limitedGrid();
+      const grid = limited_grid();
       const emitted: DocumentOp[] = [];
       grid.on("change", (event) => emitted.push(...event.transaction.patches));
-      expect(apply(grid, [setBlock(["kept", "text"])]).status).toBe("applied");
+      expect(apply(grid, [set_block(["kept", "text"])]).status).toBe("applied");
       const kept = emitted[0];
       if (!kept) throw new Error("expected the emitted setBlock");
-      const getter = smallThenOverLimit(kept);
+      const getter = small_then_over_limit(kept);
 
       expect(apply(grid, [kept]).status).toBe("applied");
       expect(getter.reads).toBe(1);
-      expect(cellAt(grid, 0)).toBe(1);
+      expect(cell_at(grid, 0)).toBe(1);
       grid.destroy();
     });
 
@@ -742,13 +746,13 @@ describe("setBlock arrays at every entry point", () => {
       });
       const result = (() => {
         try {
-          return apply(grid, [setBlock(holey)]);
+          return apply(grid, [set_block(holey)]);
         } finally {
           delete (Array.prototype as unknown as Record<number, unknown>)[1];
         }
       })();
       expect(result.status).toBe("rejected");
-      expect(cellAt(grid, 1)).toBeNull();
+      expect(cell_at(grid, 1)).toBeNull();
       grid.destroy();
     });
   }
@@ -760,7 +764,7 @@ describe("setBlock arrays at every entry point", () => {
       (grid: GridImpl) => {
         let installed = false;
         grid.setProtectionResolver(({ operation }) => {
-          if (!installed) smallThenOverLimit(operation);
+          if (!installed) small_then_over_limit(operation);
           installed = true;
           return "allow";
         });
@@ -772,7 +776,7 @@ describe("setBlock arrays at every entry point", () => {
       (grid: GridImpl) => {
         registerGridTransactionAdmission(grid, {
           reserve: (operations) => {
-            smallThenOverLimit(operations[0]);
+            small_then_over_limit(operations[0]);
             return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
           },
         });
@@ -782,12 +786,12 @@ describe("setBlock arrays at every entry point", () => {
     // The resolver is asked only about edits to a protected range.
     const workbook = makeWorkbook(4);
     if (protect) workbook.sheets[0]!.protectedRanges = [{ id: "locked", range }];
-    const grid = limitedGrid(workbook);
+    const grid = limited_grid(workbook);
     install(grid);
-    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+    expect(grid.applyTransaction({ patches: [set_block(["kept", "text"])] }).status).toBe(
       "rejected",
     );
-    expect(cellAt(grid, 0)).toBeNull();
+    expect(cell_at(grid, 0)).toBeNull();
     grid.destroy();
   });
 });
@@ -795,7 +799,7 @@ describe("setBlock arrays at every entry point", () => {
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   it("setTheme merges into the current theme and replaceTheme replaces it", () => {
     const workbook = makeWorkbook(10);
-    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
+    const grid = new GridImpl(mountHost(), { workbook }, make_fake_store(workbook));
 
     grid.setTheme({ bg: "#ff0000" });
     grid.setTheme({ fg: "#123456" });
@@ -813,23 +817,23 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     const grid = new GridImpl(
       host,
       { workbook, config: { toolbar: true } },
-      makeFakeStore(workbook),
+      make_fake_store(workbook),
     );
     // The toolbar loads lazily; awaiting its module runs the grid's mount first.
     await import("../src/ribbon/command-toolbar.js");
     expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
     // The built-in widgets read their palette from custom properties seeded on
     // the grid root (host CSS can still override them per widget).
-    const widgetColor = (name: string) => host.style.getPropertyValue(name).trim();
+    const widget_color = (name: string) => host.style.getPropertyValue(name).trim();
 
     // A host switching to its dark palette.
     grid.replaceTheme({ headerBg: "#0b1220", headerFg: "#dce3ee", bg: "#121a28" });
-    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#0b1220");
-    expect(widgetColor("--sheetwrite-toolbar-fg")).toBe("#dce3ee");
-    expect(widgetColor("--sheetwrite-widget-bg")).toBe("#121a28");
+    expect(widget_color("--sheetwrite-toolbar-bg")).toBe("#0b1220");
+    expect(widget_color("--sheetwrite-toolbar-fg")).toBe("#dce3ee");
+    expect(widget_color("--sheetwrite-widget-bg")).toBe("#121a28");
 
     grid.setTheme({ headerBg: "#f0f2f5" });
-    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#f0f2f5");
+    expect(widget_color("--sheetwrite-toolbar-bg")).toBe("#f0f2f5");
 
     grid.destroy();
   });
@@ -837,7 +841,7 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
 
 describe("Grid.setMinColumns", () => {
   it("fills the host width with empty columns only for a spreadsheet", () => {
-    const columnCount = (options: Partial<GridOptions>) => {
+    const column_count = (options: Partial<GridOptions>) => {
       const host = mountHost();
       const grid = new GridImpl(host, { workbook: makeWorkbook(5), ...options });
       const count = host.querySelector('[role="grid"]')?.getAttribute("aria-colcount");
@@ -845,10 +849,10 @@ describe("Grid.setMinColumns", () => {
       return count;
     };
     // The 800 px test host fits 9 default-width columns.
-    expect(columnCount({})).toBe("9");
+    expect(column_count({})).toBe("9");
     // A data grid shows its own three columns, and pads only on request.
-    expect(columnCount({ presentation: "data-grid" })).toBe("3");
-    expect(columnCount({ presentation: "data-grid", minColumns: 6 })).toBe("6");
+    expect(column_count({ presentation: "data-grid" })).toBe("3");
+    expect(column_count({ presentation: "data-grid", minColumns: 6 })).toBe("6");
 
     // A sheet added later fills the width too.
     const later = mountHost();
@@ -892,11 +896,11 @@ describe("Grid.setMinColumns", () => {
       })),
     );
     const grid = new GridImpl(mountHost(), { workbook }, store);
-    const reachedBackend = new Error("active sheet passed completeness guard");
+    const reached_backend = new Error("active sheet passed completeness guard");
     setXlsxTableExportBackend({
       name: "sheet-scoped-completeness",
       toXlsxTable: async () => {
-        throw reachedBackend;
+        throw reached_backend;
       },
     });
 
@@ -906,7 +910,7 @@ describe("Grid.setMinColumns", () => {
       await expect(grid.exportXlsx("active.xlsx")).rejects.toMatchObject({
         code: "export-failed",
         operation: "xlsx-export",
-        cause: reachedBackend,
+        cause: reached_backend,
       });
 
       grid.setActiveSheet("inactive");
@@ -921,9 +925,9 @@ describe("Grid.setMinColumns", () => {
 describe("Grid auto-fit", () => {
   it("matches small geometry while bounding and yielding large row and column reads", () => {
     const text = `${"wide ".repeat(40)}\nsecond wrapped line`;
-    const smallWorkbook = makeWorkbook(1);
-    const smallStore = new SheetwriteStore(smallWorkbook);
-    smallStore.applyTransaction({
+    const small_workbook = makeWorkbook(1);
+    const small_store = new SheetwriteStore(small_workbook);
+    small_store.applyTransaction({
       patches: [
         {
           op: "set",
@@ -933,24 +937,24 @@ describe("Grid auto-fit", () => {
         },
       ],
     });
-    const smallGrid = new GridImpl(mountHost(), { workbook: smallWorkbook }, smallStore);
-    smallGrid.autoFitRows({
+    const small_grid = new GridImpl(mountHost(), { workbook: small_workbook }, small_store);
+    small_grid.autoFitRows({
       sheet: "s1",
       start: { row: 0, col: 0 },
       end: { row: 0, col: 0 },
     });
-    smallGrid.autoFitColumns([0]);
-    const expectedHeight = smallWorkbook.sheets[0]!.rowHeights!.get(0)!;
-    const expectedWidth = smallWorkbook.sheets[0]!.columns[0]!.width;
+    small_grid.autoFitColumns([0]);
+    const expected_height = small_workbook.sheets[0]!.rowHeights!.get(0)!;
+    const expected_width = small_workbook.sheets[0]!.columns[0]!.width;
 
-    const rowCount = AUTO_FIT_CHUNK_CELLS + 1;
-    const workbook = makeWorkbook(rowCount);
+    const row_count = AUTO_FIT_CHUNK_CELLS + 1;
+    const workbook = makeWorkbook(row_count);
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
       patches: [
         {
           op: "set",
-          addr: { sheet: "s1", row: rowCount - 1, col: 0 },
+          addr: { sheet: "s1", row: row_count - 1, col: 0 },
           value: { kind: "literal", value: text },
           style: { wrap: true, fontSize: 18 },
         },
@@ -960,11 +964,11 @@ describe("Grid auto-fit", () => {
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
     const scheduled = new Map<number, FrameRequestCallback>();
-    let nextFrame = 1;
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    let next_frame = 1;
+    const original_request_animation_frame = globalThis.requestAnimationFrame;
+    const original_cancel_animation_frame = globalThis.cancelAnimationFrame;
     globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
-      const frame = nextFrame++;
+      const frame = next_frame++;
       scheduled.set(frame, callback);
       return frame;
     }) as typeof requestAnimationFrame;
@@ -980,11 +984,11 @@ describe("Grid auto-fit", () => {
         callback(steps);
       }
     };
-    const expectBoundedReads = (): void => {
+    const expect_bounded_reads = (): void => {
       const stats = grid.getAutoFitResourceStats();
       expect(stats.maxWindowCells).toBeLessThanOrEqual(AUTO_FIT_CHUNK_CELLS);
       expect(stats.windowRequests).toBeGreaterThanOrEqual(1);
-      expect(stats.windowRequests).toBeLessThanOrEqual(Math.ceil(rowCount / AUTO_FIT_CHUNK_CELLS));
+      expect(stats.windowRequests).toBeLessThanOrEqual(Math.ceil(row_count / AUTO_FIT_CHUNK_CELLS));
       expect(stats.scheduledChunks).toBeGreaterThanOrEqual(1);
       expect(stats.scheduledChunks).toBeLessThanOrEqual(stats.windowRequests);
     };
@@ -994,18 +998,18 @@ describe("Grid auto-fit", () => {
       grid.autoFitRows({
         sheet: "s1",
         start: { row: 0, col: 0 },
-        end: { row: rowCount - 1, col: 0 },
+        end: { row: row_count - 1, col: 0 },
       });
       expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
       expect(scheduled.size).toBeGreaterThanOrEqual(1);
       drain();
-      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
+      expect(workbook.sheets[0]!.rowHeights!.get(row_count - 1)).toBe(expected_height);
       expect(changes).toHaveLength(1);
-      expectBoundedReads();
+      expect_bounded_reads();
       grid.undo();
-      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBeUndefined();
+      expect(workbook.sheets[0]!.rowHeights!.get(row_count - 1)).toBeUndefined();
       grid.redo();
-      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
+      expect(workbook.sheets[0]!.rowHeights!.get(row_count - 1)).toBe(expected_height);
 
       changes.length = 0;
       grid.resetAutoFitResourceStats();
@@ -1013,30 +1017,30 @@ describe("Grid auto-fit", () => {
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
       expect(scheduled.size).toBeGreaterThanOrEqual(1);
       drain();
-      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expected_width);
       expect(changes).toHaveLength(1);
-      expectBoundedReads();
+      expect_bounded_reads();
       grid.undo();
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
     } finally {
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      globalThis.requestAnimationFrame = original_request_animation_frame;
+      globalThis.cancelAnimationFrame = original_cancel_animation_frame;
       grid.destroy();
       store.dispose();
-      smallGrid.destroy();
-      smallStore.dispose();
+      small_grid.destroy();
+      small_store.dispose();
     }
   });
 
   it("cancels chunked work on destroy without a late commit", () => {
-    const rowCount = AUTO_FIT_CHUNK_CELLS * 2;
-    const workbook = makeWorkbook(rowCount);
+    const row_count = AUTO_FIT_CHUNK_CELLS * 2;
+    const workbook = makeWorkbook(row_count);
     const store = new SheetwriteStore(workbook);
     store.applyTransaction({
       patches: [
         {
           op: "set",
-          addr: { sheet: "s1", row: rowCount - 1, col: 0 },
+          addr: { sheet: "s1", row: row_count - 1, col: 0 },
           value: { kind: "literal", value: "never measured ".repeat(20) },
         },
       ],
@@ -1045,11 +1049,11 @@ describe("Grid auto-fit", () => {
     const changes: ChangeEvent[] = [];
     grid.on("change", (event) => changes.push(event));
     const scheduled = new Map<number, FrameRequestCallback>();
-    let nextFrame = 1;
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    let next_frame = 1;
+    const original_request_animation_frame = globalThis.requestAnimationFrame;
+    const original_cancel_animation_frame = globalThis.cancelAnimationFrame;
     globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
-      const frame = nextFrame++;
+      const frame = next_frame++;
       scheduled.set(frame, callback);
       return frame;
     }) as typeof requestAnimationFrame;
@@ -1059,8 +1063,8 @@ describe("Grid auto-fit", () => {
 
     try {
       grid.autoFitColumns([0]);
-      const [firstFrame, first] = scheduled.entries().next().value!;
-      scheduled.delete(firstFrame);
+      const [first_frame, first] = scheduled.entries().next().value!;
+      scheduled.delete(first_frame);
       first(0);
       const late = scheduled.values().next().value;
       if (!late) throw new Error("expected auto-fit to yield before its second chunk");
@@ -1071,8 +1075,8 @@ describe("Grid auto-fit", () => {
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
       expect(changes).toEqual([]);
     } finally {
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      globalThis.requestAnimationFrame = original_request_animation_frame;
+      globalThis.cancelAnimationFrame = original_cancel_animation_frame;
       grid.destroy();
       store.dispose();
     }
@@ -1141,15 +1145,15 @@ describe("Grid auto-fit", () => {
 describe("Grid search over a custom store", () => {
   it("reports matches at data rows when the store sorts its visible window", () => {
     const workbook = makeWorkbook(5);
-    const lastRow = 4;
+    const last_row = 4;
     const window = (
       sheet: string,
       rows: { start: number; end: number },
       cols: readonly number[],
-      needleRow: number,
+      needle_row: number,
     ) => {
       const values = new Array<CellScalar>((rows.end - rows.start) * cols.length).fill(null);
-      values[(needleRow - rows.start) * cols.length] = "needle";
+      values[(needle_row - rows.start) * cols.length] = "needle";
       return {
         sheet,
         stringPoolEpoch: 0,
@@ -1162,13 +1166,13 @@ describe("Grid search over a custom store", () => {
     };
     // The store shows its rows in descending order: data row 4 is view row 0.
     const store: Store = {
-      ...makeFakeStore(workbook),
+      ...make_fake_store(workbook),
       getVisibleWindow: (sheet, rows, cols) => window(sheet, rows, cols, 0),
-      getDataWindow: (sheet, rows, cols) => window(sheet, rows, cols, lastRow),
+      getDataWindow: (sheet, rows, cols) => window(sheet, rows, cols, last_row),
     };
     const grid = new GridImpl(mountHost(), { workbook }, store);
 
-    expect(grid.search("needle").matches).toEqual([{ sheet: "s1", row: lastRow, col: 0 }]);
+    expect(grid.search("needle").matches).toEqual([{ sheet: "s1", row: last_row, col: 0 }]);
 
     grid.destroy();
   });
@@ -1200,17 +1204,17 @@ describe("transactional document metadata", () => {
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
     grid.actions.merge();
-    const mergeEvent = events.at(-1);
-    if (!mergeEvent) throw new Error("expected merge to emit a transaction");
-    const replayWorkbook = makeWorkbook(10);
-    const replayStore = new SheetwriteStore(replayWorkbook, makeColumnarData(10));
-    const replayGrid = new GridImpl(mountHost(), { workbook: replayWorkbook }, replayStore);
-    replayGrid.applyTransaction(mergeEvent.transaction);
-    expect(replayWorkbook.sheets[0]!.merges).toEqual(workbook.sheets[0]!.merges);
+    const merge_event = events.at(-1);
+    if (!merge_event) throw new Error("expected merge to emit a transaction");
+    const replay_workbook = makeWorkbook(10);
+    const replay_store = new SheetwriteStore(replay_workbook, makeColumnarData(10));
+    const replay_grid = new GridImpl(mountHost(), { workbook: replay_workbook }, replay_store);
+    replay_grid.applyTransaction(merge_event.transaction);
+    expect(replay_workbook.sheets[0]!.merges).toEqual(workbook.sheets[0]!.merges);
     for (let row = 0; row <= 1; row++) {
       for (let col = 0; col <= 1; col++) {
         const addr = { sheet: "s1", row, col };
-        expect(replayStore.getCell(addr).resolved).toBe(store.getCell(addr).resolved);
+        expect(replay_store.getCell(addr).resolved).toBe(store.getCell(addr).resolved);
       }
     }
     expect(workbook.sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
@@ -1303,8 +1307,8 @@ describe("transactional document metadata", () => {
     grid.undo();
     expect(workbook.sheets[0]!.rowGroups).toEqual([{ start: 3, end: 5, collapsed: false }]);
 
-    replayGrid.destroy();
-    replayStore.dispose();
+    replay_grid.destroy();
+    replay_store.dispose();
     grid.destroy();
     store.dispose();
   });
@@ -1470,13 +1474,13 @@ describe("transactional document metadata", () => {
     grid.undo();
     expect(workbook.sheets[0]!.protectedRanges).toEqual([]);
 
-    const noteAddr = { sheet: "s1", row: 2, col: 2 };
-    grid.setNote(noteAddr, "Check source");
-    expect(grid.getNote(noteAddr)).toBe("Check source");
+    const note_addr = { sheet: "s1", row: 2, col: 2 };
+    grid.setNote(note_addr, "Check source");
+    expect(grid.getNote(note_addr)).toBe("Check source");
     grid.undo();
-    expect(grid.getNote(noteAddr)).toBeNull();
+    expect(grid.getNote(note_addr)).toBeNull();
     grid.redo();
-    expect(grid.getNote(noteAddr)).toBe("Check source");
+    expect(grid.getNote(note_addr)).toBe("Check source");
 
     grid.hideColumns([1]);
     expect(grid.hiddenColumns()).toEqual([1]);
@@ -1557,8 +1561,8 @@ describe("transactional document metadata", () => {
 
   it("keeps every document metadata action inert in read-only mode", () => {
     const workbook = makeWorkbook(10);
-    const existingMerge = { r0: 4, c0: 0, r1: 5, c1: 1 };
-    workbook.sheets[0]!.merges = [existingMerge];
+    const existing_merge = { r0: 4, c0: 0, r1: 5, c1: 1 };
+    workbook.sheets[0]!.merges = [existing_merge];
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const grid = new GridImpl(mountHost(), { workbook, readOnly: true }, store);
     let changes = 0;
@@ -1602,7 +1606,7 @@ describe("transactional document metadata", () => {
     expect(changes).toBe(0);
     expect(workbook.sheets).toHaveLength(1);
     expect(workbook.sheets[0]).toMatchObject({ name: "Sheet 1" });
-    expect(workbook.sheets[0]!.merges).toEqual([existingMerge]);
+    expect(workbook.sheets[0]!.merges).toEqual([existing_merge]);
     expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
     expect(workbook.sheets[0]!.frozenRows).toBeUndefined();
     expect(workbook.sheets[0]!.rowGroups).toBeUndefined();
@@ -1619,11 +1623,14 @@ describe("transactional document metadata", () => {
 });
 
 describe("element height cap measurement", () => {
-  const stubDocument = (layoutClamp: number, scrollClamp = Number.POSITIVE_INFINITY): Document => {
-    const clientHeight = 32;
+  const stub_document = (
+    layout_clamp: number,
+    scroll_clamp = Number.POSITIVE_INFINITY,
+  ): Document => {
+    const client_height = 32;
     const scroller = {
       style: { cssText: "" },
-      clientHeight,
+      clientHeight: client_height,
       append: () => {},
       remove: () => {},
       _scrollTop: 0,
@@ -1632,12 +1639,12 @@ describe("element height cap measurement", () => {
       },
       set scrollTop(value: number) {
         // Engines clamp assignments to the real maximum scroll offset.
-        this._scrollTop = Math.min(value, Math.max(0, scrollClamp - clientHeight));
+        this._scrollTop = Math.min(value, Math.max(0, scroll_clamp - client_height));
       },
     };
     const sizer = {
       style: { cssText: "" },
-      getBoundingClientRect: () => ({ height: layoutClamp }),
+      getBoundingClientRect: () => ({ height: layout_clamp }),
     };
     let calls = 0;
     return {
@@ -1650,18 +1657,18 @@ describe("element height cap measurement", () => {
     // Chromium at 125% browser zoom clamps near 26.8M CSS px — well below the
     // 33M constant this measurement replaced; trusting the constant left the
     // tail of a 1M-row document unreachable.
-    const measuredClamp = 26_843_545.6;
-    const cap = measureMaxElementHeight(stubDocument(measuredClamp));
+    const measured_clamp = 26_843_545.6;
+    const cap = measureMaxElementHeight(stub_document(measured_clamp));
     expect(cap).toBeGreaterThan(0);
-    expect(cap).toBeLessThan(measuredClamp);
-    expect(measureMaxElementHeight(stubDocument(measuredClamp / 2))).toBeLessThan(cap);
+    expect(cap).toBeLessThan(measured_clamp);
+    expect(measureMaxElementHeight(stub_document(measured_clamp / 2))).toBeLessThan(cap);
 
     // No measurable clamp falls back to a conservative cap.
     const fallback = measureMaxElementHeight(null);
     expect(fallback).toBeGreaterThan(0);
     expect(fallback).toBeLessThan(26_843_545);
-    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(fallback);
-    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(fallback);
+    expect(measureMaxElementHeight(stub_document(0, 0))).toBe(fallback);
+    expect(measureMaxElementHeight(stub_document(Number.NaN, Number.NaN))).toBe(fallback);
   });
 });
 

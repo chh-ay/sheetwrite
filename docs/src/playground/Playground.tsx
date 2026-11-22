@@ -48,7 +48,7 @@ type RunState =
   | { readonly kind: "failed" };
 
 /** The status line for a run. */
-function statusText(state: RunState, entries: number): string {
+function status_text(state: RunState, entries: number): string {
   if (state.kind === "running") return "Running…";
   if (state.kind === "failed") return "The example stopped with an error.";
   const lines = entries === 1 ? "1 console line" : `${entries} console lines`;
@@ -56,26 +56,26 @@ function statusText(state: RunState, entries: number): string {
 }
 
 export function Playground(props: PlaygroundProps) {
-  const [code, setCode] = createSignal(props.source);
-  const [run, setRun] = createSignal<Run>({ id: 0, code: props.source });
-  const [state, setState] = createSignal<RunState>({ kind: "running" });
-  const [error, setError] = createSignal<ExampleError>();
-  const [entries, setEntries] = createSignal<readonly ConsoleEntry[]>([]);
+  const [code, set_code] = createSignal(props.source);
+  const [run, set_run] = createSignal<Run>({ id: 0, code: props.source });
+  const [state, set_state] = createSignal<RunState>({ kind: "running" });
+  const [error, set_error] = createSignal<ExampleError>();
+  const [entries, set_entries] = createSignal<readonly ConsoleEntry[]>([]);
   let editor: HTMLTextAreaElement | undefined;
-  const hintId = createUniqueId();
+  const hint_id = createUniqueId();
   const title = () => props.title;
 
   const start = (next: string) => {
-    setEntries([]);
-    setError(undefined);
-    setState({ kind: "running" });
-    setRun((previous) => ({ id: previous.id + 1, code: next }));
+    set_entries([]);
+    set_error(undefined);
+    set_state({ kind: "running" });
+    set_run((previous) => ({ id: previous.id + 1, code: next }));
   };
   const reset = () => {
-    setCode(props.source);
+    set_code(props.source);
     start(props.source);
   };
-  const showLine = (line: number) => {
+  const show_line = (line: number) => {
     const textarea = editor;
     if (textarea === undefined) return;
     const lines = textarea.value.split("\n");
@@ -108,17 +108,17 @@ export function Playground(props: PlaygroundProps) {
         </button>
       </div>
       <CodeEditor
-        describedBy={hintId}
+        describedBy={hint_id}
         errorLine={error()?.line}
         label={`Code of ${title() ?? "the example"}`}
-        onChange={setCode}
+        onChange={set_code}
         onRun={() => start(code())}
         textarea={(element) => {
           editor = element;
         }}
         value={code()}
       />
-      <p class="sw-playground__hint" id={hintId}>
+      <p class="sw-playground__hint" id={hint_id}>
         {EDITOR_HINT}
       </p>
       <Show when={error()}>
@@ -135,7 +135,7 @@ export function Playground(props: PlaygroundProps) {
                 class="sw-button"
                 data-size="sm"
                 data-variant="quiet"
-                onClick={() => showLine(failure().line ?? 1)}
+                onClick={() => show_line(failure().line ?? 1)}
                 type="button"
               >
                 Line {failure().line}
@@ -147,20 +147,20 @@ export function Playground(props: PlaygroundProps) {
       <div class="sw-playground__result">
         <p class="sw-playground__label">
           <span>Result</span>
-          <span role="status">{statusText(state(), entries().length)}</span>
+          <span role="status">{status_text(state(), entries().length)}</span>
         </p>
         {/* Keyed on the run: each run replaces the frame with a new one. */}
         <Show keyed when={run()}>
           {(current) => (
             <ExampleFrame
               code={current.code}
-              onConsole={(entry) => setEntries((previous) => [...previous, entry])}
+              onConsole={(entry) => set_entries((previous) => [...previous, entry])}
               onError={(failure) => {
-                setError(failure);
-                setState({ kind: "failed" });
+                set_error(failure);
+                set_state({ kind: "failed" });
               }}
               onFinish={(milliseconds) =>
-                setState((previous) =>
+                set_state((previous) =>
                   previous.kind === "failed" ? previous : { kind: "done", milliseconds },
                 )
               }
@@ -197,7 +197,7 @@ interface CodeEditorProps {
 }
 
 /** The highlighted code, one list of tokens per source line. */
-function highlightedLines(code: string): CodeToken[][] {
+function highlighted_lines(code: string): CodeToken[][] {
   const lines: CodeToken[][] = [[]];
   for (const token of tokenizeCode(code, "typescript")) {
     const parts = token.text.split("\n");
@@ -219,7 +219,7 @@ function highlightedLines(code: string): CodeToken[][] {
  */
 function CodeEditor(props: CodeEditorProps) {
   let leaving = false;
-  const onKeyDown = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
+  const on_key_down = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       props.onRun();
@@ -244,7 +244,7 @@ function CodeEditor(props: CodeEditorProps) {
     }
     leaving = false;
   };
-  const lines = createMemo(() => highlightedLines(props.value));
+  const lines = createMemo(() => highlighted_lines(props.value));
   return (
     <div class="sw-playground__editor">
       <pre aria-hidden="true">
@@ -277,7 +277,7 @@ function CodeEditor(props: CodeEditorProps) {
         autocomplete="off"
         autocorrect="off"
         onInput={(event) => props.onChange(event.currentTarget.value)}
-        onKeyDown={onKeyDown}
+        onKeyDown={on_key_down}
         ref={props.textarea}
         spellcheck={false}
         value={props.value}
@@ -298,8 +298,8 @@ interface ExampleFrameProps {
 function ExampleFrame(props: ExampleFrameProps) {
   let frame!: HTMLIFrameElement;
   // Until the example draws, the frame takes the height the example gives its grid.
-  const [height, setHeight] = createSignal<number | undefined>(expectedResultHeight(props.code));
-  const frameSource = frameDocument();
+  const [height, set_height] = createSignal<number | undefined>(expectedResultHeight(props.code));
+  const frame_source = frameDocument();
 
   onMount(() => {
     const root = document.documentElement;
@@ -309,7 +309,7 @@ function ExampleFrame(props: ExampleFrameProps) {
   });
 
   const start = () => {
-    watchFrameHeight(frame, (next) => setHeight(next));
+    watchFrameHeight(frame, (next) => set_height(next));
     const started = performance.now();
     void runExample(frame, props.code, { console: props.onConsole, error: props.onError }).then(
       (finished) => {
@@ -327,7 +327,7 @@ function ExampleFrame(props: ExampleFrameProps) {
       }}
       // Scripts run so the example can; the frame cannot navigate the page or open windows.
       sandbox="allow-scripts allow-same-origin"
-      srcdoc={frameSource}
+      srcdoc={frame_source}
       style={height() === undefined ? undefined : { height: `${height()}px` }}
       title="Example result"
     />

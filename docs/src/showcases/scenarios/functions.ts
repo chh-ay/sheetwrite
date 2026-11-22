@@ -212,7 +212,7 @@ const formula = (sheet: string, row: number, col: number, src: string): Document
   value: { kind: "formula", src },
 });
 
-function familyOperations(family: FunctionFamily): DocumentOp[] {
+function family_operations(family: FunctionFamily): DocumentOp[] {
   const sheet = family.id;
   const operations: DocumentOp[] = [
     ...["Input", "Value", "", "Function", "Result", "Formula"].map((header, col) =>
@@ -227,10 +227,10 @@ function familyOperations(family: FunctionFamily): DocumentOp[] {
   });
   family.formulas.forEach((entry, index) => {
     const row = index + 1;
-    const resultCell = `${colToA1(RESULT_COL)}${row + 1}`;
+    const result_cell = `${colToA1(RESULT_COL)}${row + 1}`;
     operations.push(
       literal(sheet, row, NAME_COL, entry.name),
-      formula(sheet, row, FORMULA_TEXT_COL, `=FORMULATEXT(${resultCell})`),
+      formula(sheet, row, FORMULA_TEXT_COL, `=FORMULATEXT(${result_cell})`),
       formula(sheet, row, RESULT_COL, entry.src),
     );
   });
@@ -247,7 +247,7 @@ function familyOperations(family: FunctionFamily): DocumentOp[] {
   return operations;
 }
 
-function lookupPivot(): PivotDefinition {
+function lookup_pivot(): PivotDefinition {
   return {
     id: "revenue-by-region",
     name: "Revenue by region",
@@ -265,7 +265,7 @@ function lookupPivot(): PivotDefinition {
   };
 }
 
-function functionsWorkbook(): Workbook {
+function functions_workbook(): Workbook {
   const widths = [128, 152, 24, 136, 152, 296, 24, 96, 96, 24, 112, 112];
   return {
     activeSheet: FAMILIES[0].id,
@@ -318,27 +318,27 @@ export function createFunctionsScenario(host: HTMLElement): FunctionsScenario {
     const shell = await mountShowcaseShell(
       host,
       // Letter headers without filler columns: the grid ends with each family's columns.
-      { workbook: functionsWorkbook(), presentation: "data-grid" },
+      { workbook: functions_workbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;
     grid = shell.grid;
     requireApplied(
-      grid.applyRemoteOperations(FAMILIES.flatMap(familyOperations)),
+      grid.applyRemoteOperations(FAMILIES.flatMap(family_operations)),
       "The function sheets",
     );
-    requireApplied(grid.setPivot(lookupPivot(), "lookup"), "The lookup pivot");
-    const stopChanges = grid.on("change", () => listeners.notify());
+    requireApplied(grid.setPivot(lookup_pivot(), "lookup"), "The lookup pivot");
+    const stop_changes = grid.on("change", () => listeners.notify());
     // Following the active sheet, so a sheet tab picks the family too.
-    const stopSheets = grid.on("active-sheet", () => listeners.notify());
+    const stop_sheets = grid.on("active-sheet", () => listeners.notify());
     dispose = () => {
-      stopChanges();
-      stopSheets();
+      stop_changes();
+      stop_sheets();
       shell.dispose();
     };
   })();
 
-  const requireGrid = (): Grid => {
+  const require_grid = (): Grid => {
     if (!grid) throw new Error("The function sheets are still loading");
     return grid;
   };
@@ -365,11 +365,11 @@ export function createFunctionsScenario(host: HTMLElement): FunctionsScenario {
       };
     },
     showFamily(id) {
-      requireGrid().setActiveSheet(id);
+      require_grid().setActiveSheet(id);
       listeners.notify();
     },
     setFirstInput(value) {
-      const current = requireGrid();
+      const current = require_grid();
       requireApplied(
         current.applyTransaction({
           patches: [literal(current.getActiveSheet(), 1, INPUT_COL, value)],

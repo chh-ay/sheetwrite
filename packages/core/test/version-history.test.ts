@@ -20,7 +20,7 @@ import type { CommittedTransaction } from "../src/types/transaction.js";
 
 const MINUTE_MS = 60_000;
 
-const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
+const key_range_descriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
 
 beforeAll(async () => {
   // Bun has no IndexedDB; the adapter reads the browser's global key range class.
@@ -29,8 +29,8 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (keyRangeDescriptor) {
-    Object.defineProperty(globalThis, "IDBKeyRange", keyRangeDescriptor);
+  if (key_range_descriptor) {
+    Object.defineProperty(globalThis, "IDBKeyRange", key_range_descriptor);
   } else {
     Reflect.deleteProperty(globalThis, "IDBKeyRange");
   }
@@ -66,7 +66,7 @@ function snapshot(value = 10): WorkbookSnapshot {
 }
 
 /** Replace the cells of the fixture sheet with one column of `rows` cells. */
-function withColumn(
+function with_column(
   base: WorkbookSnapshot,
   rows: number,
   value: (row: number) => CellValue,
@@ -76,10 +76,10 @@ function withColumn(
     throw new Error("Missing fixture sheet");
   }
 
-  const cells: SnapshotCell[] = Array.from({ length: rows }, (_, rowOffset) => ({
-    rowOffset,
+  const cells: SnapshotCell[] = Array.from({ length: rows }, (_, row_offset) => ({
+    rowOffset: row_offset,
     colOffset: 0,
-    value: value(rowOffset),
+    value: value(row_offset),
   }));
 
   sheet.rowCount = Math.max(sheet.rowCount, rows);
@@ -102,7 +102,7 @@ function change(revision: number, value: string | number = revision): CommittedT
   };
 }
 
-function firstCell(document: WorkbookSnapshot): CellValue | undefined {
+function first_cell(document: WorkbookSnapshot): CellValue | undefined {
   return document.sheets[0]?.cells[0]?.cells[0]?.value;
 }
 
@@ -166,9 +166,9 @@ for (const backend of ["memory", "indexeddb"] as const) {
 
       const restored = await reopened.readVersion(named.id);
       expect(restored.version).toBe(6);
-      expect(firstCell(restored)).toEqual({ kind: "literal", value: 6 });
+      expect(first_cell(restored)).toEqual({ kind: "literal", value: 6 });
       expect(restored.sheets[0]?.notes).toEqual(baseline.sheets[0]?.notes);
-      expect(firstCell(baseline)).toEqual({ kind: "literal", value: 10 });
+      expect(first_cell(baseline)).toEqual({ kind: "literal", value: 10 });
     });
 
     it("rejects stale writers and invalid revisions without publishing a partial version", async () => {
@@ -246,7 +246,7 @@ for (const backend of ["memory", "indexeddb"] as const) {
       expect(next.records?.[0]?.id).not.toBe(first.records?.[0]?.id);
 
       const replayed = await archive.readVersion(version.id);
-      expect(firstCell(replayed)).toEqual({ kind: "literal", value: text });
+      expect(first_cell(replayed)).toEqual({ kind: "literal", value: text });
     });
 
     it("keeps a reader's immutable chunks alive during concurrent marker deletion", async () => {
@@ -276,8 +276,8 @@ for (const backend of ["memory", "indexeddb"] as const) {
 
       await adapter.put({ ...lease, kind: "release" });
 
-      const afterRelease = adapter.get({ ...request, pin: undefined });
-      await expect(afterRelease).rejects.toMatchObject({ code: "not-found" });
+      const after_release = adapter.get({ ...request, pin: undefined });
+      await expect(after_release).rejects.toMatchObject({ code: "not-found" });
     });
 
     it("rolls back a byte-capacity failure and preserves the previously named revision", async () => {
@@ -331,20 +331,20 @@ describe("history replay memory", () => {
   it("replays a large version without growing the document engine's memory", async () => {
     const rows = 40_000;
     const text = (row: number) => `${row}:${"history".repeat(28)}`;
-    const large = withColumn(snapshot(), rows, (row) => ({ kind: "literal", value: text(row) }));
+    const large = with_column(snapshot(), rows, (row) => ({ kind: "literal", value: text(row) }));
 
     const archive = await open(new MemoryHistoryStorage());
     await archive.initialize(large, 0);
     await archive.record(change(1));
     const version = await archive.saveVersion("Large", "alice", MINUTE_MS);
 
-    const documentBytes = getEngine().getMemory().buffer.byteLength;
+    const document_bytes = getEngine().getMemory().buffer.byteLength;
     const replayed = await archive.readVersion(version.id);
 
     const cells = replayed.sheets[0]?.cells[0]?.cells;
     expect(cells?.[rows - 1]?.value).toEqual({ kind: "literal", value: text(rows - 1) });
     expect(cells?.[0]?.value).toEqual({ kind: "literal", value: 1 });
-    expect(getEngine().getMemory().buffer.byteLength).toBe(documentBytes);
+    expect(getEngine().getMemory().buffer.byteLength).toBe(document_bytes);
   });
 
   it("rebuilds a version once for the reads that follow, and again after the head moves", async () => {
@@ -352,14 +352,14 @@ describe("history replay memory", () => {
     const archive = await initialized(storage);
     await archive.record(change(1));
 
-    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    expect(first_cell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
     storage.cellPageReads = 0;
-    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
+    expect(first_cell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 1 });
     expect(storage.cellPageReads).toBe(0);
 
     // Another tab moves the head through the same storage.
     await (await open(storage)).record(change(2));
-    expect(firstCell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 2 });
+    expect(first_cell(await archive.readVersion("head"))).toEqual({ kind: "literal", value: 2 });
   });
 });
 
@@ -433,18 +433,18 @@ describe("history trust and cancellation", () => {
     const stale = archive.listVersions({ maxEntries: 1, cursor: first.cursor });
     await expect(stale).rejects.toMatchObject({ code: "conflict" });
 
-    const tooSmall = archive.listVersions({ maxBytes: 1 });
-    await expect(tooSmall).rejects.toMatchObject({ code: "capacity" });
+    const too_small = archive.listVersions({ maxBytes: 1 });
+    await expect(too_small).rejects.toMatchObject({ code: "capacity" });
 
-    const tooLarge = archive.listVersions({ maxEntries: 101 });
-    await expect(tooLarge).rejects.toMatchObject({ code: "capacity" });
+    const too_large = archive.listVersions({ maxEntries: 101 });
+    await expect(too_large).rejects.toMatchObject({ code: "capacity" });
   });
 });
 
 describe("checkpoint content addressing", () => {
   it("shares unchanged cell pages and metadata through checkpoints and frees only unreachable chunks", async () => {
     const archive = await open(new MemoryHistoryStorage(), { checkpointTransactions: 1 });
-    const initial = withColumn(snapshot(), 100, (row) => ({ kind: "literal", value: row }));
+    const initial = with_column(snapshot(), 100, (row) => ({ kind: "literal", value: row }));
 
     await archive.initialize(initial, 0);
     const first = await archive.saveVersion("First", "alice", 0);
@@ -464,8 +464,8 @@ describe("checkpoint content addressing", () => {
 
     // One changed page, its sheet, workbook-level records and the transaction; not 7 pages.
     expect(after.recordCount - before.recordCount).toBeLessThan(8);
-    expect(firstCell(await archive.readVersion(first.id))).toEqual({ kind: "literal", value: 0 });
-    expect(firstCell(await archive.readVersion(second.id))).toEqual({
+    expect(first_cell(await archive.readVersion(first.id))).toEqual({ kind: "literal", value: 0 });
+    expect(first_cell(await archive.readVersion(second.id))).toEqual({
       kind: "literal",
       value: 1000,
     });
@@ -481,8 +481,8 @@ describe("checkpoint content addressing", () => {
 
     await expect(archive.record(change(1))).rejects.toBeInstanceOf(HistoryError);
 
-    const wrongRevision = archive.record(change(1), () => snapshot());
-    await expect(wrongRevision).rejects.toMatchObject({ code: "invalid-history" });
+    const wrong_revision = archive.record(change(1), () => snapshot());
+    await expect(wrong_revision).rejects.toMatchObject({ code: "invalid-history" });
 
     const version = await archive.saveVersion("Unchanged", "alice", 0);
     expect((await archive.readVersion(version.id)).version).toBe(0);

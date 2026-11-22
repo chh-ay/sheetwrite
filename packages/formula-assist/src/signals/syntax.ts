@@ -23,7 +23,7 @@ const LETTERS = 26;
 /** Char code before `A`, so `A` counts as 1. */
 const BEFORE_A = 64;
 
-function columnIndex(letters: string): number {
+function column_index(letters: string): number {
   let index = 0;
   for (const letter of letters.toUpperCase())
     index = index * LETTERS + letter.charCodeAt(0) - BEFORE_A;
@@ -39,10 +39,10 @@ interface OpenCall {
 }
 
 /** The brackets still open at the end of `tokens`, innermost last. */
-function openCalls(
+function open_calls(
   tokens: readonly FormulaToken[],
   text: string,
-  byName: ReadonlyMap<string, FormulaFunctionMetadata>,
+  by_name: ReadonlyMap<string, FormulaFunctionMetadata>,
 ): OpenCall[] {
   const calls: OpenCall[] = [];
   for (const [index, token] of tokens.entries()) {
@@ -52,7 +52,7 @@ function openCalls(
       const previous = tokens[index - 1];
       const name =
         previous?.kind === "function" ? text.slice(previous.from, previous.to).toUpperCase() : "";
-      calls.push({ fn: byName.get(name) ?? null, arguments: 1, filled: false });
+      calls.push({ fn: by_name.get(name) ?? null, arguments: 1, filled: false });
     } else if (token.kind === "paren" && symbol === ")") {
       calls.pop();
       const outer = calls.at(-1);
@@ -67,7 +67,7 @@ function openCalls(
   return calls;
 }
 
-function maxArguments(fn: FormulaFunctionMetadata): number {
+function max_arguments(fn: FormulaFunctionMetadata): number {
   return fn.arguments.some((argument) => argument.repeating === true)
     ? Number.POSITIVE_INFINITY
     : fn.arguments.length;
@@ -79,14 +79,14 @@ function closers(calls: readonly OpenCall[]): string {
   for (let index = calls.length - 1; index >= 0; index--) {
     const call = calls[index];
     if (call === undefined || call.fn === null || !call.filled) break;
-    if (call.arguments < maxArguments(call.fn)) break;
+    if (call.arguments < max_arguments(call.fn)) break;
     closing += ")";
   }
   return closing;
 }
 
 class Syntax implements Signal {
-  private byName: ReadonlyMap<string, FormulaFunctionMetadata> = new Map();
+  private by_name: ReadonlyMap<string, FormulaFunctionMetadata> = new Map();
   private listed: readonly FormulaFunctionMetadata[] = [];
 
   constructor(private readonly edit: FormulaEdit) {}
@@ -95,7 +95,7 @@ class Syntax implements Signal {
     const functions = this.edit.functions();
     if (functions !== this.listed) {
       this.listed = functions;
-      this.byName = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
+      this.by_name = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
     }
 
     const last = analysis.tokens.at(-1);
@@ -113,7 +113,7 @@ class Syntax implements Signal {
       if (name !== null) add(`${text.slice(0, last.from)}${name.text}`, name.reason);
     }
 
-    const closing = closers(openCalls(analysis.tokens, text, this.byName));
+    const closing = closers(open_calls(analysis.tokens, text, this.by_name));
     const ends = last.kind === "paren" || (last.kind === "string" && text.endsWith('"'));
     if (closing.length > 0) add(text + closing, ends ? "closeAfterEnd" : "closeAfterValue");
     return proposals;
@@ -129,7 +129,7 @@ class Syntax implements Signal {
     const workbook = this.edit.reads.workbook();
     const sheet = workbook.sheets.find((entry) => entry.id === this.edit.cell.sheet);
     // Letters that name a column in use are as likely the start of a reference.
-    if (COLUMN_LETTERS.test(typed) && columnIndex(typed) < (sheet?.columns.length ?? 0))
+    if (COLUMN_LETTERS.test(typed) && column_index(typed) < (sheet?.columns.length ?? 0))
       return null;
 
     const names = [

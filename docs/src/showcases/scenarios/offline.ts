@@ -140,12 +140,12 @@ export function createOfflineSeedSnapshot(): WorkbookSnapshot {
   const sheet = workbook.sheets[0];
   const rota = workbook.sheets[1];
   if (!sheet || !rota) throw new Error("The dispatch workbook must define a crew rota.");
-  const columnKeys = sheet.columns.map((column) => column.key);
+  const column_keys = sheet.columns.map((column) => column.key);
 
   const cells = [];
   for (let row = 0; row < OFFLINE_ROWS; row++) {
-    for (let col = 0; col < columnKeys.length; col++) {
-      const raw = data.columns[columnKeys[col] ?? ""]?.[row];
+    for (let col = 0; col < column_keys.length; col++) {
+      const raw = data.columns[column_keys[col] ?? ""]?.[row];
       if (raw === undefined || raw === null) continue;
       const value: CellValue =
         typeof raw === "object" ? (raw as CellValue) : { kind: "literal", value: raw };
@@ -171,7 +171,7 @@ export function createOfflineSeedSnapshot(): WorkbookSnapshot {
             startRow: 0,
             startCol: 0,
             rowCount: OFFLINE_ROWS,
-            colCount: columnKeys.length,
+            colCount: column_keys.length,
             cells,
           },
         ],

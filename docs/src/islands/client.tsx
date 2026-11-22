@@ -24,7 +24,7 @@ import type { StaticRunnableCodeProps, StaticTabsProps } from "./StaticMarkup.js
 /** An island's root, from the props the server serialised for it and its own markup. */
 export type IslandRender = (island: HTMLElement, props: object) => JSX.Element;
 
-function withProps<Props extends object>(component: Component<Props>): IslandRender {
+function with_props<Props extends object>(component: Component<Props>): IslandRender {
   // The server wrote these props from the same component's props (Island.tsx).
   return (_island, props) => createComponent(component, props as Props);
 }
@@ -32,54 +32,54 @@ function withProps<Props extends object>(component: Component<Props>): IslandRen
 /** Each island's code loads only on the pages that hold it; page-scripts.ts preloads it there. */
 const CORE_ISLANDS: Readonly<Record<CoreIslandName, () => Promise<IslandRender>>> = {
   "activation-fixture": () =>
-    import("./ActivationFixture.js").then(({ ActivationFixture }) => withProps(ActivationFixture)),
+    import("./ActivationFixture.js").then(({ ActivationFixture }) => with_props(ActivationFixture)),
   "package-command": () =>
     import("../components/PackageCommand.js").then(({ PackageCommand }) =>
-      withProps(PackageCommand),
+      with_props(PackageCommand),
     ),
   "formula-reference": () =>
     import("../components/FormulaReference.js").then(({ FormulaFilter }) =>
-      withProps(FormulaFilter),
+      with_props(FormulaFilter),
     ),
   "live-grid": () =>
-    import("../components/LiveGrid.js").then(({ LiveGrid }) => withProps(LiveGrid)),
+    import("../components/LiveGrid.js").then(({ LiveGrid }) => with_props(LiveGrid)),
   tabs: () =>
     import("./StaticMarkup.js").then(
-      ({ StaticTabs, markupOf }): IslandRender =>
+      ({ StaticTabs, markupOf: markup_of }): IslandRender =>
         (island, props) =>
           createComponent(StaticTabs, {
             ...(props as Omit<StaticTabsProps, "panels">),
-            panels: markupOf(island),
+            panels: markup_of(island),
           }),
     ),
   "runnable-code": () =>
     import("./StaticMarkup.js").then(
-      ({ StaticRunnableCode, markupOf }): IslandRender =>
+      ({ StaticRunnableCode, markupOf: markup_of }): IslandRender =>
         (island, props) =>
           createComponent(StaticRunnableCode, {
             ...(props as Omit<StaticRunnableCodeProps, "html">),
-            html: markupOf(island)[0] ?? "",
+            html: markup_of(island)[0] ?? "",
           }),
     ),
   search: () =>
-    import("../components/DocsSearch.js").then(({ DocsSearch }) => withProps(DocsSearch)),
+    import("../components/DocsSearch.js").then(({ DocsSearch }) => with_props(DocsSearch)),
   "api-symbol-filter": () =>
     import("../components/ApiSymbolFilter.js").then(({ ApiSymbolFilter }) =>
-      withProps(ApiSymbolFilter),
+      with_props(ApiSymbolFilter),
     ),
   "landing-hero": () =>
-    import("../components/landing/HeroApp.js").then(({ HeroApp }) => withProps(HeroApp)),
+    import("../components/landing/HeroApp.js").then(({ HeroApp }) => with_props(HeroApp)),
   "landing-architecture": () =>
     import("../components/landing/ArchitectureScene.js").then(({ ArchitectureScene }) =>
-      withProps(ArchitectureScene),
+      with_props(ArchitectureScene),
     ),
   "landing-stories": () =>
-    import("../components/landing/StoryReel.js").then(({ StoryReel }) => withProps(StoryReel)),
+    import("../components/landing/StoryReel.js").then(({ StoryReel }) => with_props(StoryReel)),
   "landing-code": () =>
     Promise.all([import("../components/landing/CodeTabs.js"), import("./markup.js")]).then(
-      ([{ CodeTabs }, { markupOf }]): IslandRender =>
+      ([{ CodeTabs }, { markupOf: markup_of }]): IslandRender =>
         (island) =>
-          createComponent(CodeTabs, { panels: markupOf(island) }),
+          createComponent(CodeTabs, { panels: markup_of(island) }),
     ),
 };
 
@@ -96,13 +96,13 @@ const ISLANDS: Readonly<Record<IslandName, () => Promise<IslandRender>>> = {
   ) as Record<keyof typeof TEST_FIXTURE_ISLANDS, () => Promise<IslandRender>>),
 };
 
-function isIslandName(name: string | undefined): name is IslandName {
+function is_island_name(name: string | undefined): name is IslandName {
   return name !== undefined && Object.hasOwn(ISLANDS, name);
 }
 
-function islandLoader(island: HTMLElement): () => Promise<IslandRender> {
+function island_loader(island: HTMLElement): () => Promise<IslandRender> {
   const name = island.dataset.island;
-  if (!isIslandName(name)) throw new Error(`Unknown island "${name ?? ""}"`);
+  if (!is_island_name(name)) throw new Error(`Unknown island "${name ?? ""}"`);
   return ISLANDS[name];
 }
 
@@ -113,7 +113,7 @@ function islandLoader(island: HTMLElement): () => Promise<IslandRender> {
  * the server's nodes. An island that hydrates later, on first use, starts its
  * own hydration again.
  */
-function beginHydration(): void {
+function begin_hydration(): void {
   const registry = (globalThis._$HY ??= { events: [], completed: new WeakSet(), r: {} });
   registry.done = false;
   registry.events ??= [];
@@ -121,14 +121,14 @@ function beginHydration(): void {
   sharedConfig.done = false;
 }
 
-function hydrateWith(island: HTMLElement, render: IslandRender): void {
+function hydrate_with(island: HTMLElement, render: IslandRender): void {
   const props: object = JSON.parse(island.dataset.props ?? "{}");
-  beginHydration();
+  begin_hydration();
   hydrate(() => render(island, props), island, { renderId: island.dataset.islandId ?? "" });
 }
 
-async function hydrateIsland(island: HTMLElement): Promise<void> {
-  hydrateWith(island, await islandLoader(island)());
+async function hydrate_island(island: HTMLElement): Promise<void> {
+  hydrate_with(island, await island_loader(island)());
 }
 
 /** Pointing at or focusing an interaction island fetches its code ahead of use. */
@@ -148,7 +148,7 @@ const ACTIVATION_EVENTS = [
 ] as const;
 
 /** Typing and caret placement in a text field work without the island's code. */
-function isTextEntry(target: EventTarget | null): boolean {
+function is_text_entry(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return true;
   if (target instanceof HTMLElement && target.isContentEditable) return true;
   return (
@@ -189,7 +189,7 @@ const CLICKED_BY_ENTER = [
  * that only has a button role gets no click from the browser: its own key
  * handler acts, so its keys are held and replayed as usual.
  */
-function isNativeActivationKey(event: Event): boolean {
+function is_native_activation_key(event: Event): boolean {
   return (
     event instanceof KeyboardEvent &&
     event.target instanceof Element &&
@@ -199,7 +199,7 @@ function isNativeActivationKey(event: Event): boolean {
 }
 
 /** Keys that move focus or belong to the browser, not to the widget. */
-function isPassThroughKey(event: Event): boolean {
+function is_pass_through_key(event: Event): boolean {
   return (
     event instanceof KeyboardEvent &&
     (event.key === "Tab" || event.altKey || event.ctrlKey || event.metaKey)
@@ -207,7 +207,7 @@ function isPassThroughKey(event: Event): boolean {
 }
 
 /** After the page's load event, once the browser has nothing else to do. */
-function whenIdleAfterLoad(run: () => void): void {
+function when_idle_after_load(run: () => void): void {
   const idle = (): void => {
     if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 2_000 });
     else setTimeout(run, 200);
@@ -222,7 +222,7 @@ function whenIdleAfterLoad(run: () => void): void {
  * is idle, so its first use doesn't wait for the network. The module preloads
  * fill the module map; the island's own import then reuses them.
  */
-function prefetchWhenVisible(island: HTMLElement): void {
+function prefetch_when_visible(island: HTMLElement): void {
   const files = island.dataset.islandCode?.split(" ").filter(Boolean) ?? [];
   // The island's wrapper has no box (display: contents); its content does.
   const boxes = Array.from(island.children);
@@ -230,7 +230,7 @@ function prefetchWhenVisible(island: HTMLElement): void {
   const observer = new IntersectionObserver((entries) => {
     if (!entries.some((entry) => entry.isIntersecting)) return;
     observer.disconnect();
-    whenIdleAfterLoad(() => {
+    when_idle_after_load(() => {
       for (const file of files) {
         if (document.head.querySelector(`link[rel="modulepreload"][href="${file}"]`)) continue;
         const link = document.createElement("link");
@@ -252,20 +252,20 @@ function prefetchWhenVisible(island: HTMLElement): void {
  * acts once, as if the code had been there. Text fields keep working
  * natively; the island reads what was typed when it hydrates.
  */
-function hydrateOnInteraction(island: HTMLElement): () => void {
-  const load = islandLoader(island);
+function hydrate_on_interaction(island: HTMLElement): () => void {
+  const load = island_loader(island);
   let code: Promise<IslandRender> | undefined;
-  const fetchCode = (): Promise<IslandRender> => (code ??= load());
+  const fetch_code = (): Promise<IslandRender> => (code ??= load());
   const held: Event[] = [];
   let hydrating = false;
 
   const prefetch = (): void => {
-    void fetchCode();
+    void fetch_code();
   };
   const start = (): void => {
     if (hydrating) return;
     hydrating = true;
-    fetchCode().then(
+    fetch_code().then(
       (render) =>
         // Code already fetched resolves while the first event is still being
         // dispatched: a canceled click on a checkbox restores its state only
@@ -274,7 +274,7 @@ function hydrateOnInteraction(island: HTMLElement): () => void {
         setTimeout(() => {
           for (const type of PREFETCH_EVENTS) island.removeEventListener(type, prefetch);
           for (const type of ACTIVATION_EVENTS) island.removeEventListener(type, activate, true);
-          hydrateWith(island, render);
+          hydrate_with(island, render);
           // Focus that moved in before the code arrived (a visible island
           // hydrates after scrolling, not on focus): its handlers see it now.
           const focused = document.activeElement;
@@ -291,8 +291,8 @@ function hydrateOnInteraction(island: HTMLElement): () => void {
     );
   };
   const activate = (event: Event): void => {
-    if (isPassThroughKey(event) || isNativeActivationKey(event)) return;
-    if (!isTextEntry(event.target)) {
+    if (is_pass_through_key(event) || is_native_activation_key(event)) return;
+    if (!is_text_entry(event.target)) {
       // Pointer presses keep their default, so a touch still produces its
       // click (and focuses what it presses); clicks and keys are held whole.
       // Chromium dispatches clicks as PointerEvents, so the test is the type.
@@ -305,7 +305,7 @@ function hydrateOnInteraction(island: HTMLElement): () => void {
 
   for (const type of PREFETCH_EVENTS) island.addEventListener(type, prefetch, { once: true });
   for (const type of ACTIVATION_EVENTS) island.addEventListener(type, activate, true);
-  prefetchWhenVisible(island);
+  prefetch_when_visible(island);
   return start;
 }
 
@@ -317,8 +317,8 @@ const VISIBLE_MARGIN = "200px";
  * interaction island: a click or key press that reaches it first hydrates it
  * and is replayed.
  */
-function hydrateWhenVisible(island: HTMLElement): void {
-  const start = hydrateOnInteraction(island);
+function hydrate_when_visible(island: HTMLElement): void {
+  const start = hydrate_on_interaction(island);
   // The island's wrapper has no box (display: contents); its content does.
   const observer = new IntersectionObserver(
     (entries) => {
@@ -354,11 +354,11 @@ globalThis._$HY ??= { events: [], completed: new WeakSet(), r: {} };
  * nothing, so the page swaps the fragment and starts as usual.
  */
 const forwarded = forwardedHeading(window.location.pathname, window.location.hash);
-const forwardsInPage = forwarded?.startsWith(`${window.location.pathname}#`) === true;
-if (forwarded !== undefined && forwardsInPage) {
+const forwards_in_page = forwarded?.startsWith(`${window.location.pathname}#`) === true;
+if (forwarded !== undefined && forwards_in_page) {
   window.history.replaceState(window.history.state, "", forwarded);
 }
-if (forwarded === undefined || forwardsInPage) {
+if (forwarded === undefined || forwards_in_page) {
   initializeCodeEnhancements();
   installExpressiveCodeScripts();
   installAnchorReveal();
@@ -366,7 +366,9 @@ if (forwarded === undefined || forwardsInPage) {
   installFigureTips();
   installDocsShell();
   if (document.querySelector(".sw-landing") !== null) {
-    void import("../lib/landing.js").then(({ installLanding }) => installLanding());
+    void import("../lib/landing.js").then(({ installLanding: install_landing }) =>
+      install_landing(),
+    );
   }
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
@@ -374,17 +376,17 @@ if (forwarded === undefined || forwardsInPage) {
   // Interaction and visible islands listen at once; their code loads ahead,
   // near the screen or on first use.
   const islands = Array.from(document.querySelectorAll<HTMLElement>("[data-island]"));
-  const onLoad = islands.filter((island) => island.dataset.islandHydrate === undefined);
+  const on_load = islands.filter((island) => island.dataset.islandHydrate === undefined);
   for (const island of islands) {
     const hydration = island.dataset.islandHydrate;
-    if (hydration === "interaction" || hydration === "use") hydrateOnInteraction(island);
-    else if (island.dataset.islandHydrate === "visible") hydrateWhenVisible(island);
+    if (hydration === "interaction" || hydration === "use") hydrate_on_interaction(island);
+    else if (island.dataset.islandHydrate === "visible") hydrate_when_visible(island);
   }
   // After the first frame: the small bundle can arrive before the stylesheets
   // let the page paint, and hydrating then would hold the first paint back.
   requestAnimationFrame(() =>
     setTimeout(() => {
-      Promise.all(onLoad.map(hydrateIsland)).then(
+      Promise.all(on_load.map(hydrate_island)).then(
         () => {
           document.documentElement.dataset.hydrated = "true";
         },

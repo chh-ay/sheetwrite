@@ -18,13 +18,13 @@ const RGB_COLOR =
 const RESOLVER_SENTINEL = "#010203";
 const OPAQUE_WHITE: RgbaColor = { red: 255, green: 255, blue: 255, alpha: 1 };
 
-function hexChannel(digits: string, index: number): number {
+function hex_channel(digits: string, index: number): number {
   const short = digits.length <= 4;
   const pair = short ? digits.charAt(index).repeat(2) : digits.slice(index * 2, index * 2 + 2);
   return Number.parseInt(pair, 16);
 }
 
-function byteChannel(text: string | undefined): number {
+function byte_channel(text: string | undefined): number {
   return Math.min(255, Math.max(0, Number(text)));
 }
 
@@ -34,22 +34,22 @@ export function parseRgbColor(input: string): RgbaColor | undefined {
   const hex = HEX_COLOR.exec(text);
   if (hex) {
     const digits = hex[1] ?? "";
-    const hasAlpha = digits.length === 4 || digits.length === 8;
+    const has_alpha = digits.length === 4 || digits.length === 8;
     return {
-      red: hexChannel(digits, 0),
-      green: hexChannel(digits, 1),
-      blue: hexChannel(digits, 2),
-      alpha: hasAlpha ? hexChannel(digits, 3) / 255 : 1,
+      red: hex_channel(digits, 0),
+      green: hex_channel(digits, 1),
+      blue: hex_channel(digits, 2),
+      alpha: has_alpha ? hex_channel(digits, 3) / 255 : 1,
     };
   }
   const rgb = RGB_COLOR.exec(text);
   if (!rgb) return undefined;
-  const alphaText = rgb[4];
-  const alpha = alphaText === undefined ? 1 : Number(alphaText) / (rgb[5] === "%" ? 100 : 1);
+  const alpha_text = rgb[4];
+  const alpha = alpha_text === undefined ? 1 : Number(alpha_text) / (rgb[5] === "%" ? 100 : 1);
   return {
-    red: byteChannel(rgb[1]),
-    green: byteChannel(rgb[2]),
-    blue: byteChannel(rgb[3]),
+    red: byte_channel(rgb[1]),
+    green: byte_channel(rgb[2]),
+    blue: byte_channel(rgb[3]),
     alpha: Math.min(1, Math.max(0, alpha)),
   };
 }
@@ -97,7 +97,7 @@ export function contrastRatio(first: number, second: number): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
-function hexByte(value: number): string {
+function hex_byte(value: number): string {
   return Math.round(value).toString(16).padStart(2, "0");
 }
 
@@ -114,19 +114,19 @@ export function automaticTextColor(
   background: string,
   resolver?: ColorResolver,
 ): string {
-  const fillColor = resolveCssColor(fill, resolver);
-  const foregroundColor = resolveCssColor(foreground, resolver);
-  if (!fillColor || !foregroundColor) return foreground;
+  const fill_color = resolveCssColor(fill, resolver);
+  const foreground_color = resolveCssColor(foreground, resolver);
+  if (!fill_color || !foreground_color) return foreground;
   const base = over(resolveCssColor(background, resolver) ?? OPAQUE_WHITE, OPAQUE_WHITE);
-  const fillLuminance = relativeLuminance(over(fillColor, base));
+  const fill_luminance = relativeLuminance(over(fill_color, base));
   const inverse: RgbaColor = {
-    red: 255 - foregroundColor.red,
-    green: 255 - foregroundColor.green,
-    blue: 255 - foregroundColor.blue,
+    red: 255 - foreground_color.red,
+    green: 255 - foreground_color.green,
+    blue: 255 - foreground_color.blue,
     alpha: 1,
   };
-  const keep = contrastRatio(relativeLuminance(foregroundColor), fillLuminance);
-  const flip = contrastRatio(relativeLuminance(inverse), fillLuminance);
+  const keep = contrastRatio(relativeLuminance(foreground_color), fill_luminance);
+  const flip = contrastRatio(relativeLuminance(inverse), fill_luminance);
   if (flip <= keep) return foreground;
-  return `#${hexByte(inverse.red)}${hexByte(inverse.green)}${hexByte(inverse.blue)}`;
+  return `#${hex_byte(inverse.red)}${hex_byte(inverse.green)}${hex_byte(inverse.blue)}`;
 }

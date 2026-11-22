@@ -33,13 +33,13 @@ afterEach(() => {
  * The grid imports the ribbon lazily. Awaiting the same module after the grid
  * asked for it runs the grid's mount callback first, so no timer is needed.
  */
-async function ribbonMounted(host: HTMLElement): Promise<void> {
+async function ribbon_mounted(host: HTMLElement): Promise<void> {
   await import(RIBBON_MODULE);
   if (!host.querySelector(".sheetwrite-ribbon")) throw new Error("the ribbon did not mount");
 }
 
 async function setup(
-  readOnly = false,
+  read_only = false,
   icons?: IconOverrides,
   ribbon: GridConfig["ribbon"] = true,
   extra: Omit<GridConfig, "ribbon" | "icons"> = {},
@@ -66,9 +66,9 @@ async function setup(
   Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
   const config: GridConfig = { ...extra, ribbon, ...(icons === undefined ? {} : { icons }) };
-  const grid = new GridImpl(host, { workbook, readOnly, config }, store);
+  const grid = new GridImpl(host, { workbook, readOnly: read_only, config }, store);
   grids.push(grid);
-  await ribbonMounted(host);
+  await ribbon_mounted(host);
 
   const control = <T extends HTMLElement = HTMLButtonElement>(
     label: string,
@@ -78,7 +78,7 @@ async function setup(
     if (element === null) throw new Error(`no ribbon control "${label}"`);
     return element;
   };
-  const openTab = (name: string): void => {
+  const open_tab = (name: string): void => {
     const tab = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')].find(
       (candidate) => candidate.textContent === name,
     );
@@ -86,10 +86,10 @@ async function setup(
 
     tab.click();
   };
-  const select = (row: number, col: number, endRow = row) =>
+  const select = (row: number, col: number, end_row = row) =>
     grid.setSelection({
       kind: "range",
-      range: { sheet: "s1", start: { row, col }, end: { row: endRow, col } },
+      range: { sheet: "s1", start: { row, col }, end: { row: end_row, col } },
     });
   const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col });
   const key = (target: HTMLElement, name: string) =>
@@ -99,7 +99,7 @@ async function setup(
   // Enter or Space on a button: a click whose detail is 0.
   const press = (target: HTMLElement) =>
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-  return { grid, host, control, openTab, select, cell, key, press };
+  return { grid, host, control, openTab: open_tab, select, cell, key, press };
 }
 
 it.each(["full", "compact"] as const)(
@@ -139,14 +139,14 @@ it.each(["full", "compact"] as const)(
 );
 
 it("switches layout without losing a value-box draft or the active tab", async () => {
-  const { host, control, openTab, press } = await setup();
+  const { host, control, openTab: open_tab, press } = await setup();
   const size = control<HTMLInputElement>("Font Size");
   size.value = "14";
   press(control("Compact ribbon"));
 
   expect(control<HTMLInputElement>("Font Size").value).toBe("14");
   expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("true");
-  openTab("View");
+  open_tab("View");
   press(control("Compact ribbon"));
   expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("View");
   expect(control("Compact ribbon").getAttribute("aria-pressed")).toBe("false");
@@ -154,32 +154,32 @@ it("switches layout without losing a value-box draft or the active tab", async (
 
 it("renders the same commands as the toolbar for the same command flags", async () => {
   const flags = { export: true, italic: false, sort: false };
-  const { grid, host, openTab } = await setup(false, undefined, { mode: "compact" });
+  const { grid, host, openTab: open_tab } = await setup(false, undefined, { mode: "compact" });
   grid.setConfig({ ribbon: true, ...flags });
-  await ribbonMounted(host);
+  await ribbon_mounted(host);
 
-  const ribbonCommands = new Set<string>();
+  const ribbon_commands = new Set<string>();
   for (const tab of ["Home", "Insert", "Formulas", "Data", "View"]) {
-    openTab(tab);
+    open_tab(tab);
     for (const element of host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon [data-command]")) {
-      if (!element.hidden) ribbonCommands.add(element.dataset.command ?? "");
+      if (!element.hidden) ribbon_commands.add(element.dataset.command ?? "");
     }
   }
 
-  const toolbarHost = document.createElement("div");
-  document.body.appendChild(toolbarHost);
-  const toolbar = createToolbar(toolbarHost, grid, { flags });
+  const toolbar_host = document.createElement("div");
+  document.body.appendChild(toolbar_host);
+  const toolbar = createToolbar(toolbar_host, grid, { flags });
   // Commands the grid cannot run now (Insert Function without host functions) are hidden in both.
-  const toolbarCommands = [...toolbar.element.querySelectorAll<HTMLElement>("[data-command]")]
+  const toolbar_commands = [...toolbar.element.querySelectorAll<HTMLElement>("[data-command]")]
     .filter((element) => !element.hidden)
     .map((element) => element.dataset.command ?? "");
   toolbar.destroy();
 
-  expect(new Set(toolbarCommands)).toEqual(ribbonCommands);
-  expect(toolbarCommands).toHaveLength(ribbonCommands.size);
-  expect(ribbonCommands.has("exportXlsx")).toBe(true);
-  expect(ribbonCommands.has("italic")).toBe(false);
-  expect(ribbonCommands.has("sortAsc")).toBe(false);
+  expect(new Set(toolbar_commands)).toEqual(ribbon_commands);
+  expect(toolbar_commands).toHaveLength(ribbon_commands.size);
+  expect(ribbon_commands.has("exportXlsx")).toBe(true);
+  expect(ribbon_commands.has("italic")).toBe(false);
+  expect(ribbon_commands.has("sortAsc")).toBe(false);
 });
 
 it("shows the focus cell's size in points and applies typed points as pixels", async () => {
@@ -196,9 +196,9 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   size.value = "14";
   key(size, "Enter");
 
-  const fourteenPoints = (14 * 96) / 72;
-  expect(cell(0, 0).style.fontSize).toBeCloseTo(fourteenPoints);
-  expect(cell(1, 0).style.fontSize).toBeCloseTo(fourteenPoints);
+  const fourteen_points = (14 * 96) / 72;
+  expect(cell(0, 0).style.fontSize).toBeCloseTo(fourteen_points);
+  expect(cell(1, 0).style.fontSize).toBeCloseTo(fourteen_points);
   expect(size.value).toBe("14");
   expectSame(document.activeElement, host);
 });
@@ -231,16 +231,24 @@ it.each(["full", "compact"] as const)(
   "%s ribbon keeps a keyboard menu open across a pending layout frame and returns focus",
   async (mode) => {
     const frames: FrameRequestCallback[] = [];
-    const requestFrame = spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) =>
-      frames.push(callback),
+    const request_frame = spyOn(globalThis, "requestAnimationFrame").mockImplementation(
+      (callback) => frames.push(callback),
     );
     try {
-      const { host, control, select, cell, key, press, openTab } = await setup(false, undefined, {
+      const {
+        host,
+        control,
+        select,
+        cell,
+        key,
+        press,
+        openTab: open_tab,
+      } = await setup(false, undefined, {
         mode,
       });
       select(0, 0);
-      openTab("Insert");
-      openTab("Home");
+      open_tab("Insert");
+      open_tab("Home");
       const options = control("Borders options");
 
       press(options);
@@ -266,7 +274,7 @@ it.each(["full", "compact"] as const)(
       expect(options.getAttribute("aria-expanded")).toBe("false");
       expectSame(document.activeElement, options);
     } finally {
-      requestFrame.mockRestore();
+      request_frame.mockRestore();
     }
   },
 );
@@ -276,7 +284,7 @@ it.each(["full", "compact"] as const)(
  * element, even in a fixed popup, and the scroll moves `trigger`. Every focus
  * that does not prevent the scroll does so. Returns a function that undoes it.
  */
-function emulateFocusScroll(trigger: HTMLElement): () => void {
+function emulate_focus_scroll(trigger: HTMLElement): () => void {
   let scrolled = 0;
   Object.defineProperty(trigger, "getBoundingClientRect", {
     configurable: true,
@@ -298,7 +306,7 @@ function emulateFocusScroll(trigger: HTMLElement): () => void {
 it("keeps a keyboard-opened menu open when focus would scroll the page", async () => {
   const { host, control, key } = await setup();
   const options = control("Borders options");
-  const restore = emulateFocusScroll(options);
+  const restore = emulate_focus_scroll(options);
   try {
     options.focus({ preventScroll: true });
     key(options, "ArrowDown");
@@ -317,21 +325,21 @@ it("keeps a keyboard-opened menu open when focus would scroll the page", async (
 it("keeps a folded group open while its list opens and closes, then applies the pick", async () => {
   const { host, control, key, select, cell } = await setup();
   select(0, 0);
-  const groupButton = host.querySelector<HTMLButtonElement>(
+  const group_button = host.querySelector<HTMLButtonElement>(
     '.sheetwrite-ribbon-group[aria-label="Number"] .sheetwrite-ribbon-group-button',
   );
-  if (groupButton === null) throw new Error("no Number group button");
+  if (group_button === null) throw new Error("no Number group button");
   const click = (target: Element) =>
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
   const popups = () => [...host.querySelectorAll(".sheetwrite-ribbon-popup")];
-  const restore = emulateFocusScroll(groupButton);
+  const restore = emulate_focus_scroll(group_button);
   try {
-    click(groupButton);
-    const listArrow = host.querySelector(
+    click(group_button);
+    const list_arrow = host.querySelector(
       '.sheetwrite-ribbon-popup [aria-label="Number Format list"]',
     );
-    if (listArrow === null) throw new Error("group popup does not hold the format box");
-    click(listArrow);
+    if (list_arrow === null) throw new Error("group popup does not hold the format box");
+    click(list_arrow);
     const option = host.querySelector<HTMLElement>('[role="listbox"] [role="option"]');
     if (option === null) throw new Error("the format list did not open");
 
@@ -340,7 +348,7 @@ it("keeps a folded group open while its list opens and closes, then applies the 
     expect(popups().map((popup) => popup.getAttribute("role"))).toEqual(["group"]);
     expect(popups()[0]?.contains(document.activeElement)).toBe(true);
 
-    click(listArrow);
+    click(list_arrow);
     const percentage = [...host.querySelectorAll('[role="option"]')].find(
       (candidate) => candidate.textContent === "Percentage",
     );
@@ -349,18 +357,18 @@ it("keeps a folded group open while its list opens and closes, then applies the 
     expect(cell(0, 0).style.numberFormat).toBe("0.00%");
     expect(popups()).toHaveLength(0);
     // The group's controls are back in the ribbon, not lost with the popup.
-    expect(groupButton.parentElement?.contains(control("Number Format list"))).toBe(true);
+    expect(group_button.parentElement?.contains(control("Number Format list"))).toBe(true);
   } finally {
     restore();
   }
 });
 
 it("keeps a form open when it moves focus to show an error or wrap Tab", async () => {
-  const { host, control, openTab, select, key, press } = await setup();
-  openTab("Insert");
+  const { host, control, openTab: open_tab, select, key, press } = await setup();
+  open_tab("Insert");
   select(0, 0);
   const link = control("Link");
-  const restore = emulateFocusScroll(link);
+  const restore = emulate_focus_scroll(link);
   try {
     press(link);
     const form = host.querySelector<HTMLFormElement>(".sheetwrite-ribbon-popup");
@@ -393,10 +401,10 @@ it.each([
 ] as const)("keeps a menu open for a %s that leaves its trigger in place", async (type, target) => {
   const { host, control, key } = await setup();
   const options = control("Borders options");
-  let triggerTop = 500;
+  let trigger_top = 500;
   Object.defineProperty(options, "getBoundingClientRect", {
     configurable: true,
-    value: () => new DOMRect(40, triggerTop, 28, 24),
+    value: () => new DOMRect(40, trigger_top, 28, 24),
   });
   options.focus();
   key(options, "ArrowDown");
@@ -409,7 +417,7 @@ it.each([
   expect(document.activeElement?.textContent).toBe("Bottom Border");
 
   // The trigger moves: the placed menu would be wrong, so it closes.
-  triggerTop = 300;
+  trigger_top = 300;
   target.dispatchEvent(new Event(type));
   expect(menu()).toBeNull();
 });
@@ -437,8 +445,8 @@ it("fills from a palette pick and clears with No Fill", async () => {
 });
 
 it("ties a one-letter word to its neighbour, so a large label breaks only between phrases", async () => {
-  const { control, openTab } = await setup();
-  openTab("Data");
+  const { control, openTab: open_tab } = await setup();
+  open_tab("Data");
   const ascending = control("Sort A to Z");
   const label = ascending.querySelector(".sheetwrite-ribbon-label");
   // "Sort" / "A to Z" on two lines; the name and tooltip keep plain spaces.
@@ -452,8 +460,8 @@ it("ties a one-letter word to its neighbour, so a large label breaks only betwee
 });
 
 it("names a folded group on at most two lines, never stranding a one-letter word", async () => {
-  const { host, openTab } = await setup();
-  openTab("Data");
+  const { host, openTab: open_tab } = await setup();
+  open_tab("Data");
   const folded = (group: string) =>
     host.querySelector(
       `.sheetwrite-ribbon-group[aria-label="${group}"] > .sheetwrite-ribbon-group-button .sheetwrite-ribbon-label`,
@@ -462,7 +470,7 @@ it("names a folded group on at most two lines, never stranding a one-letter word
   expect(folded("Queries & Connections")).toBe("Queries\n& Connections");
   expect(folded("Sort & Filter")).toBe("Sort\n& Filter");
   expect(folded("Data Tools")).toBe("Data\nTools");
-  openTab("Home");
+  open_tab("Home");
   expect(folded("Clipboard")).toBe("Clipboard");
   // The line feed is not part of the name.
   const button = host.querySelector<HTMLElement>(
@@ -507,8 +515,8 @@ it("disables editing controls while read-only but keeps view controls", async ()
 });
 
 it("zooms with one readout that resets to 100% and is disabled there", async () => {
-  const { grid, host, control, openTab, press } = await setup();
-  openTab("View");
+  const { grid, host, control, openTab: open_tab, press } = await setup();
+  open_tab("View");
 
   const scope = ".sheetwrite-ribbon-panel:not([hidden])";
   const group = (): HTMLElement => {
@@ -572,23 +580,23 @@ it("gives the grid the panel's height back when minimized", async () => {
 });
 
 it("moves the tabs that do not fit into a More tabs menu instead of cutting one off", async () => {
-  const { host, openTab, press } = await setup();
+  const { host, openTab: open_tab, press } = await setup();
   const list = host.querySelector<HTMLElement>('.sheetwrite-ribbon [role="tablist"]');
   const more = host.querySelector<HTMLButtonElement>('.sheetwrite-ribbon [aria-label="More tabs"]');
   if (list === null || more === null) throw new Error("ribbon not mounted");
   const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')].filter((tab) => !tab.hidden);
   const names = (elements: readonly HTMLElement[]) => elements.map((tab) => tab.textContent);
-  const inRow = () => tabs.filter((tab) => tab.dataset.overflow === undefined);
+  const in_row = () => tabs.filter((tab) => tab.dataset.overflow === undefined);
   // Every tab is 60 px wide, and the row has room for three.
   let room = 180;
   Object.defineProperties(list, {
     clientWidth: { configurable: true, get: () => room },
-    scrollWidth: { configurable: true, get: () => inRow().length * 60 },
+    scrollWidth: { configurable: true, get: () => in_row().length * 60 },
   });
   expect(tabs.length).toBeGreaterThan(3);
 
-  openTab(tabs[0]!.textContent ?? "");
-  expect(names(inRow())).toEqual(names(tabs.slice(0, 3)));
+  open_tab(tabs[0]!.textContent ?? "");
+  expect(names(in_row())).toEqual(names(tabs.slice(0, 3)));
   expect(more.hidden).toBe(false);
 
   press(more);
@@ -603,13 +611,13 @@ it("moves the tabs that do not fit into a More tabs menu instead of cutting one 
   press(items.at(-1)!);
   expect(last.getAttribute("aria-selected")).toBe("true");
   expectSame(document.activeElement, last);
-  expect(names(inRow())).toEqual(names([...tabs.slice(0, 2), last]));
+  expect(names(in_row())).toEqual(names([...tabs.slice(0, 2), last]));
   expect(host.querySelector('[role="menu"][aria-label="More tabs"]')).toBeNull();
 
   // With room for every tab, the menu button goes away.
   room = 1_000;
-  openTab(tabs[0]!.textContent ?? "");
-  expect(names(inRow())).toEqual(names(tabs));
+  open_tab(tabs[0]!.textContent ?? "");
+  expect(names(in_row())).toEqual(names(tabs));
   expect(more.hidden).toBe(true);
 });
 
@@ -636,7 +644,7 @@ it("reserves a compact ribbon's own height before its chunk mounts, so the grid 
 
   // Tab row (30 px) plus the compact panel (36 px), in the first frame and after mount.
   expect(viewport.style.top).toBe("66px");
-  await ribbonMounted(host);
+  await ribbon_mounted(host);
   expect(host.querySelector(".sheetwrite-ribbon")?.getAttribute("data-mode")).toBe("compact");
   expect(viewport.style.top).toBe("66px");
 });
@@ -652,7 +660,13 @@ it("sizes the reserved ribbon by its layout and the host width", () => {
 it("replaces a glyph in every ribbon control that shows it, by glyph name", async () => {
   const custom = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   custom.setAttribute("data-icon", "custom-bold");
-  const { host, control, openTab, select, press } = await setup(false, {
+  const {
+    host,
+    control,
+    openTab: open_tab,
+    select,
+    press,
+  } = await setup(false, {
     bold: custom,
     hideRows: "HR",
   });
@@ -666,14 +680,14 @@ it("replaces a glyph in every ribbon control that shows it, by glyph name", asyn
   // Edit commands are disabled until a cell is selected, as in the other menu tests.
   select(0, 0);
   press(control("Format"));
-  const menuItem = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")].find(
+  const menu_item = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")].find(
     (item) => item.textContent?.includes("Hide Rows"),
   );
-  expect(menuItem?.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
-  openTab("Data");
-  const hideRows = control("Hide Rows");
-  expect(hideRows.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
-  expect(hideRows.querySelector(".sheetwrite-icon")).toBeNull();
+  expect(menu_item?.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
+  open_tab("Data");
+  const hide_rows = control("Hide Rows");
+  expect(hide_rows.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
+  expect(hide_rows.querySelector(".sheetwrite-icon")).toBeNull();
 });
 
 it("offers Excel's cell dialogs in the Cells menus", async () => {
@@ -692,8 +706,8 @@ it("offers Excel's cell dialogs in the Cells menus", async () => {
 
 it("shows a failed placement command in its form instead of rejecting", async () => {
   const { grid } = await setup();
-  const popupHost = document.createElement("div");
-  document.body.appendChild(popupHost);
+  const popup_host = document.createElement("div");
+  document.body.appendChild(popup_host);
   const submitted = Promise.withResolvers<string | null>();
   const view = renderControl(
     {
@@ -706,7 +720,7 @@ it("shows a failed placement command in its form instead of rejecting", async ()
     },
     {
       grid,
-      popup: new RibbonPopup(popupHost),
+      popup: new RibbonPopup(popup_host),
       focus: () => {
         throw new Error("a placement form never reads the focus style");
       },
@@ -714,10 +728,10 @@ it("shows a failed placement command in its form instead of rejecting", async ()
       run: (_key, command) => command(),
     },
   );
-  popupHost.appendChild(view.element);
+  popup_host.appendChild(view.element);
   if (!(view.element instanceof HTMLButtonElement)) throw new Error("expected a trigger button");
   view.element.click();
-  const form = popupHost.querySelector("form");
+  const form = popup_host.querySelector("form");
   if (form === null) throw new Error("the placement form did not open");
 
   form.dispatchEvent(new Event("submit", { cancelable: true }));

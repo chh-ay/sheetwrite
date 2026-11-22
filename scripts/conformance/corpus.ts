@@ -4,7 +4,7 @@ import { canonicalJson, isObject } from "./normalize.js";
 import { readCorpusJson, SHA256_PATTERN, validateCorpus } from "./schema.js";
 import type { ConformanceCorpus } from "./types.js";
 
-function declaredArtifactHashes(value: unknown): Set<string> {
+function declared_artifact_hashes(value: unknown): Set<string> {
   const hashes = new Set<string>();
   if (!isObject(value) || !Array.isArray(value.cases)) return hashes;
   for (const entry of value.cases) {
@@ -41,13 +41,13 @@ export async function loadCorpus(
   // fields in this order.
   const value: unknown =
     path === undefined ? JSON.parse(canonicalJson(generated.corpus)) : await readCorpusJson(path);
-  const structuralIssues = validateCorpus(
+  const structural_issues = validateCorpus(
     value,
     manifest,
     inventory,
-    declaredArtifactHashes(value),
+    declared_artifact_hashes(value),
   );
-  if (structuralIssues.length > 0) throw new Error(structuralIssues.join("\n"));
+  if (structural_issues.length > 0) throw new Error(structural_issues.join("\n"));
   const corpus = value as ConformanceCorpus;
   const artifacts = await verifyCaptureArtifacts(corpus, paths.captures);
   const issues = [

@@ -12,12 +12,12 @@ it("frees destroyed grids and the old document of a live grid after import", asy
     ],
     { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
   );
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(probe.stdout).text(),
     new Response(probe.stderr).text(),
     probe.exited,
   ]);
 
-  expect(exitCode, `grid lifetime probe failed:\n${stderr}`).toBe(0);
+  expect(exit_code, `grid lifetime probe failed:\n${stderr}`).toBe(0);
   expect(JSON.parse(stdout.trim())).toEqual({ tracked: 43, retained: [] });
 });

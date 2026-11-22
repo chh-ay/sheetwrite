@@ -10,12 +10,12 @@ const EMPTY: CellStyle = {};
  */
 export function styleKey(style: CellStyle): string {
   const border = style.border ? JSON.stringify(style.border) : "";
-  const numberFormat = style.numberFormat === undefined ? "" : JSON.stringify(style.numberFormat);
+  const number_format = style.numberFormat === undefined ? "" : JSON.stringify(style.numberFormat);
   return `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.underline ? 1 : 0}|${
     style.strikethrough ? 1 : 0
   }|${style.fontSize ?? ""}|${style.fontFamily ?? ""}|${style.color ?? ""}|${
     style.backgroundColor ?? ""
-  }|${style.align ?? ""}|${style.verticalAlign ?? ""}|${style.wrap ? 1 : 0}|${numberFormat}|${border}`;
+  }|${style.align ?? ""}|${style.verticalAlign ?? ""}|${style.wrap ? 1 : 0}|${number_format}|${border}`;
 }
 
 const EMPTY_KEY = styleKey(EMPTY);
@@ -50,8 +50,8 @@ export class StyleDictionary {
   }
 
   resourceOwners(): ResourceOwnerBytes[] {
-    let keyBytes = 0;
-    for (const key of this.lookup.keys()) keyBytes += key.length * 2;
+    let key_bytes = 0;
+    for (const key of this.lookup.keys()) key_bytes += key.length * 2;
     return [
       {
         owner: "js.style-dictionary.values",
@@ -62,8 +62,8 @@ export class StyleDictionary {
       },
       {
         owner: "js.style-dictionary.keys",
-        logicalBytes: keyBytes,
-        allocatedBytes: keyBytes,
+        logicalBytes: key_bytes,
+        allocatedBytes: key_bytes,
         entries: this.lookup.size,
         measurement: "utf16-upper-bound",
       },

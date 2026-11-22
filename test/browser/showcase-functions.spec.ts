@@ -6,7 +6,7 @@ test("every family calculates; only links to other workbooks show #REF!", async 
   await page.goto("/showcases/functions/");
   const controls = page.getByRole("complementary", { name: "Controls" });
   const result = (name: string) => page.getByTestId(`function-result-${name}`);
-  const pickFamily = async (family: string) => {
+  const pick_family = async (family: string) => {
     await page.getByRole("combobox", { name: "Family" }).click();
     await page.getByRole("option", { name: family, exact: true }).click();
   };
@@ -25,11 +25,11 @@ test("every family calculates; only links to other workbooks show #REF!", async 
     "Lookup",
     "Regex",
   ]) {
-    await pickFamily(family);
+    await pick_family(family);
     const values = await controls.locator("[data-testid^=function-result-]").allTextContents();
     expect(values.length, family).toBeGreaterThan(0);
     for (const value of values) expect(value, family).not.toMatch(ERROR_VALUE);
   }
-  await pickFamily("Links");
+  await pick_family("Links");
   await expect(result("Cell")).toHaveText("#REF!");
 });

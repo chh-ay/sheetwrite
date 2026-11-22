@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { expectedLlmsFiles, LLMS_FULL_PATH } from "./docs-llms.js";
 
 /** The full-text endpoint built from the given docs pages, keyed by content path. */
-async function fullText(pages: Readonly<Record<string, string>>): Promise<string> {
+async function full_text(pages: Readonly<Record<string, string>>): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
   try {
     for (const [path, content] of Object.entries(pages)) {
@@ -30,7 +30,7 @@ describe("llms full text", () => {
   it("formats prose tokens and keeps code, blank lines included, verbatim", async () => {
     const example = '<sw-format value="0.25" code="0%"></sw-format>';
     const code = ["const text = `first", "", "", "last`;"].join("\n");
-    const content = await fullText({
+    const content = await full_text({
       "index.md": page(
         "Format examples",
         `Result: ${example}.`,
@@ -50,7 +50,7 @@ describe("llms full text", () => {
   });
 
   it("gives repeated guide titles their own anchors", async () => {
-    const content = await fullText({
+    const content = await full_text({
       "guides/first.md": page("Same title", "First."),
       "guides/second.md": page("Same title", "Second."),
     });

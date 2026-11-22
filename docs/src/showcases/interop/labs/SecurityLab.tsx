@@ -21,7 +21,7 @@ import { nf } from "./vault-data.js";
 const RAW_NUMBER = /\b\d+\.\d{3,}\b|\b\d{4,}\b/gu;
 
 /** An error message with its numbers grouped and rounded for reading; the copy keeps the raw text. */
-function readableMessage(message: string): string {
+function readable_message(message: string): string {
   return message.replace(RAW_NUMBER, (number) =>
     Number(number).toLocaleString("en", { maximumFractionDigits: 1 }),
   );
@@ -100,7 +100,7 @@ const ATTACK_COUNT = HOSTILE_ROWS.length + LIMIT_ROWS.length;
 
 type Outcome = "not-run" | "rejected" | "limit" | "stopped" | "accepted";
 
-function outcomeOf(report: RejectionReport | null | undefined): Outcome {
+function outcome_of(report: RejectionReport | null | undefined): Outcome {
   if (!report) return "not-run";
   if (!report.rejected) return "accepted";
   if (report.limit) return "limit";
@@ -164,7 +164,7 @@ function ForDevelopers(props: Readonly<{ row: AttackRow; report: RejectionReport
         </Show>
       </span>
       <Show when={props.report.message}>
-        {(message) => <p class="sw-attack-message">{readableMessage(message())}</p>}
+        {(message) => <p class="sw-attack-message">{readable_message(message())}</p>}
       </Show>
       <p class="sw-attack-input">Input: {props.row.input}</p>
     </>
@@ -181,7 +181,7 @@ function AttackRows(props: Readonly<{ label: string; rows: readonly AttackRow[] 
       </tr>
       <For each={props.rows}>
         {(row) => {
-          const outcome = () => outcomeOf(row.report());
+          const outcome = () => outcome_of(row.report());
           return (
             <tr
               data-state={

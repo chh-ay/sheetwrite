@@ -39,11 +39,11 @@ const text = (row: number, col: number, value: string | number) => ({
   value: { kind: "literal" as const, value },
 });
 
-const byRegion = (anchorRow: number): PivotDefinition => ({
-  id: anchorRow === 0 ? "on-dashboard" : "on-sheet",
+const by_region = (anchor_row: number): PivotDefinition => ({
+  id: anchor_row === 0 ? "on-dashboard" : "on-sheet",
   name: "By region",
   source: { table: "orders" },
-  anchor: { row: anchorRow, col: 0 },
+  anchor: { row: anchor_row, col: 0 },
   rows: [0],
   columns: [],
   values: [{ field: 1, aggregation: "SUM" }],
@@ -74,7 +74,7 @@ function snapshot(): WorkbookSnapshot {
             totalsRow: false,
           },
         ],
-        pivots: [byRegion(6)],
+        pivots: [by_region(6)],
         cells: [
           {
             startRow: 0,
@@ -107,7 +107,7 @@ function snapshot(): WorkbookSnapshot {
         rowCount: 0,
         columns: [],
         // Dashboard pivots place no output, so they can share the anchor A1.
-        pivots: [byRegion(0), { ...byRegion(0), id: "second" }],
+        pivots: [by_region(0), { ...by_region(0), id: "second" }],
         cells: [],
       },
     ],
@@ -179,7 +179,7 @@ it("shows measure values in a dashboard pivot, equal to the same pivot on a work
     relationships: [],
     measures: [{ id: "twice", name: "Twice", table: "orders", formula: "=SUM(Orders[Amount])*2" }],
   };
-  const byMeasure = (id: string, anchorRow: number): PivotDefinition => ({
+  const by_measure = (id: string, anchor_row: number): PivotDefinition => ({
     id,
     name: "Twice by region",
     source: {
@@ -191,26 +191,26 @@ it("shows measure values in a dashboard pivot, equal to the same pivot on a work
         ],
       },
     },
-    anchor: { row: anchorRow, col: 0 },
+    anchor: { row: anchor_row, col: 0 },
     rows: [0],
     columns: [],
     values: [{ measure: "twice" }],
   });
   const [data, dash] = input.sheets;
   if (data === undefined || dash === undefined) throw new Error("the fixture has two sheets");
-  data.pivots = [byMeasure("measure-on-sheet", 6)];
-  dash.pivots = [byMeasure("measure-on-dashboard", 0)];
+  data.pivots = [by_measure("measure-on-sheet", 6)];
+  dash.pivots = [by_measure("measure-on-dashboard", 0)];
   dash.dashboard = { items: [] };
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGridFromSnapshot(host, input);
   grids.push(grid);
 
-  const onSheet = grid.getPivotResult("data", "measure-on-sheet");
-  const onDashboard = dashboardPivotResult(grid, "dash", "measure-on-dashboard");
-  expect(onSheet?.status).toBe("ok");
-  expect(onDashboard?.cells).toEqual(onSheet?.cells);
-  expect(onDashboard?.cells).toContain(8);
+  const on_sheet = grid.getPivotResult("data", "measure-on-sheet");
+  const on_dashboard = dashboardPivotResult(grid, "dash", "measure-on-dashboard");
+  expect(on_sheet?.status).toBe("ok");
+  expect(on_dashboard?.cells).toEqual(on_sheet?.cells);
+  expect(on_dashboard?.cells).toContain(8);
 });
 
 it("charts only the chosen values of a dashboard pivot, measures included, as the pivot computes them", async () => {
@@ -253,8 +253,9 @@ it("charts only the chosen values of a dashboard pivot, measures included, as th
   const grid = createGridFromSnapshot(host, input);
   grids.push(grid);
   grid.setActiveSheet("dash");
-  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
-  expect(insertPivotChart(grid, "column")).toBe(true);
+  const { insertPivotChart: insert_pivot_chart } =
+    await import("../src/panels/panel-controller.js");
+  expect(insert_pivot_chart(grid, "column")).toBe(true);
   const chart = grid.getCharts("dash")[0];
   if (chart === undefined) throw new Error("the chart was inserted");
   const points = () =>
@@ -284,7 +285,7 @@ it("shows a value field's number format in the dashboard view", async () => {
   const dash = input.sheets[1];
   if (dash === undefined) throw new Error("the fixture has a dashboard");
   dash.pivots = [
-    { ...byRegion(0), values: [{ field: 1, aggregation: "SUM", numberFormat: "$#,##0.00" }] },
+    { ...by_region(0), values: [{ field: 1, aggregation: "SUM", numberFormat: "$#,##0.00" }] },
   ];
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -300,12 +301,12 @@ it("shows a value field's number format in the dashboard view", async () => {
   expect(values).toEqual(["$4.00", "$2.00", "$6.00"]);
 });
 
-/** The dashboard Dash with a slicer on Orders[Region] beside its pivot; `readOnly` mounts a read-only grid. */
-async function withSlicer(readOnly = false) {
+/** The dashboard Dash with a slicer on Orders[Region] beside its pivot; `read_only` mounts a read-only grid. */
+async function with_slicer(read_only = false) {
   const input = snapshot();
   const dash = input.sheets[1];
   if (dash === undefined) throw new Error("the fixture has a dashboard");
-  dash.pivots = [byRegion(0)];
+  dash.pivots = [by_region(0)];
   dash.dashboard = {
     items: [
       { id: "sales", box: { x: 0, y: 0, w: 6, h: 6 }, kind: "pivot", pivot: "on-dashboard" },
@@ -319,7 +320,7 @@ async function withSlicer(readOnly = false) {
   };
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const grid = createGridFromSnapshot(host, input, { readOnly });
+  const grid = createGridFromSnapshot(host, input, { readOnly: read_only });
   grids.push(grid);
   grid.setActiveSheet("dash");
   await import("../src/dashboard/dashboard-view.js");
@@ -336,7 +337,7 @@ async function withSlicer(readOnly = false) {
 }
 
 it("filters the dashboard pivot by a slicer as a saved change, and undo clears it", async () => {
-  const { grid, press, body } = await withSlicer();
+  const { grid, press, body } = await with_slicer();
   expect(body()).toEqual(["East", 4, "West", 2, "Total", 6]);
 
   press("West");
@@ -352,7 +353,7 @@ it("filters the dashboard pivot by a slicer as a saved change, and undo clears i
 });
 
 it("builds the dashboard once for a slicer choice", async () => {
-  const { press, body } = await withSlicer();
+  const { press, body } = await with_slicer();
   const root = document.querySelector(".sheetwrite-dashboard");
   if (root === null) throw new Error("the dashboard is shown");
   const added: Node[] = [];
@@ -379,7 +380,7 @@ it("builds the dashboard once for a slicer choice", async () => {
 });
 
 it("filters only a read-only viewer's own view, without a document change", async () => {
-  const { grid, press, body } = await withSlicer(true);
+  const { grid, press, body } = await with_slicer(true);
 
   press("East");
   expect(body()).toEqual(["East", 4, "Total", 4]);
@@ -390,7 +391,7 @@ it("dims the slicer values that no row has under the other slicers, or hides the
   const input = snapshot();
   const dash = input.sheets[1];
   if (dash === undefined) throw new Error("the fixture has a dashboard");
-  dash.pivots = [byRegion(0)];
+  dash.pivots = [by_region(0)];
   const amount = {
     id: "amount",
     box: { x: 0, y: 0, w: 3, h: 6 },
@@ -412,7 +413,7 @@ it("dims the slicer values that no row has under the other slicers, or hides the
   grid.setActiveSheet("dash");
   await import("../src/dashboard/dashboard-view.js");
   await Promise.resolve();
-  const regionValues = () =>
+  const region_values = () =>
     [
       ...host.querySelectorAll<HTMLElement>(
         '[data-item-id="region"] .sheetwrite-dashboard-slicer-value',
@@ -422,7 +423,7 @@ it("dims the slicer values that no row has under the other slicers, or hides the
     );
 
   // Only West has the amount 2.
-  expect(regionValues()).toEqual(["East (no data)", "West"]);
+  expect(region_values()).toEqual(["East (no data)", "West"]);
 
   // The item menu sets Excel's "Hide items with no data" as one saved change.
   const press = (target: Element | null | undefined) =>
@@ -433,17 +434,18 @@ it("dims the slicer values that no row has under the other slicers, or hides the
       (entry) => entry.textContent === "Hide Items with No Data",
     ),
   );
-  expect(regionValues()).toEqual(["West"]);
+  expect(region_values()).toEqual(["West"]);
   expect(grid.store.getWorkbook().sheets[1]?.dashboard?.items[1]).toMatchObject({
     itemsWithNoData: "hide",
   });
 });
 
 it("charts a dashboard pivot without its total, through the slicers, and one undo removes it", async () => {
-  const { grid, press } = await withSlicer();
-  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
+  const { grid, press } = await with_slicer();
+  const { insertPivotChart: insert_pivot_chart } =
+    await import("../src/panels/panel-controller.js");
 
-  expect(insertPivotChart(grid, "column")).toBe(true);
+  expect(insert_pivot_chart(grid, "column")).toBe(true);
   const chart = grid.getCharts("dash")[0];
   expect(chart).toMatchObject({ kind: "column", title: "By region", pivot: "on-dashboard" });
   const id = chart?.id ?? "";
@@ -519,10 +521,11 @@ it("shows a measure on a KPI card in the slicers' filter context", async () => {
 });
 
 it("passes each dashboard item's current values to the XLSX export", async () => {
-  const { grid, press } = await withSlicer();
+  const { grid, press } = await with_slicer();
   press("West");
-  const { insertPivotChart } = await import("../src/panels/panel-controller.js");
-  insertPivotChart(grid, "column");
+  const { insertPivotChart: insert_pivot_chart } =
+    await import("../src/panels/panel-controller.js");
+  insert_pivot_chart(grid, "column");
   // A backend that keeps what core passes to it.
   let passed: readonly DashboardExport[] | undefined;
   setXlsxWorkbookBackend({

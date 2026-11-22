@@ -96,11 +96,11 @@ export interface DocumentControllerOptions {
  */
 export class DocumentController {
   private readonly history = new UndoManager();
-  private applyingHistory = false;
-  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
+  private applying_history = false;
+  private readonly transaction_resource_limits: Readonly<TransactionResourceLimits>;
 
   constructor(private readonly options: DocumentControllerOptions) {
-    this.transactionResourceLimits =
+    this.transaction_resource_limits =
       options.transactionResourceLimits ?? DEFAULT_TRANSACTION_RESOURCE_LIMITS;
   }
 
@@ -114,19 +114,19 @@ export class DocumentController {
   ): ApplyTransactionResult {
     const atomic = isAtomicBatch(operations);
     const limits = atomic
-      ? atomicBatchLimits(this.transactionResourceLimits)
-      : this.transactionResourceLimits;
+      ? atomicBatchLimits(this.transaction_resource_limits)
+      : this.transaction_resource_limits;
     // Each setBlock's `values` and `styleIds` are read once into private
     // copies, which the measurement, the store and the change event all use.
     const owned =
       (Array.isArray(operations) ? readBlockArraysOnce(operations) : undefined) ?? operations;
-    const resourceValidation = validateTransactionResources(owned, limits);
+    const resource_validation = validateTransactionResources(owned, limits);
 
-    if (!resourceValidation.ok) {
+    if (!resource_validation.ok) {
       return {
         status: "rejected",
         epoch: this.options.epoch(),
-        issues: [resourceValidation.issue],
+        issues: [resource_validation.issue],
       };
     }
 
@@ -134,10 +134,10 @@ export class DocumentController {
     // verified to hold the measured operations before its record is handed over.
     const patches = owned.slice();
     if (atomic) markAtomicBatch(patches);
-    const admitted = admitTransactionResources(patches, limits, resourceValidation, owned);
+    const admitted = admitTransactionResources(patches, limits, resource_validation, owned);
 
-    const captureReplay = takeTransactionReplayRollbackRequest(operations);
-    const captured = captureReplay ? this.captureInverses(patches) : undefined;
+    const capture_replay = takeTransactionReplayRollbackRequest(operations);
+    const captured = capture_replay ? this.capture_inverses(patches) : undefined;
     let outcome: ApplyTransactionResult;
     try {
       outcome = this.options.store.applyTransaction(
@@ -149,14 +149,14 @@ export class DocumentController {
         },
       );
     } catch (error) {
-      if (captured) this.disposeInverses(captured);
+      if (captured) this.dispose_inverses(captured);
       throw error;
     }
 
     if (outcome.status === "applied" && captured) {
-      const inverse = this.takeAppliedInverses(patches, captured, outcome.transaction.patches);
+      const inverse = this.take_applied_inverses(patches, captured, outcome.transaction.patches);
       const rebases: Array<{ edit: AxisResize; extent: number }> = [];
-      this.rebaseHistoryFor(outcome.transaction.patches, (edit, extent) => {
+      this.rebase_history_for(outcome.transaction.patches, (edit, extent) => {
         rebases.push({ edit, extent });
       });
       const dispose = () => {
@@ -166,13 +166,13 @@ export class DocumentController {
         commit: () => {
           for (const { edit, extent } of rebases) this.history.rebaseAxis(edit, extent);
         },
-        rollback: () => this.rollbackReplay(inverse),
+        rollback: () => this.rollback_replay(inverse),
         dispose,
       });
     } else {
-      if (captured) this.disposeInverses(captured);
+      if (captured) this.dispose_inverses(captured);
       // Replay rebases history only when every stored record has applied.
-      if (outcome.status === "applied") this.rebaseHistoryFor(outcome.transaction.patches);
+      if (outcome.status === "applied") this.rebase_history_for(outcome.transaction.patches);
     }
 
     return outcome;
@@ -191,10 +191,10 @@ export class DocumentController {
   ): ApplyTransactionResult {
     const atomic = isAtomicBatch(input);
     const limits = atomic
-      ? atomicBatchLimits(this.transactionResourceLimits)
-      : this.transactionResourceLimits;
-    const inputResources = resolveTransactionResourceValidation(input, limits, admitted);
-    if (!inputResources.result.ok) return this.rejectResources(inputResources.result.issue);
+      ? atomicBatchLimits(this.transaction_resource_limits)
+      : this.transaction_resource_limits;
+    const input_resources = resolveTransactionResourceValidation(input, limits, admitted);
+    if (!input_resources.result.ok) return this.reject_resources(input_resources.result.issue);
 
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
@@ -206,19 +206,19 @@ export class DocumentController {
 
     // Custom callbacks may mutate nested operations while retaining identity.
     // Grid's engine-owned materializer only returns the input when unchanged.
-    let admittedPatches = this.options.trustedResourceCallbacks
-      ? inputResources.admitted
+    let admitted_patches = this.options.trustedResourceCallbacks
+      ? input_resources.admitted
       : undefined;
     const patches = this.options.materializeVirtualColumns(input);
 
     if (patches !== input) {
       if (atomic) markAtomicBatch(patches);
-      const materializedResources = resolveTransactionResourceValidation(patches, limits);
-      if (!materializedResources.result.ok) {
-        return this.rejectResources(materializedResources.result.issue);
+      const materialized_resources = resolveTransactionResourceValidation(patches, limits);
+      if (!materialized_resources.result.ok) {
+        return this.reject_resources(materialized_resources.result.issue);
       }
 
-      admittedPatches = materializedResources.admitted;
+      admitted_patches = materialized_resources.admitted;
     }
 
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
@@ -236,16 +236,16 @@ export class DocumentController {
     }
 
     if (admission && (!this.options.trustedResourceCallbacks || admission.inspectedOperations)) {
-      admittedPatches = undefined;
+      admitted_patches = undefined;
     }
 
     const reservation = admission?.reservation;
 
-    if (this.applyingHistory) {
+    if (this.applying_history) {
       let outcome: ApplyTransactionResult;
 
       try {
-        outcome = this.storeApply(patches, reason, admittedPatches);
+        outcome = this.store_apply(patches, reason, admitted_patches);
       } catch (error) {
         reservation?.cancel();
         throw error;
@@ -257,17 +257,17 @@ export class DocumentController {
       return outcome;
     }
 
-    let inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
+    let inverse_by_patch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     let outcome: ApplyTransactionResult;
 
     try {
-      inverseByPatch = this.captureInverses(patches);
+      inverse_by_patch = this.capture_inverses(patches);
 
-      outcome = this.storeApply(patches, reason, admittedPatches);
+      outcome = this.store_apply(patches, reason, admitted_patches);
     } catch (error) {
       reservation?.cancel();
 
-      for (const inverse of inverseByPatch.values()) {
+      for (const inverse of inverse_by_patch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
@@ -279,7 +279,7 @@ export class DocumentController {
     reservation?.finish(outcome);
 
     if (outcome.status !== "applied") {
-      for (const inverse of inverseByPatch.values()) {
+      for (const inverse of inverse_by_patch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
@@ -293,12 +293,12 @@ export class DocumentController {
     if (outcome.rejections?.length) this.options.onMutationRejected(outcome.rejections);
 
     const applied = outcome.transaction.patches;
-    const inverse = this.takeAppliedInverses(patches, inverseByPatch, applied);
+    const inverse = this.take_applied_inverses(patches, inverse_by_patch, applied);
     for (const operation of trailingInverse) {
       inverse.push({ kind: "patches", patches: [operation] });
     }
 
-    this.rebaseHistoryFor(applied);
+    this.rebase_history_for(applied);
     this.history.push(inverse, applied, historyStepName(reason, applied));
 
     return outcome;
@@ -324,7 +324,7 @@ export class DocumentController {
     let outcome: ApplyTransactionResult | null;
 
     try {
-      outcome = this.applyHistoryPatches(step, "undo");
+      outcome = this.apply_history_patches(step, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
@@ -336,7 +336,7 @@ export class DocumentController {
     // rejections repeat on every retry; keeping the entry would block every
     // older undo behind it. Other rejections, such as a full sync queue, can
     // pass later, so those entries stay.
-    if (outcome?.status === "rejected" && outcome.issues.some(exceedsTransactionLimit)) {
+    if (outcome?.status === "rejected" && outcome.issues.some(exceeds_transaction_limit)) {
       this.history.discardUndone();
     } else {
       this.history.restoreUndo();
@@ -348,7 +348,8 @@ export class DocumentController {
     if (!step) return;
 
     try {
-      if (this.applyHistoryPatches(step, "redo")?.status !== "applied") this.history.restoreRedo();
+      if (this.apply_history_patches(step, "redo")?.status !== "applied")
+        this.history.restoreRedo();
     } catch (error) {
       this.history.restoreRedo();
       throw error;
@@ -363,7 +364,7 @@ export class DocumentController {
     this.history.clear();
   }
 
-  private storeApply(
+  private store_apply(
     patches: DocumentOp[],
     reason: CommitReason,
     admitted: AdmittedTransactionResources | undefined,
@@ -374,24 +375,24 @@ export class DocumentController {
     );
   }
 
-  private captureInverses(
+  private capture_inverses(
     patches: readonly DocumentOp[],
   ): Map<DocumentOp, Array<DocumentOp | HistoryPart>> {
     const captured = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     try {
       // Batch cell reads retain the same compact capture used by local history.
       if (patches.length > 1) {
-        const setsBySheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
+        const sets_by_sheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
         for (const patch of patches) {
           if (patch.op !== "set") continue;
-          const sets = setsBySheet.get(patch.addr.sheet) ?? [];
+          const sets = sets_by_sheet.get(patch.addr.sheet) ?? [];
           sets.push(patch);
-          setsBySheet.set(patch.addr.sheet, sets);
+          sets_by_sheet.set(patch.addr.sheet, sets);
         }
 
         if (storeEngine(this.options.store)) {
-          for (const [sheet, sets] of setsBySheet) {
-            const cells = this.snapshotSetBatch(sheet, sets);
+          for (const [sheet, sets] of sets_by_sheet) {
+            const cells = this.snapshot_set_batch(sheet, sets);
             for (const [index, patch] of sets.entries()) {
               const cell = cells[index];
               if (!cell) throw new Error("Missing captured inverse cell");
@@ -403,17 +404,17 @@ export class DocumentController {
 
       for (const patch of patches) {
         if (!captured.has(patch)) {
-          captured.set(patch, [...this.inversePatch(patch), ...this.pivotRestores(patch)]);
+          captured.set(patch, [...this.inverse_patch(patch), ...this.pivot_restores(patch)]);
         }
       }
       return captured;
     } catch (error) {
-      this.disposeInverses(captured);
+      this.dispose_inverses(captured);
       throw error;
     }
   }
 
-  private disposeInverses(captured: Map<DocumentOp, Array<DocumentOp | HistoryPart>>): void {
+  private dispose_inverses(captured: Map<DocumentOp, Array<DocumentOp | HistoryPart>>): void {
     for (const inverse of captured.values()) {
       for (const part of inverse) {
         if ("kind" in part && part.kind === "rangeSnapshot") part.dispose();
@@ -421,12 +422,12 @@ export class DocumentController {
     }
   }
 
-  private takeAppliedInverses(
+  private take_applied_inverses(
     patches: readonly DocumentOp[],
     captured: Map<DocumentOp, Array<DocumentOp | HistoryPart>>,
     applied: readonly DocumentOp[],
   ): HistoryAction {
-    const appliedSet = new Set(applied);
+    const applied_set = new Set(applied);
     const inverse: HistoryAction = [];
 
     for (const patch of patches) {
@@ -435,7 +436,7 @@ export class DocumentController {
 
       captured.delete(patch);
 
-      if (!appliedSet.has(patch)) {
+      if (!applied_set.has(patch)) {
         for (const part of items) {
           if ("kind" in part && part.kind === "rangeSnapshot") part.dispose();
         }
@@ -451,12 +452,12 @@ export class DocumentController {
     return inverse;
   }
 
-  private rollbackReplay(action: HistoryAction): void {
+  private rollback_replay(action: HistoryAction): void {
     const preparation = new TransactionPreparation();
     try {
       const patches = materializeHistoryAction(action, preparation);
       if (patches.length === 0) return;
-      const fitted = this.fitHistoryPatches(patches, preparation);
+      const fitted = this.fit_history_patches(patches, preparation);
       // Rollback is not a new local edit. It must bypass sync admission and
       // dirty-capacity checks, including while the pending queue is hydrating.
       const outcome = this.options.store.applyTransaction(
@@ -469,7 +470,7 @@ export class DocumentController {
     }
   }
 
-  private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
+  private inverse_patch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
     // A transaction that adds rows can also write them, as a paste past the
     // sheet's end does. Those rows need no restore, because undoing the added
     // rows removes them, and they cannot be read before the transaction.
@@ -480,11 +481,11 @@ export class DocumentController {
       patch.op === "setRangeStyle" ||
       patch.op === "clearRange"
     ) {
-      const range = this.existingRows(patch.range);
+      const range = this.existing_rows(patch.range);
       if (range === null) return [];
       if (range !== patch.range) {
         const last = range.end.row - range.start.row;
-        return this.inversePatch(
+        return this.inverse_patch(
           patch.op === "setRange"
             ? { ...patch, range, cells: patch.cells.filter((cell) => cell.rowOffset <= last) }
             : { ...patch, range },
@@ -493,7 +494,7 @@ export class DocumentController {
     }
     switch (patch.op) {
       case "set":
-        return [this.snapshotCell(patch.addr)];
+        return [this.snapshot_cell(patch.addr)];
 
       case "setRange": {
         const engine = storeEngine(this.options.store);
@@ -505,13 +506,13 @@ export class DocumentController {
           (patch.cells.length !== width * height ||
             patch.cells.some((cell) => cell.rowOffset >= height || cell.colOffset >= width))
         ) {
-          const rowStart = Math.min(patch.range.start.row, patch.range.end.row);
-          const colStart = Math.min(patch.range.start.col, patch.range.end.col);
+          const row_start = Math.min(patch.range.start.row, patch.range.end.row);
+          const col_start = Math.min(patch.range.start.col, patch.range.end.col);
           const captured = engine.captureCells(
             patch.range.sheet,
             patch.cells.map((cell) => ({
-              row: rowStart + cell.rowOffset,
-              col: colStart + cell.colOffset,
+              row: row_start + cell.rowOffset,
+              col: col_start + cell.colOffset,
             })),
           );
 
@@ -534,7 +535,7 @@ export class DocumentController {
           ];
         }
 
-        const captured = this.snapshotRangeCells(patch.range);
+        const captured = this.snapshot_range_cells(patch.range);
         return [
           {
             op: "setRange",
@@ -553,14 +554,14 @@ export class DocumentController {
       case "restoreBlock":
       case "setRangeStyle":
       case "clearRange": {
-        const compact = this.compactHistoryPart(patch.range);
+        const compact = this.compact_history_part(patch.range);
         return compact
           ? [compact]
           : [
               {
                 op: "setRange",
                 range: patch.range,
-                cells: this.snapshotRangeCells(patch.range),
+                cells: this.snapshot_range_cells(patch.range),
               },
             ];
       }
@@ -569,7 +570,7 @@ export class DocumentController {
         return [{ op: "removeRows", sheet: patch.sheet, at: patch.at, count: patch.count }];
 
       case "removeRows": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         const range =
           sheet && sheet.columns.length > 0
             ? {
@@ -578,20 +579,20 @@ export class DocumentController {
                 end: { row: patch.at + patch.count - 1, col: sheet.columns.length - 1 },
               }
             : null;
-        const compact = range ? this.compactHistoryPart(range) : null;
-        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
+        const compact = range ? this.compact_history_part(range) : null;
+        const charts = this.chart_restores(patch.sheet, { includeOwned: true });
         return compact
           ? [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
               compact,
               ...charts,
-              ...this.autoFilterRestore(patch.sheet),
+              ...this.auto_filter_restore(patch.sheet),
             ]
           : [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
-              ...this.snapshotRows(patch.sheet, patch.at, patch.count),
+              ...this.snapshot_rows(patch.sheet, patch.at, patch.count),
               ...charts,
-              ...this.autoFilterRestore(patch.sheet),
+              ...this.auto_filter_restore(patch.sheet),
             ];
       }
 
@@ -604,13 +605,13 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
-          ...this.moveLosses(patch),
+          ...this.move_losses(patch),
           // A partly moved source range does not map back exactly.
-          ...this.chartRestores(patch.sheet, { includeOwned: true }),
+          ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 
       case "permuteRows":
-        return this.inversePermutation(patch);
+        return this.inverse_permutation(patch);
 
       case "addColumns":
         return [
@@ -623,7 +624,7 @@ export class DocumentController {
         ];
 
       case "removeColumns": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         const range =
           sheet && sheet.rowCount > 0
             ? {
@@ -633,8 +634,8 @@ export class DocumentController {
               }
             : null;
 
-        const compact = range ? this.compactHistoryPart(range) : null;
-        const charts = this.chartRestores(patch.sheet, { includeOwned: true });
+        const compact = range ? this.compact_history_part(range) : null;
+        const charts = this.chart_restores(patch.sheet, { includeOwned: true });
 
         return compact
           ? [
@@ -642,22 +643,22 @@ export class DocumentController {
                 op: "addColumns",
                 sheet: patch.sheet,
                 at: patch.at,
-                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
+                columns: this.snapshot_columns(patch.sheet, patch.at, patch.count),
               },
               compact,
               ...charts,
-              ...this.autoFilterRestore(patch.sheet),
+              ...this.auto_filter_restore(patch.sheet),
             ]
           : [
               {
                 op: "addColumns",
                 sheet: patch.sheet,
                 at: patch.at,
-                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
+                columns: this.snapshot_columns(patch.sheet, patch.at, patch.count),
               },
-              ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
+              ...this.snapshot_column_cells(patch.sheet, patch.at, patch.count),
               ...charts,
-              ...this.autoFilterRestore(patch.sheet),
+              ...this.auto_filter_restore(patch.sheet),
             ];
       }
 
@@ -670,16 +671,16 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
-          ...this.moveLosses(patch),
+          ...this.move_losses(patch),
           // A partly moved source range does not map back exactly.
-          ...this.chartRestores(patch.sheet, { includeOwned: true }),
+          ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 
       case "moveCells":
-        return this.inverseMoveCells(patch);
+        return this.inverse_move_cells(patch);
 
       case "setColumn": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         const column = sheet?.columns[patch.col];
         return column
           ? [
@@ -687,14 +688,14 @@ export class DocumentController {
                 op: "setColumn",
                 sheet: patch.sheet,
                 col: patch.col,
-                patch: previousColumnPatch(column, patch.patch),
+                patch: previous_column_patch(column, patch.patch),
               },
             ]
           : [];
       }
 
       case "setRowMeta": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         if (!sheet) return [];
         const height = sheet.rowHeights?.get(patch.row);
         const hidden = sheet.hiddenRows?.has(patch.row) ?? false;
@@ -711,7 +712,7 @@ export class DocumentController {
       case "addMerge":
         return [
           { op: "removeMerge", sheet: patch.sheet, merge: patch.merge },
-          ...this.snapshotCellsInMerge(patch.sheet, patch.merge),
+          ...this.snapshot_cells_in_merge(patch.sheet, patch.merge),
         ];
 
       case "removeMerge":
@@ -726,20 +727,20 @@ export class DocumentController {
         // The snapshot carries the sheet's own charts; other sheets' charts need theirs back.
         const restore: DocumentOp[] = [
           { op: "addSheet", sheet: snapshot },
-          ...this.snapshotExternalFormulaAndRefs(patch.sheet),
-          ...this.chartRestores(patch.sheet, { includeOwned: false }),
+          ...this.snapshot_external_formula_and_refs(patch.sheet),
+          ...this.chart_restores(patch.sheet, { includeOwned: false }),
         ];
         // Removing the sheet turns a formula name's references to it into #REF!. A name whose
         // text holds the sheet name may refer to it; restoring one that does not is harmless.
-        const sheetName = sheetNameKey(snapshot.name);
-        for (const namedRange of this.options.store.getWorkbook().namedRanges ?? []) {
+        const sheet_name = sheetNameKey(snapshot.name);
+        for (const named_range of this.options.store.getWorkbook().namedRanges ?? []) {
           if (
-            namedRange.scope === patch.sheet ||
-            (namedRange.range === undefined
-              ? sheetNameKey(namedRange.formula).replaceAll("''", "'").includes(sheetName)
-              : namedRange.range.sheet === patch.sheet)
+            named_range.scope === patch.sheet ||
+            (named_range.range === undefined
+              ? sheetNameKey(named_range.formula).replaceAll("''", "'").includes(sheet_name)
+              : named_range.range.sheet === patch.sheet)
           ) {
-            restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
+            restore.push({ op: "setNamedRange", namedRange: { ...named_range } });
           }
         }
 
@@ -747,7 +748,7 @@ export class DocumentController {
       }
 
       case "renameSheet": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         return sheet ? [{ op: "renameSheet", sheet: patch.sheet, name: sheet.name }] : [];
       }
 
@@ -758,11 +759,14 @@ export class DocumentController {
         if (from < 0) return [];
         // A move can rewrite the endpoints of 3-D references. Setting their
         // sources again after moving back restores the text exactly.
-        return [{ op: "moveSheet", sheet: patch.sheet, to: from }, ...this.snapshotSpanFormulas()];
+        return [
+          { op: "moveSheet", sheet: patch.sheet, to: from },
+          ...this.snapshot_span_formulas(),
+        ];
       }
 
       case "setSheetVisibility": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         return sheet
           ? [
               {
@@ -784,7 +788,7 @@ export class DocumentController {
         ];
 
       case "updateTable": {
-        const table = this.sheetById(patch.sheet)?.tables?.find(
+        const table = this.sheet_by_id(patch.sheet)?.tables?.find(
           (candidate) => candidate.id === patch.tableId,
         );
         if (!table) return [];
@@ -821,14 +825,14 @@ export class DocumentController {
       }
 
       case "removeTable": {
-        const table = this.sheetById(patch.sheet)?.tables?.find(
+        const table = this.sheet_by_id(patch.sheet)?.tables?.find(
           (candidate) => candidate.id === patch.tableId,
         );
         return table ? [{ op: "addTable", table: structuredClone(table) }] : [];
       }
 
       case "setSheetMeta": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         if (!sheet) return [];
 
         return [
@@ -871,8 +875,10 @@ export class DocumentController {
       case "setHyperlink":
       case "removeHyperlink": {
         const id = patch.op === "setHyperlink" ? patch.hyperlink.id : patch.id;
-        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find((entry) => entry.id === id);
-        return entryInverse(
+        const previous = this.sheet_by_id(patch.sheet)?.hyperlinks?.find(
+          (entry) => entry.id === id,
+        );
+        return entry_inverse(
           previous,
           (hyperlink) => ({
             op: "setHyperlink",
@@ -886,8 +892,8 @@ export class DocumentController {
       case "setChart":
       case "removeChart": {
         const id = patch.op === "setChart" ? patch.chart.id : patch.id;
-        const previous = this.sheetById(patch.sheet)?.charts?.find((entry) => entry.id === id);
-        return entryInverse(
+        const previous = this.sheet_by_id(patch.sheet)?.charts?.find((entry) => entry.id === id);
+        return entry_inverse(
           previous,
           (chart) => ({ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(chart) }),
           patch.op === "setChart" ? { op: "removeChart", sheet: patch.sheet, id } : null,
@@ -897,10 +903,10 @@ export class DocumentController {
       case "setValidationRule":
       case "removeValidationRule": {
         const id = patch.op === "setValidationRule" ? patch.rule.id : patch.id;
-        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
+        const previous = this.sheet_by_id(patch.sheet)?.validationRules?.find(
           (entry) => entry.id === id,
         );
-        return entryInverse(
+        return entry_inverse(
           previous,
           (rule) => ({ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(rule) }),
           patch.op === "setValidationRule"
@@ -912,15 +918,15 @@ export class DocumentController {
       case "setProtectedRange":
       case "removeProtectedRange": {
         const id = patch.op === "setProtectedRange" ? patch.protectedRange.id : patch.id;
-        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
+        const previous = this.sheet_by_id(patch.sheet)?.protectedRanges?.find(
           (entry) => entry.id === id,
         );
-        return entryInverse(
+        return entry_inverse(
           previous,
-          (protectedRange) => ({
+          (protected_range) => ({
             op: "setProtectedRange",
             sheet: patch.sheet,
-            protectedRange: structuredClone(protectedRange),
+            protectedRange: structuredClone(protected_range),
           }),
           patch.op === "setProtectedRange"
             ? { op: "removeProtectedRange", sheet: patch.sheet, id }
@@ -929,7 +935,7 @@ export class DocumentController {
       }
 
       case "setNote": {
-        const previous = this.sheetById(patch.addr.sheet)?.notes?.find(
+        const previous = this.sheet_by_id(patch.addr.sheet)?.notes?.find(
           (note) => note.addr.row === patch.addr.row && note.addr.col === patch.addr.col,
         );
         return [
@@ -949,9 +955,9 @@ export class DocumentController {
           .namedRanges?.find(
             (range) => formulaNameKey(range.name) === formulaNameKey(name) && range.scope === scope,
           );
-        return entryInverse(
+        return entry_inverse(
           previous,
-          (namedRange) => ({ op: "setNamedRange", namedRange: { ...namedRange } }),
+          (named_range) => ({ op: "setNamedRange", namedRange: { ...named_range } }),
           patch.op === "setNamedRange" ? { op: "removeNamedRange", name, scope } : null,
         );
       }
@@ -975,7 +981,7 @@ export class DocumentController {
       case "removeMeasure": {
         const id = patch.op === "setMeasure" ? patch.measure.id : patch.id;
         const previous = findMeasure(this.options.store.getWorkbook().dataModel, id);
-        return entryInverse(
+        return entry_inverse(
           previous,
           (measure) => ({ op: "setMeasure", measure: cloneMeasure(measure) }),
           patch.op === "setMeasure" ? { op: "removeMeasure", id } : null,
@@ -986,7 +992,7 @@ export class DocumentController {
       case "removeRelationship": {
         const id = patch.op === "setRelationship" ? patch.relationship.id : patch.id;
         const previous = findRelationship(this.options.store.getWorkbook().dataModel, id);
-        return entryInverse(
+        return entry_inverse(
           previous,
           (relationship) => ({
             op: "setRelationship",
@@ -1000,7 +1006,7 @@ export class DocumentController {
       case "removeQuery": {
         const id = patch.op === "setQuery" ? patch.query.id : patch.id;
         const previous = findQuery(this.options.store.getWorkbook().queries, id);
-        return entryInverse(
+        return entry_inverse(
           previous,
           (query) => ({ op: "setQuery", query: cloneQuery(query) }),
           patch.op === "setQuery" ? { op: "removeQuery", id } : null,
@@ -1009,14 +1015,14 @@ export class DocumentController {
 
       case "setPivot":
       case "removePivot": {
-        const sheet = this.sheetById(patch.sheet);
+        const sheet = this.sheet_by_id(patch.sheet);
         // A sheet created in this batch is removed by the addSheet inverse,
         // with all its pivots. A later removePivot would target a missing sheet.
         if (!sheet) return [];
 
         const id = patch.op === "setPivot" ? patch.pivot.id : patch.id;
         const previous = sheet.pivots?.find((pivot) => pivot.id === id);
-        return entryInverse(
+        return entry_inverse(
           previous,
           (pivot) => ({ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(pivot) }),
           patch.op === "setPivot" ? { op: "removePivot", sheet: patch.sheet, id } : null,
@@ -1026,7 +1032,7 @@ export class DocumentController {
       case "setDashboardItem":
       case "removeDashboardItem": {
         const id = patch.op === "setDashboardItem" ? patch.item.id : patch.id;
-        const previous = findDashboardItem(this.sheetById(patch.sheet), id);
+        const previous = findDashboardItem(this.sheet_by_id(patch.sheet), id);
         if (previous) {
           return [{ op: "setDashboardItem", sheet: patch.sheet, item: structuredClone(previous) }];
         }
@@ -1042,7 +1048,7 @@ export class DocumentController {
    * They follow the structural inverse, so anchors and sources are back in
    * bounds when the restore is validated. The store applies the same plan.
    */
-  private pivotRestores(patch: DocumentOp): DocumentOp[] {
+  private pivot_restores(patch: DocumentOp): DocumentOp[] {
     const sheets = this.options.store.getWorkbook().sheets;
     const plan = planPivotEdit(patch, sheets);
     if (!plan) return [];
@@ -1053,7 +1059,7 @@ export class DocumentController {
     }));
   }
 
-  private compactHistoryPart(range: Range): HistoryPart | null {
+  private compact_history_part(range: Range): HistoryPart | null {
     const snapshot = this.options.loadable?.captureRangeHistory(range);
     if (!snapshot) return null;
     return {
@@ -1065,82 +1071,82 @@ export class DocumentController {
     };
   }
 
-  private snapshotRows(sheetId: SheetId, at: number, count: number): DocumentOp[] {
-    const sheet = this.sheetById(sheetId);
+  private snapshot_rows(sheet_id: SheetId, at: number, count: number): DocumentOp[] {
+    const sheet = this.sheet_by_id(sheet_id);
     if (!sheet) return [];
 
     const patches: DocumentOp[] = [];
     const end = Math.min(sheet.rowCount, at + count);
     for (let row = at; row < end; row++) {
       for (let col = 0; col < sheet.columns.length; col++) {
-        patches.push(this.snapshotCell({ sheet: sheetId, row, col }));
+        patches.push(this.snapshot_cell({ sheet: sheet_id, row, col }));
       }
     }
     return patches;
   }
 
-  private snapshotColumns(sheetId: SheetId, at: number, count: number): Column[] {
-    const sheet = this.sheetById(sheetId);
+  private snapshot_columns(sheet_id: SheetId, at: number, count: number): Column[] {
+    const sheet = this.sheet_by_id(sheet_id);
     if (!sheet) return [];
     return sheet.columns.slice(at, at + count).map((column) => ({ ...column }));
   }
 
-  private snapshotColumnCells(sheetId: SheetId, at: number, count: number): DocumentOp[] {
-    const sheet = this.sheetById(sheetId);
+  private snapshot_column_cells(sheet_id: SheetId, at: number, count: number): DocumentOp[] {
+    const sheet = this.sheet_by_id(sheet_id);
     if (!sheet) return [];
 
     const patches: DocumentOp[] = [];
     const end = Math.min(sheet.columns.length, at + count);
     for (let row = 0; row < sheet.rowCount; row++) {
       for (let col = at; col < end; col++) {
-        patches.push(this.snapshotCell({ sheet: sheetId, row, col }));
+        patches.push(this.snapshot_cell({ sheet: sheet_id, row, col }));
       }
     }
     return patches;
   }
 
-  private snapshotSetBatch(
+  private snapshot_set_batch(
     sheet: SheetId,
     sets: readonly Extract<DocumentOp, { op: "set" }>[],
   ): Array<Extract<DocumentOp, { op: "set" }>> {
     const engine = storeEngine(this.options.store);
     // Custom stores without an engine retain their scalar snapshot contract.
-    if (!engine) return sets.map((patch) => this.snapshotCell(patch.addr));
+    if (!engine) return sets.map((patch) => this.snapshot_cell(patch.addr));
 
     const first = sets[0];
     if (!first) return [];
 
-    let rowStart = first.addr.row;
-    let rowEnd = rowStart;
-    let colStart = first.addr.col;
-    let colEnd = colStart;
+    let row_start = first.addr.row;
+    let row_end = row_start;
+    let col_start = first.addr.col;
+    let col_end = col_start;
     for (const { addr } of sets) {
-      rowStart = Math.min(rowStart, addr.row);
-      rowEnd = Math.max(rowEnd, addr.row);
-      colStart = Math.min(colStart, addr.col);
-      colEnd = Math.max(colEnd, addr.col);
+      row_start = Math.min(row_start, addr.row);
+      row_end = Math.max(row_end, addr.row);
+      col_start = Math.min(col_start, addr.col);
+      col_end = Math.max(col_end, addr.col);
     }
 
-    const width = colEnd - colStart + 1;
+    const width = col_end - col_start + 1;
     const dense =
-      sets.length === (rowEnd - rowStart + 1) * width &&
+      sets.length === (row_end - row_start + 1) * width &&
       sets.every(
         ({ addr }, index) =>
-          addr.row === rowStart + Math.floor(index / width) &&
-          addr.col === colStart + (index % width),
+          addr.row === row_start + Math.floor(index / width) &&
+          addr.col === col_start + (index % width),
       );
     const range = {
       sheet,
-      start: { row: rowStart, col: colStart },
-      end: { row: rowEnd, col: colEnd },
+      start: { row: row_start, col: col_start },
+      end: { row: row_end, col: col_end },
     };
-    const capturedRange = dense ? this.captureRangeCells(range) : null;
+    const captured_range = dense ? this.capture_range_cells(range) : null;
 
     // Per-operation inverses retain only applied cells when a batch partially
     // succeeds; the range resource itself cannot represent that subset.
-    if (capturedRange) {
+    if (captured_range) {
       return sets.map((patch, offset) => {
-        const cell = capturedRange[offset];
+        const cell = captured_range[offset];
         if (!cell) throw new Error("Missing captured dense inverse cell");
 
         return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
@@ -1164,13 +1170,13 @@ export class DocumentController {
    * lost a reference (`#REF!`) cannot be adjusted back, so its cell is
    * captured before the sort and restored after the inverse order.
    */
-  private inversePermutation(patch: PermuteRowsOperation): DocumentOp[] {
+  private inverse_permutation(patch: PermuteRowsOperation): DocumentOp[] {
     const engine = storeEngine(this.options.store);
     const reverse = engine?.invertedPermutation(patch);
     if (!engine || !reverse) return [];
 
     const losses = engine.permuteRowsLosses(patch);
-    return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
+    return [reverse, ...losses.map((addr) => this.snapshot_cell(addr))];
   }
 
   /**
@@ -1178,11 +1184,11 @@ export class DocumentController {
    * get it back from the move back, so its cell is captured before the move
    * and restored after the move back.
    */
-  private moveLosses(
+  private move_losses(
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
   ): Extract<DocumentOp, { op: "set" }>[] {
     const engine = storeEngine(this.options.store);
-    return engine ? engine.moveLosses(patch).map((addr) => this.snapshotCell(addr)) : [];
+    return engine ? engine.moveLosses(patch).map((addr) => this.snapshot_cell(addr)) : [];
   }
 
   /**
@@ -1195,20 +1201,20 @@ export class DocumentController {
    * from the first block to the last, the cells a deletion closes included,
    * and the merged cells it restores are those of the deleted cells.
    */
-  private inverseMoveCells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
+  private inverse_move_cells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
     const move = cellBlockMove(patch);
     const { from, to } = move;
     const blocks = move.shift ? movedCellBounds(patch) : [to, from];
     const landed = blocks[0]!;
     const deleted = move.shift ? shiftDeletedCells(move) : to;
     const engine = storeEngine(this.options.store);
-    const sheet = this.sheetById(to.sheet);
-    const meetsTarget = (range: Range) => rangesIntersect(range, landed);
+    const sheet = this.sheet_by_id(to.sheet);
+    const meets_target = (range: Range) => rangesIntersect(range, landed);
     // A conditional format has no ID, so each sheet gets its whole list back.
     const formats = [...new Set([from.sheet, to.sheet])].map((id): DocumentOp => ({
       op: "setSheetMeta",
       sheet: id,
-      patch: { conditionalFormats: cloneJsonValue(this.sheetById(id)?.conditionalFormats ?? []) },
+      patch: { conditionalFormats: cloneJsonValue(this.sheet_by_id(id)?.conditionalFormats ?? []) },
     }));
     return [
       {
@@ -1217,19 +1223,19 @@ export class DocumentController {
         to: { sheet: from.sheet, ...from.start },
         ...(move.shift ? { shift: true as const } : {}),
       },
-      ...blocks.map((block) => this.blockCells(block)),
+      ...blocks.map((block) => this.block_cells(block)),
       ...(sheet?.notes ?? [])
-        .filter((note) => meetsTarget({ sheet: to.sheet, start: note.addr, end: note.addr }))
+        .filter((note) => meets_target({ sheet: to.sheet, start: note.addr, end: note.addr }))
         .map((note): DocumentOp => ({ op: "setNote", addr: { ...note.addr }, text: note.text })),
       ...(sheet?.hyperlinks ?? [])
-        .filter((link) => meetsTarget(link.range))
+        .filter((link) => meets_target(link.range))
         .map((link): DocumentOp => ({
           op: "setHyperlink",
           sheet: to.sheet,
           hyperlink: cloneCellHyperlink(link),
         })),
       ...(sheet?.validationRules ?? [])
-        .filter((rule) => meetsTarget(rule.range))
+        .filter((rule) => meets_target(rule.range))
         .map((rule): DocumentOp => ({
           op: "setValidationRule",
           sheet: to.sheet,
@@ -1247,36 +1253,36 @@ export class DocumentController {
             }),
         )
         .map((merge): DocumentOp => ({ op: "addMerge", sheet: to.sheet, merge: { ...merge } })),
-      ...(engine?.moveCellsLosses(patch) ?? []).map((addr) => this.snapshotCell(addr)),
+      ...(engine?.moveCellsLosses(patch) ?? []).map((addr) => this.snapshot_cell(addr)),
     ];
   }
 
   /** The cells of `block` as they are now, as one history part. */
-  private blockCells(block: Range): DocumentOp | HistoryPart {
+  private block_cells(block: Range): DocumentOp | HistoryPart {
     return (
-      this.compactHistoryPart(block) ?? {
+      this.compact_history_part(block) ?? {
         op: "setRange",
         range: block,
-        cells: this.snapshotRangeCells(block),
+        cells: this.snapshot_range_cells(block),
       }
     );
   }
 
-  private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
+  private snapshot_cell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
     const formula = this.options.loadable?.getFormula(addr) ?? this.options.store.getFormula(addr);
-    const refTarget = this.options.store.getRefTarget(addr);
+    const ref_target = this.options.store.getRefTarget(addr);
     const cell = this.options.store.getCell(addr);
     const owner = this.options.store.getSpillAnchor(addr);
-    const isSpillChild = owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
+    const is_spill_child = owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
     const value: CellValue = formula
       ? { kind: "formula", src: formula }
-      : refTarget
-        ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: isSpillChild ? null : cell.resolved };
+      : ref_target
+        ? { kind: "ref", target: ref_target }
+        : { kind: "literal", value: is_spill_child ? null : cell.resolved };
     return { op: "set", addr, value, style: cell.style };
   }
 
-  private captureRangeCells(range: Range): SnapshotCell[] | null {
+  private capture_range_cells(range: Range): SnapshotCell[] | null {
     const snapshot = storeEngine(this.options.store)?.captureRangeHistory(range);
     if (!snapshot) return null;
 
@@ -1292,7 +1298,7 @@ export class DocumentController {
     return block.values.map((value, offset) => {
       const formula = formulas.get(offset);
       const reference = references.get(offset);
-      const styleId = block.styleIds?.[offset];
+      const style_id = block.styleIds?.[offset];
 
       return {
         rowOffset: Math.floor(offset / block.colCount),
@@ -1302,13 +1308,13 @@ export class DocumentController {
           : reference
             ? { kind: "ref", target: reference }
             : { kind: "literal", value },
-        style: styleId === undefined ? undefined : block.styleTable?.[styleId],
+        style: style_id === undefined ? undefined : block.styleTable?.[style_id],
       };
     });
   }
 
-  private snapshotRangeCells(range: Range): SnapshotCell[] {
-    const captured = this.captureRangeCells(range);
+  private snapshot_range_cells(range: Range): SnapshotCell[] {
+    const captured = this.capture_range_cells(range);
     if (captured) return captured;
 
     // Custom stores and unavailable range captures retain their scalar snapshot contract.
@@ -1319,7 +1325,7 @@ export class DocumentController {
     const cells: SnapshotCell[] = [];
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
-        const patch = this.snapshotCell({ sheet: range.sheet, row, col });
+        const patch = this.snapshot_cell({ sheet: range.sheet, row, col });
         cells.push({
           rowOffset: row - r0,
           colOffset: col - c0,
@@ -1332,7 +1338,7 @@ export class DocumentController {
     return cells;
   }
 
-  private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): DocumentOp[] {
+  private snapshot_cells_in_merge(sheet: SheetId, merge: MergeRange): DocumentOp[] {
     const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     const r0 = Math.min(merge.r0, merge.r1);
     const r1 = Math.max(merge.r0, merge.r1);
@@ -1349,7 +1355,7 @@ export class DocumentController {
       }
     }
 
-    return this.snapshotSetBatch(sheet, patches);
+    return this.snapshot_set_batch(sheet, patches);
   }
 
   /**
@@ -1361,14 +1367,14 @@ export class DocumentController {
    * The sheet's AutoFilter and column filters as they are, for the inverse of
    * an edit that can shrink or drop them, such as deleting its header row.
    */
-  private autoFilterRestore(sheetId: SheetId): DocumentOp[] {
-    const sheet = this.sheetById(sheetId);
+  private auto_filter_restore(sheet_id: SheetId): DocumentOp[] {
+    const sheet = this.sheet_by_id(sheet_id);
     if (!sheet?.autoFilter) return [];
 
     return [
       {
         op: "setSheetMeta",
-        sheet: sheetId,
+        sheet: sheet_id,
         patch: {
           autoFilter: structuredClone(sheet.autoFilter),
           filters: sheet.filters?.map(([col, filter]) => [col, structuredClone(filter)]) ?? [],
@@ -1377,14 +1383,14 @@ export class DocumentController {
     ];
   }
 
-  private chartRestores(
+  private chart_restores(
     sheet: SheetId,
-    { includeOwned }: { includeOwned: boolean },
+    { includeOwned: include_owned }: { includeOwned: boolean },
   ): readonly DocumentOp[] {
     const restores: DocumentOp[] = [];
     for (const owner of this.options.store.getWorkbook().sheets) {
       const charts = owner.charts;
-      if (!charts || (!includeOwned && owner.id === sheet)) continue;
+      if (!charts || (!include_owned && owner.id === sheet)) continue;
 
       for (const chart of charts) {
         if (chartTouchesSheet(chart, owner.id, sheet)) {
@@ -1397,7 +1403,7 @@ export class DocumentController {
 
   /** The whole sheet as a snapshot, as `addSheet` takes it back, or null when there is none. */
   snapshotSheet(id: SheetId): SheetSnapshot | null {
-    const sheet = this.sheetById(id);
+    const sheet = this.sheet_by_id(id);
     if (!sheet) return null;
 
     const engine = storeEngine(this.options.store);
@@ -1406,21 +1412,21 @@ export class DocumentController {
     if (!engine) {
       for (let row = 0; row < sheet.rowCount; row++) {
         for (let col = 0; col < sheet.columns.length; col++) {
-          const patch = this.snapshotCell({ sheet: id, row, col });
-          const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
-          if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
+          const patch = this.snapshot_cell({ sheet: id, row, col });
+          const literal_empty = patch.value.kind === "literal" && patch.value.value === null;
+          if (literal_empty && Object.keys(patch.style ?? {}).length === 0) continue;
           cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
         }
       }
     }
 
-    const rowMeta: Array<[number, { height?: number; hidden?: boolean }]> = [];
+    const row_meta: Array<[number, { height?: number; hidden?: boolean }]> = [];
     const rows = new Set([
       ...(sheet.rowHeights?.keys() ?? []),
       ...(sheet.hiddenRows?.values() ?? []),
     ]);
     for (const row of [...rows].sort((left, right) => left - right)) {
-      rowMeta.push([
+      row_meta.push([
         row,
         {
           height: sheet.rowHeights?.get(row),
@@ -1439,7 +1445,7 @@ export class DocumentController {
       columns: sheet.columns.map((column) => ({ ...column })),
       frozenRows: sheet.frozenRows,
       frozenCols: sheet.frozenCols,
-      rowMeta,
+      rowMeta: row_meta,
       merges: sheet.merges?.map((candidate) => ({ ...candidate })),
       conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
       hyperlinks: sheet.hyperlinks?.map(cloneCellHyperlink),
@@ -1469,10 +1475,10 @@ export class DocumentController {
     };
   }
 
-  private snapshotExternalFormulaAndRefs(removedSheet: SheetId): DocumentOp[] {
+  private snapshot_external_formula_and_refs(removed_sheet: SheetId): DocumentOp[] {
     const patches: DocumentOp[] = [];
     for (const sheet of this.options.store.getWorkbook().sheets) {
-      if (sheet.id === removedSheet) continue;
+      if (sheet.id === removed_sheet) continue;
       const engine = storeEngine(this.options.store);
       if (engine) {
         const sources = engine.captureSheetSources(sheet.id);
@@ -1500,14 +1506,17 @@ export class DocumentController {
           for (let col = 0; col < sheet.columns.length; col++) {
             const addr = { sheet: sheet.id, row, col };
             if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
-              patches.push(this.snapshotCell(addr));
+              patches.push(this.snapshot_cell(addr));
             }
           }
         }
       }
 
       for (const hyperlink of sheet.hyperlinks ?? []) {
-        if (hyperlink.target.kind === "internal" && hyperlink.target.range.sheet === removedSheet) {
+        if (
+          hyperlink.target.kind === "internal" &&
+          hyperlink.target.range.sheet === removed_sheet
+        ) {
           patches.push({
             op: "setHyperlink",
             sheet: sheet.id,
@@ -1520,7 +1529,7 @@ export class DocumentController {
     return patches;
   }
 
-  private snapshotSpanFormulas(): DocumentOp[] {
+  private snapshot_span_formulas(): DocumentOp[] {
     const engine = storeEngine(this.options.store);
     if (!engine) return [];
     const patches: DocumentOp[] = [];
@@ -1548,18 +1557,18 @@ export class DocumentController {
    * right after its own edit, and later edits in the batch may resize the sheet
    * again, so each edit's extent is recovered from the final one.
    */
-  private rebaseHistoryFor(
+  private rebase_history_for(
     patches: readonly DocumentOp[],
     defer?: (edit: AxisResize, extent: number) => void,
   ): void {
     const extents = new Map<SheetId, { row: number; col: number }>();
     for (const patch of patches) {
-      const edit = axisResize(patch);
+      const edit = axis_resize(patch);
       if (!edit) continue;
 
       let extent = extents.get(edit.sheet);
       if (!extent) {
-        const sheet = this.sheetById(edit.sheet);
+        const sheet = this.sheet_by_id(edit.sheet);
         extent = { row: sheet?.rowCount ?? 0, col: sheet?.columns.length ?? 0 };
         extents.set(edit.sheet, extent);
       }
@@ -1567,7 +1576,7 @@ export class DocumentController {
     }
 
     for (const patch of patches) {
-      const edit = axisResize(patch);
+      const edit = axis_resize(patch);
       const extent = edit && extents.get(edit.sheet);
       if (!edit || !extent) continue;
 
@@ -1577,24 +1586,24 @@ export class DocumentController {
     }
   }
 
-  private applyHistoryPatches(
+  private apply_history_patches(
     step: HistoryStep,
     reason: "undo" | "redo",
   ): ApplyTransactionResult | null {
-    this.applyingHistory = true;
+    this.applying_history = true;
     let outcome: ApplyTransactionResult;
     const preparation = new TransactionPreparation();
     try {
       const patches = materializeHistoryAction(step.action, preparation);
       if (patches.length === 0) return null;
-      const fitted = this.fitHistoryPatches(patches, preparation);
+      const fitted = this.fit_history_patches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
       preparation.dispose();
-      this.applyingHistory = false;
+      this.applying_history = false;
     }
     if (outcome.status !== "applied") return outcome;
-    this.rebaseHistoryFor(outcome.transaction.patches);
+    this.rebase_history_for(outcome.transaction.patches);
     this.options.onHistoryApplied(outcome.transaction.patches, {
       direction: reason,
       name: step.name,
@@ -1612,18 +1621,18 @@ export class DocumentController {
    * multi-version commit in sync. The returned measurement lets the commit
    * skip a second walk of the payload.
    */
-  private fitHistoryPatches(
+  private fit_history_patches(
     patches: DocumentOp[],
     preparation: TransactionPreparation,
   ): {
     patches: DocumentOp[];
     admitted?: AdmittedTransactionResources;
   } {
-    const limits = this.transactionResourceLimits;
-    const encodedBytes = preparation.measure(patches);
+    const limits = this.transaction_resource_limits;
+    const encoded_bytes = preparation.measure(patches);
     const resources =
-      patches.length <= limits.maxOperations && encodedBytes <= limits.maxEncodedBytes
-        ? { ok: true as const, operationCount: patches.length, encodedBytes }
+      patches.length <= limits.maxOperations && encoded_bytes <= limits.maxEncodedBytes
+        ? { ok: true as const, operationCount: patches.length, encodedBytes: encoded_bytes }
         : {
             ok: false as const,
             issue: {
@@ -1633,7 +1642,7 @@ export class DocumentController {
                 patches.length > limits.maxOperations
                   ? ("operations" as const)
                   : ("encoded-bytes" as const),
-              actual: patches.length > limits.maxOperations ? patches.length : encodedBytes,
+              actual: patches.length > limits.maxOperations ? patches.length : encoded_bytes,
               max:
                 patches.length > limits.maxOperations
                   ? limits.maxOperations
@@ -1647,7 +1656,7 @@ export class DocumentController {
     }
 
     if (resources.issue.kind !== "resource-limit") return { patches };
-    if (resources.issue.resource === "encoded-bytes" && this.compactRestoreMayFit(patches)) {
+    if (resources.issue.resource === "encoded-bytes" && this.compact_restore_may_fit(patches)) {
       const compact = patches.map((patch) => {
         if (patch.op !== "setBlock") return patch;
         try {
@@ -1659,19 +1668,19 @@ export class DocumentController {
           return operation;
         } catch (error) {
           // Above the restore block caps the block stays a candidate for splitting.
-          const aboveCap =
+          const above_cap =
             error instanceof RangeError ||
             (error instanceof SheetwriteError && error.code === "resource-limit");
-          if (!aboveCap) throw error;
+          if (!above_cap) throw error;
           return patch;
         }
       });
 
-      const compactResources = validateTransactionResources(compact, limits);
-      if (compactResources.ok) {
+      const compact_resources = validateTransactionResources(compact, limits);
+      if (compact_resources.ok) {
         return {
           patches: compact,
-          admitted: admitTransactionResources(compact, limits, compactResources),
+          admitted: admitTransactionResources(compact, limits, compact_resources),
         };
       }
     }
@@ -1679,15 +1688,15 @@ export class DocumentController {
     const split = splitOversizedBlocks(patches, limits);
     if (!split) return { patches };
     const batch = markAtomicBatch(split.operations);
-    const batchLimits = atomicBatchLimits(limits);
-    const fitsBatch =
-      batch.length <= batchLimits.maxOperations &&
-      split.encodedBytes <= batchLimits.maxEncodedBytes;
+    const batch_limits = atomicBatchLimits(limits);
+    const fits_batch =
+      batch.length <= batch_limits.maxOperations &&
+      split.encodedBytes <= batch_limits.maxEncodedBytes;
     return {
       patches: batch,
-      ...(fitsBatch
+      ...(fits_batch
         ? {
-            admitted: admitTransactionResources(batch, batchLimits, {
+            admitted: admitTransactionResources(batch, batch_limits, {
               operationCount: batch.length,
               encodedBytes: split.encodedBytes,
             }),
@@ -1697,12 +1706,12 @@ export class DocumentController {
   }
 
   /** Whether the combined block compression estimate fits one transaction. */
-  private compactRestoreMayFit(patches: readonly DocumentOp[]): boolean {
+  private compact_restore_may_fit(patches: readonly DocumentOp[]): boolean {
     let estimate = 0;
     for (const patch of patches) {
       if (patch.op === "setBlock") estimate += estimateRestoreBlockBytes(patch.block);
     }
-    return estimate <= this.transactionResourceLimits.maxEncodedBytes;
+    return estimate <= this.transaction_resource_limits.maxEncodedBytes;
   }
 
   /**
@@ -1710,12 +1719,12 @@ export class DocumentController {
    * no caller to read it, so they report it through `mutation-rejected`, as the
    * admission and store rejections already do.
    */
-  private rejectResources(issue: MutationIssue): ApplyTransactionResult {
-    if (this.applyingHistory) this.options.onMutationRejected([issue]);
+  private reject_resources(issue: MutationIssue): ApplyTransactionResult {
+    if (this.applying_history) this.options.onMutationRejected([issue]);
     return { status: "rejected", epoch: this.options.epoch(), issues: [issue] };
   }
 
-  private sheetById(id: SheetId): Sheet | null {
+  private sheet_by_id(id: SheetId): Sheet | null {
     return this.options.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
 
@@ -1723,13 +1732,13 @@ export class DocumentController {
    * `range` cut to the rows its sheet has now, or null when it starts past
    * them. A range written upward (end above start) is kept as it is.
    */
-  private existingRows(range: Range): Range | null {
-    const rowCount = this.sheetById(range.sheet)?.rowCount;
-    if (rowCount === undefined || range.start.row > range.end.row || range.end.row < rowCount) {
+  private existing_rows(range: Range): Range | null {
+    const row_count = this.sheet_by_id(range.sheet)?.rowCount;
+    if (row_count === undefined || range.start.row > range.end.row || range.end.row < row_count) {
       return range;
     }
-    if (range.start.row >= rowCount) return null;
-    return { ...range, end: { row: rowCount - 1, col: range.end.col } };
+    if (range.start.row >= row_count) return null;
+    return { ...range, end: { row: row_count - 1, col: range.end.col } };
   }
 }
 
@@ -1737,7 +1746,7 @@ export class DocumentController {
  * Rejections by the fixed transaction and server-version limits, which no
  * retry can pass.
  */
-function exceedsTransactionLimit(issue: MutationIssue): boolean {
+function exceeds_transaction_limit(issue: MutationIssue): boolean {
   return (
     issue.kind === "resource-limit" &&
     (issue.resource === "operations" ||
@@ -1747,7 +1756,7 @@ function exceedsTransactionLimit(issue: MutationIssue): boolean {
 }
 
 /** The row or column count change `patch` makes; null for any other operation. */
-function axisResize(patch: DocumentOp): AxisResize | null {
+function axis_resize(patch: DocumentOp): AxisResize | null {
   switch (patch.op) {
     case "addRows":
       return { sheet: patch.sheet, axis: "row", at: patch.at, delta: patch.count };
@@ -1762,7 +1771,7 @@ function axisResize(patch: DocumentOp): AxisResize | null {
   }
 }
 
-function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {
+function previous_column_patch(column: Column, changed: Partial<Column>): Partial<Column> {
   const previous: Partial<Column> = {};
   for (const key of Object.keys(changed) as Array<keyof Column>) {
     Reflect.set(previous, key, column[key]);
@@ -1775,12 +1784,12 @@ function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<
  * the entry the edit replaced, or remove the entry a set added. Removing an
  * entry that did not exist needs no inverse.
  */
-function entryInverse<T>(
+function entry_inverse<T>(
   previous: T | undefined,
   restore: (entry: T) => DocumentOp,
-  removeAdded: DocumentOp | null,
+  remove_added: DocumentOp | null,
 ): DocumentOp[] {
   if (previous !== undefined) return [restore(previous)];
 
-  return removeAdded ? [removeAdded] : [];
+  return remove_added ? [remove_added] : [];
 }

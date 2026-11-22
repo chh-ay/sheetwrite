@@ -102,7 +102,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   }
 
   /** The distance from a point to a box's outline. */
-  function toEdge(point: Point, box: Box): number {
+  function to_edge(point: Point, box: Box): number {
     const dx = Math.max(box.x - point.x, 0, point.x - (box.x + box.width));
     const dy = Math.max(box.y - point.y, 0, point.y - (box.y + box.height));
     if (dx > 0 || dy > 0) return Math.hypot(dx, dy);
@@ -114,7 +114,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
     );
   }
 
-  function toSegment(point: Point, a: Point, b: Point): number {
+  function to_segment(point: Point, a: Point, b: Point): number {
     const length = distance(a, b) ** 2;
     if (length === 0) return distance(point, a);
     const t = Math.max(
@@ -138,19 +138,19 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   }
 
   /** An element's box in the picture's units, through any transforms between them. */
-  function boxIn(svg: SVGSVGElement, element: SVGGraphicsElement): Box {
+  function box_in(svg: SVGSVGElement, element: SVGGraphicsElement): Box {
     const local = element.getBBox();
-    const toPicture = svg
+    const to_picture = svg
       .getScreenCTM()
       ?.inverse()
       .multiply(element.getScreenCTM() ?? new DOMMatrix());
-    if (toPicture === undefined) return local;
+    if (to_picture === undefined) return local;
     const corners = [
       new DOMPoint(local.x, local.y),
       new DOMPoint(local.x + local.width, local.y),
       new DOMPoint(local.x, local.y + local.height),
       new DOMPoint(local.x + local.width, local.y + local.height),
-    ].map((corner) => corner.matrixTransform(toPicture));
+    ].map((corner) => corner.matrixTransform(to_picture));
     const xs = corners.map((corner) => corner.x);
     const ys = corners.map((corner) => corner.y);
     const x = Math.min(...xs);
@@ -159,12 +159,12 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   }
 
   /** A path made only of zero-length strokes: a dot grid, which hides nothing and needs nothing hidden. */
-  const isDotGrid = (path: SVGPathElement) =>
+  const is_dot_grid = (path: SVGPathElement) =>
     subpaths(path.getAttribute("d") ?? "").every((points) =>
       points.every((point) => distance(point, points[0] as Point) === 0),
     );
 
-  const isFilled = (element: Element) => {
+  const is_filled = (element: Element) => {
     const fill = getComputedStyle(element).fill;
     return fill !== "none" && !fill.startsWith("rgba(0, 0, 0, 0)");
   };
@@ -173,7 +173,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
 
   /** A CSS colour as sRGB over `under`: a canvas normalises every colour syntax to sRGB. */
   const canvas = document.createElement("canvas").getContext("2d");
-  function colourOf(value: string, under: Rgb): Rgb {
+  function colour_of(value: string, under: Rgb): Rgb {
     if (canvas === null) throw new Error("No 2D canvas to read colours with");
     canvas.clearRect(0, 0, 1, 1);
     canvas.fillStyle = `rgb(${under.join(" ")})`;
@@ -185,7 +185,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   }
 
   /** The page colour behind a picture: the nearest ancestor with a background colour. */
-  function pageBackground(svg: SVGSVGElement): Rgb {
+  function page_background(svg: SVGSVGElement): Rgb {
     let colour: Rgb = [255, 255, 255];
     const layers: string[] = [];
     for (let element: Element | null = svg; element !== null; element = element.parentElement) {
@@ -193,7 +193,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       if (background !== "rgba(0, 0, 0, 0)" && background !== "transparent")
         layers.push(background);
     }
-    for (const layer of layers.reverse()) colour = colourOf(layer, colour);
+    for (const layer of layers.reverse()) colour = colour_of(layer, colour);
     return colour;
   }
 
@@ -223,8 +223,8 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         (element) =>
           !(element.tagName === "rect" && element.getAttribute("fill")?.startsWith("url(")),
       )
-      .filter((element) => !(element instanceof SVGPathElement && isDotGrid(element)))
-      .map((element) => ({ element, box: boxIn(svg, element) }))
+      .filter((element) => !(element instanceof SVGPathElement && is_dot_grid(element)))
+      .map((element) => ({ element, box: box_in(svg, element) }))
       .filter(({ box }) => box.width > 0 || box.height > 0);
     const boxes = drawn.filter(
       ({ element, box }) =>
@@ -256,24 +256,24 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         .map((candidate) => candidate.box)
         .filter(
           (candidate) =>
-            toEdge(centre, candidate) >= 0 &&
+            to_edge(centre, candidate) >= 0 &&
             contains(candidate, { ...centre, width: 0, height: 0 }),
         )
         .sort((a, b) => a.width * a.height - b.width * b.height)[0];
       if (holder === undefined) continue;
       // Text on a filled badge drawn over the box belongs to the badge.
-      const holderIndex = drawn.findIndex((candidate) => candidate.box === holder);
-      const textIndex = drawn.findIndex((candidate) => candidate.element === element);
-      const onBadge = drawn.some(
-        (badge, badgeIndex) =>
-          badgeIndex > holderIndex &&
-          badgeIndex < textIndex &&
+      const holder_index = drawn.findIndex((candidate) => candidate.box === holder);
+      const text_index = drawn.findIndex((candidate) => candidate.element === element);
+      const on_badge = drawn.some(
+        (badge, badge_index) =>
+          badge_index > holder_index &&
+          badge_index < text_index &&
           badge.element.tagName !== "text" &&
           badge.element.tagName !== "rect" &&
-          isFilled(badge.element) &&
+          is_filled(badge.element) &&
           contains(badge.box, { ...centre, width: 0, height: 0 }),
       );
-      if (onBadge) continue;
+      if (on_badge) continue;
       const over = Math.max(
         holder.x + 2 - box.x,
         box.x + box.width - (holder.x + holder.width - 2),
@@ -292,16 +292,16 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         .filter(
           (entry) =>
             entry.element.tagName !== "text" &&
-            isFilled(entry.element) &&
+            is_filled(entry.element) &&
             contains(entry.box, { ...centre, width: 0, height: 0 }) &&
             entry.box.width >= MIN_SHAPE,
         )
         .at(-1);
       const behind =
         backing === undefined
-          ? pageBackground(svg)
-          : colourOf(getComputedStyle(backing.element).fill, pageBackground(svg));
-      const ink = colourOf(getComputedStyle(element).fill, behind);
+          ? page_background(svg)
+          : colour_of(getComputedStyle(backing.element).fill, page_background(svg));
+      const ink = colour_of(getComputedStyle(element).fill, behind);
       const ratio = contrast(ink, behind);
       if (ratio < MIN_CONTRAST) {
         report(
@@ -311,11 +311,11 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
     }
 
     // Shapes drawn later than a box either stay clear of it, sit inside it, or hide what is under them.
-    drawn.forEach((later, laterIndex) => {
+    drawn.forEach((later, later_index) => {
       if (later.element.tagName === "text" || later.element.classList.contains("mark")) return;
       if (later.box.width < MIN_SHAPE || later.box.height < MIN_SHAPE) return;
       for (const earlier of boxes) {
-        if (drawn.indexOf(earlier) >= laterIndex) continue;
+        if (drawn.indexOf(earlier) >= later_index) continue;
         if (contains(earlier.box, later.box) || contains(later.box, earlier.box)) continue;
         const shared = overlap(earlier.box, later.box);
         if (shared === undefined) continue;
@@ -327,14 +327,14 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
             `boxes at ${at(earlier.box)} and ${at(later.box)} overlap by ${round(shared.width)} × ${round(shared.height)}`,
           );
         } else if (
-          !isFilled(later.element) &&
+          !is_filled(later.element) &&
           // A mark on a filled badge, drawn after the box, sits on the badge, not on the box.
           !drawn.some(
-            (badge, badgeIndex) =>
-              badgeIndex > drawn.indexOf(earlier) &&
-              badgeIndex < laterIndex &&
+            (badge, badge_index) =>
+              badge_index > drawn.indexOf(earlier) &&
+              badge_index < later_index &&
               badge.element.tagName !== "text" &&
-              isFilled(badge.element) &&
+              is_filled(badge.element) &&
               contains(badge.box, later.box),
           )
         ) {
@@ -352,15 +352,15 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       for (const { element, box } of drawn) {
         if (element === frame.element || element.tagName === "text" || !contains(frame.box, box))
           continue;
-        const ownRadius = Number(element.getAttribute("rx") ?? 0);
-        const reachesX =
-          box.x < frame.box.x + radius - ownRadius ||
-          box.x + box.width > frame.box.x + frame.box.width - radius + ownRadius;
-        const reachesY =
-          box.y < frame.box.y + radius - ownRadius ||
-          box.y + box.height > frame.box.y + frame.box.height - radius + ownRadius;
-        const isFill = element.tagName === "rect" && isFilled(element);
-        if (isFill && reachesX && reachesY && box.width < frame.box.width - TOLERANCE) {
+        const own_radius = Number(element.getAttribute("rx") ?? 0);
+        const reaches_x =
+          box.x < frame.box.x + radius - own_radius ||
+          box.x + box.width > frame.box.x + frame.box.width - radius + own_radius;
+        const reaches_y =
+          box.y < frame.box.y + radius - own_radius ||
+          box.y + box.height > frame.box.y + frame.box.height - radius + own_radius;
+        const is_fill = element.tagName === "rect" && is_filled(element);
+        if (is_fill && reaches_x && reaches_y && box.width < frame.box.width - TOLERANCE) {
           report(
             `a filled ${element.tagName} at ${at(box)} pokes out of the rounded corner of the frame at ${at(frame.box)}`,
           );
@@ -382,24 +382,26 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         ({ element, box }) =>
           element instanceof SVGPathElement &&
           /z\s*$/i.test(element.getAttribute("d") ?? "") &&
-          isFilled(element) &&
+          is_filled(element) &&
           box.width >= MIN_BOX.width &&
           box.height >= MIN_BOX.height,
       ),
     ];
-    const nearestBox = (point: Point) =>
-      targets.map(({ box }) => ({ box, gap: toEdge(point, box) })).sort((a, b) => a.gap - b.gap)[0];
+    const nearest_box = (point: Point) =>
+      targets
+        .map(({ box }) => ({ box, gap: to_edge(point, box) }))
+        .sort((a, b) => a.gap - b.gap)[0];
     /** Whether a point lies on a line drawn by any other path. */
-    const touchesOtherLine = (point: Point, index: number) =>
+    const touches_other_line = (point: Point, index: number) =>
       lines.some(
-        (other, otherIndex) =>
-          otherIndex !== index &&
+        (other, other_index) =>
+          other_index !== index &&
           other.some((points) =>
             points
               .slice(1)
               .some(
-                (next, pointIndex) =>
-                  toSegment(point, points[pointIndex] as Point, next) <= TOLERANCE,
+                (next, point_index) =>
+                  to_segment(point, points[point_index] as Point, next) <= TOLERANCE,
               ),
           ),
       );
@@ -418,17 +420,17 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       const tip = head[1] as Point;
       const start = shaft[0]?.[0] as Point;
       // A shaft that bends but stays within a narrow band is a jog between nearly aligned boxes.
-      const shaftPoints = shaft.flat();
-      const xs = shaftPoints.map((point) => point.x);
-      const ys = shaftPoints.map((point) => point.y);
+      const shaft_points = shaft.flat();
+      const xs = shaft_points.map((point) => point.x);
+      const ys = shaft_points.map((point) => point.y);
       const spread = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
       if (spread > 0.5 && spread < MIN_JOG) {
         report(`an arrow into ${at(tip)} jogs ${round(spread)} sideways; line its boxes up`);
       }
-      const end = nearestBox(tip);
+      const end = nearest_box(tip);
       // In a sequence, a message ends on another lane's lifeline.
-      const tipOnLine = touchesOtherLine(tip, index);
-      if (!tipOnLine && (end === undefined || end.gap > TOLERANCE)) {
+      const tip_on_line = touches_other_line(tip, index);
+      if (!tip_on_line && (end === undefined || end.gap > TOLERANCE)) {
         report(
           `an arrow ends at ${at(tip)}, ${end === undefined ? "with no box" : `${round(end.gap)} from the nearest box edge`}`,
         );
@@ -436,9 +438,9 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         tips.push({ tip, box: end.box });
       }
       // A branch may start on another line, such as a fan's bus or a lane's lifeline.
-      const onLine = touchesOtherLine(start, index);
-      const begin = nearestBox(start);
-      if (!onLine && (begin === undefined || begin.gap > TOLERANCE)) {
+      const on_line = touches_other_line(start, index);
+      const begin = nearest_box(start);
+      if (!on_line && (begin === undefined || begin.gap > TOLERANCE)) {
         report(
           `an arrow starts at ${at(start)}, ${begin === undefined ? "with no box" : `${round(begin.gap)} from the nearest box edge`}`,
         );
@@ -454,7 +456,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   }
 
   /** A picture's name: its title, else the card or section it illustrates. */
-  function nameOf(svg: SVGSVGElement): string {
+  function name_of(svg: SVGSVGElement): string {
     const title = svg.querySelector("title")?.textContent;
     if (title) return title;
     const holder = svg.closest(".sw-card, a, section, header, article");
@@ -467,7 +469,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   const defects: ArtDefect[] = [];
   const visible = (svg: SVGSVGElement) => svg.getBoundingClientRect().width > 0;
   for (const svg of document.querySelectorAll<SVGSVGElement>("svg.sw-art")) {
-    if (visible(svg)) check(svg, nameOf(svg), defects);
+    if (visible(svg)) check(svg, name_of(svg), defects);
   }
 
   // Section card pictures are files a <use> points at. Each file is drawn once,

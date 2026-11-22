@@ -218,7 +218,7 @@ function median(samples: number[]): number {
  * Check that every capture covers the whole matrix and that neither engine
  * changed between captures. Returns the rows each side skipped.
  */
-function validatePairs(pairs: readonly FormulaGatePair[]): FormulaSkippedRow[] {
+function validate_pairs(pairs: readonly FormulaGatePair[]): FormulaSkippedRow[] {
   if (pairs.length < MINIMUM_PAIRS) {
     throw new Error(`Formula gate needs at least ${MINIMUM_PAIRS} pairs`);
   }
@@ -249,9 +249,9 @@ function validatePairs(pairs: readonly FormulaGatePair[]): FormulaSkippedRow[] {
   );
 }
 
-function acceptedByteRows(
+function accepted_byte_rows(
   pairs: readonly FormulaGatePair[],
-  byteKeys: ReadonlySet<string>,
+  byte_keys: ReadonlySet<string>,
   acceptance: FormulaByteAcceptance | undefined,
 ): Map<string, { maximum: number; reason: string }> {
   const accepted = new Map<string, { maximum: number; reason: string }>();
@@ -267,7 +267,7 @@ function acceptedByteRows(
   }
   for (const row of acceptance.rows) {
     if (
-      !byteKeys.has(row.key) ||
+      !byte_keys.has(row.key) ||
       accepted.has(row.key) ||
       !Number.isSafeInteger(row.maximum) ||
       row.maximum < 0 ||
@@ -291,40 +291,42 @@ export function compareFormulaPairs(
   limits: ReadonlyMap<string, number> = FORMULA_RATIO_LIMITS,
   acceptance?: FormulaByteAcceptance,
 ): FormulaGateVerdict {
-  const skipped = validatePairs(pairs);
-  const skippedKeys = new Set(skipped.map((row) => row.key));
+  const skipped = validate_pairs(pairs);
+  const skipped_keys = new Set(skipped.map((row) => row.key));
   const first = pairs[0];
   if (first === undefined) throw new Error("Formula gate has no pairs");
 
   const keys = Object.keys(first.base.timings)
-    .filter((key) => !skippedKeys.has(key))
+    .filter((key) => !skipped_keys.has(key))
     .sort();
-  const byteKeys = Object.keys(first.base.bytes)
-    .filter((key) => !skippedKeys.has(key.split(ALLOCATION_ROW)[0] ?? key))
+  const byte_keys = Object.keys(first.base.bytes)
+    .filter((key) => !skipped_keys.has(key.split(ALLOCATION_ROW)[0] ?? key))
     .sort();
-  const accepted = acceptedByteRows(pairs, new Set(byteKeys), acceptance);
+  const accepted = accepted_byte_rows(pairs, new Set(byte_keys), acceptance);
 
   const timings = keys.map((key): FormulaTimingVerdict => {
-    const ratioLimit = limits.get(key);
-    if (ratioLimit === undefined) throw new Error(`No reviewed formula ratio limit for ${key}`);
+    const ratio_limit = limits.get(key);
+    if (ratio_limit === undefined) throw new Error(`No reviewed formula ratio limit for ${key}`);
     const base = pairs.map((pair) => pair.base.timings[key] ?? NaN);
     const candidate = pairs.map((pair) => pair.candidate.timings[key] ?? NaN);
     if (base.some((duration) => duration <= 0) || candidate.some((duration) => duration < 0)) {
       throw new Error(`${key} has invalid durations`);
     }
 
-    const pairedRatio = median(base.map((duration, index) => (candidate[index] ?? NaN) / duration));
+    const paired_ratio = median(
+      base.map((duration, index) => (candidate[index] ?? NaN) / duration),
+    );
     return {
       key,
       baseMs: median(base),
       candidateMs: median(candidate),
-      pairedRatio,
-      ratioLimit,
-      passed: pairedRatio <= ratioLimit,
+      pairedRatio: paired_ratio,
+      ratioLimit: ratio_limit,
+      passed: paired_ratio <= ratio_limit,
     };
   });
 
-  const bytes = byteKeys.map((key): FormulaByteVerdict => {
+  const bytes = byte_keys.map((key): FormulaByteVerdict => {
     // The counters are nearly deterministic, but a row can differ by a few
     // bytes between same-engine captures (topology-remove-add/10K, 105 B in
     // one of 14). Real growth appears in every capture, so the middle one
@@ -368,7 +370,7 @@ export function compareFormulaPairs(
 }
 
 /** Run this checkout's harness against the engine artifacts built in `checkout`. */
-function captureSide(checkout: string): FormulaGateCapture {
+function capture_side(checkout: string): FormulaGateCapture {
   const child = Bun.spawnSync([process.execPath, "run", HARNESS, "--gate-capture"], {
     cwd: resolve(HARNESS_ROOT, "bench"),
     env: { ...process.env, SHEETWRITE_BENCH_ENGINE_ROOT: checkout },
@@ -413,44 +415,44 @@ function report(verdict: FormulaGateVerdict): string {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const basePath = optionValue(args, "--base");
-  if (basePath === undefined) throw new Error("--base requires a checkout with built engines");
-  const base = resolve(basePath);
+  const base_path = optionValue(args, "--base");
+  if (base_path === undefined) throw new Error("--base requires a checkout with built engines");
+  const base = resolve(base_path);
   const candidate = resolve(optionValue(args, "--candidate") ?? HARNESS_ROOT);
-  const pairCount = Number(optionValue(args, "--pairs") ?? DEFAULT_PAIRS);
-  if (!Number.isInteger(pairCount) || pairCount < MINIMUM_PAIRS) {
+  const pair_count = Number(optionValue(args, "--pairs") ?? DEFAULT_PAIRS);
+  if (!Number.isInteger(pair_count) || pair_count < MINIMUM_PAIRS) {
     throw new Error(`--pairs must be at least ${MINIMUM_PAIRS}`);
   }
-  const outputPath = optionValue(args, "--output");
-  const acceptancePath = optionValue(args, "--accept-bytes");
+  const output_path = optionValue(args, "--output");
+  const acceptance_path = optionValue(args, "--accept-bytes");
   const acceptance =
-    acceptancePath === undefined
+    acceptance_path === undefined
       ? undefined
-      : (JSON.parse(readFileSync(acceptancePath, "utf8")) as FormulaByteAcceptance);
+      : (JSON.parse(readFileSync(acceptance_path, "utf8")) as FormulaByteAcceptance);
 
-  const capturePairs = (count: number): FormulaGatePair[] =>
+  const capture_pairs = (count: number): FormulaGatePair[] =>
     Array.from({ length: count }, (_, index) => {
       // Alternate AB and BA so neither side always runs first after the other.
       if (index % 2 === 0) {
-        const baseCapture = captureSide(base);
-        return { base: baseCapture, candidate: captureSide(candidate) };
+        const base_capture = capture_side(base);
+        return { base: base_capture, candidate: capture_side(candidate) };
       }
-      const candidateCapture = captureSide(candidate);
-      return { base: captureSide(base), candidate: candidateCapture };
+      const candidate_capture = capture_side(candidate);
+      return { base: capture_side(base), candidate: candidate_capture };
     });
 
-  let pairs = capturePairs(pairCount);
+  let pairs = capture_pairs(pair_count);
   let verdict = compareFormulaPairs(pairs, FORMULA_RATIO_LIMITS, acceptance);
   // A timing failure from one noisy window rarely repeats; a real slowdown
   // does. Confirm it on twice as many pairs before reporting it.
   const confirming = verdict.timings.some((row) => !row.passed);
   if (confirming) {
-    pairs = [...pairs, ...capturePairs(pairCount)];
+    pairs = [...pairs, ...capture_pairs(pair_count)];
     verdict = compareFormulaPairs(pairs, FORMULA_RATIO_LIMITS, acceptance);
   }
 
-  if (outputPath !== undefined) {
-    await Bun.write(outputPath, `${JSON.stringify({ pairs, verdict }, null, 2)}\n`);
+  if (output_path !== undefined) {
+    await Bun.write(output_path, `${JSON.stringify({ pairs, verdict }, null, 2)}\n`);
   }
   if (confirming) process.stdout.write(`Timing failures re-judged on ${pairs.length} pairs.\n`);
   process.stdout.write(report(verdict));

@@ -11,7 +11,7 @@ import type { WorkbookTable } from "../types/table.js";
 import { panelField, panelSection, rejectionMessage, selectOf } from "./panel-dom.js";
 
 /** What `RelationshipStatus` means to a user; rows count from 1 below the header. */
-function statusText(status: RelationshipStatus): string {
+function status_text(status: RelationshipStatus): string {
   switch (status.status) {
     case "ok":
       return status.unmatched === 0
@@ -30,25 +30,29 @@ function statusText(status: RelationshipStatus): string {
   }
 }
 
-function controlButton(label: string, run: () => void, focusKey?: string): HTMLButtonElement {
+function control_button(label: string, run: () => void, focus_key?: string): HTMLButtonElement {
   const control = document.createElement("button");
   control.type = "button";
   control.className = "sheetwrite-panel-control";
   control.textContent = label;
-  if (focusKey !== undefined) control.dataset.focusKey = focusKey;
+  if (focus_key !== undefined) control.dataset.focusKey = focus_key;
   control.addEventListener("click", run);
   return control;
 }
 
 /** `Table[Column]` for one side of a relationship. */
-function columnLabel(tables: readonly WorkbookTable[], tableId: string, columnId: string): string {
-  const table = tables.find((candidate) => candidate.id === tableId);
-  const column = table?.columns.find((candidate) => candidate.id === columnId);
-  return `${table?.name ?? tableId}[${column?.name ?? columnId}]`;
+function column_label(
+  tables: readonly WorkbookTable[],
+  table_id: string,
+  column_id: string,
+): string {
+  const table = tables.find((candidate) => candidate.id === table_id);
+  const column = table?.columns.find((candidate) => candidate.id === column_id);
+  return `${table?.name ?? table_id}[${column?.name ?? column_id}]`;
 }
 
 /** The first `relationship-N` ID that no relationship uses. */
-function nextRelationshipId(relationships: readonly TableRelationship[]): string {
+function next_relationship_id(relationships: readonly TableRelationship[]): string {
   const ids = new Set(relationships.map((relationship) => relationship.id));
   let index = 1;
   while (ids.has(`relationship-${index}`)) index += 1;
@@ -64,20 +68,20 @@ export function relationshipPanel(grid: Grid): GridPanel {
   return {
     title: "Data Model",
     render(body) {
-      const tablesSection = panelSection("Tables");
-      const tableList = document.createElement("ul");
-      tablesSection.append(tableList);
+      const tables_section = panelSection("Tables");
+      const table_list = document.createElement("ul");
+      tables_section.append(table_list);
 
-      const listSection = panelSection("Relationships");
+      const list_section = panelSection("Relationships");
       const entries = document.createElement("div");
-      listSection.append(entries);
+      list_section.append(entries);
 
-      const editorSection = panelSection("Relationship");
+      const editor_section = panelSection("Relationship");
       const form = document.createElement("form");
-      const fromTable = panelField("Data table", selectOf([], ""), "from-table");
-      const fromColumn = panelField("Key column", selectOf([], ""), "from-column");
-      const toTable = panelField("Lookup table", selectOf([], ""), "to-table");
-      const toColumn = panelField("Key column", selectOf([], ""), "to-column");
+      const from_table = panelField("Data table", selectOf([], ""), "from-table");
+      const from_column = panelField("Key column", selectOf([], ""), "from-column");
+      const to_table = panelField("Lookup table", selectOf([], ""), "to-table");
+      const to_column = panelField("Key column", selectOf([], ""), "to-column");
       const save = document.createElement("button");
       save.type = "submit";
       save.className = "sheetwrite-panel-control";
@@ -91,7 +95,7 @@ export function relationshipPanel(grid: Grid): GridPanel {
         grid.store.getWorkbook().dataModel?.relationships ?? [];
 
       /** Fill a column picker from the table that `table` selects, keeping a valid choice. */
-      const fillColumns = (table: HTMLSelectElement, column: HTMLSelectElement): void => {
+      const fill_columns = (table: HTMLSelectElement, column: HTMLSelectElement): void => {
         const chosen = tables().find((candidate) => candidate.id === table.value);
         const options = (chosen?.columns ?? []).map((entry): [string, string] => [
           entry.id,
@@ -104,57 +108,57 @@ export function relationshipPanel(grid: Grid): GridPanel {
         column.value = value;
       };
 
-      const fillTables = (): void => {
+      const fill_tables = (): void => {
         const options = tables().map((table): [string, string] => [table.id, table.name]);
-        for (const picker of [fromTable.control, toTable.control]) {
+        for (const picker of [from_table.control, to_table.control]) {
           const value = options.some(([id]) => id === picker.value)
             ? picker.value
             : (options[0]?.[0] ?? "");
           picker.replaceChildren(...selectOf(options, value).childNodes);
           picker.value = value;
         }
-        if (toTable.control.value === fromTable.control.value && options[1] !== undefined) {
-          toTable.control.value = options[1][0];
+        if (to_table.control.value === from_table.control.value && options[1] !== undefined) {
+          to_table.control.value = options[1][0];
         }
-        fillColumns(fromTable.control, fromColumn.control);
-        fillColumns(toTable.control, toColumn.control);
+        fill_columns(from_table.control, from_column.control);
+        fill_columns(to_table.control, to_column.control);
       };
 
       const edit = (relationship: TableRelationship | undefined): void => {
         editing = relationship?.id;
         if (relationship !== undefined) {
-          fromTable.control.value = relationship.from.table;
-          fillColumns(fromTable.control, fromColumn.control);
-          fromColumn.control.value = relationship.from.column;
-          toTable.control.value = relationship.to.table;
-          fillColumns(toTable.control, toColumn.control);
-          toColumn.control.value = relationship.to.column;
+          from_table.control.value = relationship.from.table;
+          fill_columns(from_table.control, from_column.control);
+          from_column.control.value = relationship.from.column;
+          to_table.control.value = relationship.to.table;
+          fill_columns(to_table.control, to_column.control);
+          to_column.control.value = relationship.to.column;
         }
-        toColumn.setError(null);
-        fromTable.control.focus();
+        to_column.setError(null);
+        from_table.control.focus();
       };
 
-      fromTable.control.addEventListener("change", () =>
-        fillColumns(fromTable.control, fromColumn.control),
+      from_table.control.addEventListener("change", () =>
+        fill_columns(from_table.control, from_column.control),
       );
-      toTable.control.addEventListener("change", () =>
-        fillColumns(toTable.control, toColumn.control),
+      to_table.control.addEventListener("change", () =>
+        fill_columns(to_table.control, to_column.control),
       );
       form.append(
-        fromTable.element,
-        fromColumn.element,
-        toTable.element,
-        toColumn.element,
+        from_table.element,
+        from_column.element,
+        to_table.element,
+        to_column.element,
         save,
-        controlButton("New relationship", () => edit(undefined), "new-relationship"),
+        control_button("New relationship", () => edit(undefined), "new-relationship"),
       );
-      editorSection.append(form);
-      body.append(tablesSection, listSection, editorSection);
+      editor_section.append(form);
+      body.append(tables_section, list_section, editor_section);
 
       const draw = (): void => {
-        const workbookTables = tables();
-        tableList.replaceChildren(
-          ...workbookTables.map((table) => {
+        const workbook_tables = tables();
+        table_list.replaceChildren(
+          ...workbook_tables.map((table) => {
             const item = document.createElement("li");
             const rows =
               table.range.end.row -
@@ -176,43 +180,43 @@ export function relationshipPanel(grid: Grid): GridPanel {
           entries.append(empty);
         }
         for (const relationship of relationships()) {
-          const label = `${columnLabel(workbookTables, relationship.from.table, relationship.from.column)} → ${columnLabel(workbookTables, relationship.to.table, relationship.to.column)}`;
+          const label = `${column_label(workbook_tables, relationship.from.table, relationship.from.column)} → ${column_label(workbook_tables, relationship.to.table, relationship.to.column)}`;
           const row = panelSection(label);
           const status = document.createElement("p");
           status.className = "sheetwrite-panel-note";
-          status.textContent = statusText(
+          status.textContent = status_text(
             engine?.getRelationshipStatus(relationship.id) ?? { status: "unavailable" },
           );
-          const change = controlButton("Edit", () => edit(relationship));
+          const change = control_button("Edit", () => edit(relationship));
           change.setAttribute("aria-label", `Edit ${label}`);
-          const remove = controlButton("Delete", () => {
+          const remove = control_button("Delete", () => {
             const result = grid.applyTransaction({
               patches: [{ op: "removeRelationship", id: relationship.id }],
             });
-            toColumn.setError(rejectionMessage(result));
+            to_column.setError(rejectionMessage(result));
           });
           remove.setAttribute("aria-label", `Delete ${label}`);
           row.append(status, change, remove);
           entries.append(row);
         }
-        fillTables();
+        fill_tables();
       };
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         const relationship: TableRelationship = {
-          id: editing ?? nextRelationshipId(relationships()),
-          from: { table: fromTable.control.value, column: fromColumn.control.value },
-          to: { table: toTable.control.value, column: toColumn.control.value },
+          id: editing ?? next_relationship_id(relationships()),
+          from: { table: from_table.control.value, column: from_column.control.value },
+          to: { table: to_table.control.value, column: to_column.control.value },
         };
         if (relationship.from.table === relationship.to.table) {
-          toColumn.setError("Choose two different tables.");
+          to_column.setError("Choose two different tables.");
           return;
         }
         const patch: DocumentOp = { op: "setRelationship", relationship };
         const message = rejectionMessage(grid.applyTransaction({ patches: [patch] }));
         if (message !== null) {
-          toColumn.setError("Each pair of tables can have one relationship, without a cycle.");
+          to_column.setError("Each pair of tables can have one relationship, without a cycle.");
           return;
         }
 
@@ -221,11 +225,11 @@ export function relationshipPanel(grid: Grid): GridPanel {
         const status = storeEngine(grid.store)?.getRelationshipStatus(relationship.id);
         if (status !== undefined && status.status !== "ok" && status.status !== "unavailable") {
           grid.undo();
-          toColumn.setError(statusText(status));
+          to_column.setError(status_text(status));
           return;
         }
 
-        toColumn.setError(null);
+        to_column.setError(null);
         editing = relationship.id;
       });
 

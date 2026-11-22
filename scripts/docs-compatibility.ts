@@ -20,16 +20,16 @@ import { runOffline } from "./conformance/offline.js";
 import { repositoryRoot } from "./docs-shared.js";
 import { html } from "./evidence-format.js";
 
-let compatibilityResultsPromise: Promise<CompatibilityResults> | undefined;
+let compatibility_results_promise: Promise<CompatibilityResults> | undefined;
 
 export function compatibilityResults(): Promise<CompatibilityResults> {
-  compatibilityResultsPromise ??= (async () => {
-    const testDirectory = join(repositoryRoot, "test/conformance");
+  compatibility_results_promise ??= (async () => {
+    const test_directory = join(repositoryRoot, "test/conformance");
     const paths = {
-      inventory: join(testDirectory, "formula-contract.inventory.json"),
+      inventory: join(test_directory, "formula-contract.inventory.json"),
       captures: join(repositoryRoot, "scripts/conformance/captures"),
     };
-    const [corpus, inventory, packageJson] = await Promise.all([
+    const [corpus, inventory, package_json] = await Promise.all([
       loadCorpus(undefined, paths),
       readFormulaInventory(paths.inventory),
       readFile(join(repositoryRoot, "packages/core/package.json"), "utf8").then(
@@ -42,18 +42,18 @@ export function compatibilityResults(): Promise<CompatibilityResults> {
       corpus,
       manifest,
       offline,
-      libraryVersion: packageJson.version,
+      libraryVersion: package_json.version,
       compareObservation: compareReviewedObservation,
     });
   })();
-  return compatibilityResultsPromise;
+  return compatibility_results_promise;
 }
 
-function compatibilityCell(value: string): string {
+function compatibility_cell(value: string): string {
   return value.replaceAll("|", "\\|").replaceAll("\n", " ").trim();
 }
 
-function compatibilitySource(source: string): string {
+function compatibility_source(source: string): string {
   return source.startsWith("https://")
     ? `[spec/source](${source})`
     : `[checked source file](${repositorySourceUrl(source)})`;
@@ -114,7 +114,7 @@ export function renderCompatibilityResults(
       .filter((record) => record.warningCode !== null)
       .map(
         (record) =>
-          `| ${compatibilityCell(record.label)} | \`${record.warningCode}\` | ${compatibilityCell(record.semantics)} |`,
+          `| ${compatibility_cell(record.label)} | \`${record.warningCode}\` | ${compatibility_cell(record.semantics)} |`,
       ),
     "",
     "<details>",
@@ -143,7 +143,7 @@ export function renderCompatibilityResults(
     "## Exact sources",
     "",
     ...records.map(
-      (record) => `- ${compatibilityCell(record.label)}: ${compatibilitySource(record.source)}`,
+      (record) => `- ${compatibility_cell(record.label)}: ${compatibility_source(record.source)}`,
     ),
     "",
   ];

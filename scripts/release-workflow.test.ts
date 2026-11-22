@@ -15,10 +15,10 @@ import { assertPackagesOnRegistry } from "./release-registry-check.js";
 import { parseWorkflowContract } from "./workflow-contract.js";
 
 const SHA = "a".repeat(40);
-const workflowPath = resolve(import.meta.dir, "../.github/workflows/release.yml");
+const workflow_path = resolve(import.meta.dir, "../.github/workflows/release.yml");
 
 async function workflow() {
-  return parseWorkflowContract(await readFile(workflowPath, "utf8"), "release workflow");
+  return parseWorkflowContract(await readFile(workflow_path, "utf8"), "release workflow");
 }
 
 function artifact(name: string, version: string): ReleasePackageArtifact {
@@ -41,8 +41,8 @@ const WASM = artifact("@sheetwrite/wasm", "0.7.0");
 const CORE = artifact("@sheetwrite/core", "1.4.0");
 const REACT = artifact("@sheetwrite/react", "2.1.3");
 
-const idOf = (item: { name: string; version: string }) => `${item.name}@${item.version}`;
-const registryEntry = (
+const id_of = (item: { name: string; version: string }) => `${item.name}@${item.version}`;
+const registry_entry = (
   item: { name: string; version: string },
   integrity = `sha512-${item.name}-${item.version}`,
 ) => ({
@@ -56,7 +56,7 @@ const published = (item: ReleasePackageArtifact) => ({
   integrity: item.integrity,
 });
 
-function ciRun(overrides: Partial<CiRun> = {}): CiRun {
+function ci_run(overrides: Partial<CiRun> = {}): CiRun {
   return {
     id: 10,
     head_sha: SHA,
@@ -103,7 +103,7 @@ describe("manual package release workflow", () => {
   });
 
   it("publishes only artifacts from successful CI without repeating its gates", async () => {
-    const source = await readFile(workflowPath, "utf8");
+    const source = await readFile(workflow_path, "utf8");
     const commands = Object.values((await workflow()).jobs ?? {})
       .flatMap((job) => job.steps ?? [])
       .flatMap((step) => (step.run ? [step.run] : []))
@@ -142,17 +142,17 @@ describe("manual package release workflow", () => {
   it("takes artifacts only from the newest passed develop push CI run of the commit", () => {
     const repository = "chh-ay/sheetwrite";
     const rejected = [
-      ciRun({ id: 90, head_sha: "b".repeat(40) }),
-      ciRun({ id: 91, head_branch: "feature" }),
-      ciRun({ id: 92, event: "pull_request" }),
-      ciRun({ id: 93, status: "in_progress", conclusion: null }),
-      ciRun({ id: 94, conclusion: "failure" }),
-      ciRun({ id: 95, head_repository: { full_name: "fork/sheetwrite" } }),
+      ci_run({ id: 90, head_sha: "b".repeat(40) }),
+      ci_run({ id: 91, head_branch: "feature" }),
+      ci_run({ id: 92, event: "pull_request" }),
+      ci_run({ id: 93, status: "in_progress", conclusion: null }),
+      ci_run({ id: 94, conclusion: "failure" }),
+      ci_run({ id: 95, head_repository: { full_name: "fork/sheetwrite" } }),
     ];
 
-    expect(selectCiRun([ciRun({ id: 11 }), ciRun({ id: 12 }), ...rejected], SHA, repository)).toBe(
-      12,
-    );
+    expect(
+      selectCiRun([ci_run({ id: 11 }), ci_run({ id: 12 }), ...rejected], SHA, repository),
+    ).toBe(12);
     expect(() => selectCiRun(rejected, SHA, repository)).toThrow(
       "No successful develop push CI run",
     );
@@ -171,17 +171,17 @@ describe("manual package release workflow", () => {
   it("rejects core-only before publishing when its omitted wasm version is unavailable", async () => {
     const core = { ...CORE, internalDependencies: { "@sheetwrite/wasm": "0.7.0" } };
     const queried: string[] = [];
-    let publishCalls = 0;
+    let publish_calls = 0;
     await expect(
       publishArtifactsIdempotently(
         "/artifacts",
         [core],
         async (identity) => {
-          queried.push(idOf(identity));
+          queried.push(id_of(identity));
           return undefined;
         },
         async (_root, item) => {
-          publishCalls += 1;
+          publish_calls += 1;
           return published(item);
         },
       ),
@@ -189,7 +189,7 @@ describe("manual package release workflow", () => {
       "@sheetwrite/core@1.4.0 requires unpublished internal dependency @sheetwrite/wasm@0.7.0",
     );
     expect(queried).toEqual(["@sheetwrite/wasm@0.7.0"]);
-    expect(publishCalls).toBe(0);
+    expect(publish_calls).toBe(0);
   });
 
   it("resumes a partial publication one package at a time in dependency order, and rejects mismatched registry bytes", async () => {
@@ -199,32 +199,32 @@ describe("manual package release workflow", () => {
       "/artifacts",
       artifacts,
       async (item) => {
-        steps.push(`query:${idOf(item)}`);
-        return item.name === WASM.name ? registryEntry(WASM) : undefined;
+        steps.push(`query:${id_of(item)}`);
+        return item.name === WASM.name ? registry_entry(WASM) : undefined;
       },
       async (_root, item) => {
-        steps.push(`publish:${idOf(item)}`);
+        steps.push(`publish:${id_of(item)}`);
         await Promise.resolve();
-        steps.push(`done:${idOf(item)}`);
+        steps.push(`done:${id_of(item)}`);
         return published(item);
       },
     );
     expect(steps).toEqual([
-      `query:${idOf(WASM)}`,
+      `query:${id_of(WASM)}`,
       ...[CORE, REACT].flatMap((item) => [
-        `query:${idOf(item)}`,
-        `publish:${idOf(item)}`,
-        `done:${idOf(item)}`,
+        `query:${id_of(item)}`,
+        `publish:${id_of(item)}`,
+        `done:${id_of(item)}`,
       ]),
     ]);
-    expect(result.verifiedPackages.map(idOf)).toEqual(artifacts.map(idOf));
-    expect(result.newlyPublishedPackages.map(idOf)).toEqual([CORE, REACT].map(idOf));
+    expect(result.verifiedPackages.map(id_of)).toEqual(artifacts.map(id_of));
+    expect(result.newlyPublishedPackages.map(id_of)).toEqual([CORE, REACT].map(id_of));
 
     await expect(
       publishArtifactsIdempotently(
         "/artifacts",
         [WASM],
-        async () => registryEntry(WASM, "sha512-different"),
+        async () => registry_entry(WASM, "sha512-different"),
         async () => {
           throw new Error("must not republish mismatched bytes");
         },
@@ -233,19 +233,19 @@ describe("manual package release workflow", () => {
   });
 
   it("does not publish again when a rerun finds a version that npm still validates", async () => {
-    const publishedNames: string[] = [];
+    const published_names: string[] = [];
     const result = await publishArtifactsIdempotently(
       "/artifacts",
       [WASM, CORE],
       async (item) => (item.name === WASM.name ? "pending" : undefined),
       async (_root, item) => {
-        publishedNames.push(item.name);
+        published_names.push(item.name);
         throw new Error(
           "npm publish failed (1): npm error code E403 You cannot publish over the previously published versions: 1.4.0.",
         );
       },
     );
-    expect(publishedNames).toEqual([CORE.name]);
+    expect(published_names).toEqual([CORE.name]);
     expect(result.verifiedPackages.map((entry) => entry.name)).toEqual([WASM.name, CORE.name]);
     expect(result.newlyPublishedPackages).toEqual([]);
 
@@ -274,18 +274,18 @@ describe("manual package release workflow", () => {
   });
 
   it("verifies mixed registry versions, integrity, latest tags, and propagation retries", async () => {
-    const registryQueries: string[] = [];
-    const latestQueries: string[] = [];
+    const registry_queries: string[] = [];
+    const latest_queries: string[] = [];
     let pauses = 0;
     await verifyPublishedArtifacts(
       [WASM, CORE],
       async (item) => {
-        registryQueries.push(idOf(item));
-        if (registryQueries.length === 1) throw new Error("registry has not propagated");
-        return registryEntry(item);
+        registry_queries.push(id_of(item));
+        if (registry_queries.length === 1) throw new Error("registry has not propagated");
+        return registry_entry(item);
       },
       async (name) => {
-        latestQueries.push(name);
+        latest_queries.push(name);
         return name === WASM.name ? WASM.version : CORE.version;
       },
       2,
@@ -294,36 +294,36 @@ describe("manual package release workflow", () => {
       },
     );
     expect(pauses).toBe(1);
-    expect(registryQueries).toEqual([idOf(WASM), idOf(CORE), idOf(WASM)]);
-    expect(latestQueries).toEqual([CORE.name, WASM.name]);
+    expect(registry_queries).toEqual([id_of(WASM), id_of(CORE), id_of(WASM)]);
+    expect(latest_queries).toEqual([CORE.name, WASM.name]);
 
     expect(() =>
-      assertRegistryPackage(CORE, registryEntry(CORE, "sha512-wrong"), CORE.version),
+      assertRegistryPackage(CORE, registry_entry(CORE, "sha512-wrong"), CORE.version),
     ).toThrow("integrity does not match");
-    const flatNpmViewResponse = {
+    const flat_npm_view_response = {
       name: CORE.name,
       version: CORE.version,
       "dist.integrity": CORE.integrity,
     };
-    expect(() => assertRegistryPackage(CORE, flatNpmViewResponse, CORE.version)).toThrow(
+    expect(() => assertRegistryPackage(CORE, flat_npm_view_response, CORE.version)).toThrow(
       "integrity does not match",
     );
-    expect(() => assertRegistryPackage(CORE, registryEntry(CORE), "1.3.0")).toThrow(
+    expect(() => assertRegistryPackage(CORE, registry_entry(CORE), "1.3.0")).toThrow(
       "latest is 1.3.0",
     );
   });
 
   it("reports accepted versions as pending, and fails versions without publication evidence", async () => {
-    const notFound = async (): Promise<never> => {
+    const not_found = async (): Promise<never> => {
       throw new Error("npm view failed (1): npm error code E404");
     };
     const latest = async () => CORE.version;
-    const noPause = async () => undefined;
+    const no_pause = async () => undefined;
     const warnings: string[] = [];
     const warn = console.warn;
     console.warn = (message: string) => warnings.push(message);
     try {
-      expect(await verifyPublishedArtifacts([CORE], notFound, latest, 3, noPause, [CORE])).toBe(
+      expect(await verifyPublishedArtifacts([CORE], not_found, latest, 3, no_pause, [CORE])).toBe(
         "pending",
       );
     } finally {
@@ -333,17 +333,17 @@ describe("manual package release workflow", () => {
       expect.stringContaining("@sheetwrite/core@1.4.0 still validating on npm"),
     ]);
 
-    await expect(verifyPublishedArtifacts([CORE], notFound, latest, 3, noPause)).rejects.toThrow(
+    await expect(verifyPublishedArtifacts([CORE], not_found, latest, 3, no_pause)).rejects.toThrow(
       "verification failed after 3 checks",
     );
 
     let reads = 0;
-    const eventuallyFound = async () => {
+    const eventually_found = async () => {
       reads += 1;
-      return reads < 3 ? notFound() : registryEntry(CORE);
+      return reads < 3 ? not_found() : registry_entry(CORE);
     };
     expect(
-      await verifyPublishedArtifacts([CORE], eventuallyFound, latest, 5, noPause, [CORE]),
+      await verifyPublishedArtifacts([CORE], eventually_found, latest, 5, no_pause, [CORE]),
     ).toBe("verified");
   });
 });

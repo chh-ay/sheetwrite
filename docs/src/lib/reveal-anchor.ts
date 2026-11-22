@@ -6,7 +6,7 @@ import { fragmentId } from "./fragment.js";
  * hidden search anchor just before it (`#applytransaction`), which CSS
  * `:target` cannot carry to the card, so a data flag marks it either way.
  */
-function memberFor(target: Element): HTMLElement | null {
+function member_for(target: Element): HTMLElement | null {
   const following = target.nextElementSibling;
   if (
     target.classList.contains("api-search-anchor") &&
@@ -28,7 +28,7 @@ export function revealAnchoredMember(): void {
       if (performance.now() - started < 2000) requestAnimationFrame(attempt);
       return;
     }
-    const member = memberFor(target);
+    const member = member_for(target);
     for (const previous of document.querySelectorAll<HTMLElement>(".api-member[data-revealed]")) {
       delete previous.dataset.revealed;
     }

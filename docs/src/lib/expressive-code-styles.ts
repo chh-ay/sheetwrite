@@ -15,7 +15,7 @@ const STATE_RULE = /([^{}]*\.copy button:(?:hover|focus|active)[^{}]*?)\{([^{}]*
 const IDLE_RULE = /\.copy button div\s*\{[^{}]*?opacity\s*:\s*([^;}]+)/;
 
 /** Drops a trailing ` div` from each selector in a selector list. */
-function withoutDivSubject(selectors: string): string | null {
+function without_div_subject(selectors: string): string | null {
   const list = selectors.split(",");
   if (!list.every((selector) => /\sdiv\s*$/.test(selector))) return null;
   return list.map((selector) => selector.replace(/\s+div\s*$/, "")).join(",");
@@ -32,10 +32,10 @@ export function scopeCopyButtonStates(css: string): string {
   if (idle === undefined) throw new Error("Expressive Code styles have no copy button fill rule");
   let rewritten = 0;
   const scoped = css.replace(STATE_RULE, (rule, selectors: string, body: string) => {
-    const buttonSelectors = withoutDivSubject(selectors);
-    if (buttonSelectors === null) return rule;
+    const button_selectors = without_div_subject(selectors);
+    if (button_selectors === null) return rule;
     rewritten += 1;
-    return `${buttonSelectors}{${body.replace(/(^|;)\s*opacity\s*:/g, `$1${FILL_OPACITY_PROPERTY}:`)}}`;
+    return `${button_selectors}{${body.replace(/(^|;)\s*opacity\s*:/g, `$1${FILL_OPACITY_PROPERTY}:`)}}`;
   });
   if (rewritten === 0) throw new Error("Expressive Code styles have no copy button state rules");
   return `${scoped}\n.expressive-code .copy button div{opacity:var(${FILL_OPACITY_PROPERTY},${idle})}`;

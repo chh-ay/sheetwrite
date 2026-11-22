@@ -21,7 +21,7 @@ const FORMULA_CLOSURE_MAX_CELLS = 32_768;
 const EMPTY_BANDS = new Uint32Array(0);
 
 /** True when a sorted array holds a value inside the inclusive span. */
-function sortedHasValueIn(values: Uint32Array, start: number, end: number): boolean {
+function sorted_has_value_in(values: Uint32Array, start: number, end: number): boolean {
   let low = 0;
   let high = values.length;
   while (low < high) {
@@ -47,8 +47,8 @@ export class PaintedCells {
   intersects(sheet: SheetId, start: CellCoordinate, end: CellCoordinate): boolean {
     return (
       sheet === this.sheet &&
-      sortedHasValueIn(this.cols, Math.min(start.col, end.col), Math.max(start.col, end.col)) &&
-      sortedHasValueIn(this.rows, Math.min(start.row, end.row), Math.max(start.row, end.row))
+      sorted_has_value_in(this.cols, Math.min(start.col, end.col), Math.max(start.col, end.col)) &&
+      sorted_has_value_in(this.rows, Math.min(start.row, end.row), Math.max(start.row, end.row))
     );
   }
 }
@@ -98,77 +98,77 @@ export interface ReadWindowControllerOptions {
 
 /** Owns paint/read plans, hydration demand, formula closure and residency. */
 export class ReadWindowController {
-  private cancelScheduledFrame: (() => void) | null = null;
-  private paintInvalidationEpoch = 0;
-  private dataInvalidationEpoch = 0;
-  private columnWindowStart = -1;
-  private columnWindowEnd = -1;
-  private windowedColumnIndices: readonly number[] = [];
-  private datasourceColumnIndices: readonly number[] = [];
-  private datasourceFrozenColumns = -1;
-  private columnWindowRevision = 0;
-  private lastDataSheet: SheetId | null = null;
-  private lastDataRowStart = 0;
-  private lastDataRowEnd = 0;
-  private lastDataColumnWindowRevision = 0;
-  private lastDataStoreEpoch = 0;
-  private lastDataInvalidationEpoch = 0;
-  private lastDataFrozenRows = 0;
-  private lastDataFrozenColumns = 0;
-  private lastPaintContentTop = 0;
-  private lastPaintScrollLeft = 0;
-  private lastPaintClientWidth = 0;
-  private lastPaintClientHeight = 0;
-  private lastPaintInvalidationEpoch = 0;
-  private lastPaintFrozenHeight = 0;
-  private lastPaintFrozenWidth = 0;
-  private lastPaintZoom = 0;
-  private lastPaintView: VisibleWindowView | null = null;
-  private cachedPaneViews: VisibleWindowView[] = [];
-  private readonly paneValuePools: CellScalar[][] = [];
-  private cachedDomMergeAnchorViews: VisibleWindowView[] = [];
-  private readonly domMergeAnchorValuePools: CellScalar[][] = [];
-  private readonly domMergeSourceViews: VisibleWindowView[] = [];
-  private mainViewValuePool: CellScalar[] = [];
-  private readonly domMergeAnchorState: Array<SheetId | number> = [];
-  private formulaBands = EMPTY_BANDS;
-  private pinnedSheet: SheetId | null = null;
+  private cancel_scheduled_frame: (() => void) | null = null;
+  private paint_invalidation_epoch = 0;
+  private data_invalidation_epoch = 0;
+  private column_window_start = -1;
+  private column_window_end = -1;
+  private windowed_column_indices: readonly number[] = [];
+  private datasource_column_indices: readonly number[] = [];
+  private datasource_frozen_columns = -1;
+  private column_window_revision = 0;
+  private last_data_sheet: SheetId | null = null;
+  private last_data_row_start = 0;
+  private last_data_row_end = 0;
+  private last_data_column_window_revision = 0;
+  private last_data_store_epoch = 0;
+  private last_data_invalidation_epoch = 0;
+  private last_data_frozen_rows = 0;
+  private last_data_frozen_columns = 0;
+  private last_paint_content_top = 0;
+  private last_paint_scroll_left = 0;
+  private last_paint_client_width = 0;
+  private last_paint_client_height = 0;
+  private last_paint_invalidation_epoch = 0;
+  private last_paint_frozen_height = 0;
+  private last_paint_frozen_width = 0;
+  private last_paint_zoom = 0;
+  private last_paint_view: VisibleWindowView | null = null;
+  private cached_pane_views: VisibleWindowView[] = [];
+  private readonly pane_value_pools: CellScalar[][] = [];
+  private cached_dom_merge_anchor_views: VisibleWindowView[] = [];
+  private readonly dom_merge_anchor_value_pools: CellScalar[][] = [];
+  private readonly dom_merge_source_views: VisibleWindowView[] = [];
+  private main_view_value_pool: CellScalar[] = [];
+  private readonly dom_merge_anchor_state: Array<SheetId | number> = [];
+  private formula_bands = EMPTY_BANDS;
+  private pinned_sheet: SheetId | null = null;
   private destroyed = false;
   /** Set after the engine stops: the last frame stays and no read reaches the store again. */
   private frozen = false;
-  private stopMemoryRelease: (() => void) | undefined;
+  private stop_memory_release: (() => void) | undefined;
 
   constructor(private readonly options: ReadWindowControllerOptions) {
-    this.bindMemoryRelease();
+    this.bind_memory_release();
   }
 
   /** A replacement has a new engine and must not retain the old window or listener. */
   resetDocument(): void {
-    this.stopMemoryRelease?.();
-    this.cancelFrame();
-    this.pinnedSheet = null;
-    this.formulaBands = EMPTY_BANDS;
-    this.lastPaintView = null;
-    this.cachedPaneViews = [];
-    this.cachedDomMergeAnchorViews = [];
-    this.domMergeSourceViews.length = 0;
-    this.domMergeAnchorState.length = 0;
-    this.mainViewValuePool.length = 0;
-    this.paneValuePools.length = 0;
-    this.domMergeAnchorValuePools.length = 0;
-    this.bindMemoryRelease();
+    this.stop_memory_release?.();
+    this.cancel_frame();
+    this.pinned_sheet = null;
+    this.formula_bands = EMPTY_BANDS;
+    this.last_paint_view = null;
+    this.cached_pane_views = [];
+    this.cached_dom_merge_anchor_views = [];
+    this.dom_merge_source_views.length = 0;
+    this.dom_merge_anchor_state.length = 0;
+    this.main_view_value_pool.length = 0;
+    this.pane_value_pools.length = 0;
+    this.dom_merge_anchor_value_pools.length = 0;
+    this.bind_memory_release();
     this.invalidateColumns();
   }
 
-  private bindMemoryRelease(): void {
-    this.stopMemoryRelease = storeEngine(this.options.store)?.onMemoryRelease(() => {
+  private bind_memory_release(): void {
+    this.stop_memory_release = storeEngine(this.options.store)?.onMemoryRelease(() => {
       this.invalidateData();
       this.schedule();
     });
   }
 
   get geometryVersion(): number {
-    return this.paintInvalidationEpoch + this.dataInvalidationEpoch;
+    return this.paint_invalidation_epoch + this.data_invalidation_epoch;
   }
 
   /** View rows are mapped to backing rows, so reordered views compare correctly. */
@@ -183,20 +183,20 @@ export class ReadWindowController {
       this.options.overscan(),
     );
 
-    const bodyColumns = window.columns.end - window.columns.start;
-    const cols = new Uint32Array(window.frozenColumns + bodyColumns);
+    const body_columns = window.columns.end - window.columns.start;
+    const cols = new Uint32Array(window.frozenColumns + body_columns);
     for (let index = 0; index < window.frozenColumns; index++) {
       cols[index] = geometry.columnIndices[index] ?? 0;
     }
-    for (let offset = 0; offset < bodyColumns; offset++) {
+    for (let offset = 0; offset < body_columns; offset++) {
       cols[window.frozenColumns + offset] =
         geometry.columnIndices[window.columns.start + offset] ?? 0;
     }
 
-    const bodyRows = window.rows.end - window.rows.start;
-    const rows = new Uint32Array(window.frozenRows + bodyRows);
+    const body_rows = window.rows.end - window.rows.start;
+    const rows = new Uint32Array(window.frozenRows + body_rows);
     for (let row = 0; row < window.frozenRows; row++) rows[row] = geometry.toDataRow(row);
-    for (let offset = 0; offset < bodyRows; offset++) {
+    for (let offset = 0; offset < body_rows; offset++) {
       rows[window.frozenRows + offset] = geometry.toDataRow(window.rows.start + offset);
     }
 
@@ -205,83 +205,83 @@ export class ReadWindowController {
 
   /** Invalidates pixel/layout paint state without discarding stable data windows. */
   invalidate(): void {
-    this.paintInvalidationEpoch += 1;
+    this.paint_invalidation_epoch += 1;
   }
 
   /** Invalidates logical row/column contents or order and all dependent paint state. */
   invalidateData(): void {
-    this.dataInvalidationEpoch += 1;
-    this.paintInvalidationEpoch += 1;
+    this.data_invalidation_epoch += 1;
+    this.paint_invalidation_epoch += 1;
   }
 
   invalidateColumns(): void {
-    this.columnWindowStart = -1;
-    this.columnWindowEnd = -1;
-    this.datasourceColumnIndices = [];
-    this.datasourceFrozenColumns = -1;
+    this.column_window_start = -1;
+    this.column_window_end = -1;
+    this.datasource_column_indices = [];
+    this.datasource_frozen_columns = -1;
     this.invalidateData();
   }
 
   schedule(): void {
-    if (this.cancelScheduledFrame || this.destroyed || this.frozen) return;
+    if (this.cancel_scheduled_frame || this.destroyed || this.frozen) return;
 
     let ran = false;
     const cancel = scheduleFrame(() => {
       ran = true;
-      this.cancelScheduledFrame = null;
+      this.cancel_scheduled_frame = null;
       this.paint();
     });
     // A synchronous frame source (a test stub) has already painted; nothing is left to cancel.
-    if (!ran) this.cancelScheduledFrame = cancel;
+    if (!ran) this.cancel_scheduled_frame = cancel;
   }
 
   renderNow(): void {
     if (this.destroyed || this.frozen) return;
-    this.cancelFrame();
+    this.cancel_frame();
     this.paint();
   }
 
   /** Keep the last frame and stop every later engine read; used after the engine stops. */
   freeze(): void {
     this.frozen = true;
-    this.cancelFrame();
+    this.cancel_frame();
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.stopMemoryRelease?.();
-    if (this.pinnedSheet !== null) {
+    this.stop_memory_release?.();
+    if (this.pinned_sheet !== null) {
       // A frozen controller's store sits on a stopped instance; unpinning would call it.
       if (!this.frozen)
-        storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
-      this.pinnedSheet = null;
+        storeEngine(this.options.store)?.pinViewportBands(this.pinned_sheet, EMPTY_BANDS);
+      this.pinned_sheet = null;
     }
 
-    this.cancelFrame();
-    this.lastPaintView = null;
-    this.cachedPaneViews = [];
-    this.cachedDomMergeAnchorViews = [];
-    this.domMergeSourceViews.length = 0;
-    this.domMergeAnchorState.length = 0;
+    this.cancel_frame();
+    this.last_paint_view = null;
+    this.cached_pane_views = [];
+    this.cached_dom_merge_anchor_views = [];
+    this.dom_merge_source_views.length = 0;
+    this.dom_merge_anchor_state.length = 0;
   }
 
-  private cancelFrame(): void {
-    const cancel = this.cancelScheduledFrame;
+  private cancel_frame(): void {
+    const cancel = this.cancel_scheduled_frame;
     if (!cancel) return;
 
     cancel();
-    this.cancelScheduledFrame = null;
+    this.cancel_scheduled_frame = null;
   }
 
   private paint(): void {
     try {
       this.render();
     } catch (error) {
-      const onEngineTrap = this.options.onEngineTrap;
-      if (!onEngineTrap || !isEngineTrap(error)) throw error;
+      const on_engine_trap = this.options.onEngineTrap;
+      if (!on_engine_trap || !isEngineTrap(error)) throw error;
 
-      onEngineTrap(error);
+      on_engine_trap(error);
     } finally {
       // Last, after every layout read of the paint, in the same task.
       this.options.ariaMirror.flush();
@@ -290,85 +290,87 @@ export class ReadWindowController {
 
   private render(): void {
     const { geometry } = this.options;
-    const clientHeight = this.options.viewportHeight();
-    const clientWidth = this.options.viewportWidth();
+    const client_height = this.options.viewportHeight();
+    const client_width = this.options.viewportWidth();
     const theme = this.options.theme();
-    const bodyHeight = Math.max(0, clientHeight - theme.headerHeight);
-    const contentTop = geometry.toContent(this.options.scrollTop());
-    const scrollLeft = this.options.scrollLeft();
-    const cellViewportWidth = Math.max(0, clientWidth - theme.rowHeaderWidth);
+    const body_height = Math.max(0, client_height - theme.headerHeight);
+    const content_top = geometry.toContent(this.options.scrollTop());
+    const scroll_left = this.options.scrollLeft();
+    const cell_viewport_width = Math.max(0, client_width - theme.rowHeaderWidth);
 
-    const paintWindow = geometry.paintWindow(
-      contentTop,
-      scrollLeft,
-      bodyHeight,
-      cellViewportWidth,
+    const paint_window = geometry.paintWindow(
+      content_top,
+      scroll_left,
+      body_height,
+      cell_viewport_width,
       this.options.overscan(),
     );
-    const rows = paintWindow.rows;
-    const columns = paintWindow.columns;
-    const frozenRows = paintWindow.frozenRows;
-    const frozenColumns = paintWindow.frozenColumns;
-    const frozenHeight = paintWindow.frozenHeight;
-    const frozenWidth = paintWindow.frozenWidth;
+    const rows = paint_window.rows;
+    const columns = paint_window.columns;
+    const frozen_rows = paint_window.frozenRows;
+    const frozen_columns = paint_window.frozenColumns;
+    const frozen_height = paint_window.frozenHeight;
+    const frozen_width = paint_window.frozenWidth;
 
-    const visibleColumns = geometry.columnWindow(scrollLeft, cellViewportWidth, 0);
-    const firstBodyVisibleColumn = geometry.columnIndices[visibleColumns.start] ?? null;
-    const lastBodyVisibleColumn = geometry.columnIndices[visibleColumns.end - 1] ?? null;
-    const firstVisibleColumn =
-      frozenColumns > 0
-        ? (geometry.columnIndices[0] ?? firstBodyVisibleColumn)
-        : firstBodyVisibleColumn;
-    const lastVisibleColumn =
-      lastBodyVisibleColumn ??
-      (frozenColumns > 0 ? (geometry.columnIndices[frozenColumns - 1] ?? null) : null);
-    const rawVisibleRows = geometry.visibleRowWindow(
-      contentTop + frozenHeight,
-      Math.max(0, bodyHeight - frozenHeight) + theme.headerHeight,
+    const visible_columns = geometry.columnWindow(scroll_left, cell_viewport_width, 0);
+    const first_body_visible_column = geometry.columnIndices[visible_columns.start] ?? null;
+    const last_body_visible_column = geometry.columnIndices[visible_columns.end - 1] ?? null;
+    const first_visible_column =
+      frozen_columns > 0
+        ? (geometry.columnIndices[0] ?? first_body_visible_column)
+        : first_body_visible_column;
+    const last_visible_column =
+      last_body_visible_column ??
+      (frozen_columns > 0 ? (geometry.columnIndices[frozen_columns - 1] ?? null) : null);
+    const raw_visible_rows = geometry.visibleRowWindow(
+      content_top + frozen_height,
+      Math.max(0, body_height - frozen_height) + theme.headerHeight,
       0,
     );
-    const visibleRows =
-      frozenRows > 0
+    const visible_rows =
+      frozen_rows > 0
         ? {
-            start: Math.max(rawVisibleRows.start, frozenRows),
-            end: Math.max(rawVisibleRows.end, frozenRows),
+            start: Math.max(raw_visible_rows.start, frozen_rows),
+            end: Math.max(raw_visible_rows.end, frozen_rows),
           }
-        : rawVisibleRows;
+        : raw_visible_rows;
 
-    const usePanes =
-      (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
-    const rowGeometry = geometry.rowGeometry(rows);
-    const columnWindowChanged =
-      columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd;
-    if (columnWindowChanged) {
-      const columnCount = columns.end - columns.start;
-      let contentsChanged = columnCount !== this.windowedColumnIndices.length;
-      for (let offset = 0; !contentsChanged && offset < columnCount; offset++) {
-        if (geometry.columnIndices[columns.start + offset] !== this.windowedColumnIndices[offset]) {
-          contentsChanged = true;
+    const use_panes =
+      (frozen_rows > 0 || frozen_columns > 0) && this.options.renderer().paintPanes !== undefined;
+    const row_geometry = geometry.rowGeometry(rows);
+    const column_window_changed =
+      columns.start !== this.column_window_start || columns.end !== this.column_window_end;
+    if (column_window_changed) {
+      const column_count = columns.end - columns.start;
+      let contents_changed = column_count !== this.windowed_column_indices.length;
+      for (let offset = 0; !contents_changed && offset < column_count; offset++) {
+        if (
+          geometry.columnIndices[columns.start + offset] !== this.windowed_column_indices[offset]
+        ) {
+          contents_changed = true;
         }
       }
 
-      this.columnWindowStart = columns.start;
-      this.columnWindowEnd = columns.end;
-      this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
-      if (contentsChanged) this.columnWindowRevision += 1;
+      this.column_window_start = columns.start;
+      this.column_window_end = columns.end;
+      this.windowed_column_indices = geometry.columnIndices.slice(columns.start, columns.end);
+      if (contents_changed) this.column_window_revision += 1;
       this.options.ariaMirror.bumpVersion();
     }
 
-    if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
-      const frozenColumnIndices =
-        frozenColumns > 0 ? geometry.columnIndices.slice(0, frozenColumns) : [];
-      const demanded = [...frozenColumnIndices, ...this.windowedColumnIndices].sort(
+    if (column_window_changed || frozen_columns !== this.datasource_frozen_columns) {
+      const frozen_column_indices =
+        frozen_columns > 0 ? geometry.columnIndices.slice(0, frozen_columns) : [];
+      const demanded = [...frozen_column_indices, ...this.windowed_column_indices].sort(
         (left, right) => left - right,
       );
-      const datasourceColumnCount =
+      const datasource_column_count =
         this.options.datasourceColumnCount?.() ?? Number.MAX_SAFE_INTEGER;
       let write = 0;
       for (const column of demanded) {
         if (
           column >= 0 &&
-          column < datasourceColumnCount &&
+          column < datasource_column_count &&
           (write === 0 || demanded[write - 1] !== column)
         ) {
           demanded[write++] = column;
@@ -376,302 +378,302 @@ export class ReadWindowController {
       }
 
       demanded.length = write;
-      this.datasourceColumnIndices = demanded;
-      this.datasourceFrozenColumns = frozenColumns;
+      this.datasource_column_indices = demanded;
+      this.datasource_frozen_columns = frozen_columns;
     }
 
-    const activeSheet = this.options.activeSheet();
-    const storeEpoch = this.options.storeEpoch();
+    const active_sheet = this.options.activeSheet();
+    const store_epoch = this.options.storeEpoch();
     const viewport: Viewport = {
-      scrollTop: contentTop,
-      scrollLeft,
-      width: clientWidth,
-      height: clientHeight,
-      contentRevision: storeEpoch + this.dataInvalidationEpoch + this.paintInvalidationEpoch,
+      scrollTop: content_top,
+      scrollLeft: scroll_left,
+      width: client_width,
+      height: client_height,
+      contentRevision: store_epoch + this.data_invalidation_epoch + this.paint_invalidation_epoch,
     };
-    if (rowGeometry) {
-      viewport.rowTops = rowGeometry.rowTops;
-      viewport.rowHeights = rowGeometry.rowHeights;
+    if (row_geometry) {
+      viewport.rowTops = row_geometry.rowTops;
+      viewport.rowHeights = row_geometry.rowHeights;
     }
-    const rowNumbers = this.options.rowNumbers(rows);
-    if (rowNumbers) viewport.rowNumbers = rowNumbers;
-    const filteredRows = this.options.filteredRows();
-    if (filteredRows) viewport.filteredRows = filteredRows;
-    const filterHeader = this.options.filterHeader();
-    if (filterHeader) viewport.filterHeader = filterHeader;
+    const row_numbers = this.options.rowNumbers(rows);
+    if (row_numbers) viewport.rowNumbers = row_numbers;
+    const filtered_rows = this.options.filteredRows();
+    if (filtered_rows) viewport.filteredRows = filtered_rows;
+    const filter_header = this.options.filterHeader();
+    if (filter_header) viewport.filterHeader = filter_header;
 
     this.options.renderer().setViewport(viewport);
 
     const zoom = this.options.zoom();
-    const refreshData =
-      this.lastPaintView === null ||
-      activeSheet !== this.lastDataSheet ||
-      rows.start !== this.lastDataRowStart ||
-      rows.end !== this.lastDataRowEnd ||
-      this.columnWindowRevision !== this.lastDataColumnWindowRevision ||
-      storeEpoch !== this.lastDataStoreEpoch ||
-      this.dataInvalidationEpoch !== this.lastDataInvalidationEpoch ||
-      frozenRows !== this.lastDataFrozenRows ||
-      frozenColumns !== this.lastDataFrozenColumns;
+    const refresh_data =
+      this.last_paint_view === null ||
+      active_sheet !== this.last_data_sheet ||
+      rows.start !== this.last_data_row_start ||
+      rows.end !== this.last_data_row_end ||
+      this.column_window_revision !== this.last_data_column_window_revision ||
+      store_epoch !== this.last_data_store_epoch ||
+      this.data_invalidation_epoch !== this.last_data_invalidation_epoch ||
+      frozen_rows !== this.last_data_frozen_rows ||
+      frozen_columns !== this.last_data_frozen_columns;
     const repaint =
-      refreshData ||
-      !Object.is(contentTop, this.lastPaintContentTop) ||
-      !Object.is(scrollLeft, this.lastPaintScrollLeft) ||
-      !Object.is(clientWidth, this.lastPaintClientWidth) ||
-      !Object.is(clientHeight, this.lastPaintClientHeight) ||
-      this.paintInvalidationEpoch !== this.lastPaintInvalidationEpoch ||
-      !Object.is(frozenHeight, this.lastPaintFrozenHeight) ||
-      !Object.is(frozenWidth, this.lastPaintFrozenWidth) ||
-      !Object.is(zoom, this.lastPaintZoom);
+      refresh_data ||
+      !Object.is(content_top, this.last_paint_content_top) ||
+      !Object.is(scroll_left, this.last_paint_scroll_left) ||
+      !Object.is(client_width, this.last_paint_client_width) ||
+      !Object.is(client_height, this.last_paint_client_height) ||
+      this.paint_invalidation_epoch !== this.last_paint_invalidation_epoch ||
+      !Object.is(frozen_height, this.last_paint_frozen_height) ||
+      !Object.is(frozen_width, this.last_paint_frozen_width) ||
+      !Object.is(zoom, this.last_paint_zoom);
 
-    this.updateDemand(activeSheet, rows, visibleRows, frozenRows, refreshData);
+    this.update_demand(active_sheet, rows, visible_rows, frozen_rows, refresh_data);
 
     let view: VisibleWindowView;
-    if (usePanes) {
-      view = this.paintFrozenPanes(
-        activeSheet,
+    if (use_panes) {
+      view = this.paint_frozen_panes(
+        active_sheet,
         rows,
-        this.windowedColumnIndices,
-        frozenRows,
-        frozenColumns,
-        frozenHeight,
-        frozenWidth,
-        contentTop,
-        scrollLeft,
-        clientWidth,
-        clientHeight,
-        rowGeometry,
-        refreshData,
+        this.windowed_column_indices,
+        frozen_rows,
+        frozen_columns,
+        frozen_height,
+        frozen_width,
+        content_top,
+        scroll_left,
+        client_width,
+        client_height,
+        row_geometry,
+        refresh_data,
         repaint,
       );
     } else {
-      if (refreshData) {
-        this.cachedPaneViews = [];
+      if (refresh_data) {
+        this.cached_pane_views = [];
         // Store windows borrow a reusable value scratch array. Unrelated reads
         // must not overwrite a window retained across display-neutral edits.
-        this.lastPaintView = this.previewed(
-          this.retainMainView(
-            this.options.store.getVisibleWindow(activeSheet, rows, this.windowedColumnIndices),
+        this.last_paint_view = this.previewed(
+          this.retain_main_view(
+            this.options.store.getVisibleWindow(active_sheet, rows, this.windowed_column_indices),
           ),
         );
       }
 
-      const cachedView = this.lastPaintView;
-      if (!cachedView) throw new Error("Sheetwrite: paint window was not resolved");
-      view = cachedView;
+      const cached_view = this.last_paint_view;
+      if (!cached_view) throw new Error("Sheetwrite: paint window was not resolved");
+      view = cached_view;
       if (repaint) {
-        this.domMergeSourceViews[0] = view;
-        this.domMergeSourceViews.length = 1;
-        const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
-        const refreshAnchors = this.domMergeAnchorsNeedRefresh(requests, refreshData);
-        if (refreshAnchors && requests.length > 0) {
-          view = this.retainMainView(view);
-          this.lastPaintView = view;
-          this.domMergeSourceViews[0] = view;
+        this.dom_merge_source_views[0] = view;
+        this.dom_merge_source_views.length = 1;
+        const requests = this.options.domOverlay.mergeAnchorRequests(this.dom_merge_source_views);
+        const refresh_anchors = this.dom_merge_anchors_need_refresh(requests, refresh_data);
+        if (refresh_anchors && requests.length > 0) {
+          view = this.retain_main_view(view);
+          this.last_paint_view = view;
+          this.dom_merge_source_views[0] = view;
         }
 
-        if (refreshAnchors) this.loadDomMergeAnchorViews(requests);
-        this.options.domOverlay.paint(view, viewport, this.cachedDomMergeAnchorViews);
+        if (refresh_anchors) this.load_dom_merge_anchor_views(requests);
+        this.options.domOverlay.paint(view, viewport, this.cached_dom_merge_anchor_views);
         this.options.renderer().paint(view);
       }
     }
 
-    this.lastPaintView = view;
-    this.lastDataSheet = activeSheet;
-    this.lastDataRowStart = rows.start;
-    this.lastDataRowEnd = rows.end;
-    this.lastDataColumnWindowRevision = this.columnWindowRevision;
-    this.lastDataStoreEpoch = storeEpoch;
-    this.lastDataInvalidationEpoch = this.dataInvalidationEpoch;
-    this.lastDataFrozenRows = frozenRows;
-    this.lastDataFrozenColumns = frozenColumns;
-    this.lastPaintContentTop = contentTop;
-    this.lastPaintScrollLeft = scrollLeft;
-    this.lastPaintClientWidth = clientWidth;
-    this.lastPaintClientHeight = clientHeight;
-    this.lastPaintInvalidationEpoch = this.paintInvalidationEpoch;
-    this.lastPaintFrozenHeight = frozenHeight;
-    this.lastPaintFrozenWidth = frozenWidth;
-    this.lastPaintZoom = zoom;
+    this.last_paint_view = view;
+    this.last_data_sheet = active_sheet;
+    this.last_data_row_start = rows.start;
+    this.last_data_row_end = rows.end;
+    this.last_data_column_window_revision = this.column_window_revision;
+    this.last_data_store_epoch = store_epoch;
+    this.last_data_invalidation_epoch = this.data_invalidation_epoch;
+    this.last_data_frozen_rows = frozen_rows;
+    this.last_data_frozen_columns = frozen_columns;
+    this.last_paint_content_top = content_top;
+    this.last_paint_scroll_left = scroll_left;
+    this.last_paint_client_width = client_width;
+    this.last_paint_client_height = client_height;
+    this.last_paint_invalidation_epoch = this.paint_invalidation_epoch;
+    this.last_paint_frozen_height = frozen_height;
+    this.last_paint_frozen_width = frozen_width;
+    this.last_paint_zoom = zoom;
 
-    if (refreshData) this.options.ariaMirror.bumpVersion();
+    if (refresh_data) this.options.ariaMirror.bumpVersion();
     // Inserts, deletes, filters and sheet switches all change the displayed rows.
-    this.options.ariaMirror.setRowCount(this.options.store.viewRowCount(activeSheet));
+    this.options.ariaMirror.setRowCount(this.options.store.viewRowCount(active_sheet));
     this.options.ariaMirror.update(view);
-    this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
-    this.options.repositionEditor(contentTop, scrollLeft);
+    this.options.overlayPainter.paint(content_top, scroll_left, client_width, client_height);
+    this.options.repositionEditor(content_top, scroll_left);
     this.options.emitScroll({
-      scrollTop: contentTop,
-      scrollLeft,
+      scrollTop: content_top,
+      scrollLeft: scroll_left,
       firstRow: rows.start,
       lastRow: Math.max(rows.start, rows.end - 1),
-      firstVisibleColumn,
-      lastVisibleColumn,
+      firstVisibleColumn: first_visible_column,
+      lastVisibleColumn: last_visible_column,
     });
   }
 
-  private paintFrozenPanes(
-    activeSheet: SheetId,
-    bodyRows: { start: number; end: number },
-    bodyColumns: readonly number[],
-    frozenRows: number,
-    frozenColumns: number,
-    frozenHeight: number,
-    frozenWidth: number,
-    contentTop: number,
-    scrollLeft: number,
-    clientWidth: number,
-    clientHeight: number,
-    bodyGeometry: { rowTops: Float64Array; rowHeights: Float64Array } | null,
-    refreshData: boolean,
+  private paint_frozen_panes(
+    active_sheet: SheetId,
+    body_rows: { start: number; end: number },
+    body_columns: readonly number[],
+    frozen_rows: number,
+    frozen_columns: number,
+    frozen_height: number,
+    frozen_width: number,
+    content_top: number,
+    scroll_left: number,
+    client_width: number,
+    client_height: number,
+    body_geometry: { rowTops: Float64Array; rowHeights: Float64Array } | null,
+    refresh_data: boolean,
     repaint: boolean,
   ): VisibleWindowView {
     const theme = this.options.theme();
     const gutter = theme.rowHeaderWidth;
-    const headerHeight = theme.headerHeight;
-    const xSplit = frozenColumns > 0 ? gutter + frozenWidth : 0;
-    const ySplit = frozenRows > 0 ? headerHeight + frozenHeight : 0;
-    const frozenRowWindow = { start: 0, end: frozenRows };
-    const frozenColumnIndices =
-      frozenColumns > 0 ? this.options.geometry.columnIndices.slice(0, frozenColumns) : [];
-    const frozenGeometry =
-      frozenRows > 0 ? this.options.geometry.frozenRowGeometry(frozenRows) : null;
+    const header_height = theme.headerHeight;
+    const x_split = frozen_columns > 0 ? gutter + frozen_width : 0;
+    const y_split = frozen_rows > 0 ? header_height + frozen_height : 0;
+    const frozen_row_window = { start: 0, end: frozen_rows };
+    const frozen_column_indices =
+      frozen_columns > 0 ? this.options.geometry.columnIndices.slice(0, frozen_columns) : [];
+    const frozen_geometry =
+      frozen_rows > 0 ? this.options.geometry.frozenRowGeometry(frozen_rows) : null;
     const panes: PanePaint[] = [];
-    const frozenNumbers = frozenRows > 0 ? this.options.rowNumbers(frozenRowWindow) : undefined;
-    const bodyNumbers = this.options.rowNumbers(bodyRows);
-    const filteredRows = this.options.filteredRows();
-    const filterHeader = this.options.filterHeader();
+    const frozen_numbers = frozen_rows > 0 ? this.options.rowNumbers(frozen_row_window) : undefined;
+    const body_numbers = this.options.rowNumbers(body_rows);
+    const filtered_rows = this.options.filteredRows();
+    const filter_header = this.options.filterHeader();
 
-    const paneView = (
+    const pane_view = (
       rows: { start: number; end: number },
       columns: readonly number[],
     ): VisibleWindowView => {
       const slot = panes.length;
-      let view = this.cachedPaneViews[slot];
-      if (refreshData || !view) {
+      let view = this.cached_pane_views[slot];
+      if (refresh_data || !view) {
         view = this.previewed(
-          this.retainPaneView(
-            this.options.store.getVisibleWindow(activeSheet, rows, columns),
+          this.retain_pane_view(
+            this.options.store.getVisibleWindow(active_sheet, rows, columns),
             slot,
           ),
         );
-        this.cachedPaneViews[slot] = view;
+        this.cached_pane_views[slot] = view;
       }
 
       return view;
     };
 
-    if (frozenRows > 0 && frozenColumns > 0) {
+    if (frozen_rows > 0 && frozen_columns > 0) {
       panes.push({
-        view: paneView(frozenRowWindow, frozenColumnIndices),
-        clip: { x: 0, y: 0, w: xSplit, h: ySplit },
+        view: pane_view(frozen_row_window, frozen_column_indices),
+        clip: { x: 0, y: 0, w: x_split, h: y_split },
         scrollTop: 0,
         scrollLeft: 0,
-        rowTops: frozenGeometry?.rowTops,
-        rowHeights: frozenGeometry?.rowHeights,
-        rowNumbers: frozenNumbers,
-        filteredRows,
-        filterHeader,
+        rowTops: frozen_geometry?.rowTops,
+        rowHeights: frozen_geometry?.rowHeights,
+        rowNumbers: frozen_numbers,
+        filteredRows: filtered_rows,
+        filterHeader: filter_header,
       });
     }
 
-    if (frozenRows > 0) {
+    if (frozen_rows > 0) {
       panes.push({
-        view: paneView(frozenRowWindow, bodyColumns),
-        clip: { x: xSplit, y: 0, w: Math.max(0, clientWidth - xSplit), h: ySplit },
+        view: pane_view(frozen_row_window, body_columns),
+        clip: { x: x_split, y: 0, w: Math.max(0, client_width - x_split), h: y_split },
         scrollTop: 0,
-        scrollLeft,
-        rowTops: frozenGeometry?.rowTops,
-        rowHeights: frozenGeometry?.rowHeights,
-        rowNumbers: frozenNumbers,
-        filteredRows,
-        filterHeader,
+        scrollLeft: scroll_left,
+        rowTops: frozen_geometry?.rowTops,
+        rowHeights: frozen_geometry?.rowHeights,
+        rowNumbers: frozen_numbers,
+        filteredRows: filtered_rows,
+        filterHeader: filter_header,
       });
     }
 
-    if (frozenColumns > 0) {
+    if (frozen_columns > 0) {
       panes.push({
-        view: paneView(bodyRows, frozenColumnIndices),
-        clip: { x: 0, y: ySplit, w: xSplit, h: Math.max(0, clientHeight - ySplit) },
-        scrollTop: contentTop,
+        view: pane_view(body_rows, frozen_column_indices),
+        clip: { x: 0, y: y_split, w: x_split, h: Math.max(0, client_height - y_split) },
+        scrollTop: content_top,
         scrollLeft: 0,
-        rowTops: bodyGeometry?.rowTops,
-        rowHeights: bodyGeometry?.rowHeights,
-        rowNumbers: bodyNumbers,
-        filteredRows,
-        filterHeader,
+        rowTops: body_geometry?.rowTops,
+        rowHeights: body_geometry?.rowHeights,
+        rowNumbers: body_numbers,
+        filteredRows: filtered_rows,
+        filterHeader: filter_header,
       });
     }
 
-    const bodyView = paneView(bodyRows, bodyColumns);
+    const body_view = pane_view(body_rows, body_columns);
     panes.push({
-      view: bodyView,
+      view: body_view,
       clip: {
-        x: xSplit,
-        y: ySplit,
-        w: Math.max(0, clientWidth - xSplit),
-        h: Math.max(0, clientHeight - ySplit),
+        x: x_split,
+        y: y_split,
+        w: Math.max(0, client_width - x_split),
+        h: Math.max(0, client_height - y_split),
       },
-      scrollTop: contentTop,
-      scrollLeft,
-      rowTops: bodyGeometry?.rowTops,
-      rowHeights: bodyGeometry?.rowHeights,
-      rowNumbers: bodyNumbers,
-      filteredRows,
-      filterHeader,
+      scrollTop: content_top,
+      scrollLeft: scroll_left,
+      rowTops: body_geometry?.rowTops,
+      rowHeights: body_geometry?.rowHeights,
+      rowNumbers: body_numbers,
+      filteredRows: filtered_rows,
+      filterHeader: filter_header,
     });
-    this.cachedPaneViews.length = panes.length;
+    this.cached_pane_views.length = panes.length;
 
     if (repaint) {
-      this.domMergeSourceViews.length = panes.length;
+      this.dom_merge_source_views.length = panes.length;
       for (let slot = 0; slot < panes.length; slot++) {
         const pane = panes[slot];
         if (!pane) throw new Error("Sheetwrite: missing frozen pane");
-        this.domMergeSourceViews[slot] = pane.view;
+        this.dom_merge_source_views[slot] = pane.view;
       }
 
-      const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
-      if (this.domMergeAnchorsNeedRefresh(requests, refreshData)) {
-        this.loadDomMergeAnchorViews(requests);
+      const requests = this.options.domOverlay.mergeAnchorRequests(this.dom_merge_source_views);
+      if (this.dom_merge_anchors_need_refresh(requests, refresh_data)) {
+        this.load_dom_merge_anchor_views(requests);
       }
 
-      this.options.domOverlay.paintPanes(panes, this.cachedDomMergeAnchorViews);
+      this.options.domOverlay.paintPanes(panes, this.cached_dom_merge_anchor_views);
       this.options.renderer().paintPanes?.(panes, {
-        x: frozenColumns > 0 ? xSplit - 0.5 : null,
-        y: frozenRows > 0 ? ySplit - 0.5 : null,
+        x: frozen_columns > 0 ? x_split - 0.5 : null,
+        y: frozen_rows > 0 ? y_split - 0.5 : null,
       });
     }
 
-    return bodyView;
+    return body_view;
   }
 
-  private domMergeAnchorsNeedRefresh(
+  private dom_merge_anchors_need_refresh(
     requests: readonly DomMergeAnchorRequest[],
-    refreshData: boolean,
+    refresh_data: boolean,
   ): boolean {
-    let changed = refreshData;
-    let stateIndex = 0;
+    let changed = refresh_data;
+    let state_index = 0;
 
     for (const request of requests) {
-      if (this.domMergeAnchorState[stateIndex] !== request.sheet) changed = true;
-      this.domMergeAnchorState[stateIndex++] = request.sheet;
-      if (this.domMergeAnchorState[stateIndex] !== request.row) changed = true;
-      this.domMergeAnchorState[stateIndex++] = request.row;
-      if (this.domMergeAnchorState[stateIndex] !== request.cols.length) changed = true;
-      this.domMergeAnchorState[stateIndex++] = request.cols.length;
+      if (this.dom_merge_anchor_state[state_index] !== request.sheet) changed = true;
+      this.dom_merge_anchor_state[state_index++] = request.sheet;
+      if (this.dom_merge_anchor_state[state_index] !== request.row) changed = true;
+      this.dom_merge_anchor_state[state_index++] = request.row;
+      if (this.dom_merge_anchor_state[state_index] !== request.cols.length) changed = true;
+      this.dom_merge_anchor_state[state_index++] = request.cols.length;
       for (const col of request.cols) {
-        if (this.domMergeAnchorState[stateIndex] !== col) changed = true;
-        this.domMergeAnchorState[stateIndex++] = col;
+        if (this.dom_merge_anchor_state[state_index] !== col) changed = true;
+        this.dom_merge_anchor_state[state_index++] = col;
       }
     }
 
-    if (this.domMergeAnchorState.length !== stateIndex) changed = true;
-    this.domMergeAnchorState.length = stateIndex;
+    if (this.dom_merge_anchor_state.length !== state_index) changed = true;
+    this.dom_merge_anchor_state.length = state_index;
     return changed;
   }
 
-  private loadDomMergeAnchorViews(requests: readonly DomMergeAnchorRequest[]): void {
-    this.cachedDomMergeAnchorViews.length = requests.length;
+  private load_dom_merge_anchor_views(requests: readonly DomMergeAnchorRequest[]): void {
+    this.cached_dom_merge_anchor_views.length = requests.length;
     for (let slot = 0; slot < requests.length; slot++) {
       const request = requests[slot];
       if (!request) throw new Error("Sheetwrite: missing merge anchor request");
@@ -681,55 +683,60 @@ export class ReadWindowController {
         { start: request.row, end: request.row + 1 },
         request.cols,
       );
-      let values = this.domMergeAnchorValuePools[slot];
+      let values = this.dom_merge_anchor_value_pools[slot];
       if (!values || values.length !== view.values.length) {
         values = new Array<CellScalar>(view.values.length);
-        this.domMergeAnchorValuePools[slot] = values;
+        this.dom_merge_anchor_value_pools[slot] = values;
       }
 
       for (let index = 0; index < values.length; index++)
         values[index] = view.values[index] ?? null;
-      this.cachedDomMergeAnchorViews[slot] = this.previewed({ ...view, values });
+      this.cached_dom_merge_anchor_views[slot] = this.previewed({ ...view, values });
     }
   }
 
-  private updateDemand(
+  private update_demand(
     sheet: SheetId,
-    paintRows: { start: number; end: number },
-    visibleRows: { start: number; end: number },
-    frozenRows: number,
-    refreshData: boolean,
+    paint_rows: { start: number; end: number },
+    visible_rows: { start: number; end: number },
+    frozen_rows: number,
+    refresh_data: boolean,
   ): void {
     const engine = storeEngine(this.options.store);
-    const refreshClosure =
-      refreshData &&
+    const refresh_closure =
+      refresh_data &&
       engine !== null &&
       (this.options.datasourceEnabled === true || engine.isPaged(sheet));
 
-    if (refreshData && !refreshClosure) {
-      this.formulaBands = EMPTY_BANDS;
-      if (engine && this.pinnedSheet !== null) {
-        engine.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
-        this.pinnedSheet = null;
+    if (refresh_data && !refresh_closure) {
+      this.formula_bands = EMPTY_BANDS;
+      if (engine && this.pinned_sheet !== null) {
+        engine.pinViewportBands(this.pinned_sheet, EMPTY_BANDS);
+        this.pinned_sheet = null;
       }
     }
 
     const anchors: DomMergeAnchorRequest[] = [];
-    if (refreshClosure) {
+    if (refresh_closure) {
       const merges =
         this.options.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)
           ?.merges ?? [];
       if (merges.length > 0) {
         const index = prepareMergeIndex(merges);
         const reached = new Set(
-          intersectingMerges(index, paintRows.start, paintRows.end, this.datasourceColumnIndices),
+          intersectingMerges(
+            index,
+            paint_rows.start,
+            paint_rows.end,
+            this.datasource_column_indices,
+          ),
         );
-        if (frozenRows > 0) {
+        if (frozen_rows > 0) {
           for (const merge of intersectingMerges(
             index,
             0,
-            frozenRows,
-            this.datasourceColumnIndices,
+            frozen_rows,
+            this.datasource_column_indices,
           )) {
             reached.add(merge);
           }
@@ -741,17 +748,17 @@ export class ReadWindowController {
       }
     }
 
-    if (engine && refreshClosure) {
+    if (engine && refresh_closure) {
       const roots = [
-        { sheet, row: paintRows.start, end: paintRows.end, cols: this.datasourceColumnIndices },
-        ...(frozenRows > 0
-          ? [{ sheet, row: 0, end: frozenRows, cols: this.datasourceColumnIndices }]
+        { sheet, row: paint_rows.start, end: paint_rows.end, cols: this.datasource_column_indices },
+        ...(frozen_rows > 0
+          ? [{ sheet, row: 0, end: frozen_rows, cols: this.datasource_column_indices }]
           : []),
         ...anchors.map((anchor) => ({ ...anchor, end: anchor.row + 1 })),
       ];
-      const protectedBands: number[] = [];
-      const formulaBands: number[] = [];
-      let remainingCells = FORMULA_CLOSURE_MAX_CELLS;
+      const protected_bands: number[] = [];
+      const formula_bands: number[] = [];
+      let remaining_cells = FORMULA_CLOSURE_MAX_CELLS;
 
       for (const root of roots) {
         if (root.sheet !== sheet) continue;
@@ -765,72 +772,73 @@ export class ReadWindowController {
             row += 1;
           }
 
-          for (const col of root.cols) protectedBands.push(start, end, col, col + 1);
-          const bands = engine.formulaReadBands(sheet, start, end, root.cols, remainingCells);
+          for (const col of root.cols) protected_bands.push(start, end, col, col + 1);
+          const bands = engine.formulaReadBands(sheet, start, end, root.cols, remaining_cells);
           for (let index = 0; index < bands.length; index += 4) {
-            const rowStart = bands[index];
-            const rowEnd = bands[index + 1];
-            const colStart = bands[index + 2];
-            const colEnd = bands[index + 3];
+            const row_start = bands[index];
+            const row_end = bands[index + 1];
+            const col_start = bands[index + 2];
+            const col_end = bands[index + 3];
             if (
-              rowStart === undefined ||
-              rowEnd === undefined ||
-              colStart === undefined ||
-              colEnd === undefined
+              row_start === undefined ||
+              row_end === undefined ||
+              col_start === undefined ||
+              col_end === undefined
             ) {
               throw new Error("Sheetwrite: invalid formula closure band");
             }
 
-            formulaBands.push(rowStart, rowEnd, colStart, colEnd);
-            protectedBands.push(rowStart, rowEnd, colStart, colEnd);
-            remainingCells -= (rowEnd - rowStart) * (colEnd - colStart);
+            formula_bands.push(row_start, row_end, col_start, col_end);
+            protected_bands.push(row_start, row_end, col_start, col_end);
+            remaining_cells -= (row_end - row_start) * (col_end - col_start);
           }
         }
       }
 
-      if (this.pinnedSheet !== null && this.pinnedSheet !== sheet) {
-        engine.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
+      if (this.pinned_sheet !== null && this.pinned_sheet !== sheet) {
+        engine.pinViewportBands(this.pinned_sheet, EMPTY_BANDS);
       }
 
-      this.formulaBands = formulaBands.length === 0 ? EMPTY_BANDS : Uint32Array.from(formulaBands);
-      engine.pinViewportBands(sheet, Uint32Array.from(protectedBands));
-      this.pinnedSheet = sheet;
+      this.formula_bands =
+        formula_bands.length === 0 ? EMPTY_BANDS : Uint32Array.from(formula_bands);
+      engine.pinViewportBands(sheet, Uint32Array.from(protected_bands));
+      this.pinned_sheet = sheet;
     }
 
     // Protection is committed before any page can hydrate or evict a chunk.
-    if (frozenRows > 0)
-      this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
+    if (frozen_rows > 0)
+      this.options.datasource.ensureLoaded(0, frozen_rows, this.datasource_column_indices);
     for (const anchor of anchors) {
       this.options.datasource.ensureLoaded(anchor.row, anchor.row + 1, anchor.cols);
     }
 
     this.options.datasource.updateViewport(
-      visibleRows.start,
-      visibleRows.end,
-      this.datasourceColumnIndices,
-      this.formulaBands,
+      visible_rows.start,
+      visible_rows.end,
+      this.datasource_column_indices,
+      this.formula_bands,
     );
   }
 
-  private retainMainView(view: VisibleWindowView): VisibleWindowView {
-    if (this.mainViewValuePool.length !== view.values.length) {
-      this.mainViewValuePool = new Array<CellScalar>(view.values.length);
+  private retain_main_view(view: VisibleWindowView): VisibleWindowView {
+    if (this.main_view_value_pool.length !== view.values.length) {
+      this.main_view_value_pool = new Array<CellScalar>(view.values.length);
     }
-    for (let index = 0; index < this.mainViewValuePool.length; index++) {
-      this.mainViewValuePool[index] = view.values[index] ?? null;
+    for (let index = 0; index < this.main_view_value_pool.length; index++) {
+      this.main_view_value_pool[index] = view.values[index] ?? null;
     }
-    return { ...view, values: this.mainViewValuePool };
+    return { ...view, values: this.main_view_value_pool };
   }
 
   private previewed(view: VisibleWindowView): VisibleWindowView {
     return this.options.previewWindow?.()?.(view) ?? view;
   }
 
-  private retainPaneView(view: VisibleWindowView, slot: number): VisibleWindowView {
-    let values = this.paneValuePools[slot];
+  private retain_pane_view(view: VisibleWindowView, slot: number): VisibleWindowView {
+    let values = this.pane_value_pools[slot];
     if (!values || values.length !== view.values.length) {
       values = new Array<CellScalar>(view.values.length);
-      this.paneValuePools[slot] = values;
+      this.pane_value_pools[slot] = values;
     }
 
     for (let index = 0; index < values.length; index++) values[index] = view.values[index] ?? null;

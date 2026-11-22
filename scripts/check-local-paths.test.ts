@@ -5,10 +5,10 @@ import { findLocalPaths } from "./check-local-paths.js";
 
 const encode = (text: string) => new TextEncoder().encode(text);
 // Joined at runtime so this tracked file does not trip the guard it tests.
-const homePath = (separator: string, ...parts: string[]) => parts.join(separator);
-const LINUX_HOME = homePath("/", "", "home", "someone", "sheetwrite");
-const MAC_HOME = homePath("/", "", "Users", "someone", "sheetwrite");
-const WINDOWS_HOME = homePath("\\", "C:", "Users", "someone", "sheetwrite");
+const home_path = (separator: string, ...parts: string[]) => parts.join(separator);
+const LINUX_HOME = home_path("/", "", "home", "someone", "sheetwrite");
+const MAC_HOME = home_path("/", "", "Users", "someone", "sheetwrite");
+const WINDOWS_HOME = home_path("\\", "C:", "Users", "someone", "sheetwrite");
 
 it("reports Linux, macOS and Windows home-directory paths with their line", () => {
   const contents = encode(

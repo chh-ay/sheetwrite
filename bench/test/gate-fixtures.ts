@@ -88,9 +88,9 @@ interface RenderFixtureOptions {
 }
 
 /** Formatter and merge-index counters; Handsontable reports none. */
-function scenarioResources(engine: EngineId, scenarioId: ScenarioId) {
+function scenario_resources(engine: EngineId, scenario_id: ScenarioId) {
   const count = engine === "sheetwrite" ? 1 : 0;
-  if (scenarioId === "formatted-paint.top-left") {
+  if (scenario_id === "formatted-paint.top-left") {
     const [formats, formatters] = [2 * count, count];
     return {
       resources: {
@@ -103,7 +103,7 @@ function scenarioResources(engine: EngineId, scenarioId: ScenarioId) {
       },
     };
   }
-  if (scenarioId === "merge-heavy.paint") {
+  if (scenario_id === "merge-heavy.paint") {
     return { mergeResources: { indexConstructions: count, candidatesExamined: 100 * count } };
   }
   return {};
@@ -113,49 +113,49 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
   const rounds = options.rounds ?? 2;
   const engines = options.engines ?? (["sheetwrite", "handsontable"] as const);
   const rows = options.rows ?? [100_000];
-  const measuredSamples = options.measuredSamples ?? 3;
-  const runId = "00000000-0000-4000-8000-000000000052";
+  const measured_samples = options.measuredSamples ?? 3;
+  const run_id = "00000000-0000-4000-8000-000000000052";
   const config: RenderRunConfig = {
     engines,
     rows,
     scenarios: options.scenarios ?? RENDER_SCENARIOS.map((scenario) => scenario.id),
   };
   const results: ScenarioResult[] = [];
-  const launchAttempts: BrowserLaunchAttempt[] = [];
+  const launch_attempts: BrowserLaunchAttempt[] = [];
   for (let round = 1; round <= rounds; round++) {
     for (const engine of engines) {
-      for (const rowCount of rows) {
-        launchAttempts.push({
+      for (const row_count of rows) {
+        launch_attempts.push({
           round,
           engine,
-          rows: rowCount,
+          rows: row_count,
           attempt: 1,
           success: true,
           errorClass: null,
           message: null,
         });
-        for (const scenarioId of config.scenarios) {
+        for (const scenario_id of config.scenarios) {
           const values =
-            options.samples?.(round, engine, scenarioId) ??
-            Array.from({ length: measuredSamples }, () => 10);
-          if (values.length !== measuredSamples) {
+            options.samples?.(round, engine, scenario_id) ??
+            Array.from({ length: measured_samples }, () => 10);
+          if (values.length !== measured_samples) {
             throw new Error("fixture sample callback returned the wrong sample count");
           }
           const summary = summarizeFinite(values);
           results.push({
-            runId,
+            runId: run_id,
             round,
             engine,
-            rows: rowCount,
-            scenarioId,
-            group: scenarioGroup(scenarioId),
+            rows: row_count,
+            scenarioId: scenario_id,
+            group: scenarioGroup(scenario_id),
             status: "success",
-            operationCount: measuredSamples * 100,
-            rawSamples: values.map((perOperationMs, index) => ({
+            operationCount: measured_samples * 100,
+            rawSamples: values.map((per_operation_ms, index) => ({
               index,
-              durationMs: perOperationMs * 100,
+              durationMs: per_operation_ms * 100,
               operationCount: 100,
-              perOperationMs,
+              perOperationMs: per_operation_ms,
             })),
             medianMs: summary.median,
             p95Ms: summary.p95,
@@ -169,7 +169,7 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
               },
             ],
             memory: { beforeBytes: 1_000, afterBytes: 1_100, deltaBytes: 100 },
-            ...scenarioResources(engine, scenarioId),
+            ...scenario_resources(engine, scenario_id),
           });
         }
       }
@@ -177,7 +177,7 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
   }
   return {
     protocolVersion: RENDER_PROTOCOL_VERSION,
-    runId,
+    runId: run_id,
     metadata: {
       commit: options.commit ?? "2c10118",
       dirty: false,
@@ -191,16 +191,19 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
       engineVersions: { sheetwrite: "0.0.0", handsontable: "18.0.0" },
       datasetSeed: DEFAULT_SEED,
       datasetHashes: Object.fromEntries(
-        rows.map((rowCount) => [String(rowCount), must(RENDER_DATASET_HASHES[rowCount], "hash")]),
+        rows.map((row_count) => [
+          String(row_count),
+          must(RENDER_DATASET_HASHES[row_count], "hash"),
+        ]),
       ),
       viewport: { width: 640, height: 480 },
-      measuredSamples,
+      measuredSamples: measured_samples,
       warmupSamples: 1,
       minimumSampleDurationMs: 100,
       rounds,
       orderSeed: RENDER_ORDER_SEED,
       engineOrder: counterbalancedOrder(engines, rounds, RENDER_ORDER_SEED),
-      launchAttempts,
+      launchAttempts: launch_attempts,
     },
     config,
     results,

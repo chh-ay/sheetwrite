@@ -4,12 +4,12 @@ import { compile } from "@mdx-js/mdx";
 
 import { SOLID_MDX_OPTIONS } from "../src/lib/recma-solid-elements.ts";
 
-async function compileForSolid(source: string): Promise<string> {
+async function compile_for_solid(source: string): Promise<string> {
   return String(await compile(source, SOLID_MDX_OPTIONS));
 }
 
 test("HTML elements compile to literal tags, components still come from `components`", async () => {
-  const output = await compileForSolid('Some [link](/docs/) and <PackageCommand packages="x" />');
+  const output = await compile_for_solid('Some [link](/docs/) and <PackageCommand packages="x" />');
   expect(output).toContain("<p>");
   expect(output).toContain('<a href="/docs/">');
   expect(output).not.toContain("_components.p");
@@ -19,7 +19,7 @@ test("HTML elements compile to literal tags, components still come from `compone
 });
 
 test("React's dangerouslySetInnerHTML becomes Solid's innerHTML", async () => {
-  const output = await compileForSolid(
+  const output = await compile_for_solid(
     '<template className="store" dangerouslySetInnerHTML={{ __html: "<b>x</b>" }} />',
   );
   expect(output).toContain('innerHTML={"<b>x</b>"}');
@@ -27,7 +27,7 @@ test("React's dangerouslySetInnerHTML becomes Solid's innerHTML", async () => {
 });
 
 test("dangerouslySetInnerHTML without __html is a build error", async () => {
-  await expect(compileForSolid("<div dangerouslySetInnerHTML={{ html: 1 }} />")).rejects.toThrow(
+  await expect(compile_for_solid("<div dangerouslySetInnerHTML={{ html: 1 }} />")).rejects.toThrow(
     "without __html",
   );
 });

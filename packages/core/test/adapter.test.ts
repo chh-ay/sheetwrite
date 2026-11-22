@@ -16,26 +16,26 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, GridOptions } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
-let restoreCanvasStubs: () => void;
+let restore_canvas_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreCanvasStubs = installCanvasTestStubs();
+  restore_canvas_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreCanvasStubs();
+  restore_canvas_stubs();
   document.body.innerHTML = "";
 });
 
-for (const [retiredReadiness, currentPublication] of [
+for (const [retired_readiness, current_publication] of [
   ["rejects", "sync"],
   ["resolves", "async"],
 ] as const) {
-  it(`announces only the current generation, ignores a retired attachment's publication that ${retiredReadiness}, and applies live changes while ${currentPublication} publication waits`, async () => {
+  it(`announces only the current generation, ignores a retired attachment's publication that ${retired_readiness}, and applies live changes while ${current_publication} publication waits`, async () => {
     const host = mountHost();
     const stale = Promise.withResolvers<void>();
     const current = Promise.withResolvers<void>();
@@ -50,7 +50,7 @@ for (const [retiredReadiness, currentPublication] of [
           published.grid = grid;
           if (!grid) return retired.promise;
           if (++published.count === 1) return stale.promise;
-          if (currentPublication === "async") return current.promise;
+          if (current_publication === "async") return current.promise;
         },
         setInitializationState() {},
         reportConsumerFailure: (error) => failures.push(error),
@@ -62,7 +62,7 @@ for (const [retiredReadiness, currentPublication] of [
     expect(published.grid?.getEffectiveTheme().bg).toBe("#102030");
     controller.unmount();
     controller.mount(host, { options });
-    if (retiredReadiness === "rejects") stale.reject(new Error("retired readiness"));
+    if (retired_readiness === "rejects") stale.reject(new Error("retired readiness"));
     else stale.resolve();
     retired.reject(new Error("retired handle"));
     current.resolve();
@@ -82,10 +82,10 @@ for (const [retiredReadiness, currentPublication] of [
 it("retires a new Grid after publication throws without reporting an initialization failure", () => {
   const host = mountHost();
   const failure = new Error("consumer publication failed");
-  const initializationErrors: unknown[] = [];
+  const initialization_errors: unknown[] = [];
   let published: Grid | null = null;
   const controller = createAdapterGridController(
-    { onInitializationError: (error) => initializationErrors.push(error) },
+    { onInitializationError: (error) => initialization_errors.push(error) },
     {
       publish(grid) {
         published = grid;
@@ -102,7 +102,7 @@ it("retires a new Grid after publication throws without reporting an initializat
   );
   expect(published).toBeNull();
   expect(host.childElementCount).toBe(0);
-  expect(initializationErrors).toEqual([]);
+  expect(initialization_errors).toEqual([]);
 });
 
 it("applies live readOnly and config changes to the existing grid", async () => {
@@ -159,8 +159,8 @@ it("replaces the grid with an input reset when only data changes", () => {
 });
 
 it("rejects duplicate keys, empty keys, and empty titles in simple columns", () => {
-  const defaultRows: Array<Record<string, string>> = [{ name: "A", "": "A" }];
-  const valid = { columns: [{ key: "name", title: "Name" }], defaultRows };
+  const default_rows: Array<Record<string, string>> = [{ name: "A", "": "A" }];
+  const valid = { columns: [{ key: "name", title: "Name" }], defaultRows: default_rows };
   expect(() => createSimpleGridInput(valid)).not.toThrow();
   const invalid: Array<Array<{ key: string; title: string }>> = [
     [

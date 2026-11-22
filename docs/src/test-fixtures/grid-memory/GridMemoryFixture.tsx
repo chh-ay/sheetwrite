@@ -18,7 +18,7 @@ const OUTPUT_STYLE = { "margin-left": "8px" };
 const BUTTONS_STYLE = { display: "flex", gap: "8px", "margin-top": "8px" };
 const GRID_HOST_STYLE = { height: "640px", "margin-top": "8px", width: "900px" };
 
-function columnarRows(): ColumnarData {
+function columnar_rows(): ColumnarData {
   const columns: Record<string, string[] | Float64Array> = {};
   for (const key of TEXT_COLUMNS) {
     columns[key] = Array.from(
@@ -35,18 +35,18 @@ function columnarRows(): ColumnarData {
   return { rowCount: ROW_COUNT, columns };
 }
 
-function nextFrame(): Promise<void> {
+function next_frame(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   requestAnimationFrame(() => resolve());
   return promise;
 }
 
-async function settledFrames(): Promise<void> {
-  await nextFrame();
-  await nextFrame();
+async function settled_frames(): Promise<void> {
+  await next_frame();
+  await next_frame();
 }
 
-async function documentDigest(grid: Grid): Promise<string> {
+async function document_digest(grid: Grid): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(grid.exportSnapshot()));
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
 
@@ -55,7 +55,7 @@ async function documentDigest(grid: Grid): Promise<string> {
   );
 }
 
-function cachedStrings(grid: Grid): number {
+function cached_strings(grid: Grid): number {
   const snapshot = grid.getRuntimeResourceSnapshot("scroll", "settled");
   const owner = snapshot.jsOwners.find((entry) => entry.owner === "js.window.string-cache");
 
@@ -66,19 +66,19 @@ function cachedStrings(grid: Grid): number {
 export function GridMemoryFixture() {
   let host: HTMLElement | undefined;
   let grid: Grid | undefined;
-  const [status, setStatus] = createSignal<FixtureStatus>("loading");
-  const [digest, setDigest] = createSignal("");
-  const [stringEntries, setStringEntries] = createSignal(0);
+  const [status, set_status] = createSignal<FixtureStatus>("loading");
+  const [digest, set_digest] = createSignal("");
+  const [string_entries, set_string_entries] = createSignal(0);
 
   onMount(() => {
     if (!host) return;
-    const mountedHost = host;
+    const mounted_host = host;
     let disposed = false;
 
     initSheetwrite().then(
       async () => {
         if (disposed) return;
-        const mountedGrid = createGrid(mountedHost, {
+        const mounted_grid = createGrid(mounted_host, {
           workbook: {
             activeSheet: "s1",
             sheets: [
@@ -111,18 +111,18 @@ export function GridMemoryFixture() {
               },
             ],
           },
-          data: columnarRows(),
+          data: columnar_rows(),
           config: { toolbar: false, contextMenu: false, find: false },
         });
-        grid = mountedGrid;
-        await settledFrames();
-        setDigest(await documentDigest(mountedGrid));
-        setStringEntries(cachedStrings(mountedGrid));
-        setStatus("ready");
+        grid = mounted_grid;
+        await settled_frames();
+        set_digest(await document_digest(mounted_grid));
+        set_string_entries(cached_strings(mounted_grid));
+        set_status("ready");
       },
       (error: unknown) => {
         console.error("The grid memory fixture could not start the engine.", error);
-        if (!disposed) setStatus("error");
+        if (!disposed) set_status("error");
       },
     );
 
@@ -138,32 +138,32 @@ export function GridMemoryFixture() {
     done: FixtureStatus,
   ) => {
     if (!grid || !host) throw new Error("The grid memory fixture has no grid.");
-    const activeGrid = grid;
+    const active_grid = grid;
 
-    setStatus("busy");
-    await action(activeGrid, host);
-    setDigest(await documentDigest(activeGrid));
-    setStringEntries(cachedStrings(activeGrid));
-    setStatus(done);
+    set_status("busy");
+    await action(active_grid, host);
+    set_digest(await document_digest(active_grid));
+    set_string_entries(cached_strings(active_grid));
+    set_status(done);
   };
 
-  const scrollThrough = async (_activeGrid: Grid, scrollHost: HTMLElement): Promise<void> => {
-    const scroller = scrollHost.querySelector<HTMLElement>(".sheetwrite-scroller");
+  const scroll_through = async (_active_grid: Grid, scroll_host: HTMLElement): Promise<void> => {
+    const scroller = scroll_host.querySelector<HTMLElement>(".sheetwrite-scroller");
     if (!scroller) throw new Error("The grid memory fixture has no scroller.");
 
     for (let row = 0; row <= SCROLLED_ROWS; row += ROWS_PER_STEP) {
       scroller.scrollTop = row * ROW_HEIGHT;
-      await nextFrame();
+      await next_frame();
     }
 
     // A fixed final viewport makes the before and after screenshots comparable.
     scroller.scrollTop = RETURN_ROW * ROW_HEIGHT;
-    await settledFrames();
+    await settled_frames();
   };
 
-  const trim = async (activeGrid: Grid): Promise<void> => {
-    activeGrid.trimMemory();
-    await settledFrames();
+  const trim = async (active_grid: Grid): Promise<void> => {
+    active_grid.trimMemory();
+    await settled_frames();
   };
 
   return (
@@ -174,13 +174,13 @@ export function GridMemoryFixture() {
       <output data-digest={digest()} id="grid-memory-document" style={OUTPUT_STYLE}>
         {digest()}
       </output>
-      <output data-entries={stringEntries()} id="grid-memory-strings" style={OUTPUT_STYLE}>
-        {stringEntries()}
+      <output data-entries={string_entries()} id="grid-memory-strings" style={OUTPUT_STYLE}>
+        {string_entries()}
       </output>
       <div style={BUTTONS_STYLE}>
         <button
           disabled={status() === "busy"}
-          onClick={() => void run(scrollThrough, "scrolled")}
+          onClick={() => void run(scroll_through, "scrolled")}
           type="button"
         >
           Scroll through

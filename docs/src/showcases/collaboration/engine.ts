@@ -131,7 +131,7 @@ interface ClientRuntime {
   disposers: Array<() => void>;
 }
 
-let nextMutation = 1;
+let next_mutation = 1;
 
 /** Waits between drill steps so the page state and the durable queue keep up. */
 function delay(ms: number): Promise<void> {
@@ -144,7 +144,7 @@ function delay(ms: number): Promise<void> {
  * One sequencer decision in plain words; mutation ids stay out of the UI. Both
  * documents share the log, so usage-document versions carry their document.
  */
-function describeServerDecision(record: ShowcaseCommitRecord): string {
+function describe_server_decision(record: ShowcaseCommitRecord): string {
   const label =
     record.status === "applied"
       ? "applied to both clients"
@@ -182,9 +182,9 @@ export function createCollaborationEngine(
   };
   let bus: ShowcasePresenceBus | null = null;
   const clients: Record<ClientKey, ClientRuntime | null> = { a: null, b: null };
-  let serverDisposers: Array<() => void> = [];
+  let server_disposers: Array<() => void> = [];
   /** Document both clients show, or are switching to. */
-  let currentDocument: ShowcaseDocument = "forecast";
+  let current_document: ShowcaseDocument = "forecast";
   /** Serializes document switches so two never interleave their remounts. */
   let switching: Promise<boolean> = Promise.resolve(true);
   /** True while the batch drill runs: nothing may move the clients off its document. */
@@ -192,36 +192,36 @@ export function createCollaborationEngine(
   /** Last account read per client, kept while the clients show the usage document. */
   const accounts: Record<ClientKey, string> = { a: "the first deal", b: "the first deal" };
   const recovering: Record<ClientKey, boolean> = { a: false, b: false };
-  let bootGeneration = 0;
+  let boot_generation = 0;
   const flashes: Record<ClientKey, Map<string, HighlightRange & { until: number }>> = {
     a: new Map(),
     b: new Map(),
   };
-  const flashTimers: Record<ClientKey, number | null> = { a: null, b: null };
+  const flash_timers: Record<ClientKey, number | null> = { a: null, b: null };
   /** Rows each client shows, refreshed once per frame while it scrolls. */
-  const shownRows: Record<ClientKey, { first: number; last: number } | null> = {
+  const shown_rows: Record<ClientKey, { first: number; last: number } | null> = {
     a: null,
     b: null,
   };
-  let chaosRun = 0;
+  let chaos_run = 0;
 
   /** Repaint a client's edit highlights and schedule the next expiry. */
-  const paintFlashes = (key: ClientKey) => {
+  const paint_flashes = (key: ClientKey) => {
     const runtime = clients[key];
     const pending = flashes[key];
     const now = performance.now();
     for (const [id, flash] of pending) if (flash.until <= now) pending.delete(id);
     runtime?.grid.highlightCells(pending.size > 0 ? [...pending.values()] : null);
-    const timer = flashTimers[key];
+    const timer = flash_timers[key];
     if (timer !== null) window.clearTimeout(timer);
-    flashTimers[key] = null;
+    flash_timers[key] = null;
     if (pending.size === 0) return;
     const next = Math.min(...[...pending.values()].map((flash) => flash.until));
-    flashTimers[key] = window.setTimeout(() => paintFlashes(key), next - now + 16);
+    flash_timers[key] = window.setTimeout(() => paint_flashes(key), next - now + 16);
   };
 
   /** Highlight the cells an edit changed, in the color of the analyst who made it. */
-  const flashEdit = (key: ClientKey, event: ChangeEvent) => {
+  const flash_edit = (key: ClientKey, event: ChangeEvent) => {
     if (event.transaction.patches.length > EDIT_FLASH_MAX_CELLS) return;
     const author: ClientKey = event.source === "remote" ? (key === "a" ? "b" : "a") : key;
     const until = performance.now() + EDIT_FLASH_MS;
@@ -238,35 +238,35 @@ export function createCollaborationEngine(
       });
       flashed = true;
     }
-    if (flashed) paintFlashes(key);
+    if (flashed) paint_flashes(key);
   };
 
   /** Rows of the plan sheet the reader can currently see in a client's Grid. */
-  const visibleRows = (key: ClientKey): { first: number; last: number } | null => {
+  const visible_rows = (key: ClientKey): { first: number; last: number } | null => {
     const runtime = clients[key];
     const host = hosts[key];
     if (!runtime) return null;
     const rect = host.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
-    const rowAt = (y: number) => runtime.grid.getCellAtPoint(x, y)?.row;
+    const row_at = (y: number) => runtime.grid.getCellAtPoint(x, y)?.row;
     let first: number | undefined;
-    for (let y = rect.top + 2; y < rect.top + 120 && first === undefined; y += 6) first = rowAt(y);
+    for (let y = rect.top + 2; y < rect.top + 120 && first === undefined; y += 6) first = row_at(y);
     let last: number | undefined;
     for (let y = rect.bottom - 2; y > rect.bottom - 160 && last === undefined; y -= 6) {
-      last = rowAt(y);
+      last = row_at(y);
     }
     return first === undefined || last === undefined ? null : { first, last };
   };
 
   /** Scroll so rows `first`..`last` are on screen (the Grid scrolls minimally). */
-  const showRows = (key: ClientKey, rows: { first: number; last: number }) => {
+  const show_rows = (key: ClientKey, rows: { first: number; last: number }) => {
     const grid = clients[key]?.grid;
     grid?.scrollToCell({ sheet: "plan", row: rows.first, col: 0 });
     grid?.scrollToCell({ sheet: "plan", row: rows.last, col: 0 });
   };
 
   /** Account behind this client's sample edit; read from the forecast it is mounted on. */
-  const sampleAccount = (key: ClientKey): string => {
+  const sample_account = (key: ClientKey): string => {
     const runtime = clients[key];
     if (runtime?.document !== "forecast") return accounts[key];
     const resolved = runtime.grid.store.getCell({
@@ -279,7 +279,7 @@ export function createCollaborationEngine(
   };
 
   /** The forecast total and sync state; on the usage document the total keeps its last value. */
-  const readClient = (key: ClientKey) => {
+  const read_client = (key: ClientKey) => {
     const runtime = clients[key];
     if (!runtime) return;
     if (runtime.document !== "forecast") {
@@ -293,11 +293,11 @@ export function createCollaborationEngine(
           ? `$${resolved.toLocaleString("en-US")}`
           : String(resolved ?? "–"),
       syncState: runtime.sync.state,
-      account: sampleAccount(key),
+      account: sample_account(key),
     });
   };
 
-  const disposeClient = (key: ClientKey, resources: "close" | "retain" = "close") => {
+  const dispose_client = (key: ClientKey, resources: "close" | "retain" = "close") => {
     const runtime = clients[key];
     if (!runtime) return;
     for (const dispose of runtime.disposers) dispose();
@@ -315,7 +315,7 @@ export function createCollaborationEngine(
     clients[key] = null;
   };
 
-  const retryPending = (key: ClientKey) => {
+  const retry_pending = (key: ClientKey) => {
     const runtime = clients[key];
     if (!runtime) return;
     const head = runtime.sync.pendingCommits()[0];
@@ -327,20 +327,20 @@ export function createCollaborationEngine(
     void runtime.sync.retry(head.clientMutationId).catch(() => {});
   };
 
-  const wireClient = (key: ClientKey, runtime: ClientRuntime) => {
+  const wire_client = (key: ClientKey, runtime: ClientRuntime) => {
     const { sync, link, presence } = runtime;
-    const isCurrent = () => clients[key] === runtime && runtime.generation === bootGeneration;
+    const is_current = () => clients[key] === runtime && runtime.generation === boot_generation;
     runtime.disposers.push(
       sync.on((event) => {
-        if (!isCurrent()) return;
+        if (!is_current()) return;
         switch (event.type) {
           case "state":
             patchView(key, { syncState: event.state });
-            readClient(key);
+            read_client(key);
             break;
           case "pending":
             // A stale boot never drains the durable queue the live session owns.
-            if (link.connected && sync.state.connection === "online" && isCurrent()) {
+            if (link.connected && sync.state.connection === "online" && is_current()) {
               void sync.flush().catch(() => {});
             }
             break;
@@ -355,7 +355,7 @@ export function createCollaborationEngine(
             break;
           case "remote-applied":
             pushClientLog(key, "remote", `Applied remote v${event.operation.version}`);
-            readClient(key);
+            read_client(key);
             break;
           case "restored":
             if (event.pending.length > 0) {
@@ -379,7 +379,7 @@ export function createCollaborationEngine(
               "warn",
               `Conflict: commit based on v${event.mutation.baseVersion}, server is at v${event.response.currentVersion}`,
             );
-            void recoverClient(key, event.response);
+            void recover_client(key, event.response);
             break;
           case "error":
             if (event.error instanceof ShowcaseLinkError) {
@@ -398,19 +398,19 @@ export function createCollaborationEngine(
     runtime.disposers.push(link.subscribeState((state) => patchView(key, { linkState: state })));
     runtime.disposers.push(
       runtime.grid.on("change", (event) => {
-        if (isCurrent()) flashEdit(key, event);
+        if (is_current()) flash_edit(key, event);
       }),
     );
-    let rowsFrame = 0;
+    let rows_frame = 0;
     runtime.disposers.push(
       runtime.grid.on("scroll", () => {
-        if (rowsFrame !== 0) return;
-        rowsFrame = requestAnimationFrame(() => {
-          rowsFrame = 0;
-          if (isCurrent()) shownRows[key] = visibleRows(key);
+        if (rows_frame !== 0) return;
+        rows_frame = requestAnimationFrame(() => {
+          rows_frame = 0;
+          if (is_current()) shown_rows[key] = visible_rows(key);
         });
       }),
-      () => cancelAnimationFrame(rowsFrame),
+      () => cancelAnimationFrame(rows_frame),
     );
     runtime.disposers.push(
       presence.on((event) => {
@@ -421,7 +421,7 @@ export function createCollaborationEngine(
     );
   };
 
-  const createClient = (
+  const create_client = (
     key: ClientKey,
     options: {
       snapshot: WorkbookSnapshot;
@@ -432,7 +432,7 @@ export function createCollaborationEngine(
       bus: ShowcasePresenceBus;
     },
   ): ClientRuntime => {
-    const { snapshot, generation, target, link, storage, bus: presenceBus } = options;
+    const { snapshot, generation, target, link, storage, bus: presence_bus } = options;
     const host = hosts[key];
     const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
     host.replaceChildren();
@@ -443,7 +443,7 @@ export function createCollaborationEngine(
         contextMenu: [
           { action: "copy", label: "Copy shared value" },
           { action: "paste" },
-          { label: "Retry pending", onClick: () => retryPending(key) },
+          { label: "Retry pending", onClick: () => retry_pending(key) },
           { action: "exportXlsx", label: "Export this client's workbook" },
         ],
       },
@@ -455,10 +455,10 @@ export function createCollaborationEngine(
       pendingStorage: storage,
       // Each client's commits carry its person, as version history records them.
       authorId: actor.id,
-      createMutationId: () => `${actor.id}-${Date.now().toString(36)}-${nextMutation++}`,
+      createMutationId: () => `${actor.id}-${Date.now().toString(36)}-${next_mutation++}`,
       limits: { maxVersionPayloadBytes: DEMO_VERSION_BYTES },
     });
-    const presence = new PresenceCoordinator(grid, presenceBus.endpoint(), {
+    const presence = new PresenceCoordinator(grid, presence_bus.endpoint(), {
       actor,
       heartbeatMs: 0,
     });
@@ -473,47 +473,47 @@ export function createCollaborationEngine(
       presence,
       disposers: [],
     };
-    wireClient(key, runtime);
+    wire_client(key, runtime);
     clients[key] = runtime;
     runtime.disposers.push(sync.subscribe(link));
     return runtime;
   };
 
-  const bootClient = async (
+  const boot_client = async (
     key: ClientKey,
     generation: number,
     target: ShowcaseDocument,
   ): Promise<void> => {
     const server = servers[target];
-    if (!server || !bus || generation !== bootGeneration) return;
+    if (!server || !bus || generation !== boot_generation) return;
     const link = new ShowcaseNetworkLink(server);
     const snapshot = await server.load(DOCUMENT_ID[target]);
     link.startFrom(snapshot.version ?? 0);
-    if (generation !== bootGeneration) {
+    if (generation !== boot_generation) {
       link.destroy();
       return;
     }
     const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
-    const runtime = createClient(key, { snapshot, generation, target, link, storage, bus });
+    const runtime = create_client(key, { snapshot, generation, target, link, storage, bus });
     const { sync } = runtime;
-    if (generation !== bootGeneration) {
-      if (clients[key] === runtime) disposeClient(key);
+    if (generation !== boot_generation) {
+      if (clients[key] === runtime) dispose_client(key);
       return;
     }
     await sync.ready();
-    if (generation !== bootGeneration) {
-      if (clients[key] === runtime) disposeClient(key);
+    if (generation !== boot_generation) {
+      if (clients[key] === runtime) dispose_client(key);
       return;
     }
     if (sync.pendingCount > 0) {
       await sync.flush();
-      if (generation !== bootGeneration) {
-        if (clients[key] === runtime) disposeClient(key);
+      if (generation !== boot_generation) {
+        if (clients[key] === runtime) dispose_client(key);
         return;
       }
     }
     patchView(key, { ready: true, online: true, linkState: link.state() });
-    readClient(key);
+    read_client(key);
   };
 
   /**
@@ -523,29 +523,29 @@ export function createCollaborationEngine(
    * the server correctly rejects it as a conflict. Start each server with
    * empty client queues.
    */
-  const clearQueueDatabases = async () => {
+  const clear_queue_databases = async () => {
     for (const key of CLIENT_KEYS) {
       await deleteDatabase(QUEUE_DATABASE[key], { error: "reject", blocked: "resolve" });
     }
   };
 
   /** Starts a document's in-page server and logs its sequencing decisions. */
-  const startServer = (target: ShowcaseDocument): ShowcaseCollaborationServer => {
+  const start_server = (target: ShowcaseDocument): ShowcaseCollaborationServer => {
     const server = new ShowcaseCollaborationServer(
       target === "forecast" ? makeCollaborationSnapshot() : makeCollaborationUsageSnapshot(),
     );
     servers[target] = server;
-    serverDisposers.push(
+    server_disposers.push(
       server.observeCommits((record: ShowcaseCommitRecord) => {
         const entry = {
           id: nextLogId(),
           kind: "info" as const,
           status: record.status,
-          text: describeServerDecision(record),
+          text: describe_server_decision(record),
         };
         setServerLog((entries) => [entry, ...entries].slice(0, SERVER_LOG_LIMIT));
         // The head shown is the head of the document the clients are on.
-        if (record.documentId === DOCUMENT_ID[currentDocument]) {
+        if (record.documentId === DOCUMENT_ID[current_document]) {
           setServerVersion((current) => Math.max(current, record.version));
         }
       }),
@@ -553,13 +553,13 @@ export function createCollaborationEngine(
     return server;
   };
 
-  const stopServers = () => {
-    for (const dispose of serverDisposers) dispose();
-    serverDisposers = [];
+  const stop_servers = () => {
+    for (const dispose of server_disposers) dispose();
+    server_disposers = [];
     servers = { forecast: null, usage: null };
   };
 
-  const clientsBusy = () =>
+  const clients_busy = () =>
     CLIENT_KEYS.some(
       (key) => (clients[key]?.sync.pendingCommits().length ?? 1) > 0 || recovering[key],
     );
@@ -570,22 +570,22 @@ export function createCollaborationEngine(
    * forecast reloads 10,000 cells instead of 110,000. Resolves false if the
    * clients stayed where they were.
    */
-  const showDocument = (target: ShowcaseDocument): Promise<boolean> => {
+  const show_document = (target: ShowcaseDocument): Promise<boolean> => {
     const next = switching.then(async () => {
-      const onTarget = CLIENT_KEYS.every((key) => clients[key]?.document === target);
-      if (onTarget) return true;
+      const on_target = CLIENT_KEYS.every((key) => clients[key]?.document === target);
+      if (on_target) return true;
       if (drilling && target !== "usage") return false;
-      const generation = bootGeneration;
-      const settleBy = performance.now() + CHAOS_SETTLE_MS;
-      while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
-      if (clientsBusy() || generation !== bootGeneration) return false;
-      const server = servers[target] ?? startServer(target);
-      for (const key of CLIENT_KEYS) disposeClient(key);
-      currentDocument = target;
+      const generation = boot_generation;
+      const settle_by = performance.now() + CHAOS_SETTLE_MS;
+      while (performance.now() < settle_by && clients_busy()) await delay(CHAOS_TICK_MS);
+      if (clients_busy() || generation !== boot_generation) return false;
+      const server = servers[target] ?? start_server(target);
+      for (const key of CLIENT_KEYS) dispose_client(key);
+      current_document = target;
       setServerVersion(server.headVersion(DOCUMENT_ID[target]));
-      await bootClient("a", generation, target);
-      await bootClient("b", generation, target);
-      if (generation !== bootGeneration) return false;
+      await boot_client("a", generation, target);
+      await boot_client("b", generation, target);
+      if (generation !== boot_generation) return false;
       await clients.a?.presence.publishNow();
       await clients.b?.presence.publishNow();
       return CLIENT_KEYS.every((key) => clients[key]?.document === target);
@@ -594,39 +594,39 @@ export function createCollaborationEngine(
     return next;
   };
 
-  const bootAll = async (generation: number) => {
-    if (generation !== bootGeneration) return;
+  const boot_all = async (generation: number) => {
+    if (generation !== boot_generation) return;
     setStatus("loading");
     setStatusDetail("Starting the in-page server…");
     try {
-      await clearQueueDatabases();
-      if (generation !== bootGeneration) return;
+      await clear_queue_databases();
+      if (generation !== boot_generation) return;
       await initSheetwrite();
-      if (generation !== bootGeneration) return;
-      stopServers();
+      if (generation !== boot_generation) return;
+      stop_servers();
       bus = new ShowcasePresenceBus();
-      currentDocument = "forecast";
+      current_document = "forecast";
       setServerVersion(0);
       setServerLog([]);
-      startServer("forecast");
-      await bootClient("a", generation, "forecast");
-      if (generation !== bootGeneration) return;
-      await bootClient("b", generation, "forecast");
-      if (generation !== bootGeneration) return;
+      start_server("forecast");
+      await boot_client("a", generation, "forecast");
+      if (generation !== boot_generation) return;
+      await boot_client("b", generation, "forecast");
+      if (generation !== boot_generation) return;
       // Both clients are subscribed now; announce presence deterministically.
       await clients.a?.presence.publishNow();
       await clients.b?.presence.publishNow();
-      if (generation !== bootGeneration) return;
+      if (generation !== boot_generation) return;
       setStatus("ready");
       setStatusDetail("Two live clients, one sequencing server");
     } catch (error) {
-      if (generation !== bootGeneration) return;
+      if (generation !== boot_generation) return;
       setStatus("error");
       setStatusDetail(errorText(error));
     }
   };
 
-  const editForecast = (key: ClientKey) => {
+  const edit_forecast = (key: ClientKey) => {
     const runtime = clients[key];
     if (!runtime) return;
     const row = SAMPLE_ROW[key];
@@ -641,10 +641,10 @@ export function createCollaborationEngine(
     if (outcome.status !== "applied") {
       pushClientLog(key, "error", `Edit was not applied: ${outcome.status}`);
     }
-    readClient(key);
+    read_client(key);
   };
 
-  const toggleOnline = (key: ClientKey, online: boolean) => {
+  const toggle_online = (key: ClientKey, online: boolean) => {
     const runtime = clients[key];
     if (!runtime) return;
     if (online) {
@@ -657,7 +657,7 @@ export function createCollaborationEngine(
       pushClientLog(key, "info", "Offline: edits keep committing locally into the durable queue");
     }
     patchView(key, { online, linkState: runtime.link.state() });
-    readClient(key);
+    read_client(key);
   };
 
   /**
@@ -665,7 +665,7 @@ export function createCollaborationEngine(
    * versions touch other cells; otherwise rebase, clear stale durable ids,
    * remount, and resubmit.
    */
-  const recoverClient = async (key: ClientKey, response: ConflictResponse) => {
+  const recover_client = async (key: ClientKey, response: ConflictResponse) => {
     if (recovering[key]) return;
     recovering[key] = true;
     let frozen: Grid | null = null;
@@ -673,19 +673,19 @@ export function createCollaborationEngine(
       const runtime = clients[key];
       const server = runtime ? servers[runtime.document] : null;
       if (!runtime || !server || !bus) return;
-      const inPlace = await runtime.sync.recoverConflict();
-      if (clients[key] !== runtime || inPlace.status === "no-conflict") return;
-      if (inPlace.status === "recovered") {
+      const in_place = await runtime.sync.recoverConflict();
+      if (clients[key] !== runtime || in_place.status === "no-conflict") return;
+      if (in_place.status === "recovered") {
         pushClientLog(
           key,
           "commit",
-          `Recovered in place at v${inPlace.serverVersion}: pending work resent`,
+          `Recovered in place at v${in_place.serverVersion}: pending work resent`,
         );
-        readClient(key);
+        read_client(key);
         void runtime.sync.flush().catch(() => {});
         return;
       }
-      pushClientLog(key, "info", `Reloading to recover (${inPlace.reason.replaceAll("-", " ")})`);
+      pushClientLog(key, "info", `Reloading to recover (${in_place.reason.replaceAll("-", " ")})`);
       if (!response.operationsSinceBase) {
         pushClientLog(key, "error", "Manual review required: no operation tail returned");
         return;
@@ -699,30 +699,30 @@ export function createCollaborationEngine(
       await runtime.sync.ready();
       if (clients[key] !== runtime) return;
       // Remounting resets the scroll position; keep the reader's place.
-      const keptRows = visibleRows(key);
+      const kept_rows = visible_rows(key);
       const pending = runtime.sync.pendingCommits();
-      const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
+      const remote_operations = response.operationsSinceBase.flatMap((entry) => [
         ...entry.operations,
       ]);
-      const rebasedBatches: DocumentOp[][] = [];
+      const rebased_batches: DocumentOp[][] = [];
       for (const record of pending) {
-        const result = rebaseDocumentOperations(record.operations, remoteOperations);
+        const result = rebaseDocumentOperations(record.operations, remote_operations);
         if (result.status === "conflict") {
           pushClientLog(key, "error", `Manual review required: ${result.conflict.message}`);
           return;
         }
-        rebasedBatches.push([...result.operations]);
+        rebased_batches.push([...result.operations]);
       }
       pushClientLog(
         key,
         "info",
-        `Rebasing ${rebasedBatches.length} pending commit${rebasedBatches.length === 1 ? "" : "s"} over ${response.operationsSinceBase.length} newer server version${response.operationsSinceBase.length === 1 ? "" : "s"}`,
+        `Rebasing ${rebased_batches.length} pending commit${rebased_batches.length === 1 ? "" : "s"} over ${response.operationsSinceBase.length} newer server version${response.operationsSinceBase.length === 1 ? "" : "s"}`,
       );
       for (const record of pending) {
         await runtime.storage.remove(DOCUMENT_ID[runtime.document], record.clientMutationId);
       }
       const { link, storage, document: target } = runtime;
-      disposeClient(key, "retain");
+      dispose_client(key, "retain");
 
       // Loading and validating the whole document is the expensive step. Give
       // the browser a frame before each half so scrolling keeps painting.
@@ -732,9 +732,9 @@ export function createCollaborationEngine(
       // the new coordinator; the ones this snapshot already holds are dropped.
       link.startFrom(latest.version ?? 0);
       await delay(0);
-      const next = createClient(key, {
+      const next = create_client(key, {
         snapshot: latest,
-        generation: bootGeneration,
+        generation: boot_generation,
         target,
         link,
         storage,
@@ -742,8 +742,8 @@ export function createCollaborationEngine(
       });
       const { grid, sync, presence } = next;
       await sync.ready();
-      if (bootGeneration !== next.generation) return;
-      for (const batch of rebasedBatches) {
+      if (boot_generation !== next.generation) return;
+      for (const batch of rebased_batches) {
         const outcome = grid.applyTransaction({ patches: batch });
         if (outcome.status !== "applied") {
           pushClientLog(key, "error", `Rebased transaction was not applied: ${outcome.status}`);
@@ -752,10 +752,10 @@ export function createCollaborationEngine(
       }
       await sync.flush();
       await presence.publishNow();
-      if (keptRows) showRows(key, keptRows);
-      shownRows[key] = visibleRows(key);
+      if (kept_rows) show_rows(key, kept_rows);
+      shown_rows[key] = visible_rows(key);
       patchView(key, { ready: true, online: true, linkState: link.state() });
-      readClient(key);
+      read_client(key);
       pushClientLog(
         key,
         "commit",
@@ -770,22 +770,22 @@ export function createCollaborationEngine(
     }
   };
 
-  const holdNextBroadcast = (key: ClientKey) => {
+  const hold_next_broadcast = (key: ClientKey) => {
     clients[key]?.link.holdNextBroadcast();
     pushClientLog(key, "info", "The next inbound broadcast will be held back (delivery reordered)");
   };
 
-  const releaseHeld = (key: ClientKey) => {
+  const release_held = (key: ClientKey) => {
     clients[key]?.link.releaseHeldBroadcasts();
   };
 
   /** Waits until one client is at the given server version with nothing queued. */
-  const waitForPeerHead = async (peer: ClientRuntime, version: number): Promise<boolean> => {
+  const wait_for_peer_head = async (peer: ClientRuntime, version: number): Promise<boolean> => {
     const deadline = performance.now() + CHAOS_SETTLE_MS;
-    const caughtUp = () =>
+    const caught_up = () =>
       peer.sync.serverVersion >= version && peer.sync.pendingCommits().length === 0;
-    while (performance.now() < deadline && !caughtUp()) await delay(CHAOS_TICK_MS);
-    return caughtUp();
+    while (performance.now() < deadline && !caught_up()) await delay(CHAOS_TICK_MS);
+    return caught_up();
   };
 
   /**
@@ -793,10 +793,10 @@ export function createCollaborationEngine(
    * drop, reconnect, and broadcasts arrive out of order. Then both clients
    * reconnect and the page compares their Grids cell by cell.
    */
-  const runChaos = async () => {
-    const run = chaosRun + 1;
-    chaosRun = run;
-    const stillRunning = () => chaosRun === run && clients.a !== null && clients.b !== null;
+  const run_chaos = async () => {
+    const run = chaos_run + 1;
+    chaos_run = run;
+    const still_running = () => chaos_run === run && clients.a !== null && clients.b !== null;
     const report: ChaosReport = {
       phase: "storm",
       edits: 0,
@@ -807,18 +807,18 @@ export function createCollaborationEngine(
       ms: 0,
     };
     let started = performance.now();
-    let publishedAt = 0;
+    let published_at = 0;
     const publish = (force = true) => {
       const now = performance.now();
-      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
-      publishedAt = now;
+      if (!force && now - published_at < CHAOS_PUBLISH_MS) return;
+      published_at = now;
       setChaos({ ...report, ms: now - started });
     };
     // Publishing first replaces any earlier verdict and keeps the button
     // disabled while the clients leave the usage document of the batch drill.
     publish();
     try {
-      if (!(await showDocument("forecast"))) {
+      if (!(await show_document("forecast"))) {
         report.phase = "timed-out";
         publish();
         return;
@@ -832,13 +832,13 @@ export function createCollaborationEngine(
       // Bring the rows where Ana's half meets Bram's on screen in both Grids,
       // so every edit and every synced arrival is visible while the storm runs.
       for (const key of CLIENT_KEYS) {
-        showRows(key, CHAOS_VIEW_ROWS);
-        shownRows[key] = visibleRows(key);
+        show_rows(key, CHAOS_VIEW_ROWS);
+        shown_rows[key] = visible_rows(key);
       }
       // Seeded per run, so a run's fault sequence can be reproduced exactly.
       const random = seededRandom(run);
 
-      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
+      while (performance.now() - started < CHAOS_STORM_MS && still_running()) {
         const key: ClientKey = random() < 0.5 ? "a" : "b";
         const runtime = clients[key];
         // A recovering client is being remounted and accepts no new edits.
@@ -850,16 +850,16 @@ export function createCollaborationEngine(
         if (roll < 0.1) {
           offline[key] = !offline[key];
           if (offline[key]) report.disconnects += 1;
-          toggleOnline(key, !offline[key]);
+          toggle_online(key, !offline[key]);
         } else if (roll < 0.18 && !offline[key]) {
-          holdNextBroadcast(key);
+          hold_next_broadcast(key);
           report.reorders += 1;
         } else {
           // Edit a row the reader can see in this analyst's Grid when one exists.
           const owned = CHAOS_ROWS[key];
-          const view = shownRows[key];
-          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
-          const rows = onScreen.length > 0 ? onScreen : owned;
+          const view = shown_rows[key];
+          const on_screen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
+          const rows = on_screen.length > 0 ? on_screen : owned;
           const row = rows[Math.floor(random() * rows.length)];
           if (row === undefined) throw new Error("The analyst has no forecast rows.");
           const addr = { sheet: "plan", row, col: 2 };
@@ -881,13 +881,13 @@ export function createCollaborationEngine(
       report.phase = "settling";
       publish();
       for (const key of CLIENT_KEYS) {
-        if (offline[key]) toggleOnline(key, true);
-        releaseHeld(key);
+        if (offline[key]) toggle_online(key, true);
+        release_held(key);
       }
       // Wait until both queues drain, no conflict recovery is still running,
       // and both clients sit at the server head: a client stuck on a version
       // gap has nothing queued but has not caught up.
-      const settleBy = performance.now() + CHAOS_DRAIN_MS;
+      const settle_by = performance.now() + CHAOS_DRAIN_MS;
       const head = () => servers.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
       const idle = () =>
         CLIENT_KEYS.every(
@@ -896,12 +896,12 @@ export function createCollaborationEngine(
             !recovering[key] &&
             clients[key]?.sync.serverVersion === head(),
         );
-      while (stillRunning() && performance.now() < settleBy && !idle()) {
-        for (const key of CLIENT_KEYS) releaseHeld(key);
+      while (still_running() && performance.now() < settle_by && !idle()) {
+        for (const key of CLIENT_KEYS) release_held(key);
         await delay(CHAOS_TICK_MS);
       }
       await delay(CHAOS_TICK_MS * 4);
-      if (!stillRunning()) return;
+      if (!still_running()) return;
       if (!idle()) {
         // Never call a still-moving state converged.
         report.phase = "timed-out";
@@ -910,7 +910,7 @@ export function createCollaborationEngine(
       }
       const a = clients.a?.grid;
       const b = clients.b?.grid;
-      if (!a || !b || !stillRunning()) return;
+      if (!a || !b || !still_running()) return;
       let mismatches = 0;
       let cells = 0;
       for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
@@ -925,14 +925,14 @@ export function createCollaborationEngine(
       report.phase = mismatches === 0 ? "converged" : "diverged";
       publish();
     } finally {
-      if (stillRunning()) {
+      if (still_running()) {
         if (report.phase === "storm" || report.phase === "settling") {
           report.phase = "timed-out";
           publish();
         }
         for (const key of CLIENT_KEYS) {
-          toggleOnline(key, true);
-          releaseHeld(key);
+          toggle_online(key, true);
+          release_held(key);
         }
       }
     }
@@ -944,14 +944,14 @@ export function createCollaborationEngine(
    * splits it into one atomic multi-version batch; Bram applies every version
    * in a single transaction or none of them.
    */
-  const restoreUsage = () => {
+  const restore_usage = () => {
     const started = performance.now();
     setRestoreRunning(true);
     setBatchReport(null);
     drilling = true;
     void (async () => {
       try {
-        if (!(await showDocument("usage"))) {
+        if (!(await show_document("usage"))) {
           pushClientLog(
             "a",
             "warn",
@@ -963,13 +963,13 @@ export function createCollaborationEngine(
         const peer = clients.b;
         const server = servers.usage;
         if (!restorer || !peer || !server) return;
-        const settleBy = performance.now() + CHAOS_SETTLE_MS;
-        while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
-        if (clientsBusy()) {
+        const settle_by = performance.now() + CHAOS_SETTLE_MS;
+        while (performance.now() < settle_by && clients_busy()) await delay(CHAOS_TICK_MS);
+        if (clients_busy()) {
           pushClientLog("a", "warn", "Restore drill stopped: a client still has queued work.");
           return;
         }
-        const totalBefore = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+        const total_before = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
         await restorer.sync.flush();
         const cleared = restorer.grid.applyTransaction({
           patches: [{ op: "clearRange", range: USAGE_RANGE, contents: true }],
@@ -979,46 +979,46 @@ export function createCollaborationEngine(
           return;
         }
         await restorer.sync.flush();
-        await waitForPeerHead(peer, restorer.sync.serverVersion);
+        await wait_for_peer_head(peer, restorer.sync.serverVersion);
         // The batch window starts here: only the batch may touch Bram's Grid.
         let versions = 0;
         let pieces = 0;
-        let operationBytes = 0;
-        let peerChanges = 0;
-        const stopServer = server.observeCommits((record) => {
+        let operation_bytes = 0;
+        let peer_changes = 0;
+        const stop_server = server.observeCommits((record) => {
           if (record.batchVersions && record.batchVersions > 1) versions = record.batchVersions;
         });
-        const stopPeer = peer.grid.on("change", (event) => {
-          if (event.source === "remote") peerChanges += 1;
+        const stop_peer = peer.grid.on("change", (event) => {
+          if (event.source === "remote") peer_changes += 1;
         });
-        const stopUndo = restorer.grid.on("change", (event) => {
+        const stop_undo = restorer.grid.on("change", (event) => {
           if (event.commitReason !== "undo") return;
           pieces += event.transaction.patches.length;
-          operationBytes += new TextEncoder().encode(
+          operation_bytes += new TextEncoder().encode(
             JSON.stringify(event.transaction.patches),
           ).length;
         });
         try {
           restorer.grid.undo();
           await restorer.sync.flush();
-          const reachedHead = await waitForPeerHead(peer, restorer.sync.serverVersion);
-          const totalAfter = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
-          const peerTotal = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const reached_head = await wait_for_peer_head(peer, restorer.sync.serverVersion);
+          const total_after = Number(restorer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
+          const peer_total = Number(peer.grid.store.getCell(USAGE_TOTAL_CELL).resolved);
           const passed =
             versions > 1 &&
             pieces > 1 &&
-            totalAfter === totalBefore &&
-            peerTotal === totalBefore &&
-            peerChanges === 1 &&
-            reachedHead;
+            total_after === total_before &&
+            peer_total === total_before &&
+            peer_changes === 1 &&
+            reached_head;
           setBatchReport({
             versions,
             pieces,
-            operationBytes,
-            peerChanges,
-            totalBefore,
-            totalAfter,
-            peerTotal,
+            operationBytes: operation_bytes,
+            peerChanges: peer_changes,
+            totalBefore: total_before,
+            totalAfter: total_after,
+            peerTotal: peer_total,
             ms: performance.now() - started,
             passed,
           });
@@ -1026,13 +1026,13 @@ export function createCollaborationEngine(
             "a",
             passed ? "commit" : "warn",
             passed
-              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peerChanges} transaction).`
+              ? `Undo committed ${versions} versions of one atomic batch; Bram applied the batch once (${peer_changes} transaction).`
               : "The batch drill did not meet every check.",
           );
         } finally {
-          stopServer();
-          stopPeer();
-          stopUndo();
+          stop_server();
+          stop_peer();
+          stop_undo();
         }
       } catch (error) {
         pushClientLog("a", "error", errorText(error));
@@ -1043,38 +1043,38 @@ export function createCollaborationEngine(
     })();
   };
 
-  const stopTheme = observeSiteTheme(() => {
+  const stop_theme = observeSiteTheme(() => {
     for (const key of CLIENT_KEYS) clients[key]?.grid.replaceTheme(siteGridTheme());
   });
 
   // The page owns one boot session; reset starts the next generation.
-  bootGeneration = 1;
-  void bootAll(1);
+  boot_generation = 1;
+  void boot_all(1);
 
   return {
     sampleEdit(key) {
       void action.run(
         async () => {
-          if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
-          editForecast(key);
+          if (!(await show_document("forecast"))) throw new Error("The forecast is not ready.");
+          edit_forecast(key);
         },
         () => "Cannot apply the sample edit. Try again.",
       );
     },
-    toggleOnline,
-    retryPending,
+    toggleOnline: toggle_online,
+    retryPending: retry_pending,
     loseNextAck(key) {
       clients[key]?.link.dropNextAcknowledgement();
       pushClientLog(key, "info", "The next acknowledgement (and its echo) will be lost in transit");
     },
-    holdNextBroadcast,
-    releaseHeld,
-    runChaos,
-    restoreUsage,
+    holdNextBroadcast: hold_next_broadcast,
+    releaseHeld: release_held,
+    runChaos: run_chaos,
+    restoreUsage: restore_usage,
     serverEdit() {
       void action.run(
         async () => {
-          if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
+          if (!(await show_document("forecast"))) throw new Error("The forecast is not ready.");
           const server = servers.forecast;
           if (!server) return;
           const runtime = clients.a ?? clients.b;
@@ -1092,22 +1092,22 @@ export function createCollaborationEngine(
     resetDemo() {
       void action.run(
         async () => {
-          const generation = bootGeneration + 1;
-          bootGeneration = generation;
-          for (const key of CLIENT_KEYS) disposeClient(key);
-          stopServers();
-          if (generation !== bootGeneration) return;
+          const generation = boot_generation + 1;
+          boot_generation = generation;
+          for (const key of CLIENT_KEYS) dispose_client(key);
+          stop_servers();
+          if (generation !== boot_generation) return;
           setViews({ a: emptyClientView(), b: emptyClientView() });
-          await bootAll(generation);
+          await boot_all(generation);
         },
         () => "Cannot reset the demo. Try again.",
       );
     },
     dispose() {
-      bootGeneration += 1;
-      stopTheme();
-      for (const key of CLIENT_KEYS) disposeClient(key);
-      stopServers();
+      boot_generation += 1;
+      stop_theme();
+      for (const key of CLIENT_KEYS) dispose_client(key);
+      stop_servers();
       bus = null;
     },
   };

@@ -180,14 +180,14 @@ interface ReplacePlan {
 const DEFAULT_PREVIEW_LIMIT = 1_000;
 
 /** Count `change` in `plan`, and list it while the plan lists fewer than its limit. */
-function addChange(plan: ReplacePlan, change: ReplaceChange): void {
+function add_change(plan: ReplacePlan, change: ReplaceChange): void {
   plan.total += 1;
   if (change.kind === "formula") plan.formulas += 1;
   if (plan.changes.length < plan.limit) plan.changes.push(change);
 }
 
 /** Whether two lists hold the same cells in the same order. */
-function sameMatches(next: MatchList, previous: MatchList): boolean {
+function same_matches(next: MatchList, previous: MatchList): boolean {
   if (next.length !== previous.length || next.sheets.length !== previous.sheets.length)
     return false;
   return next.sheets.every((part, index) => {
@@ -205,31 +205,31 @@ function sameMatches(next: MatchList, previous: MatchList): boolean {
 }
 
 /**
- * Whether cell (row, col) comes before (otherRow, otherCol) in Excel's search
+ * Whether cell (row, col) comes before (other_row, other_col) in Excel's search
  * order: across each row, or down each column for Search: By Columns.
  */
 function precedes(
-  byColumns: boolean,
+  by_columns: boolean,
   row: number,
   col: number,
-  otherRow: number,
-  otherCol: number,
+  other_row: number,
+  other_col: number,
 ): boolean {
-  return byColumns
-    ? col < otherCol || (col === otherCol && row < otherRow)
-    : row < otherRow || (row === otherRow && col < otherCol);
+  return by_columns
+    ? col < other_col || (col === other_col && row < other_row)
+    : row < other_row || (row === other_row && col < other_col);
 }
 
 /** `[row, col, ...]` pairs sorted into search order. */
-function sortPairs(pairs: Uint32Array, byColumns: boolean): Uint32Array {
+function sort_pairs(pairs: Uint32Array, by_columns: boolean): Uint32Array {
   const order = Array.from({ length: pairs.length >>> 1 }, (_, index) => index);
   order.sort((left, right) => {
-    const leftRow = pairs[left << 1] ?? 0;
-    const leftCol = pairs[(left << 1) + 1] ?? 0;
-    const rightRow = pairs[right << 1] ?? 0;
-    const rightCol = pairs[(right << 1) + 1] ?? 0;
-    if (precedes(byColumns, leftRow, leftCol, rightRow, rightCol)) return -1;
-    return precedes(byColumns, rightRow, rightCol, leftRow, leftCol) ? 1 : 0;
+    const left_row = pairs[left << 1] ?? 0;
+    const left_col = pairs[(left << 1) + 1] ?? 0;
+    const right_row = pairs[right << 1] ?? 0;
+    const right_col = pairs[(right << 1) + 1] ?? 0;
+    if (precedes(by_columns, left_row, left_col, right_row, right_col)) return -1;
+    return precedes(by_columns, right_row, right_col, left_row, left_col) ? 1 : 0;
   });
   const sorted = new Uint32Array(pairs.length);
   for (const [position, index] of order.entries()) {
@@ -249,7 +249,7 @@ const MAX_PLAIN_NUMBER = 1e21;
  * Text the engine's search sees for a stored scalar, or null when JS cannot
  * reproduce it exactly (exponent forms, `-0`, infinities). Callers rescan then.
  */
-function engineSearchText(value: CellScalar): string | null {
+function engine_search_text(value: CellScalar): string | null {
   if (value === null) return "";
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "string") return value;
@@ -266,14 +266,14 @@ function engineSearchText(value: CellScalar): string | null {
  * for anything else, and for a number the formula bar shows as stored, which
  * the engine compares as it is.
  */
-function formattedNumberText(
+function formatted_number_text(
   value: CellScalar | undefined,
   format: string | undefined,
   locale: string | undefined,
-  lookIn: "formulas" | "values",
+  look_in: "formulas" | "values",
 ): string | null {
   if (typeof value !== "number" || isGeneralCode(format)) return null;
-  return lookIn === "values"
+  return look_in === "values"
     ? formatNumber(value, format, locale)
     : formulaBarText(value, format, locale);
 }
@@ -288,12 +288,12 @@ const FORMATTED_SCAN_ROWS = 16_384;
 export class SearchController {
   private readonly deps: SearchControllerDeps;
   private found: MatchList = NO_MATCHES;
-  private searchActive = -1;
-  private searchQuery = "";
-  private searchOpts: SearchOptions = {};
-  private searchMatcher: (text: string) => boolean = () => false;
+  private search_active = -1;
+  private search_query = "";
+  private search_opts: SearchOptions = {};
+  private search_matcher: (text: string) => boolean = () => false;
   /** The selection a search runs in, in view rows; null searches the whole sheet. */
-  private searchScope: { sheet: SheetId; rects: readonly SelRect[] } | null = null;
+  private search_scope: { sheet: SheetId; rects: readonly SelRect[] } | null = null;
   private revision = 0;
 
   constructor(deps: SearchControllerDeps) {
@@ -307,8 +307,8 @@ export class SearchController {
 
   /** The active match's index in {@link matches}, or -1 when it is on another sheet. */
   get active(): number {
-    const part = this.found.locate(this.searchActive);
-    return part?.sheet === this.deps.activeSheet() ? this.searchActive - part.start : -1;
+    const part = this.found.locate(this.search_active);
+    return part?.sheet === this.deps.activeSheet() ? this.search_active - part.start : -1;
   }
 
   get version(): number {
@@ -327,30 +327,30 @@ export class SearchController {
     activeSheet: SheetId,
     independentCells: boolean,
   ): void {
-    if (!this.searchQuery) return;
+    if (!this.search_query) return;
     const previous = this.found;
     const only = previous.sheets.length === 1 ? previous.sheets[0] : undefined;
     if (
       independentCells &&
-      this.searchOpts.within !== "workbook" &&
-      this.searchOpts.lookIn !== "notes" &&
+      this.search_opts.within !== "workbook" &&
+      this.search_opts.lookIn !== "notes" &&
       only?.sheet === activeSheet &&
-      patches.every((patch) => this.preservesMatchMembership(patch, activeSheet, only.set))
+      patches.every((patch) => this.preserves_match_membership(patch, activeSheet, only.set))
     )
       return;
-    const next = this.scanAll(this.searchQuery, this.searchOpts);
+    const next = this.scan_all(this.search_query, this.search_opts);
     // Retain the match identity and row index when only values changed.
-    if (sameMatches(next, previous)) return;
+    if (same_matches(next, previous)) return;
 
-    const active = previous.at(this.searchActive);
+    const active = previous.at(this.search_active);
     this.found = next;
     const kept = active ? next.indexOf(active) : -1;
-    this.searchActive = kept >= 0 ? kept : next.length > 0 ? 0 : -1;
+    this.search_active = kept >= 0 ? kept : next.length > 0 ? 0 : -1;
     this.revision += 1;
-    this.emitSearch();
+    this.emit_search();
   }
 
-  private preservesMatchMembership(
+  private preserves_match_membership(
     patch: DocumentOp,
     sheet: SheetId,
     matches: SearchMatchSet,
@@ -363,28 +363,28 @@ export class SearchController {
     if (patch.op !== "set") return false;
     if (patch.addr.sheet !== sheet) return true;
     if (patch.value.kind !== "literal") return false;
-    if (this.searchOpts.columns && !this.searchOpts.columns.includes(patch.addr.col)) return true;
+    if (this.search_opts.columns && !this.search_opts.columns.includes(patch.addr.col)) return true;
     // A cell outside the searched selection is never a match.
-    if (!this.inScope(sheet, patch.addr.row, patch.addr.col)) return true;
+    if (!this.in_scope(sheet, patch.addr.row, patch.addr.col)) return true;
 
     const cell = this.deps.store.getCell(patch.addr);
-    const text = this.formattedText(patch.addr, cell) ?? engineSearchText(cell.resolved);
+    const text = this.formatted_text(patch.addr, cell) ?? engine_search_text(cell.resolved);
     if (text === null) return false;
-    if (!this.searchOpts.matchCase && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery)))
+    if (!this.search_opts.matchCase && (NON_ASCII.test(text) || NON_ASCII.test(this.search_query)))
       return false;
-    const matchesNow = this.searchMatcher(text);
-    const byColumns = this.searchOpts.searchBy === "columns";
+    const matches_now = this.search_matcher(text);
+    const by_columns = this.search_opts.searchBy === "columns";
     const { row, col } = patch.addr;
     let start = 0;
     let end = matches.length;
     while (start < end) {
       const middle = start + ((end - start) >>> 1);
-      if (precedes(byColumns, matches.rowAt(middle), matches.colAt(middle), row, col))
+      if (precedes(by_columns, matches.rowAt(middle), matches.colAt(middle), row, col))
         start = middle + 1;
       else end = middle;
     }
-    const matchedBefore = matches.rowAt(start) === row && matches.colAt(start) === col;
-    return matchesNow === matchedBefore;
+    const matched_before = matches.rowAt(start) === row && matches.colAt(start) === col;
+    return matches_now === matched_before;
   }
 
   /**
@@ -393,62 +393,62 @@ export class SearchController {
    * a sheet search to it, as in Excel.
    */
   search(query: string, opts: SearchOptions = {}): SearchResult {
-    this.searchQuery = query;
-    this.searchOpts = opts;
-    this.searchMatcher = findMatcher(query, opts);
-    const activeSheet = this.deps.activeSheet();
-    const sheet = opts.sheet ?? activeSheet;
+    this.search_query = query;
+    this.search_opts = opts;
+    this.search_matcher = findMatcher(query, opts);
+    const active_sheet = this.deps.activeSheet();
+    const sheet = opts.sheet ?? active_sheet;
     const rects =
-      opts.within !== "workbook" && sheet === activeSheet ? this.deps.selectionScope() : null;
-    this.searchScope = rects ? { sheet, rects } : null;
-    this.found = query ? this.scanAll(query, opts) : NO_MATCHES;
-    this.searchActive = this.startIndex();
+      opts.within !== "workbook" && sheet === active_sheet ? this.deps.selectionScope() : null;
+    this.search_scope = rects ? { sheet, rects } : null;
+    this.found = query ? this.scan_all(query, opts) : NO_MATCHES;
+    this.search_active = this.start_index();
     this.revision += 1;
-    this.revealActiveMatch();
+    this.reveal_active_match();
     this.deps.scheduleRender();
-    return this.emitSearch();
+    return this.emit_search();
   }
 
   findNext(): SearchResult {
     if (this.found.length > 0) {
-      this.searchActive = (this.searchActive + 1) % this.found.length;
+      this.search_active = (this.search_active + 1) % this.found.length;
       this.revision += 1;
-      this.revealActiveMatch();
+      this.reveal_active_match();
       this.deps.scheduleRender();
     }
-    return this.emitSearch();
+    return this.emit_search();
   }
 
   findPrev(): SearchResult {
     if (this.found.length > 0) {
       const n = this.found.length;
-      this.searchActive = (this.searchActive - 1 + n) % n;
+      this.search_active = (this.search_active - 1 + n) % n;
       this.revision += 1;
-      this.revealActiveMatch();
+      this.reveal_active_match();
       this.deps.scheduleRender();
     }
-    return this.emitSearch();
+    return this.emit_search();
   }
 
   /** Make match `index` the active match, then select it and scroll to it. */
   selectMatch(index: number): SearchResult {
     if (Number.isInteger(index) && index >= 0 && index < this.found.length) {
-      this.searchActive = index;
+      this.search_active = index;
       this.revision += 1;
-      this.revealActiveMatch();
+      this.reveal_active_match();
       this.deps.scheduleRender();
     }
-    return this.emitSearch();
+    return this.emit_search();
   }
 
   clearSearch(): void {
-    this.searchQuery = "";
-    this.searchScope = null;
+    this.search_query = "";
+    this.search_scope = null;
     this.found = NO_MATCHES;
-    this.searchActive = -1;
+    this.search_active = -1;
     this.revision += 1;
     this.deps.scheduleRender();
-    this.emitSearch();
+    this.emit_search();
   }
 
   /**
@@ -458,19 +458,19 @@ export class SearchController {
    * advances so the caller is never stuck.
    */
   replaceCurrent(replacement: string): SearchResult {
-    const target = this.found.at(this.searchActive);
-    if (this.deps.readOnly() || !target) return this.emitSearch();
+    const target = this.found.at(this.search_active);
+    if (this.deps.readOnly() || !target) return this.emit_search();
 
-    const planned = this.replacementPatch(target, replacement);
+    const planned = this.replacement_patch(target, replacement);
     if (planned) {
-      this.deps.commit([this.patchOf(planned)]);
-      this.found = this.scanAll(this.searchQuery, this.searchOpts);
+      this.deps.commit([this.patch_of(planned)]);
+      this.found = this.scan_all(this.search_query, this.search_opts);
     }
-    this.searchActive = this.advanceAfter(target);
+    this.search_active = this.advance_after(target);
     this.revision += 1;
-    this.revealActiveMatch();
+    this.reveal_active_match();
     this.deps.scheduleRender();
-    return this.emitSearch();
+    return this.emit_search();
   }
 
   /**
@@ -481,7 +481,7 @@ export class SearchController {
    */
   previewReplaceAll(replacement: string, limit = DEFAULT_PREVIEW_LIMIT): ReplacePreview {
     if (this.deps.readOnly()) return { changes: [], total: 0, formulas: 0 };
-    const { changes, total, formulas } = this.planReplaceAll(replacement, false, limit);
+    const { changes, total, formulas } = this.plan_replace_all(replacement, false, limit);
     return { changes, total, formulas };
   }
 
@@ -492,20 +492,20 @@ export class SearchController {
    */
   replaceAll(replacement: string): ReplaceResult {
     if (this.deps.readOnly()) {
-      return { replaced: 0, result: this.emitSearch() };
+      return { replaced: 0, result: this.emit_search() };
     }
 
-    const { patches, total } = this.planReplaceAll(replacement, true, Number.POSITIVE_INFINITY);
+    const { patches, total } = this.plan_replace_all(replacement, true, Number.POSITIVE_INFINITY);
     if (patches.length > 0) {
       this.deps.commit(patches);
-      this.found = this.scanAll(this.searchQuery, this.searchOpts);
+      this.found = this.scan_all(this.search_query, this.search_opts);
       const own = this.found.find(this.deps.activeSheet());
-      this.searchActive = this.found.length > 0 ? (own?.start ?? 0) : -1;
+      this.search_active = this.found.length > 0 ? (own?.start ?? 0) : -1;
       this.revision += 1;
-      this.revealActiveMatch(false);
+      this.reveal_active_match(false);
       this.deps.scheduleRender();
     }
-    return { replaced: total, result: this.emitSearch() };
+    return { replaced: total, result: this.emit_search() };
   }
 
   /**
@@ -513,19 +513,19 @@ export class SearchController {
    * it needs only the changes, so it skips reading the new text into values,
    * and it lists only the first `limit`.
    */
-  private planReplaceAll(replacement: string, writes: boolean, limit: number): ReplacePlan {
+  private plan_replace_all(replacement: string, writes: boolean, limit: number): ReplacePlan {
     const plan: ReplacePlan = { patches: [], changes: [], limit, total: 0, formulas: 0 };
     for (const part of this.found.sheets) {
       const matches = part.set.materialize();
-      if (this.searchOpts.lookIn === "notes")
-        this.planNoteReplacements(part.sheet, matches, replacement, plan, writes);
-      else this.planCellReplacements(part.sheet, matches, replacement, plan, writes);
+      if (this.search_opts.lookIn === "notes")
+        this.plan_note_replacements(part.sheet, matches, replacement, plan, writes);
+      else this.plan_cell_replacements(part.sheet, matches, replacement, plan, writes);
     }
     return plan;
   }
 
   /** Add the replacements in one sheet's cells to `plan`. */
-  private planCellReplacements(
+  private plan_cell_replacements(
     sheet: SheetId,
     matches: readonly CellAddress[],
     replacement: string,
@@ -536,7 +536,7 @@ export class SearchController {
     const captured = engine?.captureCells(sheet, matches);
     const metadata = this.deps.sheet(sheet);
     // Per-cell operations preserve policy issue indices and partial spill rejection.
-    const scalarWrites =
+    const scalar_writes =
       !engine ||
       Boolean(
         metadata.validationRules?.length ||
@@ -544,46 +544,46 @@ export class SearchController {
         captured?.some((cell) => cell.isSpillChild),
       );
     const cells: SnapshotCell[] = [];
-    let endRow = 0;
-    let endCol = 0;
+    let end_row = 0;
+    let end_col = 0;
     for (const [index, addr] of matches.entries()) {
       const cell = captured?.[index];
       // Custom stores without an engine retain their scalar read contract.
       const planned = !cell
-        ? this.cellReplacement(addr, replacement)
+        ? this.cell_replacement(addr, replacement)
         : cell.value.kind === "formula"
-          ? this.formulaReplacement(addr, replacement, cell.value.src, cell.style)
+          ? this.formula_replacement(addr, replacement, cell.value.src, cell.style)
           : cell.value.kind === "ref"
             ? null
-            : this.replacementFromCell(addr, replacement, cell);
+            : this.replacement_from_cell(addr, replacement, cell);
       if (!planned) continue;
-      addChange(plan, planned.change);
+      add_change(plan, planned.change);
       if (!writes) continue;
-      if (scalarWrites) {
-        plan.patches.push(this.patchOf(planned));
+      if (scalar_writes) {
+        plan.patches.push(this.patch_of(planned));
         continue;
       }
 
       cells.push({
         rowOffset: addr.row,
         colOffset: addr.col,
-        value: this.valueOf(planned.change),
+        value: this.value_of(planned.change),
         style: planned.style,
       });
-      endRow = Math.max(endRow, addr.row);
-      endCol = Math.max(endCol, addr.col);
+      end_row = Math.max(end_row, addr.row);
+      end_col = Math.max(end_col, addr.col);
     }
 
     if (cells.length === 0) return;
     plan.patches.push({
       op: "setRange",
-      range: { sheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
+      range: { sheet, start: { row: 0, col: 0 }, end: { row: end_row, col: end_col } },
       cells,
     });
   }
 
   /** Add the replacements in one sheet's notes to `plan`. */
-  private planNoteReplacements(
+  private plan_note_replacements(
     sheet: SheetId,
     matches: readonly CellAddress[],
     replacement: string,
@@ -595,26 +595,30 @@ export class SearchController {
       notes.set(`${note.addr.row}:${note.addr.col}`, note.text);
     }
     for (const addr of matches) {
-      const planned = this.noteReplacement(addr, notes.get(`${addr.row}:${addr.col}`), replacement);
+      const planned = this.note_replacement(
+        addr,
+        notes.get(`${addr.row}:${addr.col}`),
+        replacement,
+      );
       if (!planned) continue;
-      addChange(plan, planned.change);
-      if (writes) plan.patches.push(this.patchOf(planned));
+      add_change(plan, planned.change);
+      if (writes) plan.patches.push(this.patch_of(planned));
     }
   }
 
   /** The operation that writes one planned change. */
-  private patchOf({ change, style }: Planned): DocumentOp {
+  private patch_of({ change, style }: Planned): DocumentOp {
     const { addr, kind, after } = change;
     return kind === "note"
       ? { op: "setNote", addr, text: after }
-      : { op: "set", addr, value: this.valueOf(change), style };
+      : { op: "set", addr, value: this.value_of(change), style };
   }
 
   /**
    * The value a changed cell holds: the new formula, or the new text read as
    * if typed into its column, so numbers stay numbers.
    */
-  private valueOf({ addr, kind, after }: ReplaceChange): CellValue {
+  private value_of({ addr, kind, after }: ReplaceChange): CellValue {
     if (kind === "formula" && after.startsWith("=")) return { kind: "formula", src: after };
     const type = this.deps.sheet(addr.sheet).columns[addr.col]?.type ?? "text";
     const value = parseCellInput(after, type);
@@ -628,24 +632,24 @@ export class SearchController {
   }
 
   /** The change that rewrites a note's text, or null when nothing in it matches. */
-  private noteReplacement(
+  private note_replacement(
     addr: CellAddress,
     text: string | undefined,
     replacement: string,
   ): Planned | null {
     if (text === undefined) return null;
-    const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
+    const next = replaceInText(text, this.search_query, replacement, this.search_opts);
     if (next === null) return null;
     return { change: { addr, kind: "note", before: text, after: next } };
   }
 
   /** The replacement in one match: its note, or its cell. */
-  private replacementPatch(addr: CellAddress, replacement: string): Planned | null {
-    if (this.searchOpts.lookIn !== "notes") return this.cellReplacement(addr, replacement);
+  private replacement_patch(addr: CellAddress, replacement: string): Planned | null {
+    if (this.search_opts.lookIn !== "notes") return this.cell_replacement(addr, replacement);
     const note = this.deps
       .sheet(addr.sheet)
       .notes?.find((entry) => entry.addr.row === addr.row && entry.addr.col === addr.col);
-    return this.noteReplacement(addr, note?.text, replacement);
+    return this.note_replacement(addr, note?.text, replacement);
   }
 
   /**
@@ -653,11 +657,11 @@ export class SearchController {
    * cell is not eligible (a reference, or a formula in a value search) or
    * holds no occurrence to replace. The cell keeps its style.
    */
-  private cellReplacement(addr: CellAddress, replacement: string): Planned | null {
+  private cell_replacement(addr: CellAddress, replacement: string): Planned | null {
     if (this.deps.store.getRefTarget(addr) !== null) return null;
     const formula = this.deps.store.getFormula(addr);
     if (formula !== null) {
-      return this.formulaReplacement(
+      return this.formula_replacement(
         addr,
         replacement,
         formula,
@@ -665,7 +669,7 @@ export class SearchController {
       );
     }
 
-    return this.replacementFromCell(addr, replacement, this.deps.store.getCell(addr));
+    return this.replacement_from_cell(addr, replacement, this.deps.store.getCell(addr));
   }
 
   /**
@@ -674,14 +678,14 @@ export class SearchController {
    * not a formula the engine can read. Text that no longer starts with `=` is
    * entered as a value.
    */
-  private formulaReplacement(
+  private formula_replacement(
     addr: CellAddress,
     replacement: string,
     source: string,
     style: ResolvedCell["style"],
   ): Planned | null {
-    if (this.searchOpts.lookIn === "values") return null;
-    const next = replaceInText(source, this.searchQuery, replacement, this.searchOpts);
+    if (this.search_opts.lookIn === "values") return null;
+    const next = replaceInText(source, this.search_query, replacement, this.search_opts);
     if (next === null) return null;
     const planned: Planned = {
       change: { addr, kind: "formula", before: source, after: next },
@@ -695,35 +699,35 @@ export class SearchController {
     return null;
   }
 
-  private replacementFromCell(
+  private replacement_from_cell(
     addr: CellAddress,
     replacement: string,
     cell: Pick<ResolvedCell, "resolved" | "style">,
   ): Planned | null {
     // A formatted number is replaced in the text Find compared.
-    const text = this.formattedText(addr, cell) ?? cellScalarToText(cell.resolved);
-    const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
+    const text = this.formatted_text(addr, cell) ?? cellScalarToText(cell.resolved);
+    const next = replaceInText(text, this.search_query, replacement, this.search_opts);
     if (next === null) return null;
     return { change: { addr, kind: "value", before: text, after: next }, style: cell.style };
   }
 
-  /** {@link formattedNumberText} of one cell, in its own format or its column's. */
-  private formattedText(
+  /** {@link formatted_number_text} of one cell, in its own format or its column's. */
+  private formatted_text(
     addr: CellAddress,
     cell: Pick<ResolvedCell, "resolved" | "style">,
   ): string | null {
     if (typeof cell.resolved !== "number") return null;
     const column = this.deps.sheet(addr.sheet).columns[addr.col];
-    return formattedNumberText(
+    return formatted_number_text(
       cell.resolved,
       cell.style.numberFormat ?? column?.numberFormat,
       column?.numberLocale,
-      this.searchOpts.lookIn === "values" ? "values" : "formulas",
+      this.search_opts.lookIn === "values" ? "values" : "formulas",
     );
   }
 
   /** The sheet's place in the tab order. */
-  private tabOf(sheet: SheetId): number {
+  private tab_of(sheet: SheetId): number {
     return this.deps.store.getWorkbook().sheets.findIndex((entry) => entry.id === sheet);
   }
 
@@ -731,18 +735,18 @@ export class SearchController {
    * Index of the first match after `prev` in search order: later on its sheet,
    * then on the next sheet in tab order, wrapping to 0.
    */
-  private advanceAfter(prev: CellAddress): number {
+  private advance_after(prev: CellAddress): number {
     const found = this.found;
     if (found.length === 0) return -1;
-    const byColumns = this.searchOpts.searchBy === "columns";
+    const by_columns = this.search_opts.searchBy === "columns";
     const part = found.find(prev.sheet);
     if (part) {
       for (let index = 0; index < part.set.length; index++) {
-        if (precedes(byColumns, prev.row, prev.col, part.set.rowAt(index), part.set.colAt(index)))
+        if (precedes(by_columns, prev.row, prev.col, part.set.rowAt(index), part.set.colAt(index)))
           return part.start + index;
       }
     }
-    const tab = this.tabOf(prev.sheet);
+    const tab = this.tab_of(prev.sheet);
     return found.sheets.find((entry) => entry.tab > tab)?.start ?? 0;
   }
 
@@ -752,15 +756,15 @@ export class SearchController {
    * the next sheet that has a match, as Excel's does, and a sheet search wraps
    * to its first match in view order.
    */
-  private startIndex(): number {
+  private start_index(): number {
     const found = this.found;
-    const activeSheet = this.deps.activeSheet();
-    const workbook = this.searchOpts.within === "workbook";
-    const own = workbook ? found.find(activeSheet) : found.sheets[0];
-    const viewport = own ? this.viewportMatches(own.set, this.deps.viewportAnchor()) : null;
+    const active_sheet = this.deps.activeSheet();
+    const workbook = this.search_opts.within === "workbook";
+    const own = workbook ? found.find(active_sheet) : found.sheets[0];
+    const viewport = own ? this.viewport_matches(own.set, this.deps.viewportAnchor()) : null;
     if (own && viewport && viewport.after >= 0) return own.start + viewport.after;
     if (workbook) {
-      const tab = this.tabOf(activeSheet);
+      const tab = this.tab_of(active_sheet);
       const next =
         found.sheets.find((part) => part.tab > tab) ?? found.sheets.find((part) => part !== own);
       if (next) return next.start;
@@ -773,58 +777,58 @@ export class SearchController {
    * order, and the earliest match in view order, or -1 for each. Search
    * results stay in data space; sorted views are mapped here.
    */
-  private viewportMatches(
+  private viewport_matches(
     matches: SearchMatchSet,
     anchor: { row: number; col: number },
   ): { after: number; first: number } {
-    const byColumns = this.searchOpts.searchBy === "columns";
-    let firstIndex = -1;
-    let firstRow = Number.MAX_SAFE_INTEGER;
-    let firstCol = Number.MAX_SAFE_INTEGER;
-    let afterIndex = -1;
-    let afterRow = Number.MAX_SAFE_INTEGER;
-    let afterCol = Number.MAX_SAFE_INTEGER;
+    const by_columns = this.search_opts.searchBy === "columns";
+    let first_index = -1;
+    let first_row = Number.MAX_SAFE_INTEGER;
+    let first_col = Number.MAX_SAFE_INTEGER;
+    let after_index = -1;
+    let after_row = Number.MAX_SAFE_INTEGER;
+    let after_col = Number.MAX_SAFE_INTEGER;
 
     for (let i = 0; i < matches.length; i++) {
-      const viewRow = this.deps.toViewRow(matches.rowAt(i));
-      if (viewRow === null) continue;
+      const view_row = this.deps.toViewRow(matches.rowAt(i));
+      if (view_row === null) continue;
       const col = matches.colAt(i);
-      if (precedes(byColumns, viewRow, col, firstRow, firstCol)) {
-        firstIndex = i;
-        firstRow = viewRow;
-        firstCol = col;
+      if (precedes(by_columns, view_row, col, first_row, first_col)) {
+        first_index = i;
+        first_row = view_row;
+        first_col = col;
       }
-      const atOrAfter = !precedes(byColumns, viewRow, col, anchor.row, anchor.col);
-      if (atOrAfter && precedes(byColumns, viewRow, col, afterRow, afterCol)) {
-        afterIndex = i;
-        afterRow = viewRow;
-        afterCol = col;
+      const at_or_after = !precedes(by_columns, view_row, col, anchor.row, anchor.col);
+      if (at_or_after && precedes(by_columns, view_row, col, after_row, after_col)) {
+        after_index = i;
+        after_row = view_row;
+        after_col = col;
       }
     }
-    return { after: afterIndex, first: firstIndex };
+    return { after: after_index, first: first_index };
   }
 
   /** Scan the searched sheet, or every visible sheet in tab order for a workbook search. */
-  private scanAll(query: string, opts: SearchOptions): MatchList {
+  private scan_all(query: string, opts: SearchOptions): MatchList {
     const parts: Omit<SheetMatches, "start">[] = [];
     if (opts.within === "workbook") {
       for (const [tab, sheet] of this.deps.store.getWorkbook().sheets.entries()) {
         // Excel's Find skips hidden sheets.
         if ((sheet.visibility ?? "visible") !== "visible") continue;
-        const set = this.scanMatches(sheet.id, query, opts);
+        const set = this.scan_matches(sheet.id, query, opts);
         if (set.length > 0) parts.push({ sheet: sheet.id, tab, set });
       }
     } else {
       const sheet = opts.sheet ?? this.deps.activeSheet();
-      const set = this.scanMatches(sheet, query, opts);
-      if (set.length > 0) parts.push({ sheet, tab: this.tabOf(sheet), set });
+      const set = this.scan_matches(sheet, query, opts);
+      if (set.length > 0) parts.push({ sheet, tab: this.tab_of(sheet), set });
     }
     return parts.length === 0 ? NO_MATCHES : new MatchList(parts);
   }
 
   /** Scan one sheet, keeping only matches inside the searched selection, in search order. */
-  private scanMatches(sheetId: SheetId, query: string, opts: SearchOptions): SearchMatchSet {
-    const scope = this.searchScope?.sheet === sheetId ? this.searchScope : null;
+  private scan_matches(sheet_id: SheetId, query: string, opts: SearchOptions): SearchMatchSet {
+    const scope = this.search_scope?.sheet === sheet_id ? this.search_scope : null;
     let columns = opts.columns;
     if (scope) {
       const scoped = new Set<number>();
@@ -838,59 +842,62 @@ export class SearchController {
 
     const notes = opts.lookIn === "notes";
     let pairs = notes
-      ? this.scanNotes(sheetId, columns)
-      : this.scanCells(sheetId, query, { ...opts, columns });
+      ? this.scan_notes(sheet_id, columns)
+      : this.scan_cells(sheet_id, query, { ...opts, columns });
     if (scope) {
       const kept: number[] = [];
       for (let offset = 0; offset < pairs.length; offset += 2) {
         const row = pairs[offset] ?? 0;
         const col = pairs[offset + 1] ?? 0;
-        if (this.inScope(sheetId, row, col)) kept.push(row, col);
+        if (this.in_scope(sheet_id, row, col)) kept.push(row, col);
       }
       pairs = Uint32Array.from(kept);
     }
     // Cell scans come back across each row; notes come in the order they were added.
-    const byColumns = opts.searchBy === "columns";
-    if (notes || byColumns) pairs = sortPairs(pairs, byColumns);
-    return pairs.length === 0 ? EMPTY_MATCHES : new FlatSearchMatchSet(sheetId, pairs);
+    const by_columns = opts.searchBy === "columns";
+    if (notes || by_columns) pairs = sort_pairs(pairs, by_columns);
+    return pairs.length === 0 ? EMPTY_MATCHES : new FlatSearchMatchSet(sheet_id, pairs);
   }
 
   /** Whether a data cell lies in the searched selection; every cell does without one. */
-  private inScope(sheet: SheetId, dataRow: number, col: number): boolean {
-    const scope = this.searchScope;
+  private in_scope(sheet: SheetId, data_row: number, col: number): boolean {
+    const scope = this.search_scope;
     if (scope?.sheet !== sheet) return true;
-    const viewRow = this.deps.toViewRow(dataRow);
-    if (viewRow === null) return false;
+    const view_row = this.deps.toViewRow(data_row);
+    if (view_row === null) return false;
     return scope.rects.some(
-      (rect) => rect.r0 <= viewRow && viewRow <= rect.r1 && rect.c0 <= col && col <= rect.c1,
+      (rect) => rect.r0 <= view_row && view_row <= rect.r1 && rect.c0 <= col && col <= rect.c1,
     );
   }
 
   /** `[row, col, ...]` pairs of the notes whose text matches, as Excel's Look in: Notes reads them. */
-  private scanNotes(sheetId: SheetId, columns: readonly number[] | undefined): Uint32Array {
+  private scan_notes(sheet_id: SheetId, columns: readonly number[] | undefined): Uint32Array {
     const pairs: number[] = [];
-    for (const note of this.deps.sheet(sheetId).notes ?? []) {
+    for (const note of this.deps.sheet(sheet_id).notes ?? []) {
       if (columns && !columns.includes(note.addr.col)) continue;
-      if (this.searchMatcher(note.text)) pairs.push(note.addr.row, note.addr.col);
+      if (this.search_matcher(note.text)) pairs.push(note.addr.row, note.addr.col);
     }
     return Uint32Array.from(pairs);
   }
 
   /** Row-major `[row, col, ...]` pairs of the cells whose text matches. */
-  private scanCells(sheetId: SheetId, query: string, opts: SearchOptions): Uint32Array {
-    const lookIn = opts.lookIn === "values" ? "values" : "formulas";
+  private scan_cells(sheet_id: SheetId, query: string, opts: SearchOptions): Uint32Array {
+    const look_in = opts.lookIn === "values" ? "values" : "formulas";
     // Fast path: scan the columnar store in WASM (no per-cell JS materialization),
     // then correct it for numbers in a number format, which it reads as stored.
     if (this.deps.loadable) {
-      const found = this.deps.loadable.searchCellsFlat(sheetId, query, { ...opts, lookIn });
-      return this.withFormattedNumbers(this.deps.loadable, sheetId, query, opts, found);
+      const found = this.deps.loadable.searchCellsFlat(sheet_id, query, {
+        ...opts,
+        lookIn: look_in,
+      });
+      return this.with_formatted_numbers(this.deps.loadable, sheet_id, query, opts, found);
     }
 
     // Fallback for a non-SheetwriteStore store: bulk-read the sheet and scan in JS.
-    const sheet = this.deps.sheet(sheetId);
+    const sheet = this.deps.sheet(sheet_id);
     const cols = opts.columns ?? sheet.columns.map((_, i) => i);
     const matches = findMatcher(query, opts);
-    const formulas = lookIn === "formulas";
+    const formulas = look_in === "formulas";
     const pairs: number[] = [];
     if (sheet.rowCount === 0 || cols.length === 0) return new Uint32Array(0);
 
@@ -898,8 +905,8 @@ export class SearchController {
     // own sort or filter, so read canonical data rows when the store offers them.
     const rows = { start: 0, end: sheet.rowCount };
     const view =
-      this.deps.store.getDataWindow?.(sheetId, rows, cols) ??
-      this.deps.store.getVisibleWindow(sheetId, rows, cols);
+      this.deps.store.getDataWindow?.(sheet_id, rows, cols) ??
+      this.deps.store.getVisibleWindow(sheet_id, rows, cols);
     const n = cols.length;
     for (let r = 0; r < sheet.rowCount; r++) {
       for (let c = 0; c < n; c++) {
@@ -908,13 +915,13 @@ export class SearchController {
         if (v === null || v === undefined || v === "") continue;
         const column = sheet.columns[cols[c]!];
         const formula = formulas
-          ? this.deps.store.getFormula({ sheet: sheetId, row: r, col: cols[c]! })
+          ? this.deps.store.getFormula({ sheet: sheet_id, row: r, col: cols[c]! })
           : null;
-        const shown = formattedNumberText(
+        const shown = formatted_number_text(
           v,
           view.styles[view.styleIds[index] ?? 0]?.numberFormat ?? column?.numberFormat,
           column?.numberLocale,
-          lookIn,
+          look_in,
         );
         if (matches(formula ?? shown ?? String(v))) {
           pairs.push(r, cols[c]!);
@@ -931,55 +938,55 @@ export class SearchController {
    * matches unread. Otherwise only the columns that can hold them are read,
    * in bounded windows, and only formatted numbers are compared.
    */
-  private withFormattedNumbers(
+  private with_formatted_numbers(
     store: SheetwriteStore,
-    sheetId: SheetId,
+    sheet_id: SheetId,
     query: string,
     opts: SearchOptions,
     found: Uint32Array,
   ): Uint32Array {
-    const sheet = this.deps.sheet(sheetId);
+    const sheet = this.deps.sheet(sheet_id);
     const searched = opts.columns ?? sheet.columns.map((_, index) => index);
     // A cell's own format can sit in any column; a column's format only in its own.
     const styles = storeEngine(store)?.styleTable();
-    const cellFormats =
+    const cell_formats =
       styles === undefined || styles.some((style: CellStyle) => !isGeneralCode(style.numberFormat));
-    const cols = cellFormats
+    const cols = cell_formats
       ? searched
       : searched.filter((col) => !isGeneralCode(sheet.columns[col]?.numberFormat));
     if (cols.length === 0 || sheet.rowCount === 0) return found;
 
-    const lookIn = opts.lookIn === "values" ? "values" : "formulas";
+    const look_in = opts.lookIn === "values" ? "values" : "formulas";
     const width = sheet.columns.length;
-    const engineMatches = new Set<number>();
+    const engine_matches = new Set<number>();
     for (let offset = 0; offset < found.length; offset += 2) {
-      engineMatches.add((found[offset] ?? 0) * width + (found[offset + 1] ?? 0));
+      engine_matches.add((found[offset] ?? 0) * width + (found[offset + 1] ?? 0));
     }
     const matches = findMatcher(query, opts);
     // Cells whose match differs from the engine's, by `row * width + col`.
     const corrected = new Map<number, boolean>();
     for (let start = 0; start < sheet.rowCount; start += FORMATTED_SCAN_ROWS) {
       const end = Math.min(sheet.rowCount, start + FORMATTED_SCAN_ROWS);
-      const view = store.getDataWindow(sheetId, { start, end }, cols);
+      const view = store.getDataWindow(sheet_id, { start, end }, cols);
       for (let index = 0; index < view.values.length; index++) {
         const col = cols[index % cols.length]!;
         const column = sheet.columns[col];
-        const text = formattedNumberText(
+        const text = formatted_number_text(
           view.values[index],
           view.styles[view.styleIds[index] ?? 0]?.numberFormat ?? column?.numberFormat,
           column?.numberLocale,
-          lookIn,
+          look_in,
         );
         if (text === null) continue;
         const row = start + Math.floor(index / cols.length);
         const key = row * width + col;
-        const engineMatched = engineMatches.has(key);
-        if (matches(text) === engineMatched) continue;
+        const engine_matched = engine_matches.has(key);
+        if (matches(text) === engine_matched) continue;
         // In formulas, a formula cell is found by its formula, as the engine read it.
-        if (lookIn === "formulas" && store.getFormula({ sheet: sheetId, row, col }) !== null) {
+        if (look_in === "formulas" && store.getFormula({ sheet: sheet_id, row, col }) !== null) {
           continue;
         }
-        corrected.set(key, !engineMatched);
+        corrected.set(key, !engine_matched);
       }
     }
     if (corrected.size === 0) return found;
@@ -993,38 +1000,38 @@ export class SearchController {
     for (const [key, matched] of corrected) {
       if (matched) pairs.push(Math.floor(key / width), key % width);
     }
-    return sortPairs(Uint32Array.from(pairs), false);
+    return sort_pairs(Uint32Array.from(pairs), false);
   }
 
   /**
    * Select the active match and scroll to it, as Excel's Find Next does. In a
    * searched selection the active cell moves and the selection stays. A match
    * on another sheet of a workbook search shows that sheet, unless
-   * `switchSheet` is false.
+   * `switch_sheet` is false.
    */
-  private revealActiveMatch(switchSheet = true): void {
-    const match = this.found.at(this.searchActive);
+  private reveal_active_match(switch_sheet = true): void {
+    const match = this.found.at(this.search_active);
     if (!match) return;
     if (match.sheet !== this.deps.activeSheet()) {
-      if (!switchSheet || this.searchOpts.within !== "workbook") return;
+      if (!switch_sheet || this.search_opts.within !== "workbook") return;
       this.deps.activateSheet(match.sheet);
       if (match.sheet !== this.deps.activeSheet()) return;
     }
 
-    const viewRow = this.deps.toViewRow(match.row);
-    if (viewRow === null) return;
+    const view_row = this.deps.toViewRow(match.row);
+    if (view_row === null) return;
 
-    const cell = { ...match, row: viewRow };
-    if (this.searchScope?.sheet === match.sheet) this.deps.setActiveCell(cell);
+    const cell = { ...match, row: view_row };
+    if (this.search_scope?.sheet === match.sheet) this.deps.setActiveCell(cell);
     else this.deps.selectCell(cell);
     this.deps.scrollToCell(cell);
   }
 
-  private emitSearch(): SearchResult {
+  private emit_search(): SearchResult {
     const result: SearchResult = {
-      query: this.searchQuery,
+      query: this.search_query,
       matches: this.found.materialize(),
-      active: this.searchActive,
+      active: this.search_active,
     };
     this.deps.emit(result);
     return result;

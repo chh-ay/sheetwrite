@@ -27,7 +27,7 @@ export const DYNAMIC_ARRAY_METADATA =
   '<cellMetadata count="1"><bk><rc t="1" v="0"/></bk></cellMetadata></metadata>';
 
 /** Whether a future metadata block holds dynamic-array properties with `fDynamic` set. */
-function isDynamicBlock(block: XmlElement): boolean {
+function is_dynamic_block(block: XmlElement): boolean {
   const extensions = xmlChild(block, "extLst");
   return (extensions ? xmlChildren(extensions, "ext") : []).some((extension) => {
     if (xmlAttribute(extension, "uri") !== DYNAMIC_ARRAY_EXTENSION) return false;
@@ -43,20 +43,20 @@ function isDynamicBlock(block: XmlElement): boolean {
  */
 export function dynamicArrayCellMetadata(root: XmlElement): ReadonlySet<string> {
   const types = xmlChild(root, "metadataTypes");
-  const typeNames = (types ? xmlChildren(types, "metadataType") : []).map((type) =>
+  const type_names = (types ? xmlChildren(types, "metadataType") : []).map((type) =>
     xmlAttribute(type, "name"),
   );
   const future = xmlChildren(root, "futureMetadata").find(
     (element) => xmlAttribute(element, "name") === DYNAMIC_ARRAY_TYPE,
   );
-  const dynamicBlocks = (future ? xmlChildren(future, "bk") : []).map(isDynamicBlock);
-  const cellMetadata = xmlChild(root, "cellMetadata");
+  const dynamic_blocks = (future ? xmlChildren(future, "bk") : []).map(is_dynamic_block);
+  const cell_metadata = xmlChild(root, "cellMetadata");
   const marked = new Set<string>();
-  for (const [index, block] of (cellMetadata ? xmlChildren(cellMetadata, "bk") : []).entries()) {
+  for (const [index, block] of (cell_metadata ? xmlChildren(cell_metadata, "bk") : []).entries()) {
     const dynamic = xmlChildren(block, "rc").some(
       (record) =>
-        typeNames[Number(xmlAttribute(record, "t")) - 1] === DYNAMIC_ARRAY_TYPE &&
-        dynamicBlocks[Number(xmlAttribute(record, "v"))] === true,
+        type_names[Number(xmlAttribute(record, "t")) - 1] === DYNAMIC_ARRAY_TYPE &&
+        dynamic_blocks[Number(xmlAttribute(record, "v"))] === true,
     );
     if (dynamic) marked.add(String(index + 1));
   }

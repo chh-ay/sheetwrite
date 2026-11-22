@@ -7,24 +7,24 @@ import { encodeRestoreBlock } from "../src/restore-block.js";
 import { preparedRestore, TransactionPreparation } from "../src/transaction-preparation.js";
 import type { DocumentOp } from "../src/types/document.js";
 
-const setOperation: DocumentOp = {
+const set_operation: DocumentOp = {
   op: "set",
   addr: { sheet: "sheet", row: 0, col: 0 },
   value: { kind: "literal", value: "next" },
 };
 
-function snapshotAction(byteLength: number, onDispose: () => void): HistoryAction {
+function snapshot_action(byte_length: number, on_dispose: () => void): HistoryAction {
   return [
     {
       kind: "rangeSnapshot",
       range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-      byteLength,
+      byteLength: byte_length,
       toPatch: (range) => ({
         op: "setBlock",
         range,
         block: { rowCount: 1, colCount: 1, values: ["before"] },
       }),
-      dispose: onDispose,
+      dispose: on_dispose,
     },
   ];
 }
@@ -34,8 +34,8 @@ describe("UndoManager rejection recovery", () => {
     let disposals = 0;
     const history = new UndoManager();
     history.push(
-      snapshotAction(13, () => (disposals += 1)),
-      [setOperation],
+      snapshot_action(13, () => (disposals += 1)),
+      [set_operation],
       "Typing",
     );
     expect(history.getResourceStats()).toEqual({
@@ -56,31 +56,31 @@ describe("UndoManager rejection recovery", () => {
 
   it("drops the oldest snapshots once retained bytes pass the budget, keeping the newest", () => {
     // About the 13 MB a 1M-cell clear snapshot retains.
-    const millionCellSnapshotBytes = 13_000_000;
-    const historyBudgetBytes = 256 * 1024 * 1024;
+    const million_cell_snapshot_bytes = 13_000_000;
+    const history_budget_bytes = 256 * 1024 * 1024;
     const edits = 30;
     let disposals = 0;
     const history = new UndoManager();
     for (let edit = 0; edit < edits; edit++) {
       history.push(
-        snapshotAction(millionCellSnapshotBytes, () => (disposals += 1)),
-        [setOperation],
+        snapshot_action(million_cell_snapshot_bytes, () => (disposals += 1)),
+        [set_operation],
         "Typing",
       );
     }
-    const kept = Math.floor(historyBudgetBytes / millionCellSnapshotBytes);
+    const kept = Math.floor(history_budget_bytes / million_cell_snapshot_bytes);
     expect(history.getResourceStats()).toEqual({
       undoEntries: kept,
       redoEntries: 0,
       retainedSnapshots: kept,
-      retainedSnapshotBytes: kept * millionCellSnapshotBytes,
+      retainedSnapshotBytes: kept * million_cell_snapshot_bytes,
     });
     expect(disposals).toBe(edits - kept);
 
     // A single restore larger than the whole budget stays undoable.
     history.push(
-      snapshotAction(historyBudgetBytes * 2, () => (disposals += 1)),
-      [setOperation],
+      snapshot_action(history_budget_bytes * 2, () => (disposals += 1)),
+      [set_operation],
       "Typing",
     );
     expect(history.getResourceStats().undoEntries).toBe(1);
@@ -148,7 +148,7 @@ describe("history restore measurement", () => {
     const range = { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
     const block = { rowCount: 1, colCount: 2, values: [1, "text"] };
     let checks = 0;
-    const countingCheck = (): readonly never[] => {
+    const counting_check = (): readonly never[] => {
       checks++;
       return [];
     };
@@ -157,15 +157,15 @@ describe("history restore measurement", () => {
     const preparation = new TransactionPreparation();
     try {
       preparation.seed(seeded, block);
-      expect(preparedRestore(seeded, countingCheck).errors).toEqual([]);
+      expect(preparedRestore(seeded, counting_check).errors).toEqual([]);
       expect(checks).toBe(0);
     } finally {
       preparation.dispose();
     }
 
-    expect(preparedRestore(seeded, countingCheck).errors).toEqual([]);
+    expect(preparedRestore(seeded, counting_check).errors).toEqual([]);
     expect(checks).toBe(1);
-    expect(preparedRestore(encodeRestoreBlock(range, block), countingCheck).errors).toEqual([]);
+    expect(preparedRestore(encodeRestoreBlock(range, block), counting_check).errors).toEqual([]);
     expect(checks).toBe(2);
   });
 });

@@ -67,7 +67,7 @@ class FakeClipboardItem {
 }
 
 /** Replace the browser clipboard with `value`. */
-function useClipboard(value: object): void {
+function use_clipboard(value: object): void {
   Object.defineProperty(navigator, "clipboard", { configurable: true, value });
 }
 
@@ -88,7 +88,7 @@ afterEach(() => {
  * `nativeFormatsOnly`, the clipboard takes only plain text and HTML, as
  * Firefox's and Safari's do: a write with another format fails.
  */
-function clipboardHarness(
+function clipboard_harness(
   options: {
     nativeFormatsOnly?: boolean;
     maxRowsPerSheet?: number;
@@ -103,7 +103,7 @@ function clipboardHarness(
     configurable: true,
     value: FakeClipboardItem,
   });
-  useClipboard({
+  use_clipboard({
     write: (items: FakeClipboardItem[]) => {
       const native = ["text/plain", "text/html"];
       if (
@@ -149,11 +149,11 @@ function clipboardHarness(
   });
   const selection = new SelectionModel(ROWS, 0, 3);
   const lifetime = new Scope();
-  let activeSheet = "s1";
+  let active_sheet = "s1";
   const marks: Array<Range | null> = [];
   const refusals: string[] = [];
   const asked: boolean[] = [];
-  const sheetOf = (id: string) =>
+  const sheet_of = (id: string) =>
     store.getWorkbook().sheets.find((candidate) => candidate.id === id)!;
   const reads = options.perCellReads
     ? (new Proxy(store, {
@@ -168,8 +168,8 @@ function clipboardHarness(
     lifetime,
     store: reads,
     selection: () => selection,
-    activeSheet: () => activeSheet,
-    sheet: () => sheetOf(activeSheet),
+    activeSheet: () => active_sheet,
+    sheet: () => sheet_of(active_sheet),
     colIndices: () => [0, 1, 2, 3],
     readOnly: () => false,
     mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
@@ -183,17 +183,17 @@ function clipboardHarness(
     commit: (patches, reason) => document.commit(patches, reason),
     onCutChange: (cut) => marks.push(cut),
     loadPasteSpecial: () => import("../src/paste-special.js"),
-    askPasteSpecial: async (ownCopy) => {
-      asked.push(ownCopy);
+    askPasteSpecial: async (own_copy) => {
+      asked.push(own_copy);
       return null;
     },
-    sheetName: (id) => sheetOf(id)?.name,
+    sheetName: (id) => sheet_of(id)?.name,
     onPasteRefused: (reason) => refusals.push(reason),
   });
-  const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
+  const stop_listening = store.on("change", (event) => clipboard.storeChanged(event));
 
-  const at = (row: number, col: number, sheetId = "s1"): CellAddress => ({
-    sheet: sheetId,
+  const at = (row: number, col: number, sheet_id = "s1"): CellAddress => ({
+    sheet: sheet_id,
     row,
     col,
   });
@@ -212,11 +212,11 @@ function clipboardHarness(
     clip,
     at,
     select,
-    sheetOf,
-    value: (row: number, col: number, sheetId?: string) =>
-      store.getCell(at(row, col, sheetId)).resolved,
-    formula: (row: number, col: number, sheetId?: string) =>
-      store.getFormula(at(row, col, sheetId)),
+    sheetOf: sheet_of,
+    value: (row: number, col: number, sheet_id?: string) =>
+      store.getCell(at(row, col, sheet_id)).resolved,
+    formula: (row: number, col: number, sheet_id?: string) =>
+      store.getFormula(at(row, col, sheet_id)),
     style: (row: number, col: number) => store.getCell(at(row, col)).style,
     apply: (patches: DocumentOp[]) => document.commit(patches, "api"),
     /** Set a cell of `s1`; a string that starts with `=` is a formula. */
@@ -248,10 +248,10 @@ function clipboardHarness(
       return clipboard.pasteSpecial(options);
     },
     showSheet: (id: string) => {
-      activeSheet = id;
+      active_sheet = id;
     },
     close: () => {
-      stopListening();
+      stop_listening();
       lifetime.close();
       document.destroy();
       store.dispose();
@@ -263,7 +263,7 @@ function clipboardHarness(
 
 describe("ClipboardController", () => {
   it("repeats a copied cell over a larger selection, shifting each copy, as Excel does", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(1, 1, "=A2+B$2");
     await h.copy(1, 1);
 
@@ -279,16 +279,16 @@ describe("ClipboardController", () => {
   });
 
   it("marks the captured source when selection changes during the clipboard write", async () => {
-    const h = clipboardHarness();
-    const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
-    useClipboard({ writeText: () => pendingWrite, readText: () => Promise.resolve("") });
+    const h = clipboard_harness();
+    const { promise: pending_write, resolve: finish_write } = Promise.withResolvers<void>();
+    use_clipboard({ writeText: () => pending_write, readText: () => Promise.resolve("") });
     h.set(1, 1, "=A1+B$2");
     h.set(3, 1, "keep");
     h.select(1, 1);
 
     const cut = h.clipboard.cut();
     h.select(3, 1);
-    finishWrite();
+    finish_write();
     await cut;
 
     expect(h.marks).toEqual([range("s1", 1, 1, 1, 1)]);
@@ -297,9 +297,9 @@ describe("ClipboardController", () => {
   });
 
   it("lets a newer paste stop an older one that is still reading", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const reads: Array<(text: string) => void> = [];
-    useClipboard({
+    use_clipboard({
       readText: () => {
         const read = Promise.withResolvers<string>();
         reads.push(read.resolve);
@@ -318,7 +318,7 @@ describe("ClipboardController", () => {
   });
 
   it("copies bounded hyperlink metadata with a new stable identity and translated range", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const link = {
       target: { kind: "external" as const, url: "https://example.com/report" },
       display: "Report",
@@ -341,7 +341,7 @@ describe("ClipboardController", () => {
   });
 
   it("preserves signed numbers from external paste", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.clip.text = "text\t-1\r\ntext\t+1";
     await h.paste(0, 0);
 
@@ -349,7 +349,7 @@ describe("ClipboardController", () => {
   });
 
   it("serializes covered merge cells as blanks", async () => {
-    const h = clipboardHarness({
+    const h = clipboard_harness({
       mergeAnchorAt: (row, col) => (row === 0 && col <= 1 ? { r0: 0, c0: 0, r1: 0, c1: 1 } : null),
     });
     h.set(0, 0, "anchor");
@@ -361,21 +361,21 @@ describe("ClipboardController", () => {
   });
 
   it("keeps a cut source when the grid closes before the clipboard accepts it", async () => {
-    const h = clipboardHarness();
-    const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
-    useClipboard({ writeText: () => pendingWrite, readText: () => Promise.resolve("") });
+    const h = clipboard_harness();
+    const { promise: pending_write, resolve: finish_write } = Promise.withResolvers<void>();
+    use_clipboard({ writeText: () => pending_write, readText: () => Promise.resolve("") });
     h.set(1, 1, "=A1+B$2");
     h.select(1, 1);
 
     const cut = h.clipboard.cut();
     h.lifetime.close();
-    finishWrite();
+    finish_write();
 
     expect(await cut).toBe("empty");
   });
 
   it("pasteValues writes the resolved literal and no formula", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 2, "=5*3");
     await h.copy(0, 2);
 
@@ -386,7 +386,7 @@ describe("ClipboardController", () => {
   });
 
   it("neutralizes injection prefixes in external text, never producing a formula", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.clip.text = "=SUM(A1)\tsafe";
     await h.paste(0, 0);
 
@@ -394,9 +394,9 @@ describe("ClipboardController", () => {
   });
 
   it("resolves 'blocked' on a rejected readText and leaves the store unchanged", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(1, 1, "keep");
-    useClipboard({ readText: () => Promise.reject(new Error("read denied")) });
+    use_clipboard({ readText: () => Promise.reject(new Error("read denied")) });
 
     await expect(h.paste(1, 1)).resolves.toBe("blocked");
     expect(h.value(1, 1)).toBe("keep");
@@ -404,8 +404,8 @@ describe("ClipboardController", () => {
 
   it.each([false, true])(
     "round-trips formulas, refs and styles through the browser custom clipboard format (per-cell reads: %p)",
-    async (perCellReads) => {
-      const h = clipboardHarness({ perCellReads });
+    async (per_cell_reads) => {
+      const h = clipboard_harness({ perCellReads: per_cell_reads });
       h.set(0, 0, "=B1", { bold: true, backgroundColor: "#abcdef" });
       h.apply([
         {
@@ -431,7 +431,7 @@ describe("ClipboardController", () => {
   );
 
   it("exports safe colors and both text decorations in copied HTML", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, "styled", {
       underline: true,
       strikethrough: true,
@@ -447,7 +447,7 @@ describe("ClipboardController", () => {
   });
 
   it("hardens every dangerous prefix in plain and preferred HTML while trusted private cells stay exact", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const originals = [
       ["=cmd", "+1", "-1"],
       ["@x", "\tx", "\rx"],
@@ -483,7 +483,7 @@ describe("ClipboardController", () => {
   });
 
   it("pastes every external HTML formula as inert text, including nested dangerous calls", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const html =
       '<table><tbody><tr><td data-formula="=A1+1" style="font-weight:bold;color:#123456">2</td>' +
       '<td data-formula="=IF(1,WEBSERVICE(&quot;https://example.test&quot;),0)">' +
@@ -499,7 +499,7 @@ describe("ClipboardController", () => {
   });
 
   it("keeps the cells Excel's HTML marks as text as text in general columns, as Excel does", async () => {
-    const h = clipboardHarness({ columnType: "general" });
+    const h = clipboard_harness({ columnType: "general" });
     // Excel marks a cell in its Text format with mso-number-format:"\@", in a
     // class of the page's style sheet or in the cell's style, and writes x:str
     // on a cell whose value is a string.
@@ -533,7 +533,7 @@ describe("ClipboardController", () => {
   });
 
   it("parses signed HTML numbers into a number column before guarding formula text", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.clip.items = [item("text/html", "<table><tr><td>-5</td></tr><tr><td>+1</td></tr></table>")];
 
     await expect(h.paste(1, 1)).resolves.toBe("done");
@@ -541,11 +541,11 @@ describe("ClipboardController", () => {
   });
 
   it("does not trust another controller's private clipboard token", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, "=B1");
     await h.copy(0, 0);
 
-    const other = clipboardHarness();
+    const other = clipboard_harness();
     other.clip.items = h.clip.items;
     await expect(other.paste(3, 0)).resolves.toBe("done");
     expect([other.formula(3, 0), other.value(3, 0)]).toEqual([null, "'=B1"]);
@@ -563,7 +563,7 @@ describe("ClipboardController", () => {
     });
 
   it("uses resolved literals for pasteValues from an untrusted rich payload", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const cell = { value: { kind: "formula", src: "=A1+1" }, resolved: 7, style: { italic: true } };
     h.clip.items = [item(SHEETWRITE_CLIPBOARD_MIME, envelope([[cell]]))];
     h.select(5, 0);
@@ -573,15 +573,15 @@ describe("ClipboardController", () => {
   });
 
   describe("applies the pasted-text limits to HTML and another grid's payload", () => {
-    const tooWide = 16_385;
+    const too_wide = 16_385;
     const literal = { value: { kind: "literal", value: "x" }, resolved: "x", style: {} };
     const padding = " ".repeat(32 * 1024 * 1024);
     const wide = "this paste has 16,385 columns, and a paste can have at most 16,384.";
     const large = "this paste has more than 32 MB of text, the most a paste can have.";
-    const wideHtml = `<table><tr>${"<td>x</td>".repeat(tooWide)}</tr></table>`;
+    const wide_html = `<table><tr>${"<td>x</td>".repeat(too_wide)}</tr></table>`;
 
     it.each([
-      ["HTML wider than a sheet", "text/html", wideHtml, wide],
+      ["HTML wider than a sheet", "text/html", wide_html, wide],
       [
         "HTML over the byte limit",
         "text/html",
@@ -591,7 +591,7 @@ describe("ClipboardController", () => {
       [
         "a payload wider than a sheet",
         SHEETWRITE_CLIPBOARD_MIME,
-        envelope([Array(tooWide).fill(literal)]),
+        envelope([Array(too_wide).fill(literal)]),
         wide,
       ],
       [
@@ -601,7 +601,7 @@ describe("ClipboardController", () => {
         large,
       ],
     ])("refuses %s, as pasted text is refused", async (_name, type, text, reason) => {
-      const h = clipboardHarness();
+      const h = clipboard_harness();
       h.clip.items = [item(type, text)];
 
       expect(await h.paste(1, 0)).toBe("rejected");
@@ -610,18 +610,18 @@ describe("ClipboardController", () => {
     });
 
     it("refuses an oversized payload in Paste Special too", async () => {
-      const h = clipboardHarness();
-      h.clip.items = [item(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(tooWide).fill(literal)]))];
+      const h = clipboard_harness();
+      h.clip.items = [item(SHEETWRITE_CLIPBOARD_MIME, envelope([Array(too_wide).fill(literal)]))];
 
       expect(await h.pasteSpecial({ paste: "values" }, 1, 0)).toBe("rejected");
       expect(h.refusals).toEqual([wide]);
     });
 
     it("pastes the text beside HTML past the limits, as Excel's large HTML gives way to its text", async () => {
-      const h = clipboardHarness();
+      const h = clipboard_harness();
       h.clip.items = [
         new FakeClipboardItem({
-          "text/html": new Blob([wideHtml], { type: "text/html" }),
+          "text/html": new Blob([wide_html], { type: "text/html" }),
           "text/plain": new Blob(["from text"], { type: "text/plain" }),
         }),
       ];
@@ -631,7 +631,7 @@ describe("ClipboardController", () => {
     });
 
     it("pastes this grid's own copy whatever the size of its payload", async () => {
-      const h = clipboardHarness();
+      const h = clipboard_harness();
       h.set(0, 0, "=B1");
       await h.copy(0, 0);
       const type = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
@@ -646,14 +646,14 @@ describe("ClipboardController", () => {
 
 describe("spill clipboard commands", () => {
   /** B2 holds =SEQUENCE(3), which spills into B3:B4. */
-  function spillHarness() {
-    const h = clipboardHarness();
+  function spill_harness() {
+    const h = clipboard_harness();
     h.set(1, 1, "=SEQUENCE(3)");
     return h;
   }
 
   it("does not cut or move a projected child without its anchor", async () => {
-    const h = spillHarness();
+    const h = spill_harness();
     h.select(2, 1);
     expect(await h.clipboard.cut()).toBe("empty");
     expect(h.value(2, 1)).toBe(2);
@@ -662,7 +662,7 @@ describe("spill clipboard commands", () => {
   });
 
   it("moves the anchor's formula on paste, with undo and redo", async () => {
-    const h = spillHarness();
+    const h = spill_harness();
     h.select(1, 1);
     expect(await h.clipboard.cut()).toBe("done");
     expect(h.value(2, 1)).toBe(2);
@@ -675,7 +675,7 @@ describe("spill clipboard commands", () => {
   });
 
   it("pastes clipboard values into projected children and restores the spill on undo", async () => {
-    const h = spillHarness();
+    const h = spill_harness();
     h.set(0, 0, 99);
     await h.copy(0, 0);
     expect(await h.paste(2, 1)).toBe("done");
@@ -719,11 +719,11 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       const amounts = Array.from(sorted.values, Number);
       expect(amounts).toEqual([...amounts].sort((left, right) => right - left));
       expect(sorted.ffiCalls).toBe(4);
-      const sortedRows = Array.from(sorted.dataRows);
-      expect(sorted.formulas).toEqual([{ offset: sortedRows.indexOf(0), source: "=1+1" }]);
+      const sorted_rows = Array.from(sorted.dataRows);
+      expect(sorted.formulas).toEqual([{ offset: sorted_rows.indexOf(0), source: "=1+1" }]);
       expect(sorted.refs).toEqual([
         {
-          offset: sortedRows.indexOf(1),
+          offset: sorted_rows.indexOf(1),
           target: { sheet: "s1", row: 0, col: 1 },
         },
       ]);
@@ -735,7 +735,7 @@ describe("SheetwriteStore clipboard bulk reads", () => {
 
 describe("cut and paste", () => {
   it("marks the cells on cut and moves them, with every reference, on paste (#756)", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
     h.set(1, 0, 2);
     h.set(0, 1, "=A1*10");
@@ -769,7 +769,7 @@ describe("cut and paste", () => {
   });
 
   it("keeps a moved formula pointing at the same cells", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 4);
     h.set(0, 2, 5);
     h.set(0, 1, "=A1+C1");
@@ -782,7 +782,7 @@ describe("cut and paste", () => {
   });
 
   it("moves a block onto part of itself", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
     h.set(1, 0, 2);
     h.set(2, 0, 3);
@@ -797,7 +797,7 @@ describe("cut and paste", () => {
   });
 
   it("replaces the cells it lands on, and undo brings them back", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
     h.set(2, 2, 5);
     h.set(4, 1, "=C3");
@@ -817,7 +817,7 @@ describe("cut and paste", () => {
   });
 
   it("moves cells, notes and hyperlinks to another sheet", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 3);
     h.set(1, 0, "=A1*2");
     h.set(0, 3, "=A2+1");
@@ -851,7 +851,7 @@ describe("cut and paste", () => {
   });
 
   it("ends the cut on Esc, a new copy or another edit, and the ended cut does not paste", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
 
     h.select(0, 0);
@@ -896,7 +896,7 @@ describe("cut and paste", () => {
   ])(
     "ends the cut when a peer's %s reaches its cells, and not for other cells (#1074)",
     async (_name, change) => {
-      const h = clipboardHarness();
+      const h = clipboard_harness();
       for (const row of [0, 1, 2]) h.set(row, 0, row + 1);
       h.select(0, 0, 1, 0);
       await h.clipboard.cut();
@@ -924,7 +924,7 @@ describe("cut and paste", () => {
   );
 
   it("pastes another app's clipboard as a plain paste and ends the cut", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
 
     h.select(0, 0);
@@ -937,7 +937,7 @@ describe("cut and paste", () => {
   });
 
   it("moves validation and conditional-format rules inside the block, and undo puts them back", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 4);
     h.set(0, 1, 1);
     const format = {
@@ -983,7 +983,7 @@ describe("cut and paste", () => {
   });
 
   it("does not paste values after a cut, as Excel greys out Paste Special", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
 
     h.select(0, 0);
@@ -997,7 +997,7 @@ describe("cut and paste", () => {
   });
 
   it("moves the cut cells and keeps a copy's formulas in browsers without custom formats (#921)", async () => {
-    const h = clipboardHarness({ nativeFormatsOnly: true });
+    const h = clipboard_harness({ nativeFormatsOnly: true });
     h.set(0, 0, "a");
     h.set(0, 1, 1);
     h.set(1, 0, "=B1*2");
@@ -1021,7 +1021,7 @@ describe("cut and paste", () => {
   });
 
   it("adds the rows a cut needs to move past the last row", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
     h.set(1, 0, 2);
     h.set(2, 0, 3);
@@ -1034,7 +1034,7 @@ describe("cut and paste", () => {
   });
 
   it("is refused with the sheet's row limit, and changes nothing, when the sheet cannot grow", async () => {
-    const h = clipboardHarness({ maxRowsPerSheet: 40 });
+    const h = clipboard_harness({ maxRowsPerSheet: 40 });
     h.clip.text = Array.from({ length: 20 }, (_, row) => `${row}`).join("\n");
     expect(await h.paste(25, 0)).toBe("rejected");
     expect([h.sheetOf("s1").rowCount, h.value(25, 0)]).toEqual([ROWS, null]);
@@ -1057,21 +1057,21 @@ describe("moveCells operation", () => {
   });
 
   it("conflicts with concurrent work on either sheet, and not with other sheets", () => {
-    const onTarget: DocumentOp = {
+    const on_target: DocumentOp = {
       op: "set",
       addr: { sheet: "s2", row: 20, col: 3 },
       value: { kind: "literal", value: 1 },
     };
-    const elsewhere: DocumentOp = { ...onTarget, addr: { sheet: "s3", row: 0, col: 0 } };
+    const elsewhere: DocumentOp = { ...on_target, addr: { sheet: "s3", row: 0, col: 0 } };
 
-    expect(rebaseDocumentOperations([onTarget], [move]).status).toBe("conflict");
+    expect(rebaseDocumentOperations([on_target], [move]).status).toBe("conflict");
     expect(rebaseDocumentOperations([elsewhere], [move]).status).toBe("rebased");
   });
 });
 
 describe("Paste Special", () => {
   it("adds copied values to the target's numbers and keeps the target's formats, as one undo step", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 10, { bold: true });
     h.set(1, 0, "=A1*2");
     h.set(0, 2, 1, { italic: true });
@@ -1089,7 +1089,7 @@ describe("Paste Special", () => {
   });
 
   it("transposes, skips blanks and shifts each formula by its own move", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 1);
     h.set(1, 0, "=A1");
     h.set(1, 1, 4);
@@ -1104,7 +1104,7 @@ describe("Paste Special", () => {
   });
 
   it("pastes formats, notes, column widths or validation alone", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 7, { bold: true, numberFormat: "0.00" });
     h.apply([
       { op: "setNote", addr: h.at(0, 0), text: "Checked" },
@@ -1142,7 +1142,7 @@ describe("Paste Special", () => {
   });
 
   it("links to the copied cells: absolute for one cell, with the sheet's name from another sheet", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     h.set(0, 0, 5);
     h.set(1, 0, 6);
     await h.copy(0, 0);
@@ -1157,7 +1157,7 @@ describe("Paste Special", () => {
   });
 
   it("carries notes and conditional formats with Paste, as Excel's All, and merges them on request", async () => {
-    const h = clipboardHarness();
+    const h = clipboard_harness();
     const rule = (r0: number, r1: number) => ({
       range: range("s1", r0, 0, r1, 0),
       when: { kind: "greaterThan" as const, value: 1 },

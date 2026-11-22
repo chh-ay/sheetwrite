@@ -61,7 +61,7 @@ describe("formatNumber", () => {
   });
 
   it("reads dates back as serials, 29 February 1900 as Excel's serial 60, and rejects invalid ones", () => {
-    const leapDay = dateToSerial(new Date(Date.UTC(2024, 1, 29)));
+    const leap_day = dateToSerial(new Date(Date.UTC(2024, 1, 29)));
     const cases: [string, number | null][] = [
       ["1900-02-29", 60],
       ["1900-02-29 18:00", 60.75],
@@ -69,12 +69,12 @@ describe("formatNumber", () => {
       ["29/02/1900", 60],
       ["1900-02-28", 59],
       ["1900-03-01", 61],
-      [" 2024-02-29 ", leapDay],
-      ["2024-02-29 12:30", leapDay + 12.5 / 24],
-      ["2024-02-29T23:59:58", leapDay + (23 * 3600 + 59 * 60 + 58) / 86_400],
-      ["31/01/2024", leapDay - 29],
-      ["01/31/2024", leapDay - 29],
-      ["04/05/2024", leapDay + 36],
+      [" 2024-02-29 ", leap_day],
+      ["2024-02-29 12:30", leap_day + 12.5 / 24],
+      ["2024-02-29T23:59:58", leap_day + (23 * 3600 + 59 * 60 + 58) / 86_400],
+      ["31/01/2024", leap_day - 29],
+      ["01/31/2024", leap_day - 29],
+      ["04/05/2024", leap_day + 36],
     ];
     for (const invalid of ["1900-02-30", "1899-02-29", "1901-02-29", "1900-02-29 24:00"]) {
       cases.push([invalid, null]);

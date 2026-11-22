@@ -14,11 +14,11 @@ export function selectionCell(selection: Selection | null): CellAddress | null {
     case "cell":
       return selection.addr;
     case "range":
-      return selection.active ?? rangeTopLeft(selection.range);
+      return selection.active ?? range_top_left(selection.range);
     case "multi": {
       if (selection.active) return selection.active;
       const last = selection.ranges.at(-1);
-      return last === undefined ? null : rangeTopLeft(last);
+      return last === undefined ? null : range_top_left(last);
     }
     case "row":
     case "column":
@@ -26,7 +26,7 @@ export function selectionCell(selection: Selection | null): CellAddress | null {
   }
 }
 
-function rangeTopLeft(range: Range): CellAddress {
+function range_top_left(range: Range): CellAddress {
   return {
     sheet: range.sheet,
     row: Math.min(range.start.row, range.end.row),
@@ -253,7 +253,7 @@ export class SelectionModel {
   toSelection(sheet: SheetId): Selection | null {
     const region = this.regions.at(-1);
     if (region === undefined) return null;
-    const toRange = (rect: SelRect): Range => ({
+    const to_range = (rect: SelRect): Range => ({
       sheet,
       start: { row: rect.r0, col: rect.c0 },
       end: { row: rect.r1, col: rect.c1 },
@@ -269,7 +269,7 @@ export class SelectionModel {
     if (this.regions.length > 1) {
       return {
         kind: "multi",
-        ranges: this.regions.map((r) => toRange(r.rect)),
+        ranges: this.regions.map((r) => to_range(r.rect)),
         ...active(rect.r0, rect.c0),
       };
     }
@@ -280,7 +280,7 @@ export class SelectionModel {
     if (rect.r0 === rect.r1 && rect.c0 === rect.c1) {
       return { kind: "cell", addr: { sheet, row: rect.r0, col: rect.c0 } };
     }
-    return { kind: "range", range: toRange(rect), ...active(rect.r0, rect.c0) };
+    return { kind: "range", range: to_range(rect), ...active(rect.r0, rect.c0) };
   }
 
   forEachRect(cb: (rect: SelRect) => void): void {

@@ -21,14 +21,14 @@ export function requiresDocumentationBuild(paths: readonly string[]): boolean {
   );
 }
 
-function changedPaths(baseSha: string): readonly string[] {
-  if (!/^[0-9a-f]{40}$/.test(baseSha)) {
+function changed_paths(base_sha: string): readonly string[] {
+  if (!/^[0-9a-f]{40}$/.test(base_sha)) {
     throw new Error("BASE_SHA must be a full lowercase commit SHA");
   }
-  if (/^0+$/.test(baseSha)) return [];
+  if (/^0+$/.test(base_sha)) return [];
 
   const result = Bun.spawnSync(
-    ["git", "diff", "--name-only", "--diff-filter=ACDMRTUXB", baseSha, "HEAD"],
+    ["git", "diff", "--name-only", "--diff-filter=ACDMRTUXB", base_sha, "HEAD"],
     { stderr: "pipe", stdout: "pipe" },
   );
   if (result.exitCode !== 0) {
@@ -42,7 +42,7 @@ function changedPaths(baseSha: string): readonly string[] {
 }
 
 if (import.meta.main) {
-  const baseSha = process.env.BASE_SHA;
-  if (!baseSha) throw new Error("BASE_SHA is required");
-  console.log(`docs_required=${requiresDocumentationBuild(changedPaths(baseSha))}`);
+  const base_sha = process.env.BASE_SHA;
+  if (!base_sha) throw new Error("BASE_SHA is required");
+  console.log(`docs_required=${requiresDocumentationBuild(changed_paths(base_sha))}`);
 }

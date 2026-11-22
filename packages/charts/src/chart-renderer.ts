@@ -30,7 +30,7 @@ export function createChartRenderer(store: Store): ChartRenderer {
   return {
     mount(host, chart, size) {
       // Frames come from the host's own window, which differs from the global one inside an iframe.
-      const hostWindow = host.ownerDocument.defaultView ?? globalThis;
+      const host_window = host.ownerDocument.defaultView ?? globalThis;
       let width = size.width;
       let height = size.height;
       let frame: number | null = null;
@@ -46,30 +46,30 @@ export function createChartRenderer(store: Store): ChartRenderer {
       };
 
       // Edits and resizes can arrive many times in one frame; the chart only needs the last state.
-      const scheduleDraw = (): void => {
-        if (frame === null) frame = hostWindow.requestAnimationFrame(draw);
+      const schedule_draw = (): void => {
+        if (frame === null) frame = host_window.requestAnimationFrame(draw);
       };
 
-      const isThisChart = (other: ChartRef): boolean =>
+      const is_this_chart = (other: ChartRef): boolean =>
         other.sheet === chart.sheet && other.id === chart.id;
       const unsubscribe = views.subscribe((event) => {
-        if (event.charts.some(isThisChart)) scheduleDraw();
+        if (event.charts.some(is_this_chart)) schedule_draw();
       });
 
       draw();
 
       const handle: MountedChart = {
-        resize(nextWidth, nextHeight) {
-          if (nextWidth === width && nextHeight === height) return;
+        resize(next_width, next_height) {
+          if (next_width === width && next_height === height) return;
 
-          width = nextWidth;
-          height = nextHeight;
-          scheduleDraw();
+          width = next_width;
+          height = next_height;
+          schedule_draw();
         },
         dispose() {
           if (!mounted.delete(handle)) return;
 
-          if (frame !== null) hostWindow.cancelAnimationFrame(frame);
+          if (frame !== null) host_window.cancelAnimationFrame(frame);
           frame = null;
           unsubscribe();
           host.replaceChildren();

@@ -105,9 +105,9 @@ export interface NumberFormatResourceStats {
 const FORMAT_CACHE_LIMIT = 256;
 const NUMBER_FORMATTER_CACHE_LIMIT = 128;
 const DATE_TIME_FORMATTER_CACHE_LIMIT = 64;
-const formatCache = new Map<string, CompiledFormat>();
-const numberFormatterCache = new Map<string, Intl.NumberFormat>();
-const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const format_cache = new Map<string, CompiledFormat>();
+const number_formatter_cache = new Map<string, Intl.NumberFormat>();
+const date_time_formatter_cache = new Map<string, Intl.DateTimeFormat>();
 
 /**
  * Rendered-text cache for numbers and dates. `Intl` formatting and date token
@@ -126,29 +126,29 @@ const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
 const NUMBER_TEXT_GROUP_LIMIT = 8;
 const NUMBER_TEXT_PER_GROUP_LIMIT = 512;
 const NUMBER_TEXT_MAX_TEXT_LENGTH = 128;
-const numberTextCache = new Map<string, Map<string, Map<number, string>>>();
-let numberTextGroups = 0;
+const number_text_cache = new Map<string, Map<string, Map<number, string>>>();
+let number_text_groups = 0;
 
 /** Drop the least recently added (format, locale) group. */
-function dropOldestNumberTextGroup(): void {
-  const oldestCode = numberTextCache.keys().next();
-  if (oldestCode.done) return;
-  const byLocale = numberTextCache.get(oldestCode.value);
-  if (byLocale === undefined) return;
-  const oldestLocale = byLocale.keys().next();
-  if (oldestLocale.done) {
-    numberTextCache.delete(oldestCode.value);
+function drop_oldest_number_text_group(): void {
+  const oldest_code = number_text_cache.keys().next();
+  if (oldest_code.done) return;
+  const by_locale = number_text_cache.get(oldest_code.value);
+  if (by_locale === undefined) return;
+  const oldest_locale = by_locale.keys().next();
+  if (oldest_locale.done) {
+    number_text_cache.delete(oldest_code.value);
     return;
   }
-  byLocale.delete(oldestLocale.value);
-  numberTextGroups -= 1;
-  if (byLocale.size === 0) numberTextCache.delete(oldestCode.value);
+  by_locale.delete(oldest_locale.value);
+  number_text_groups -= 1;
+  if (by_locale.size === 0) number_text_cache.delete(oldest_code.value);
 }
 
-function lookupNumberText(code: string, locale: string, value: number): string | undefined {
-  const byLocale = numberTextCache.get(code);
-  if (byLocale === undefined) return undefined;
-  const texts = byLocale.get(locale);
+function lookup_number_text(code: string, locale: string, value: number): string | undefined {
+  const by_locale = number_text_cache.get(code);
+  if (by_locale === undefined) return undefined;
+  const texts = by_locale.get(locale);
   if (texts === undefined) return undefined;
   const cached = texts.get(value);
   if (cached === undefined) return undefined;
@@ -158,20 +158,20 @@ function lookupNumberText(code: string, locale: string, value: number): string |
   return cached;
 }
 
-function rememberNumberText(code: string, locale: string, value: number, text: string): string {
+function remember_number_text(code: string, locale: string, value: number, text: string): string {
   // Long output is rare and would make the retained text unbounded.
   if (text.length > NUMBER_TEXT_MAX_TEXT_LENGTH) return text;
-  let byLocale = numberTextCache.get(code);
-  if (byLocale === undefined) {
-    byLocale = new Map();
-    numberTextCache.set(code, byLocale);
+  let by_locale = number_text_cache.get(code);
+  if (by_locale === undefined) {
+    by_locale = new Map();
+    number_text_cache.set(code, by_locale);
   }
-  let texts = byLocale.get(locale);
+  let texts = by_locale.get(locale);
   if (texts === undefined) {
-    if (numberTextGroups >= NUMBER_TEXT_GROUP_LIMIT) dropOldestNumberTextGroup();
+    if (number_text_groups >= NUMBER_TEXT_GROUP_LIMIT) drop_oldest_number_text_group();
     texts = new Map();
-    byLocale.set(locale, texts);
-    numberTextGroups += 1;
+    by_locale.set(locale, texts);
+    number_text_groups += 1;
   }
   if (texts.delete(value)) texts.set(value, text);
   else {
@@ -183,12 +183,12 @@ function rememberNumberText(code: string, locale: string, value: number, text: s
   }
   return text;
 }
-let compiledFormats = 0;
-let numberFormatters = 0;
-let dateTimeFormatters = 0;
-let currencySymbol: string | undefined;
+let compiled_formats = 0;
+let number_formatters = 0;
+let date_time_formatters = 0;
+let currency_symbol: string | undefined;
 
-function splitRawSections(code: string): string[] {
+function split_raw_sections(code: string): string[] {
   const sections: string[] = [];
   let section = "";
   let quoted = false;
@@ -210,13 +210,13 @@ function splitRawSections(code: string): string[] {
   return sections.slice(0, 4);
 }
 
-function sectionFor(
+function section_for(
   value: number,
   format: CompiledFormat,
 ): { section: CompiledSection; magnitude: number } {
   const sections = format.numberSections;
   const fallback = sections[0]!;
-  if (format.conditional) return conditionalSection(value, sections);
+  if (format.conditional) return conditional_section(value, sections);
   if (value > 0 || sections.length === 1) return { section: fallback, magnitude: value };
   if (value < 0) {
     return sections[1] !== undefined
@@ -245,7 +245,7 @@ function meets(value: number, condition: SectionCondition): boolean {
 }
 
 /** Whether only negative numbers meet `condition`, as only they take a negative section. */
-function onlyNegative(condition: SectionCondition): boolean {
+function only_negative(condition: SectionCondition): boolean {
   return condition.operator === "<"
     ? condition.operand <= 0
     : (condition.operator === "<=" || condition.operator === "=") && condition.operand < 0;
@@ -257,7 +257,7 @@ function onlyNegative(condition: SectionCondition): boolean {
  * second. A section that only negative numbers meet shows the magnitude, as
  * Excel's negative section does; the other sections keep the sign.
  */
-function conditionalSection(
+function conditional_section(
   value: number,
   sections: readonly CompiledSection[],
 ): { section: CompiledSection; magnitude: number } {
@@ -265,10 +265,10 @@ function conditionalSection(
   const second = sections[1];
   const many = sections.length > 1;
   if (first.condition !== null && meets(value, first.condition)) {
-    return { section: first, magnitude: many && onlyNegative(first.condition) ? -value : value };
+    return { section: first, magnitude: many && only_negative(first.condition) ? -value : value };
   }
   if (second?.condition && meets(value, second.condition)) {
-    return { section: second, magnitude: onlyNegative(second.condition) ? -value : value };
+    return { section: second, magnitude: only_negative(second.condition) ? -value : value };
   }
   if (first.condition !== null && second?.condition) {
     return { section: sections[2] ?? first, magnitude: value };
@@ -352,7 +352,7 @@ const PALETTE_COLOR = /^color(\d{1,2})$/i;
 const CONDITION = /^(<=|>=|<>|<|>|=)\s*(-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)$/i;
 
 /** The color and the condition in a section's brackets; colors and conditions take the first of each. */
-function sectionBrackets(source: string): Pick<CompiledSection, "color" | "condition"> {
+function section_brackets(source: string): Pick<CompiledSection, "color" | "condition"> {
   let color: string | null = null;
   let condition: SectionCondition | null = null;
   let quoted = false;
@@ -389,12 +389,12 @@ function sectionBrackets(source: string): Pick<CompiledSection, "color" | "condi
  */
 export function numberFormatColor(value: number, format: string | undefined): string | undefined {
   if (format === undefined || !Number.isFinite(value)) return undefined;
-  const compiled = compileFormat(format);
+  const compiled = compile_format(format);
   if (!compiled.colored) return undefined;
-  return sectionFor(value, compiled).section.color ?? undefined;
+  return section_for(value, compiled).section.color ?? undefined;
 }
 
-function cacheValue<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V {
+function cache_value<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V {
   cache.set(key, value);
   if (cache.size > limit) {
     const oldest = cache.keys().next();
@@ -405,19 +405,19 @@ function cacheValue<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V 
 
 /** Test-only deterministic formatter resource counters. */
 export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats {
-  let numberTextEntries = 0;
-  for (const byLocale of numberTextCache.values()) {
-    for (const texts of byLocale.values()) numberTextEntries += texts.size;
+  let number_text_entries = 0;
+  for (const by_locale of number_text_cache.values()) {
+    for (const texts of by_locale.values()) number_text_entries += texts.size;
   }
 
   return {
-    compiledFormats,
-    numberFormatters,
-    dateTimeFormatters,
-    formatCacheEntries: formatCache.size,
-    numberFormatterCacheEntries: numberFormatterCache.size,
-    dateTimeFormatterCacheEntries: dateTimeFormatterCache.size,
-    numberTextEntries,
+    compiledFormats: compiled_formats,
+    numberFormatters: number_formatters,
+    dateTimeFormatters: date_time_formatters,
+    formatCacheEntries: format_cache.size,
+    numberFormatterCacheEntries: number_formatter_cache.size,
+    dateTimeFormatterCacheEntries: date_time_formatter_cache.size,
+    numberTextEntries: number_text_entries,
   };
 }
 
@@ -426,23 +426,23 @@ export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats
  * text. The creation counters stay, so tests can see a rebuild.
  */
 export function trimNumberFormatCaches(): void {
-  formatCache.clear();
-  numberFormatterCache.clear();
-  dateTimeFormatterCache.clear();
-  numberTextCache.clear();
-  numberTextGroups = 0;
+  format_cache.clear();
+  number_formatter_cache.clear();
+  date_time_formatter_cache.clear();
+  number_text_cache.clear();
+  number_text_groups = 0;
 }
 
 /** Test-only reset for isolated formatter resource assertions. */
 export function resetNumberFormatResourcesForTest(): void {
   trimNumberFormatCaches();
-  compiledFormats = 0;
-  numberFormatters = 0;
-  dateTimeFormatters = 0;
-  currencySymbol = undefined;
+  compiled_formats = 0;
+  number_formatters = 0;
+  date_time_formatters = 0;
+  currency_symbol = undefined;
 }
 
-function decodeLiteral(source: string): string {
+function decode_literal(source: string): string {
   let output = "";
   let quoted = false;
   for (let index = 0; index < source.length; index++) {
@@ -470,10 +470,10 @@ function decodeLiteral(source: string): string {
     }
     output += char;
   }
-  return output.includes("¤") ? output.replaceAll("¤", getCurrencySymbol()) : output;
+  return output.includes("¤") ? output.replaceAll("¤", get_currency_symbol()) : output;
 }
 
-function placeholderBounds(section: string): [number, number] | null {
+function placeholder_bounds(section: string): [number, number] | null {
   let first = -1;
   let last = -1;
   let quoted = false;
@@ -492,8 +492,8 @@ function placeholderBounds(section: string): [number, number] | null {
   return first < 0 ? null : [first, last];
 }
 
-function parseNumericFormat(section: string): NumericDescriptor | null {
-  const bounds = placeholderBounds(section);
+function parse_numeric_format(section: string): NumericDescriptor | null {
+  const bounds = placeholder_bounds(section);
   if (!bounds) return null;
   const [first, last] = bounds;
   const pattern = section.slice(first, last + 1);
@@ -511,8 +511,8 @@ function parseNumericFormat(section: string): NumericDescriptor | null {
     percent: section.includes("%"),
     decimals,
     grouped: mantissa.includes(","),
-    prefix: decodeLiteral(section.slice(0, first)),
-    suffix: decodeLiteral(section.slice(last + 1)),
+    prefix: decode_literal(section.slice(0, first)),
+    suffix: decode_literal(section.slice(last + 1)),
     scientific: exponent !== null,
     exponentDigits: exponent?.[1]?.length ?? 0,
   };
@@ -521,11 +521,11 @@ function parseNumericFormat(section: string): NumericDescriptor | null {
 
 function formatter(locale: string, decimals: number, grouped: boolean): Intl.NumberFormat {
   const key = `fixed:${locale}:${decimals}:${grouped ? 1 : 0}`;
-  const cached = numberFormatterCache.get(key);
+  const cached = number_formatter_cache.get(key);
   if (cached) return cached;
-  numberFormatters += 1;
-  return cacheValue(
-    numberFormatterCache,
+  number_formatters += 1;
+  return cache_value(
+    number_formatter_cache,
     key,
     new Intl.NumberFormat(locale, {
       useGrouping: grouped,
@@ -536,16 +536,16 @@ function formatter(locale: string, decimals: number, grouped: boolean): Intl.Num
   );
 }
 
-function getCurrencySymbol(): string {
-  if (currencySymbol === undefined) {
-    numberFormatters += 1;
+function get_currency_symbol(): string {
+  if (currency_symbol === undefined) {
+    number_formatters += 1;
     const parts = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).formatToParts(0);
-    currencySymbol = parts.find((part) => part.type === "currency")?.value ?? "$";
+    currency_symbol = parts.find((part) => part.type === "currency")?.value ?? "$";
   }
-  return currencySymbol;
+  return currency_symbol;
 }
 
 /**
@@ -553,7 +553,7 @@ function getCurrencySymbol(): string {
  * and `[ss]` give hours, minutes and seconds; anything else (a color, a
  * condition or a locale) gives `null`.
  */
-function elapsedKind(section: string, open: number, close: number): DateTokenKind | null {
+function elapsed_kind(section: string, open: number, close: number): DateTokenKind | null {
   if (close <= open + 1) return null;
   const lower = section[open + 1]!.toLowerCase();
   for (let index = open + 2; index < close; index++) {
@@ -570,7 +570,7 @@ const ELAPSED_KINDS: ReadonlySet<DateTokenKind> = new Set([
   "elapsedSeconds",
 ]);
 
-function tokenizeDate(section: string): DateToken[] {
+function tokenize_date(section: string): DateToken[] {
   const tokens: DateToken[] = [];
   for (let index = 0; index < section.length;) {
     if (section[index] === '"') {
@@ -594,10 +594,10 @@ function tokenizeDate(section: string): DateToken[] {
         index++;
         continue;
       }
-      const kind = elapsedKind(section, index, close);
+      const kind = elapsed_kind(section, index, close);
       tokens.push(
         kind === null
-          ? { kind: "literal", pad: false, text: decodeLiteral(section.slice(index, close + 1)) }
+          ? { kind: "literal", pad: false, text: decode_literal(section.slice(index, close + 1)) }
           : { kind, pad: close - index > 2, text: "" },
       );
       index = close + 1;
@@ -644,14 +644,14 @@ function tokenizeDate(section: string): DateToken[] {
       literal += section[index++]!;
     }
 
-    tokens.push({ kind: "literal", pad: false, text: decodeLiteral(literal) });
+    tokens.push({ kind: "literal", pad: false, text: decode_literal(literal) });
   }
 
-  resolveMonthMinute(tokens);
+  resolve_month_minute(tokens);
   return tokens;
 }
 
-function compileDateFormat(section: string): DateToken[] | null {
+function compile_date_format(section: string): DateToken[] | null {
   let visible = "";
   let quoted = false;
   for (let index = 0; index < section.length; index++) {
@@ -660,7 +660,7 @@ function compileDateFormat(section: string): DateToken[] | null {
       const close = section.indexOf("]", index + 1);
       if (close >= 0) {
         // Elapsed time shows as a time; other brackets show nothing.
-        if (elapsedKind(section, index, close) !== null) visible += section[index + 1];
+        if (elapsed_kind(section, index, close) !== null) visible += section[index + 1];
         index = close;
         continue;
       }
@@ -669,11 +669,11 @@ function compileDateFormat(section: string): DateToken[] | null {
     else if (char === "\\") index++;
     else if (!quoted) visible += char;
   }
-  const tokens = /[ymdhs]/i.test(visible) && !/#/.test(visible) ? tokenizeDate(section) : null;
+  const tokens = /[ymdhs]/i.test(visible) && !/#/.test(visible) ? tokenize_date(section) : null;
   return tokens;
 }
 
-function resolveMonthMinute(tokens: DateToken[]): void {
+function resolve_month_minute(tokens: DateToken[]): void {
   for (let index = 0; index < tokens.length; index++) {
     if (tokens[index]!.kind !== "month") continue;
     let minute = false;
@@ -696,43 +696,43 @@ function resolveMonthMinute(tokens: DateToken[]): void {
   }
 }
 
-function compileFormat(code: string): CompiledFormat {
-  const cached = formatCache.get(code);
+function compile_format(code: string): CompiledFormat {
+  const cached = format_cache.get(code);
   if (cached) return cached;
-  const sections = splitRawSections(code).map((source): CompiledSection => ({
+  const sections = split_raw_sections(code).map((source): CompiledSection => ({
     source,
-    ...sectionBrackets(source),
-    dateTokens: compileDateFormat(source),
-    numeric: parseNumericFormat(source),
-    fraction: parseFraction(source),
-    text: hasTextPlaceholder(source),
-    literal: decodeLiteral(source),
+    ...section_brackets(source),
+    dateTokens: compile_date_format(source),
+    numeric: parse_numeric_format(source),
+    fraction: parse_fraction(source),
+    text: has_text_placeholder(source),
+    literal: decode_literal(source),
   }));
   // A last section that holds `@` is the text section, which numbers skip.
-  const numberSections =
+  const number_sections =
     sections.length < 4 && sections[sections.length - 1]!.text ? sections.slice(0, -1) : sections;
   const compiled = {
     sections,
-    numberSections,
-    colored: numberSections.some((section) => section.color !== null),
-    conditional: numberSections.some((section) => section.condition !== null),
+    numberSections: number_sections,
+    colored: number_sections.some((section) => section.color !== null),
+    conditional: number_sections.some((section) => section.condition !== null),
   };
-  compiledFormats += 1;
-  return cacheValue(formatCache, code, compiled, FORMAT_CACHE_LIMIT);
+  compiled_formats += 1;
+  return cache_value(format_cache, code, compiled, FORMAT_CACHE_LIMIT);
 }
 
-function calendarFormatter(
+function calendar_formatter(
   locale: string,
   field: "month" | "weekday",
   width: "long" | "short",
 ): Intl.DateTimeFormat {
   const key = `${locale}:${field}:${width}`;
-  const cached = dateTimeFormatterCache.get(key);
+  const cached = date_time_formatter_cache.get(key);
   if (cached) return cached;
   const options: Intl.DateTimeFormatOptions = { timeZone: "UTC", [field]: width };
-  dateTimeFormatters += 1;
-  return cacheValue(
-    dateTimeFormatterCache,
+  date_time_formatters += 1;
+  return cache_value(
+    date_time_formatter_cache,
     key,
     new Intl.DateTimeFormat(locale, options),
     DATE_TIME_FORMATTER_CACHE_LIMIT,
@@ -748,7 +748,7 @@ function calendarFormatter(
  * rounded as Excel shows them, and the minutes and seconds beside it come from
  * the same count.
  */
-function renderDate(serial: number, tokens: readonly DateToken[], locale: string): string {
+function render_date(serial: number, tokens: readonly DateToken[], locale: string): string {
   const date = serialToDate(serial);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
@@ -757,12 +757,12 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
   let minute = date.getUTCMinutes();
   let second = date.getUTCSeconds();
   const elapsed = tokens.some((token) => ELAPSED_KINDS.has(token.kind));
-  const totalSeconds = elapsed ? Math.round(serial * 86_400) : 0;
+  const total_seconds = elapsed ? Math.round(serial * 86_400) : 0;
   if (elapsed) {
-    minute = Math.floor(totalSeconds / 60) % 60;
-    second = totalSeconds % 60;
+    minute = Math.floor(total_seconds / 60) % 60;
+    second = total_seconds % 60;
   }
-  const usesAmPm = tokens.some((token) => token.kind === "ampm");
+  const uses_am_pm = tokens.some((token) => token.kind === "ampm");
   let output = "";
   for (const token of tokens) {
     switch (token.kind) {
@@ -784,7 +784,7 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
 
       case "monthShort":
       case "monthLong":
-        output += calendarFormatter(
+        output += calendar_formatter(
           locale,
           "month",
           token.kind === "monthLong" ? "long" : "short",
@@ -801,7 +801,7 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
 
       case "weekdayShort":
       case "weekdayLong":
-        output += calendarFormatter(
+        output += calendar_formatter(
           locale,
           "weekday",
           token.kind === "weekdayLong" ? "long" : "short",
@@ -809,7 +809,7 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
         break;
 
       case "hour": {
-        const hour = usesAmPm ? hour24 % 12 || 12 : hour24;
+        const hour = uses_am_pm ? hour24 % 12 || 12 : hour24;
         output += token.pad ? String(hour).padStart(2, "0") : String(hour);
         break;
       }
@@ -823,10 +823,10 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
       case "elapsedSeconds": {
         const count =
           token.kind === "elapsedHours"
-            ? Math.floor(totalSeconds / 3600)
+            ? Math.floor(total_seconds / 3600)
             : token.kind === "elapsedMinutes"
-              ? Math.floor(totalSeconds / 60)
-              : totalSeconds;
+              ? Math.floor(total_seconds / 60)
+              : total_seconds;
         output += token.pad ? String(count).padStart(2, "0") : String(count);
         break;
       }
@@ -840,15 +840,15 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
   return output;
 }
 
-function formatScientific(value: number, decimals: number, exponentDigits: number): string {
-  const [mantissa, rawExponent = "0"] = value.toExponential(decimals).toUpperCase().split("E");
-  const exponent = Number(rawExponent);
+function format_scientific(value: number, decimals: number, exponent_digits: number): string {
+  const [mantissa, raw_exponent = "0"] = value.toExponential(decimals).toUpperCase().split("E");
+  const exponent = Number(raw_exponent);
   const sign = exponent >= 0 ? "+" : "-";
-  return `${mantissa}E${sign}${String(Math.abs(exponent)).padStart(exponentDigits, "0")}`;
+  return `${mantissa}E${sign}${String(Math.abs(exponent)).padStart(exponent_digits, "0")}`;
 }
 
 /** Whether a section holds `@` outside quotes and escapes. */
-function hasTextPlaceholder(section: string): boolean {
+function has_text_placeholder(section: string): boolean {
   let quoted = false;
   for (let index = 0; index < section.length; index++) {
     const char = section[index]!;
@@ -861,7 +861,7 @@ function hasTextPlaceholder(section: string): boolean {
 }
 
 /** The index of the fraction's `/`, outside quotes, escapes and brackets, or -1. */
-function fractionSlash(section: string): number {
+function fraction_slash(section: string): number {
   let quoted = false;
   for (let index = 0; index < section.length; index++) {
     const char = section[index]!;
@@ -880,7 +880,7 @@ function fractionSlash(section: string): number {
  * The literal text of a stretch of a fraction code, or `null` when it holds a
  * number placeholder, percent, exponent, `General` or a date letter.
  */
-function fractionLiteral(source: string): string | null {
+function fraction_literal(source: string): string | null {
   let visible = "";
   let quoted = false;
   for (let index = 0; index < source.length; index++) {
@@ -893,28 +893,28 @@ function fractionLiteral(source: string): string | null {
       if (close >= 0) index = close;
     } else visible += char;
   }
-  return /[0#?%dmyhsg]|e[+-]/i.test(visible) ? null : decodeLiteral(source);
+  return /[0#?%dmyhsg]|e[+-]/i.test(visible) ? null : decode_literal(source);
 }
 
 /**
  * The fraction layout of a section, or `null` when it is not one: a `/` with
  * digit placeholders right before it and placeholders or digits right after.
  */
-function parseFraction(section: string): FractionDescriptor | null {
-  const slash = fractionSlash(section);
+function parse_fraction(section: string): FractionDescriptor | null {
+  const slash = fraction_slash(section);
   if (slash < 0) return null;
   const head = section.slice(0, slash);
   const tail = section.slice(slash + 1);
-  const denominatorText = /^[0-9#?]*/.exec(tail)![0];
+  const denominator_text = /^[0-9#?]*/.exec(tail)![0];
   const numerator = /[0#?]+$/.exec(head)?.[0];
-  if (denominatorText === "" || numerator === undefined) return null;
+  if (denominator_text === "" || numerator === undefined) return null;
   const before = head.slice(0, head.length - numerator.length);
   // The whole-number part: the last run of placeholders and grouping commas
   // before the numerator, apart from it by literal text.
   const integer = /([0#?,]*[0#?])([^0#?]*)$/.exec(before);
-  const prefix = fractionLiteral(integer ? before.slice(0, integer.index) : before);
-  const separator = integer ? fractionLiteral(integer[2]!) : "";
-  const suffix = fractionLiteral(tail.slice(denominatorText.length));
+  const prefix = fraction_literal(integer ? before.slice(0, integer.index) : before);
+  const separator = integer ? fraction_literal(integer[2]!) : "";
+  const suffix = fraction_literal(tail.slice(denominator_text.length));
   if (prefix === null || separator === null || suffix === null) return null;
   return {
     prefix,
@@ -922,7 +922,9 @@ function parseFraction(section: string): FractionDescriptor | null {
     grouped: integer?.[1]!.includes(",") ?? false,
     separator,
     numerator,
-    denominator: /^[1-9][0-9]*$/.test(denominatorText) ? Number(denominatorText) : denominatorText,
+    denominator: /^[1-9][0-9]*$/.test(denominator_text)
+      ? Number(denominator_text)
+      : denominator_text,
     suffix,
   };
 }
@@ -930,13 +932,13 @@ function parseFraction(section: string): FractionDescriptor | null {
  * A whole number's digits as Excel writes them: at most 15 significant
  * digits, then zeros, so a huge whole part reads as TEXT() writes it.
  */
-function integerDigits(value: number): string {
+function integer_digits(value: number): string {
   const key = "integer-digits";
-  const cached = numberFormatterCache.get(key);
+  const cached = number_formatter_cache.get(key);
   if (cached) return cached.format(value);
-  numberFormatters += 1;
-  return cacheValue(
-    numberFormatterCache,
+  number_formatters += 1;
+  return cache_value(
+    number_formatter_cache,
     key,
     new Intl.NumberFormat("en-US", { maximumSignificantDigits: 15, useGrouping: false }),
     NUMBER_FORMATTER_CACHE_LIMIT,
@@ -950,27 +952,27 @@ function significant(value: number): number {
 
 /**
  * The fraction closest to `value` whose denominator is at most
- * `maxDenominator`, as numerator and denominator. On a tie the smaller
+ * `max_denominator`, as numerator and denominator. On a tie the smaller
  * denominator wins. The closest fraction is the last convergent of
  * `value`'s continued fraction within the bound, or the semiconvergent after
  * it, so a few steps find it instead of trying every denominator.
  */
-function closestFraction(value: number, maxDenominator: number): [number, number] {
+function closest_fraction(value: number, max_denominator: number): [number, number] {
   // The two latest convergents, oldest first, starting from 0/1 and 1/0.
   let [p0, q0, p1, q1] = [0, 1, 1, 0];
   let rest = value;
   for (;;) {
     const term = Math.floor(rest);
-    const nextQ = term * q1 + q0;
-    if (nextQ > maxDenominator) {
-      const steps = Math.floor((maxDenominator - q0) / q1);
+    const next_q = term * q1 + q0;
+    if (next_q > max_denominator) {
+      const steps = Math.floor((max_denominator - q0) / q1);
       const p = steps * p1 + p0;
       const q = steps * q1 + q0;
       const error = Math.abs(value - p / q);
       const latest = Math.abs(value - p1 / q1);
       return error < latest || (error === latest && q < q1) ? [p, q] : [p1, q1];
     }
-    [p0, q0, p1, q1] = [p1, q1, term * p1 + p0, nextQ];
+    [p0, q0, p1, q1] = [p1, q1, term * p1 + p0, next_q];
     const fraction = rest - term;
     if (fraction === 0 || p1 / q1 === value) return [p1, q1];
     rest = 1 / fraction;
@@ -978,7 +980,7 @@ function closestFraction(value: number, maxDenominator: number): [number, number
 }
 
 /** `0` pads with a zero, `?` with a space, `#` with nothing. */
-function placeholderPad(placeholders: string): string {
+function placeholder_pad(placeholders: string): string {
   return placeholders.replaceAll("#", "").replaceAll("?", " ");
 }
 
@@ -989,7 +991,7 @@ function placeholderPad(placeholders: string): string {
  * carries into the whole number. The numerator is right-aligned in its
  * placeholders and the denominator left-aligned.
  */
-function renderFraction(value: number, fraction: FractionDescriptor, locale: string): string {
+function render_fraction(value: number, fraction: FractionDescriptor, locale: string): string {
   const magnitude = significant(Math.abs(value));
   let whole = 0;
   let part = magnitude;
@@ -1001,7 +1003,7 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
   const [rounded, denominator] =
     typeof fraction.denominator === "number"
       ? [Math.round(significant(part * fraction.denominator)), fraction.denominator]
-      : closestFraction(part, 10 ** fraction.denominator.length - 1);
+      : closest_fraction(part, 10 ** fraction.denominator.length - 1);
   let numerator = rounded;
   if (fraction.integer !== null && numerator >= denominator) {
     whole += 1;
@@ -1011,9 +1013,9 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
   let text = value < 0 && (whole > 0 || numerator > 0) ? "-" : "";
   text += fraction.prefix;
   if (fraction.integer !== null) {
-    const digits = whole > 0 ? integerDigits(whole) : "";
+    const digits = whole > 0 ? integer_digits(whole) : "";
     let integer =
-      placeholderPad(
+      placeholder_pad(
         fraction.integer.slice(0, Math.max(0, fraction.integer.length - digits.length)),
       ) + digits;
     if (integer.trim() === "" && numerator === 0) integer = "0";
@@ -1028,15 +1030,16 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
       return text + " ".repeat(width) + fraction.suffix;
     }
   }
-  const numeratorText = integerDigits(numerator);
-  text += placeholderPad(
-    fraction.numerator.slice(0, Math.max(0, fraction.numerator.length - numeratorText.length)),
+  const numerator_text = integer_digits(numerator);
+  text += placeholder_pad(
+    fraction.numerator.slice(0, Math.max(0, fraction.numerator.length - numerator_text.length)),
   );
-  text += `${numeratorText}/`;
-  const denominatorText = integerDigits(denominator);
+  text += `${numerator_text}/`;
+  const denominator_text = integer_digits(denominator);
   text += fixed
-    ? denominatorText
-    : denominatorText + placeholderPad(String(fraction.denominator).slice(denominatorText.length));
+    ? denominator_text
+    : denominator_text +
+      placeholder_pad(String(fraction.denominator).slice(denominator_text.length));
   return text + fraction.suffix;
 }
 
@@ -1057,8 +1060,8 @@ export function formatNumber(value: number | string, format?: string, locale = "
   const code = isGeneralCode(format) ? undefined : format;
   if (typeof value === "string") {
     if (!code) return value;
-    const textSection = compileFormat(code).sections[3];
-    return textSection === undefined ? value : textSection.literal.replaceAll("@", value);
+    const text_section = compile_format(code).sections[3];
+    return text_section === undefined ? value : text_section.literal.replaceAll("@", value);
   }
   if (!Number.isFinite(value)) return "";
 
@@ -1066,36 +1069,36 @@ export function formatNumber(value: number | string, format?: string, locale = "
   // differently (a one-section code keeps the raw negative magnitude), so
   // negative zero never enters the cache.
   const cacheable = !Object.is(value, -0);
-  const formatCode = code ?? "";
+  const format_code = code ?? "";
   if (cacheable) {
-    const cached = lookupNumberText(formatCode, locale, value);
+    const cached = lookup_number_text(format_code, locale, value);
     if (cached !== undefined) return cached;
   }
-  const text = renderNumberText(value, code, locale);
-  return cacheable ? rememberNumberText(formatCode, locale, value, text) : text;
+  const text = render_number_text(value, code, locale);
+  return cacheable ? remember_number_text(format_code, locale, value, text) : text;
 }
 
 /** Uncached format core; `formatNumber` owns the shared text cache. */
-function renderNumberText(value: number, code: string | undefined, locale: string): string {
+function render_number_text(value: number, code: string | undefined, locale: string): string {
   if (!code) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
 
-  const format = compileFormat(code);
+  const format = compile_format(code);
   // A text format, such as `"Code "@`, shows a number as General would.
   if (format.numberSections.length === 0) return formatGeneral(value, GENERAL_WIDTH, locale) ?? "";
-  const { section, magnitude } = sectionFor(value, format);
-  if (section.fraction) return renderFraction(magnitude, section.fraction, locale);
-  if (section.dateTokens) return renderDate(magnitude, section.dateTokens, locale);
+  const { section, magnitude } = section_for(value, format);
+  if (section.fraction) return render_fraction(magnitude, section.fraction, locale);
+  if (section.dateTokens) return render_date(magnitude, section.dateTokens, locale);
 
   const descriptor = section.numeric;
   if (!descriptor) return section.literal.replaceAll("@", "");
   // Only the first-section fallback keeps a negative magnitude. Put its
   // automatic sign before all affixes, not inside the formatted digit run.
   // Preserve the existing handling of raw -0, dates, and explicit sections.
-  const automaticMinus = magnitude < 0;
-  const numericValue = automaticMinus ? -magnitude : magnitude;
-  const scaled = descriptor.percent ? numericValue * 100 : numericValue;
+  const automatic_minus = magnitude < 0;
+  const numeric_value = automatic_minus ? -magnitude : magnitude;
+  const scaled = descriptor.percent ? numeric_value * 100 : numeric_value;
   const body = descriptor.scientific
-    ? formatScientific(scaled, descriptor.decimals, descriptor.exponentDigits)
+    ? format_scientific(scaled, descriptor.decimals, descriptor.exponentDigits)
     : formatter(locale, descriptor.decimals, descriptor.grouped).format(scaled);
-  return `${automaticMinus ? "-" : ""}${descriptor.prefix}${body}${descriptor.suffix}`;
+  return `${automatic_minus ? "-" : ""}${descriptor.prefix}${body}${descriptor.suffix}`;
 }

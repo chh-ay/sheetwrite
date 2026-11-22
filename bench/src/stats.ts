@@ -34,12 +34,12 @@ function percentile(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return Number.NaN;
   const q = Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 0;
   const pos = (sorted.length - 1) * q;
-  const lowerIdx = Math.floor(pos);
-  const upperIdx = Math.ceil(pos);
-  const lower = sorted[lowerIdx];
-  const upper = sorted[upperIdx];
+  const lower_idx = Math.floor(pos);
+  const upper_idx = Math.ceil(pos);
+  const lower = sorted[lower_idx];
+  const upper = sorted[upper_idx];
   if (lower === undefined || upper === undefined) return Number.NaN;
-  return lower + (upper - lower) * (pos - lowerIdx);
+  return lower + (upper - lower) * (pos - lower_idx);
 }
 
 /**
@@ -127,7 +127,7 @@ export interface AggregateSample {
 
 /** Median absolute deviation around the sample median. */
 export function medianAbsoluteDeviation(samples: readonly number[]): number {
-  assertFiniteSample(samples);
+  assert_finite_sample(samples);
   const center = percentile(
     [...samples].sort((a, b) => a - b),
     0.5,
@@ -140,7 +140,7 @@ export function medianAbsoluteDeviation(samples: readonly number[]): number {
 export function summarizeFinite(
   samples: readonly number[],
 ): Pick<Stat, "median" | "p95" | "iters"> & { readonly mad: number } {
-  assertFiniteSample(samples);
+  assert_finite_sample(samples);
   const sorted = [...samples].sort((a, b) => a - b);
   return {
     median: percentile(sorted, 0.5),
@@ -150,7 +150,7 @@ export function summarizeFinite(
   };
 }
 
-function assertFiniteSample(samples: readonly number[]): void {
+function assert_finite_sample(samples: readonly number[]): void {
   if (samples.length === 0) throw new RangeError("timing sample must not be empty");
   for (const sample of samples) {
     if (!Number.isFinite(sample) || sample < 0) {
@@ -171,10 +171,10 @@ export function counterbalancedOrder<T>(values: readonly T[], rounds: number, se
   }
 
   const base = [...values];
-  const rng = seededOrderRng(seed);
+  const rng = seeded_order_rng(seed);
   for (let index = base.length - 1; index > 0; index--) {
-    const swapWith = Math.floor(rng() * (index + 1));
-    [base[index], base[swapWith]] = [base[swapWith]!, base[index]!];
+    const swap_with = Math.floor(rng() * (index + 1));
+    [base[index], base[swap_with]] = [base[swap_with]!, base[index]!];
   }
 
   const orders = new Array<T[]>(rounds);
@@ -185,7 +185,7 @@ export function counterbalancedOrder<T>(values: readonly T[], rounds: number, se
   return orders;
 }
 
-function seededOrderRng(seed: number): () => number {
+function seeded_order_rng(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) | 0;
@@ -222,7 +222,7 @@ export function forceGc(): void {
  * are never included in the timing.
  */
 export function collect(fn: () => void, opts: MeasureOptions): number[] {
-  const { warmup, iters, before, after, gcBetween } = opts;
+  const { warmup, iters, before, after, gcBetween: gc_between } = opts;
 
   for (let i = 0; i < warmup; i++) {
     before?.();
@@ -233,7 +233,7 @@ export function collect(fn: () => void, opts: MeasureOptions): number[] {
   const samples = new Array<number>(iters);
   for (let i = 0; i < iters; i++) {
     before?.();
-    if (gcBetween) forceGc();
+    if (gc_between) forceGc();
     const t0 = now();
     fn();
     const t1 = now();

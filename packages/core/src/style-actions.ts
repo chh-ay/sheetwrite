@@ -123,38 +123,38 @@ export class StyleActions {
     if (this.deps.readOnly() || selection.isEmpty) return;
 
     const sheet = this.deps.sheet();
-    const activeSheet = this.deps.activeSheet();
+    const active_sheet = this.deps.activeSheet();
     const rects: SelRect[] = [];
     const seen = new Set<number>();
     selection.forEachRect((r) => rects.push(r));
-    const intersectsMerge = this.deps
+    const intersects_merge = this.deps
       .merges()
       .some((merge) => rects.some((rect) => mergesOverlap(rect, merge)));
 
     const patches: DocumentOp[] = [];
-    if (!intersectsMerge) {
+    if (!intersects_merge) {
       for (const rect of rects) {
-        let runStart = this.deps.toDataRow(rect.r0);
-        let previous = runStart;
-        for (let viewRow = rect.r0 + 1; viewRow <= rect.r1 + 1; viewRow++) {
-          const dataRow = viewRow <= rect.r1 ? this.deps.toDataRow(viewRow) : -1;
-          if (viewRow <= rect.r1 && Math.abs(dataRow - previous) === 1) {
-            previous = dataRow;
+        let run_start = this.deps.toDataRow(rect.r0);
+        let previous = run_start;
+        for (let view_row = rect.r0 + 1; view_row <= rect.r1 + 1; view_row++) {
+          const data_row = view_row <= rect.r1 ? this.deps.toDataRow(view_row) : -1;
+          if (view_row <= rect.r1 && Math.abs(data_row - previous) === 1) {
+            previous = data_row;
             continue;
           }
 
           patches.push({
             op: "setRangeStyle",
             range: {
-              sheet: activeSheet,
-              start: { row: runStart, col: rect.c0 },
+              sheet: active_sheet,
+              start: { row: run_start, col: rect.c0 },
               end: { row: previous, col: rect.c1 },
             },
             style: patch,
           });
 
-          runStart = dataRow;
-          previous = dataRow;
+          run_start = data_row;
+          previous = data_row;
         }
       }
 
@@ -166,15 +166,15 @@ export class StyleActions {
     for (const rect of rects) {
       for (let r = rect.r0; r <= rect.r1; r++) {
         for (let c = rect.c0; c <= rect.c1; c++) {
-          const cellRef = this.deps.anchorCell(r, c);
-          const key = cellRef.row * sheet.columns.length + cellRef.col;
+          const cell_ref = this.deps.anchorCell(r, c);
+          const key = cell_ref.row * sheet.columns.length + cell_ref.col;
           if (seen.has(key)) continue;
           seen.add(key);
 
           const addr = {
-            sheet: activeSheet,
-            row: this.deps.toDataRow(cellRef.row),
-            col: cellRef.col,
+            sheet: active_sheet,
+            row: this.deps.toDataRow(cell_ref.row),
+            col: cell_ref.col,
           };
 
           anchors.push(addr);
@@ -182,10 +182,10 @@ export class StyleActions {
       }
     }
 
-    const captured = storeEngine(this.deps.store)?.captureCells(activeSheet, anchors);
+    const captured = storeEngine(this.deps.store)?.captureCells(active_sheet, anchors);
 
     // Per-cell operations preserve policy issue indices and partial spill rejection.
-    const scalarWrites =
+    const scalar_writes =
       !captured ||
       Boolean(
         sheet.validationRules?.length ||
@@ -194,8 +194,8 @@ export class StyleActions {
       );
 
     const cells: SnapshotCell[] = [];
-    let endRow = 0;
-    let endCol = 0;
+    let end_row = 0;
+    let end_col = 0;
     for (const [index, addr] of anchors.entries()) {
       const cell = captured?.[index] ?? this.deps.store.getCell(addr);
       // Custom stores without an engine retain their scalar source read contract.
@@ -210,11 +210,11 @@ export class StyleActions {
         ? { kind: "formula", src: formula }
         : { kind: "literal", value: cell.resolved };
       const style = patch ? { ...cell.style, ...patch } : undefined;
-      if (scalarWrites) patches.push({ op: "set", addr, value, style });
+      if (scalar_writes) patches.push({ op: "set", addr, value, style });
       else {
         cells.push({ rowOffset: addr.row, colOffset: addr.col, value, style });
-        endRow = Math.max(endRow, addr.row);
-        endCol = Math.max(endCol, addr.col);
+        end_row = Math.max(end_row, addr.row);
+        end_col = Math.max(end_col, addr.col);
       }
     }
 
@@ -222,7 +222,11 @@ export class StyleActions {
     if (cells.length > 0)
       patches.push({
         op: "setRange",
-        range: { sheet: activeSheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
+        range: {
+          sheet: active_sheet,
+          start: { row: 0, col: 0 },
+          end: { row: end_row, col: end_col },
+        },
         cells,
       });
 

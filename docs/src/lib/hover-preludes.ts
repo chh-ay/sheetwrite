@@ -167,20 +167,20 @@ export function injectHoverPrelude(
   language: "ts" | "tsx" | "vue" | "svelte",
   prelude: string,
 ): PreludeInjection {
-  const originalOffsets = lineStartOffsets(source);
+  const original_offsets = lineStartOffsets(source);
   const original = (line: number, character: number): OriginalPosition => ({
     line,
     character,
-    start: (originalOffsets[line] ?? 0) + character,
+    start: (original_offsets[line] ?? 0) + character,
   });
-  const preludeLines = prelude.split("\n").length;
+  const prelude_lines = prelude.split("\n").length;
 
   if (language === "ts" || language === "tsx") {
     return {
       analysisSource: `${prelude}\n${source}`,
       toOriginal(position) {
-        if (position.line < preludeLines) return null;
-        return original(position.line - preludeLines, position.character);
+        if (position.line < prelude_lines) return null;
+        return original(position.line - prelude_lines, position.character);
       },
     };
   }
@@ -189,40 +189,42 @@ export function injectHoverPrelude(
   if (tag === null) {
     // Template-only snippet: synthesize a script block so the prelude can
     // type template expressions; the whole synthetic range maps to null.
-    const scriptOpen = language === "vue" ? '<script setup lang="ts">' : '<script lang="ts">';
-    const syntheticLines = preludeLines + 2;
+    const script_open = language === "vue" ? '<script setup lang="ts">' : '<script lang="ts">';
+    const synthetic_lines = prelude_lines + 2;
     return {
-      analysisSource: `${scriptOpen}\n${prelude}\n</script>\n${source}`,
+      analysisSource: `${script_open}\n${prelude}\n</script>\n${source}`,
       toOriginal(position) {
-        if (position.line < syntheticLines) return null;
-        return original(position.line - syntheticLines, position.character);
+        if (position.line < synthetic_lines) return null;
+        return original(position.line - synthetic_lines, position.character);
       },
     };
   }
 
-  const insertAt = tag.index + tag[0].length;
-  const before = source.slice(0, insertAt);
-  const after = source.slice(insertAt);
-  const tagLine = before.split("\n").length - 1;
-  const tagColumn = insertAt - (originalOffsets[tagLine] ?? 0);
+  const insert_at = tag.index + tag[0].length;
+  const before = source.slice(0, insert_at);
+  const after = source.slice(insert_at);
+  const tag_line = before.split("\n").length - 1;
+  const tag_column = insert_at - (original_offsets[tag_line] ?? 0);
   // `after` starts on its own line, so injected lines are exactly
-  // [tagLine + 1, tagLine + preludeLines] and every original position keeps
+  // [tag_line + 1, tag_line + prelude_lines] and every original position keeps
   // whole-line granularity.
-  const insertedLines = preludeLines + 1;
-  const remainderLine = tagLine + preludeLines + 1;
+  const inserted_lines = prelude_lines + 1;
+  const remainder_line = tag_line + prelude_lines + 1;
 
   return {
     analysisSource: `${before}\n${prelude}\n${after}`,
     toOriginal(position) {
-      if (position.line < tagLine) return original(position.line, position.character);
-      if (position.line === tagLine) {
-        return position.character <= tagColumn ? original(position.line, position.character) : null;
+      if (position.line < tag_line) return original(position.line, position.character);
+      if (position.line === tag_line) {
+        return position.character <= tag_column
+          ? original(position.line, position.character)
+          : null;
       }
-      if (position.line < remainderLine) return null;
-      if (position.line === remainderLine) {
-        return original(tagLine, position.character + tagColumn);
+      if (position.line < remainder_line) return null;
+      if (position.line === remainder_line) {
+        return original(tag_line, position.character + tag_column);
       }
-      return original(position.line - insertedLines, position.character);
+      return original(position.line - inserted_lines, position.character);
     },
   };
 }

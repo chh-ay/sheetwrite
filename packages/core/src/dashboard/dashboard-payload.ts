@@ -33,7 +33,7 @@ export function slicerSelection(
 }
 
 /** `filters` with `values` kept on `field`: both keep-lists when the field has one. */
-function withFilter(
+function with_filter(
   filters: readonly PivotFilter[],
   field: number,
   values: readonly CellScalar[],
@@ -62,7 +62,7 @@ function sliced(
       .find((candidate) => candidate.id === base)
       ?.columns.findIndex((candidate) => candidate.id === column);
     if (field === undefined || field < 0) return pivot;
-    return { ...pivot, filters: withFilter(pivot.filters ?? [], field, values) };
+    return { ...pivot, filters: with_filter(pivot.filters ?? [], field, values) };
   }
   const reached =
     table === base || relatedTables(base, tables, relationships).some((t) => t.id === table);
@@ -70,12 +70,12 @@ function sliced(
   if (added === null) return pivot;
   return {
     ...added.pivot,
-    filters: withFilter(added.pivot.filters ?? [], added.field, values),
+    filters: with_filter(added.pivot.filters ?? [], added.field, values),
   };
 }
 
 /** The slicers of `sheet` in item order, with the values each keeps in this view. */
-function slicersOf(sheet: Sheet, overrides: SlicerOverrides) {
+function slicers_of(sheet: Sheet, overrides: SlicerOverrides) {
   return (sheet.dashboard?.items ?? []).flatMap((item) =>
     item.kind === "slicer" ? [{ item, values: slicerSelection(item, overrides) }] : [],
   );
@@ -87,7 +87,7 @@ function slicersOf(sheet: Sheet, overrides: SlicerOverrides) {
  * totals. A value missing from its labels has no data, as Excel's slicer
  * cross filtering shows ([MS-XLSX] 2.3.2.1.7).
  */
-function dataPivot(
+function data_pivot(
   slicer: DashboardSlicerItem,
   others: readonly { item: DashboardSlicerItem; values: readonly CellScalar[] | undefined }[],
   tables: readonly WorkbookTable[],
@@ -130,7 +130,7 @@ const UNPLACED_COL = 2 ** 30;
  * with one label column per row field, as an Excel PivotChart leaves totals
  * out.
  */
-function chartCopy(pivot: PivotDefinition, id: string): PivotDefinition {
+function chart_copy(pivot: PivotDefinition, id: string): PivotDefinition {
   return {
     ...pivot,
     id,
@@ -142,7 +142,7 @@ function chartCopy(pivot: PivotDefinition, id: string): PivotDefinition {
 }
 
 /** The hidden pivot that charts `item`: its chart's pivot, as the slicers filter it. */
-function chartPivot(
+function chart_pivot(
   item: DashboardChartItem,
   sheet: Sheet,
   pivots: readonly PivotDefinition[],
@@ -150,7 +150,7 @@ function chartPivot(
   const chart = sheet.charts?.find((candidate) => candidate.id === item.chart);
   const pivot = pivots.find((candidate) => candidate.id === chart?.pivot);
   if (pivot === undefined) return null;
-  return chartCopy(pivot, `chart-data-${item.id}`);
+  return chart_copy(pivot, `chart-data-${item.id}`);
 }
 
 /**
@@ -158,10 +158,10 @@ function chartPivot(
  * with no rows or columns, filtered by every slicer that reaches that table.
  * Its output is the measure's caption over its one value.
  */
-function kpiPivot(
+function kpi_pivot(
   item: DashboardKpiItem,
   model: DataModel | undefined,
-  slicers: ReturnType<typeof slicersOf>,
+  slicers: ReturnType<typeof slicers_of>,
   tables: readonly WorkbookTable[],
 ): PivotDefinition | null {
   const measure = model?.measures?.find((candidate) => candidate.id === item.measure);
@@ -208,7 +208,7 @@ export function dashboardPayload(
   model: DataModel | undefined,
   overrides: SlicerOverrides,
 ): PivotViewPayload | undefined {
-  const slicers = slicersOf(sheet, overrides);
+  const slicers = slicers_of(sheet, overrides);
   const items = sheet.dashboard?.items ?? [];
   const charts = items.filter((item): item is DashboardChartItem => item.kind === "chart");
   const kpis = items.filter((item): item is DashboardKpiItem => item.kind === "kpi");
@@ -233,10 +233,10 @@ export function dashboardPayload(
   };
   for (const { item } of slicers) {
     if (item.itemsWithNoData !== "show")
-      add(item.id, dataPivot(item, slicers, tables, relationships));
+      add(item.id, data_pivot(item, slicers, tables, relationships));
   }
-  for (const item of charts) add(item.id, chartPivot(item, sheet, pivots));
-  for (const item of kpis) add(item.id, kpiPivot(item, model, slicers, tables));
+  for (const item of charts) add(item.id, chart_pivot(item, sheet, pivots));
+  for (const item of kpis) add(item.id, kpi_pivot(item, model, slicers, tables));
   return { pivots: all, hidden };
 }
 
@@ -258,7 +258,7 @@ export function worksheetPayload(sheet: Sheet): PivotViewPayload | undefined {
     let index = copies.get(pivot.id);
     if (index === undefined) {
       index = all.length;
-      const copy = chartCopy(pivot, `chart-data-${pivot.id}`);
+      const copy = chart_copy(pivot, `chart-data-${pivot.id}`);
       all.push({ ...copy, anchor: { row: 0, col: UNPLACED_COL + copies.size } });
       copies.set(pivot.id, index);
     }

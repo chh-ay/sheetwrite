@@ -63,16 +63,16 @@ export function OutcomeBadge(props: Readonly<{ outcome: CaseOutcome }>) {
 
 /** The vault's headline: the pass figure beside the answer. */
 function VaultAnswer() {
-  const notApplicable = TEST_SET.unsupported;
+  const not_applicable = TEST_SET.unsupported;
   return (
     <LabAnswer
       answer={
         <>
           Sheetwrite passes {TEST_SET.localPassed === APPLICABLE ? "all " : ""}
           {nf(TEST_SET.localPassed)} checks that apply.
-          <Show when={notApplicable > 0}>
+          <Show when={not_applicable > 0}>
             {" "}
-            The other {nf(notApplicable)} don't apply and aren't counted.
+            The other {nf(not_applicable)} don't apply and aren't counted.
           </Show>
         </>
       }
@@ -241,11 +241,11 @@ function CheckDetail(props: Readonly<{ entry: CompatibilityResultCase; onClose?:
 /** The published checks: search and filters, a short table, the selected check beside it. */
 function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFilter) => void }>) {
   let sheet!: HTMLDialogElement;
-  const [query, setQuery] = createSignal("");
-  const [outcome, setOutcome] = createSignal<OutcomeFilter>("any");
-  const [page, setPage] = createSignal(0);
-  const [selectedId, setSelectedId] = createSignal<string | null>(null);
-  const [expanded, setExpanded] = createSignal(false);
+  const [query, set_query] = createSignal("");
+  const [outcome, set_outcome] = createSignal<OutcomeFilter>("any");
+  const [page, set_page] = createSignal(0);
+  const [selected_id, set_selected_id] = createSignal<string | null>(null);
+  const [expanded, set_expanded] = createSignal(false);
 
   const visible = createMemo(() => {
     const needle = query().trim().toLowerCase();
@@ -259,21 +259,21 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
           (entry.formula ?? "").toLowerCase().includes(needle)),
     );
   });
-  const pageCount = () => Math.max(1, Math.ceil(visible().length / PAGE_SIZE));
-  const currentPage = () => Math.min(page(), pageCount() - 1);
-  const rows = () => visible().slice(currentPage() * PAGE_SIZE, (currentPage() + 1) * PAGE_SIZE);
-  const selected = () => visible().find((entry) => entry.id === selectedId()) ?? rows()[0];
+  const page_count = () => Math.max(1, Math.ceil(visible().length / PAGE_SIZE));
+  const current_page = () => Math.min(page(), page_count() - 1);
+  const rows = () => visible().slice(current_page() * PAGE_SIZE, (current_page() + 1) * PAGE_SIZE);
+  const selected = () => visible().find((entry) => entry.id === selected_id()) ?? rows()[0];
   const reset = () => {
-    setPage(0);
-    setSelectedId(null);
-    setExpanded(false);
+    set_page(0);
+    set_selected_id(null);
+    set_expanded(false);
   };
   const choose = (entry: CompatibilityResultCase) => {
-    setSelectedId(entry.id);
+    set_selected_id(entry.id);
     if (window.matchMedia(PHONE_QUERY).matches) sheet.showModal();
   };
-  const first = () => currentPage() * PAGE_SIZE + 1;
-  const last = () => Math.min(visible().length, (currentPage() + 1) * PAGE_SIZE);
+  const first = () => current_page() * PAGE_SIZE + 1;
+  const last = () => Math.min(visible().length, (current_page() + 1) * PAGE_SIZE);
 
   return (
     <section aria-labelledby="vault-browse" class="sw-vault-browse">
@@ -291,7 +291,7 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
           <input
             data-testid="compatibility-search"
             onInput={(event) => {
-              setQuery(event.currentTarget.value);
+              set_query(event.currentTarget.value);
               reset();
             }}
             placeholder="Search by name or formula"
@@ -322,7 +322,7 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
           id="vault-outcome"
           label="Result"
           onChange={(value) => {
-            setOutcome(value as OutcomeFilter);
+            set_outcome(value as OutcomeFilter);
             reset();
           }}
           options={[
@@ -407,7 +407,7 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
           </table>
           <Show when={!expanded() && rows().length > PHONE_ROWS}>
             <div class="sw-vault-more">
-              <button class="sw-button" onClick={() => setExpanded(true)} type="button">
+              <button class="sw-button" onClick={() => set_expanded(true)} type="button">
                 Show {rows().length - PHONE_ROWS} more checks
               </button>
             </div>
@@ -420,11 +420,11 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
               <button
                 aria-label="Previous checks"
                 class="sw-icon-button"
-                disabled={currentPage() === 0}
+                disabled={current_page() === 0}
                 onClick={() => {
-                  setPage(currentPage() - 1);
-                  setSelectedId(null);
-                  setExpanded(false);
+                  set_page(current_page() - 1);
+                  set_selected_id(null);
+                  set_expanded(false);
                 }}
                 type="button"
               >
@@ -433,11 +433,11 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
               <button
                 aria-label="Next checks"
                 class="sw-icon-button"
-                disabled={currentPage() >= pageCount() - 1}
+                disabled={current_page() >= page_count() - 1}
                 onClick={() => {
-                  setPage(currentPage() + 1);
-                  setSelectedId(null);
-                  setExpanded(false);
+                  set_page(current_page() + 1);
+                  set_selected_id(null);
+                  set_expanded(false);
                 }}
                 type="button"
               >
@@ -575,20 +575,20 @@ function BoundaryColumn(
 
 /** The declared feature boundaries in three columns, one record open below. */
 function Boundaries() {
-  const [selectedId, setSelectedId] = createSignal<string | undefined>(undefined);
-  const [expanded, setExpanded] = createSignal<string | null>(null);
+  const [selected_id, set_selected_id] = createSignal<string | undefined>(undefined);
+  const [expanded, set_expanded] = createSignal<string | null>(null);
   onMount(() => {
     // `?compatibility=<record id>` opens one record.
     const requested = new URLSearchParams(window.location.search).get("compatibility");
     const record = RECORDS.find((candidate) => candidate.id === requested);
     if (!record) return;
-    setSelectedId(record.id);
+    set_selected_id(record.id);
     const group = BOUNDARY_GROUPS.find((candidate) =>
       candidate.statuses.some((status) => status === record.status),
     );
-    if (group) setExpanded(group.id);
+    if (group) set_expanded(group.id);
   });
-  const selected = () => RECORDS.find((record) => record.id === selectedId());
+  const selected = () => RECORDS.find((record) => record.id === selected_id());
   return (
     <section aria-labelledby="vault-bounds" class="sw-vault-bounds">
       <header class="sw-lab-section-head">
@@ -601,10 +601,10 @@ function Boundaries() {
             <BoundaryColumn
               expanded={expanded() === group.id}
               group={group}
-              onExpand={() => setExpanded(group.id)}
-              onToggle={() => setExpanded(expanded() === group.id ? null : group.id)}
-              onSelect={setSelectedId}
-              selectedId={selectedId()}
+              onExpand={() => set_expanded(group.id)}
+              onToggle={() => set_expanded(expanded() === group.id ? null : group.id)}
+              onSelect={set_selected_id}
+              selectedId={selected_id()}
             />
           )}
         </For>
@@ -616,7 +616,7 @@ function Boundaries() {
 
 /** The Evidence vault: the answer, kinds of check, the gaps, the checks and the boundaries. */
 export function VaultLab() {
-  const [kind, setKind] = createSignal<KindFilter>("all");
+  const [kind, set_kind] = createSignal<KindFilter>("all");
   return (
     <div class="sw-lab-body sw-vault" data-testid="compatibility-vault">
       <VaultAnswer />
@@ -626,7 +626,7 @@ export function VaultLab() {
             <li>
               <button
                 aria-pressed={kind() === item.kind}
-                onClick={() => setKind(kind() === item.kind ? "all" : item.kind)}
+                onClick={() => set_kind(kind() === item.kind ? "all" : item.kind)}
                 type="button"
               >
                 <span class="sw-vault-kinds__icon">
@@ -641,7 +641,7 @@ export function VaultLab() {
         </For>
       </ul>
       <VaultGaps />
-      <CheckBrowser kind={kind()} onKind={setKind} />
+      <CheckBrowser kind={kind()} onKind={set_kind} />
       <Boundaries />
       <p class="sw-vault-verify-set">
         <Icon class="sw-vault-verify-set__icon" name="key" />

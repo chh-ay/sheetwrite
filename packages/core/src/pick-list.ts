@@ -10,7 +10,7 @@ const PAGE_ENTRIES = 8;
 /** A pause longer than this starts a new type-to-find word. */
 const TYPEAHEAD_MS = 700;
 
-let listCount = 0;
+let list_count = 0;
 
 /**
  * A listbox of text entries placed under a cell. It never takes the focus
@@ -18,9 +18,9 @@ let listCount = 0;
  */
 export class EntryList {
   readonly element: HTMLDivElement;
-  private readonly id = `sheetwrite-entry-list-${++listCount}`;
+  private readonly id = `sheetwrite-entry-list-${++list_count}`;
   private entries: readonly string[] = [];
-  private activeIndex = 0;
+  private active_index = 0;
 
   constructor(host: HTMLElement, label: string, theme: Theme, onPick: (entry: string) => void) {
     const element = document.createElement("div");
@@ -49,12 +49,12 @@ export class EntryList {
 
   /** The entry Enter picks. */
   get active(): string | undefined {
-    return this.entries[this.activeIndex];
+    return this.entries[this.active_index];
   }
 
   /** The id of the selected option, for the owner's `aria-activedescendant`. */
   get activeId(): string {
-    return `${this.id}-${this.activeIndex}`;
+    return `${this.id}-${this.active_index}`;
   }
 
   /** Show `entries` with the one at `active` selected. */
@@ -78,12 +78,12 @@ export class EntryList {
   select(index: number): void {
     const count = this.entries.length;
     if (count === 0) return;
-    this.activeIndex = Math.max(0, Math.min(count - 1, index));
+    this.active_index = Math.max(0, Math.min(count - 1, index));
     const options = this.element.children;
     for (let at = 0; at < options.length; at++) {
-      options[at]!.setAttribute("aria-selected", String(at === this.activeIndex));
+      options[at]!.setAttribute("aria-selected", String(at === this.active_index));
     }
-    const active = options[this.activeIndex];
+    const active = options[this.active_index];
     if (active === undefined) return;
     this.element.setAttribute("aria-activedescendant", active.id);
     if (typeof active.scrollIntoView === "function") active.scrollIntoView({ block: "nearest" });
@@ -93,7 +93,7 @@ export class EntryList {
   deselect(): void {
     for (const option of this.element.children) option.setAttribute("aria-selected", "false");
     this.element.removeAttribute("aria-activedescendant");
-    this.activeIndex = 0;
+    this.active_index = 0;
   }
 
   /**
@@ -111,7 +111,7 @@ export class EntryList {
     };
     const step = steps[key];
     if (step === undefined) return false;
-    this.select(this.activeIndex + step);
+    this.select(this.active_index + step);
     return true;
   }
 
@@ -158,7 +158,7 @@ export class PickList {
   private list: EntryList | null = null;
   private options: BeginPickOptions | null = null;
   private typed = "";
-  private typedAt = 0;
+  private typed_at = 0;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -179,8 +179,8 @@ export class PickList {
     );
     list.position(options.rect);
     list.element.tabIndex = 0;
-    list.element.addEventListener("keydown", this.onKeyDown);
-    list.element.addEventListener("blur", this.onBlur);
+    list.element.addEventListener("keydown", this.on_key_down);
+    list.element.addEventListener("blur", this.on_blur);
     this.list = list;
     this.options = options;
     list.element.focus();
@@ -213,15 +213,15 @@ export class PickList {
     options.onCommit(entry, "none");
   }
 
-  private readonly onKeyDown = (event: KeyboardEvent): void => {
+  private readonly on_key_down = (event: KeyboardEvent): void => {
     const list = this.list;
-    if (list === null || !(list.moveFor(event.key) || this.keyAction(list, event))) return;
+    if (list === null || !(list.moveFor(event.key) || this.key_action(list, event))) return;
     event.preventDefault();
     event.stopPropagation();
   };
 
   /** Enter picks, Escape closes, and a character finds an entry; false for other keys. */
-  private keyAction(list: EntryList, event: KeyboardEvent): boolean {
+  private key_action(list: EntryList, event: KeyboardEvent): boolean {
     if (event.key === "Enter") {
       const entry = list.active;
       if (entry !== undefined) this.commit(entry);
@@ -229,8 +229,8 @@ export class PickList {
       this.cancel();
     } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
       const now = Date.now();
-      this.typed = now - this.typedAt > TYPEAHEAD_MS ? event.key : this.typed + event.key;
-      this.typedAt = now;
+      this.typed = now - this.typed_at > TYPEAHEAD_MS ? event.key : this.typed + event.key;
+      this.typed_at = now;
       list.find(this.typed);
     } else {
       return false;
@@ -238,7 +238,7 @@ export class PickList {
     return true;
   }
 
-  private readonly onBlur = (): void => {
+  private readonly on_blur = (): void => {
     this.cancel();
   };
 }

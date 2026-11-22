@@ -35,7 +35,7 @@ export function popoverIdPrefix(path: string | undefined): string {
 const PANEL_CLASS = "sw-code-popover__panel";
 const STORE_CLASS = "sw-code-popover-store";
 
-function hasClass(node: HastNode, name: string): boolean {
+function has_class(node: HastNode, name: string): boolean {
   const value = node.properties?.className;
   return Array.isArray(value)
     ? value.includes(name)
@@ -45,7 +45,7 @@ function hasClass(node: HastNode, name: string): boolean {
 }
 
 /** Panel identity: its content and attributes, without the per-position id. */
-function panelKey(panel: HastNode): string {
+function panel_key(panel: HastNode): string {
   return JSON.stringify(panel, (key, value) =>
     key === "position" || key === "id" ? undefined : value,
   );
@@ -55,7 +55,7 @@ function panelKey(panel: HastNode): string {
  * Panels are hast elements built by Expressive Code; `HastNode` is the build
  * plugins' structural view of the same nodes.
  */
-function panelsHtml(panels: HastNode[]): string {
+function panels_html(panels: HastNode[]): string {
   return toHtml({
     type: "root",
     children: panels as unknown as ElementContent[],
@@ -67,8 +67,8 @@ function panelsHtml(panels: HastNode[]): string {
  * as an MDX JSX node. React writes the HTML into the template's content on
  * client renders and leaves the prerendered content alone when it hydrates.
  */
-function popoverStore(html: string): HastNode & Record<string, unknown> {
-  const innerHtml = {
+function popover_store(html: string): HastNode & Record<string, unknown> {
+  const inner_html = {
     type: "ObjectExpression",
     properties: [
       {
@@ -98,7 +98,7 @@ function popoverStore(html: string): HastNode & Record<string, unknown> {
             estree: {
               type: "Program",
               sourceType: "module",
-              body: [{ type: "ExpressionStatement", expression: innerHtml }],
+              body: [{ type: "ExpressionStatement", expression: inner_html }],
             },
           },
         },
@@ -111,7 +111,7 @@ function popoverStore(html: string): HastNode & Record<string, unknown> {
 export function dedupeCodePopovers() {
   return (tree: HastNode, file: VFileLike): void => {
     const renamed = new Map<string, string>();
-    const sharedIdByKey = new Map<string, string>();
+    const shared_id_by_key = new Map<string, string>();
     const store: HastNode[] = [];
     // Several documents can share one page (landing snippets, showcase setup),
     // so shared ids carry a per-document prefix, then the panel's position.
@@ -120,19 +120,19 @@ export function dedupeCodePopovers() {
     const collect = (node: HastNode): void => {
       if (!node.children) return;
       node.children = node.children.filter((child) => {
-        if (child.type !== "element" || !hasClass(child, PANEL_CLASS)) return true;
-        const originalId = String(child.properties?.id ?? "");
-        const key = panelKey(child);
-        let sharedId = sharedIdByKey.get(key);
-        if (sharedId === undefined) {
-          sharedId = `${prefix}-${sharedIdByKey.size}`;
-          sharedIdByKey.set(key, sharedId);
+        if (child.type !== "element" || !has_class(child, PANEL_CLASS)) return true;
+        const original_id = String(child.properties?.id ?? "");
+        const key = panel_key(child);
+        let shared_id = shared_id_by_key.get(key);
+        if (shared_id === undefined) {
+          shared_id = `${prefix}-${shared_id_by_key.size}`;
+          shared_id_by_key.set(key, shared_id);
           store.push({
             ...child,
-            properties: { ...child.properties, id: sharedId },
+            properties: { ...child.properties, id: shared_id },
           });
         }
-        renamed.set(originalId, sharedId);
+        renamed.set(original_id, shared_id);
         return false;
       });
       for (const child of node.children) collect(child);
@@ -141,12 +141,12 @@ export function dedupeCodePopovers() {
     const retarget = (node: HastNode): void => {
       const target = node.properties?.dataSwCodePopoverTrigger;
       if (typeof target === "string") {
-        const sharedId = renamed.get(target);
-        if (sharedId !== undefined) {
+        const shared_id = renamed.get(target);
+        if (shared_id !== undefined) {
           node.properties = {
             ...node.properties,
-            ariaDescribedBy: sharedId,
-            dataSwCodePopoverTrigger: sharedId,
+            ariaDescribedBy: shared_id,
+            dataSwCodePopoverTrigger: shared_id,
           };
         }
       }
@@ -156,6 +156,6 @@ export function dedupeCodePopovers() {
     collect(tree);
     if (store.length === 0) return;
     retarget(tree);
-    tree.children = [...(tree.children ?? []), popoverStore(panelsHtml(store))];
+    tree.children = [...(tree.children ?? []), popover_store(panels_html(store))];
   };
 }

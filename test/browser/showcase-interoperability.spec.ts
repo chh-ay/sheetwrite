@@ -42,21 +42,21 @@ interface CompatibilityTestSet {
   checksum: string;
 }
 
-async function bootInterop(page: Page): Promise<void> {
+async function boot_interop(page: Page): Promise<void> {
   await page.goto(ROUTE);
   await page.waitForSelector(".sw-si-grid canvas", { state: "attached", timeout: 15_000 });
   await expect(page.getByTestId("interop-status")).toContainText("Loaded:", { timeout: 15_000 });
 }
 
 /** Open a lab through its tile; one lab is open at a time, below the tiles. */
-async function openLab(page: Page, lab: string): Promise<void> {
+async function open_lab(page: Page, lab: string): Promise<void> {
   const tile = page.getByTestId(`interop-lab-${lab}`);
   await tile.click();
   await expect(tile).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(`#interop-lab-${lab}-panel`)).toBeVisible();
 }
 
-function sheetNames(page: Page): Promise<string[] | undefined> {
+function sheet_names(page: Page): Promise<string[] | undefined> {
   return page.evaluate(() =>
     window.__sheetwriteInteropGrid?.store
       .getWorkbook()
@@ -65,7 +65,7 @@ function sheetNames(page: Page): Promise<string[] | undefined> {
   );
 }
 
-function importedCell(page: Page, row: number, col: number): Promise<unknown> {
+function imported_cell(page: Page, row: number, col: number): Promise<unknown> {
   return page.evaluate(
     ([at, column]) =>
       window.__sheetwriteInteropGrid?.store.getCell({ sheet: "imported", row: at, col: column })
@@ -83,40 +83,40 @@ test("a link to #<lab> opens that lab; the evidence vault reports the served che
   await expect(delimited).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#interop-lab-delimited-panel")).toBeVisible();
   await expect(delimited).toBeInViewport();
-  await openLab(page, "vault");
+  await open_lab(page, "vault");
   const vault = page.getByTestId("interop-lab-vault");
-  const vaultPanel = page.locator("#interop-lab-vault-panel");
+  const vault_panel = page.locator("#interop-lab-vault-panel");
 
   // Every figure comes from the checked results file the page links to.
   const href = await page.getByRole("link", { name: "Published checks" }).getAttribute("href");
   if (href === null) throw new Error("The published checks link has no href");
   const response = await page.request.get(new URL(href, page.url()).href);
   expect(response.ok()).toBe(true);
-  const { testSet } = (await response.json()) as { testSet: CompatibilityTestSet };
+  const { testSet: test_set } = (await response.json()) as { testSet: CompatibilityTestSet };
   const figure = page.getByTestId("compatibility-results-summary");
-  await expect(figure).toContainText(testSet.localPassed.toLocaleString("en-US"));
+  await expect(figure).toContainText(test_set.localPassed.toLocaleString("en-US"));
   await expect(figure).toContainText(
-    `/ ${(testSet.totalTests - testSet.unsupported).toLocaleString("en-US")}`,
+    `/ ${(test_set.totalTests - test_set.unsupported).toLocaleString("en-US")}`,
   );
   // No known-difference count while there are none.
-  if (testSet.knownDifferences === 0) await expect(figure).not.toContainText("known difference");
-  for (const count of [testSet.formulaTests, testSet.editSequenceTests, testSet.workbookTests]) {
-    await expect(vaultPanel.locator(".sw-vault-kinds")).toContainText(
+  if (test_set.knownDifferences === 0) await expect(figure).not.toContainText("known difference");
+  for (const count of [test_set.formulaTests, test_set.editSequenceTests, test_set.workbookTests]) {
+    await expect(vault_panel.locator(".sw-vault-kinds")).toContainText(
       count.toLocaleString("en-US"),
     );
   }
-  await expect(vaultPanel).toContainText(
-    `${testSet.unsupported.toLocaleString("en-US")} checks don't apply`,
+  await expect(vault_panel).toContainText(
+    `${test_set.unsupported.toLocaleString("en-US")} checks don't apply`,
   );
-  if (testSet.reviewedResults === 0) {
-    await expect(vaultPanel).toContainText("No results from Excel, Google Sheets and LibreOffice");
+  if (test_set.reviewedResults === 0) {
+    await expect(vault_panel).toContainText("No results from Excel, Google Sheets and LibreOffice");
   }
   await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveAttribute(
     "title",
-    testSet.checksum,
+    test_set.checksum,
   );
   await expect(page.getByTestId("compatibility-example-page")).toHaveText(
-    `1–15 of ${testSet.publishedExamples.toLocaleString("en-US")}`,
+    `1–15 of ${test_set.publishedExamples.toLocaleString("en-US")}`,
   );
 
   await vault.focus();
@@ -141,9 +141,9 @@ test("a link to #<lab> opens that lab; the evidence vault reports the served che
 test("@portability a committed fixture imports with its coded warnings, and File › Import XLSX opens the native picker from the keyboard", async ({
   page,
 }) => {
-  await bootInterop(page);
+  await boot_interop(page);
   // The showcase registers its optional backend on its first XLSX action.
-  await openLab(page, "fixtures");
+  await open_lab(page, "fixtures");
   const load = page.getByTestId("fixture-libreoffice-rich-load");
   await expect(load).toBeEnabled({ timeout: 20_000 });
   await expect(page.getByTestId("interop-lab-fixtures")).toContainText("3 hashes match");
@@ -151,10 +151,10 @@ test("@portability a committed fixture imports with its coded warnings, and File
   await expect(page.getByTestId("interop-source")).toContainText("libreoffice-rich.xlsx", {
     timeout: 15_000,
   });
-  await expect.poll(() => sheetNames(page)).toEqual(["Calc", "Hidden", "Inputs"]);
+  await expect.poll(() => sheet_names(page)).toEqual(["Calc", "Hidden", "Inputs"]);
   const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
   if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
-  await openLab(page, "warnings");
+  await open_lab(page, "warnings");
   await expect(page.getByTestId("interop-warning-count")).toContainText(fixture.file);
   const codes = await page
     .getByTestId("interop-warnings")
@@ -166,21 +166,21 @@ test("@portability a committed fixture imports with its coded warnings, and File
 
   await page.evaluate(() => window.__sheetwriteInteropGrid?.setConfig({ ribbon: true }));
   const ribbon = page.locator(".sw-si-grid .sheetwrite-ribbon");
-  const fileTab = ribbon.getByRole("tab", { name: "File", exact: true });
-  await fileTab.focus();
-  await fileTab.press("Enter");
+  const file_tab = ribbon.getByRole("tab", { name: "File", exact: true });
+  await file_tab.focus();
+  await file_tab.press("Enter");
   const command = ribbon.getByRole("button", { name: "Import XLSX", exact: true });
   await expect(command).toBeEnabled();
   await command.focus();
-  const chooserReady = page.waitForEvent("filechooser");
+  const chooser_ready = page.waitForEvent("filechooser");
   await command.press("Enter");
-  const chooser = await chooserReady;
+  const chooser = await chooser_ready;
   await chooser.setFiles(
     fileURLToPath(
       new URL("../../packages/xlsx/test/fixtures/shared-formula.xlsx", import.meta.url),
     ),
   );
-  await expect.poll(() => sheetNames(page)).toEqual(["Fixture"]);
+  await expect.poll(() => sheet_names(page)).toEqual(["Fixture"]);
   expect(
     await page.evaluate(() => {
       const grid = window.__sheetwriteInteropGrid;
@@ -197,8 +197,8 @@ test("@portability a committed fixture imports with its coded warnings, and File
 });
 
 test("one run stops every hostile file and limit in the browser", async ({ page }) => {
-  await bootInterop(page);
-  await openLab(page, "security");
+  await boot_interop(page);
+  await open_lab(page, "security");
   const figure = page.getByTestId("interop-attacks-figure");
   await expect(figure).toContainText("attacks, not run yet");
   await page.getByTestId("interop-hostile-run").click();
@@ -226,7 +226,7 @@ test("one run stops every hostile file and limit in the browser", async ({ page 
 test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV demo loads 200,000 sales records", async ({
   page,
 }) => {
-  await bootInterop(page);
+  await boot_interop(page);
   await page.getByTestId("interop-file-input").setInputFiles({
     name: "quarter-sales.csv",
     mimeType: "text/csv",
@@ -234,8 +234,8 @@ test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV 
   });
   await expect(page.getByTestId("interop-status")).toContainText("Loaded: quarter-sales.csv");
   await expect(page.getByTestId("interop-file-report")).toContainText("6 stored cells");
-  await expect.poll(() => importedCell(page, 0, 0)).toBe("Alder Design");
-  await expect.poll(() => importedCell(page, 1, 2)).toBe(2050);
+  await expect.poll(() => imported_cell(page, 0, 0)).toBe("Alder Design");
+  await expect.poll(() => imported_cell(page, 1, 2)).toBe(2050);
 
   await page.getByTestId("interop-bulk-import").click();
   await expect(page.getByTestId("interop-bulk-report")).toContainText("200,000 rows × 10 columns", {
@@ -245,7 +245,7 @@ test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV 
   await expect(page.getByTestId("interop-status")).toContainText("Loaded: Generated sales ledger", {
     timeout: 30_000,
   });
-  const lastOrder = await page.evaluate(() => {
+  const last_order = await page.evaluate(() => {
     const grid = window.__sheetwriteInteropGrid;
     if (!grid) throw new Error("The imported Grid is not available");
     return {
@@ -254,5 +254,5 @@ test("a chosen CSV file rebuilds the live workbench, and the 0.5.0 streamed CSV 
       net: grid.store.getCell({ sheet: "imported", row: 199_999, col: 9 }).resolved,
     };
   });
-  expect(lastOrder).toEqual({ rows: 200_000, order: "OP-299999", net: 17_835 });
+  expect(last_order).toEqual({ rows: 200_000, order: "OP-299999", net: 17_835 });
 });

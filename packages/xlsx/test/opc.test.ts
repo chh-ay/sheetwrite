@@ -14,13 +14,13 @@ describe("OPC package metadata", () => {
       "custom/fallback.xml": "<root/>",
       "custom/extensionless": "plain",
     });
-    const packageFile = await OpcPackage.open(archive, createCodecContext("import"));
-    await packageFile.load(["custom/data.bin"]);
+    const package_file = await OpcPackage.open(archive, createCodecContext("import"));
+    await package_file.load(["custom/data.bin"]);
 
-    expect(packageFile.contentType("custom/data.bin")).toBe("application/custom");
-    expect(packageFile.contentType("custom/fallback.XML")).toBe("application/xml");
-    expect(packageFile.contentType("custom/extensionless")).toBeUndefined();
-    expect(new TextDecoder().decode(packageFile.read("custom/data.bin"))).toBe("binary");
+    expect(package_file.contentType("custom/data.bin")).toBe("application/custom");
+    expect(package_file.contentType("custom/fallback.XML")).toBe("application/xml");
+    expect(package_file.contentType("custom/extensionless")).toBeUndefined();
+    expect(new TextDecoder().decode(package_file.read("custom/data.bin"))).toBe("binary");
   });
 
   it("rejects unknown limits and preserves structural backend failures", () => {

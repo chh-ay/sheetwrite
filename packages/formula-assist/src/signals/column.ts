@@ -89,7 +89,7 @@ export function columnRelation(edit: FormulaEdit, formula: string): ColumnRelati
 }
 
 /** The column's formulas above and below, moved to the edited cell. */
-function columnProposals(edit: FormulaEdit): Proposal[] {
+function column_proposals(edit: FormulaEdit): Proposal[] {
   const { above, below } = around(edit);
   const proposal = (formula: string, reason: string): Proposal => ({
     formula,
@@ -112,6 +112,6 @@ function columnProposals(edit: FormulaEdit): Proposal[] {
 
 /** Open the column-pattern signal of one edit; it reads the column once. */
 export function openColumn(edit: FormulaEdit): Signal {
-  const proposals = columnProposals(edit);
+  const proposals = column_proposals(edit);
   return { proposals: () => proposals };
 }

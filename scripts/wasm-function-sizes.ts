@@ -22,7 +22,7 @@ const U32_LEB_MAX_BYTES = 5;
 const U32_LEB_FINAL_MAX = 0x0f;
 const LIMIT_HAS_MAXIMUM = 1;
 const LIMIT_IS_64_BIT = 4;
-const textDecoder = new TextDecoder("utf-8", { fatal: true });
+const text_decoder = new TextDecoder("utf-8", { fatal: true });
 
 interface WasmFunctionSize {
   readonly name: string;
@@ -66,11 +66,11 @@ class Reader {
   }
 
   string(): string {
-    return textDecoder.decode(this.take(this.u32()));
+    return text_decoder.decode(this.take(this.u32()));
   }
 }
 
-function skipLimits(reader: Reader): void {
+function skip_limits(reader: Reader): void {
   const flags = reader.u32();
   if ((flags & LIMIT_IS_64_BIT) !== 0) {
     throw new Error("Expected wasm32 engine limits, not 64-bit limits");
@@ -80,7 +80,7 @@ function skipLimits(reader: Reader): void {
   if ((flags & LIMIT_HAS_MAXIMUM) !== 0) reader.u32();
 }
 
-function countImportedFunctions(reader: Reader): number {
+function count_imported_functions(reader: Reader): number {
   let functions = 0;
   const count = reader.u32();
   for (let i = 0; i < count; i++) {
@@ -94,10 +94,10 @@ function countImportedFunctions(reader: Reader): number {
         break;
       case IMPORT_TABLE:
         reader.byte();
-        skipLimits(reader);
+        skip_limits(reader);
         break;
       case IMPORT_MEMORY:
-        skipLimits(reader);
+        skip_limits(reader);
         break;
       case IMPORT_GLOBAL:
         reader.byte();
@@ -114,7 +114,7 @@ function countImportedFunctions(reader: Reader): number {
   return functions;
 }
 
-function readFunctionNames(reader: Reader, names: Map<number, string>): void {
+function read_function_names(reader: Reader, names: Map<number, string>): void {
   while (reader.position < reader.bytes.length) {
     const kind = reader.byte();
     const subsection = new Reader(reader.take(reader.u32()));
@@ -143,36 +143,36 @@ export function checkWasmFunctionSizes(bytes: Uint8Array): {
     throw new Error("Expected a WebAssembly version 1 module");
   }
 
-  let importedFunctions = 0;
-  const bodySizes: number[] = [];
+  let imported_functions = 0;
+  const body_sizes: number[] = [];
   const names = new Map<number, string>();
-  const publishedSections: Uint8Array[] = [header];
+  const published_sections: Uint8Array[] = [header];
   while (reader.position < bytes.length) {
     const start = reader.position;
     const kind = reader.byte();
     const section = new Reader(reader.take(reader.u32()));
     if (kind === SECTION_CUSTOM && section.string() === "name") {
-      readFunctionNames(section, names);
+      read_function_names(section, names);
       continue;
     }
 
-    publishedSections.push(bytes.subarray(start, reader.position));
+    published_sections.push(bytes.subarray(start, reader.position));
     if (kind === SECTION_IMPORT) {
-      importedFunctions = countImportedFunctions(section);
+      imported_functions = count_imported_functions(section);
     } else if (kind === SECTION_CODE) {
       const count = section.u32();
       for (let i = 0; i < count; i++) {
         const size = section.u32();
-        bodySizes.push(size);
+        body_sizes.push(size);
         section.take(size);
       }
     }
   }
 
-  if (bodySizes.length === 0) throw new Error("Engine WASM contains no function bodies");
+  if (body_sizes.length === 0) throw new Error("Engine WASM contains no function bodies");
 
-  const functions = bodySizes.map((size, index) => {
-    const name = names.get(importedFunctions + index);
+  const functions = body_sizes.map((size, index) => {
+    const name = names.get(imported_functions + index);
     if (!name) {
       throw new Error(
         "Engine WASM is missing function names; keep wasm-opt -g before finalization",
@@ -202,7 +202,7 @@ export function checkWasmFunctionSizes(bytes: Uint8Array): {
   }
 
   return {
-    wasm: Buffer.concat(publishedSections),
+    wasm: Buffer.concat(published_sections),
     largestFunctions: functions.slice(0, TOP_FUNCTION_COUNT),
   };
 }

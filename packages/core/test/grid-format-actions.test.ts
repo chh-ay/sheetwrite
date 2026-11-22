@@ -20,7 +20,7 @@ afterEach(() => {
   restore();
 });
 
-function setup(columnStyle?: CellStyle) {
+function setup(column_style?: CellStyle) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -33,7 +33,7 @@ function setup(columnStyle?: CellStyle) {
           header: `C${col}`,
           type: "number" as const,
           width: 100,
-          cellStyle: columnStyle,
+          cellStyle: column_style,
           numberFormat: "0.00",
         })),
       },
@@ -49,10 +49,10 @@ function setup(columnStyle?: CellStyle) {
   });
   const grid = new GridImpl(mountHost(), { workbook }, store);
   grids.push(grid);
-  const select = (row: number, col: number, endRow = row, endCol = col) =>
+  const select = (row: number, col: number, end_row = row, end_col = col) =>
     grid.setSelection({
       kind: "range",
-      range: { sheet: "s1", start: { row, col }, end: { row: endRow, col: endCol } },
+      range: { sheet: "s1", start: { row, col }, end: { row: end_row, col: end_col } },
     });
   const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col });
   return { grid, store, select, cell };

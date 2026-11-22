@@ -26,7 +26,7 @@ export const COLLABORATION_TOTAL_CELL = {
  * accounts, with the weighted value as a per-row formula.
  */
 export function makeCollaborationSnapshot(): WorkbookSnapshot {
-  const accountPrefixes = [
+  const account_prefixes = [
     "Harbor",
     "Northvale",
     "Cedar",
@@ -58,7 +58,7 @@ export function makeCollaborationSnapshot(): WorkbookSnapshot {
     "Parkside",
     "Elmstead",
   ];
-  const accountSuffixes = [
+  const account_suffixes = [
     "Studio",
     "Design",
     "Systems",
@@ -76,8 +76,8 @@ export function makeCollaborationSnapshot(): WorkbookSnapshot {
     "Consulting",
   ];
   const deals = Array.from({ length: COLLABORATION_FORECAST_ROWS }, (_, index) => ({
-    account: `${accountPrefixes[index % accountPrefixes.length]} ${
-      accountSuffixes[Math.floor(index / accountPrefixes.length) % accountSuffixes.length]
+    account: `${account_prefixes[index % account_prefixes.length]} ${
+      account_suffixes[Math.floor(index / account_prefixes.length) % account_suffixes.length]
     }`,
     owner: index < COLLABORATION_FORECAST_ROWS / 2 ? "Ana" : "Bram",
     amount: 9_000 + (index % 9) * 1_500 + (Math.floor(index / 90) % 8) * 1_000,

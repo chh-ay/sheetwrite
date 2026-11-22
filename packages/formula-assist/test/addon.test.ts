@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 
 /** Numbers in A1:A5, and B2 and B4 doubling the cell to their left; B3 is the cell typed in. */
-function doubledColumn(): SheetwriteStore {
+function doubled_column(): SheetwriteStore {
   const number = (value: number) => ({ kind: "literal", value }) as const;
   const formula = (src: string) => ({ kind: "formula", src }) as const;
   const snapshot: WorkbookSnapshot = {
@@ -58,7 +58,7 @@ function doubledColumn(): SheetwriteStore {
 }
 
 it("fetches the predictor when the grid mounts; an edit opened before it arrives waits for it", async () => {
-  const store = doubledColumn();
+  const store = doubled_column();
   const edit = await openFormulaEdit(store, { sheet: "s", row: 2, col: 1 });
   const analysis = analyzeFormula("=", 1, edit.functions());
   let suggester: FormulaSuggester | undefined;

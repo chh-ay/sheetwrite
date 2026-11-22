@@ -60,21 +60,21 @@ export class DomOverlay {
   private readonly host: HTMLElement;
   private readonly geometry: GeometryLayoutController;
   private readonly entries = new Map<string, DomEntry>();
-  private readonly rendererIds = new WeakMap<CellRenderer, number>();
-  private readonly ownedNodes = new WeakSet<HTMLElement>();
-  private readonly mergeMap = new Map<number, MergeRect>();
-  private readonly styleCaches: Array<Map<number, CellStyle>> = [];
-  private readonly styleTables: Array<VisibleWindowView["styles"]> = [];
+  private readonly renderer_ids = new WeakMap<CellRenderer, number>();
+  private readonly owned_nodes = new WeakSet<HTMLElement>();
+  private readonly merge_map = new Map<number, MergeRect>();
+  private readonly style_caches: Array<Map<number, CellStyle>> = [];
+  private readonly style_tables: Array<VisibleWindowView["styles"]> = [];
   private renderers: ReadonlyMap<string, CellRenderer> = new Map();
   private layout: RenderLayout | null = null;
   private theme: Theme | null = null;
-  private mergeIndex: PreparedMergeIndex | null = null;
+  private merge_index: PreparedMergeIndex | null = null;
   private frame = 0;
-  private frameStyleTableCount = 0;
-  private frameView: VisibleWindowView | null = null;
-  private framePanes: readonly PanePaint[] | null = null;
-  private frameAnchorViews: readonly VisibleWindowView[] = EMPTY_WINDOW_VIEWS;
-  private nextRendererId = 1;
+  private frame_style_table_count = 0;
+  private frame_view: VisibleWindowView | null = null;
+  private frame_panes: readonly PanePaint[] | null = null;
+  private frame_anchor_views: readonly VisibleWindowView[] = EMPTY_WINDOW_VIEWS;
+  private next_renderer_id = 1;
   private destroyed = false;
 
   constructor(parent: HTMLElement, options: DomOverlayOptions) {
@@ -84,14 +84,14 @@ export class DomOverlay {
     const element = document.createElement("div");
     element.className = "sheetwrite-dom-overlay";
     element.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;";
-    element.addEventListener("keydown", this.onKeyDown);
+    element.addEventListener("keydown", this.on_key_down);
     parent.appendChild(element);
     this.element = element;
   }
 
   setLayout(layout: RenderLayout): void {
     this.layout = layout;
-    this.mergeIndex = layout.merges?.length ? prepareMergeIndex(layout.merges) : null;
+    this.merge_index = layout.merges?.length ? prepareMergeIndex(layout.merges) : null;
   }
 
   setTheme(theme: Theme): void {
@@ -103,7 +103,7 @@ export class DomOverlay {
     const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
       if (renderers.get(entry.rendererName) === entry.renderer) continue;
-      failures.run(() => this.removeEntry(entry, true));
+      failures.run(() => this.remove_entry(entry, true));
     }
     failures.rethrow();
   }
@@ -113,14 +113,14 @@ export class DomOverlay {
     viewport: Viewport,
     anchorViews: readonly VisibleWindowView[] = EMPTY_WINDOW_VIEWS,
   ): void {
-    if (!this.beginFrame()) return;
-    this.frameView = view;
-    this.framePanes = null;
-    this.frameAnchorViews = anchorViews;
+    if (!this.begin_frame()) return;
+    this.frame_view = view;
+    this.frame_panes = null;
+    this.frame_anchor_views = anchorViews;
     const failures = new FirstFailure();
     failures.run(() => {
-      this.populateMergeMap(view);
-      this.paintView(view, {
+      this.populate_merge_map(view);
+      this.paint_view(view, {
         x: 0,
         y: 0,
         w: viewport.width,
@@ -129,108 +129,114 @@ export class DomOverlay {
         scrollLeft: viewport.scrollLeft,
       });
     });
-    this.finishFrame(failures);
+    this.finish_frame(failures);
   }
 
   paintPanes(
     panes: readonly PanePaint[],
     anchorViews: readonly VisibleWindowView[] = EMPTY_WINDOW_VIEWS,
   ): void {
-    if (!this.beginFrame()) return;
-    this.frameView = null;
-    this.framePanes = panes;
-    this.frameAnchorViews = anchorViews;
+    if (!this.begin_frame()) return;
+    this.frame_view = null;
+    this.frame_panes = panes;
+    this.frame_anchor_views = anchorViews;
     const failures = new FirstFailure();
     failures.run(() => {
-      for (const pane of panes) this.populateMergeMap(pane.view);
+      for (const pane of panes) this.populate_merge_map(pane.view);
       for (const pane of panes) {
-        this.paintView(pane.view, {
+        this.paint_view(pane.view, {
           ...pane.clip,
           scrollTop: pane.scrollTop,
           scrollLeft: pane.scrollLeft,
         });
       }
     });
-    this.finishFrame(failures);
+    this.finish_frame(failures);
   }
 
   reset(): void {
-    this.removeAllEntries(true);
+    this.remove_all_entries(true);
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     const failures = new FirstFailure();
-    failures.run(() => this.removeAllEntries(false));
+    failures.run(() => this.remove_all_entries(false));
     this.entries.clear();
-    this.clearFrameSources();
-    this.styleTables.length = 0;
-    for (const cache of this.styleCaches) cache.clear();
-    this.element.removeEventListener("keydown", this.onKeyDown);
+    this.clear_frame_sources();
+    this.style_tables.length = 0;
+    for (const cache of this.style_caches) cache.clear();
+    this.element.removeEventListener("keydown", this.on_key_down);
     this.element.remove();
     failures.rethrow();
   }
 
-  private beginFrame(): boolean {
+  private begin_frame(): boolean {
     if (this.destroyed || this.layout === null || this.theme === null) return false;
     this.frame += 1;
-    this.mergeMap.clear();
-    for (let slot = 0; slot < this.frameStyleTableCount; slot++) {
-      this.styleCaches[slot]!.clear();
+    this.merge_map.clear();
+    for (let slot = 0; slot < this.frame_style_table_count; slot++) {
+      this.style_caches[slot]!.clear();
     }
-    this.styleTables.length = 0;
-    this.frameStyleTableCount = 0;
+    this.style_tables.length = 0;
+    this.frame_style_table_count = 0;
     return true;
   }
 
-  private endFrame(removeCurrentEntries: boolean): void {
+  private end_frame(remove_current_entries: boolean): void {
     const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
-      if (!removeCurrentEntries && entry.frame === this.frame) continue;
-      failures.run(() => this.removeEntry(entry, true));
+      if (!remove_current_entries && entry.frame === this.frame) continue;
+      failures.run(() => this.remove_entry(entry, true));
     }
     failures.rethrow();
   }
 
-  private populateMergeMap(view: VisibleWindowView): void {
-    if (this.mergeIndex === null || view.cols.length === 0) return;
-    const merges = intersectingMerges(this.mergeIndex, view.rows.start, view.rows.end, view.cols);
+  private populate_merge_map(view: VisibleWindowView): void {
+    if (this.merge_index === null || view.cols.length === 0) return;
+    const merges = intersectingMerges(this.merge_index, view.rows.start, view.rows.end, view.cols);
     for (const merge of merges) {
-      const rowStart = Math.max(view.rows.start, merge.r0);
-      const rowEnd = Math.min(view.rows.end - 1, merge.r1);
-      for (let row = rowStart; row <= rowEnd; row++) {
+      const row_start = Math.max(view.rows.start, merge.r0);
+      const row_end = Math.min(view.rows.end - 1, merge.r1);
+      for (let row = row_start; row <= row_end; row++) {
         const base = row * MERGE_KEY_STRIDE;
         for (const col of view.cols) {
-          if (col >= merge.c0 && col <= merge.c1) this.mergeMap.set(base + col, merge);
+          if (col >= merge.c0 && col <= merge.c1) this.merge_map.set(base + col, merge);
         }
       }
     }
   }
 
   mergeAnchorRequests(views: readonly VisibleWindowView[]): readonly DomMergeAnchorRequest[] {
-    if (this.mergeIndex === null || this.layout === null || views.length === 0) {
+    if (this.merge_index === null || this.layout === null || views.length === 0) {
       return EMPTY_ANCHOR_REQUESTS;
     }
 
     const grouped = new Map<string, { sheet: string; row: number; cols: number[] }>();
     for (const view of views) {
-      const merges = intersectingMerges(this.mergeIndex, view.rows.start, view.rows.end, view.cols);
+      const merges = intersectingMerges(
+        this.merge_index,
+        view.rows.start,
+        view.rows.end,
+        view.cols,
+      );
       for (const merge of merges) {
-        const rendererName = this.layout.columns[merge.c0]?.renderer;
-        const renderer = rendererName === undefined ? undefined : this.renderers.get(rendererName);
+        const renderer_name = this.layout.columns[merge.c0]?.renderer;
+        const renderer =
+          renderer_name === undefined ? undefined : this.renderers.get(renderer_name);
         if (renderer?.dom === undefined) continue;
 
-        let intersectsColumn = false;
+        let intersects_column = false;
         for (const col of view.cols) {
           if (col >= merge.c0 && col <= merge.c1) {
-            intersectsColumn = true;
+            intersects_column = true;
             break;
           }
         }
         if (
-          !intersectsColumn ||
-          this.findViewContaining(views, view.sheet, merge.r0, merge.c0) !== null
+          !intersects_column ||
+          this.find_view_containing(views, view.sheet, merge.r0, merge.c0) !== null
         ) {
           continue;
         }
@@ -255,112 +261,113 @@ export class DomOverlay {
     return requests;
   }
 
-  private paintView(
+  private paint_view(
     view: VisibleWindowView,
     pane: { x: number; y: number; w: number; h: number; scrollTop: number; scrollLeft: number },
   ): void {
     const { layout, theme } = this;
-    // beginFrame already refused a frame without both.
+    // begin_frame already refused a frame without both.
     if (layout === null || theme === null) return;
 
-    const nCols = view.cols.length;
-    const nRows = view.rows.end - view.rows.start;
-    const styleStride = view.styles.length || 1;
-    const styleCache = this.styleCacheFor(view.styles);
+    const n_cols = view.cols.length;
+    const n_rows = view.rows.end - view.rows.start;
+    const style_stride = view.styles.length || 1;
+    const style_cache = this.style_cache_for(view.styles);
 
-    for (let rowOffset = 0; rowOffset < nRows; rowOffset++) {
-      const row = view.rows.start + rowOffset;
-      for (let colOffset = 0; colOffset < nCols; colOffset++) {
-        const col = view.cols[colOffset]!;
-        const merge = this.mergeMap.get(row * MERGE_KEY_STRIDE + col);
+    for (let row_offset = 0; row_offset < n_rows; row_offset++) {
+      const row = view.rows.start + row_offset;
+      for (let col_offset = 0; col_offset < n_cols; col_offset++) {
+        const col = view.cols[col_offset]!;
+        const merge = this.merge_map.get(row * MERGE_KEY_STRIDE + col);
         if (merge && (merge.r0 !== row || merge.c0 !== col)) {
-          this.retainCoveredMerge(view, merge, pane, layout, theme);
+          this.retain_covered_merge(view, merge, pane, layout, theme);
           continue;
         }
 
         const column = layout.columns[col];
-        const rendererName = column?.renderer;
-        const renderer = rendererName === undefined ? undefined : this.renderers.get(rendererName);
-        if (renderer?.dom === undefined || rendererName === undefined) continue;
+        const renderer_name = column?.renderer;
+        const renderer =
+          renderer_name === undefined ? undefined : this.renderers.get(renderer_name);
+        if (renderer?.dom === undefined || renderer_name === undefined) continue;
 
-        const rendererId = this.rendererId(renderer);
-        const key = `${view.sheet}\u0000${row}\u0000${col}\u0000${rendererId}`;
+        const renderer_id = this.renderer_id(renderer);
+        const key = `${view.sheet}\u0000${row}\u0000${col}\u0000${renderer_id}`;
         let entry = this.entries.get(key);
-        const index = rowOffset * nCols + colOffset;
-        const hasFreshStyle = index < view.styleIds.length;
-        const styleId = hasFreshStyle ? view.styleIds[index]! : 0;
-        const sourceStyle = hasFreshStyle
-          ? (view.styles[styleId] ?? EMPTY_STYLE)
+        const index = row_offset * n_cols + col_offset;
+        const has_fresh_style = index < view.styleIds.length;
+        const style_id = has_fresh_style ? view.styleIds[index]! : 0;
+        const source_style = has_fresh_style
+          ? (view.styles[style_id] ?? EMPTY_STYLE)
           : (entry?.sourceStyle ?? EMPTY_STYLE);
         const style =
-          !hasFreshStyle && entry
+          !has_fresh_style && entry
             ? entry.context.style
-            : this.effectiveStyle(layout, styleCache, col, styleId, styleStride, sourceStyle);
+            : this.effective_style(layout, style_cache, col, style_id, style_stride, source_style);
         const value = view.values[index] ?? null;
-        const rowEnd = merge?.r1 ?? row;
-        const colEnd = merge?.c1 ?? col;
+        const row_end = merge?.r1 ?? row;
+        const col_end = merge?.c1 ?? col;
         const x = this.geometry.screenColumnLeft(col, pane.scrollLeft);
         const y = this.geometry.screenRowTop(row, pane.scrollTop);
-        const w = this.geometry.columnLeft(colEnd + 1) - this.geometry.columnLeft(col);
-        const h = this.geometry.rowOffset(rowEnd + 1) - this.geometry.rowOffset(row);
+        const w = this.geometry.columnLeft(col_end + 1) - this.geometry.columnLeft(col);
+        const h = this.geometry.rowOffset(row_end + 1) - this.geometry.rowOffset(row);
 
         if (entry === undefined) {
           const context: CellPaintContext = { value, x, y, w, h, theme, style };
-          entry = this.createEntry(
+          entry = this.create_entry(
             key,
-            rendererName,
+            renderer_name,
             renderer,
             context,
-            sourceStyle,
+            source_style,
             row,
             col,
             view.sheet,
           );
           this.entries.set(key, entry);
         } else {
-          this.updateEntry(entry, value, x, y, w, h, theme, style, sourceStyle);
+          this.update_entry(entry, value, x, y, w, h, theme, style, source_style);
         }
         entry.frame = this.frame;
-        this.positionEntry(entry, x, y, w, h, pane, theme);
+        this.position_entry(entry, x, y, w, h, pane, theme);
       }
     }
   }
 
-  private retainCoveredMerge(
-    currentView: VisibleWindowView,
+  private retain_covered_merge(
+    current_view: VisibleWindowView,
     merge: MergeRect,
     pane: { x: number; y: number; w: number; h: number; scrollTop: number; scrollLeft: number },
     layout: RenderLayout,
     theme: Theme,
   ): void {
-    const rendererName = layout.columns[merge.c0]?.renderer;
-    const renderer = rendererName === undefined ? undefined : this.renderers.get(rendererName);
-    if (renderer?.dom === undefined || rendererName === undefined) return;
-    const key = `${currentView.sheet}\u0000${merge.r0}\u0000${merge.c0}\u0000${this.rendererId(renderer)}`;
+    const renderer_name = layout.columns[merge.c0]?.renderer;
+    const renderer = renderer_name === undefined ? undefined : this.renderers.get(renderer_name);
+    if (renderer?.dom === undefined || renderer_name === undefined) return;
+    const key = `${current_view.sheet}\u0000${merge.r0}\u0000${merge.c0}\u0000${this.renderer_id(renderer)}`;
     let entry = this.entries.get(key);
     if (entry?.frame === this.frame) return;
 
-    const anchorView = this.findAnchorView(currentView, currentView.sheet, merge.r0, merge.c0);
-    if (anchorView === null) return;
-    const index = this.viewCellIndex(anchorView, currentView.sheet, merge.r0, merge.c0);
+    const anchor_view = this.find_anchor_view(current_view, current_view.sheet, merge.r0, merge.c0);
+    if (anchor_view === null) return;
+    const index = this.view_cell_index(anchor_view, current_view.sheet, merge.r0, merge.c0);
     if (index < 0) return;
-    const hasFreshStyle = index < anchorView.styleIds.length;
-    const styleId = hasFreshStyle ? anchorView.styleIds[index]! : 0;
-    const sourceStyle = hasFreshStyle
-      ? (anchorView.styles[styleId] ?? EMPTY_STYLE)
+    const has_fresh_style = index < anchor_view.styleIds.length;
+    const style_id = has_fresh_style ? anchor_view.styleIds[index]! : 0;
+    const source_style = has_fresh_style
+      ? (anchor_view.styles[style_id] ?? EMPTY_STYLE)
       : (entry?.sourceStyle ?? EMPTY_STYLE);
     const style =
-      !hasFreshStyle && entry
+      !has_fresh_style && entry
         ? entry.context.style
-        : this.effectiveStyle(
+        : this.effective_style(
             layout,
-            this.styleCacheFor(anchorView.styles),
+            this.style_cache_for(anchor_view.styles),
             merge.c0,
-            styleId,
-            anchorView.styles.length || 1,
-            sourceStyle,
+            style_id,
+            anchor_view.styles.length || 1,
+            source_style,
           );
-    const value = anchorView.values[index] ?? null;
+    const value = anchor_view.values[index] ?? null;
     const x = this.geometry.screenColumnLeft(merge.c0, pane.scrollLeft);
     const y = this.geometry.screenRowTop(merge.r0, pane.scrollTop);
     const w = this.geometry.columnLeft(merge.c1 + 1) - this.geometry.columnLeft(merge.c0);
@@ -368,123 +375,128 @@ export class DomOverlay {
 
     if (entry === undefined) {
       const context: CellPaintContext = { value, x, y, w, h, theme, style };
-      entry = this.createEntry(
+      entry = this.create_entry(
         key,
-        rendererName,
+        renderer_name,
         renderer,
         context,
-        sourceStyle,
+        source_style,
         merge.r0,
         merge.c0,
-        currentView.sheet,
+        current_view.sheet,
       );
       this.entries.set(key, entry);
     } else {
-      this.updateEntry(entry, value, x, y, w, h, theme, style, sourceStyle);
+      this.update_entry(entry, value, x, y, w, h, theme, style, source_style);
     }
     entry.frame = this.frame;
-    this.positionEntry(entry, x, y, w, h, pane, theme);
+    this.position_entry(entry, x, y, w, h, pane, theme);
   }
 
-  private effectiveStyle(
+  private effective_style(
     layout: RenderLayout,
     cache: Map<number, CellStyle>,
     col: number,
-    styleId: number,
-    styleStride: number,
-    sourceStyle: CellStyle,
+    style_id: number,
+    style_stride: number,
+    source_style: CellStyle,
   ): CellStyle {
-    const columnStyle = layout.columns[col]?.cellStyle;
-    if (columnStyle === undefined) return sourceStyle;
-    const key = col * styleStride + styleId;
+    const column_style = layout.columns[col]?.cellStyle;
+    if (column_style === undefined) return source_style;
+    const key = col * style_stride + style_id;
     let style = cache.get(key);
     if (style === undefined) {
-      style = { ...columnStyle, ...sourceStyle };
+      style = { ...column_style, ...source_style };
       cache.set(key, style);
     }
     return style;
   }
 
-  private styleCacheFor(styles: VisibleWindowView["styles"]): Map<number, CellStyle> {
-    for (let slot = 0; slot < this.frameStyleTableCount; slot++) {
-      if (this.styleTables[slot] === styles) return this.styleCaches[slot]!;
+  private style_cache_for(styles: VisibleWindowView["styles"]): Map<number, CellStyle> {
+    for (let slot = 0; slot < this.frame_style_table_count; slot++) {
+      if (this.style_tables[slot] === styles) return this.style_caches[slot]!;
     }
-    const slot = this.frameStyleTableCount++;
-    this.styleTables[slot] = styles;
-    let cache = this.styleCaches[slot];
+    const slot = this.frame_style_table_count++;
+    this.style_tables[slot] = styles;
+    let cache = this.style_caches[slot];
     if (cache === undefined) {
       cache = new Map();
-      this.styleCaches[slot] = cache;
+      this.style_caches[slot] = cache;
     }
     return cache;
   }
 
-  private findAnchorView(
-    currentView: VisibleWindowView,
+  private find_anchor_view(
+    current_view: VisibleWindowView,
     sheet: string,
     row: number,
     col: number,
   ): VisibleWindowView | null {
-    if (this.viewCellIndex(currentView, sheet, row, col) >= 0) return currentView;
+    if (this.view_cell_index(current_view, sheet, row, col) >= 0) return current_view;
     if (
-      this.frameView !== null &&
-      this.frameView !== currentView &&
-      this.viewCellIndex(this.frameView, sheet, row, col) >= 0
+      this.frame_view !== null &&
+      this.frame_view !== current_view &&
+      this.view_cell_index(this.frame_view, sheet, row, col) >= 0
     ) {
-      return this.frameView;
+      return this.frame_view;
     }
-    if (this.framePanes !== null) {
-      for (const pane of this.framePanes) {
-        if (pane.view !== currentView && this.viewCellIndex(pane.view, sheet, row, col) >= 0) {
+    if (this.frame_panes !== null) {
+      for (const pane of this.frame_panes) {
+        if (pane.view !== current_view && this.view_cell_index(pane.view, sheet, row, col) >= 0) {
           return pane.view;
         }
       }
     }
-    return this.findViewContaining(this.frameAnchorViews, sheet, row, col);
+    return this.find_view_containing(this.frame_anchor_views, sheet, row, col);
   }
 
-  private findViewContaining(
+  private find_view_containing(
     views: readonly VisibleWindowView[],
     sheet: string,
     row: number,
     col: number,
   ): VisibleWindowView | null {
     for (const view of views) {
-      if (this.viewCellIndex(view, sheet, row, col) >= 0) return view;
+      if (this.view_cell_index(view, sheet, row, col) >= 0) return view;
     }
     return null;
   }
 
-  private viewCellIndex(view: VisibleWindowView, sheet: string, row: number, col: number): number {
+  private view_cell_index(
+    view: VisibleWindowView,
+    sheet: string,
+    row: number,
+    col: number,
+  ): number {
     if (view.sheet !== sheet || row < view.rows.start || row >= view.rows.end) return -1;
-    for (let colOffset = 0; colOffset < view.cols.length; colOffset++) {
-      if (view.cols[colOffset] === col) {
-        return (row - view.rows.start) * view.cols.length + colOffset;
+    for (let col_offset = 0; col_offset < view.cols.length; col_offset++) {
+      if (view.cols[col_offset] === col) {
+        return (row - view.rows.start) * view.cols.length + col_offset;
       }
     }
     return -1;
   }
 
   /** End the frame; a failed paint also removes the entries it placed. */
-  private finishFrame(failures: FirstFailure): void {
-    const paintFailed = failures.hasFailed;
-    failures.run(() => this.endFrame(paintFailed));
-    this.clearFrameSources();
+  private finish_frame(failures: FirstFailure): void {
+    const paint_failed = failures.hasFailed;
+    failures.run(() => this.end_frame(paint_failed));
+    this.clear_frame_sources();
     failures.rethrow();
   }
 
-  private clearFrameSources(): void {
-    this.frameView = null;
-    this.framePanes = null;
-    this.frameAnchorViews = EMPTY_WINDOW_VIEWS;
+  private clear_frame_sources(): void {
+    this.frame_view = null;
+    this.frame_panes = null;
+    this.frame_anchor_views = EMPTY_WINDOW_VIEWS;
   }
 
-  private createEntry(
+  private create_entry(
     key: string,
-    rendererName: string,
+    renderer_name: string,
     renderer: CellRenderer,
     context: CellPaintContext,
-    sourceStyle: CellStyle,
+    source_style: CellStyle,
     row: number,
     col: number,
     sheet: string,
@@ -497,7 +509,7 @@ export class DomOverlay {
         "Sheetwrite: CellRenderer.dom() must return an HTMLElement",
       );
     }
-    this.claimRendererNode(node);
+    this.claim_renderer_node(node);
 
     const clip = document.createElement("div");
     clip.className = "sheetwrite-dom-cell";
@@ -510,7 +522,7 @@ export class DomOverlay {
     bounds.style.cssText = "position:absolute;pointer-events:none;";
     const entry: DomEntry = {
       key,
-      rendererName,
+      rendererName: renderer_name,
       sheet,
       row,
       col,
@@ -519,7 +531,7 @@ export class DomOverlay {
       bounds,
       context,
       node,
-      sourceStyle,
+      sourceStyle: source_style,
       frame: this.frame,
     };
 
@@ -527,11 +539,11 @@ export class DomOverlay {
       bounds.appendChild(node);
       clip.appendChild(bounds);
       this.element.appendChild(clip);
-      this.syncSemantics(entry);
+      this.sync_semantics(entry);
       return entry;
     } catch (error) {
       try {
-        this.removeEntry(entry, false);
+        this.remove_entry(entry, false);
       } catch {
         // Preserve the creation failure after completing structural cleanup.
       }
@@ -539,7 +551,7 @@ export class DomOverlay {
     }
   }
 
-  private updateEntry(
+  private update_entry(
     entry: DomEntry,
     value: CellScalar,
     x: number,
@@ -548,10 +560,10 @@ export class DomOverlay {
     h: number,
     theme: Theme,
     style: CellStyle,
-    sourceStyle: CellStyle,
+    source_style: CellStyle,
   ): void {
     const context = entry.context;
-    const needsLegacyRefresh =
+    const needs_legacy_refresh =
       context.value !== value ||
       context.w !== w ||
       context.h !== h ||
@@ -564,12 +576,12 @@ export class DomOverlay {
     context.h = h;
     context.theme = theme;
     context.style = style;
-    entry.sourceStyle = sourceStyle;
+    entry.sourceStyle = source_style;
 
     if (entry.renderer.update) {
       entry.renderer.update(entry.node, context);
-      this.syncSemantics(entry);
-    } else if (needsLegacyRefresh) {
+      this.sync_semantics(entry);
+    } else if (needs_legacy_refresh) {
       const next = entry.renderer.dom!(context);
       if (!(next instanceof HTMLElement)) {
         throw new SheetwriteError(
@@ -578,23 +590,23 @@ export class DomOverlay {
           "Sheetwrite: CellRenderer.dom() must return an HTMLElement",
         );
       }
-      this.claimRendererNode(next);
+      this.claim_renderer_node(next);
       const previous = entry.node;
-      const hadFocus = previous.contains(document.activeElement);
+      const had_focus = previous.contains(document.activeElement);
       const failures = new FirstFailure();
       failures.run(() => entry.renderer.destroy?.(previous));
-      this.ownedNodes.delete(previous);
+      this.owned_nodes.delete(previous);
       entry.bounds.replaceChildren(next);
       entry.node = next;
-      if (hadFocus) failures.run(() => this.focusHost());
+      if (had_focus) failures.run(() => this.focus_host());
       failures.rethrow();
-      this.syncSemantics(entry);
+      this.sync_semantics(entry);
     }
     // A legacy renderer whose node was not rebuilt keeps the semantics the last
     // rebuild or creation installed: only the position moved.
   }
 
-  private positionEntry(
+  private position_entry(
     entry: DomEntry,
     x: number,
     y: number,
@@ -612,20 +624,20 @@ export class DomOverlay {
       return;
     }
 
-    const clipStyle = entry.clip.style;
-    clipStyle.display = "block";
-    clipStyle.left = `${left}px`;
-    clipStyle.top = `${top}px`;
-    clipStyle.width = `${right - left}px`;
-    clipStyle.height = `${bottom - top}px`;
-    const boundsStyle = entry.bounds.style;
-    boundsStyle.left = `${x - left}px`;
-    boundsStyle.top = `${y - top}px`;
-    boundsStyle.width = `${w}px`;
-    boundsStyle.height = `${h}px`;
+    const clip_style = entry.clip.style;
+    clip_style.display = "block";
+    clip_style.left = `${left}px`;
+    clip_style.top = `${top}px`;
+    clip_style.width = `${right - left}px`;
+    clip_style.height = `${bottom - top}px`;
+    const bounds_style = entry.bounds.style;
+    bounds_style.left = `${x - left}px`;
+    bounds_style.top = `${y - top}px`;
+    bounds_style.width = `${w}px`;
+    bounds_style.height = `${h}px`;
   }
 
-  private syncSemantics(entry: DomEntry): void {
+  private sync_semantics(entry: DomEntry): void {
     const accessible =
       entry.node.matches(ACCESSIBLE_SELECTOR) || entry.node.querySelector(ACCESSIBLE_SELECTOR);
     if (accessible) entry.clip.removeAttribute("aria-hidden");
@@ -638,28 +650,28 @@ export class DomOverlay {
     entry.clip.style.pointerEvents = interactive ? "auto" : "none";
   }
 
-  private removeEntry(entry: DomEntry, restoreFocus: boolean): void {
-    const hadFocus = entry.node.contains(document.activeElement);
+  private remove_entry(entry: DomEntry, restore_focus: boolean): void {
+    const had_focus = entry.node.contains(document.activeElement);
     const failures = new FirstFailure();
     failures.run(() => entry.renderer.destroy?.(entry.node));
-    this.ownedNodes.delete(entry.node);
+    this.owned_nodes.delete(entry.node);
     entry.node.remove();
     entry.clip.remove();
     this.entries.delete(entry.key);
-    if (restoreFocus && hadFocus) failures.run(() => this.focusHost());
+    if (restore_focus && had_focus) failures.run(() => this.focus_host());
     failures.rethrow();
   }
 
-  private removeAllEntries(restoreFocus: boolean): void {
+  private remove_all_entries(restore_focus: boolean): void {
     const failures = new FirstFailure();
     for (const entry of this.entries.values()) {
-      failures.run(() => this.removeEntry(entry, restoreFocus));
+      failures.run(() => this.remove_entry(entry, restore_focus));
     }
     failures.rethrow();
   }
 
-  private claimRendererNode(node: HTMLElement): void {
-    if (this.ownedNodes.has(node)) {
+  private claim_renderer_node(node: HTMLElement): void {
+    if (this.owned_nodes.has(node)) {
       throw new SheetwriteError(
         "invalid-argument",
         "render",
@@ -673,23 +685,23 @@ export class DomOverlay {
         "Sheetwrite: CellRenderer.dom() must return a fresh detached HTMLElement",
       );
     }
-    this.ownedNodes.add(node);
+    this.owned_nodes.add(node);
   }
 
-  private focusHost(): void {
+  private focus_host(): void {
     this.host.focus({ preventScroll: true });
   }
 
-  private rendererId(renderer: CellRenderer): number {
-    let id = this.rendererIds.get(renderer);
+  private renderer_id(renderer: CellRenderer): number {
+    let id = this.renderer_ids.get(renderer);
     if (id === undefined) {
-      id = this.nextRendererId++;
-      this.rendererIds.set(renderer, id);
+      id = this.next_renderer_id++;
+      this.renderer_ids.set(renderer, id);
     }
     return id;
   }
 
-  private readonly onKeyDown = (event: KeyboardEvent): void => {
+  private readonly on_key_down = (event: KeyboardEvent): void => {
     const target = event.target;
     if (!(target instanceof Element)) return;
     const cell = target.closest<HTMLElement>(".sheetwrite-dom-cell");

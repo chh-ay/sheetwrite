@@ -151,33 +151,33 @@ function key(value: Pick<XlsxRawSample, "engine" | "operation" | "scenario">): s
   return `${value.engine}:${value.operation}:${value.scenario}`;
 }
 
-function finiteNonNegative(value: number, path: string): void {
+function finite_non_negative(value: number, path: string): void {
   if (!Number.isFinite(value) || value < 0)
     throw new Error(`${path} must be finite and non-negative`);
 }
 
-function exactMatrix(expected: readonly string[], actual: readonly string[]): void {
-  const expectedSorted = [...expected].sort();
-  const actualSorted = [...actual].sort();
-  if (JSON.stringify(expectedSorted) !== JSON.stringify(actualSorted)) {
+function exact_matrix(expected: readonly string[], actual: readonly string[]): void {
+  const expected_sorted = [...expected].sort();
+  const actual_sorted = [...actual].sort();
+  if (JSON.stringify(expected_sorted) !== JSON.stringify(actual_sorted)) {
     throw new Error(
-      `XLSX benchmark matrix mismatch: expected ${expectedSorted.join(", ")}; received ${actualSorted.join(", ")}`,
+      `XLSX benchmark matrix mismatch: expected ${expected_sorted.join(", ")}; received ${actual_sorted.join(", ")}`,
     );
   }
 }
 
-function returnAllocation(sample: XlsxRawSample): number {
+function return_allocation(sample: XlsxRawSample): number {
   return (
     Math.max(0, sample.heapAfterBytes - sample.heapBeforeBytes) +
     Math.max(0, sample.arrayBuffersAfterBytes - sample.arrayBuffersBeforeBytes)
   );
 }
 
-function summaryFor(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
+function summary_for(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
   const first = samples[0];
   if (!first) throw new Error("cannot summarize an empty XLSX sample");
   const rss = samples.map((sample) => sample.maxRssBytes);
-  const allocated = samples.map(returnAllocation);
+  const allocated = samples.map(return_allocation);
   const retained = samples.map(
     (sample) =>
       Math.max(0, sample.heapRetainedBytes - sample.heapBeforeBytes) +
@@ -201,7 +201,7 @@ function summaryFor(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
   };
 }
 
-function buildSummaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
+function build_summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
   const grouped = new Map<string, XlsxRawSample[]>();
   for (const sample of samples) {
     const bucket = grouped.get(key(sample));
@@ -209,15 +209,15 @@ function buildSummaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[
     else grouped.set(key(sample), [sample]);
   }
   return [...grouped.values()]
-    .map(summaryFor)
+    .map(summary_for)
     .sort((left, right) => key(left).localeCompare(key(right)));
 }
 
-function buildComparisons(summaries: readonly XlsxScenarioSummary[]): XlsxComparison[] {
-  const byKey = new Map(summaries.map((summary) => [key(summary), summary]));
+function build_comparisons(summaries: readonly XlsxScenarioSummary[]): XlsxComparison[] {
+  const by_key = new Map(summaries.map((summary) => [key(summary), summary]));
   return PERFORMANCE_SCENARIOS.map((scenario) => {
-    const current = byKey.get(`current:${scenario.operation}:${scenario.name}`);
-    const baseline = byKey.get(`baseline:${scenario.operation}:${scenario.name}`);
+    const current = by_key.get(`current:${scenario.operation}:${scenario.name}`);
+    const baseline = by_key.get(`baseline:${scenario.operation}:${scenario.name}`);
     if (!current || !baseline)
       throw new Error(`missing baseline pair for ${scenario.operation}:${scenario.name}`);
     return {
@@ -229,7 +229,7 @@ function buildComparisons(summaries: readonly XlsxScenarioSummary[]): XlsxCompar
   });
 }
 
-function baselineCommit(root: string): string {
+function baseline_commit(root: string): string {
   const result = Bun.spawnSync(["git", "rev-parse", "HEAD"], {
     cwd: root,
     stdout: "pipe",
@@ -239,7 +239,7 @@ function baselineCommit(root: string): string {
   return result.stdout.toString().trim();
 }
 
-async function runWorker(
+async function run_worker(
   round: number,
   engine: XlsxEngine,
   scenario: Scenario,
@@ -266,24 +266,24 @@ async function runWorker(
     ],
     { cwd: root, stdout: "pipe", stderr: "pipe" },
   );
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  const processWallMs = performance.now() - started;
-  if (exitCode !== 0) {
+  const process_wall_ms = performance.now() - started;
+  if (exit_code !== 0) {
     throw new Error(
-      `${engine} ${scenario.operation}:${scenario.name} exited ${exitCode}: ${stderr.trim()}`,
+      `${engine} ${scenario.operation}:${scenario.name} exited ${exit_code}: ${stderr.trim()}`,
     );
   }
   const lines = stdout.trim().split("\n");
   if (lines.length !== 1) throw new Error(`XLSX worker returned ${lines.length} output lines`);
   const parsed = JSON.parse(lines[0]!) as Omit<XlsxRawSample, "round" | "processWallMs">;
-  return { ...parsed, round, processWallMs };
+  return { ...parsed, round, processWallMs: process_wall_ms };
 }
 
-function expectedMatrix(rounds: number, compared: boolean): string[] {
+function expected_matrix(rounds: number, compared: boolean): string[] {
   const expected: string[] = [];
   for (let round = 0; round < rounds; round++) {
     for (const scenario of PERFORMANCE_SCENARIOS) {
@@ -327,7 +327,7 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
   ) {
     throw new Error("XLSX fixture provenance is incomplete");
   }
-  exactMatrix(
+  exact_matrix(
     [
       ...PERFORMANCE_SCENARIOS.map((scenario) => `${scenario.operation}:${scenario.name}`),
       ...REJECTION_SCENARIOS.map((scenario) => `${scenario.operation}:${scenario.name}`),
@@ -348,8 +348,8 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
   }
   if (artifact.maxBaselineRatio !== MAX_BASELINE_RATIO) throw new Error("XLSX ratio gate is stale");
   const compared = artifact.toolchain.baselineCommit !== undefined;
-  exactMatrix(
-    expectedMatrix(artifact.rounds, compared),
+  exact_matrix(
+    expected_matrix(artifact.rounds, compared),
     artifact.samples.map(
       (sample) => `${sample.round}:${sample.engine}:${sample.operation}:${sample.scenario}`,
     ),
@@ -370,7 +370,7 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
       "inputBytes",
       "outputBytes",
     ] as const) {
-      finiteNonNegative(sample[metric], `samples[${index}].${metric}`);
+      finite_non_negative(sample[metric], `samples[${index}].${metric}`);
     }
     if (!/^[a-f\d]{64}$/.test(sample.checksum)) {
       throw new Error(`samples[${index}].checksum must be SHA-256`);
@@ -379,9 +379,9 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
       throw new Error(`samples[${index}] peak RSS is below final RSS`);
     }
     if (sample.operation === "reject") {
-      const expectedResource =
+      const expected_resource =
         sample.scenario === "compression-ratio" ? "maxCompressionRatio" : "maxXmlDepth";
-      if (!sample.rejection?.includes(expectedResource)) {
+      if (!sample.rejection?.includes(expected_resource)) {
         throw new Error(`samples[${index}] did not reject the expected hostile resource`);
       }
       if (
@@ -408,11 +408,11 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
     if (checksums.size !== 1)
       throw new Error(`current ${scenario.operation}:${scenario.name} is not deterministic`);
   }
-  const summaries = buildSummaries(artifact.samples);
+  const summaries = build_summaries(artifact.samples);
   if (JSON.stringify(artifact.summaries) !== JSON.stringify(summaries)) {
     throw new Error("XLSX summaries do not match raw samples");
   }
-  const comparisons = compared ? buildComparisons(summaries) : [];
+  const comparisons = compared ? build_comparisons(summaries) : [];
   if (JSON.stringify(artifact.comparisons) !== JSON.stringify(comparisons)) {
     throw new Error("XLSX comparisons do not match raw samples");
   }
@@ -448,7 +448,7 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
   if (sha256(new Uint8Array(await Bun.file(CORPUS_GENERATOR).arrayBuffer())) !== GENERATOR_SHA256) {
     throw new Error("XLSX corpus generator checksum does not match the protocol");
   }
-  if (options.baselineRoot && baselineCommit(options.baselineRoot) !== BASELINE_COMMIT) {
+  if (options.baselineRoot && baseline_commit(options.baselineRoot) !== BASELINE_COMMIT) {
     throw new Error(`XLSX baseline must be detached at ${BASELINE_COMMIT}`);
   }
 
@@ -462,7 +462,7 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
         : (["current"] as const);
       for (const engine of engines) {
         samples.push(
-          await runWorker(
+          await run_worker(
             round,
             engine,
             scenario,
@@ -473,12 +473,12 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
       }
     }
     for (const scenario of REJECTION_SCENARIOS) {
-      samples.push(await runWorker(round, "current", scenario, options.mode, REPOSITORY_ROOT));
+      samples.push(await run_worker(round, "current", scenario, options.mode, REPOSITORY_ROOT));
     }
   }
-  const summaries = buildSummaries(samples);
-  const comparisons = options.baselineRoot ? buildComparisons(summaries) : [];
-  const fixtureBytes = Bun.file(CORPUS_FIXTURE).size;
+  const summaries = build_summaries(samples);
+  const comparisons = options.baselineRoot ? build_comparisons(summaries) : [];
+  const fixture_bytes = Bun.file(CORPUS_FIXTURE).size;
   return validateXlsxBenchmarkArtifact({
     protocol: PROTOCOL,
     mode: options.mode,
@@ -501,7 +501,7 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
     maxBaselineRatio: MAX_BASELINE_RATIO,
     fixture: {
       path: relative(REPOSITORY_ROOT, CORPUS_FIXTURE),
-      bytes: fixtureBytes,
+      bytes: fixture_bytes,
       sha256: FIXTURE_SHA256,
       generatorPath: relative(REPOSITORY_ROOT, CORPUS_GENERATOR),
       generatorSha256: GENERATOR_SHA256,
@@ -536,8 +536,8 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const mode: XlsxBenchmarkMode = args.includes("--smoke") ? "smoke" : "full";
-  const roundsText = optionValue(args, "--rounds");
-  const rounds = roundsText === undefined ? (mode === "smoke" ? 1 : 5) : Number(roundsText);
+  const rounds_text = optionValue(args, "--rounds");
+  const rounds = rounds_text === undefined ? (mode === "smoke" ? 1 : 5) : Number(rounds_text);
   const artifact = await runXlsxBenchmark({
     mode,
     rounds,

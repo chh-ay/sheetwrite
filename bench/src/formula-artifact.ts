@@ -38,11 +38,11 @@ const HARNESS_SOURCE_URLS = {
 const ENGINE_SOURCE_FILENAMES = ["sheetwrite_wasm.js", "sheetwrite_wasm_bg.wasm"] as const;
 export type FormulaEnginePackage = "wasm" | "formulas";
 
-/** The provenance keys of a capture that measured the engine in `packages/<enginePackage>`. */
-function formulaSourceFiles(enginePackage: FormulaEnginePackage): string[] {
+/** The provenance keys of a capture that measured the engine in `packages/<engine_package>`. */
+function formula_source_files(engine_package: FormulaEnginePackage): string[] {
   return [
     ...Object.keys(HARNESS_SOURCE_URLS),
-    ...ENGINE_SOURCE_FILENAMES.map((filename) => `packages/${enginePackage}/pkg/${filename}`),
+    ...ENGINE_SOURCE_FILENAMES.map((filename) => `packages/${engine_package}/pkg/${filename}`),
   ].sort();
 }
 
@@ -56,16 +56,16 @@ function formulaSourceFiles(enginePackage: FormulaEnginePackage): string[] {
 export function formulaSourceEnginePackage(
   files: Readonly<Record<string, string>>,
 ): FormulaEnginePackage {
-  const enginePackage =
+  const engine_package =
     "packages/formulas/pkg/sheetwrite_wasm_bg.wasm" in files ? "formulas" : "wasm";
-  const expected = formulaSourceFiles(enginePackage);
+  const expected = formula_source_files(engine_package);
   // Recorded captures before this extraction hash the original monolithic harness.
-  const extractedPaths: readonly string[] = FORMULA_SUPPORT_SOURCE_FILES;
-  const recordedKeys = extractedPaths.some((path) => path in files)
+  const extracted_paths: readonly string[] = FORMULA_SUPPORT_SOURCE_FILES;
+  const recorded_keys = extracted_paths.some((path) => path in files)
     ? expected
-    : expected.filter((path) => !extractedPaths.includes(path));
-  exactObjectKeys(files, recordedKeys, "formula source provenance.files");
-  return enginePackage;
+    : expected.filter((path) => !extracted_paths.includes(path));
+  exact_object_keys(files, recorded_keys, "formula source provenance.files");
+  return engine_package;
 }
 
 export const FORMULA_BENCHMARK_SCHEMA_VERSION = 2 as const;
@@ -74,7 +74,7 @@ export function formulaWorkloadKey(workload: Pick<FormulaWorkloadResult, "id" | 
   return `workload=${workload.id};size=${workload.size}`;
 }
 
-export const FORMULA_SOURCE_FILES = formulaSourceFiles(ENGINE_PACKAGE);
+export const FORMULA_SOURCE_FILES = formula_source_files(ENGINE_PACKAGE);
 export const FORMULA_ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_SAMPLES = 5;
 export const SMOKE_SAMPLES = 2;
@@ -262,20 +262,20 @@ export function currentFormulaSourceProvenance(commit: string): FormulaSourcePro
     if (url === undefined) throw new Error(`formula source ${path} has no file`);
     files[path] = sha256(readFileSync(url));
   }
-  const baselineContext = captureEngineBaselineContext(commit, [ENGINE_PACKAGE]);
+  const baseline_context = captureEngineBaselineContext(commit, [ENGINE_PACKAGE]);
   return {
     protocol: FORMULA_PROTOCOL,
     commit,
     files,
-    ...(baselineContext === undefined ? {} : { baselineContext }),
-    digest: formulaSourceDigest(commit, files, baselineContext),
+    ...(baseline_context === undefined ? {} : { baselineContext: baseline_context }),
+    digest: formulaSourceDigest(commit, files, baseline_context),
   };
 }
 
-function runnerCommand(
+function runner_command(
   mode: BenchmarkMode,
   capture: FormulaCaptureKind,
-  outputPath?: string,
+  output_path?: string,
 ): string[] {
   return [
     "bun",
@@ -283,23 +283,23 @@ function runnerCommand(
     "src/formula-bench.ts",
     ...(mode === "smoke" ? ["--smoke"] : []),
     ...(capture === "preliminary" ? ["--preliminary"] : []),
-    ...(capture === "output" && outputPath !== undefined ? ["--output", outputPath] : []),
+    ...(capture === "output" && output_path !== undefined ? ["--output", output_path] : []),
   ];
 }
 
 /** An output capture records the path it was written to, so validation checks its shape. */
-function runnerCommandMatches(
+function runner_command_matches(
   mode: BenchmarkMode,
   capture: FormulaCaptureKind,
   command: readonly string[],
 ): boolean {
   if (capture !== "output") {
-    return JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture));
+    return JSON.stringify(command) === JSON.stringify(runner_command(mode, capture));
   }
-  const outputPath = command.at(-1) ?? "";
+  const output_path = command.at(-1) ?? "";
   return (
-    outputPath.length > 0 &&
-    JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture, outputPath))
+    output_path.length > 0 &&
+    JSON.stringify(command) === JSON.stringify(runner_command(mode, capture, output_path))
   );
 }
 
@@ -309,7 +309,7 @@ export function currentRunnerProvenance(
   outputPath?: string,
 ): FormulaRunnerProvenance {
   return {
-    command: runnerCommand(mode, capture, outputPath),
+    command: runner_command(mode, capture, outputPath),
     bun: Bun.version,
     node: process.versions.node,
     platform: process.platform,
@@ -342,7 +342,7 @@ export interface FormulaArtifactMatrix {
 }
 
 /** A blocked capture declares why it carries no baseline comparison. */
-function formulaCaptureKind(regression: Record<string, unknown>): FormulaCaptureKind {
+function formula_capture_kind(regression: Record<string, unknown>): FormulaCaptureKind {
   if (regression.status === "passed") return "gated";
   if (regression.status !== "blocked") {
     throw new Error("formula regression gate has no declared status");
@@ -352,15 +352,15 @@ function formulaCaptureKind(regression: Record<string, unknown>): FormulaCapture
   throw new Error("formula blocked result does not declare a known blocker");
 }
 
-function objectRecord(value: unknown, path: string): Record<string, unknown> {
+function object_record(value: unknown, path: string): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${path} must be an object`);
   }
   return value as Record<string, unknown>;
 }
 
-function exactObjectKeys(value: unknown, expected: readonly string[], path: string): void {
-  const record = objectRecord(value, path);
+function exact_object_keys(value: unknown, expected: readonly string[], path: string): void {
+  const record = object_record(value, path);
   const actual = Object.keys(record).sort();
   const wanted = [...expected].sort();
   if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
@@ -368,17 +368,17 @@ function exactObjectKeys(value: unknown, expected: readonly string[], path: stri
   }
 }
 
-function exactString(value: unknown, path: string): asserts value is string {
+function exact_string(value: unknown, path: string): asserts value is string {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${path} must be a non-empty string`);
   }
 }
 
-function validateStatShape(stat: Stat, path: string): void {
-  exactObjectKeys(stat, ["median", "p95", "mean", "stddev", "min", "max", "iters"], path);
+function validate_stat_shape(stat: Stat, path: string): void {
+  exact_object_keys(stat, ["median", "p95", "mean", "stddev", "min", "max", "iters"], path);
 }
 
-function validateArtifactBound(result: FormulaBenchmarkResult): void {
+function validate_artifact_bound(result: FormulaBenchmarkResult): void {
   let serialized: string;
   try {
     serialized = JSON.stringify(result);
@@ -393,17 +393,17 @@ function validateArtifactBound(result: FormulaBenchmarkResult): void {
   }
 }
 
-function validateProvenance(
+function validate_provenance(
   result: CompleteFormulaBenchmarkResult,
   capture: FormulaCaptureKind,
 ): void {
-  exactObjectKeys(
+  exact_object_keys(
     result.meta,
     ["bun", "platform", "arch", "commit", "dirty", "timestamp"],
     "formula metadata",
   );
   for (const field of ["bun", "platform", "arch"] as const) {
-    exactString(result.meta[field], `formula metadata.${field}`);
+    exact_string(result.meta[field], `formula metadata.${field}`);
   }
   if (!/^[0-9a-f]{40}$/u.test(result.meta.commit)) {
     throw new Error("formula metadata.commit must be a 40-character lowercase Git SHA");
@@ -419,7 +419,7 @@ function validateProvenance(
     throw new Error("formula metadata.timestamp must be a canonical ISO timestamp");
   }
 
-  exactObjectKeys(
+  exact_object_keys(
     result.runner,
     ["command", "bun", "node", "platform", "kernel", "arch", "cpu", "concurrency", "gc"],
     "formula runner provenance",
@@ -427,12 +427,12 @@ function validateProvenance(
   if (
     !Array.isArray(result.runner.command) ||
     result.runner.command.some((part) => typeof part !== "string") ||
-    !runnerCommandMatches(result.mode, capture, result.runner.command)
+    !runner_command_matches(result.mode, capture, result.runner.command)
   ) {
     throw new Error("formula runner provenance.command does not match the declared capture mode");
   }
   for (const field of ["bun", "node", "platform", "kernel", "arch", "cpu"] as const) {
-    exactString(result.runner[field], `formula runner provenance.${field}`);
+    exact_string(result.runner[field], `formula runner provenance.${field}`);
   }
   if (
     result.runner.concurrency !== 1 ||
@@ -450,7 +450,7 @@ function validateProvenance(
     throw new Error("formula runner provenance disagrees with formula metadata");
   }
 
-  exactObjectKeys(
+  exact_object_keys(
     result.source,
     [
       "protocol",
@@ -464,7 +464,7 @@ function validateProvenance(
   if (result.source.protocol !== FORMULA_PROTOCOL || result.source.commit !== result.meta.commit) {
     throw new Error("formula source provenance protocol/commit does not match metadata");
   }
-  const recordedPackage = formulaSourceEnginePackage(result.source.files);
+  const recorded_package = formulaSourceEnginePackage(result.source.files);
   for (const path of Object.keys(result.source.files)) {
     if (!/^[0-9a-f]{64}$/u.test(result.source.files[path] ?? "")) {
       throw new Error(`formula source provenance.files.${path} must be a SHA-256 digest`);
@@ -478,14 +478,14 @@ function validateProvenance(
     });
     if (packages.length !== 1) throw new Error("Formula baseline must identify one engine");
     validateEngineBaselineContext(result.source.baselineContext, result.source.commit, packages);
-    const packageName = packages[0];
-    if (recordedPackage !== "wasm" && recordedPackage !== packageName) {
+    const package_name = packages[0];
+    if (recorded_package !== "wasm" && recorded_package !== package_name) {
       throw new Error("Formula baseline engine file binding mismatch");
     }
     for (const filename of ENGINE_SOURCE_FILENAMES) {
       if (
-        result.source.files[`packages/${recordedPackage}/pkg/${filename}`] !==
-        result.source.baselineContext.engineFiles[`packages/${packageName}/pkg/${filename}`]
+        result.source.files[`packages/${recorded_package}/pkg/${filename}`] !==
+        result.source.baselineContext.engineFiles[`packages/${package_name}/pkg/${filename}`]
       ) {
         throw new Error("Formula baseline engine file binding mismatch");
       }
@@ -501,19 +501,19 @@ function validateProvenance(
   }
 }
 
-function validateAllocation(
+function validate_allocation(
   workload: CompleteFormulaWorkloadResult,
-  expectedSamples: number,
+  expected_samples: number,
   key: string,
 ): void {
   if (
     !Array.isArray(workload.allocationSamples) ||
-    workload.allocationSamples.length !== expectedSamples
+    workload.allocationSamples.length !== expected_samples
   ) {
-    throw new Error(`${key}.allocationSamples must contain ${expectedSamples} raw samples`);
+    throw new Error(`${key}.allocationSamples must contain ${expected_samples} raw samples`);
   }
   for (const [index, sample] of workload.allocationSamples.entries()) {
-    exactObjectKeys(
+    exact_object_keys(
       sample,
       ["retainedBytes", "peakTransientBytes", "transientAllocations"],
       `${key}.allocationSamples[${index}]`,
@@ -528,13 +528,13 @@ function validateAllocation(
       `${key}.allocationSamples[${index}].transientAllocations`,
     );
   }
-  exactObjectKeys(
+  exact_object_keys(
     workload.allocationStat,
     ["retainedBytes", "peakTransientBytes", "transientAllocations"],
     `${key}.allocationStat`,
   );
   for (const field of ["retainedBytes", "peakTransientBytes", "transientAllocations"] as const) {
-    validateStatShape(workload.allocationStat[field], `${key}.allocationStat.${field}`);
+    validate_stat_shape(workload.allocationStat[field], `${key}.allocationStat.${field}`);
     validateRawStat(
       workload.allocationSamples.map((sample) => sample[field]),
       workload.allocationStat[field],
@@ -552,7 +552,7 @@ function validateAllocation(
   }
 }
 
-function assertCompleteFormulaResult(
+function assert_complete_formula_result(
   result: FormulaBenchmarkResult,
 ): asserts result is CompleteFormulaBenchmarkResult {
   if (
@@ -573,15 +573,15 @@ function assertCompleteFormulaResult(
   }
 }
 
-function validateFormulaEvidence(
+function validate_formula_evidence(
   matrix: FormulaArtifactMatrix,
   result: FormulaBenchmarkResult,
-  expectedMode: BenchmarkMode,
-  requirePassedGate: boolean,
-  expectedWorkloadKeys = matrix.workloadKeys(expectedMode),
+  expected_mode: BenchmarkMode,
+  require_passed_gate: boolean,
+  expected_workload_keys = matrix.workloadKeys(expected_mode),
 ): asserts result is CompleteFormulaBenchmarkResult {
-  validateArtifactBound(result);
-  assertGateIdentity("formula", expectedMode, result);
+  validate_artifact_bound(result);
+  assertGateIdentity("formula", expected_mode, result);
   if (!Array.isArray(result.workloads)) throw new Error("formula workloads must be an array");
   for (const workload of result.workloads) {
     if (
@@ -595,11 +595,11 @@ function validateFormulaEvidence(
   }
   validateExactMatrix(
     "formula workload",
-    expectedWorkloadKeys,
+    expected_workload_keys,
     result.workloads.map(formulaWorkloadKey),
   );
 
-  exactObjectKeys(
+  exact_object_keys(
     result,
     [
       "protocolVersion",
@@ -618,31 +618,31 @@ function validateFormulaEvidence(
     "formula artifact",
   );
   for (const workload of result.workloads) {
-    exactObjectKeys(
+    exact_object_keys(
       workload,
       ["id", "size", "samplesMs", "stat", "allocationSamples", "allocationStat", "output"],
       "formula workload",
     );
   }
-  assertCompleteFormulaResult(result);
+  assert_complete_formula_result(result);
   if (result.schemaVersion !== FORMULA_BENCHMARK_SCHEMA_VERSION) {
     throw new Error(
       `formula schema mismatch: expected ${FORMULA_BENCHMARK_SCHEMA_VERSION}, observed ${String(result.schemaVersion)}`,
     );
   }
-  const regression = objectRecord(result.gates.regression, "formula gates.regression");
-  const capture = formulaCaptureKind(regression);
-  validateProvenance(result, capture);
+  const regression = object_record(result.gates.regression, "formula gates.regression");
+  const capture = formula_capture_kind(regression);
+  validate_provenance(result, capture);
 
-  const expectedSamples = expectedMode === "smoke" ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
-  exactObjectKeys(
+  const expected_samples = expected_mode === "smoke" ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
+  exact_object_keys(
     result.methodology,
     ["warmupSamples", "measuredSamples", "timing", "allocation", "correctness"],
     "formula methodology",
   );
   if (
     result.methodology.warmupSamples !== 1 ||
-    result.methodology.measuredSamples !== expectedSamples ||
+    result.methodology.measuredSamples !== expected_samples ||
     result.methodology.timing !== TIMING_METHOD ||
     result.methodology.allocation !== ALLOCATION_METHOD ||
     result.methodology.correctness !== CORRECTNESS_METHOD
@@ -651,12 +651,12 @@ function validateFormulaEvidence(
   }
   for (const workload of result.workloads) {
     const key = formulaWorkloadKey(workload);
-    if (!Array.isArray(workload.samplesMs) || workload.samplesMs.length !== expectedSamples) {
-      throw new Error(`${key}.samplesMs must contain ${expectedSamples} post-warmup raw samples`);
+    if (!Array.isArray(workload.samplesMs) || workload.samplesMs.length !== expected_samples) {
+      throw new Error(`${key}.samplesMs must contain ${expected_samples} post-warmup raw samples`);
     }
-    validateStatShape(workload.stat, `${key}.stat`);
+    validate_stat_shape(workload.stat, `${key}.stat`);
     validateRawStat(workload.samplesMs, workload.stat, key);
-    validateAllocation(workload, expectedSamples, key);
+    validate_allocation(workload, expected_samples, key);
     const expected = expectedFormulaOutput(workload.id, workload.size);
     if (!outputsEqual(workload.output, expected)) {
       throw new Error(
@@ -679,14 +679,14 @@ function validateFormulaEvidence(
 
   if (!Array.isArray(result.memory)) throw new Error("formula memory must be an array");
   for (const memory of result.memory) {
-    exactObjectKeys(memory, ["formulas", "wasmDeltaBytes"], "formula memory");
+    exact_object_keys(memory, ["formulas", "wasmDeltaBytes"], "formula memory");
     if (!Number.isInteger(memory.formulas) || memory.formulas <= 0) {
       throw new Error("formula memory contains a malformed identity");
     }
   }
   validateExactMatrix(
     "formula memory",
-    matrix.memoryKeys(expectedMode),
+    matrix.memoryKeys(expected_mode),
     result.memory.map((memory) => `memory=formulas=${memory.formulas}`),
   );
   for (const memory of result.memory) {
@@ -698,15 +698,15 @@ function validateFormulaEvidence(
     }
   }
 
-  exactObjectKeys(result.gates, ["passed", "tolerance", "regression"], "formula gates");
+  exact_object_keys(result.gates, ["passed", "tolerance", "regression"], "formula gates");
   if (result.gates.tolerance !== FORMULA_GATE_TOLERANCE) {
     throw new Error("formula gates.tolerance does not match the enforced regression policy");
   }
-  if (requirePassedGate) {
+  if (require_passed_gate) {
     if (result.gates.passed !== true || regression.status !== "passed") {
       throw new Error("formula result does not contain a successful regression gate record");
     }
-    exactObjectKeys(
+    exact_object_keys(
       regression,
       ["status", "baselineCommit", "baselineSourceDigest"],
       "formula gates.regression",
@@ -723,10 +723,10 @@ function validateFormulaEvidence(
     if (result.gates.passed !== false || capture === "gated") {
       throw new Error("formula blocked result must fail closed with its declared baseline blocker");
     }
-    exactObjectKeys(regression, ["status", "blocker"], "formula gates.regression");
+    exact_object_keys(regression, ["status", "blocker"], "formula gates.regression");
   }
 
-  if (expectedMode === "full") {
+  if (expected_mode === "full") {
     for (const id of [
       "independent-parse-load",
       "independent-first-recompute",
@@ -767,11 +767,11 @@ export function validateFormulaBenchmark(
   result: FormulaBenchmarkResult,
   expectedMode: BenchmarkMode = result.mode,
 ): asserts result is CompleteFormulaBenchmarkResult {
-  validateFormulaEvidence(matrix, result, expectedMode, true);
+  validate_formula_evidence(matrix, result, expectedMode, true);
 }
 
-function timingRegressionLimit(baseline: number, floorMs: number): number {
-  return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + floorMs);
+function timing_regression_limit(baseline: number, floor_ms: number): number {
+  return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + floor_ms);
 }
 
 /**
@@ -786,22 +786,22 @@ function timingRegressionLimit(baseline: number, floorMs: number): number {
 const SUB_MILLISECOND_BASELINE_MS = 1;
 const SUB_MILLISECOND_MEDIAN_FLOOR_MS = 0.3;
 
-function isSubMillisecond(baseline: FormulaWorkloadResult): boolean {
+function is_sub_millisecond(baseline: FormulaWorkloadResult): boolean {
   return baseline.stat.median < SUB_MILLISECOND_BASELINE_MS;
 }
 
-function validateLegacyFormulaBaseline(
+function validate_legacy_formula_baseline(
   matrix: FormulaArtifactMatrix,
   result: FormulaBenchmarkResult,
 ): void {
-  validateArtifactBound(result);
+  validate_artifact_bound(result);
   assertGateIdentity("formula", "full", result);
-  exactObjectKeys(
+  exact_object_keys(
     result,
     ["protocolVersion", "mode", "matrixId", "meta", "workloads", "memory", "gates"],
     "legacy formula artifact",
   );
-  exactObjectKeys(
+  exact_object_keys(
     result.meta,
     ["bun", "platform", "arch", "commit", "dirty", "timestamp"],
     "legacy formula metadata",
@@ -819,11 +819,11 @@ function validateLegacyFormulaBaseline(
   );
   for (const workload of result.workloads) {
     const key = formulaWorkloadKey(workload);
-    exactObjectKeys(workload, ["id", "size", "samplesMs", "stat"], key);
+    exact_object_keys(workload, ["id", "size", "samplesMs", "stat"], key);
     if (!Array.isArray(workload.samplesMs) || workload.samplesMs.length !== DEFAULT_SAMPLES) {
       throw new Error(`${key}.samplesMs must contain ${DEFAULT_SAMPLES} post-warmup raw samples`);
     }
-    validateStatShape(workload.stat, `${key}.stat`);
+    validate_stat_shape(workload.stat, `${key}.stat`);
     validateRawStat(workload.samplesMs, workload.stat, key);
     if (workload.stat.p95 >= 30_000) {
       throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
@@ -835,13 +835,13 @@ function validateLegacyFormulaBaseline(
     result.memory.map((memory) => `memory=formulas=${memory.formulas}`),
   );
   for (const memory of result.memory) {
-    exactObjectKeys(memory, ["formulas", "wasmDeltaBytes"], "legacy formula memory");
+    exact_object_keys(memory, ["formulas", "wasmDeltaBytes"], "legacy formula memory");
     assertFiniteNonNegative(
       memory.wasmDeltaBytes,
       `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
     );
   }
-  exactObjectKeys(result.gates, ["passed", "tolerance"], "legacy formula gates");
+  exact_object_keys(result.gates, ["passed", "tolerance"], "legacy formula gates");
   if (result.gates.passed !== true || typeof result.gates.tolerance !== "string") {
     throw new Error("legacy formula baseline does not contain a successful gate");
   }
@@ -851,7 +851,7 @@ function validateLegacyFormulaBaseline(
  * An older baseline may leave out expanded workloads. Every core workload must still be listed,
  * and no key outside the current full matrix is allowed.
  */
-function regressionBaselineWorkloadKeys(
+function regression_baseline_workload_keys(
   matrix: FormulaArtifactMatrix,
   baseline: FormulaBenchmarkResult,
 ): string[] {
@@ -866,13 +866,13 @@ function regressionBaselineWorkloadKeys(
       return expected;
     }
   }
-  const observedSet = new Set(observed);
+  const observed_set = new Set(observed);
   const recognised = new Set(matrix.workloadKeys("full", "formulas"));
   const core = matrix.legacyWorkloadKeys();
   if (
     observed.length > 0 &&
     core.length > 0 &&
-    core.every((key) => observedSet.has(key)) &&
+    core.every((key) => observed_set.has(key)) &&
     observed.every((key) => recognised.has(key))
   ) {
     return observed;
@@ -880,28 +880,28 @@ function regressionBaselineWorkloadKeys(
   throw new Error("formula regression baseline does not match the current or legacy full matrix");
 }
 
-function validateFormulaBaselineBinding(
+function validate_formula_baseline_binding(
   matrix: FormulaArtifactMatrix,
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
 ): asserts candidate is CompleteFormulaBenchmarkResult {
   if (baseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
-    validateFormulaEvidence(
+    validate_formula_evidence(
       matrix,
       baseline,
       "full",
       true,
-      regressionBaselineWorkloadKeys(matrix, baseline),
+      regression_baseline_workload_keys(matrix, baseline),
     );
   } else {
-    validateLegacyFormulaBaseline(matrix, baseline);
+    validate_legacy_formula_baseline(matrix, baseline);
   }
   validateFormulaBenchmark(matrix, candidate, candidate.mode);
-  const baselineIdentity = formulaRegressionBaselineIdentity(baseline);
+  const baseline_identity = formulaRegressionBaselineIdentity(baseline);
   const regression = candidate.gates.regression as PassedRegressionGate;
   if (
-    regression.baselineCommit !== baselineIdentity.commit ||
-    regression.baselineSourceDigest !== baselineIdentity.sourceDigest
+    regression.baselineCommit !== baseline_identity.commit ||
+    regression.baselineSourceDigest !== baseline_identity.sourceDigest
   ) {
     throw new Error("formula regression gate is not bound to the supplied baseline provenance");
   }
@@ -911,27 +911,27 @@ function validateFormulaBaselineBinding(
 export function readCommittedFormulaBaseline(
   matrix: FormulaArtifactMatrix,
 ): FormulaBenchmarkResult {
-  const rawBaseline = readFileSync(
+  const raw_baseline = readFileSync(
     new URL("../results/formula-results.json", import.meta.url),
     "utf8",
   );
-  const baselineBytes = Buffer.byteLength(rawBaseline);
-  if (baselineBytes > FORMULA_ARTIFACT_MAX_BYTES) {
+  const baseline_bytes = Buffer.byteLength(raw_baseline);
+  if (baseline_bytes > FORMULA_ARTIFACT_MAX_BYTES) {
     throw new Error(
-      `formula baseline artifact exceeded the ${FORMULA_ARTIFACT_MAX_BYTES} byte safety ceiling: ${baselineBytes}`,
+      `formula baseline artifact exceeded the ${FORMULA_ARTIFACT_MAX_BYTES} byte safety ceiling: ${baseline_bytes}`,
     );
   }
-  const baseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
+  const baseline = JSON.parse(raw_baseline) as FormulaBenchmarkResult;
   if (baseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
-    validateFormulaEvidence(
+    validate_formula_evidence(
       matrix,
       baseline,
       "full",
       true,
-      regressionBaselineWorkloadKeys(matrix, baseline),
+      regression_baseline_workload_keys(matrix, baseline),
     );
   } else {
-    validateLegacyFormulaBaseline(matrix, baseline);
+    validate_legacy_formula_baseline(matrix, baseline);
   }
   return baseline;
 }
@@ -944,7 +944,7 @@ interface GateRow {
   ruleLimit: number;
 }
 
-function assertWithinGate(gate: GateRow): void {
+function assert_within_gate(gate: GateRow): void {
   if (gate.candidate > gate.ruleLimit) {
     throw new Error(
       `${gate.row} regression: baseline ${gate.baseline}, candidate ${gate.candidate}, limit ${gate.ruleLimit}`,
@@ -957,28 +957,28 @@ export function validateFormulaRegression(
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
 ): void {
-  validateFormulaBaselineBinding(matrix, candidate, baseline);
-  const baselineWorkloads = new Map(
+  validate_formula_baseline_binding(matrix, candidate, baseline);
+  const baseline_workloads = new Map(
     baseline.workloads.map((workload) => [formulaWorkloadKey(workload), workload]),
   );
 
-  let comparedWorkloads = 0;
+  let compared_workloads = 0;
   for (const workload of candidate.workloads) {
     const key = formulaWorkloadKey(workload);
-    const previous = baselineWorkloads.get(key);
+    const previous = baseline_workloads.get(key);
     if (previous === undefined) continue;
-    comparedWorkloads += 1;
-    const subMillisecond = isSubMillisecond(previous);
+    compared_workloads += 1;
+    const sub_millisecond = is_sub_millisecond(previous);
     for (const field of ["median", "p95"] as const) {
-      if (field === "p95" && subMillisecond) continue;
+      if (field === "p95" && sub_millisecond) continue;
       const before = previous.stat[field];
-      assertWithinGate({
+      assert_within_gate({
         row: `${key}.${field}`,
         baseline: before,
         candidate: workload.stat[field],
-        ruleLimit: timingRegressionLimit(
+        ruleLimit: timing_regression_limit(
           before,
-          subMillisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : TIMING_REGRESSION_FLOOR_MS,
+          sub_millisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : TIMING_REGRESSION_FLOOR_MS,
         ),
       });
     }
@@ -990,7 +990,7 @@ export function validateFormulaRegression(
       ] as const) {
         for (const field of ["median", "p95"] as const) {
           const before = previous.allocationStat[allocation][field];
-          assertWithinGate({
+          assert_within_gate({
             row: `${key}.allocation.${allocation}.${field}`,
             baseline: before,
             candidate: workload.allocationStat[allocation][field],
@@ -1000,17 +1000,17 @@ export function validateFormulaRegression(
       }
     }
   }
-  if (comparedWorkloads === 0) {
+  if (compared_workloads === 0) {
     throw new Error("formula regression baseline has no workloads compatible with the candidate");
   }
 
-  const baselineMemory = new Map(
+  const baseline_memory = new Map(
     baseline.memory.map((entry) => [entry.formulas, entry.wasmDeltaBytes]),
   );
   for (const memory of candidate.memory) {
-    const before = baselineMemory.get(memory.formulas);
+    const before = baseline_memory.get(memory.formulas);
     if (before === undefined) continue;
-    assertWithinGate({
+    assert_within_gate({
       row: `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
       baseline: before,
       candidate: memory.wasmDeltaBytes,
@@ -1026,17 +1026,17 @@ export function validateFormulaCapture(
 ): void {
   if (baseline === undefined) {
     // A release baseline's engine may predate expanded rows; see runWorkloads in formula-bench.ts.
-    const olderEngine =
+    const older_engine =
       candidate.mode === "full" && candidate.source?.baselineContext !== undefined;
-    validateFormulaEvidence(
+    validate_formula_evidence(
       matrix,
       candidate,
       candidate.mode,
       false,
-      olderEngine ? regressionBaselineWorkloadKeys(matrix, candidate) : undefined,
+      older_engine ? regression_baseline_workload_keys(matrix, candidate) : undefined,
     );
   } else if (candidate.mode === "smoke") {
-    validateFormulaBaselineBinding(matrix, candidate, baseline);
+    validate_formula_baseline_binding(matrix, candidate, baseline);
   } else {
     validateFormulaRegression(matrix, candidate, baseline);
   }
@@ -1052,12 +1052,12 @@ export function validateRecordedFormulaCapture(
   matrix: FormulaArtifactMatrix,
   capture: FormulaBenchmarkResult,
 ): void {
-  validateFormulaEvidence(
+  validate_formula_evidence(
     matrix,
     capture,
     capture.mode,
     false,
-    regressionBaselineWorkloadKeys(matrix, capture),
+    regression_baseline_workload_keys(matrix, capture),
   );
 }
 
@@ -1066,12 +1066,12 @@ export function validateCurrentCaptureProvenance(
   capture: FormulaCaptureKind,
   outputPath?: string,
 ): void {
-  const currentSource = currentFormulaSourceProvenance(result.meta.commit);
-  if (JSON.stringify(result.source) !== JSON.stringify(currentSource)) {
+  const current_source = currentFormulaSourceProvenance(result.meta.commit);
+  if (JSON.stringify(result.source) !== JSON.stringify(current_source)) {
     throw new Error("formula capture source provenance does not match current source bytes");
   }
-  const currentRunner = currentRunnerProvenance(result.mode, capture, outputPath);
-  if (JSON.stringify(result.runner) !== JSON.stringify(currentRunner)) {
+  const current_runner = currentRunnerProvenance(result.mode, capture, outputPath);
+  if (JSON.stringify(result.runner) !== JSON.stringify(current_runner)) {
     throw new Error("formula capture runner provenance does not match the current runner");
   }
 }

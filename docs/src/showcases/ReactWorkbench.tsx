@@ -42,53 +42,53 @@ const SEGMENT_OPTIONS = [
   ...ANALYTICS_SEGMENTS.map((value) => ({ label: value, value })),
 ];
 
-function kpiText(value: number | null): string {
+function kpi_text(value: number | null): string {
   return value === null ? "—" : money.format(value);
 }
 
 /** Layout effect that also runs through SSR without warnings. */
-const useStageLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+const use_stage_layout_effect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export default function ReactWorkbench() {
-  const gridHostRef = useRef<HTMLDivElement | null>(null);
-  const [gridHostWidth, setGridHostWidth] = useState(0);
+  const grid_host_ref = useRef<HTMLDivElement | null>(null);
+  const [grid_host_width, set_grid_host_width] = useState(0);
   // Column widths follow the real stage: the Grid pads its host with empty
   // letter columns past the sheet schema, so the workbook is fitted to the
   // measured host before the Grid is constructed (see fitColumnsToHost).
-  useStageLayoutEffect(() => {
-    const host = gridHostRef.current;
-    if (host) setGridHostWidth(host.clientWidth);
+  use_stage_layout_effect(() => {
+    const host = grid_host_ref.current;
+    if (host) set_grid_host_width(host.clientWidth);
   }, []);
-  const bench = useAnalyticsWorkbench({ gridHostWidth });
-  const { fitGridColumns } = bench;
-  const hasMatches = (bench.matches?.matches.length ?? 0) > 0;
+  const bench = useAnalyticsWorkbench({ gridHostWidth: grid_host_width });
+  const { fitGridColumns: fit_grid_columns } = bench;
+  const has_matches = (bench.matches?.matches.length ?? 0) > 0;
 
   // A resized stage re-fits the declared columns: at most one fit per frame,
   // and the fit itself skips the re-layout when no width moved.
   useEffect(() => {
-    const host = gridHostRef.current;
-    if (!host || gridHostWidth === 0) return;
+    const host = grid_host_ref.current;
+    if (!host || grid_host_width === 0) return;
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => fitGridColumns(host.clientWidth));
+      frame = requestAnimationFrame(() => fit_grid_columns(host.clientWidth));
     });
     observer.observe(host);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [fitGridColumns, gridHostWidth]);
+  }, [fit_grid_columns, grid_host_width]);
 
-  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+  function on_search_key_down(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === "Enter") bench.runSearch(bench.query);
   }
 
-  function onFormulaKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+  function on_formula_key_down(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === "Enter") bench.commitFormulaDraft();
   }
 
-  function onImportChange(event: ReactChangeEvent<HTMLInputElement>): void {
+  function on_import_change(event: ReactChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (file) void bench.importCsv(file);
@@ -175,7 +175,7 @@ export default function ReactWorkbench() {
                 placeholder="Enter a value or formula"
                 disabled={bench.readOnly || bench.formulaAddress === null}
                 onChange={(event) => bench.editFormulaDraft(event.target.value)}
-                onKeyDown={onFormulaKeyDown}
+                onKeyDown={on_formula_key_down}
               />
             </label>
             <DemoButton
@@ -189,9 +189,9 @@ export default function ReactWorkbench() {
         </div>
 
         <div className="sw-rwb-workspace">
-          <div className="sw-demo-grid" ref={gridHostRef}>
+          <div className="sw-demo-grid" ref={grid_host_ref}>
             <ActionError error={bench.initializationError} />
-            {gridHostWidth > 0 ? (
+            {grid_host_width > 0 ? (
               <SheetwriteGrid
                 ref={bench.gridRef}
                 workbook={bench.workbook}
@@ -246,25 +246,25 @@ export default function ReactWorkbench() {
               <div className="sw-rwb-kpi">
                 <dt>Total ARR</dt>
                 <dd data-testid="kpi-total" data-raw={bench.kpis.total ?? ""}>
-                  {kpiText(bench.kpis.total)}
+                  {kpi_text(bench.kpis.total)}
                 </dd>
               </div>
               <div className="sw-rwb-kpi">
                 <dt>Average deal</dt>
                 <dd data-testid="kpi-average" data-raw={bench.kpis.average ?? ""}>
-                  {kpiText(bench.kpis.average)}
+                  {kpi_text(bench.kpis.average)}
                 </dd>
               </div>
               <div className="sw-rwb-kpi">
                 <dt>Largest deal</dt>
                 <dd data-testid="kpi-largest" data-raw={bench.kpis.largest ?? ""}>
-                  {kpiText(bench.kpis.largest)}
+                  {kpi_text(bench.kpis.largest)}
                 </dd>
               </div>
               <div className="sw-rwb-kpi" data-focused={bench.market !== "all"}>
                 <dt>{bench.market === "all" ? "All-market ARR" : `${bench.market} ARR`}</dt>
                 <dd data-testid="kpi-market" data-raw={bench.kpis.market ?? ""}>
-                  {kpiText(bench.kpis.market)}
+                  {kpi_text(bench.kpis.market)}
                 </dd>
               </div>
             </dl>
@@ -317,16 +317,16 @@ export default function ReactWorkbench() {
                       value={bench.query}
                       placeholder="Beacon Ridge"
                       onChange={(event) => bench.setQuery(event.target.value)}
-                      onKeyDown={onSearchKeyDown}
+                      onKeyDown={on_search_key_down}
                     />
                   </label>
                   <DemoButton type="button" onClick={() => bench.runSearch(bench.query)}>
                     Find
                   </DemoButton>
-                  <DemoButton type="button" onClick={bench.findPrev} disabled={!hasMatches}>
+                  <DemoButton type="button" onClick={bench.findPrev} disabled={!has_matches}>
                     Previous
                   </DemoButton>
-                  <DemoButton type="button" onClick={bench.findNext} disabled={!hasMatches}>
+                  <DemoButton type="button" onClick={bench.findNext} disabled={!has_matches}>
                     Next
                   </DemoButton>
                 </fieldset>
@@ -346,14 +346,14 @@ export default function ReactWorkbench() {
                   <DemoButton
                     type="button"
                     onClick={bench.replaceCurrent}
-                    disabled={bench.readOnly || !hasMatches}
+                    disabled={bench.readOnly || !has_matches}
                   >
                     Replace
                   </DemoButton>
                   <DemoButton
                     type="button"
                     onClick={bench.replaceAll}
-                    disabled={bench.readOnly || !hasMatches}
+                    disabled={bench.readOnly || !has_matches}
                   >
                     Replace all
                   </DemoButton>
@@ -405,7 +405,7 @@ export default function ReactWorkbench() {
                       accept=".csv,text/csv"
                       disabled={bench.readOnly || bench.importAction.pending}
                       aria-busy={bench.importAction.pending || undefined}
-                      onChange={onImportChange}
+                      onChange={on_import_change}
                     />
                   </label>
                   <a

@@ -5,16 +5,18 @@ import {
   WASM_FUNCTION_BUDGET_BYTES,
 } from "../../scripts/wasm-function-sizes.js";
 
-const wasmPath = new URL("./pkg/sheetwrite_queries_bg.wasm", import.meta.url);
-const { wasm, largestFunctions } = checkWasmFunctionSizes(await readFile(wasmPath));
+const wasm_path = new URL("./pkg/sheetwrite_queries_bg.wasm", import.meta.url);
+const { wasm, largestFunctions: largest_functions } = checkWasmFunctionSizes(
+  await readFile(wasm_path),
+);
 
 process.stdout.write(
   [
     `Query WASM function budget: ${WASM_FUNCTION_BUDGET_BYTES} B`,
-    ...largestFunctions.map((entry) => `${entry.bytes} B ${entry.name}`),
+    ...largest_functions.map((entry) => `${entry.bytes} B ${entry.name}`),
     "",
   ].join("\n"),
 );
 
 // Names are needed by the guard but do not belong in the shipped artifact.
-await writeFile(wasmPath, wasm);
+await writeFile(wasm_path, wasm);

@@ -474,12 +474,12 @@ const TYPE_FACADE_IMPORTERS: Readonly<Record<string, true>> = {
 };
 
 export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGraphIssue[] {
-  const normalizedFiles = new Map<string, string>();
-  for (const [file, source] of files) normalizedFiles.set(toPosix(normalize(file)), source);
+  const normalized_files = new Map<string, string>();
+  for (const [file, source] of files) normalized_files.set(to_posix(normalize(file)), source);
 
   const graph = new Map<string, string[]>();
   const issues: ImportGraphIssue[] = [];
-  for (const [file, source] of normalizedFiles) {
+  for (const [file, source] of normalized_files) {
     const base = file.slice(file.lastIndexOf("/") + 1);
     if (/^(?:utils|helpers)\.ts$/.test(base)) {
       issues.push({
@@ -488,9 +488,9 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
       });
     }
 
-    const imports = staticImports(source)
+    const imports = static_imports(source)
       .filter((specifier) => specifier.startsWith("."))
-      .map((specifier) => resolveImport(file, specifier, normalizedFiles))
+      .map((specifier) => resolve_import(file, specifier, normalized_files))
       .filter((target): target is string => target !== null);
     graph.set(file, imports);
 
@@ -511,28 +511,28 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
       });
     }
 
-    const typeDomainName = TYPE_DOMAIN_BY_SOURCE[file];
-    const typeDomain =
-      typeDomainName === undefined ? undefined : PUBLIC_TYPE_DOMAINS[typeDomainName];
-    if (typeDomain !== undefined) {
-      const allowedDependencies = new Set(typeDomain.dependencies);
+    const type_domain_name = TYPE_DOMAIN_BY_SOURCE[file];
+    const type_domain =
+      type_domain_name === undefined ? undefined : PUBLIC_TYPE_DOMAINS[type_domain_name];
+    if (type_domain !== undefined) {
+      const allowed_dependencies = new Set(type_domain.dependencies);
       for (const target of imports) {
-        const dependencyName = TYPE_DOMAIN_BY_SOURCE[target];
-        if (dependencyName !== undefined && !allowedDependencies.has(dependencyName)) {
+        const dependency_name = TYPE_DOMAIN_BY_SOURCE[target];
+        if (dependency_name !== undefined && !allowed_dependencies.has(dependency_name)) {
           issues.push({
             kind: "type-edge",
-            message: `${file}: disallowed type-domain dependency ${dependencyName}`,
+            message: `${file}: disallowed type-domain dependency ${dependency_name}`,
           });
         }
       }
     }
 
     if (file.includes("/store/") && STORE_EDGES[base]) {
-      const ownerDir = dirname(file);
+      const owner_dir = dirname(file);
       const allowed = new Set(
         STORE_EDGES[base].map((target) =>
-          toPosix(
-            normalize(target.startsWith("../") ? join(ownerDir, target) : join(ownerDir, target)),
+          to_posix(
+            normalize(target.startsWith("../") ? join(owner_dir, target) : join(owner_dir, target)),
           ),
         ),
       );
@@ -547,54 +547,56 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
     }
   }
 
-  const expectedOwnerBySymbol = new Map<string, string>();
-  const declaredOwners = new Map<string, string[]>();
+  const expected_owner_by_symbol = new Map<string, string>();
+  const declared_owners = new Map<string, string[]>();
   for (const domain of Object.values(PUBLIC_TYPE_DOMAINS)) {
-    for (const name of domain.exports) expectedOwnerBySymbol.set(name, domain.source);
-    const source = normalizedFiles.get(domain.source);
+    for (const name of domain.exports) expected_owner_by_symbol.set(name, domain.source);
+    const source = normalized_files.get(domain.source);
     if (source === undefined) continue;
     for (const match of source.matchAll(
       /\bexport\s+(?:declare\s+)?(?:interface|type)\s+([A-Za-z_$][\w$]*)/g,
     )) {
       const name = match[1]!;
-      const owners = declaredOwners.get(name) ?? [];
+      const owners = declared_owners.get(name) ?? [];
       owners.push(domain.source);
-      declaredOwners.set(name, owners);
+      declared_owners.set(name, owners);
     }
   }
 
   if (
-    [...Object.values(PUBLIC_TYPE_DOMAINS)].some((domain) => normalizedFiles.has(domain.source))
+    [...Object.values(PUBLIC_TYPE_DOMAINS)].some((domain) => normalized_files.has(domain.source))
   ) {
-    for (const [name, expectedOwner] of expectedOwnerBySymbol) {
-      const owners = declaredOwners.get(name) ?? [];
-      if (owners.length !== 1 || owners[0] !== expectedOwner) {
+    for (const [name, expected_owner] of expected_owner_by_symbol) {
+      const owners = declared_owners.get(name) ?? [];
+      if (owners.length !== 1 || owners[0] !== expected_owner) {
         issues.push({
           kind: "type-owner",
-          message: `${name}: expected one owner ${expectedOwner}; found ${owners.join(", ") || "none"}`,
+          message: `${name}: expected one owner ${expected_owner}; found ${owners.join(", ") || "none"}`,
         });
       }
     }
-    for (const [name, owners] of declaredOwners) {
-      if (expectedOwnerBySymbol.has(name)) continue;
+    for (const [name, owners] of declared_owners) {
+      if (expected_owner_by_symbol.has(name)) continue;
       issues.push({
         kind: "type-owner",
         message: `${name}: undeclared public type owner ${owners.join(", ")}`,
       });
     }
 
-    const facade = normalizedFiles.get("packages/core/src/types.ts");
+    const facade = normalized_files.get("packages/core/src/types.ts");
     if (facade === undefined) {
       issues.push({ kind: "type-owner", message: "packages/core/src/types.ts: missing facade" });
     } else {
-      const facadeTargets = staticImports(facade)
-        .map((specifier) => resolveImport("packages/core/src/types.ts", specifier, normalizedFiles))
+      const facade_targets = static_imports(facade)
+        .map((specifier) =>
+          resolve_import("packages/core/src/types.ts", specifier, normalized_files),
+        )
         .filter((target): target is string => target !== null)
         .sort();
-      const expectedTargets = Object.values(PUBLIC_TYPE_DOMAINS)
+      const expected_targets = Object.values(PUBLIC_TYPE_DOMAINS)
         .map((domain) => domain.source)
         .sort();
-      if (JSON.stringify(facadeTargets) !== JSON.stringify(expectedTargets)) {
+      if (JSON.stringify(facade_targets) !== JSON.stringify(expected_targets)) {
         issues.push({
           kind: "type-owner",
           message:
@@ -621,7 +623,7 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
       if (state.get(target) === 1) {
         const start = stack.indexOf(target);
         const cycle = [...stack.slice(start), target];
-        const key = canonicalCycle(cycle);
+        const key = canonical_cycle(cycle);
         if (!reported.has(key)) {
           reported.add(key);
           issues.push({ kind: "cycle", message: `import cycle: ${cycle.join(" -> ")}` });
@@ -639,7 +641,7 @@ export function analyzeImportGraph(files: ReadonlyMap<string, string>): ImportGr
 }
 
 export async function readTypeScriptSources(root: string): Promise<Map<string, string>> {
-  const absoluteRoot = resolve(root);
+  const absolute_root = resolve(root);
   const files = new Map<string, string>();
   const walk = async (directory: string): Promise<void> => {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -647,15 +649,15 @@ export async function readTypeScriptSources(root: string): Promise<Map<string, s
       const path = join(directory, entry.name);
       if (entry.isDirectory()) await walk(path);
       else if (entry.isFile() && extname(entry.name) === ".ts") {
-        files.set(toPosix(relative(process.cwd(), path)), await readFile(path, "utf8"));
+        files.set(to_posix(relative(process.cwd(), path)), await readFile(path, "utf8"));
       }
     }
   };
-  await walk(absoluteRoot);
+  await walk(absolute_root);
   return files;
 }
 
-function staticImports(source: string): string[] {
+function static_imports(source: string): string[] {
   const imports: string[] = [];
   const declaration = /\b(?:import|export)\s+(?:type\s+)?(?:[^"'`;]*?\s+from\s+)?["']([^"']+)["']/g;
   const dynamic = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
@@ -664,19 +666,19 @@ function staticImports(source: string): string[] {
   return imports;
 }
 
-function resolveImport(
+function resolve_import(
   importer: string,
   specifier: string,
   files: ReadonlyMap<string, string>,
 ): string | null {
-  const unresolved = toPosix(normalize(join(dirname(importer), specifier)));
+  const unresolved = to_posix(normalize(join(dirname(importer), specifier)));
   const candidates = unresolved.endsWith(".js")
     ? [`${unresolved.slice(0, -3)}.ts`]
     : [unresolved, `${unresolved}.ts`, `${unresolved}/index.ts`];
   return candidates.find((candidate) => files.has(candidate)) ?? null;
 }
 
-function canonicalCycle(cycle: readonly string[]): string {
+function canonical_cycle(cycle: readonly string[]): string {
   const nodes = cycle.slice(0, -1);
   let best = nodes.join("\0");
   for (let index = 1; index < nodes.length; index++) {
@@ -686,7 +688,7 @@ function canonicalCycle(cycle: readonly string[]): string {
   return best;
 }
 
-function toPosix(path: string): string {
+function to_posix(path: string): string {
   return sep === "/" ? path : path.split(sep).join("/");
 }
 

@@ -5,7 +5,7 @@ import { OffsetIndex, ScaledScroll } from "../src/fenwick.js";
 const DEFAULT_HEIGHT = 28;
 
 /** Check every answer of `index` against plain per-row `heights`. */
-function expectHeights(index: OffsetIndex, heights: readonly number[]): void {
+function expect_heights(index: OffsetIndex, heights: readonly number[]): void {
   expect(index.count).toBe(heights.length);
   let top = 0;
   for (let row = 0; row < heights.length; row++) {
@@ -46,7 +46,7 @@ describe("OffsetIndex", () => {
       row: 500_000,
       top: 500_000 * DEFAULT_HEIGHT,
     });
-    expectHeights(new OffsetIndex(5, DEFAULT_HEIGHT), Array(5).fill(DEFAULT_HEIGHT));
+    expect_heights(new OffsetIndex(5, DEFAULT_HEIGHT), Array(5).fill(DEFAULT_HEIGHT));
     // Rows outside the sheet, negative or fractional, are ignored.
     index.setHeight(-1, 50);
     index.setHeight(2.5, 50);
@@ -101,7 +101,7 @@ describe("OffsetIndex", () => {
           heights[row] = height;
         }
       }
-      expectHeights(index, heights);
+      expect_heights(index, heights);
     }
   });
 
@@ -112,11 +112,11 @@ describe("OffsetIndex", () => {
     heights[0] = 40;
     heights[7] = 50;
     heights[9] = 12;
-    expectHeights(index, heights);
+    expect_heights(index, heights);
     index.load(Int32Array.of(1, 7), Float64Array.of(33, DEFAULT_HEIGHT));
     heights[1] = 33;
     heights[7] = DEFAULT_HEIGHT;
-    expectHeights(index, heights);
+    expect_heights(index, heights);
   });
 
   it("answers heights and the total between single-row resizes without a read", () => {
@@ -137,16 +137,16 @@ describe("OffsetIndex", () => {
     index.setHeight(3, 44);
     heights[1_999] = DEFAULT_HEIGHT;
     heights[3] = 44;
-    expectHeights(index, heights);
+    expect_heights(index, heights);
     for (let row = 0; row < heights.length; row += 3) {
       index.setHeight(row, DEFAULT_HEIGHT);
       heights[row] = DEFAULT_HEIGHT;
     }
     index.setHeight(10, 90);
     heights[10] = 90;
-    expectHeights(index, heights);
+    expect_heights(index, heights);
     for (let row = 0; row < heights.length; row++) index.setHeight(row, DEFAULT_HEIGHT);
-    expectHeights(index, Array(heights.length).fill(DEFAULT_HEIGHT));
+    expect_heights(index, Array(heights.length).fill(DEFAULT_HEIGHT));
     expect(index.backingStoreBytes).toBe(0);
   });
 });
@@ -162,12 +162,12 @@ describe("ScaledScroll", () => {
     expect(s.scaled).toBe(false);
     expect(s.sizerHeight).toBe(total);
 
-    const zoomedCap = 26_843_545;
-    s.update(total, viewport, zoomedCap);
+    const zoomed_cap = 26_843_545;
+    s.update(total, viewport, zoomed_cap);
     expect(s.scaled).toBe(true);
-    expect(s.sizerHeight).toBe(zoomedCap);
+    expect(s.sizerHeight).toBe(zoomed_cap);
     // The last row stays reachable at the clamped maximum scroll position.
-    expect(s.toContent(zoomedCap - viewport)).toBeCloseTo(total - viewport, 5);
+    expect(s.toContent(zoomed_cap - viewport)).toBeCloseTo(total - viewport, 5);
     expect(s.toScroll(s.toContent(600))).toBeCloseTo(600, 5);
   });
 });

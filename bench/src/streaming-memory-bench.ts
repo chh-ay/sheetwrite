@@ -33,7 +33,7 @@ function option(name: string, fallback: string): string {
   return optionValue(process.argv, name) ?? fallback;
 }
 
-function maximumRssBytes(): number {
+function maximum_rss_bytes(): number {
   const match = /^VmHWM:\s+(\d+)\s+kB$/m.exec(readFileSync("/proc/self/status", "utf8"));
   return match ? Number(match[1]) * 1024 : process.resourceUsage().maxRSS * 1024;
 }
@@ -70,7 +70,7 @@ function snapshot(rows: number): WorkbookSnapshot {
   };
 }
 
-function csvFixture(rows: number): { workbook: Workbook; data: ColumnarData } {
+function csv_fixture(rows: number): { workbook: Workbook; data: ColumnarData } {
   const columns: ColumnarData["columns"] = Object.create(null);
   for (let col = 0; col < COLUMNS; col++) {
     columns[`c${col}`] = Array.from({ length: rows }, (_unused, row) =>
@@ -123,10 +123,10 @@ async function worker(): Promise<StreamingMemoryResult> {
     pathToFileURL(resolve(root, "packages/xlsx/src/workbook.ts")).href
   )) as { sheetwriteWorkbookBackend: XlsxWorkbookBackend };
   // A baseline checkout from before the add-on API takes no options object and has the setter instead.
-  const legacySetter = Reflect.get(core, "setXlsxWorkbookBackend");
-  if (typeof legacySetter === "function") {
+  const legacy_setter = Reflect.get(core, "setXlsxWorkbookBackend");
+  if (typeof legacy_setter === "function") {
     await core.initSheetwrite();
-    legacySetter(xlsx.sheetwriteWorkbookBackend);
+    legacy_setter(xlsx.sheetwriteWorkbookBackend);
   } else {
     await core.initSheetwrite({
       addons: [
@@ -148,34 +148,34 @@ async function worker(): Promise<StreamingMemoryResult> {
       maxXmlElements: rows * COLUMNS * 3 + 1_000,
     },
   };
-  const fixturePath = option("--fixture", "");
+  const fixture_path = option("--fixture", "");
   if (operation === "fixture") {
-    writeFileSync(fixturePath, await core.toXlsxWorkbook(snapshot(rows), options));
+    writeFileSync(fixture_path, await core.toXlsxWorkbook(snapshot(rows), options));
     process.exit(0);
   }
   const fixture = operation === "xlsx-export" ? snapshot(rows) : undefined;
-  const csv = operation === "csv" ? csvFixture(rows) : undefined;
+  const csv = operation === "csv" ? csv_fixture(rows) : undefined;
   const store = csv ? new core.SheetwriteStore(csv.workbook, csv.data) : undefined;
   Bun.gc(true);
   // Reset VmHWM so fixture construction is excluded from the measured peak.
   writeFileSync("/proc/self/clear_refs", "5");
-  const rssBefore = process.memoryUsage().rss;
+  const rss_before = process.memoryUsage().rss;
   const started = performance.now();
   let measured = { bytes: 0, peak: 0 };
   if (operation === "csv") {
     if (!store) throw new Error("CSV fixture store unavailable");
     const sheet = store.getWorkbook().sheets[0];
     if (!sheet) throw new Error("CSV fixture sheet unavailable");
-    const csvOptions = {
+    const csv_options = {
       resourceLimits: {
         maxRows: rows + 1,
         maxCells: (rows + 1) * COLUMNS,
         maxOutputBytes: 2 ** 31,
       },
     };
-    if (mode === "stream") measured = await consume(core.toCsvStream(sheet, store, csvOptions));
+    if (mode === "stream") measured = await consume(core.toCsvStream(sheet, store, csv_options));
     else {
-      const text = core.toCsv(sheet, store, csvOptions);
+      const text = core.toCsv(sheet, store, csv_options);
       measured = { bytes: Buffer.byteLength(text), peak: Buffer.byteLength(text) };
     }
   } else if (operation === "xlsx-export") {
@@ -186,11 +186,11 @@ async function worker(): Promise<StreamingMemoryResult> {
       measured = { bytes: bytes.byteLength, peak: bytes.byteLength };
     }
   } else {
-    if (!fixturePath) throw new Error("--fixture is required for xlsx-import");
+    if (!fixture_path) throw new Error("--fixture is required for xlsx-import");
     const imported =
       mode === "stream"
-        ? await core.fromXlsxWorkbookFile(Bun.file(fixturePath), options)
-        : await core.fromXlsxWorkbook(readFileSync(fixturePath), options);
+        ? await core.fromXlsxWorkbookFile(Bun.file(fixture_path), options)
+        : await core.fromXlsxWorkbook(readFileSync(fixture_path), options);
     measured = { bytes: imported.sheets[0]?.rowCount ?? 0, peak: 0 };
   }
   return {
@@ -200,13 +200,13 @@ async function worker(): Promise<StreamingMemoryResult> {
     rows,
     outputBytes: measured.bytes,
     peakChunkBytes: measured.peak,
-    maxRssBytes: maximumRssBytes(),
-    rssDeltaBytes: process.memoryUsage().rss - rssBefore,
+    maxRssBytes: maximum_rss_bytes(),
+    rssDeltaBytes: process.memoryUsage().rss - rss_before,
     durationMs: performance.now() - started,
   };
 }
 
-async function runOne(args: readonly string[]): Promise<StreamingMemoryResult | undefined> {
+async function run_one(args: readonly string[]): Promise<StreamingMemoryResult | undefined> {
   const child = Bun.spawn([process.execPath, import.meta.path, "--worker", ...args], {
     stdout: "pipe",
     stderr: "inherit",
@@ -223,19 +223,19 @@ async function runOne(args: readonly string[]): Promise<StreamingMemoryResult | 
  * `--baseline-root` is a built checkout of the pre-change commit.
  */
 async function main(): Promise<void> {
-  const baselineRoot = option("--baseline-root", "");
-  if (!baselineRoot) throw new Error("--baseline-root is required");
-  const candidateRoot = option("--candidate-root", resolve(import.meta.dir, "../.."));
+  const baseline_root = option("--baseline-root", "");
+  if (!baseline_root) throw new Error("--baseline-root is required");
+  const candidate_root = option("--candidate-root", resolve(import.meta.dir, "../.."));
   const pairs = Math.max(3, Number(option("--pairs", "3")));
   const rows = option("--rows", "200000");
   const operations = option("--operations", "csv,xlsx-export,xlsx-import").split(",");
   const results: StreamingMemoryResult[] = [];
-  const fixtureDirectory = mkdtempSync(join(tmpdir(), "sheetwrite-stream-memory-"));
-  const fixture = join(fixtureDirectory, "import.xlsx");
+  const fixture_directory = mkdtempSync(join(tmpdir(), "sheetwrite-stream-memory-"));
+  const fixture = join(fixture_directory, "import.xlsx");
   try {
-    await runOne([
+    await run_one([
       "--root",
-      candidateRoot,
+      candidate_root,
       "--operation",
       "fixture",
       "--rows",
@@ -244,16 +244,16 @@ async function main(): Promise<void> {
       fixture,
     ]);
     const arms = [
-      { root: baselineRoot, mode: "buffered" },
-      { root: candidateRoot, mode: "buffered" },
-      { root: candidateRoot, mode: "stream" },
-      { root: baselineRoot, mode: "stream" },
+      { root: baseline_root, mode: "buffered" },
+      { root: candidate_root, mode: "buffered" },
+      { root: candidate_root, mode: "stream" },
+      { root: baseline_root, mode: "stream" },
     ];
     for (const operation of operations) {
       for (let pair = 0; pair < pairs; pair++) {
         const order = pair % 2 === 0 ? arms : [...arms].reverse();
         for (const arm of order) {
-          const result = await runOne([
+          const result = await run_one([
             "--root",
             arm.root,
             "--mode",
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
       }
     }
   } finally {
-    rmSync(fixtureDirectory, { recursive: true, force: true });
+    rmSync(fixture_directory, { recursive: true, force: true });
   }
   process.stdout.write(`${JSON.stringify({ pairs, rows: Number(rows), results }, null, 2)}\n`);
 }

@@ -14,7 +14,7 @@ export interface DatabaseLabProps {
 
 /** The database page's failure lab: lost acknowledgements, conflicts, limits and storage. */
 export function DatabaseLab(props: DatabaseLabProps) {
-  let limitHost!: HTMLDivElement;
+  let limit_host!: HTMLDivElement;
   const counters = () => [
     {
       id: "dbx-snapshot-version",
@@ -39,14 +39,14 @@ export function DatabaseLab(props: DatabaseLabProps) {
             <Button
               data-testid="dbx-tight-limit"
               disabled={!ready()}
-              onClick={() => engine()?.tryTightUndo(limitHost)}
+              onClick={() => engine()?.tryTightUndo(limit_host)}
             >
               Try a 128-byte undo limit
             </Button>
             <div
               class="sw-dbx__limit-grid"
               ref={(element) => {
-                limitHost = element;
+                limit_host = element;
               }}
             />
             <Show when={limitReport()}>

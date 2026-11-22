@@ -22,7 +22,7 @@ interface ThemedGrid {
 const grids = new Map<ThemedGrid, object | undefined>();
 
 /** A stylesheet in the frame, resolved once it has loaded. */
-function linkStylesheet(href: string): Promise<void> {
+function link_stylesheet(href: string): Promise<void> {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = href;
@@ -40,7 +40,7 @@ function linkStylesheet(href: string): Promise<void> {
  * Core with the site's grid theme as the default, so the example's grid
  * matches the page in light and dark. A theme the example passes still wins.
  */
-async function coreWithSiteTheme(): Promise<PackageExports> {
+async function core_with_site_theme(): Promise<PackageExports> {
   const core = await import("@sheetwrite/core");
   const themed = <Options extends { theme?: object }>(options: Options): Options => ({
     ...options,
@@ -64,9 +64,9 @@ async function coreWithSiteTheme(): Promise<PackageExports> {
 
 /** The packages an example can import, and how the frame loads each one. */
 const PACKAGES: Readonly<Record<RunnableImport, () => Promise<PackageExports>>> = {
-  "@sheetwrite/core": coreWithSiteTheme,
+  "@sheetwrite/core": core_with_site_theme,
   "@sheetwrite/core/styles.css": async () => {
-    await linkStylesheet(coreStylesUrl);
+    await link_stylesheet(coreStylesUrl);
     return {};
   },
   "@sheetwrite/formulas": () => import("@sheetwrite/formulas"),
@@ -74,15 +74,15 @@ const PACKAGES: Readonly<Record<RunnableImport, () => Promise<PackageExports>>> 
 };
 
 /** Whether a runnable example may import `specifier`. */
-function isRunnableImport(specifier: string): specifier is RunnableImport {
+function is_runnable_import(specifier: string): specifier is RunnableImport {
   return (RUNNABLE_IMPORTS as readonly string[]).includes(specifier);
 }
 
-async function loadPackages(
+async function load_packages(
   specifiers: readonly string[],
 ): Promise<ReadonlyMap<string, PackageExports>> {
-  const runnable = specifiers.filter(isRunnableImport);
-  const unknown = specifiers.find((specifier) => !isRunnableImport(specifier));
+  const runnable = specifiers.filter(is_runnable_import);
+  const unknown = specifiers.find((specifier) => !is_runnable_import(specifier));
   if (unknown !== undefined) {
     throw new Error(
       `Try it can import only ${RUNNABLE_IMPORTS.join(", ")}. This example imports ${unknown}.`,
@@ -94,8 +94,11 @@ async function loadPackages(
   return new Map(loaded);
 }
 
-function applySiteTheme(): void {
+function apply_site_theme(): void {
   for (const [grid, theme] of grids) grid.setTheme({ ...siteGridTheme(), ...theme });
 }
 
-Reflect.set(globalThis, RUNTIME_KEY, { loadPackages, applySiteTheme } satisfies PlaygroundRuntime);
+Reflect.set(globalThis, RUNTIME_KEY, {
+  loadPackages: load_packages,
+  applySiteTheme: apply_site_theme,
+} satisfies PlaygroundRuntime);

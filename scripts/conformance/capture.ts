@@ -8,7 +8,7 @@ import type { CaptureArtifact, ConformanceCorpus, ConformanceObservation } from 
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 const CAPTURE_DIRECTORY = "scripts/conformance/captures";
 
-async function readBoundedFile(path: string, limit: number): Promise<Uint8Array> {
+async function read_bounded_file(path: string, limit: number): Promise<Uint8Array> {
   const handle = await open(path, "r");
   try {
     const info = await handle.stat();
@@ -20,7 +20,7 @@ async function readBoundedFile(path: string, limit: number): Promise<Uint8Array>
   }
 }
 
-function validateCaptureArtifact(value: unknown, path: string): string[] {
+function validate_capture_artifact(value: unknown, path: string): string[] {
   const issues: string[] = [];
   if (!isObject(value)) return [`${path}: expected object`];
   if (value.protocol !== 1) issues.push(`${path}.protocol: expected 1`);
@@ -34,24 +34,25 @@ function validateCaptureArtifact(value: unknown, path: string): string[] {
   } else {
     const ids = new Set<string>();
     value.observations.forEach((observation, index) => {
-      const observationPath = `${path}.observations[${index}]`;
+      const observation_path = `${path}.observations[${index}]`;
       if (!isObject(observation)) {
-        issues.push(`${observationPath}: expected object`);
+        issues.push(`${observation_path}: expected object`);
         return;
       }
-      if (!isNonemptyString(observation.caseId)) issues.push(`${observationPath}.caseId: required`);
-      else if (ids.has(observation.caseId)) issues.push(`${observationPath}.caseId: duplicate`);
+      if (!isNonemptyString(observation.caseId))
+        issues.push(`${observation_path}.caseId: required`);
+      else if (ids.has(observation.caseId)) issues.push(`${observation_path}.caseId: duplicate`);
       else ids.add(observation.caseId);
-      validateResult(observation.result, `${observationPath}.result`, issues);
+      validateResult(observation.result, `${observation_path}.result`, issues);
     });
   }
   scanSecrets(value, path, issues);
   return issues;
 }
 
-function bindsObservation(
+function binds_observation(
   artifact: CaptureArtifact,
-  caseId: string,
+  case_id: string,
   observation: ConformanceObservation,
 ): boolean {
   if (
@@ -61,7 +62,7 @@ function bindsObservation(
   ) {
     return false;
   }
-  const captured = artifact.observations.find((candidate) => candidate.caseId === caseId);
+  const captured = artifact.observations.find((candidate) => candidate.caseId === case_id);
   return (
     captured !== undefined && canonicalJson(captured.result) === canonicalJson(observation.result)
   );
@@ -73,30 +74,30 @@ export async function verifyCaptureArtifacts(
 ): Promise<{ verified: Set<string>; issues: string[] }> {
   const verified = new Set<string>();
   const issues: string[] = [];
-  const reviewedByHash = new Map<
+  const reviewed_by_hash = new Map<
     string,
     Array<{ caseId: string; observation: ConformanceObservation }>
   >();
   for (const entry of corpus.cases) {
     for (const observation of entry.observations) {
       if (observation.status !== "reviewed" || !observation.artifactSha256) continue;
-      const bound = reviewedByHash.get(observation.artifactSha256) ?? [];
+      const bound = reviewed_by_hash.get(observation.artifactSha256) ?? [];
       bound.push({ caseId: entry.id, observation });
-      reviewedByHash.set(observation.artifactSha256, bound);
+      reviewed_by_hash.set(observation.artifactSha256, bound);
     }
   }
-  for (const [hash, claims] of reviewedByHash) {
+  for (const [hash, claims] of reviewed_by_hash) {
     const path = resolve(directory, `${hash}.json`);
     let bytes: Uint8Array;
     try {
-      bytes = await readBoundedFile(path, MAX_CAPTURE_BYTES);
+      bytes = await read_bounded_file(path, MAX_CAPTURE_BYTES);
     } catch (error) {
       issues.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
-    const actualHash = sha256Bytes(bytes);
-    if (actualHash !== hash) {
-      issues.push(`${path}: filename hash ${hash} does not match artifact bytes ${actualHash}`);
+    const actual_hash = sha256Bytes(bytes);
+    if (actual_hash !== hash) {
+      issues.push(`${path}: filename hash ${hash} does not match artifact bytes ${actual_hash}`);
       continue;
     }
     let value: unknown;
@@ -108,27 +109,27 @@ export async function verifyCaptureArtifacts(
       );
       continue;
     }
-    const artifactIssues = validateCaptureArtifact(value, path);
-    if (artifactIssues.length > 0) {
-      issues.push(...artifactIssues);
+    const artifact_issues = validate_capture_artifact(value, path);
+    if (artifact_issues.length > 0) {
+      issues.push(...artifact_issues);
       continue;
     }
     const artifact = value as CaptureArtifact;
-    let fullyBound = true;
+    let fully_bound = true;
     for (const claim of claims) {
-      if (!bindsObservation(artifact, claim.caseId, claim.observation)) {
-        fullyBound = false;
+      if (!binds_observation(artifact, claim.caseId, claim.observation)) {
+        fully_bound = false;
         issues.push(
           `${path}: does not bind reviewed observation ${claim.caseId}/${claim.observation.producer}`,
         );
       }
     }
-    if (fullyBound) verified.add(hash);
+    if (fully_bound) verified.add(hash);
   }
   return { verified, issues };
 }
 
-function artifactPath(producer: string): string {
+function artifact_path(producer: string): string {
   return resolve(
     "test-results/conformance",
     `${producer}-${new Date().toISOString().replaceAll(":", "-")}.json`,
@@ -136,7 +137,7 @@ function artifactPath(producer: string): string {
 }
 
 export async function persistCapture(artifact: CaptureArtifact): Promise<string> {
-  const path = artifactPath(artifact.producer);
+  const path = artifact_path(artifact.producer);
   await mkdir(dirname(path), { recursive: true });
   const bytes = new TextEncoder().encode(`${canonicalJson(artifact)}\n`);
   if (bytes.byteLength > MAX_CAPTURE_BYTES) {
@@ -150,9 +151,9 @@ export async function readBoundedResponse(
   response: Response,
   limit = MAX_CAPTURE_BYTES,
 ): Promise<Uint8Array> {
-  const rawLength = response.headers.get("content-length");
-  if (rawLength !== null) {
-    const length = Number(rawLength);
+  const raw_length = response.headers.get("content-length");
+  if (raw_length !== null) {
+    const length = Number(raw_length);
     if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
       await response.body?.cancel();
       throw new RangeError(`Oracle response Content-Length exceeds ${limit} bytes`);

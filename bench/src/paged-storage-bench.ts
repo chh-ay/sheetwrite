@@ -55,14 +55,14 @@ export interface PagedStorageResult {
   readonly cases: Readonly<Record<PagedStorageCase, PagedStorageCaseResult>>;
 }
 
-function workbook(rowCount: number): Workbook {
+function workbook(row_count: number): Workbook {
   return {
     activeSheet: "s1",
     sheets: [
       {
         id: "s1",
         name: "paged",
-        rowCount,
+        rowCount: row_count,
         columns: Array.from({ length: COLUMNS }, (_, col) => ({
           key: `c${col}`,
           header: `Column ${col + 1}`,
@@ -74,15 +74,15 @@ function workbook(rowCount: number): Workbook {
   };
 }
 
-function pagedStore(chunkRows: number, cacheBytes: number): SheetwriteStore {
+function paged_store(chunk_rows: number, cache_bytes: number): SheetwriteStore {
   return new SheetwriteStore(workbook(ROWS), undefined, {
     storage: "paged",
-    chunkRows,
-    cacheBytes,
+    chunkRows: chunk_rows,
+    cacheBytes: cache_bytes,
   });
 }
 
-function rowData(start: number, count: number): RowData[] {
+function row_data(start: number, count: number): RowData[] {
   return Array.from({ length: count }, (_, offset) => {
     const row = start + offset;
     return { c0: row, c1: row + 1, c2: row + 2, c3: row + 3, c4: row + 4 };
@@ -93,14 +93,14 @@ const COLUMN_BANDS = [
   { start: 0, end: COLUMNS, keys: Array.from({ length: COLUMNS }, (_, col) => `c${col}`) },
 ];
 
-function loadRows(store: SheetwriteStore, pages: ReadonlyArray<readonly RowData[]>, rows: number) {
+function load_rows(store: SheetwriteStore, pages: ReadonlyArray<readonly RowData[]>, rows: number) {
   for (const [page, data] of pages.entries()) {
     store.loadPage("s1", page * rows, COLUMN_BANDS, data);
   }
 }
 
 /** `count` literal edits spread evenly over `rows` rows and every column. */
-function scatteredEdits(count: number, rows: number, value: number): DocumentOp[] {
+function scattered_edits(count: number, rows: number, value: number): DocumentOp[] {
   return Array.from({ length: count }, (_, index) => ({
     op: "set",
     addr: { sheet: "s1", row: Math.floor((index * rows) / count), col: index % COLUMNS },
@@ -108,11 +108,11 @@ function scatteredEdits(count: number, rows: number, value: number): DocumentOp[
   }));
 }
 
-function retainedBytes(store: SheetwriteStore): number {
+function retained_bytes(store: SheetwriteStore): number {
   return store.getRuntimeResourceSnapshot("edit", "settled").wasm.allocatedCapacityBytes;
 }
 
-function applyAll(store: SheetwriteStore, patches: DocumentOp[]): void {
+function apply_all(store: SheetwriteStore, patches: DocumentOp[]): void {
   const outcome = store.applyTransaction({ patches });
   if (outcome.status !== "applied") throw new Error(`paged edit was ${outcome.status}`);
 }
@@ -122,61 +122,61 @@ interface Sample {
   readonly retainedBytes: number;
 }
 
-function editSample(): Sample {
-  const store = pagedStore(CHUNK_ROWS, CACHE_BYTES);
-  const patches = scatteredEdits(EDIT_CELLS, ROWS, 1);
+function edit_sample(): Sample {
+  const store = paged_store(CHUNK_ROWS, CACHE_BYTES);
+  const patches = scattered_edits(EDIT_CELLS, ROWS, 1);
 
   const started = now();
-  applyAll(store, patches);
+  apply_all(store, patches);
   const ms = now() - started;
 
   if (store.getPagedStats("s1").dirtyCells !== EDIT_CELLS) throw new Error("edits were not kept");
-  const bytes = retainedBytes(store);
+  const bytes = retained_bytes(store);
   store.dispose();
   return { ms, retainedBytes: bytes };
 }
 
-function acknowledgeSample(): Sample {
-  const store = pagedStore(CHUNK_ROWS, CACHE_BYTES);
-  const patches = scatteredEdits(EDIT_CELLS, ROWS, 1);
-  applyAll(store, patches);
+function acknowledge_sample(): Sample {
+  const store = paged_store(CHUNK_ROWS, CACHE_BYTES);
+  const patches = scattered_edits(EDIT_CELLS, ROWS, 1);
+  apply_all(store, patches);
 
   const started = now();
   store.acknowledgeOperations(patches);
   const ms = now() - started;
 
   if (store.getPagedStats("s1").dirtyCells !== 0) throw new Error("acknowledgement left edits");
-  const bytes = retainedBytes(store);
+  const bytes = retained_bytes(store);
   store.dispose();
   return { ms, retainedBytes: bytes };
 }
 
-const evictionPages = Array.from({ length: EVICTION_PAGES }, (_, page) =>
-  rowData(page * EVICTION_CHUNK_ROWS, EVICTION_CHUNK_ROWS),
+const eviction_pages = Array.from({ length: EVICTION_PAGES }, (_, page) =>
+  row_data(page * EVICTION_CHUNK_ROWS, EVICTION_CHUNK_ROWS),
 );
-const evictionPageBytes =
+const eviction_page_bytes =
   EVICTION_CHUNK_ROWS * (1 + Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT) +
   BigUint64Array.BYTES_PER_ELEMENT;
 
-function evictionSample(): Sample {
-  const store = pagedStore(EVICTION_CHUNK_ROWS, EVICTION_RETAINED_PAGES * evictionPageBytes);
-  applyAll(store, scatteredEdits(EDIT_CELLS, ROWS, 1));
+function eviction_sample(): Sample {
+  const store = paged_store(EVICTION_CHUNK_ROWS, EVICTION_RETAINED_PAGES * eviction_page_bytes);
+  apply_all(store, scattered_edits(EDIT_CELLS, ROWS, 1));
 
   const started = now();
-  loadRows(store, evictionPages, EVICTION_CHUNK_ROWS);
+  load_rows(store, eviction_pages, EVICTION_CHUNK_ROWS);
   const ms = now() - started;
 
   const stats = store.getPagedStats("s1");
   if (stats.chunks !== EVICTION_RETAINED_PAGES) {
     throw new Error(`eviction kept ${stats.chunks} pages`);
   }
-  const bytes = retainedBytes(store);
+  const bytes = retained_bytes(store);
   store.dispose();
   return { ms, retainedBytes: bytes };
 }
 
-const rangePages = Array.from({ length: Math.ceil(RANGE_ROWS / LOAD_PAGE_ROWS) }, (_, page) =>
-  rowData(page * LOAD_PAGE_ROWS, Math.min(LOAD_PAGE_ROWS, RANGE_ROWS - page * LOAD_PAGE_ROWS)),
+const range_pages = Array.from({ length: Math.ceil(RANGE_ROWS / LOAD_PAGE_ROWS) }, (_, page) =>
+  row_data(page * LOAD_PAGE_ROWS, Math.min(LOAD_PAGE_ROWS, RANGE_ROWS - page * LOAD_PAGE_ROWS)),
 );
 const RANGE_FORMULAS = [
   `=SUM(A1:E${RANGE_ROWS})`,
@@ -185,11 +185,11 @@ const RANGE_FORMULAS = [
 ];
 const FORMULA_ROW = RANGE_ROWS + 1;
 
-function rangeReadSample(): Sample {
-  const store = pagedStore(CHUNK_ROWS, CACHE_BYTES);
-  loadRows(store, rangePages, LOAD_PAGE_ROWS);
-  applyAll(store, scatteredEdits(RANGE_DIRTY_CELLS, RANGE_ROWS, 7));
-  applyAll(
+function range_read_sample(): Sample {
+  const store = paged_store(CHUNK_ROWS, CACHE_BYTES);
+  load_rows(store, range_pages, LOAD_PAGE_ROWS);
+  apply_all(store, scattered_edits(RANGE_DIRTY_CELLS, RANGE_ROWS, 7));
+  apply_all(
     store,
     RANGE_FORMULAS.map((src, col) => ({
       op: "set",
@@ -201,7 +201,7 @@ function rangeReadSample(): Sample {
 
   // One source edit inside the range recalculates every formula over it.
   const started = now();
-  applyAll(store, [
+  apply_all(store, [
     { op: "set", addr: { sheet: "s1", row: 1, col: 1 }, value: { kind: "literal", value: 1e6 } },
   ]);
   const after = store.getCell({ sheet: "s1", row: FORMULA_ROW, col: 0 }).resolved;
@@ -210,33 +210,33 @@ function rangeReadSample(): Sample {
   if (typeof before !== "number" || typeof after !== "number" || after === before) {
     throw new Error("range formulas did not recalculate");
   }
-  const bytes = retainedBytes(store);
+  const bytes = retained_bytes(store);
   store.dispose();
   return { ms, retainedBytes: bytes };
 }
 
 const SAMPLERS: Readonly<Record<PagedStorageCase, () => Sample>> = {
-  edit: editSample,
-  acknowledge: acknowledgeSample,
-  eviction: evictionSample,
-  "range-read": rangeReadSample,
+  edit: edit_sample,
+  acknowledge: acknowledge_sample,
+  eviction: eviction_sample,
+  "range-read": range_read_sample,
 };
 
 function measure(sampler: () => Sample, samples: number): PagedStorageCaseResult {
   for (let warmup = 0; warmup < WARMUP_SAMPLES; warmup++) sampler();
 
-  const samplesMs: number[] = [];
+  const samples_ms: number[] = [];
   let last: Sample | undefined;
   for (let sample = 0; sample < samples; sample++) {
     Bun.gc(true);
     last = sampler();
-    samplesMs.push(last.ms);
+    samples_ms.push(last.ms);
   }
 
   if (!last) throw new Error("paged storage bench needs at least one sample");
   return {
-    samplesMs,
-    stat: summarize(samplesMs),
+    samplesMs: samples_ms,
+    stat: summarize(samples_ms),
     retainedBytes: last.retainedBytes,
     wasmCommittedBytes: getEngine().getMemory().buffer.byteLength,
   };
@@ -263,8 +263,9 @@ if (import.meta.main) {
     throw new Error("--samples is a positive integer");
 
   const result = await runPagedStorageBench(engine, samples);
-  const outputPath = optionValue(process.argv, "--output");
-  if (outputPath !== undefined) await Bun.write(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+  const output_path = optionValue(process.argv, "--output");
+  if (output_path !== undefined)
+    await Bun.write(output_path, `${JSON.stringify(result, null, 2)}\n`);
 
   console.log(`| ${engine} case | median ms | p95 ms | retained MiB |`);
   console.log("|---|---:|---:|---:|");

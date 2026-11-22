@@ -25,7 +25,7 @@ const ROWS = 1_000;
 const SAMPLES = [1, 2, 3];
 const KEY = `engine=sheetwrite;rows=${ROWS}`;
 
-function smokeFixture(): DeepMutable<DataBenchmarkResult> {
+function smoke_fixture(): DeepMutable<DataBenchmarkResult> {
   const stat = () => ({ ...summarize(SAMPLES), samples: [...SAMPLES] });
   const stats: Record<string, DataStat> = Object.fromEntries(
     WORKLOADS.map((workload) => [workload, stat()]),
@@ -70,12 +70,12 @@ function smokeFixture(): DeepMutable<DataBenchmarkResult> {
 /** The validator checks the artifact's shape at run time, as it does for captured JSON. */
 const validate = (result: unknown) => validateDataBenchmark(result as DataBenchmarkResult, "smoke");
 
-const sheetwriteRow = (result: DeepMutable<DataBenchmarkResult>) =>
+const sheetwrite_row = (result: DeepMutable<DataBenchmarkResult>) =>
   must(result.sheetwrite[ROWS], "Sheetwrite row");
 
 test("rejects drifted identity, metadata, matrix cells and query resources", () => {
-  expect(() => validate(smokeFixture())).not.toThrow();
-  expectRejections(smokeFixture, validate, [
+  expect(() => validate(smoke_fixture())).not.toThrow();
+  expectRejections(smoke_fixture, validate, [
     ...(["sheetwrite", "handsontable"] as const).map(
       (engine) =>
         [
@@ -100,29 +100,29 @@ test("rejects drifted identity, metadata, matrix cells and query resources", () 
       ),
     ),
     [
-      (result) => (result.sheetwrite["01000"] = sheetwriteRow(result)),
+      (result) => (result.sheetwrite["01000"] = sheetwrite_row(result)),
       `duplicate ${KEY};metric=ingest`,
     ],
     [
       (result) =>
-        Reflect.set(sheetwriteRow(result).stats, "notDeclared", {
+        Reflect.set(sheetwrite_row(result).stats, "notDeclared", {
           ...summarize([1]),
           samples: [1],
         }),
       `unexpected ${KEY};metric=notDeclared`,
     ],
     [
-      (result) => (sheetwriteRow(result).stats.ingest.median = 4),
+      (result) => (sheetwrite_row(result).stats.ingest.median = 4),
       `${KEY};metric=ingest.stat contains an impossible finite summary`,
     ],
     [
-      (result) => Reflect.deleteProperty(sheetwriteRow(result).stats.ingest, "samples"),
+      (result) => Reflect.deleteProperty(sheetwrite_row(result).stats.ingest, "samples"),
       `${KEY};metric=ingest.samples are missing`,
     ],
     [
       (result) =>
         Reflect.set(
-          must(sheetwriteRow(result).queryResources, "query resources"),
+          must(sheetwrite_row(result).queryResources, "query resources"),
           "containsCacheConstructions",
           ROWS,
         ),
@@ -132,28 +132,28 @@ test("rejects drifted identity, metadata, matrix cells and query resources", () 
 });
 
 test("collects after every Sheetwrite sample and disposes each ingest store first", async () => {
-  const disposalsAtCollection: number[] = [];
+  const disposals_at_collection: number[] = [];
   const dispose = spyOn(SheetwriteStore.prototype, "dispose");
   const gc = spyOn(Bun, "gc").mockImplementation((full) => {
     expect(full).toBe(true);
-    disposalsAtCollection.push(dispose.mock.calls.length);
+    disposals_at_collection.push(dispose.mock.calls.length);
     return 0;
   });
 
   try {
     const result = must((await runSheetwriteDataBench([ROWS], "smoke")).get(ROWS), "row size");
-    const allStats = [...Object.values(result.stats), ...Object.values(result.queries ?? {})];
+    const all_stats = [...Object.values(result.stats), ...Object.values(result.queries ?? {})];
     // Each workload collects after its final warm-up and every timed sample;
     // one more GC runs once all of this engine's stores have been released.
-    const expectedCollections = allStats.reduce((count, stat) => count + stat.iters + 1, 1);
-    expect(gc).toHaveBeenCalledTimes(expectedCollections);
+    const expected_collections = all_stats.reduce((count, stat) => count + stat.iters + 1, 1);
+    expect(gc).toHaveBeenCalledTimes(expected_collections);
 
     // The first eight collections follow the warm-up and seven ingests. Each
     // ingest store must be disposed before that sample's GC, rather than left
     // alive until the next iteration or workload starts.
-    const firstDisposals = must(disposalsAtCollection[0], "post-warm-up collection");
-    expect(disposalsAtCollection.slice(0, 8)).toEqual(
-      Array.from({ length: 8 }, (_, index) => firstDisposals + index),
+    const first_disposals = must(disposals_at_collection[0], "post-warm-up collection");
+    expect(disposals_at_collection.slice(0, 8)).toEqual(
+      Array.from({ length: 8 }, (_, index) => first_disposals + index),
     );
   } finally {
     gc.mockRestore();

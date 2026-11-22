@@ -156,7 +156,7 @@ export function replayMetrics(counts: ReplayCounts): ReplayMetrics {
 }
 
 /** Whether a quote opens a string before `at` in `formula`. */
-function insideString(formula: string, at: number): boolean {
+function inside_string(formula: string, at: number): boolean {
   let inside = false;
   for (let index = 0; index < at; index++) if (formula.charAt(index) === '"') inside = !inside;
   return inside;
@@ -170,7 +170,7 @@ function insideString(formula: string, at: number): boolean {
 export function agrees(formula: string, at: number, insert: string): boolean {
   if (at + insert.length > formula.length) return false;
 
-  let inside = insideString(formula, at);
+  let inside = inside_string(formula, at);
   for (let offset = 0; offset < insert.length; offset++) {
     const expected = formula.charAt(at + offset);
     const typed = insert.charAt(offset);
@@ -200,7 +200,7 @@ interface ShownSuggestion {
  * Whether `text` at `at` is still `shown`: the user typed the start of the
  * shown suggestion and the rest of it is what shows now.
  */
-function stillShown(
+function still_shown(
   shown: ShownSuggestion | null,
   formula: string,
   at: number,
@@ -216,7 +216,7 @@ function stillShown(
 }
 
 /** The longest run of leading words of `suggestion` that agrees with `formula`, as a length. */
-function agreeingWords(
+function agreeing_words(
   formula: string,
   text: string,
   suggestion: string,
@@ -238,7 +238,7 @@ class TypedFormula {
   private shown: ShownSuggestion | null = null;
   /** The ghost on screen as the formula bar keeps it, and the signal that made it. */
   private ghost: GhostOnScreen | null = null;
-  private ghostSignal = "";
+  private ghost_signal = "";
   private helped = false;
 
   constructor(
@@ -273,26 +273,26 @@ class TypedFormula {
     const shown = shownSuggestion(this.text, analysis, suggestion, this.ghost);
     if (shown !== null) {
       if (suggestion !== null && suggestion.text === shown.text)
-        this.ghostSignal = suggestion.signal;
+        this.ghost_signal = suggestion.signal;
       this.ghost = { text: this.text, shown };
-      const keys = this.considerSuggestion({ text: shown.text, signal: this.ghostSignal });
+      const keys = this.consider_suggestion({ text: shown.text, signal: this.ghost_signal });
       if (keys > 0) return keys;
     } else {
       this.shown = null;
       this.ghost = null;
     }
 
-    if (this.takeListEntry(analysis)) return 1;
+    if (this.take_list_entry(analysis)) return 1;
 
     this.insert(1);
     return 1;
   }
 
   /** Count the suggestion and take what agrees of it; returns the keys used, 0 for none. */
-  private considerSuggestion(suggestion: AttributedSuggestion): number {
+  private consider_suggestion(suggestion: AttributedSuggestion): number {
     const at = this.text.length;
     const signal = tally(this.counts, suggestion.signal);
-    if (!stillShown(this.shown, this.formula, at, suggestion.text)) {
+    if (!still_shown(this.shown, this.formula, at, suggestion.text)) {
       this.counts.shown++;
       signal.shown++;
       if (!agrees(this.formula, at, suggestion.text)) {
@@ -310,7 +310,7 @@ class TypedFormula {
       return 1;
     }
 
-    const words = agreeingWords(this.formula, this.text, suggestion.text, this.analyzed);
+    const words = agreeing_words(this.formula, this.text, suggestion.text, this.analyzed);
     if (words.length <= words.words) return 0;
 
     this.take(signal, words.length, words.words);
@@ -329,13 +329,13 @@ class TypedFormula {
   }
 
   /** Excel's completion: Tab takes the list's first entry when it is the function being typed. */
-  private takeListEntry(analysis: FormulaAnalysis): boolean {
+  private take_list_entry(analysis: FormulaAnalysis): boolean {
     const completion = analysis.completion;
     const entry = completion?.matches[0];
     if (completion === null || entry === undefined) return false;
 
-    const opensCall = this.formula.charAt(completion.to) === "(" ? "" : "(";
-    const completed = `${this.text.slice(0, completion.from)}${entry.name}${opensCall}`;
+    const opens_call = this.formula.charAt(completion.to) === "(" ? "" : "(";
+    const completed = `${this.text.slice(0, completion.from)}${entry.name}${opens_call}`;
     const length = completed.length - this.text.length;
     if (length <= 1 || !agrees(this.formula, this.text.length, completed.slice(this.text.length))) {
       return false;
@@ -366,7 +366,7 @@ export function openReplayStore(snapshot: WorkbookSnapshot): SheetwriteStore {
 }
 
 /** Clear or restore one cell. */
-function setCell(store: SheetwriteStore, cell: CellAddress, formula: string | null): void {
+function set_cell(store: SheetwriteStore, cell: CellAddress, formula: string | null): void {
   store.applyTransaction({
     patches: [
       {
@@ -394,7 +394,7 @@ export async function replayWorkbook(
   const suggester = attach(store);
   try {
     for (const target of workbook.targets) {
-      setCell(store, target.cell, null);
+      set_cell(store, target.cell, null);
       const edit = await openFormulaEdit(store, target.cell);
       const session = suggester.open(edit);
       try {
@@ -404,7 +404,7 @@ export async function replayWorkbook(
         counts.keys += keys;
       } finally {
         session.close();
-        setCell(store, target.cell, target.formula);
+        set_cell(store, target.cell, target.formula);
       }
     }
   } finally {

@@ -292,31 +292,31 @@ interface MutableSheetState<Id extends RowBridgeId> {
   readonly columns: string[];
 }
 
-function assertNever(value: never): never {
-  const unknownValue: unknown = value;
+function assert_never(value: never): never {
+  const unknown_value: unknown = value;
   let operation = "unknown";
   if (
-    typeof unknownValue === "object" &&
-    unknownValue !== null &&
-    "op" in unknownValue &&
-    typeof unknownValue.op === "string"
+    typeof unknown_value === "object" &&
+    unknown_value !== null &&
+    "op" in unknown_value &&
+    typeof unknown_value.op === "string"
   ) {
-    operation = unknownValue.op;
+    operation = unknown_value.op;
   }
   throw new Error(`Sheetwrite: unsupported document operation ${operation}`);
 }
 
-function stableJson(value: unknown): string {
+function stable_json(value: unknown): string {
   if (value === null || typeof value !== "object") {
     if (typeof value === "bigint") return `bigint:${String(value)}`;
     if (typeof value === "undefined") return "undefined";
     return JSON.stringify(value) ?? String(value);
   }
-  if (Array.isArray(value)) return `[${value.map((entry) => stableJson(entry)).join(",")}]`;
+  if (Array.isArray(value)) return `[${value.map((entry) => stable_json(entry)).join(",")}]`;
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record)
     .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+    .map((key) => `${JSON.stringify(key)}:${stable_json(record[key])}`)
     .join(",")}}`;
 }
 
@@ -331,19 +331,19 @@ function hash(value: string): string {
 
 /**
  * Canonical transaction ID from the operations' stable JSON. The text equals
- * `stableJson({ epoch, operations })`, built from JSON the caller already has.
+ * `stable_json({ epoch, operations })`, built from JSON the caller already has.
  */
-function transactionIdFor(epoch: number | undefined, operationsJson: string): string {
-  return `tx-${hash(`{"epoch":${stableJson(epoch)},"operations":${operationsJson}}`)}`;
+function transaction_id_for(epoch: number | undefined, operations_json: string): string {
+  return `tx-${hash(`{"epoch":${stable_json(epoch)},"operations":${operations_json}}`)}`;
 }
 
-function transactionFor(
+function transaction_for(
   event: ChangeEvent,
-  operationsJson: string,
-  explicitId?: string,
+  operations_json: string,
+  explicit_id?: string,
 ): RowBridgeTransaction {
   const operations = event.transaction.patches;
-  const id = explicitId ?? transactionIdFor(event.epoch, operationsJson);
+  const id = explicit_id ?? transaction_id_for(event.epoch, operations_json);
   return {
     id,
     source: event.source,
@@ -353,18 +353,18 @@ function transactionFor(
   };
 }
 
-function cellAddressKey(addr: CellAddress): string {
+function cell_address_key(addr: CellAddress): string {
   return `${addr.sheet}\u0000${addr.row}\u0000${addr.col}`;
 }
 
 /** Paste and fill commits report cell writes under their own delta kinds. */
-function writeDeltaKind(reason: CommitReason): "paste" | "fill" | undefined {
+function write_delta_kind(reason: CommitReason): "paste" | "fill" | undefined {
   if (reason === "paste" || reason === "fill") return reason;
 
   return undefined;
 }
 
-function operationRange(operation: DocumentOp): Range | null {
+function operation_range(operation: DocumentOp): Range | null {
   switch (operation.op) {
     case "set":
       return cellRange(operation.addr);
@@ -382,7 +382,7 @@ function operationRange(operation: DocumentOp): Range | null {
   }
 }
 
-function operationColumns(operation: DocumentOp): string[] {
+function operation_columns(operation: DocumentOp): string[] {
   switch (operation.op) {
     case "addColumns":
       return operation.columns.map((column) => column.key);
@@ -471,18 +471,18 @@ export class RowBridge<
   Row extends Record<string, CellScalar> = Record<string, CellScalar>,
 > {
   private readonly sheets = new Map<SheetId, MutableSheetState<Id>>();
-  private readonly createRowId: RowBridgeOptions<Row, Id>["createRowId"];
-  private readonly localFingerprints: RecentIdentities;
-  private readonly seenTransactionIds: RecentIdentities;
-  private latestVersion = -Infinity;
+  private readonly create_row_id: RowBridgeOptions<Row, Id>["createRowId"];
+  private readonly local_fingerprints: RecentIdentities;
+  private readonly seen_transaction_ids: RecentIdentities;
+  private latest_version = -Infinity;
 
   /** Creates a bridge over `options.defaultRows`; `maxRecentTransactions` must be a positive safe integer. */
   constructor(options: RowBridgeOptions<Row, Id>) {
-    const maxRecentTransactions =
+    const max_recent_transactions =
       options.maxRecentTransactions === undefined
         ? DEFAULT_MAX_RECENT_TRANSACTIONS
         : options.maxRecentTransactions;
-    if (!Number.isSafeInteger(maxRecentTransactions) || maxRecentTransactions <= 0) {
+    if (!Number.isSafeInteger(max_recent_transactions) || max_recent_transactions <= 0) {
       throw new SheetwriteError(
         "invalid-argument",
         "row-bridge",
@@ -490,10 +490,10 @@ export class RowBridge<
       );
     }
 
-    this.localFingerprints = new RecentIdentities(maxRecentTransactions);
-    this.seenTransactionIds = new RecentIdentities(maxRecentTransactions);
-    const columnKeys = options.columns.map((column) => column.key);
-    if (new Set(columnKeys).size !== columnKeys.length) {
+    this.local_fingerprints = new RecentIdentities(max_recent_transactions);
+    this.seen_transaction_ids = new RecentIdentities(max_recent_transactions);
+    const column_keys = options.columns.map((column) => column.key);
+    if (new Set(column_keys).size !== column_keys.length) {
       throw new SheetwriteError(
         "invalid-argument",
         "row-bridge",
@@ -501,8 +501,8 @@ export class RowBridge<
       );
     }
 
-    const rowIds: Array<Id | null> = [];
-    const rowIdSet = new Set<Id>();
+    const row_ids: Array<Id | null> = [];
+    const row_id_set = new Set<Id>();
     for (let index = 0; index < options.defaultRows.length; index += 1) {
       const id = options.getRowId(options.defaultRows[index]!, index);
       if (id === undefined || id === null || (typeof id !== "string" && typeof id !== "number")) {
@@ -513,18 +513,22 @@ export class RowBridge<
         );
       }
 
-      if (rowIdSet.has(id))
+      if (row_id_set.has(id))
         throw new SheetwriteError(
           "invalid-argument",
           "row-bridge",
           `Sheetwrite: duplicate row ID "${String(id)}"`,
         );
-      rowIdSet.add(id);
-      rowIds.push(id);
+      row_id_set.add(id);
+      row_ids.push(id);
     }
 
-    this.sheets.set(options.sheet ?? DEFAULT_SHEET_ID, { rowIds, rowIdSet, columns: columnKeys });
-    this.createRowId = options.createRowId;
+    this.sheets.set(options.sheet ?? DEFAULT_SHEET_ID, {
+      rowIds: row_ids,
+      rowIdSet: row_id_set,
+      columns: column_keys,
+    });
+    this.create_row_id = options.createRowId;
   }
 
   /** Current data-space row identities; visual sort and filters do not affect this order. */
@@ -543,11 +547,11 @@ export class RowBridge<
     requestedOperations?: readonly DocumentOp[],
     transactionId?: string,
   ): RowBridgeProjection<Id> {
-    const operationsJson = stableJson(event.transaction.patches);
+    const operations_json = stable_json(event.transaction.patches);
     const transformed =
-      requestedOperations !== undefined && stableJson(requestedOperations) !== operationsJson;
+      requestedOperations !== undefined && stable_json(requestedOperations) !== operations_json;
     const status = transformed ? "transformed" : event.source === "remote" ? "remote" : "accepted";
-    return this.projectEvent(event, operationsJson, status, transactionId);
+    return this.project_event(event, operations_json, status, transactionId);
   }
 
   /** Reconcile a canonical transaction response without synchronizing host rows implicitly. */
@@ -556,12 +560,12 @@ export class RowBridge<
     const operations = event?.transaction.patches ?? input.operations ?? [];
     const source =
       input.source ?? event?.source ?? (input.status === "remote" ? "remote" : "local");
-    const transactionId = input.transactionId;
+    const transaction_id = input.transactionId;
     if (input.version !== undefined) {
-      if (input.version < this.latestVersion) {
-        return this.emptyResult(
+      if (input.version < this.latest_version) {
+        return this.empty_result(
           "out-of-order",
-          transactionId,
+          transaction_id,
           source,
           operations,
           input.commitReason,
@@ -569,7 +573,7 @@ export class RowBridge<
         );
       }
 
-      this.latestVersion = input.version;
+      this.latest_version = input.version;
     }
 
     if (
@@ -577,9 +581,9 @@ export class RowBridge<
       input.status === "out-of-order" ||
       input.status === "duplicate"
     ) {
-      return this.emptyResult(
+      return this.empty_result(
         input.status,
-        transactionId,
+        transaction_id,
         source,
         operations,
         input.commitReason,
@@ -588,7 +592,7 @@ export class RowBridge<
     }
 
     if (event) {
-      return this.projectEvent(event, stableJson(operations), input.status, transactionId);
+      return this.project_event(event, stable_json(operations), input.status, transaction_id);
     }
 
     const synthetic: ChangeEvent = {
@@ -598,78 +602,78 @@ export class RowBridge<
       source,
     };
 
-    return this.projectEvent(synthetic, stableJson(operations), input.status, transactionId);
+    return this.project_event(synthetic, stable_json(operations), input.status, transaction_id);
   }
 
-  private emptyResult(
+  private empty_result(
     status: RowBridgeReconciliationStatus,
-    transactionId: string | undefined,
+    transaction_id: string | undefined,
     source: OperationSource,
     operations: readonly DocumentOp[],
-    commitReason = "api" as CommitReason,
+    commit_reason = "api" as CommitReason,
     epoch?: number,
   ): RowBridgeProjection<Id> {
     const event: ChangeEvent = {
       transaction: { patches: [...operations], ...(epoch === undefined ? {} : { epoch }) },
       changes: [],
-      commitReason,
+      commitReason: commit_reason,
       source,
       ...(epoch === undefined ? {} : { epoch }),
     };
     return {
       status,
-      transaction: transactionFor(event, stableJson(operations), transactionId),
+      transaction: transaction_for(event, stable_json(operations), transaction_id),
       deltas: [],
     };
   }
 
-  private projectEvent(
+  private project_event(
     event: ChangeEvent,
-    operationsJson: string,
+    operations_json: string,
     status: RowBridgeReconciliationStatus,
-    explicitId?: string,
+    explicit_id?: string,
   ): RowBridgeProjection<Id> {
     const operations = event.transaction.patches;
-    const transaction = transactionFor(event, operationsJson, explicitId);
-    const fingerprint = hash(operationsJson);
-    const hasTransactionIdentity = explicitId !== undefined || event.epoch !== undefined;
-    if (hasTransactionIdentity && this.seenTransactionIds.has(transaction.id)) {
+    const transaction = transaction_for(event, operations_json, explicit_id);
+    const fingerprint = hash(operations_json);
+    const has_transaction_identity = explicit_id !== undefined || event.epoch !== undefined;
+    if (has_transaction_identity && this.seen_transaction_ids.has(transaction.id)) {
       return { status: "duplicate", transaction, deltas: [] };
     }
 
-    if (event.source === "remote" && this.localFingerprints.has(fingerprint)) {
-      this.localFingerprints.delete(fingerprint);
-      if (hasTransactionIdentity) {
-        this.seenTransactionIds.remember(transaction.id);
+    if (event.source === "remote" && this.local_fingerprints.has(fingerprint)) {
+      this.local_fingerprints.delete(fingerprint);
+      if (has_transaction_identity) {
+        this.seen_transaction_ids.remember(transaction.id);
       }
 
       return { status: "duplicate", transaction, deltas: [] };
     }
 
-    if (event.epoch !== undefined && event.epoch < this.latestVersion) {
+    if (event.epoch !== undefined && event.epoch < this.latest_version) {
       return { status: "out-of-order", transaction, deltas: [] };
     }
 
-    if (event.epoch !== undefined) this.latestVersion = Math.max(this.latestVersion, event.epoch);
-    if (hasTransactionIdentity) {
-      this.seenTransactionIds.remember(transaction.id);
+    if (event.epoch !== undefined) this.latest_version = Math.max(this.latest_version, event.epoch);
+    if (has_transaction_identity) {
+      this.seen_transaction_ids.remember(transaction.id);
     }
 
     if (event.source === "local") {
-      this.localFingerprints.remember(fingerprint);
+      this.local_fingerprints.remember(fingerprint);
     }
 
-    const changeQueues = new Map<string, CellChange[]>();
+    const change_queues = new Map<string, CellChange[]>();
     for (const change of event.changes) {
-      const key = cellAddressKey(change.addr);
-      const queue = changeQueues.get(key);
+      const key = cell_address_key(change.addr);
+      const queue = change_queues.get(key);
       if (queue) queue.push(change);
-      else changeQueues.set(key, [change]);
+      else change_queues.set(key, [change]);
     }
 
     const deltas: RowBridgeDelta<Id>[] = [];
     for (const operation of operations) {
-      deltas.push(this.projectOperation(operation, transaction, changeQueues));
+      deltas.push(this.project_operation(operation, transaction, change_queues));
     }
 
     return { status, transaction, deltas };
@@ -679,49 +683,49 @@ export class RowBridge<
     return this.sheets.get(sheet) ?? null;
   }
 
-  private rowId(sheet: SheetId, row: number): Id | null {
+  private row_id(sheet: SheetId, row: number): Id | null {
     return this.state(sheet)?.rowIds[row] ?? null;
   }
 
-  private columnKey(sheet: SheetId, col: number): string | null {
+  private column_key(sheet: SheetId, col: number): string | null {
     return this.state(sheet)?.columns[col] ?? null;
   }
 
-  private cellsFor(
+  private cells_for(
     operation: DocumentOp,
-    changeQueues: Map<string, CellChange[]>,
+    change_queues: Map<string, CellChange[]>,
   ): RowBridgeCell<Id>[] {
     const addresses: CellAddress[] = [];
     const values = new Map<string, CellValue>();
     if (operation.op === "set") {
       addresses.push(operation.addr);
-      values.set(cellAddressKey(operation.addr), operation.value);
+      values.set(cell_address_key(operation.addr), operation.value);
     } else if (operation.op === "setRange") {
       const range = operation.range;
-      const startRow = Math.min(range.start.row, range.end.row);
-      const startCol = Math.min(range.start.col, range.end.col);
+      const start_row = Math.min(range.start.row, range.end.row);
+      const start_col = Math.min(range.start.col, range.end.col);
       for (const cell of operation.cells) {
         const addr = {
           sheet: range.sheet,
-          row: startRow + cell.rowOffset,
-          col: startCol + cell.colOffset,
+          row: start_row + cell.rowOffset,
+          col: start_col + cell.colOffset,
         };
 
         addresses.push(addr);
-        values.set(cellAddressKey(addr), cell.value);
+        values.set(cell_address_key(addr), cell.value);
       }
     } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
       const { block, range } =
         operation.op === "restoreBlock" ? restoreBlockFacts(operation) : operation;
-      const startRow = Math.min(range.start.row, range.end.row);
-      const startCol = Math.min(range.start.col, range.end.col);
+      const start_row = Math.min(range.start.row, range.end.row);
+      const start_col = Math.min(range.start.col, range.end.col);
       const formulas = new Map(block.formulas ?? []);
       const refs = new Map(block.refs ?? []);
       for (let offset = 0; offset < block.values.length; offset += 1) {
         const addr = {
           sheet: range.sheet,
-          row: startRow + Math.floor(offset / block.colCount),
-          col: startCol + (offset % block.colCount),
+          row: start_row + Math.floor(offset / block.colCount),
+          col: start_col + (offset % block.colCount),
         };
 
         addresses.push(addr);
@@ -729,7 +733,7 @@ export class RowBridge<
         const formula = formulas.get(offset);
         const target = refs.get(offset);
         values.set(
-          cellAddressKey(addr),
+          cell_address_key(addr),
           formula !== undefined
             ? { kind: "formula", src: formula }
             : target !== undefined
@@ -747,17 +751,17 @@ export class RowBridge<
       } else {
         // Without capture for this clear (reconcile, or capture off) every cell may have changed.
         const range = operation.range;
-        const startRow = Math.min(range.start.row, range.end.row);
-        const endRow = Math.max(range.start.row, range.end.row);
-        const startCol = Math.min(range.start.col, range.end.col);
-        const endCol = Math.max(range.start.col, range.end.col);
+        const start_row = Math.min(range.start.row, range.end.row);
+        const end_row = Math.max(range.start.row, range.end.row);
+        const start_col = Math.min(range.start.col, range.end.col);
+        const end_col = Math.max(range.start.col, range.end.col);
 
-        for (let row = startRow; row <= endRow; row += 1) {
-          for (let col = startCol; col <= endCol; col += 1) {
+        for (let row = start_row; row <= end_row; row += 1) {
+          for (let col = start_col; col <= end_col; col += 1) {
             const addr = { sheet: range.sheet, row, col };
             addresses.push(addr);
             if (operation.contents !== false) {
-              values.set(cellAddressKey(addr), { kind: "literal", value: null });
+              values.set(cell_address_key(addr), { kind: "literal", value: null });
             }
           }
         }
@@ -766,13 +770,13 @@ export class RowBridge<
       // Every cell of the range can take another row's content; the store
       // reports each new value as a change.
       const range = operation.range;
-      const startRow = Math.min(range.start.row, range.end.row);
-      const endRow = Math.max(range.start.row, range.end.row);
-      const startCol = Math.min(range.start.col, range.end.col);
-      const endCol = Math.max(range.start.col, range.end.col);
+      const start_row = Math.min(range.start.row, range.end.row);
+      const end_row = Math.max(range.start.row, range.end.row);
+      const start_col = Math.min(range.start.col, range.end.col);
+      const end_col = Math.max(range.start.col, range.end.col);
 
-      for (let row = startRow; row <= endRow; row += 1) {
-        for (let col = startCol; col <= endCol; col += 1) {
+      for (let row = start_row; row <= end_row; row += 1) {
+        for (let col = start_col; col <= end_col; col += 1) {
           addresses.push({ sheet: range.sheet, row, col });
         }
       }
@@ -789,14 +793,14 @@ export class RowBridge<
     }
 
     return addresses.map((addr) => {
-      const key = cellAddressKey(addr);
-      const change = changeQueues.get(key)?.shift();
+      const key = cell_address_key(addr);
+      const change = change_queues.get(key)?.shift();
       return {
         sheet: addr.sheet,
         row: addr.row,
-        rowId: this.rowId(addr.sheet, addr.row),
+        rowId: this.row_id(addr.sheet, addr.row),
         col: addr.col,
-        columnKey: this.columnKey(addr.sheet, addr.col),
+        columnKey: this.column_key(addr.sheet, addr.col),
         previous: change?.oldValue,
         next: change?.newValue ?? values.get(key),
       };
@@ -808,7 +812,7 @@ export class RowBridge<
     operation: DocumentOp,
     previous: unknown,
     next: unknown,
-    rowIds: readonly (Id | null)[],
+    row_ids: readonly (Id | null)[],
   ): RowBridgeDeltaBase<Id> & { readonly kind?: Kind } {
     return {
       transaction,
@@ -817,52 +821,52 @@ export class RowBridge<
       previous,
       next,
       operation,
-      rowIds,
+      rowIds: row_ids,
     };
   }
 
-  private projectOperation(
+  private project_operation(
     operation: DocumentOp,
     transaction: RowBridgeTransaction,
-    changeQueues: Map<string, CellChange[]>,
+    change_queues: Map<string, CellChange[]>,
   ): RowBridgeDelta<Id> {
     switch (operation.op) {
       case "set":
-        return this.cellDelta(operation, transaction, changeQueues);
+        return this.cell_delta(operation, transaction, change_queues);
 
       case "setRange":
       case "setBlock":
       case "restoreBlock":
       case "permuteRows":
-        return this.rangeDelta(operation, transaction, changeQueues);
+        return this.range_delta(operation, transaction, change_queues);
 
       case "moveCells": {
-        const cells = this.cellsFor(operation, changeQueues);
-        const base = this.cellsBase(transaction, operation, cells);
-        const kind = writeDeltaKind(transaction.commitReason) ?? "range";
+        const cells = this.cells_for(operation, change_queues);
+        const base = this.cells_base(transaction, operation, cells);
+        const kind = write_delta_kind(transaction.commitReason) ?? "range";
         return { ...base, kind, range: movedBlock(operation), cells };
       }
 
       case "clearRange": {
-        const cells = this.cellsFor(operation, changeQueues);
-        const base = this.cellsBase(transaction, operation, cells);
+        const cells = this.cells_for(operation, change_queues);
+        const base = this.cells_base(transaction, operation, cells);
         return { ...base, kind: "clear", range: operation.range, cells };
       }
 
       case "addRows":
-        return this.insertRows(operation, transaction);
+        return this.insert_rows(operation, transaction);
 
       case "removeRows":
-        return this.removeRows(operation, transaction);
+        return this.remove_rows(operation, transaction);
 
       case "moveRows":
-        return this.moveRows(operation, transaction);
+        return this.move_rows(operation, transaction);
 
       case "addColumns":
         this.state(operation.sheet)?.columns.splice(
           operation.at,
           0,
-          ...operationColumns(operation),
+          ...operation_columns(operation),
         );
         return this.metadata(transaction, operation, "column");
 
@@ -881,8 +885,8 @@ export class RowBridge<
         return this.metadata(transaction, operation, "column");
 
       case "setRowMeta": {
-        const rowIds = [this.rowId(operation.sheet, operation.row)];
-        return this.metadata(transaction, operation, "row", rowIds);
+        const row_ids = [this.row_id(operation.sheet, operation.row)];
+        return this.metadata(transaction, operation, "row", row_ids);
       }
 
       case "setRangeStyle":
@@ -894,14 +898,14 @@ export class RowBridge<
 
       case "addSheet": {
         const snapshot = operation.sheet;
-        this.sheets.set(snapshot.id, this.sheetStateForSnapshot(snapshot));
-        return this.hostAction(transaction, operation, "add-sheet", undefined, snapshot, []);
+        this.sheets.set(snapshot.id, this.sheet_state_for_snapshot(snapshot));
+        return this.host_action(transaction, operation, "add-sheet", undefined, snapshot, []);
       }
 
       case "removeSheet": {
         const previous = this.sheets.get(operation.sheet)?.rowIds ?? [];
         this.sheets.delete(operation.sheet);
-        return this.hostAction(
+        return this.host_action(
           transaction,
           operation,
           "remove-sheet",
@@ -912,7 +916,7 @@ export class RowBridge<
       }
 
       case "renameSheet":
-        return this.hostAction(
+        return this.host_action(
           transaction,
           operation,
           "rename-sheet",
@@ -922,11 +926,11 @@ export class RowBridge<
         );
 
       case "moveSheet":
-        return this.hostAction(transaction, operation, "move-sheet", undefined, operation.to, []);
+        return this.host_action(transaction, operation, "move-sheet", undefined, operation.to, []);
 
       case "setSheetVisibility": {
         const visibility = operation.visibility;
-        return this.hostAction(
+        return this.host_action(
           transaction,
           operation,
           "set-sheet-visibility",
@@ -957,8 +961,8 @@ export class RowBridge<
         return this.metadata(transaction, operation, "protected-range");
 
       case "setNote": {
-        const rowIds = [this.rowId(operation.addr.sheet, operation.addr.row)];
-        return this.metadata(transaction, operation, "note", rowIds);
+        const row_ids = [this.row_id(operation.addr.sheet, operation.addr.row)];
+        return this.metadata(transaction, operation, "note", row_ids);
       }
 
       case "setNamedRange":
@@ -994,43 +998,43 @@ export class RowBridge<
         return this.metadata(transaction, operation, "pivot");
 
       default:
-        return assertNever(operation);
+        return assert_never(operation);
     }
   }
 
   /** Paste and fill commits report their cell writes as paste or fill deltas. */
-  private cellDelta(
+  private cell_delta(
     operation: Extract<DocumentOp, { op: "set" }>,
     transaction: RowBridgeTransaction,
-    changeQueues: Map<string, CellChange[]>,
+    change_queues: Map<string, CellChange[]>,
   ): RowBridgeDelta<Id> {
-    const cells = this.cellsFor(operation, changeQueues);
+    const cells = this.cells_for(operation, change_queues);
     const cell = cells[0];
-    const rowIds = cell ? [cell.rowId] : [];
-    const base = this.base(transaction, operation, cell?.previous, cell?.next, rowIds);
-    const kind = writeDeltaKind(transaction.commitReason);
-    if (kind !== undefined) return { ...base, kind, range: operationRange(operation), cells };
+    const row_ids = cell ? [cell.rowId] : [];
+    const base = this.base(transaction, operation, cell?.previous, cell?.next, row_ids);
+    const kind = write_delta_kind(transaction.commitReason);
+    if (kind !== undefined) return { ...base, kind, range: operation_range(operation), cells };
 
     if (!cell) throw new Error("Sheetwrite: a cell write projects exactly one cell");
 
     return { ...base, kind: "cell", cell };
   }
 
-  private rangeDelta(
+  private range_delta(
     operation: Extract<
       DocumentOp,
       { op: "setRange" | "setBlock" | "restoreBlock" | "permuteRows" }
     >,
     transaction: RowBridgeTransaction,
-    changeQueues: Map<string, CellChange[]>,
+    change_queues: Map<string, CellChange[]>,
   ): RowBridgeDelta<Id> {
-    const cells = this.cellsFor(operation, changeQueues);
-    const base = this.cellsBase(transaction, operation, cells);
-    const kind = writeDeltaKind(transaction.commitReason) ?? "range";
+    const cells = this.cells_for(operation, change_queues);
+    const base = this.cells_base(transaction, operation, cells);
+    const kind = write_delta_kind(transaction.commitReason) ?? "range";
     return { ...base, kind, range: operation.range, cells };
   }
 
-  private cellsBase(
+  private cells_base(
     transaction: RowBridgeTransaction,
     operation: DocumentOp,
     cells: readonly RowBridgeCell<Id>[],
@@ -1044,12 +1048,12 @@ export class RowBridge<
     );
   }
 
-  private insertRows(
+  private insert_rows(
     operation: Extract<DocumentOp, { op: "addRows" }>,
     transaction: RowBridgeTransaction,
   ): RowBridgeDelta<Id> {
     const state = this.state(operation.sheet);
-    const inserted = this.insertedRowIds(operation, transaction, state);
+    const inserted = this.inserted_row_ids(operation, transaction, state);
     state?.rowIds.splice(operation.at, 0, ...inserted);
     for (const id of inserted) if (id !== null) state?.rowIdSet.add(id);
 
@@ -1067,21 +1071,21 @@ export class RowBridge<
   }
 
   /** Host row IDs for inserted rows; every ID must be new to the sheet. */
-  private insertedRowIds(
+  private inserted_row_ids(
     operation: Extract<DocumentOp, { op: "addRows" }>,
     transaction: RowBridgeTransaction,
     state: MutableSheetState<Id> | null,
   ): Array<Id | null> {
     const inserted: Array<Id | null> = [];
-    const insertedIds = new Set<Id>();
+    const inserted_ids = new Set<Id>();
 
     for (let offset = 0; offset < operation.count; offset += 1) {
-      if (!this.createRowId) {
+      if (!this.create_row_id) {
         inserted.push(null);
         continue;
       }
 
-      const id = this.createRowId({
+      const id = this.create_row_id({
         sheet: operation.sheet,
         at: operation.at,
         offset,
@@ -1096,7 +1100,7 @@ export class RowBridge<
         );
       }
 
-      if (state?.rowIdSet.has(id) || insertedIds.has(id)) {
+      if (state?.rowIdSet.has(id) || inserted_ids.has(id)) {
         throw new SheetwriteError(
           "invalid-argument",
           "row-bridge",
@@ -1104,14 +1108,14 @@ export class RowBridge<
         );
       }
 
-      insertedIds.add(id);
+      inserted_ids.add(id);
       inserted.push(id);
     }
 
     return inserted;
   }
 
-  private removeRows(
+  private remove_rows(
     operation: Extract<DocumentOp, { op: "removeRows" }>,
     transaction: RowBridgeTransaction,
   ): RowBridgeDelta<Id> {
@@ -1132,7 +1136,7 @@ export class RowBridge<
     };
   }
 
-  private moveRows(
+  private move_rows(
     operation: Extract<DocumentOp, { op: "moveRows" }>,
     transaction: RowBridgeTransaction,
   ): RowBridgeDelta<Id> {
@@ -1156,22 +1160,22 @@ export class RowBridge<
     };
   }
 
-  private hostAction(
+  private host_action(
     transaction: RowBridgeTransaction,
     operation: DocumentOp,
     action: RowBridgeHostActionDelta["action"],
     previous: unknown,
     next: unknown,
-    rowIds: readonly (Id | null)[],
+    row_ids: readonly (Id | null)[],
   ): RowBridgeHostActionDelta<Id> {
     return {
-      ...this.base(transaction, operation, previous, next, rowIds),
+      ...this.base(transaction, operation, previous, next, row_ids),
       kind: "host-action",
       action,
     };
   }
 
-  private sheetStateForSnapshot(snapshot: SheetSnapshot): MutableSheetState<Id> {
+  private sheet_state_for_snapshot(snapshot: SheetSnapshot): MutableSheetState<Id> {
     return {
       rowIds: new Array<Id | null>(snapshot.rowCount).fill(null),
       rowIdSet: new Set<Id>(),
@@ -1183,10 +1187,10 @@ export class RowBridge<
     transaction: RowBridgeTransaction,
     operation: DocumentOp,
     metadata: RowBridgeMetadataDelta["metadata"],
-    rowIds: readonly (Id | null)[] = [],
+    row_ids: readonly (Id | null)[] = [],
   ): RowBridgeMetadataDelta<Id> {
     return {
-      ...this.base(transaction, operation, undefined, operation, rowIds),
+      ...this.base(transaction, operation, undefined, operation, row_ids),
       kind: "metadata",
       metadata,
     };
@@ -1227,5 +1231,5 @@ export function createRowBridge<
 export function rowBridgeTransactionId(
   transaction: Pick<Transaction, "patches" | "epoch">,
 ): string {
-  return transactionIdFor(transaction.epoch, stableJson(transaction.patches));
+  return transaction_id_for(transaction.epoch, stable_json(transaction.patches));
 }

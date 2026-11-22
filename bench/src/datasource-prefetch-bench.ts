@@ -47,12 +47,12 @@ interface ScheduledTask {
 
 class LogicalClock {
   now = 0;
-  private nextId = 1;
+  private next_id = 1;
   private readonly tasks: ScheduledTask[] = [];
 
   schedule(delay: number, run: () => void): () => void {
     const task: ScheduledTask = {
-      id: this.nextId++,
+      id: this.next_id++,
       at: this.now + delay,
       run,
       cancelled: false,
@@ -157,7 +157,7 @@ function workbook(): Workbook {
   };
 }
 
-function traceValue(key: string, row: number): RowData[string] {
+function trace_value(key: string, row: number): RowData[string] {
   switch (key) {
     case "c0":
       return row;
@@ -176,7 +176,7 @@ function traceValue(key: string, row: number): RowData[string] {
   }
 }
 
-function traceRows(
+function trace_rows(
   start: number,
   end: number,
   columns: readonly DataSourceColumnBand[],
@@ -184,19 +184,19 @@ function traceRows(
   const keys = columns.flatMap((band) => band.keys);
   return Array.from({ length: end - start }, (_, offset) => {
     const row = start + offset;
-    const pageRow: RowData = {};
-    for (const key of keys) pageRow[key] = traceValue(key, row);
-    return pageRow;
+    const page_row: RowData = {};
+    for (const key of keys) page_row[key] = trace_value(key, row);
+    return page_row;
   });
 }
 
-async function flushRequests(): Promise<void> {
+async function flush_requests(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
 }
 
-async function runRepetition(repetition: number): Promise<PrefetchTraceRepetition> {
+async function run_repetition(repetition: number): Promise<PrefetchTraceRepetition> {
   const clock = new LogicalClock();
   const store = new SheetwriteStore(workbook(), undefined, {
     storage: "paged",
@@ -215,11 +215,11 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     getRows({ start, end, columns, signal }) {
       source.requests += 1;
       source.requestedRows += end - start;
-      pendingSignals.add(signal);
+      pending_signals.add(signal);
       const result = Promise.withResolvers<DataSourcePage>();
       const cancel = clock.schedule(SOURCE_LATENCY_MS, () => {
-        pendingSignals.delete(signal);
-        const rows = traceRows(start, end, columns);
+        pending_signals.delete(signal);
+        const rows = trace_rows(start, end, columns);
         source.rowsServed += rows.length;
         source.bytesServed += new TextEncoder().encode(JSON.stringify(rows)).byteLength;
         result.resolve({ protocol: 2, start, columns, rows });
@@ -228,7 +228,7 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
         "abort",
         () => {
           cancel();
-          pendingSignals.delete(signal);
+          pending_signals.delete(signal);
           source.aborts += 1;
           result.reject(new DOMException("Logical datasource request aborted", "AbortError"));
         },
@@ -237,8 +237,8 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
       return result.promise;
     },
   };
-  const pendingSignals = new Set<AbortSignal>();
-  let visibleStart = VIEWPORT_ROWS / 2;
+  const pending_signals = new Set<AbortSignal>();
+  let visible_start = VIEWPORT_ROWS / 2;
   const controller = new DatasourceController(
     {
       datasource,
@@ -257,90 +257,91 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     },
     ROW_COUNT,
   );
-  let peakActiveRequests = 0;
-  let peakActiveSpeculativeRows = 0;
-  const sampleActiveResources = () => {
+  let peak_active_requests = 0;
+  let peak_active_speculative_rows = 0;
+  const sample_active_resources = () => {
     const telemetry = controller.getTelemetry();
-    peakActiveRequests = Math.max(peakActiveRequests, telemetry.activeRequests);
-    peakActiveSpeculativeRows = Math.max(
-      peakActiveSpeculativeRows,
+    peak_active_requests = Math.max(peak_active_requests, telemetry.activeRequests);
+    peak_active_speculative_rows = Math.max(
+      peak_active_speculative_rows,
       telemetry.activeSpeculativeRows,
     );
   };
 
   // Declared warm-up: visible demand plus the two aligned look-ahead bands.
-  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-  sampleActiveResources();
+  controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sample_active_resources();
   await clock.advance(SOURCE_LATENCY_MS);
-  await flushRequests();
+  await flush_requests();
   controller.resetTelemetry();
-  const warmSource = { ...source };
+  const warm_source = { ...source };
 
-  const demandedRows = new Set<number>();
-  const recordDemand = () => {
-    for (let row = visibleStart; row < visibleStart + VIEWPORT_ROWS; row++) demandedRows.add(row);
+  const demanded_rows = new Set<number>();
+  const record_demand = () => {
+    for (let row = visible_start; row < visible_start + VIEWPORT_ROWS; row++)
+      demanded_rows.add(row);
   };
 
-  const steadyFrames = TRACE_BANDS * 4;
-  for (let frame = 0; frame < steadyFrames; frame++) {
+  const steady_frames = TRACE_BANDS * 4;
+  for (let frame = 0; frame < steady_frames; frame++) {
     await clock.advance(FRAME_MS);
-    visibleStart += VIEWPORT_ROWS / 4;
-    recordDemand();
-    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-    sampleActiveResources();
+    visible_start += VIEWPORT_ROWS / 4;
+    record_demand();
+    controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sample_active_resources();
   }
 
   // Hold the final window for one complete measured logical frame.
   await clock.advance(FRAME_MS);
-  recordDemand();
-  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-  sampleActiveResources();
+  record_demand();
+  controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sample_active_resources();
 
   for (let frame = 0; frame < REVERSE_BANDS * 4; frame++) {
     await clock.advance(FRAME_MS);
-    visibleStart -= VIEWPORT_ROWS / 4;
-    recordDemand();
-    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-    sampleActiveResources();
+    visible_start -= VIEWPORT_ROWS / 4;
+    record_demand();
+    controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sample_active_resources();
   }
-  await flushRequests();
+  await flush_requests();
 
   const steady = controller.getTelemetry();
-  const sourceAfterSteady = { ...source };
-  const demandedBytes = new TextEncoder().encode(
-    JSON.stringify(traceRows(0, demandedRows.size, FULL_TRACE_BANDS)),
+  const source_after_steady = { ...source };
+  const demanded_bytes = new TextEncoder().encode(
+    JSON.stringify(trace_rows(0, demanded_rows.size, FULL_TRACE_BANDS)),
   ).byteLength;
   // Repeated non-jump band steps create fresh visible/speculative ownership so
   // the immediate distant jump deterministically proves both cancellation paths.
   for (let step = 0; step < 3; step++) {
-    visibleStart += VIEWPORT_ROWS * 2;
-    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-    sampleActiveResources();
+    visible_start += VIEWPORT_ROWS * 2;
+    controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sample_active_resources();
   }
 
   // The distant jump must expose unloaded state until its real 90 ms response.
-  visibleStart = 3_000;
-  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-  sampleActiveResources();
-  const jumpVisibleResidentBeforeResponse = store.isRangeFullyLoaded({
+  visible_start = 3_000;
+  controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sample_active_resources();
+  const jump_visible_resident_before_response = store.isRangeFullyLoaded({
     sheet: "trace",
-    start: { row: visibleStart, col: 0 },
-    end: { row: visibleStart + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
+    start: { row: visible_start, col: 0 },
+    end: { row: visible_start + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
   });
   await clock.advance(SOURCE_LATENCY_MS);
-  await flushRequests();
-  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
-  sampleActiveResources();
-  const jumpVisibleResidentAfterResponse = store.isRangeFullyLoaded({
+  await flush_requests();
+  controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sample_active_resources();
+  const jump_visible_resident_after_response = store.isRangeFullyLoaded({
     sheet: "trace",
-    start: { row: visibleStart, col: 0 },
-    end: { row: visibleStart + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
+    start: { row: visible_start, col: 0 },
+    end: { row: visible_start + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
   });
   const complete = controller.getTelemetry();
   const cache = store.getPagedStats("trace");
-  const measuredRequestedRows = sourceAfterSteady.requestedRows - warmSource.requestedRows;
-  const measuredRowsServed = sourceAfterSteady.rowsServed - warmSource.rowsServed;
-  const measuredBytesServed = sourceAfterSteady.bytesServed - warmSource.bytesServed;
+  const measured_requested_rows = source_after_steady.requestedRows - warm_source.requestedRows;
+  const measured_rows_served = source_after_steady.rowsServed - warm_source.rowsServed;
+  const measured_bytes_served = source_after_steady.bytesServed - warm_source.bytesServed;
 
   const result: PrefetchTraceRepetition = {
     repetition,
@@ -348,31 +349,31 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     p95VisibleWaitMs: steady.p95VisibleWaitMs,
     measuredFrames: steady.measuredFrames,
     residentFrames: steady.residentFrames,
-    requests: sourceAfterSteady.requests - warmSource.requests,
-    requestedRows: measuredRequestedRows,
-    rowsServed: measuredRowsServed,
-    bytesServed: measuredBytesServed,
-    requestedRowMultiplier: measuredRequestedRows / demandedRows.size,
-    servedByteMultiplier: demandedBytes === 0 ? 0 : measuredBytesServed / demandedBytes,
-    aborts: source.aborts - warmSource.aborts,
+    requests: source_after_steady.requests - warm_source.requests,
+    requestedRows: measured_requested_rows,
+    rowsServed: measured_rows_served,
+    bytesServed: measured_bytes_served,
+    requestedRowMultiplier: measured_requested_rows / demanded_rows.size,
+    servedByteMultiplier: demanded_bytes === 0 ? 0 : measured_bytes_served / demanded_bytes,
+    aborts: source.aborts - warm_source.aborts,
     reversalAborts: complete.reversalAborts,
     jumpAborts: complete.jumpAborts,
     promotions: complete.promotions,
     cacheAllocatedBytes: cache.allocatedBytes,
     cacheChunks: cache.chunks,
-    peakActiveRequests,
-    peakActiveSpeculativeRows,
-    jumpVisibleResidentBeforeResponse,
-    jumpVisibleResidentAfterResponse,
+    peakActiveRequests: peak_active_requests,
+    peakActiveSpeculativeRows: peak_active_speculative_rows,
+    jumpVisibleResidentBeforeResponse: jump_visible_resident_before_response,
+    jumpVisibleResidentAfterResponse: jump_visible_resident_after_response,
   };
 
   controller.destroy();
   store.dispose();
-  if (pendingSignals.size !== 0) throw new Error("Prefetch trace leaked datasource requests");
+  if (pending_signals.size !== 0) throw new Error("Prefetch trace leaked datasource requests");
   return result;
 }
 
-function assertRepetition(result: PrefetchTraceRepetition): void {
+function assert_repetition(result: PrefetchTraceRepetition): void {
   if (result.residencyRatio < 0.95) {
     throw new Error(`repetition ${result.repetition}: residency ${result.residencyRatio} < 0.95`);
   }
@@ -436,7 +437,7 @@ export function validateDatasourcePrefetchReport(value: PrefetchBenchmarkReport)
     if (repetition.repetition !== index + 1) {
       throw new Error("Datasource prefetch repetition identity is incomplete");
     }
-    assertRepetition(repetition);
+    assert_repetition(repetition);
   }
   const residency = value.repetitions.map((result) => result.residencyRatio);
   const waits = value.repetitions.map((result) => result.p95VisibleWaitMs);
@@ -466,14 +467,14 @@ export function validateDatasourcePrefetchReport(value: PrefetchBenchmarkReport)
   }
 }
 
-function sparseBookkeepingEvidence(): SparseDatasourceBookkeepingEvidence {
-  const logicalRows = 1_000_000_000;
-  const visibleStart = 900_000_000;
+function sparse_bookkeeping_evidence(): SparseDatasourceBookkeepingEvidence {
+  const logical_rows = 1_000_000_000;
+  const visible_start = 900_000_000;
   const controller = new DatasourceController(
     {
       loadable: null,
       activeSheet: () => "trace",
-      rowCount: () => logicalRows,
+      rowCount: () => logical_rows,
       columns: () => TRACE_COLUMNS,
       revision: () => 0,
       isCellNewerThan: () => false,
@@ -482,12 +483,12 @@ function sparseBookkeepingEvidence(): SparseDatasourceBookkeepingEvidence {
       onError: () => {},
       now: () => 0,
     },
-    logicalRows,
+    logical_rows,
   );
-  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  controller.updateViewport(visible_start, visible_start + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
   const telemetry = controller.getTelemetry();
   const evidence: SparseDatasourceBookkeepingEvidence = {
-    logicalRows,
+    logicalRows: logical_rows,
     visibleRows: VIEWPORT_ROWS,
     loadedBands: telemetry.loadedBands,
     ownedBands: telemetry.ownedBands,
@@ -515,8 +516,8 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
   await initSheetwrite();
   const repetitions: PrefetchTraceRepetition[] = [];
   for (let repetition = 1; repetition <= REPETITIONS; repetition++) {
-    const result = await runRepetition(repetition);
-    assertRepetition(result);
+    const result = await run_repetition(repetition);
+    assert_repetition(result);
     repetitions.push(result);
   }
   const residency = repetitions.map((result) => result.residencyRatio);
@@ -533,7 +534,7 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
       cacheBytes: CACHE_BYTES,
     },
     repetitions,
-    sparseBookkeeping: sparseBookkeepingEvidence(),
+    sparseBookkeeping: sparse_bookkeeping_evidence(),
     medianResidencyRatio: nearestRankPercentile(residency, 0.5),
     p95ResidencyRatio: nearestRankPercentile(residency, 0.95),
     medianP95VisibleWaitMs: nearestRankPercentile(waits, 0.5),

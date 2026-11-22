@@ -38,11 +38,11 @@ const workbook: Workbook = {
 const replacement: Workbook = { ...workbook, sheets: [...workbook.sheets] };
 const host = document.createElement("div");
 document.body.append(host);
-const restoreCanvas = installCanvasTestStubs();
+const restore_canvas = installCanvasTestStubs();
 await initSheetwrite();
-const controlHost = document.createElement("div");
-document.body.append(controlHost);
-const controlGrid = createGrid(controlHost, { workbook });
+const control_host = document.createElement("div");
+document.body.append(control_host);
+const control_grid = createGrid(control_host, { workbook });
 const SELECTIONS_PER_CYCLE = 5_000;
 
 interface SvelteBenchmarkHarness {
@@ -50,13 +50,13 @@ interface SvelteBenchmarkHarness {
 }
 
 /** Throws unless the adapter published a live grid into the host. */
-function assertMounted(adapter: string): void {
+function assert_mounted(adapter: string): void {
   if (host.querySelector('[role="grid"]') === null) {
     throw new Error(`${adapter} benchmark cycle did not mount a grid`);
   }
 }
 
-async function reactCycle(reset: boolean): Promise<void> {
+async function react_cycle(reset: boolean): Promise<void> {
   const root = createRoot(host);
   const ref = createRef<Grid>();
   flushReact(() => root.render(createElement(ReactGrid, { workbook, ref })));
@@ -66,14 +66,14 @@ async function reactCycle(reset: boolean): Promise<void> {
   flushReact(() => root.unmount());
 }
 
-async function vueCycle(reset: boolean): Promise<void> {
+async function vue_cycle(reset: boolean): Promise<void> {
   const input = shallowRef(workbook);
   const app = createApp(
     defineComponent({ setup: () => () => h(VueGrid, { workbook: input.value }) }),
   );
   app.mount(host);
   await nextTick();
-  assertMounted("Vue");
+  assert_mounted("Vue");
   if (reset) {
     input.value = replacement;
     await nextTick();
@@ -82,13 +82,13 @@ async function vueCycle(reset: boolean): Promise<void> {
   app.unmount();
 }
 
-async function svelteCycle(reset: boolean): Promise<void> {
+async function svelte_cycle(reset: boolean): Promise<void> {
   const component = mount(SvelteHarness, {
     target: host,
     props: { initialProps: { workbook, fallbackLabel: "" } },
   }) as SvelteBenchmarkHarness;
   flushSvelte();
-  assertMounted("Svelte");
+  assert_mounted("Svelte");
   if (reset) {
     component.update({ workbook: replacement, fallbackLabel: "" });
     flushSvelte();
@@ -104,18 +104,18 @@ const workloads: Record<string, () => void | Promise<void>> = {
   },
   "core-selection-control": () => {
     for (let selection = 0; selection < SELECTIONS_PER_CYCLE; selection += 1) {
-      controlGrid.setSelection({
+      control_grid.setSelection({
         kind: "cell",
         addr: { sheet: "bench", row: selection % 20, col: 0 },
       });
     }
   },
-  "react-mount": () => reactCycle(false),
-  "react-reset": () => reactCycle(true),
-  "vue-mount": () => vueCycle(false),
-  "vue-reset": () => vueCycle(true),
-  "svelte-mount": () => svelteCycle(false),
-  "svelte-reset": () => svelteCycle(true),
+  "react-mount": () => react_cycle(false),
+  "react-reset": () => react_cycle(true),
+  "vue-mount": () => vue_cycle(false),
+  "vue-reset": () => vue_cycle(true),
+  "svelte-mount": () => svelte_cycle(false),
+  "svelte-reset": () => svelte_cycle(true),
 };
 const results: Record<string, { medianUs: number; samplesUs: number[] }> = {};
 try {
@@ -141,20 +141,20 @@ try {
     }
     if (process.env.ADAPTER_BENCH_WORKLOAD && process.env.ADAPTER_BENCH_WORKLOAD !== name) continue;
     for (let iteration = 0; iteration < WARMUP_ITERATIONS; iteration += 1) await cycle();
-    const samplesUs: number[] = [];
+    const samples_us: number[] = [];
     for (let sample = 0; sample < SAMPLES; sample += 1) {
       const start = performance.now();
       for (let iteration = 0; iteration < ITERATIONS; iteration += 1) await cycle();
-      samplesUs.push(((performance.now() - start) * 1_000) / ITERATIONS);
+      samples_us.push(((performance.now() - start) * 1_000) / ITERATIONS);
     }
-    results[name] = { medianUs: median(samplesUs), samplesUs };
+    results[name] = { medianUs: median(samples_us), samplesUs: samples_us };
   }
   process.stdout.write(
     `${JSON.stringify({ iterations: ITERATIONS, samples: SAMPLES, results })}\n`,
   );
 } finally {
-  controlGrid.destroy();
-  controlHost.remove();
-  restoreCanvas();
+  control_grid.destroy();
+  control_host.remove();
+  restore_canvas();
   host.remove();
 }

@@ -38,10 +38,13 @@ export function sortStateFits(rule: WorkbookTableXmlElement, rows: number, cols:
     const match = A1_REFERENCE.exec(reference);
     if (!match) return false;
 
-    const [, startCol = "", startRow, endCol = startCol, endRow = startRow] = match;
-    const lastCol = Math.max(labelToCol(startCol.toUpperCase()), labelToCol(endCol.toUpperCase()));
-    const lastRow = Math.max(Number(startRow), Number(endRow));
-    if (lastCol >= cols || lastRow > rows) return false;
+    const [, start_col = "", start_row, end_col = start_col, end_row = start_row] = match;
+    const last_col = Math.max(
+      labelToCol(start_col.toUpperCase()),
+      labelToCol(end_col.toUpperCase()),
+    );
+    const last_row = Math.max(Number(start_row), Number(end_row));
+    if (last_col >= cols || last_row > rows) return false;
   }
   return rule.children.every((child) => sortStateFits(child, rows, cols));
 }
@@ -52,26 +55,26 @@ export function sortStateFits(rule: WorkbookTableXmlElement, rows: number, cols:
  * and Excel repairs a table whose filter or sort ref disagrees with its own.
  * Returns null when a column rule no longer falls inside the table.
  */
-function anchoredTableRule(
+function anchored_table_rule(
   rule: WorkbookTableXmlElement,
   table: WrittenTable,
 ): WorkbookTableXmlElement | null {
   const c0 = table.range.start.col;
   const c1 = table.range.end.col;
-  const firstData = table.range.start.row + (table.headerRow ? 1 : 0);
-  const lastData = table.range.end.row - (table.totalsRow ? 1 : 0);
+  const first_data = table.range.start.row + (table.headerRow ? 1 : 0);
+  const last_data = table.range.end.row - (table.totalsRow ? 1 : 0);
   const span = (left: number, right: number, top: number): string =>
-    `${cellA1(top, left)}:${cellA1(lastData, right)}`;
+    `${cellA1(top, left)}:${cellA1(last_data, right)}`;
   if (rule.name === "autoFilter") {
     const children: WorkbookTableXmlElement[] = [];
     for (const child of rule.children) {
       if (child.name === "filterColumn") {
-        const colId = Number(child.attributes.colId);
-        if (!Number.isSafeInteger(colId) || colId < 0 || colId > c1 - c0) return null;
+        const col_id = Number(child.attributes.colId);
+        if (!Number.isSafeInteger(col_id) || col_id < 0 || col_id > c1 - c0) return null;
         children.push(child);
         continue;
       }
-      const anchored = anchoredTableRule(child, table);
+      const anchored = anchored_table_rule(child, table);
       if (!anchored) return null;
       children.push(anchored);
     }
@@ -82,7 +85,7 @@ function anchoredTableRule(
     };
   }
   if (rule.name !== "sortState") return rule;
-  if (lastData < firstData) return null;
+  if (last_data < first_data) return null;
   const children: WorkbookTableXmlElement[] = [];
   for (const condition of rule.children) {
     const match = /^\$?([A-Za-z]{1,3})\$?\d*(?::\$?([A-Za-z]{1,3})\$?\d*)?$/u.exec(
@@ -95,13 +98,13 @@ function anchoredTableRule(
     if (start < c0 || end > c1 || end < start) return null;
     children.push({
       ...condition,
-      attributes: { ...condition.attributes, ref: span(start, end, firstData) },
+      attributes: { ...condition.attributes, ref: span(start, end, first_data) },
     });
   }
-  return { ...rule, attributes: { ...rule.attributes, ref: span(c0, c1, firstData) }, children };
+  return { ...rule, attributes: { ...rule.attributes, ref: span(c0, c1, first_data) }, children };
 }
 
-function appendAnchoredTableRule(
+function append_anchored_table_rule(
   xml: XmlBuffer,
   rule: WorkbookTableXmlElement | undefined,
   table: WrittenTable,
@@ -109,7 +112,7 @@ function appendAnchoredTableRule(
   warn: (message: string) => void,
 ): void {
   if (!rule) return;
-  const anchored = anchoredTableRule(rule, table);
+  const anchored = anchored_table_rule(rule, table);
   if (anchored) appendTableRule(xml, anchored, styles);
   else
     warn(
@@ -131,18 +134,18 @@ export function tableXml(
   xml.append(
     `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}"${queryTable ? ' tableType="queryTable"' : ""} headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
   );
-  const warnRuleLoss = (message: string): void => {
+  const warn_rule_loss = (message: string): void => {
     emitWarning(context, { code: "unsupported-feature", message, sheet: sheetName });
   };
-  appendAnchoredTableRule(xml, table.autoFilter, table, styles, warnRuleLoss);
-  appendAnchoredTableRule(xml, table.sortState, table, styles, warnRuleLoss);
+  append_anchored_table_rule(xml, table.autoFilter, table, styles, warn_rule_loss);
+  append_anchored_table_rule(xml, table.sortState, table, styles, warn_rule_loss);
   xml.append(`<tableColumns count="${table.columns.length}">`);
   for (const [index, column] of table.columns.entries()) {
-    const externalTotals =
+    const external_totals =
       column.totalsRowFormula !== undefined &&
       formulaContainsExternalReference(column.totalsRowFormula.text);
     xml.append(
-      `<tableColumn id="${index + 1}"${queryTable ? ` queryTableFieldId="${index + 1}"` : ""} name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !externalTotals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
+      `<tableColumn id="${index + 1}"${queryTable ? ` queryTableFieldId="${index + 1}"` : ""} name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !external_totals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
     );
     for (const formula of [column.calculatedColumnFormula, column.totalsRowFormula]) {
       if (!formula) continue;

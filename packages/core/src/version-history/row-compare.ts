@@ -28,23 +28,24 @@ export type RowComparer = (
  * `source` overrides where its WASM comes from, as `HistoryDiffRequest.kernel`.
  */
 export async function loadRowComparer(source?: HistoryDiffRequest["kernel"]): Promise<RowComparer> {
-  const { DiffKernel, loadHistoryKernel } = await import("@sheetwrite/wasm/history");
-  await loadHistoryKernel(source);
+  const { DiffKernel, loadHistoryKernel: load_history_kernel } =
+    await import("@sheetwrite/wasm/history");
+  await load_history_kernel(source);
 
   return (left, right, sheet, rect) => {
     const rows = rect.r1 - rect.r0 + 1;
     const cols = rect.c1 - rect.c0 + 1;
-    const windowRows = Math.max(1, Math.floor(WINDOW_CELLS / cols));
+    const window_rows = Math.max(1, Math.floor(WINDOW_CELLS / cols));
     const kernel = new DiffKernel(MAX_HISTORY_DIFF_ENTRIES);
 
     try {
       const slot = kernel.addSheet(rows, cols, true);
-      const [leftStyles, rightStyles] = styleTables(left, right);
-      kernel.setStyles(leftStyles, rightStyles);
+      const [left_styles, right_styles] = styleTables(left, right);
+      kernel.setStyles(left_styles, right_styles);
 
       const changed: number[] = [];
-      for (let row0 = 0; row0 < rows; row0 += windowRows) {
-        const count = Math.min(windowRows, rows - row0);
+      for (let row0 = 0; row0 < rows; row0 += window_rows) {
+        const count = Math.min(window_rows, rows - row0);
         const loaded =
           kernel.loadBefore(transferOf(left, sheet, rect.r0 + row0, rect.c0, count, cols)) &&
           kernel.loadAfter(transferOf(right, sheet, rect.r0 + row0, rect.c0, count, cols));

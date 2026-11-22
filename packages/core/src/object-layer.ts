@@ -26,7 +26,7 @@ const WHEEL_LINE_PX = 16;
 const WHEEL_PAGE_PX = 400;
 
 /** Name of a chart kind as screen readers and the plain frame say it, such as "Column chart". */
-function chartName(kind: ChartKind): string {
+function chart_name(kind: ChartKind): string {
   return `${CHART_KIND_LABELS[kind]} chart`;
 }
 
@@ -126,9 +126,9 @@ interface ResolvedAnchor {
 }
 
 /** Accessible name of a chart object: its title and its kind. */
-function chartObjectLabel(chart: ChartDefinition): string {
+function chart_object_label(chart: ChartDefinition): string {
   const title = chart.title?.trim();
-  return title ? `${title}, ${chartName(chart.kind).toLowerCase()}` : chartName(chart.kind);
+  return title ? `${title}, ${chart_name(chart.kind).toLowerCase()}` : chart_name(chart.kind);
 }
 
 /**
@@ -143,11 +143,11 @@ export class ObjectLayer {
   private readonly entries = new Map<string, ObjectEntry>();
   private renderer: ChartRenderer | null = null;
   private sheet: SheetId | null = null;
-  private selectedId: string | null = null;
+  private selected_id: string | null = null;
   private drag: DragSession | null = null;
-  private lastContentTop = 0;
-  private lastScrollLeft = 0;
-  private isReadOnlyShown: boolean | null = null;
+  private last_content_top = 0;
+  private last_scroll_left = 0;
+  private is_read_only_shown: boolean | null = null;
   private destroyed = false;
 
   constructor(private readonly options: ObjectLayerOptions) {
@@ -155,25 +155,25 @@ export class ObjectLayer {
     root.className = "sheetwrite-object-layer";
     root.style.cssText = "position:absolute;inset:0;pointer-events:none;";
     this.panes = {
-      "top-left": createPane("top-left"),
-      "top-right": createPane("top-right"),
-      "bottom-left": createPane("bottom-left"),
-      "bottom-right": createPane("bottom-right"),
+      "top-left": create_pane("top-left"),
+      "top-right": create_pane("top-right"),
+      "bottom-left": create_pane("bottom-left"),
+      "bottom-right": create_pane("bottom-right"),
     };
     for (const name of PANE_NAMES) root.appendChild(this.panes[name]);
     this.root = root;
     this.setTheme(options.theme());
-    root.addEventListener("wheel", this.onWheel, { passive: false });
+    root.addEventListener("wheel", this.on_wheel, { passive: false });
     options.viewport.appendChild(root);
 
     // A press on a cell belongs to the grid and ends object selection.
-    options.scroller.addEventListener("pointerdown", this.onGridPointerDown);
+    options.scroller.addEventListener("pointerdown", this.on_grid_pointer_down);
   }
 
   get selected(): ChartRef | null {
-    return this.selectedId === null || this.sheet === null
+    return this.selected_id === null || this.sheet === null
       ? null
-      : { sheet: this.sheet, id: this.selectedId };
+      : { sheet: this.sheet, id: this.selected_id };
   }
 
   /** Mount and unmount hosts to match the charts on the active sheet. */
@@ -201,28 +201,28 @@ export class ObjectLayer {
   /** Place every host for the current scroll position; the grid calls this each render frame. */
   place(contentTop: number, scrollLeft: number): void {
     if (this.destroyed) return;
-    this.lastContentTop = contentTop;
-    this.lastScrollLeft = scrollLeft;
-    const readOnly = this.options.readOnly();
-    if (readOnly !== this.isReadOnlyShown) {
-      this.isReadOnlyShown = readOnly;
-      this.root.dataset.readonly = String(readOnly);
+    this.last_content_top = contentTop;
+    this.last_scroll_left = scrollLeft;
+    const read_only = this.options.readOnly();
+    if (read_only !== this.is_read_only_shown) {
+      this.is_read_only_shown = read_only;
+      this.root.dataset.readonly = String(read_only);
     }
     if (this.entries.size === 0) return;
 
-    this.placePanes();
-    for (const entry of this.entries.values()) this.placeEntry(entry, contentTop, scrollLeft);
+    this.place_panes();
+    for (const entry of this.entries.values()) this.place_entry(entry, contentTop, scrollLeft);
   }
 
   /** Select `id` on the active sheet, or deselect with `null`. */
   select(id: string | null, focus = false): void {
     const entry = id === null ? undefined : this.entries.get(id);
-    const nextId = entry ? entry.chart.id : null;
-    if (nextId !== this.selectedId) {
-      const previous = this.selectedId === null ? undefined : this.entries.get(this.selectedId);
-      if (previous) showSelected(previous, false);
-      this.selectedId = nextId;
-      if (entry) showSelected(entry, true);
+    const next_id = entry ? entry.chart.id : null;
+    if (next_id !== this.selected_id) {
+      const previous = this.selected_id === null ? undefined : this.entries.get(this.selected_id);
+      if (previous) show_selected(previous, false);
+      this.selected_id = next_id;
+      if (entry) show_selected(entry, true);
       this.options.onSelect(this.selected);
     }
     // Placement follows the grid's scroll, so focus must not scroll the pane.
@@ -247,9 +247,9 @@ export class ObjectLayer {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.cancelDrag();
-    this.options.scroller.removeEventListener("pointerdown", this.onGridPointerDown);
-    for (const entry of this.entries.values()) disposeEntry(entry);
+    this.cancel_drag();
+    this.options.scroller.removeEventListener("pointerdown", this.on_grid_pointer_down);
+    for (const entry of this.entries.values()) dispose_entry(entry);
     this.entries.clear();
     this.renderer?.dispose();
     this.renderer = null;
@@ -257,12 +257,12 @@ export class ObjectLayer {
   }
 
   private clear(): void {
-    this.cancelDrag();
-    if (this.selectedId !== null) {
-      this.selectedId = null;
+    this.cancel_drag();
+    if (this.selected_id !== null) {
+      this.selected_id = null;
       this.options.onSelect(null);
     }
-    for (const entry of this.entries.values()) disposeEntry(entry);
+    for (const entry of this.entries.values()) dispose_entry(entry);
     this.entries.clear();
   }
 
@@ -299,65 +299,65 @@ export class ObjectLayer {
     // Resolved on each mount, so a renderer registered after the grid was made still draws.
     this.renderer ??= createChartRenderer(this.options.store);
     let mounted: MountedChart | null = null;
-    let fallbackTitle: HTMLElement | null = null;
+    let fallback_title: HTMLElement | null = null;
     if (this.renderer) {
       mounted = this.renderer.mount(host, { sheet, id: chart.id }, size);
     } else {
-      fallbackTitle = document.createElement("div");
-      fallbackTitle.className = "sheetwrite-object-fallback";
-      host.appendChild(fallbackTitle);
+      fallback_title = document.createElement("div");
+      fallback_title.className = "sheetwrite-object-fallback";
+      host.appendChild(fallback_title);
     }
 
     const entry: ObjectEntry = {
       chart,
       frame,
       mounted,
-      fallbackTitle,
+      fallbackTitle: fallback_title,
       label: "",
       box: null,
       preview: null,
     };
     this.update(entry, chart);
-    frame.addEventListener("pointerdown", (event) => this.onObjectPointerDown(event, entry));
-    frame.addEventListener("keydown", (event) => this.onObjectKeyDown(event, entry));
+    frame.addEventListener("pointerdown", (event) => this.on_object_pointer_down(event, entry));
+    frame.addEventListener("keydown", (event) => this.on_object_key_down(event, entry));
     frame.addEventListener("contextmenu", (event) => {
       // Ours replaces the browser's menu, and the grid's cell menu must not open too.
       event.preventDefault();
       event.stopPropagation();
-      this.openMenu(entry, event.clientX, event.clientY);
+      this.open_menu(entry, event.clientX, event.clientY);
     });
     return entry;
   }
 
   private update(entry: ObjectEntry, chart: ChartDefinition): void {
     entry.chart = chart;
-    const label = chartObjectLabel(chart);
+    const label = chart_object_label(chart);
     if (label !== entry.label) {
       entry.label = label;
       entry.frame.setAttribute("aria-label", label);
     }
     // Without a renderer the frame shows the title, else the kind, so a chart is never blank.
-    const text = chart.title?.trim() || chartName(chart.kind);
+    const text = chart.title?.trim() || chart_name(chart.kind);
     if (entry.fallbackTitle && entry.fallbackTitle.textContent !== text) {
       entry.fallbackTitle.textContent = text;
     }
   }
 
   private unmount(entry: ObjectEntry): void {
-    if (this.drag?.entry === entry) this.cancelDrag();
-    const hadFocus = entry.frame.contains(document.activeElement);
-    disposeEntry(entry);
+    if (this.drag?.entry === entry) this.cancel_drag();
+    const had_focus = entry.frame.contains(document.activeElement);
+    dispose_entry(entry);
     this.entries.delete(entry.chart.id);
-    if (this.selectedId === entry.chart.id) {
-      this.selectedId = null;
+    if (this.selected_id === entry.chart.id) {
+      this.selected_id = null;
       this.options.onSelect(null);
     }
 
     // Focus would fall to the document body; keep keyboard users in the grid.
-    if (hadFocus) this.options.focusGrid();
+    if (had_focus) this.options.focusGrid();
   }
 
-  private placePanes(): void {
+  private place_panes(): void {
     const { geometry } = this.options;
     const theme = this.options.theme();
     const left = theme.rowHeaderWidth;
@@ -365,48 +365,48 @@ export class ObjectLayer {
     // The scroller's client box leaves out its scroll bars, which objects must not cover.
     const right = Math.max(left, this.options.scroller.clientWidth);
     const bottom = Math.max(top, this.options.scroller.clientHeight);
-    const splitX = Math.min(right, left + geometry.frozenWidth());
-    const splitY = Math.min(bottom, top + geometry.frozenHeight());
-    writePane(this.panes["top-left"], left, top, splitX, splitY);
-    writePane(this.panes["top-right"], splitX, top, right, splitY);
-    writePane(this.panes["bottom-left"], left, splitY, splitX, bottom);
-    writePane(this.panes["bottom-right"], splitX, splitY, right, bottom);
+    const split_x = Math.min(right, left + geometry.frozenWidth());
+    const split_y = Math.min(bottom, top + geometry.frozenHeight());
+    write_pane(this.panes["top-left"], left, top, split_x, split_y);
+    write_pane(this.panes["top-right"], split_x, top, right, split_y);
+    write_pane(this.panes["bottom-left"], left, split_y, split_x, bottom);
+    write_pane(this.panes["bottom-right"], split_x, split_y, right, bottom);
   }
 
-  private paneOrigin(name: PaneName): { left: number; top: number } {
+  private pane_origin(name: PaneName): { left: number; top: number } {
     const { geometry } = this.options;
     const theme = this.options.theme();
-    const isRightPane = name === "top-right" || name === "bottom-right";
-    const isBottomPane = name === "bottom-left" || name === "bottom-right";
+    const is_right_pane = name === "top-right" || name === "bottom-right";
+    const is_bottom_pane = name === "bottom-left" || name === "bottom-right";
     return {
-      left: theme.rowHeaderWidth + (isRightPane ? geometry.frozenWidth() : 0),
-      top: theme.headerHeight + (isBottomPane ? geometry.frozenHeight() : 0),
+      left: theme.rowHeaderWidth + (is_right_pane ? geometry.frozenWidth() : 0),
+      top: theme.headerHeight + (is_bottom_pane ? geometry.frozenHeight() : 0),
     };
   }
 
-  private placeEntry(entry: ObjectEntry, contentTop: number, scrollLeft: number): void {
+  private place_entry(entry: ObjectEntry, content_top: number, scroll_left: number): void {
     const { geometry } = this.options;
     const zoom = this.options.zoom();
     const anchor = entry.chart.anchor;
-    const resolved = this.resolveAnchor(anchor);
-    const isTopPane = resolved.viewRow < geometry.frozenRowCount();
-    const isLeftPane = resolved.col < geometry.firstBodyColumn();
-    const pane: PaneName = isTopPane
-      ? isLeftPane
+    const resolved = this.resolve_anchor(anchor);
+    const is_top_pane = resolved.viewRow < geometry.frozenRowCount();
+    const is_left_pane = resolved.col < geometry.firstBodyColumn();
+    const pane: PaneName = is_top_pane
+      ? is_left_pane
         ? "top-left"
         : "top-right"
-      : isLeftPane
+      : is_left_pane
         ? "bottom-left"
         : "bottom-right";
 
     // The same screen geometry that places the cell editor and the note card.
-    const cellX = geometry.screenColumnLeft(resolved.col, scrollLeft);
-    const cellY = geometry.screenRowTop(resolved.viewRow, contentTop);
-    const origin = this.paneOrigin(pane);
+    const cell_x = geometry.screenColumnLeft(resolved.col, scroll_left);
+    const cell_y = geometry.screenRowTop(resolved.viewRow, content_top);
+    const origin = this.pane_origin(pane);
     const box: PlacedBox = {
       pane,
-      x: cellX + (resolved.isColCollapsed ? 0 : anchor.offsetX * zoom) - origin.left,
-      y: cellY + (resolved.isRowCollapsed ? 0 : anchor.offsetY * zoom) - origin.top,
+      x: cell_x + (resolved.isColCollapsed ? 0 : anchor.offsetX * zoom) - origin.left,
+      y: cell_y + (resolved.isRowCollapsed ? 0 : anchor.offsetY * zoom) - origin.top,
       width: anchor.width * zoom,
       height: anchor.height * zoom,
     };
@@ -417,55 +417,55 @@ export class ObjectLayer {
       box.width = Math.max(MIN_OBJECT_SIZE * zoom, box.width + preview.dw);
       box.height = Math.max(MIN_OBJECT_SIZE * zoom, box.height + preview.dh);
     }
-    this.writeBox(entry, box);
+    this.write_box(entry, box);
   }
 
-  private writeBox(entry: ObjectEntry, box: PlacedBox): void {
+  private write_box(entry: ObjectEntry, box: PlacedBox): void {
     const previous = entry.box;
     const { frame } = entry;
     if (previous?.pane !== box.pane) {
-      const hadFocus = frame.contains(document.activeElement);
+      const had_focus = frame.contains(document.activeElement);
       this.panes[box.pane].appendChild(frame);
       // Moving a node to another parent drops its focus.
-      if (hadFocus) frame.focus({ preventScroll: true });
+      if (had_focus) frame.focus({ preventScroll: true });
     }
     if (previous?.x !== box.x || previous.y !== box.y) {
       frame.style.transform = `translate(${box.x}px, ${box.y}px)`;
     }
-    const isResized = previous?.width !== box.width || previous.height !== box.height;
-    if (isResized) {
+    const is_resized = previous?.width !== box.width || previous.height !== box.height;
+    if (is_resized) {
       frame.style.width = `${box.width}px`;
       frame.style.height = `${box.height}px`;
     }
     entry.box = box;
 
     // The first placement uses the size that `mount` received.
-    if (isResized && previous) entry.mounted?.resize(box.width, box.height);
+    if (is_resized && previous) entry.mounted?.resize(box.width, box.height);
   }
 
   /** The view row and visible column of an anchor; hidden rows and columns collapse forward. */
-  private resolveAnchor(anchor: ChartAnchor): ResolvedAnchor {
+  private resolve_anchor(anchor: ChartAnchor): ResolvedAnchor {
     const { geometry } = this.options;
-    const rowCount = geometry.rowCount;
-    let viewRow: number | null = null;
-    let isRowCollapsed = false;
+    const row_count = geometry.rowCount;
+    let view_row: number | null = null;
+    let is_row_collapsed = false;
     for (let walked = 0; walked < HIDDEN_ROW_WALK_LIMIT; walked++) {
-      viewRow = geometry.toViewRow(anchor.row + walked);
-      if (viewRow !== null) {
-        isRowCollapsed = walked > 0;
+      view_row = geometry.toViewRow(anchor.row + walked);
+      if (view_row !== null) {
+        is_row_collapsed = walked > 0;
         break;
       }
     }
-    if (viewRow === null) {
-      viewRow = rowCount;
-      isRowCollapsed = true;
+    if (view_row === null) {
+      view_row = row_count;
+      is_row_collapsed = true;
     }
 
     const columns = geometry.columnIndices;
-    const col = columns[lowerBound(columns, anchor.col)];
+    const col = columns[lower_bound(columns, anchor.col)];
     return {
-      viewRow: Math.min(viewRow, rowCount),
-      isRowCollapsed,
+      viewRow: Math.min(view_row, row_count),
+      isRowCollapsed: is_row_collapsed,
       // Past the last visible column, the object sits at the right edge of the cells.
       col: col ?? anchor.col,
       isColCollapsed: col !== anchor.col,
@@ -473,58 +473,58 @@ export class ObjectLayer {
   }
 
   /** Top-left of an object in content space, in zoomed pixels. */
-  private contentOrigin(anchor: ChartAnchor): ContentPoint {
+  private content_origin(anchor: ChartAnchor): ContentPoint {
     const { geometry } = this.options;
     const zoom = this.options.zoom();
-    const resolved = this.resolveAnchor(anchor);
-    const offsetX = resolved.isColCollapsed ? 0 : anchor.offsetX * zoom;
-    const offsetY = resolved.isRowCollapsed ? 0 : anchor.offsetY * zoom;
+    const resolved = this.resolve_anchor(anchor);
+    const offset_x = resolved.isColCollapsed ? 0 : anchor.offsetX * zoom;
+    const offset_y = resolved.isRowCollapsed ? 0 : anchor.offsetY * zoom;
     return {
-      x: geometry.columnLeft(resolved.col) + offsetX,
-      y: geometry.rowOffset(resolved.viewRow) + offsetY,
+      x: geometry.columnLeft(resolved.col) + offset_x,
+      y: geometry.rowOffset(resolved.viewRow) + offset_y,
     };
   }
 
-  /** The cell and offsets of a content point; the inverse of `contentOrigin`. */
-  private anchorAt(point: ContentPoint, size: { width: number; height: number }): ChartAnchor {
+  /** The cell and offsets of a content point; the inverse of `content_origin`. */
+  private anchor_at(point: ContentPoint, size: { width: number; height: number }): ChartAnchor {
     const { geometry } = this.options;
     const zoom = this.options.zoom();
     const columns = geometry.columnIndices;
     const x = Math.max(0, point.x);
     const y = Math.max(0, point.y);
 
-    const hitColumn = geometry.columnAtX(x);
-    const col = hitColumn === -1 ? (columns[columns.length - 1] ?? 0) : hitColumn;
-    const lastRow = Math.max(0, geometry.rowCount - 1);
-    const viewRow = Math.min(geometry.rowAtOffset(y), lastRow);
+    const hit_column = geometry.columnAtX(x);
+    const col = hit_column === -1 ? (columns[columns.length - 1] ?? 0) : hit_column;
+    const last_row = Math.max(0, geometry.rowCount - 1);
+    const view_row = Math.min(geometry.rowAtOffset(y), last_row);
     return {
-      row: geometry.toDataRow(viewRow),
+      row: geometry.toDataRow(view_row),
       col,
       offsetX: Math.max(0, Math.round((x - geometry.columnLeft(col)) / zoom)),
-      offsetY: Math.max(0, Math.round((y - geometry.rowOffset(viewRow)) / zoom)),
+      offsetY: Math.max(0, Math.round((y - geometry.rowOffset(view_row)) / zoom)),
       width: Math.round(size.width),
       height: Math.round(size.height),
     };
   }
 
-  private commitAnchor(entry: ObjectEntry, anchor: ChartAnchor): void {
+  private commit_anchor(entry: ObjectEntry, anchor: ChartAnchor): void {
     const current = entry.chart.anchor;
-    const isSame =
+    const is_same =
       anchor.row === current.row &&
       anchor.col === current.col &&
       anchor.offsetX === current.offsetX &&
       anchor.offsetY === current.offsetY &&
       anchor.width === current.width &&
       anchor.height === current.height;
-    if (isSame) return;
+    if (is_same) return;
     this.options.setChart({ ...structuredClone(entry.chart), anchor });
   }
 
-  private readonly onGridPointerDown = (): void => {
+  private readonly on_grid_pointer_down = (): void => {
     this.select(null);
   };
 
-  private readonly onWheel = (event: WheelEvent): void => {
+  private readonly on_wheel = (event: WheelEvent): void => {
     // Objects sit outside the scroller, so a wheel over one would not scroll the cells.
     if (!(event.target instanceof Element) || !event.target.closest(".sheetwrite-object")) return;
     const scale =
@@ -538,7 +538,7 @@ export class ObjectLayer {
     this.options.scroller.scrollLeft += event.deltaX * scale;
   };
 
-  private onObjectPointerDown(event: PointerEvent, entry: ObjectEntry): void {
+  private on_object_pointer_down(event: PointerEvent, entry: ObjectEntry): void {
     if (event.button !== 0 || this.drag) return;
     // Keep the press away from text selection and from the grid's own pointer handling.
     event.preventDefault();
@@ -547,23 +547,23 @@ export class ObjectLayer {
     if (this.options.readOnly()) return;
 
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const handleName = target?.dataset.handle;
+    const handle_name = target?.dataset.handle;
     this.drag = {
       entry,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      handle: HANDLES.find((candidate) => candidate.name === handleName) ?? null,
+      handle: HANDLES.find((candidate) => candidate.name === handle_name) ?? null,
       isActive: false,
     };
     // Document listeners follow the pointer outside the object; pointer capture
     // is not needed and fails for synthetic pointers.
-    document.addEventListener("pointermove", this.onDragMove);
-    document.addEventListener("pointerup", this.onDragEnd);
-    document.addEventListener("pointercancel", this.onDragCancel);
+    document.addEventListener("pointermove", this.on_drag_move);
+    document.addEventListener("pointerup", this.on_drag_end);
+    document.addEventListener("pointercancel", this.on_drag_cancel);
   }
 
-  private readonly onDragMove = (event: PointerEvent): void => {
+  private readonly on_drag_move = (event: PointerEvent): void => {
     const drag = this.drag;
     if (!drag || event.pointerId !== drag.pointerId) return;
     const dx = event.clientX - drag.startX;
@@ -571,67 +571,67 @@ export class ObjectLayer {
     if (!drag.isActive && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     drag.isActive = true;
     event.preventDefault();
-    drag.entry.preview = previewFor(drag.handle, dx, dy);
-    this.placeAgain(drag.entry);
+    drag.entry.preview = preview_for(drag.handle, dx, dy);
+    this.place_again(drag.entry);
   };
 
-  private readonly onDragEnd = (event: PointerEvent): void => {
+  private readonly on_drag_end = (event: PointerEvent): void => {
     const drag = this.drag;
     if (!drag || event.pointerId !== drag.pointerId) return;
-    const preview = previewFor(
+    const preview = preview_for(
       drag.handle,
       event.clientX - drag.startX,
       event.clientY - drag.startY,
     );
-    const isActive = drag.isActive;
-    this.endDrag();
-    if (isActive) this.commitPreview(drag.entry, preview);
+    const is_active = drag.isActive;
+    this.end_drag();
+    if (is_active) this.commit_preview(drag.entry, preview);
     // A no-op commit leaves the box at its preview position.
-    this.placeAgain(drag.entry);
+    this.place_again(drag.entry);
   };
 
-  private readonly onDragCancel = (event: PointerEvent): void => {
-    if (this.drag && event.pointerId === this.drag.pointerId) this.cancelDrag();
+  private readonly on_drag_cancel = (event: PointerEvent): void => {
+    if (this.drag && event.pointerId === this.drag.pointerId) this.cancel_drag();
   };
 
-  private cancelDrag(): void {
+  private cancel_drag(): void {
     const drag = this.drag;
     if (!drag) return;
-    this.endDrag();
-    this.placeAgain(drag.entry);
+    this.end_drag();
+    this.place_again(drag.entry);
   }
 
-  private endDrag(): void {
+  private end_drag(): void {
     const drag = this.drag;
     if (!drag) return;
     this.drag = null;
     drag.entry.preview = null;
-    document.removeEventListener("pointermove", this.onDragMove);
-    document.removeEventListener("pointerup", this.onDragEnd);
-    document.removeEventListener("pointercancel", this.onDragCancel);
+    document.removeEventListener("pointermove", this.on_drag_move);
+    document.removeEventListener("pointerup", this.on_drag_end);
+    document.removeEventListener("pointercancel", this.on_drag_cancel);
   }
 
   /** Place one object at once for the last frame's scroll position. */
-  private placeAgain(entry: ObjectEntry): void {
+  private place_again(entry: ObjectEntry): void {
     if (this.destroyed || this.entries.get(entry.chart.id) !== entry) return;
-    this.placeEntry(entry, this.lastContentTop, this.lastScrollLeft);
+    this.place_entry(entry, this.last_content_top, this.last_scroll_left);
   }
 
   /** Turn a screen-pixel preview into one anchor change. */
-  private commitPreview(entry: ObjectEntry, preview: DragPreview): void {
+  private commit_preview(entry: ObjectEntry, preview: DragPreview): void {
     const zoom = this.options.zoom();
     const anchor = entry.chart.anchor;
-    const origin = this.contentOrigin(anchor);
+    const origin = this.content_origin(anchor);
     const width = Math.max(MIN_OBJECT_SIZE, anchor.width + preview.dw / zoom);
     const height = Math.max(MIN_OBJECT_SIZE, anchor.height + preview.dh / zoom);
-    const next = this.anchorAt(
+    const next = this.anchor_at(
       { x: origin.x + preview.dx, y: origin.y + preview.dy },
       { width, height },
     );
-    this.commitAnchor(entry, next);
+    this.commit_anchor(entry, next);
   }
 
-  private onObjectKeyDown(event: KeyboardEvent, entry: ObjectEntry): void {
+  private on_object_key_down(event: KeyboardEvent, entry: ObjectEntry): void {
     // Undo and redo belong to the grid. Other keys must not reach it: it would
     // move the cell cursor, start an edit, or cut and paste the cells behind.
     if (this.options.isHistoryShortcut(event)) return;
@@ -642,11 +642,11 @@ export class ObjectLayer {
     if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
       event.preventDefault();
       const box = entry.frame.getBoundingClientRect();
-      this.openMenu(entry, box.left, box.top);
+      this.open_menu(entry, box.left, box.top);
       return;
     }
 
-    const isReadOnly = this.options.readOnly();
+    const is_read_only = this.options.readOnly();
     switch (event.key) {
       case "Escape":
         event.preventDefault();
@@ -664,14 +664,14 @@ export class ObjectLayer {
       case "Delete":
       case "Backspace":
         event.preventDefault();
-        if (!isReadOnly) this.options.removeChart(entry.chart.id);
+        if (!is_read_only) this.options.removeChart(entry.chart.id);
         return;
       case "ArrowUp":
       case "ArrowDown":
       case "ArrowLeft":
       case "ArrowRight":
         event.preventDefault();
-        if (!isReadOnly) this.nudge(entry, event.key, event.shiftKey);
+        if (!is_read_only) this.nudge(entry, event.key, event.shiftKey);
         return;
       default:
         return;
@@ -679,41 +679,41 @@ export class ObjectLayer {
   }
 
   /** Select the chart, then ask the grid for its menu; Escape gives focus back to it. */
-  private openMenu(entry: ObjectEntry, clientX: number, clientY: number): void {
+  private open_menu(entry: ObjectEntry, client_x: number, client_y: number): void {
     this.select(entry.chart.id, true);
     this.options.onContextMenu(
       { sheet: this.sheet ?? this.options.activeSheet(), id: entry.chart.id },
-      clientX,
-      clientY,
+      client_x,
+      client_y,
     );
   }
 
-  /** Move by one document pixel, or by one cell with `byCell`; one commit per press. */
-  private nudge(entry: ObjectEntry, key: ArrowKey, byCell: boolean): void {
+  /** Move by one document pixel, or by one cell with `by_cell`; one commit per press. */
+  private nudge(entry: ObjectEntry, key: ArrowKey, by_cell: boolean): void {
     const dx = key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0;
     const dy = key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0;
     const anchor = entry.chart.anchor;
-    if (!byCell) {
+    if (!by_cell) {
       const zoom = this.options.zoom();
-      const origin = this.contentOrigin(anchor);
+      const origin = this.content_origin(anchor);
       const moved = { x: origin.x + dx * zoom, y: origin.y + dy * zoom };
-      this.commitAnchor(entry, this.anchorAt(moved, anchor));
+      this.commit_anchor(entry, this.anchor_at(moved, anchor));
       return;
     }
 
     const { geometry } = this.options;
-    const resolved = this.resolveAnchor(anchor);
-    const lastRow = Math.max(0, geometry.rowCount - 1);
-    const viewRow = Math.min(lastRow, Math.max(0, resolved.viewRow + dy));
-    this.commitAnchor(entry, {
+    const resolved = this.resolve_anchor(anchor);
+    const last_row = Math.max(0, geometry.rowCount - 1);
+    const view_row = Math.min(last_row, Math.max(0, resolved.viewRow + dy));
+    this.commit_anchor(entry, {
       ...anchor,
-      row: dy === 0 ? anchor.row : geometry.toDataRow(viewRow),
+      row: dy === 0 ? anchor.row : geometry.toDataRow(view_row),
       col: dx === 0 ? anchor.col : geometry.nextVisibleColumn(resolved.col, dx === 1 ? 1 : -1),
     });
   }
 }
 
-function createPane(name: PaneName): HTMLDivElement {
+function create_pane(name: PaneName): HTMLDivElement {
   const pane = document.createElement("div");
   pane.className = "sheetwrite-object-pane";
   pane.dataset.pane = name;
@@ -723,21 +723,21 @@ function createPane(name: PaneName): HTMLDivElement {
   return pane;
 }
 
-function writePane(
+function write_pane(
   pane: HTMLDivElement,
   left: number,
   top: number,
   right: number,
   bottom: number,
 ): void {
-  writeStyle(pane.style, "left", `${left}px`);
-  writeStyle(pane.style, "top", `${top}px`);
-  writeStyle(pane.style, "width", `${Math.max(0, right - left)}px`);
-  writeStyle(pane.style, "height", `${Math.max(0, bottom - top)}px`);
+  write_style(pane.style, "left", `${left}px`);
+  write_style(pane.style, "top", `${top}px`);
+  write_style(pane.style, "width", `${Math.max(0, right - left)}px`);
+  write_style(pane.style, "height", `${Math.max(0, bottom - top)}px`);
 }
 
 /** Write only changed values: this runs on every scroll frame. */
-function writeStyle(
+function write_style(
   style: CSSStyleDeclaration,
   property: "left" | "top" | "width" | "height",
   value: string,
@@ -745,19 +745,19 @@ function writeStyle(
   if (style[property] !== value) style[property] = value;
 }
 
-function showSelected(entry: ObjectEntry, isSelected: boolean): void {
-  entry.frame.classList.toggle("sheetwrite-object-selected", isSelected);
-  entry.frame.setAttribute("aria-current", String(isSelected));
-  entry.frame.tabIndex = isSelected ? 0 : -1;
+function show_selected(entry: ObjectEntry, is_selected: boolean): void {
+  entry.frame.classList.toggle("sheetwrite-object-selected", is_selected);
+  entry.frame.setAttribute("aria-current", String(is_selected));
+  entry.frame.tabIndex = is_selected ? 0 : -1;
 }
 
-function disposeEntry(entry: ObjectEntry): void {
+function dispose_entry(entry: ObjectEntry): void {
   entry.mounted?.dispose();
   entry.frame.remove();
 }
 
 /** Screen-pixel change of position and size for a move (`handle` null) or a resize. */
-function previewFor(handle: HandleDirection | null, dx: number, dy: number): DragPreview {
+function preview_for(handle: HandleDirection | null, dx: number, dy: number): DragPreview {
   if (handle === null) return { dx, dy, dw: 0, dh: 0 };
   return {
     // A left or top handle moves that edge: the box moves and shrinks by the same amount.
@@ -769,7 +769,7 @@ function previewFor(handle: HandleDirection | null, dx: number, dy: number): Dra
 }
 
 /** First index in ascending `values` whose value is at least `target`. */
-function lowerBound(values: readonly number[], target: number): number {
+function lower_bound(values: readonly number[], target: number): number {
   let low = 0;
   let high = values.length;
   while (low < high) {

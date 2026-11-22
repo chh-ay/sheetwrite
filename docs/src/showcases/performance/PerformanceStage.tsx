@@ -259,14 +259,14 @@ function DrawingControls() {
 
 /** The exact row and column form, and jumps to the start, middle, end or a random row. */
 function JumpControls() {
-  const [jumpRow, setJumpRow] = createSignal("742000");
-  const [jumpColumn, setJumpColumn] = createSignal("4");
-  const handleJump = () => {
-    const row = Number(jumpRow());
-    const column = Number(jumpColumn());
+  const [jump_row, set_jump_row] = createSignal("742000");
+  const [jump_column, set_jump_column] = createSignal("4");
+  const handle_jump = () => {
+    const row = Number(jump_row());
+    const column = Number(jump_column());
     if (
-      !/^\d+$/.test(jumpRow().trim()) ||
-      !/^\d+$/.test(jumpColumn().trim()) ||
+      !/^\d+$/.test(jump_row().trim()) ||
+      !/^\d+$/.test(jump_column().trim()) ||
       !Number.isSafeInteger(row) ||
       !Number.isSafeInteger(column) ||
       row < 1 ||
@@ -283,7 +283,7 @@ function JumpControls() {
         class="sw-sp-jump"
         onSubmit={(event) => {
           event.preventDefault();
-          handleJump();
+          handle_jump();
         }}
       >
         <label for="scale-jump-row">
@@ -294,9 +294,9 @@ function JumpControls() {
             inputmode="numeric"
             max={SCALE_ROWS}
             min={1}
-            onInput={(event) => setJumpRow(event.currentTarget.value)}
+            onInput={(event) => set_jump_row(event.currentTarget.value)}
             type="number"
-            value={jumpRow()}
+            value={jump_row()}
           />
         </label>
         <label for="scale-jump-column">
@@ -307,9 +307,9 @@ function JumpControls() {
             inputmode="numeric"
             max={SCALE_COLUMNS}
             min={1}
-            onInput={(event) => setJumpColumn(event.currentTarget.value)}
+            onInput={(event) => set_jump_column(event.currentTarget.value)}
             type="number"
-            value={jumpColumn()}
+            value={jump_column()}
           />
         </label>
         <Button data-testid="scale-jump" disabled={!ready()} type="submit" variant="primary">

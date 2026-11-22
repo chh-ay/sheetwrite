@@ -50,14 +50,14 @@ const MOST_TYPED = 3;
  * `=`, as `0`, `1`, `2` or `3+`. A formula that keeps agreeing with what the
  * user types gets likelier with every character.
  */
-function typedBucket(text: string): string {
+function typed_bucket(text: string): string {
   const typed = text.length - 1;
   return typed >= MOST_TYPED ? `${MOST_TYPED}+` : String(typed);
 }
 
 /** The calibration key of a proposal after `text`. */
 export function calibrationKey(proposal: Proposal, text: string): string {
-  return `${proposal.signal}|${proposal.reason}|${typedBucket(text)}`;
+  return `${proposal.signal}|${proposal.reason}|${typed_bucket(text)}`;
 }
 
 /**
@@ -94,19 +94,19 @@ const MIN_SHARED = 2;
 export function continues(formula: string, text: string): boolean {
   if (formula.length <= text.length) return false;
 
-  let inString = false;
+  let in_string = false;
   for (let index = 0; index < text.length; index++) {
     const expected = formula.charAt(index);
     const typed = text.charAt(index);
-    const same = inString ? expected === typed : expected.toUpperCase() === typed.toUpperCase();
+    const same = in_string ? expected === typed : expected.toUpperCase() === typed.toUpperCase();
     if (!same) return false;
-    if (expected === '"') inString = !inString;
+    if (expected === '"') in_string = !in_string;
   }
   return true;
 }
 
 /** A key that is equal for continuations that insert the same text, letter case aside outside strings. */
-function continuationKey(continuation: string): string {
+function continuation_key(continuation: string): string {
   return continuation
     .split('"')
     .map((part, index) => (index % 2 === 0 ? part.toUpperCase() : part))
@@ -135,7 +135,7 @@ export function rank(text: string, candidates: Iterable<Candidate>): Ranked[] {
     if (!continues(candidate.formula, text)) continue;
 
     const continuation = candidate.formula.slice(text.length);
-    const key = continuationKey(continuation);
+    const key = continuation_key(continuation);
     const group = groups.get(key);
     if (group === undefined) {
       groups.set(key, {
@@ -158,11 +158,11 @@ export function rank(text: string, candidates: Iterable<Candidate>): Ranked[] {
 }
 
 /** The length of the start two continuations share, letter case aside outside strings. */
-function sharedLength(left: string, right: string): number {
-  const leftKey = continuationKey(left);
-  const rightKey = continuationKey(right);
+function shared_length(left: string, right: string): number {
+  const left_key = continuation_key(left);
+  const right_key = continuation_key(right);
   let length = 0;
-  while (length < leftKey.length && leftKey.charAt(length) === rightKey.charAt(length)) length++;
+  while (length < left_key.length && left_key.charAt(length) === right_key.charAt(length)) length++;
   return length;
 }
 
@@ -190,7 +190,7 @@ export function choose(ranked: readonly Ranked[]): Choice | null {
   }
   if (next === undefined) return null;
 
-  const shared = sharedLength(best.continuation, next.continuation);
+  const shared = shared_length(best.continuation, next.continuation);
   // Different formulas exclude each other, so their chances add up.
   const together = Math.min(1, best.confidence + next.confidence);
   if (shared < MIN_SHARED || together < SHARED_AT || !best.shows) return null;

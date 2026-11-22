@@ -85,18 +85,18 @@ export function createGridFromSnapshot(
   snapshot: unknown,
   options: SnapshotGridOptions = {},
 ): Grid {
-  const { snapshotResourceLimits, ...gridOptions } = options;
+  const { snapshotResourceLimits: snapshot_resource_limits, ...grid_options } = options;
   let store: SheetwriteStore;
   try {
     store = SheetwriteStore.fromSnapshot(snapshot, {
-      storage: gridOptions.datasourceStorage?.mode ?? "dense",
-      chunkRows: gridOptions.datasourceStorage?.chunkRows,
-      cacheBytes: gridOptions.datasourceStorage?.cacheBytes,
-      dirtyCellLimit: gridOptions.datasourceStorage?.dirtyCellLimit,
-      protectionResolver: gridOptions.protectionResolver,
-      mutationPolicy: gridOptions.mutationPolicy,
-      snapshotResourceLimits,
-      transactionResourceLimits: gridOptions.transactionResourceLimits,
+      storage: grid_options.datasourceStorage?.mode ?? "dense",
+      chunkRows: grid_options.datasourceStorage?.chunkRows,
+      cacheBytes: grid_options.datasourceStorage?.cacheBytes,
+      dirtyCellLimit: grid_options.datasourceStorage?.dirtyCellLimit,
+      protectionResolver: grid_options.protectionResolver,
+      mutationPolicy: grid_options.mutationPolicy,
+      snapshotResourceLimits: snapshot_resource_limits,
+      transactionResourceLimits: grid_options.transactionResourceLimits,
     });
   } catch (error) {
     if (error instanceof SnapshotValidationError) {
@@ -109,7 +109,7 @@ export function createGridFromSnapshot(
   }
 
   try {
-    return new GridImpl(host, { ...gridOptions, workbook: store.getWorkbook() }, store, true);
+    return new GridImpl(host, { ...grid_options, workbook: store.getWorkbook() }, store, true);
   } catch (error) {
     store.dispose();
     if (
@@ -126,7 +126,7 @@ export function createGridFromSnapshot(
 export class MemoryPersistenceAdapter implements PersistenceAdapter {
   private readonly documents = new Map<string, MemoryDocument>();
   /** Commits run one at a time, so a journal write cannot interleave with another commit. */
-  private commitTail: Promise<unknown> = Promise.resolve();
+  private commit_tail: Promise<unknown> = Promise.resolve();
 
   /**
    * Starts with one document per snapshot. Each needs a `documentId`; an
@@ -158,12 +158,12 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 
   /** Returns a copy of the document at its latest version; an unknown ID throws `not-found`. */
   async load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
-    throwIfAborted(signal);
+    throw_if_aborted(signal);
     const document = this.documents.get(documentId);
     if (!document) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
     await Promise.resolve();
-    throwIfAborted(signal);
-    return currentSnapshot(document);
+    throw_if_aborted(signal);
+    return current_snapshot(document);
   }
 
   /**
@@ -183,7 +183,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 
   /** Applies the commit at the next version, or answers `duplicate` or `conflict`. */
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
-    return this.commitVersions(request, [request.operations]);
+    return this.commit_versions(request, [request.operations]);
   }
 
   /**
@@ -192,17 +192,17 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
    * every member applied.
    */
   async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
-    return this.commitVersions(request, splitBatchVersions(request));
+    return this.commit_versions(request, split_batch_versions(request));
   }
 
-  private commitVersions(
+  private commit_versions(
     request: PersistenceCommitRequest,
     versions: readonly (readonly DocumentOp[])[],
   ): Promise<PersistenceCommitResponse> {
-    const run = this.commitTail.then(() => this.commitInOrder(request, versions));
+    const run = this.commit_tail.then(() => this.commit_in_order(request, versions));
 
     // The caller receives the outcome through `run`; the tail only orders the next commit.
-    this.commitTail = run.then(
+    this.commit_tail = run.then(
       () => undefined,
       () => undefined,
     );
@@ -210,35 +210,35 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     return run;
   }
 
-  private async commitInOrder(
+  private async commit_in_order(
     request: PersistenceCommitRequest,
     versions: readonly (readonly DocumentOp[])[],
   ): Promise<PersistenceCommitResponse> {
-    throwIfAborted(request.signal);
+    throw_if_aborted(request.signal);
     const document = this.documents.get(request.documentId);
     if (!document) {
       throw new PersistenceError("not-found", `Unknown document: ${request.documentId}`);
     }
-    const appliedVersion = document.applied.get(request.clientMutationId);
-    if (appliedVersion !== undefined) {
+    const applied_version = document.applied.get(request.clientMutationId);
+    if (applied_version !== undefined) {
       return {
         status: "duplicate",
-        version: appliedVersion,
+        version: applied_version,
         clientMutationId: request.clientMutationId,
       };
     }
     if (request.baseVersion !== document.version) {
-      const operationsSinceBase =
+      const operations_since_base =
         request.baseVersion >= document.initialVersion
           ? document.log.filter((entry) => entry.version > request.baseVersion)
           : undefined;
       return {
         status: "conflict",
         currentVersion: document.version,
-        ...(operationsSinceBase &&
-        operationsSinceBase.length === document.version - request.baseVersion
-          ? { operationsSinceBase: cloneJsonValue(operationsSinceBase) }
-          : { snapshot: currentSnapshot(document) }),
+        ...(operations_since_base &&
+        operations_since_base.length === document.version - request.baseVersion
+          ? { operationsSinceBase: cloneJsonValue(operations_since_base) }
+          : { snapshot: current_snapshot(document) }),
       };
     }
 
@@ -250,7 +250,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       );
     }
 
-    const committedAt = Math.max(Date.now(), document.lastCommitAt);
+    const committed_at = Math.max(Date.now(), document.lastCommitAt);
     const version = document.version + versions.length;
 
     // Everything that can fail runs before the store changes or inside the
@@ -261,7 +261,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       clientMutationId: request.clientMutationId,
       ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
       ...(request.authorId !== undefined ? { authorId: request.authorId } : {}),
-      ...(journal ? { committedAt } : {}),
+      ...(journal ? { committedAt: committed_at } : {}),
     }));
     // Built before the rollback-protected block: a failed build changes nothing.
     document.store ??= SheetwriteStore.fromSnapshot(document.initial);
@@ -282,7 +282,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
           throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
         }
       }
-      throwIfAborted(request.signal);
+      throw_if_aborted(request.signal);
 
       // Last step that can fail: once the journal holds the commit, it is published.
       if (journal && request.authorId !== undefined) {
@@ -292,7 +292,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
             revision: version,
             mutationId: request.clientMutationId,
             authorId: request.authorId,
-            time: committedAt,
+            time: committed_at,
             operations: versions.flat(),
             ...(request.restore !== undefined ? { restore: { ...request.restore } } : {}),
           },
@@ -303,7 +303,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       // A rejected transaction leaves the store unchanged, but an earlier
       // member of a batch, an abort, or an unexpected failure may not. Rebuild
       // the last committed state so a failed commit changes nothing.
-      restoreCommittedStore(document);
+      restore_committed_store(document);
       if (error instanceof PersistenceError) throw error;
       throw new PersistenceError(
         "commit-rejected",
@@ -315,7 +315,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     document.applied.set(request.clientMutationId, version);
     document.log.push(...entries);
     document.version = version;
-    document.lastCommitAt = committedAt;
+    document.lastCommitAt = committed_at;
 
     return {
       status: "applied",
@@ -325,7 +325,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
   }
 }
 
-function currentSnapshot(document: MemoryDocument): WorkbookSnapshot {
+function current_snapshot(document: MemoryDocument): WorkbookSnapshot {
   if (!document.store) return cloneJsonValue({ ...document.initial, version: document.version });
   return { ...document.store.exportSnapshot(), version: document.version };
 }
@@ -335,7 +335,7 @@ function currentSnapshot(document: MemoryDocument): WorkbookSnapshot {
  * the log. With nothing committed the document returns to its initial,
  * store-free state, so loads match an adapter that never committed.
  */
-function restoreCommittedStore(document: MemoryDocument): void {
+function restore_committed_store(document: MemoryDocument): void {
   if (document.log.length === 0) {
     document.store?.dispose();
     document.store = undefined;
@@ -356,7 +356,7 @@ function restoreCommittedStore(document: MemoryDocument): void {
  * Split a batch request into its member versions. Each member must fit the
  * default per-version limits, and the batch must fit the default batch limits.
  */
-function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[][] {
+function split_batch_versions(request: PersistenceBatchCommitRequest): DocumentOp[][] {
   const limits = DEFAULT_SYNC_COORDINATOR_LIMITS;
   const counts = request.versionOperationCounts;
   const reject = (message: string): never => {
@@ -370,7 +370,7 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
 
   const versions: DocumentOp[][] = [];
   let start = 0;
-  let batchBytes = 0;
+  let batch_bytes = 0;
   for (const count of counts) {
     if (count > limits.maxOperationsPerVersion) {
       reject(`a version needs 1 to ${limits.maxOperationsPerVersion} operations`);
@@ -378,7 +378,7 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
     const operations = request.operations.slice(start, start + count);
     start += count;
     try {
-      batchBytes += boundedJsonByteLength(operations, limits.maxVersionPayloadBytes);
+      batch_bytes += boundedJsonByteLength(operations, limits.maxVersionPayloadBytes);
     } catch (error) {
       if (!(error instanceof JsonByteLengthError)) throw error;
       reject(
@@ -389,11 +389,11 @@ function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[
     }
     versions.push(operations);
   }
-  if (batchBytes > limits.maxBatchBytes) reject(`it exceeds ${limits.maxBatchBytes} bytes`);
+  if (batch_bytes > limits.maxBatchBytes) reject(`it exceeds ${limits.maxBatchBytes} bytes`);
   return versions;
 }
 
-function throwIfAborted(signal?: AbortSignal): void {
+function throw_if_aborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new PersistenceError("aborted", "Persistence operation aborted", {
       cause: signal.reason,

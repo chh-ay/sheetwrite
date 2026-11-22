@@ -39,13 +39,13 @@ export async function mountShowcaseShell(
     ribbon: { mode: "auto" },
     grid: { ...grid, theme: siteGridTheme() },
   });
-  const stopTheme = observeSiteTheme(() => shell.setTheme(siteGridTheme()));
+  const stop_theme = observeSiteTheme(() => shell.setTheme(siteGridTheme()));
 
   return {
     grid: shell.grid,
     element: shell.element,
     dispose() {
-      stopTheme();
+      stop_theme();
       shell.destroy();
     },
   };

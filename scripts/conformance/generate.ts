@@ -429,15 +429,15 @@ interface InventorySubject {
   categoryContract?: CategoryContract;
 }
 
-function sourceWithChecksum(source: Omit<CaseSource, "sha256">): CaseSource {
+function source_with_checksum(source: Omit<CaseSource, "sha256">): CaseSource {
   return { ...source, sha256: sha256(source) };
 }
 
-function finalizedCase(entry: CaseWithoutChecksum): ConformanceCase {
+function finalized_case(entry: CaseWithoutChecksum): ConformanceCase {
   return entry;
 }
 
-function assertInventory(inventory: FormulaInventory): void {
+function assert_inventory(inventory: FormulaInventory): void {
   if (inventory.contract !== "sheetwrite.formula-capabilities" || inventory.version !== 1) {
     throw new Error("Formula inventory contract/version is invalid");
   }
@@ -460,15 +460,15 @@ function assertInventory(inventory: FormulaInventory): void {
 }
 
 export function supportedInventorySubjects(inventory: FormulaInventory): InventorySubject[] {
-  assertInventory(inventory);
+  assert_inventory(inventory);
   const functions = inventory.functions.map((entry: FormulaInventoryFunction): InventorySubject => {
     const family = inventory.families[entry.family];
     if (!family) throw new Error(`function:${entry.canonical}: missing family ${entry.family}`);
     const source = inventory.sources[family.source];
     if (!source) throw new Error(`function:${entry.canonical}: missing source ${family.source}`);
-    const argumentsSource =
+    const arguments_source =
       ARGUMENTS_BY_FUNCTION[entry.canonical] ?? ARGUMENTS_BY_SIGNATURE[entry.signature];
-    if (argumentsSource === undefined) {
+    if (arguments_source === undefined) {
       throw new Error(
         `function:${entry.canonical}: signature ${entry.signature} has no independent probe`,
       );
@@ -489,7 +489,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
     return {
       subject: { kind: "function", name: entry.canonical },
       family: entry.family,
-      source: sourceWithChecksum({
+      source: source_with_checksum({
         title: source.title,
         section: family.section,
         url: source.link,
@@ -497,9 +497,9 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
         authorship: "spec-derived",
       }),
       assertions: authoredAssertions(entry.canonical),
-      argumentsSource,
+      argumentsSource: arguments_source,
       inputs: BASE_INPUT_REFERENCE.test(
-        `${argumentsSource},${authoredAssertions(entry.canonical).join(",")}`,
+        `${arguments_source},${authoredAssertions(entry.canonical).join(",")}`,
       )
         ? BASE_INPUTS
         : [],
@@ -518,7 +518,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
     return {
       subject: { kind: "operator", name: entry.canonical },
       family: entry.family,
-      source: sourceWithChecksum({
+      source: source_with_checksum({
         title: source.title,
         section: entry.section,
         url: source.link,
@@ -534,38 +534,38 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
   return [...functions, ...operators];
 }
 
-function replaceFirstArgument(argumentsSource: string, replacement: string): string {
-  if (argumentsSource.length === 0) return argumentsSource;
+function replace_first_argument(arguments_source: string, replacement: string): string {
+  if (arguments_source.length === 0) return arguments_source;
   let depth = 0;
   let quoted = false;
-  for (let index = 0; index < argumentsSource.length; index++) {
-    const character = argumentsSource[index]!;
+  for (let index = 0; index < arguments_source.length; index++) {
+    const character = arguments_source[index]!;
     if (character === '"') quoted = !quoted;
     else if (!quoted && character === "(") depth += 1;
     else if (!quoted && character === ")") depth -= 1;
     else if (!quoted && depth === 0 && character === ",") {
-      return `${replacement}${argumentsSource.slice(index)}`;
+      return `${replacement}${arguments_source.slice(index)}`;
     }
   }
   return replacement;
 }
 
-function removeFirstArgument(argumentsSource: string): string {
+function remove_first_argument(arguments_source: string): string {
   let depth = 0;
   let quoted = false;
-  for (let index = 0; index < argumentsSource.length; index++) {
-    const character = argumentsSource[index]!;
+  for (let index = 0; index < arguments_source.length; index++) {
+    const character = arguments_source[index]!;
     if (character === '"') quoted = !quoted;
     else if (!quoted && character === "(") depth += 1;
     else if (!quoted && character === ")") depth -= 1;
     else if (!quoted && depth === 0 && character === ",") {
-      return argumentsSource.slice(index + 1);
+      return arguments_source.slice(index + 1);
     }
   }
   return "";
 }
 
-function operatorCategoryExpression(
+function operator_category_expression(
   operator: FormulaInventoryOperator,
   replacement: string,
 ): string {
@@ -574,7 +574,7 @@ function operatorCategoryExpression(
   return `${replacement}${operator.token}1`;
 }
 
-function categoryFormula(
+function category_formula(
   category: Exclude<SemanticCategory, "mutation">,
   subject: InventorySubject,
   variant: 0 | 1,
@@ -595,7 +595,7 @@ function categoryFormula(
       unsupported: true,
     };
   }
-  const categoryInputs: FormulaInputs =
+  const category_inputs: FormulaInputs =
     category === "mixed"
       ? [{ cell: "C1", value: "2" }]
       : category === "boundary"
@@ -606,15 +606,15 @@ function categoryFormula(
               { cell: "C2", value: 2 },
             ]
           : [];
-  const directOverride =
+  const direct_override =
     subject.subject.kind === "function"
       ? CATEGORY_ASSERTIONS_BY_FUNCTION[subject.subject.name]?.[category]
       : CATEGORY_ASSERTIONS_BY_OPERATOR[subject.subject.name]?.[category];
-  let property = directOverride;
+  let property = direct_override;
   if (!property && subject.subject.kind === "operator") {
     const operator = subject.operator!;
     if (category === "error") {
-      property = `ISERROR(${operatorCategoryExpression(operator, "1/0")})`;
+      property = `ISERROR(${operator_category_expression(operator, "1/0")})`;
     } else {
       const replacement = category === "range-array" ? "SUM(C1:C2)" : "C1";
       const baseline =
@@ -627,15 +627,15 @@ function categoryFormula(
             : category === "empty" && operator.token === "&"
               ? '""'
               : "0";
-      property = `IFERROR((${operatorCategoryExpression(operator, replacement)})=(${operatorCategoryExpression(operator, baseline)}),FALSE)`;
+      property = `IFERROR((${operator_category_expression(operator, replacement)})=(${operator_category_expression(operator, baseline)}),FALSE)`;
     }
   }
   if (!property) {
     const contract = subject.categoryContract!;
-    const directArgument =
+    const direct_argument =
       category === "error" ? "1/0" : category === "range-array" ? "C1:C2" : "C1";
-    const directArguments = replaceFirstArgument(subject.argumentsSource, directArgument);
-    const direct = `${subject.subject.name}(${directArguments})`;
+    const direct_arguments = replace_first_argument(subject.argumentsSource, direct_argument);
+    const direct = `${subject.subject.name}(${direct_arguments})`;
     if (DIRECT_ERROR_EXPECTATIONS[category]?.has(subject.subject.name)) {
       property = `ISERROR(${direct})`;
     } else if (category === "error") {
@@ -647,14 +647,14 @@ function categoryFormula(
     } else if (category === "empty" && contract.blank === "function-defined") {
       property = `NOT(ISERROR(${direct}))`;
     } else {
-      let baselineArguments: string;
+      let baseline_arguments: string;
       if (
         (category === "empty" && contract.blank === "ignored") ||
         (category === "mixed" && contract.text === "ignored-in-ranges")
       ) {
-        baselineArguments = removeFirstArgument(subject.argumentsSource);
+        baseline_arguments = remove_first_argument(subject.argumentsSource);
       } else {
-        const baselineArgument =
+        const baseline_argument =
           category === "mixed"
             ? contract.text === "number-if-parseable"
               ? "2"
@@ -666,19 +666,19 @@ function categoryFormula(
                   ? "FALSE"
                   : "0"
               : "0";
-        baselineArguments = replaceFirstArgument(subject.argumentsSource, baselineArgument);
+        baseline_arguments = replace_first_argument(subject.argumentsSource, baseline_argument);
       }
-      property = `IFERROR((${direct})=(${subject.subject.name}(${baselineArguments})),FALSE)`;
+      property = `IFERROR((${direct})=(${subject.subject.name}(${baseline_arguments})),FALSE)`;
     }
   }
   return {
     formula: `=AND(${assertion},${property})`,
-    inputs: [...subject.inputs, ...categoryInputs],
+    inputs: [...subject.inputs, ...category_inputs],
     oracle: "Authored result and direct coercion/shape property.",
   };
 }
 
-function generatedFormulaCases(inventory: FormulaInventory, count: number): ConformanceCase[] {
+function generated_formula_cases(inventory: FormulaInventory, count: number): ConformanceCase[] {
   const subjects = supportedInventorySubjects(inventory);
   const primary = subjects.flatMap((subject) =>
     FORMULA_CATEGORIES.map((category) => ({ subject, category, variant: 0 as const })),
@@ -693,10 +693,10 @@ function generatedFormulaCases(inventory: FormulaInventory, count: number): Conf
   );
   return [...primary, ...secondary].slice(0, count).map((descriptor) => {
     const { subject, category, variant } = descriptor;
-    const property = categoryFormula(category, subject, variant);
-    const stableName = subject.subject.name.toLowerCase();
-    return finalizedCase({
-      id: `formula.${subject.subject.kind}.${stableName}.${category}.${variant + 1}`,
+    const property = category_formula(category, subject, variant);
+    const stable_name = subject.subject.name.toLowerCase();
+    return finalized_case({
+      id: `formula.${subject.subject.kind}.${stable_name}.${category}.${variant + 1}`,
       area: "formula",
       dialect: "shared",
       category,
@@ -716,8 +716,8 @@ function generatedFormulaCases(inventory: FormulaInventory, count: number): Conf
   });
 }
 
-function documentSource(section: string): CaseSource {
-  return sourceWithChecksum({
+function document_source(section: string): CaseSource {
+  return source_with_checksum({
     title: "ECMA-376 Office Open XML File Formats",
     section,
     url: ECMA_376_URL,
@@ -726,11 +726,11 @@ function documentSource(section: string): CaseSource {
   });
 }
 
-function featureSequences(features: readonly string[], count: number, minLength = 1): string[][] {
+function feature_sequences(features: readonly string[], count: number, min_length = 1): string[][] {
   const sequences: string[][] = [];
   const seen = new Set<string>();
   for (const reverse of [false, true]) {
-    for (let length = minLength; length <= features.length; length++) {
+    for (let length = min_length; length <= features.length; length++) {
       for (let offset = 0; offset < features.length; offset++) {
         const sequence = Array.from(
           { length },
@@ -748,10 +748,10 @@ function featureSequences(features: readonly string[], count: number, minLength 
   throw new Error(`Only ${sequences.length} unique operation shapes for ${count} cases`);
 }
 
-function generatedMutationCases(count: number): ConformanceCase[] {
-  return featureSequences(MUTATION_FEATURES, count, 2).map((shape, index) => {
+function generated_mutation_cases(count: number): ConformanceCase[] {
+  return feature_sequences(MUTATION_FEATURES, count, 2).map((shape, index) => {
     const sequence = String(index + 1).padStart(3, "0");
-    return finalizedCase({
+    return finalized_case({
       id: `mutation.sequence.${sequence}`,
       area: "mutation",
       feature: "mutation-matrix",
@@ -759,7 +759,7 @@ function generatedMutationCases(count: number): ConformanceCase[] {
       category: "mutation",
       family: "document-mutation",
       kind: "mutation",
-      source: documentSource("Part 1, 18.3 worksheet state transitions"),
+      source: document_source("Part 1, 18.3 worksheet state transitions"),
       evidence: {
         kind: "property",
         basis: "property-invariant",
@@ -776,10 +776,10 @@ function generatedMutationCases(count: number): ConformanceCase[] {
   });
 }
 
-function generatedWorkbookCases(count: number): ConformanceCase[] {
-  return featureSequences(WORKBOOK_FEATURES, count).map((shape, index) => {
+function generated_workbook_cases(count: number): ConformanceCase[] {
+  return feature_sequences(WORKBOOK_FEATURES, count).map((shape, index) => {
     const scenario = String(index + 1).padStart(3, "0");
-    return finalizedCase({
+    return finalized_case({
       id: `workbook.scenario.${scenario}`,
       area: "workbook",
       feature: "workbook-matrix",
@@ -787,7 +787,7 @@ function generatedWorkbookCases(count: number): ConformanceCase[] {
       category: index % 2 === 0 ? "normal" : "boundary",
       family: "workbook-state",
       kind: "workbook",
-      source: documentSource("Part 1, 18.2 workbook and worksheet metadata"),
+      source: document_source("Part 1, 18.2 workbook and worksheet metadata"),
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -804,8 +804,8 @@ function generatedWorkbookCases(count: number): ConformanceCase[] {
   });
 }
 
-function openFormulaSource(section: string): CaseSource {
-  return sourceWithChecksum({
+function open_formula_source(section: string): CaseSource {
+  return source_with_checksum({
     title: "OpenDocument v1.3 Part 4 OpenFormula",
     section,
     url: OPENFORMULA_URL,
@@ -814,15 +814,15 @@ function openFormulaSource(section: string): CaseSource {
   });
 }
 
-function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
+function canary_cases(inventory: FormulaInventory): ConformanceCase[] {
   const subjects = new Map(
     supportedInventorySubjects(inventory).map((entry) => [
       `${entry.subject.kind}:${entry.subject.name}`,
       entry,
     ]),
   );
-  const formulaCanary = (entry: Omit<CaseWithoutChecksum, "localCanary">): ConformanceCase =>
-    finalizedCase({ ...entry, localCanary: true });
+  const formula_canary = (entry: Omit<CaseWithoutChecksum, "localCanary">): ConformanceCase =>
+    finalized_case({ ...entry, localCanary: true });
   const subject = (kind: FormulaSubject["kind"], name: string): InventorySubject => {
     const value = subjects.get(`${kind}:${name}`);
     if (!value)
@@ -830,11 +830,11 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
     return value;
   };
   const add = subject("operator", "add");
-  const ifFunction = subject("function", "IF");
+  const if_function = subject("function", "IF");
   const countif = subject("function", "COUNTIF");
   const vlookup = subject("function", "VLOOKUP");
   const filter = subject("function", "FILTER");
-  const dateSource = sourceWithChecksum({
+  const date_source = source_with_checksum({
     title: "Date systems in Excel",
     section: "The 1900 date system",
     url: "https://support.microsoft.com/en-us/office/date-systems-in-excel-e7fe7167-48a9-4b96-bb53-5612a800b487",
@@ -842,7 +842,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
     authorship: "spec-derived",
   });
   return [
-    formulaCanary({
+    formula_canary({
       id: "canary.arithmetic.1-plus-1",
       area: "formula",
       dialect: "shared",
@@ -863,7 +863,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "number", value: 2 },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.date.serial-60",
       area: "formula",
       dialect: "excel",
@@ -871,7 +871,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       family: add.family,
       kind: "formula",
       subject: add.subject,
-      source: dateSource,
+      source: date_source,
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -886,15 +886,15 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "number", value: 60, displayedText: "1900-02-29" },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.if.lazy-error-branch",
       area: "formula",
       dialect: "shared",
       category: "error",
-      family: ifFunction.family,
+      family: if_function.family,
       kind: "formula",
-      subject: ifFunction.subject,
-      source: openFormulaSource("6.15.4 IF"),
+      subject: if_function.subject,
+      source: open_formula_source("6.15.4 IF"),
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -907,7 +907,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "number", value: 7 },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.criteria.wildcard",
       area: "formula",
       dialect: "shared",
@@ -915,7 +915,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       family: countif.family,
       kind: "formula",
       subject: countif.subject,
-      source: openFormulaSource("6.10.9 COUNTIF"),
+      source: open_formula_source("6.10.9 COUNTIF"),
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -931,7 +931,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "number", value: 1 },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.lookup.not-found",
       area: "formula",
       dialect: "shared",
@@ -939,7 +939,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       family: vlookup.family,
       kind: "formula",
       subject: vlookup.subject,
-      source: openFormulaSource("6.14.12 VLOOKUP"),
+      source: open_formula_source("6.14.12 VLOOKUP"),
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -957,7 +957,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "error", error: "#N/A" },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.spill.obstruction",
       area: "formula",
       dialect: "shared",
@@ -984,7 +984,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       expected: { type: "error", error: "#SPILL!" },
       observations: [],
     }),
-    formulaCanary({
+    formula_canary({
       id: "canary.workbook.roundtrip",
       area: "workbook",
       feature: "workbook-canary",
@@ -992,7 +992,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
       category: "mutation",
       family: "workbook-state",
       kind: "workbook",
-      source: documentSource("Part 1, 18.2 workbook and worksheet identity"),
+      source: document_source("Part 1, 18.2 workbook and worksheet identity"),
       evidence: {
         kind: "property",
         basis: "property-invariant",
@@ -1017,7 +1017,7 @@ function canaryCases(inventory: FormulaInventory): ConformanceCase[] {
 }
 
 /** Classic circular references that converge under iterative calculation. */
-function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] {
+function circular_reference_cases(inventory: FormulaInventory): ConformanceCase[] {
   const subjects = new Map(
     supportedInventorySubjects(inventory).map((entry) => [
       `${entry.subject.kind}:${entry.subject.name}`,
@@ -1030,8 +1030,8 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
     return value;
   };
   const add = subject("operator", "add");
-  const ifFunction = subject("function", "IF");
-  const circularSource = sourceWithChecksum({
+  const if_function = subject("function", "IF");
+  const circular_source = source_with_checksum({
     title: "Remove or allow a circular reference in Excel",
     section: "Change the number of times Excel iterates formulas",
     url: "https://support.microsoft.com/en-us/office/remove-or-allow-a-circular-reference-in-excel-8540bd0f-6e97-4483-bcf7-1b49cd50d123",
@@ -1043,15 +1043,15 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
   const iterative = { iterate: true, maxIterations: 100, maxChange: 1e-9 } as const;
   const multiply = subject("operator", "multiply");
   return [
-    finalizedCase({
+    finalized_case({
       id: "formula.iterative.running-total",
       area: "formula",
       dialect: "shared",
       category: "normal",
-      family: ifFunction.family,
+      family: if_function.family,
       kind: "formula",
-      subject: ifFunction.subject,
-      source: circularSource,
+      subject: if_function.subject,
+      source: circular_source,
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -1066,7 +1066,7 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
       expected: { type: "number", value: 100 },
       observations: [],
     }),
-    finalizedCase({
+    finalized_case({
       id: "formula.iterative.fixed-point",
       area: "formula",
       dialect: "shared",
@@ -1074,7 +1074,7 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
       family: add.family,
       kind: "formula",
       subject: add.subject,
-      source: circularSource,
+      source: circular_source,
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -1088,7 +1088,7 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
       expected: { type: "number", value: 2, tolerance: { kind: "absolute", value: 1e-6 } },
       observations: [],
     }),
-    finalizedCase({
+    finalized_case({
       id: "formula.iterative.interest-on-balance",
       area: "formula",
       dialect: "shared",
@@ -1096,7 +1096,7 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
       family: multiply.family,
       kind: "formula",
       subject: multiply.subject,
-      source: circularSource,
+      source: circular_source,
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -1118,15 +1118,15 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
       },
       observations: [],
     }),
-    finalizedCase({
+    finalized_case({
       id: "formula.iterative.newton-square-root",
       area: "formula",
       dialect: "shared",
       category: "normal",
-      family: ifFunction.family,
+      family: if_function.family,
       kind: "formula",
-      subject: ifFunction.subject,
-      source: circularSource,
+      subject: if_function.subject,
+      source: circular_source,
       evidence: {
         kind: "property",
         basis: "documented-semantics",
@@ -1159,12 +1159,12 @@ const NUMBER_FORMAT_CASES_URL = new URL(
  * confirmed: those whose note starts with "unsure". An Excel capture of these
  * cases settles them.
  */
-function numberFormatCases(inventory: FormulaInventory): ConformanceCase[] {
+function number_format_cases(inventory: FormulaInventory): ConformanceCase[] {
   const text = supportedInventorySubjects(inventory).find(
     (entry) => entry.subject.kind === "function" && entry.subject.name === "TEXT",
   );
   if (!text) throw new Error("Subject function:TEXT is absent from the typed inventory");
-  const source = sourceWithChecksum({
+  const source = source_with_checksum({
     title: "Number format codes",
     section: "Display decimal places and significant digits; Include a text entry",
     url: "https://support.microsoft.com/en-us/office/number-format-codes-5026bbd6-04bc-48cd-bf33-80f18b4eae68",
@@ -1177,7 +1177,7 @@ function numberFormatCases(inventory: FormulaInventory): ConformanceCase[] {
   return fixture.cases
     .filter(([, , , note]) => note.startsWith("unsure"))
     .map(([value, code, shown, note]) =>
-      finalizedCase({
+      finalized_case({
         id: `formula.text-format.${sha256([value, code]).slice(0, 12)}`,
         area: "formula",
         dialect: "excel",
@@ -1212,43 +1212,43 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
   corpus: ConformanceCorpus;
   manifest: ConformanceManifest;
 } {
-  const canaries = canaryCases(inventory);
-  const formulaCanaries = canaries.filter((entry) => entry.area === "formula").length;
-  const workbookCanaries = canaries.filter((entry) => entry.area === "workbook").length;
-  const circular = circularReferenceCases(inventory);
-  const numberFormats = numberFormatCases(inventory);
-  const generatedFormulas = generatedFormulaCases(
+  const canaries = canary_cases(inventory);
+  const formula_canaries = canaries.filter((entry) => entry.area === "formula").length;
+  const workbook_canaries = canaries.filter((entry) => entry.area === "workbook").length;
+  const circular = circular_reference_cases(inventory);
+  const number_formats = number_format_cases(inventory);
+  const generated_formulas = generated_formula_cases(
     inventory,
-    REQUIRED_COUNTS.formula - formulaCanaries - circular.length - numberFormats.length,
+    REQUIRED_COUNTS.formula - formula_canaries - circular.length - number_formats.length,
   );
-  const mutations = generatedMutationCases(REQUIRED_COUNTS.mutation);
-  const workbooks = generatedWorkbookCases(REQUIRED_COUNTS.workbook - workbookCanaries);
+  const mutations = generated_mutation_cases(REQUIRED_COUNTS.mutation);
+  const workbooks = generated_workbook_cases(REQUIRED_COUNTS.workbook - workbook_canaries);
   const corpus: ConformanceCorpus = {
     protocol: 1,
     license: "MIT; original vectors derived independently from cited public specifications",
     cases: [
       ...canaries,
       ...circular,
-      ...numberFormats,
-      ...generatedFormulas,
+      ...number_formats,
+      ...generated_formulas,
       ...mutations,
       ...workbooks,
     ],
   };
-  const operationShapes = corpus.cases
+  const operation_shapes = corpus.cases
     .filter((entry) => entry.area === "mutation" || entry.area === "workbook")
     .map((entry) => ({
       id: entry.id,
       operations: (entry.operations ?? []).map((operation) => String(operation.op)),
     }));
-  const featureCounts: Record<string, number> = {};
-  for (const shape of operationShapes) {
+  const feature_counts: Record<string, number> = {};
+  for (const shape of operation_shapes) {
     for (const feature of shape.operations) {
-      featureCounts[feature] = (featureCounts[feature] ?? 0) + 1;
+      feature_counts[feature] = (feature_counts[feature] ?? 0) + 1;
     }
   }
-  const sortedFeatureCounts = Object.fromEntries(
-    Object.entries(featureCounts).sort(([left], [right]) =>
+  const sorted_feature_counts = Object.fromEntries(
+    Object.entries(feature_counts).sort(([left], [right]) =>
       left < right ? -1 : left > right ? 1 : 0,
     ),
   );
@@ -1262,8 +1262,8 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
     inventorySha256: sha256(inventory),
     supportedNamesSha256: supportedNamesChecksum(inventory),
     categoriesSha256: sha256([...REQUIRED_CATEGORIES].sort()),
-    operationShapesSha256: sha256(operationShapes),
-    featureCounts: sortedFeatureCounts,
+    operationShapesSha256: sha256(operation_shapes),
+    featureCounts: sorted_feature_counts,
     caseSha256: corpus.cases.map((entry) => sha256(entry)),
     counts: {
       formula: corpus.cases.filter((entry) => entry.area === "formula").length,

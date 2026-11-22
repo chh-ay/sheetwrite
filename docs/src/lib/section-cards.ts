@@ -69,8 +69,8 @@ export function sectionPages(href: string): Array<NavigationItem & { href: strin
   });
 }
 
-function description(contentRoot: string, href: string): string {
-  const base = join(contentRoot, href.replace(/^\/docs\//, "").replace(/\/$/, ""));
+function description(content_root: string, href: string): string {
+  const base = join(content_root, href.replace(/^\/docs\//, "").replace(/\/$/, ""));
   for (const path of [
     `${base}.md`,
     `${base}.mdx`,
@@ -91,12 +91,12 @@ function description(contentRoot: string, href: string): string {
   throw new Error(`no docs page for ${href}`);
 }
 
-function routeOf(contentRoot: string, path: string): string {
-  const relativePath = relative(contentRoot, path)
+function route_of(content_root: string, path: string): string {
+  const relative_path = relative(content_root, path)
     .split(sep)
     .join("/")
     .replace(/\.mdx?$/, "");
-  return `/docs/${relativePath.replace(/(^|\/)index$/, "")}/`.replace(/\/+/g, "/");
+  return `/docs/${relative_path.replace(/(^|\/)index$/, "")}/`.replace(/\/+/g, "/");
 }
 
 /** Rehype plugin; `contentRoot` is docs/src/content/docs. */
@@ -111,18 +111,18 @@ export function renderSectionCards(options: { contentRoot: string }) {
           continue;
         }
         if (file.path === undefined) throw new Error(`${CARDS_TAG} needs a source file`);
-        const pages = sectionPages(routeOf(options.contentRoot, file.path));
+        const pages = sectionPages(route_of(options.contentRoot, file.path));
         const cards = pages.map((page) => {
           // The current release is the newest one, the next release included.
-          const isNew = navigationBadge(page, CURRENT_RELEASE) === "new";
+          const is_new = navigationBadge(page, CURRENT_RELEASE) === "new";
           const illustration = SECTION_ILLUSTRATIONS[page.href];
           return docCard({
             title: page.label,
             href: page.href,
             body: [{ type: "text", value: description(options.contentRoot, page.href) }],
             illustration,
-            icon: illustration === undefined ? sidebarIcon(page) : undefined,
-            badge: isNew
+            icon: illustration === undefined ? sidebar_icon(page) : undefined,
+            badge: is_new
               ? element("span", [{ type: "text", value: "New" }], {
                   className: ["sw-nav-badge"],
                   dataBadge: "new",
@@ -141,7 +141,7 @@ export function renderSectionCards(options: { contentRoot: string }) {
 }
 
 /** The page's sidebar icon, when the sidebar gives it one. */
-function sidebarIcon(page: NavigationItem): string | undefined {
+function sidebar_icon(page: NavigationItem): string | undefined {
   return "icon" in page && typeof page.icon === "string" ? page.icon : undefined;
 }
 

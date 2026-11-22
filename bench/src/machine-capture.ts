@@ -95,7 +95,7 @@ function run(command: readonly string[], cwd: string): string {
   return result.stdout.toString().trim();
 }
 
-function osVersion(): string {
+function os_version(): string {
   if (platform() === "darwin") {
     return `macOS ${run(["sw_vers", "-productVersion"], BENCH_ROOT)} (${run(["sw_vers", "-buildVersion"], BENCH_ROOT)})`;
   }
@@ -103,7 +103,7 @@ function osVersion(): string {
 }
 
 /** The capture stamp an artifact states as `meta` or `metadata`, when it has one. */
-async function captureStamp(
+async function capture_stamp(
   path: string,
 ): Promise<{ commit: string; timestamp: string } | undefined> {
   const file = Bun.file(path);
@@ -119,10 +119,10 @@ async function captureStamp(
 }
 
 /** The last lines a failed suite printed, so the manifest names the error. */
-function errorTail(output: string): string {
+function error_tail(output: string): string {
   const lines = output.trim().split("\n");
-  const errorLine = lines.findLast((line) => /error:/iu.test(line));
-  return (errorLine ?? lines.at(-1) ?? "").trim().slice(-ERROR_TAIL_CHARACTERS);
+  const error_line = lines.findLast((line) => /error:/iu.test(line));
+  return (error_line ?? lines.at(-1) ?? "").trim().slice(-ERROR_TAIL_CHARACTERS);
 }
 
 interface ManifestFailure {
@@ -144,11 +144,13 @@ async function main(): Promise<void> {
   }
   const version = requiredOption(args, "--release");
   const checkout = resolve(requiredOption(args, "--checkout"));
-  const xlsxBaselineRoot = resolve(requiredOption(args, "--xlsx-baseline-root"));
+  const xlsx_baseline_root = resolve(requiredOption(args, "--xlsx-baseline-root"));
   const commit = run(["git", "rev-parse", "HEAD"], checkout);
-  const tagCommit = run(["git", "rev-parse", `v${version}^{commit}`], checkout);
-  if (commit !== tagCommit) {
-    throw new Error(`${checkout} is at ${commit}, not the v${version} release commit ${tagCommit}`);
+  const tag_commit = run(["git", "rev-parse", `v${version}^{commit}`], checkout);
+  if (commit !== tag_commit) {
+    throw new Error(
+      `${checkout} is at ${commit}, not the v${version} release commit ${tag_commit}`,
+    );
   }
   // Results are outputs, not sources: a written artifact never dirties the measured tree.
   if (
@@ -162,12 +164,12 @@ async function main(): Promise<void> {
   const unknown =
     selected?.filter((name) => !MACHINE_CAPTURE_SUITES.some((suite) => suite.name === name)) ?? [];
   if (unknown.length > 0) throw new Error(`unknown suites: ${unknown.join(", ")}`);
-  const outputDir = resolve(
+  const output_dir = resolve(
     BENCH_ROOT,
     optionValue(args, "--output-dir") ?? `results/machines/${machine}`,
   );
-  const previous = (await Bun.file(resolve(outputDir, "capture.json")).exists())
-    ? (JSON.parse(await readFile(resolve(outputDir, "capture.json"), "utf8")) as {
+  const previous = (await Bun.file(resolve(output_dir, "capture.json")).exists())
+    ? (JSON.parse(await readFile(resolve(output_dir, "capture.json"), "utf8")) as {
         failed?: ManifestFailure[];
       })
     : undefined;
@@ -178,7 +180,7 @@ async function main(): Promise<void> {
   for (const suite of MACHINE_CAPTURE_SUITES) {
     if (selected !== undefined && !selected.includes(suite.name)) continue;
     const command = suite.script.map((part) =>
-      part === XLSX_BASELINE_ROOT ? xlsxBaselineRoot : part,
+      part === XLSX_BASELINE_ROOT ? xlsx_baseline_root : part,
     );
     process.stderr.write(`\n=== ${suite.name}: bun run ${command.join(" ")}\n`);
     const child = Bun.spawnSync(["bun", "run", ...command], {
@@ -189,18 +191,18 @@ async function main(): Promise<void> {
     const stderr = child.stderr.toString();
     process.stderr.write(stderr);
     if (child.exitCode === 0) failed.delete(suite.name);
-    else failed.set(suite.name, errorTail(stderr));
+    else failed.set(suite.name, error_tail(stderr));
   }
 
-  await mkdir(outputDir, { recursive: true });
+  await mkdir(output_dir, { recursive: true });
   const collected: Array<{ artifact: string; timestamp: string }> = [];
   for (const suite of MACHINE_CAPTURE_SUITES) {
     for (const artifact of suite.artifacts) {
       const source = resolve(checkout, "bench/results", artifact);
-      const stamp = await captureStamp(source);
+      const stamp = await capture_stamp(source);
       // A checkout carries the release machine's committed artifacts; only this release's runs count.
       if (stamp?.commit !== commit) continue;
-      await copyFile(source, resolve(outputDir, artifact));
+      await copyFile(source, resolve(output_dir, artifact));
       collected.push({ artifact, timestamp: stamp.timestamp });
     }
   }
@@ -211,7 +213,7 @@ async function main(): Promise<void> {
     machine: {
       id: machine,
       label: expected.label,
-      os: osVersion(),
+      os: os_version(),
       arch: arch(),
       cpu: processors[0]?.model ?? "unknown",
       logicalCores: processors.length,
@@ -226,9 +228,9 @@ async function main(): Promise<void> {
     artifacts: collected,
     failed: [...failed].map(([suite, error]) => ({ suite, error })),
   };
-  await writeFile(resolve(outputDir, "capture.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(resolve(output_dir, "capture.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   process.stderr.write(
-    `\nwrote ${collected.length} artifacts and capture.json to ${outputDir}\n` +
+    `\nwrote ${collected.length} artifacts and capture.json to ${output_dir}\n` +
       (failed.size > 0 ? `suites that did not complete: ${[...failed.keys()].join(", ")}\n` : "") +
       "Next: commit them, then `bun run docs:generate` shows this machine's section.\n",
   );

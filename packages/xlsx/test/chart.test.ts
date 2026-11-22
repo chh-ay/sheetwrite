@@ -33,7 +33,7 @@ beforeAll(async () => {
 
 const KINDS: ChartKind[] = ["column", "bar", "line", "area", "pie", "doughnut", "scatter"];
 const DRAWING = "xl/drawings/sheetwrite-drawing1.xml";
-const drawingCount = (bytes: Uint8Array) =>
+const drawing_count = (bytes: Uint8Array) =>
   partText(bytes, "xl/worksheets/sheet1.xml").match(/<drawing\b/g)?.length ?? 0;
 
 function authored(): WorkbookSnapshot {
@@ -73,11 +73,11 @@ function authored(): WorkbookSnapshot {
 }
 
 /** Without the sidecar the sheet gets a new ID, so compare ranges by sheet name instead. */
-function portable(snapshot: WorkbookSnapshot, sheetName: string): unknown {
+function portable(snapshot: WorkbookSnapshot, sheet_name: string): unknown {
   const names = new Map(snapshot.sheets.map((entry) => [entry.id, entry.name]));
   const reference = (target: ChartDefinition["series"][number]["values"] | undefined) =>
     target && target !== "#REF!" ? { ...target, sheet: names.get(target.sheet) } : target;
-  return sheetNamed(snapshot, sheetName).charts?.map((chart) => ({
+  return sheetNamed(snapshot, sheet_name).charts?.map((chart) => ({
     ...chart,
     id: undefined,
     series: chart.series.map((series) => ({
@@ -100,7 +100,7 @@ describe("native XLSX charts", () => {
     expect(partNames(bytes).filter((part) => /^xl\/charts\/[^/]+\.xml$/.test(part))).toHaveLength(
       KINDS.length,
     );
-    expect(drawingCount(bytes)).toBe(1);
+    expect(drawing_count(bytes)).toBe(1);
   });
 
   it("keeps chart IDs, an omitted legend and subpixel anchors through the sidecar", async () => {
@@ -146,9 +146,9 @@ describe("native XLSX charts", () => {
       },
       0,
     );
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
 
-    const imported = await fromXlsxWorkbook(edited, { onWarning });
+    const imported = await fromXlsxWorkbook(edited, { onWarning: on_warning });
 
     expect(sheetAt(imported).charts).toHaveLength(KINDS.length);
     // The repeated frames share one chart part, so the host gets one warning, not one per frame.
@@ -189,8 +189,8 @@ describe("native XLSX charts", () => {
         },
       ],
     });
-    const { warnings, onWarning } = collectWarnings();
-    const saved = await toXlsxWorkbook(store, { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const saved = await toXlsxWorkbook(store, { onWarning: on_warning });
     expect(warnings.filter((warning) => warning.part?.includes("chart"))).toEqual([]);
     expect(packageProblems(saved)).toEqual([]);
     expect(portable(await fromXlsxWorkbook(withoutSidecar(saved)), owner.name)).toEqual(
@@ -216,7 +216,7 @@ describe("native XLSX charts", () => {
     const reopened = await fromXlsxWorkbook(saved);
 
     expect(packageProblems(saved)).toEqual([]);
-    expect(drawingCount(saved)).toBe(1);
+    expect(drawing_count(saved)).toBe(1);
     expect(drawing).toContain("xdr:pic");
     expect(drawing).toContain('name="new-chart"');
     expect(partNames(saved)).toContain("xl/media/10000000000006450000032120C875D8.jpg");
@@ -231,8 +231,8 @@ describe("native XLSX charts", () => {
     const edited = editParts(await toXlsxWorkbook(authored()), {
       [unsupported]: (xml) => xml.replaceAll("c:barChart", "c:bar3DChart"),
     });
-    const { warnings, onWarning } = collectWarnings();
-    const imported = await fromXlsxWorkbook(withoutSidecar(edited), { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const imported = await fromXlsxWorkbook(withoutSidecar(edited), { onWarning: on_warning });
     const supported = KINDS.filter((kind) => kind !== "bar");
 
     expect(sheetAt(imported).charts?.map((chart) => chart.kind)).toEqual(supported);
@@ -244,7 +244,7 @@ describe("native XLSX charts", () => {
     // The kept chart's part name is the one export would generate first; export must pick another.
     const exported = await toXlsxWorkbook(imported);
     expect(packageProblems(exported)).toEqual([]);
-    expect(drawingCount(exported)).toBe(1);
+    expect(drawing_count(exported)).toBe(1);
     expect(partText(exported, unsupported)).toContain("bar3DChart");
     const restored = await fromXlsxWorkbook(withoutSidecar(exported));
     expect(sheetAt(restored).charts?.map((chart) => chart.kind)).toEqual(supported);
@@ -288,7 +288,7 @@ describe("native XLSX charts", () => {
       /<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/,
     )?.[0];
     if (!anchor) throw new Error("authored drawing has no chart anchor");
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await fromXlsxWorkbook(
       editParts(bytes, {
         [DRAWING]: (xml) =>
@@ -303,7 +303,7 @@ describe("native XLSX charts", () => {
           ),
         "xl/charts/overflow.xml": "<not-well-formed",
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
 
     expect(sheetAt(imported).charts).toHaveLength(100);
@@ -318,16 +318,16 @@ describe("native XLSX charts", () => {
   it("reads series ranges written with lower-case column letters", async () => {
     const bytes = await toXlsxWorkbook(authored());
     const expected = await fromXlsxWorkbook(withoutSidecar(bytes));
-    const chartPart = "xl/charts/sheetwrite-chart1-1.xml";
+    const chart_part = "xl/charts/sheetwrite-chart1-1.xml";
     const lowered = editParts(bytes, {
-      [chartPart]: (xml) =>
+      [chart_part]: (xml) =>
         xml.replace(
           /<c:f>([^<]*)<\/c:f>/g,
           (_formula: string, source: string) =>
             `<c:f>${source.replace(/\$([A-Z]{1,3})\$/g, (column: string) => column.toLowerCase())}</c:f>`,
         ),
     });
-    expect(partText(lowered, chartPart)).toMatch(/<c:f>[^<]*\$[a-z]+\$/);
+    expect(partText(lowered, chart_part)).toMatch(/<c:f>[^<]*\$[a-z]+\$/);
 
     const imported = await fromXlsxWorkbook(withoutSidecar(lowered));
     expect(sheetAt(imported).charts?.[0]?.series).toEqual(

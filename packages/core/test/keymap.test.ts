@@ -7,26 +7,26 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
-let restoreCanvasStubs: () => void;
-let platformDescriptor: PropertyDescriptor | undefined;
-let clipboardDescriptor: PropertyDescriptor | undefined;
+let restore_canvas_stubs: () => void;
+let platform_descriptor: PropertyDescriptor | undefined;
+let clipboard_descriptor: PropertyDescriptor | undefined;
 const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreCanvasStubs = installCanvasTestStubs();
-  platformDescriptor = Object.getOwnPropertyDescriptor(navigator, "platform");
-  clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-  setPlatform("Linux x86_64");
+  restore_canvas_stubs = installCanvasTestStubs();
+  platform_descriptor = Object.getOwnPropertyDescriptor(navigator, "platform");
+  clipboard_descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  set_platform("Linux x86_64");
 });
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
-  restoreCanvasStubs();
+  restore_canvas_stubs();
   for (const [property, descriptor] of [
-    ["platform", platformDescriptor],
-    ["clipboard", clipboardDescriptor],
+    ["platform", platform_descriptor],
+    ["clipboard", clipboard_descriptor],
   ] as const) {
     if (descriptor) Object.defineProperty(navigator, property, descriptor);
     else Reflect.deleteProperty(navigator, property);
@@ -34,7 +34,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function setPlatform(platform: string): void {
+function set_platform(platform: string): void {
   Object.defineProperty(navigator, "platform", { configurable: true, value: platform });
 }
 
@@ -62,13 +62,13 @@ function press(host: HTMLElement, key: string, modifiers: KeyboardEventInit = {}
   return event.defaultPrevented;
 }
 
-function requiredElement(host: HTMLElement, selector: string): HTMLElement {
+function required_element(host: HTMLElement, selector: string): HTMLElement {
   const element = host.querySelector<HTMLElement>(selector);
   if (!element) throw new Error(`Missing grid control: ${selector}`);
   return element;
 }
 
-function menuLabel(host: HTMLElement, id: string): string | null | undefined {
+function menu_label(host: HTMLElement, id: string): string | null | undefined {
   host
     .querySelector(".sheetwrite-scroller")
     ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 80, clientY: 80 }));
@@ -77,7 +77,7 @@ function menuLabel(host: HTMLElement, id: string): string | null | undefined {
 }
 
 describe("declarative keyboard bindings", () => {
-  for (const [platform, copyLabel, undoLabel, explicitLabel, pasteLabel] of [
+  for (const [platform, copy_label, undo_label, explicit_label, paste_label] of [
     ["MacIntel", "⌘⇧K", "⌘J", "⌘⇧⌥L", "⌘V"],
     ["Linux x86_64", "Ctrl+Shift+K", "Ctrl+J", "Ctrl+Shift+Alt+L", "Ctrl+V"],
   ] as const) {
@@ -123,50 +123,52 @@ describe("declarative keyboard bindings", () => {
           ],
         },
       });
-      const shellToolbar = createToolbar(host, grid, { items: [{ action: "undo" }] });
+      const shell_toolbar = createToolbar(host, grid, { items: [{ action: "undo" }] });
       // The built-in toolbar loads lazily; awaiting its module runs the mount first.
       await import("../src/ribbon/command-toolbar.js");
       try {
         const addr = { sheet: "s1", row: 0, col: 0 };
         grid.setSelection({ kind: "cell", addr });
-        requiredElement(host, ".sheetwrite-scroller").dispatchEvent(
+        required_element(host, ".sheetwrite-scroller").dispatchEvent(
           new MouseEvent("contextmenu", { bubbles: true, clientX: 80, clientY: 80 }),
         );
         expect(
-          requiredElement(host, '[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut')
-            .textContent,
-        ).toBe(copyLabel);
+          required_element(
+            host,
+            '[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut',
+          ).textContent,
+        ).toBe(copy_label);
         expect(
-          requiredElement(
+          required_element(
             host,
             '[data-context-menu-item="custom"] .sheetwrite-context-menu-shortcut',
           ).textContent,
-        ).toBe(copyLabel);
+        ).toBe(copy_label);
         expect(
-          requiredElement(
+          required_element(
             host,
             '[data-context-menu-item="explicit"] .sheetwrite-context-menu-shortcut',
           ).textContent,
-        ).toBe(explicitLabel);
+        ).toBe(explicit_label);
         expect(
-          requiredElement(
+          required_element(
             host,
             '[data-context-menu-item="paste"] .sheetwrite-context-menu-shortcut',
           ).textContent,
-        ).toBe(pasteLabel);
-        expect(requiredElement(host, '.sheetwrite-toolbar [data-command="undo"]').title).toBe(
-          `Undo (${undoLabel})`,
+        ).toBe(paste_label);
+        expect(required_element(host, '.sheetwrite-toolbar [data-command="undo"]').title).toBe(
+          `Undo (${undo_label})`,
         );
-        expect(requiredElement(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title).toBe(
-          `Undo (${undoLabel})`,
-        );
+        expect(
+          required_element(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title,
+        ).toBe(`Undo (${undo_label})`);
         grid.setSelection({ kind: "cell", addr });
         const mod = platform === "MacIntel" ? { metaKey: true } : { ctrlKey: true };
-        const press = (key: string, shiftKey = false) =>
+        const press = (key: string, shift_key = false) =>
           host.dispatchEvent(
             new KeyboardEvent("keydown", {
               key,
-              shiftKey,
+              shiftKey: shift_key,
               ...mod,
               bubbles: true,
               cancelable: true,
@@ -188,14 +190,14 @@ describe("declarative keyboard bindings", () => {
           contextMenu: [{ id: "copy", action: "copy" }],
         });
         expect(grid.getShortcutLabel("copy")).toBe("");
-        expect(requiredElement(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title).toBe(
-          platform === "MacIntel" ? "Undo (⌘Z)" : "Undo (Ctrl+Z)",
-        );
+        expect(
+          required_element(host, '.sheetwrite-shell-toolbar [data-command="undo"]').title,
+        ).toBe(platform === "MacIntel" ? "Undo (⌘Z)" : "Undo (Ctrl+Z)");
         press("c");
         await Promise.resolve();
         expect(copied).toEqual(["Customer 0"]);
       } finally {
-        shellToolbar.destroy();
+        shell_toolbar.destroy();
         grid.destroy();
       }
     });
@@ -208,7 +210,7 @@ describe("custom key combinations", () => {
     ["Linux x86_64", { ctrlKey: true }, "Ctrl+Shift+J"],
   ] as const) {
     it(`runs a menu item's onClick from its ${platform} combination, in string or object form`, () => {
-      setPlatform(platform);
+      set_platform(platform);
       for (const shortcut of ["Mod+Shift+J", { key: "j", mod: true, shift: true }] as const) {
         const runs: string[] = [];
         const { host, grid } = mount({
@@ -226,7 +228,7 @@ describe("custom key combinations", () => {
         expect(press(host, "J", { ...mod, shiftKey: true })).toBe(true);
         // onClick gets the active cell.
         expect(runs).toEqual(["1:2"]);
-        expect(menuLabel(host, "jump")).toBe(label);
+        expect(menu_label(host, "jump")).toBe(label);
       }
     });
   }

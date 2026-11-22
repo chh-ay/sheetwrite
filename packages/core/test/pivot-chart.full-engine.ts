@@ -57,7 +57,7 @@ const ORDERS: readonly (readonly [string, string, string, number])[] = [
 type Order = (typeof ORDERS)[number];
 
 /** Sales by region, then segment, on Report at B2. */
-function salesPivot(changes: Partial<PivotDefinition> = {}): PivotDefinition {
+function sales_pivot(changes: Partial<PivotDefinition> = {}): PivotDefinition {
   return {
     id: "sales",
     name: "Sales",
@@ -147,7 +147,7 @@ function snapshot(pivot: PivotDefinition): WorkbookSnapshot {
   };
 }
 
-function mount(pivot: PivotDefinition = salesPivot()): Grid {
+function mount(pivot: PivotDefinition = sales_pivot()): Grid {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGridFromSnapshot(host, snapshot(pivot));
@@ -156,12 +156,12 @@ function mount(pivot: PivotDefinition = salesPivot()): Grid {
 }
 
 /** "Region / Segment" of each leaf item of `orders`, in the pivot's label order. */
-function leafLabels(orders: readonly Order[]): string[] {
+function leaf_labels(orders: readonly Order[]): string[] {
   return [...new Set(orders.map(([region, segment]) => `${region} / ${segment}`))].sort();
 }
 
 /** The sum of the amounts of `orders` for each leaf item; null where it has none. */
-function leafSums(orders: readonly Order[], labels: readonly string[]): (number | null)[] {
+function leaf_sums(orders: readonly Order[], labels: readonly string[]): (number | null)[] {
   return labels.map((label) => {
     const matching = orders.filter(([region, segment]) => `${region} / ${segment}` === label);
     return matching.length === 0 ? null : matching.reduce((sum, order) => sum + order[AMOUNT], 0);
@@ -172,7 +172,7 @@ function leafSums(orders: readonly Order[], labels: readonly string[]): (number 
  * The chart's view once the pivot views are computed. The first resolve
  * loads them, and a change event names the chart when they are ready.
  */
-async function loadedView(grid: Grid): Promise<ChartView | null> {
+async function loaded_view(grid: Grid): Promise<ChartView | null> {
   const { promise: ready, resolve } = Promise.withResolvers<void>();
   const stop = subscribeChartChanges(grid.store, (event) => {
     if (!event.charts.some((chart) => chart.sheet === "report" && chart.id === CHART.id)) return;
@@ -193,7 +193,7 @@ function view(grid: Grid): ChartView | null {
  * The item of each category of `series`: its levels from the outside in,
  * each outer label carried down to the rest of its group.
  */
-function categoryItems(series: ChartSeriesView): string[] {
+function category_items(series: ChartSeriesView): string[] {
   const carried = series.categoryLevels.map(() => "");
   return series.categories.map((category, index) => {
     series.categoryLevels.forEach((level, depth) => {
@@ -205,20 +205,20 @@ function categoryItems(series: ChartSeriesView): string[] {
 }
 
 /** Each series as the items of its categories and its values. */
-function points(chartView: ChartView | null) {
-  return chartView?.series.map((series) => [categoryItems(series), series.values]);
+function points(chart_view: ChartView | null) {
+  return chart_view?.series.map((series) => [category_items(series), series.values]);
 }
 
 describe("a chart over a worksheet pivot", () => {
-  const labels = leafLabels(ORDERS);
-  const sums = leafSums(ORDERS, labels);
+  const labels = leaf_labels(ORDERS);
+  const sums = leaf_sums(ORDERS, labels);
 
   for (const layout of ["compact", "tabular"] as const) {
     for (const subtotals of [true, false]) {
       it(`plots only the leaf items of a ${layout} pivot, subtotals ${subtotals ? "on" : "off"}`, async () => {
-        const grid = mount(salesPivot({ layout, subtotals }));
+        const grid = mount(sales_pivot({ layout, subtotals }));
 
-        expect(points(await loadedView(grid))).toEqual([[labels, sums]]);
+        expect(points(await loaded_view(grid))).toEqual([[labels, sums]]);
         // The pivot on the sheet keeps its totals; the chart never plots them.
         expect(grid.getPivotResult("report", "sales")?.cells).toContain("Total");
       });
@@ -226,8 +226,8 @@ describe("a chart over a worksheet pivot", () => {
   }
 
   it("fills the category levels from the row fields: the outer item once at the start of its group", async () => {
-    const grid = mount(salesPivot({ layout: "tabular" }));
-    const [series] = (await loadedView(grid))?.series ?? [];
+    const grid = mount(sales_pivot({ layout: "tabular" }));
+    const [series] = (await loaded_view(grid))?.series ?? [];
 
     expect(series?.categories).toEqual(["Online", "Retail", "Retail", "Online", "Retail"]);
     expect(series?.categoryLevels.map((level) => level.labels)).toEqual([
@@ -236,18 +236,18 @@ describe("a chart over a worksheet pivot", () => {
   });
 
   it("plots one series per column item, with gaps where a leaf item has no value", async () => {
-    const grid = mount(salesPivot({ columns: [QUARTER] }));
-    const chartView = await loadedView(grid);
+    const grid = mount(sales_pivot({ columns: [QUARTER] }));
+    const chart_view = await loaded_view(grid);
 
     const quarters = ["Q1", "Q2"];
     // Each series is named by its column item.
     expect(
-      chartView?.series.map((series) => quarters.find((quarter) => series.name.includes(quarter))),
+      chart_view?.series.map((series) => quarters.find((quarter) => series.name.includes(quarter))),
     ).toEqual(quarters);
-    expect(points(chartView)).toEqual(
+    expect(points(chart_view)).toEqual(
       quarters.map((quarter) => [
         labels,
-        leafSums(
+        leaf_sums(
           ORDERS.filter((order) => order[QUARTER] === quarter),
           labels,
         ),
@@ -257,14 +257,14 @@ describe("a chart over a worksheet pivot", () => {
 
   it("plots only the chosen value fields", async () => {
     const grid = mount(
-      salesPivot({
+      sales_pivot({
         values: [
           { field: AMOUNT, aggregation: "SUM" },
           { field: AMOUNT, aggregation: "COUNT" },
         ],
       }),
     );
-    await loadedView(grid);
+    await loaded_view(grid);
     expect(grid.setChart({ ...CHART, pivotValues: [1] }, "report").status).toBe("applied");
 
     const counts = labels.map(
@@ -275,12 +275,12 @@ describe("a chart over a worksheet pivot", () => {
 
   it("follows a filter change and a source edit, and keeps no values of its own", async () => {
     const grid = mount();
-    await loadedView(grid);
+    await loaded_view(grid);
 
     const kept = ORDERS.filter(([region]) => region !== "North");
-    const filtered = salesPivot({ filters: [{ field: REGION, values: ["East", "West"] }] });
+    const filtered = sales_pivot({ filters: [{ field: REGION, values: ["East", "West"] }] });
     expect(grid.setPivot(filtered, "report").status).toBe("applied");
-    expect(points(view(grid))).toEqual([[leafLabels(kept), leafSums(kept, leafLabels(kept))]]);
+    expect(points(view(grid))).toEqual([[leaf_labels(kept), leaf_sums(kept, leaf_labels(kept))]]);
 
     // Data row 2 is East, Retail, Q2: its amount goes from 5 to 50.
     grid.store.applyTransaction({
@@ -296,7 +296,7 @@ describe("a chart over a worksheet pivot", () => {
       index === 1 ? [order[0], order[1], order[2], 50] : order,
     );
     expect(points(view(grid))).toEqual([
-      [leafLabels(edited), leafSums(edited, leafLabels(edited))],
+      [leaf_labels(edited), leaf_sums(edited, leaf_labels(edited))],
     ]);
 
     const report = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "report");
@@ -306,7 +306,7 @@ describe("a chart over a worksheet pivot", () => {
 
   it("plots a measure as the pivot computes it for each item", async () => {
     const input = snapshot(
-      salesPivot({
+      sales_pivot({
         source: {
           model: {
             table: "orders",
@@ -336,7 +336,7 @@ describe("a chart over a worksheet pivot", () => {
       const orders = ORDERS.filter((order) => order[REGION] === region);
       return 2 * orders.reduce((sum, order) => sum + order[AMOUNT], 0);
     });
-    expect(points(await loadedView(grid))).toEqual([[regions, twice]]);
+    expect(points(await loaded_view(grid))).toEqual([[regions, twice]]);
   });
 
   it("passes the chart's view to the XLSX export", async () => {
@@ -367,7 +367,7 @@ describe("Insert › Charts › PivotChart on a worksheet", () => {
     const host = document.createElement("div");
     Object.defineProperties(host, { clientWidth: { value: 1400 }, clientHeight: { value: 500 } });
     document.body.appendChild(host);
-    const input = snapshot(salesPivot());
+    const input = snapshot(sales_pivot());
     const report = input.sheets[1];
     if (report === undefined) throw new Error("the fixture has a report sheet");
     report.charts = [];
@@ -376,12 +376,12 @@ describe("Insert › Charts › PivotChart on a worksheet", () => {
     // Await the ribbon's lazy mount, which loads its own chunk.
     await import(RIBBON_MODULE);
 
-    const insertTab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+    const insert_tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
       (tab) => tab.textContent === "Insert",
     );
-    insertTab?.click();
+    insert_tab?.click();
     /** The face of the PivotChart command while the ribbon shows it; hidden commands stay in the DOM. */
-    const pivotChartButton = (): HTMLButtonElement | null => {
+    const pivot_chart_button = (): HTMLButtonElement | null => {
       const command = host.querySelector<HTMLElement>(
         '.sheetwrite-ribbon [data-command="pivotChart"]',
       );
@@ -392,10 +392,10 @@ describe("Insert › Charts › PivotChart on a worksheet", () => {
     };
 
     grid.setSelection({ kind: "cell", addr: { sheet: "report", row: 0, col: 0 } });
-    expect(pivotChartButton()).toBeNull();
+    expect(pivot_chart_button()).toBeNull();
 
     grid.setSelection({ kind: "cell", addr: { sheet: "report", row: 3, col: 2 } });
-    const button = pivotChartButton();
+    const button = pivot_chart_button();
     expect(button).not.toBeNull();
     button?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
     await loadPanels(grid);

@@ -26,14 +26,14 @@ const CHARS_SHOWN = 2_000;
  */
 const NEUTRALIZED_CELL = /(?:^|,)"?'[=+\-@]/u;
 
-const textLines = (text: string): string[] => text.split(/\r?\n/u).filter((line) => line !== "");
+const text_lines = (text: string): string[] => text.split(/\r?\n/u).filter((line) => line !== "");
 
 /** The first lines of exported text, the rest on demand. */
 function ExportedText(props: Readonly<{ text: string; testId: string }>) {
-  const [expanded, setExpanded] = createSignal(false);
-  const all = () => textLines(props.text);
+  const [expanded, set_expanded] = createSignal(false);
+  const all = () => text_lines(props.text);
   const lines = () =>
-    expanded() ? textLines(props.text.slice(0, CHARS_SHOWN)) : all().slice(0, LINES_SHOWN);
+    expanded() ? text_lines(props.text.slice(0, CHARS_SHOWN)) : all().slice(0, LINES_SHOWN);
   return (
     <>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region of text takes a tab stop so keyboard users can scroll it. */}
@@ -51,7 +51,7 @@ function ExportedText(props: Readonly<{ text: string; testId: string }>) {
         </For>
       </pre>
       <Show when={all().length > LINES_SHOWN && !expanded()}>
-        <button class="sw-lab-more" onClick={() => setExpanded(true)} type="button">
+        <button class="sw-lab-more" onClick={() => set_expanded(true)} type="button">
           Show more of the {nf(all().length)} lines
         </button>
       </Show>
@@ -111,10 +111,10 @@ function InjectionProbe() {
 
 /** The CSV and TSV lab: the grid out as text, injection neutralized, and CSV back in. */
 export function DelimitedLab() {
-  const [pasteText, setPasteText] = createSignal("");
+  const [paste_text, set_paste_text] = createSignal("");
   const lines = () => {
     const text = csvPreview();
-    return text === null ? [] : textLines(text);
+    return text === null ? [] : text_lines(text);
   };
   const neutralized = () => lines().filter((line) => NEUTRALIZED_CELL.test(line)).length;
   return (
@@ -241,11 +241,11 @@ export function DelimitedLab() {
             <span>CSV with a header row</span>
             <textarea
               data-testid="interop-csv-input"
-              onInput={(event) => setPasteText(event.currentTarget.value)}
+              onInput={(event) => set_paste_text(event.currentTarget.value)}
               placeholder={"region,units,revenue\neu-west,12,3400\nus-east,7,2050"}
               rows={4}
               spellcheck={false}
-              value={pasteText()}
+              value={paste_text()}
             />
           </label>
           <div class="sw-lab-actions">
@@ -255,7 +255,7 @@ export function DelimitedLab() {
               data-testid="interop-csv-import"
               data-variant="primary"
               {...pendingProps(actionPending())}
-              onClick={() => run((current) => current.handlePasteImport(pasteText()))}
+              onClick={() => run((current) => current.handlePasteImport(paste_text()))}
               type="button"
             >
               Import into the grid

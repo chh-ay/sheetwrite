@@ -98,7 +98,7 @@ interface FinishedFill {
 }
 
 /** The part of `target` that is new: the cells beyond the source along the fill. */
-function outputOf(source: SelRect, target: SelRect): SelRect | null {
+function output_of(source: SelRect, target: SelRect): SelRect | null {
   const output = { ...target };
   if (target.r0 < source.r0) output.r1 = source.r0 - 1;
   else if (target.r1 > source.r1) output.r0 = source.r1 + 1;
@@ -111,14 +111,14 @@ function outputOf(source: SelRect, target: SelRect): SelRect | null {
 export class FillController {
   private readonly deps: FillControllerDeps;
   /** The source of the fill handle's drag, read when the drag starts. */
-  private dragSource: FillSource | null = null;
+  private drag_source: FillSource | null = null;
   /** The drag's source in data rows, with the rows hidden by hand in it; read when needed. */
-  private handSource: FillSource | null = null;
+  private hand_source: FillSource | null = null;
   /**
    * The fill the dragged handle would write now: the new view cells, their
    * plan, and the plan's row for a view row.
    */
-  private dragFill: {
+  private drag_fill: {
     readonly output: SelRect;
     readonly plan: FillPlan;
     readonly row: (viewRow: number) => number;
@@ -133,14 +133,14 @@ export class FillController {
 
   /** Read the source of a fill-handle drag once, so each pointer move only plans. */
   beginDrag(source: SelRect): void {
-    this.dragSource = this.read(source, this.deps.toDataRow);
-    this.handSource = null;
+    this.drag_source = this.read(source, this.deps.toDataRow);
+    this.hand_source = null;
   }
 
   endDrag(): void {
-    this.dragSource = null;
-    this.handSource = null;
-    this.dragFill = null;
+    this.drag_source = null;
+    this.hand_source = null;
+    this.drag_fill = null;
   }
 
   /**
@@ -149,19 +149,21 @@ export class FillController {
    * null when the drag adds no cells or that cell gets a formula.
    */
   drag(target: SelRect, options: FillOptions): string | null {
-    const dragged = this.dragSource;
-    const output = dragged ? outputOf(dragged.rect, target) : null;
+    const dragged = this.drag_source;
+    const output = dragged ? output_of(dragged.rect, target) : null;
     if (!dragged || !output) {
-      this.dragFill = null;
+      this.drag_fill = null;
       return null;
     }
     const rows = this.rows(dragged.rect, target);
-    const source = rows.hand ? (this.handSource ??= this.read(rows.source, rows.dataRow)) : dragged;
+    const source = rows.hand
+      ? (this.hand_source ??= this.read(rows.source, rows.dataRow))
+      : dragged;
     const vertical = output.c0 === source.rect.c0 && output.c1 === source.rect.c1;
     const plan = this.plan(source, vertical, options);
-    this.dragFill = { output, plan, row: rows.hand ? this.deps.toDataRow : (row) => row };
+    this.drag_fill = { output, plan, row: rows.hand ? this.deps.toDataRow : (row) => row };
     // The far end of the fill, in its last row or column.
-    const end = outputOf(source.rect, rows.target) ?? output;
+    const end = output_of(source.rect, rows.target) ?? output;
     const row = vertical && end.r0 < source.rect.r0 ? end.r0 : end.r1;
     const col = !vertical && end.c0 < source.rect.c0 ? end.c0 : end.c1;
     return this.shown(plan, row, col)?.text ?? null;
@@ -169,7 +171,7 @@ export class FillController {
 
   /** The new cells of the dragged handle's fill, whose values show in place. */
   get dragArea(): SelRect | null {
-    return this.dragFill?.output ?? null;
+    return this.drag_fill?.output ?? null;
   }
 
   /**
@@ -178,7 +180,7 @@ export class FillController {
    * that gets a formula, whose value is known only once it is written.
    */
   preview(row: number, col: number): { text: string; right: boolean } | null {
-    const fill = this.dragFill;
+    const fill = this.drag_fill;
     return fill ? this.shown(fill.plan, fill.row(row), col) : null;
   }
 
@@ -209,7 +211,7 @@ export class FillController {
   ): boolean {
     if (this.deps.readOnly()) return false;
     const rows = this.rows(source, target, throughHidden);
-    const dragged = rows.hand ? this.handSource : this.dragSource;
+    const dragged = rows.hand ? this.hand_source : this.drag_source;
     const read =
       dragged &&
       dragged.rect.r0 === rows.source.r0 &&
@@ -291,14 +293,14 @@ export class FillController {
   /**
    * `source` and `target` in the rows the fill covers. When rows hidden by
    * hand lie between them, Excel fills them too, and the rectangles are then
-   * in data rows. Under a sort or a filter, and without `throughHidden`, the
+   * in data rows. Under a sort or a filter, and without `through_hidden`, the
    * view rows.
    */
-  private rows(source: SelRect, target: SelRect, throughHidden = true): FillRows {
+  private rows(source: SelRect, target: SelRect, through_hidden = true): FillRows {
     const view = { source, target, dataRow: this.deps.toDataRow, hand: false };
     const first = Math.min(source.r0, target.r0);
     const last = Math.max(source.r1, target.r1);
-    const span = throughHidden ? this.deps.rowSpan(first, last) : null;
+    const span = through_hidden ? this.deps.rowSpan(first, last) : null;
     if (!span || span.last - span.first === last - first) return view;
     const data = (rect: SelRect): SelRect => ({
       ...rect,
@@ -313,18 +315,18 @@ export class FillController {
     };
   }
 
-  private read(rect: SelRect, dataRow: (row: number) => number): FillSource {
+  private read(rect: SelRect, data_row: (row: number) => number): FillSource {
     const coordinates: Array<{ row: number; col: number }> = [];
     for (let row = rect.r0; row <= rect.r1; row++) {
       for (let col = rect.c0; col <= rect.c1; col++) {
-        coordinates.push({ row: dataRow(row), col });
+        coordinates.push({ row: data_row(row), col });
       }
     }
     const columns = this.deps.sheet().columns;
     return {
       rect,
-      dataRow,
-      cells: this.readCells(coordinates).map((cell, index) => ({
+      dataRow: data_row,
+      cells: this.read_cells(coordinates).map((cell, index) => ({
         ...cell,
         kind:
           columns[coordinates[index]?.col ?? -1]?.type === "date"
@@ -335,7 +337,7 @@ export class FillController {
   }
 
   /** The cells at `coordinates` (data rows), as one engine read when the store has one. */
-  private readCells(
+  private read_cells(
     coordinates: readonly { row: number; col: number }[],
   ): Array<Omit<FillCell, "kind">> {
     const sheet = this.deps.activeSheet();
@@ -379,17 +381,17 @@ export class FillController {
     const [first, last] = vertical ? [rect.c0, rect.c1] : [rect.r0, rect.r1];
     const [from, to] = vertical ? [rect.r0, rect.r1] : [rect.c0, rect.c1];
     for (let line = first; line <= last; line++) {
-      const lineCells = [];
+      const line_cells = [];
       for (let along = from; along <= to; along++) {
         const cell = vertical ? at(along, line) : at(line, along);
-        lineCells.push({
+        line_cells.push({
           value: cell.resolved,
           isFormula: cell.formula !== null,
           isDate: cell.kind === "date",
           isTime: cell.kind === "time",
         });
       }
-      series.set(line, detectFillSeries(lineCells, options));
+      series.set(line, detectFillSeries(line_cells, options));
     }
     return { rect, vertical, at, series, dataRow: source.dataRow };
   }
@@ -403,23 +405,23 @@ export class FillController {
     // The source cell this target repeats; series steps count along the fill axis.
     const rows = rect.r1 - rect.r0 + 1;
     const cols = rect.c1 - rect.c0 + 1;
-    const sourceRow = rect.r0 + ((((row - rect.r0) % rows) + rows) % rows);
-    const sourceCol = rect.c0 + ((((col - rect.c0) % cols) + cols) % cols);
-    const series = plan.series.get(vertical ? sourceCol : sourceRow);
+    const source_row = rect.r0 + ((((row - rect.r0) % rows) + rows) % rows);
+    const source_col = rect.c0 + ((((col - rect.c0) % cols) + cols) % cols);
+    const series = plan.series.get(vertical ? source_col : source_row);
     if (!series) throw new Error(`Missing fill series for ${vertical ? "column" : "row"}`);
     const step = series.stepAt(vertical ? row - rect.r0 : col - rect.c0);
-    const fromRow = vertical && step.kind === "tile" ? rect.r0 + step.sourceIndex : sourceRow;
-    const fromCol = !vertical && step.kind === "tile" ? rect.c0 + step.sourceIndex : sourceCol;
-    const cell = plan.at(fromRow, fromCol);
+    const from_row = vertical && step.kind === "tile" ? rect.r0 + step.sourceIndex : source_row;
+    const from_col = !vertical && step.kind === "tile" ? rect.c0 + step.sourceIndex : source_col;
+    const cell = plan.at(from_row, from_col);
     // Fill copies the source cell's format along with its value, as in Excel.
     if (step.kind === "value")
       return { value: { kind: "literal", value: step.value }, style: cell.style };
     if (cell.formula === null) {
       return { value: { kind: "literal", value: cell.resolved }, style: cell.style };
     }
-    const dRow = plan.dataRow(row) - plan.dataRow(fromRow);
+    const d_row = plan.dataRow(row) - plan.dataRow(from_row);
     return {
-      value: { kind: "formula", src: shiftA1Refs(cell.formula, dRow, col - fromCol) },
+      value: { kind: "formula", src: shiftA1Refs(cell.formula, d_row, col - from_col) },
       style: cell.style,
     };
   }
@@ -437,23 +439,23 @@ export class FillController {
     options: FillOptions,
     keep: "formats" | "values" | null,
   ): boolean {
-    const output = outputOf(source.rect, target);
+    const output = output_of(source.rect, target);
     if (!output) return false;
     const vertical = output.c0 === source.rect.c0 && output.c1 === source.rect.c1;
     const plan = this.plan(source, vertical, options);
 
     const sheet = this.deps.activeSheet();
-    const dataRows: number[] = [];
-    for (let row = output.r0; row <= output.r1; row++) dataRows.push(source.dataRow(row));
-    const firstRow = dataRows[0];
-    if (firstRow === undefined) return false;
-    const startRow = dataRows.reduce((minimum, row) => Math.min(minimum, row), firstRow);
-    const endRow = dataRows.reduce((maximum, row) => Math.max(maximum, row), firstRow);
+    const data_rows: number[] = [];
+    for (let row = output.r0; row <= output.r1; row++) data_rows.push(source.dataRow(row));
+    const first_row = data_rows[0];
+    if (first_row === undefined) return false;
+    const start_row = data_rows.reduce((minimum, row) => Math.min(minimum, row), first_row);
+    const end_row = data_rows.reduce((maximum, row) => Math.max(maximum, row), first_row);
     const width = output.c1 - output.c0 + 1;
 
     const existing = keep
-      ? this.readCells(
-          dataRows.flatMap((row) =>
+      ? this.read_cells(
+          data_rows.flatMap((row) =>
             Array.from({ length: width }, (_, index) => ({ row, col: output.c0 + index })),
           ),
         )
@@ -462,20 +464,20 @@ export class FillController {
     const metadata = this.deps.sheet();
     // Protection requires per-cell operations for policy issue indices. A fill
     // is not checked against validation rules, as in Excel.
-    const scalarWrites = Boolean(metadata.protectedRanges?.length);
+    const scalar_writes = Boolean(metadata.protectedRanges?.length);
     const patches: DocumentOp[] = [];
     const cells: SnapshotCell[] = [];
     for (let r = output.r0; r <= output.r1; r++) {
-      const dataRow = dataRows[r - output.r0] ?? firstRow;
+      const data_row = data_rows[r - output.r0] ?? first_row;
       for (let c = output.c0; c <= output.c1; c++) {
         const write = this.write(plan, r, c);
         const own = existing?.[(r - output.r0) * width + c - output.c0];
         const value = keep === "formats" && own ? own.value : write.value;
         const style = keep === "values" && own ? own.style : write.style;
-        if (scalarWrites) {
-          patches.push({ op: "set", addr: { sheet, row: dataRow, col: c }, value, style });
+        if (scalar_writes) {
+          patches.push({ op: "set", addr: { sheet, row: data_row, col: c }, value, style });
         } else {
-          cells.push({ rowOffset: dataRow - startRow, colOffset: c - output.c0, value, style });
+          cells.push({ rowOffset: data_row - start_row, colOffset: c - output.c0, value, style });
         }
       }
     }
@@ -483,21 +485,21 @@ export class FillController {
     // setRange keeps per-cell change events; setBlock reports them only on opt-in.
     const range = {
       sheet,
-      start: { row: startRow, col: output.c0 },
-      end: { row: endRow, col: output.c1 },
+      start: { row: start_row, col: output.c0 },
+      end: { row: end_row, col: output.c1 },
     };
     const rules =
-      keep === "values" ? [] : this.validationPatches(source, output, vertical, dataRows);
-    const wasChanging = this.changing;
+      keep === "values" ? [] : this.validation_patches(source, output, vertical, data_rows);
+    const was_changing = this.changing;
     this.changing = true;
     try {
       const outcome = this.deps.commit(
-        scalarWrites ? [...patches, ...rules] : [{ op: "setRange", range, cells }, ...rules],
+        scalar_writes ? [...patches, ...rules] : [{ op: "setRange", range, cells }, ...rules],
         "fill",
       );
       return outcome.status === "applied";
     } finally {
-      this.changing = wasChanging;
+      this.changing = was_changing;
     }
   }
 
@@ -508,22 +510,22 @@ export class FillController {
    * covers the new cells as one range. None when a sorted view splits the
    * rows, as for a paste.
    */
-  private validationPatches(
+  private validation_patches(
     source: FillSource,
     output: SelRect,
     vertical: boolean,
-    dataRows: readonly number[],
+    data_rows: readonly number[],
   ): DocumentOp[] {
     const sheet = this.deps.sheet();
     const rules = sheet.validationRules ?? [];
     const { rect } = source;
     const first = source.dataRow(rect.r0);
-    const outputFirst = dataRows[0];
-    if (rules.length === 0 || outputFirst === undefined) return [];
+    const output_first = data_rows[0];
+    if (rules.length === 0 || output_first === undefined) return [];
     for (let row = rect.r0 + 1; row <= rect.r1; row++) {
       if (source.dataRow(row) !== first + row - rect.r0) return [];
     }
-    if (dataRows.some((row, index) => row !== outputFirst + index)) return [];
+    if (data_rows.some((row, index) => row !== output_first + index)) return [];
     const block: Range = {
       sheet: sheet.id,
       start: { row: first, col: rect.c0 },
@@ -553,9 +555,9 @@ export class FillController {
       let run: [number, number] | null = null;
       for (let tile = start; tile <= end;) {
         const offset = (((tile - from) % length) + length) % length;
-        const tileEnd = Math.min(end, tile + length - 1 - offset);
+        const tile_end = Math.min(end, tile + length - 1 - offset);
         const a = tile + Math.max(lo, offset) - offset;
-        const b = tile + Math.min(hi, offset + tileEnd - tile) - offset;
+        const b = tile + Math.min(hi, offset + tile_end - tile) - offset;
         if (a <= b) {
           if (run && run[1] + 1 === a) run[1] = b;
           else {
@@ -563,7 +565,7 @@ export class FillController {
             run = [a, b];
           }
         }
-        tile = tileEnd + 1;
+        tile = tile_end + 1;
       }
       if (run) place(run[0], run[1]);
     }
@@ -573,7 +575,7 @@ export class FillController {
       sheet,
       pieces,
       { rows, cols },
-      { row: outputFirst, col: output.c0, rows, cols },
+      { row: output_first, col: output.c0, rows, cols },
     );
   }
 }

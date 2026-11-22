@@ -27,7 +27,7 @@ export interface EngineMemoryReleaseReport {
   readonly pauseMs: number;
 }
 
-let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
+let pending_release: Promise<EngineMemoryReleaseReport> | undefined;
 
 /**
  * Move all live stores into a fresh WASM instance. Call explicitly while idle;
@@ -51,13 +51,13 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
  * @see EngineMemoryReleaseReport
  */
 export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
-  if (pendingRelease) return pendingRelease;
+  if (pending_release) return pending_release;
 
-  pendingRelease = release().finally(() => {
-    pendingRelease = undefined;
+  pending_release = release().finally(() => {
+    pending_release = undefined;
   });
 
-  return pendingRelease;
+  return pending_release;
 }
 
 async function release(): Promise<EngineMemoryReleaseReport> {

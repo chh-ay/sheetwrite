@@ -28,7 +28,7 @@ import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const SQUASH_MERGE_PULL = /\(#(\d+)\)\s*$/;
 
-async function commandOutput(
+async function command_output(
   runner: CommandRunner,
   command: readonly [string, ...string[]],
 ): Promise<string | undefined> {
@@ -36,15 +36,15 @@ async function commandOutput(
   return result.exitCode === 0 ? result.stdout.trim() : undefined;
 }
 
-async function withPullAndAuthor(
+async function with_pull_and_author(
   entry: ChangelogEntry,
   runner: CommandRunner,
 ): Promise<ChangelogEntry> {
   if (entry.commit === undefined || entry.pull !== undefined) return entry;
 
-  const subject = await commandOutput(runner, ["git", "log", "-1", "--format=%s", entry.commit]);
+  const subject = await command_output(runner, ["git", "log", "-1", "--format=%s", entry.commit]);
   const pull = subject === undefined ? undefined : SQUASH_MERGE_PULL.exec(subject)?.[1];
-  const author = await commandOutput(runner, [
+  const author = await command_output(runner, [
     "gh",
     "api",
     `repos/${GITHUB_REPOSITORY}/commits/${entry.commit}`,
@@ -59,7 +59,7 @@ async function withPullAndAuthor(
 }
 
 async function main(): Promise<void> {
-  const [version, outputPath] = process.argv.slice(2);
+  const [version, output_path] = process.argv.slice(2);
   if (version === undefined) {
     throw new Error("Usage: bun scripts/release-notes-preview.ts <version> [output.md]");
   }
@@ -71,7 +71,8 @@ async function main(): Promise<void> {
     const groups = [];
     for (const group of changelog.section.groups) {
       const entries = [];
-      for (const entry of group.entries) entries.push(await withPullAndAuthor(entry, runCommand));
+      for (const entry of group.entries)
+        entries.push(await with_pull_and_author(entry, runCommand));
       groups.push({ ...group, entries });
     }
     resolved.push({ ...changelog, section: { ...changelog.section, groups } });
@@ -81,11 +82,11 @@ async function main(): Promise<void> {
     resolved,
     await releaseNotesLinks(resolved, version, runCommand),
   );
-  if (outputPath === undefined) {
+  if (output_path === undefined) {
     process.stdout.write(notes);
     return;
   }
-  await writeFile(outputPath, notes);
+  await writeFile(output_path, notes);
 }
 
 if (import.meta.main) await main();

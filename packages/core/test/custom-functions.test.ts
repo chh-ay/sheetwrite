@@ -11,7 +11,7 @@ beforeAll(async () => {
 
 describe("host formula functions on the default engine", () => {
   it("refuse a grid with functions because only the full engine has the bridge", async () => {
-    const restoreCanvas = installCanvasTestStubs();
+    const restore_canvas = installCanvasTestStubs();
     const host = document.createElement("div");
     document.body.append(host);
     const store = new SheetwriteStore(makeWorkbook(2));
@@ -47,7 +47,7 @@ describe("host formula functions on the default engine", () => {
     } finally {
       store.dispose();
       host.remove();
-      restoreCanvas();
+      restore_canvas();
     }
   });
 });

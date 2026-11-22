@@ -14,18 +14,21 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 export const mountReact: MountAdapter = async (props) => {
   const host = document.body.appendChild(document.createElement("div"));
   const root = createRoot(host);
-  const gridRef = createRef<Grid>();
-  const publishedAtReady: Array<Grid | null | undefined> = [];
-  const render = async ({ fallbackLabel, ...gridProps }: AdapterConformanceProps) => {
+  const grid_ref = createRef<Grid>();
+  const published_at_ready: Array<Grid | null | undefined> = [];
+  const render = async ({
+    fallbackLabel: fallback_label,
+    ...grid_props
+  }: AdapterConformanceProps) => {
     await act(async () => {
       root.render(
         <SheetwriteGrid
-          {...gridProps}
-          ref={gridRef}
-          fallback={<span data-lifecycle-fallback>{fallbackLabel}</span>}
+          {...grid_props}
+          ref={grid_ref}
+          fallback={<span data-lifecycle-fallback>{fallback_label}</span>}
           onReady={(event) => {
-            publishedAtReady.push(gridRef.current);
-            gridProps.onReady?.(event);
+            published_at_ready.push(grid_ref.current);
+            grid_props.onReady?.(event);
           }}
         />,
       );
@@ -34,8 +37,8 @@ export const mountReact: MountAdapter = async (props) => {
   await render(props);
   return {
     host,
-    publishedAtReady,
-    getPublishedGrid: () => gridRef.current,
+    publishedAtReady: published_at_ready,
+    getPublishedGrid: () => grid_ref.current,
     render,
     unmount: () => act(async () => root.unmount()),
   };

@@ -29,22 +29,22 @@ interface PackedRowIndexShape {
   readonly storageLength: number;
 }
 
-function packedIndexShape(logicalRows: number, survivors: number): PackedRowIndexShape {
+function packed_index_shape(logical_rows: number, survivors: number): PackedRowIndexShape {
   if (survivors === 0) return { kind: "empty", storageLength: 0 };
 
-  const requiredSlots = survivors * 2;
+  const required_slots = survivors * 2;
 
-  if (requiredSlots < 0x8000_0000) {
+  if (required_slots < 0x8000_0000) {
     let capacity = 1;
-    while (capacity < requiredSlots) capacity *= 2;
-    const storageLength = capacity * 2;
-    if (storageLength < logicalRows) return { kind: "sparse", storageLength };
+    while (capacity < required_slots) capacity *= 2;
+    const storage_length = capacity * 2;
+    if (storage_length < logical_rows) return { kind: "sparse", storageLength: storage_length };
   }
 
-  return { kind: "dense", storageLength: logicalRows };
+  return { kind: "dense", storageLength: logical_rows };
 }
 
-function hashDataRow(row: number): number {
+function hash_data_row(row: number): number {
   return Math.imul(row ^ (row >>> 16), 0x045d_9f3b) >>> 0;
 }
 
@@ -66,90 +66,90 @@ interface ViewState {
 
 /** Owns the mutable view permutation and its query configuration. */
 export class StoreViewState {
-  private readonly orderBySheet = new Map<SheetId, Uint32Array>();
-  private readonly rowIndexBySheet = new Map<SheetId, PackedRowIndex>();
-  private readonly stateBySheet = new Map<SheetId, ViewState>();
-  private readonly engineHiddenRows: EngineHiddenRows;
+  private readonly order_by_sheet = new Map<SheetId, Uint32Array>();
+  private readonly row_index_by_sheet = new Map<SheetId, PackedRowIndex>();
+  private readonly state_by_sheet = new Map<SheetId, ViewState>();
+  private readonly engine_hidden_rows: EngineHiddenRows;
 
   constructor(
     private wasm: RecomputingCellStore,
     private readonly sheets: SheetRegistry,
   ) {
-    this.engineHiddenRows = new EngineHiddenRows(wasm, sheets.workbook, sheets.handles);
+    this.engine_hidden_rows = new EngineHiddenRows(wasm, sheets.workbook, sheets.handles);
   }
 
   replaceEngine(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
-    this.engineHiddenRows.replaceEngine(wasm);
+    this.engine_hidden_rows.replaceEngine(wasm);
   }
 
   /** Queue a sheet that was loaded or added with hidden rows of its own. */
   queueHiddenRows(sheet: SheetId): void {
-    this.engineHiddenRows.queue(sheet);
+    this.engine_hidden_rows.queue(sheet);
   }
 
   /** Whether a sheet waits for {@link flushHiddenRows}. */
   hasQueuedHiddenRows(): boolean {
-    return this.engineHiddenRows.hasQueued();
+    return this.engine_hidden_rows.hasQueued();
   }
 
   /** Send the hidden rows of the sheets changed since the last flush to the engine. */
   flushHiddenRows(): void {
-    this.engineHiddenRows.flush();
+    this.engine_hidden_rows.flush();
   }
 
   order(sheet: SheetId): Uint32Array | undefined {
-    return this.orderBySheet.get(sheet);
+    return this.order_by_sheet.get(sheet);
   }
 
   dataRowAt(sheet: SheetId, viewRow: number): number {
-    const order = this.orderBySheet.get(sheet);
+    const order = this.order_by_sheet.get(sheet);
     return order ? (order[viewRow] ?? viewRow) : viewRow;
   }
 
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
     if (!Number.isInteger(dataRow) || dataRow < 0) return null;
 
-    const order = this.orderBySheet.get(sheet);
+    const order = this.order_by_sheet.get(sheet);
     if (!order) {
       const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
       return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
     }
 
-    let index = this.rowIndexBySheet.get(sheet);
+    let index = this.row_index_by_sheet.get(sheet);
     if (!index?.valid) {
       const meta = this.sheets.sheetMeta(sheet);
       if (dataRow >= meta.rowCount) return null;
-      index = this.rebuildRowIndex(sheet, order, meta.rowCount, index);
+      index = this.rebuild_row_index(sheet, order, meta.rowCount, index);
     }
 
     if (dataRow >= index.logicalRows || index.kind === "empty") return null;
 
     if (index.kind === "dense") {
-      const viewRow = index.storage[dataRow]!;
-      return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
+      const view_row = index.storage[dataRow]!;
+      return view_row === ABSENT_VIEW_ROW ? null : view_row;
     }
 
     const capacity = index.storage.length / 2;
     const mask = capacity - 1;
-    let slot = hashDataRow(dataRow) & mask;
+    let slot = hash_data_row(dataRow) & mask;
 
     for (;;) {
       const at = slot * 2;
-      const storedDataRow = index.storage[at]!;
-      if (storedDataRow === ABSENT_VIEW_ROW) return null;
-      if (storedDataRow === dataRow) return index.storage[at + 1]!;
+      const stored_data_row = index.storage[at]!;
+      if (stored_data_row === ABSENT_VIEW_ROW) return null;
+      if (stored_data_row === dataRow) return index.storage[at + 1]!;
       slot = (slot + 1) & mask;
     }
   }
 
   /** Retained packed backing bytes for focused resource attribution. */
   inverseIndexByteLength(sheet: SheetId): number {
-    return this.rowIndexBySheet.get(sheet)?.storage.byteLength ?? 0;
+    return this.row_index_by_sheet.get(sheet)?.storage.byteLength ?? 0;
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
-    return this.stateBySheet.get(sheet)?.filters ?? EMPTY_FILTERS;
+    return this.state_by_sheet.get(sheet)?.filters ?? EMPTY_FILTERS;
   }
 
   rowGroups(sheet: SheetId): readonly RowGroup[] {
@@ -158,23 +158,23 @@ export class StoreViewState {
 
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
     const handle = this.sheets.handleOf(sheet);
-    const order = this.orderBySheet.get(sheet);
+    const order = this.order_by_sheet.get(sheet);
     if (order) return this.wasm.dataEdgeOrdered(handle, order, row, col, dRow, dCol);
     return this.wasm.dataEdge(handle, row, col, dRow, dCol);
   }
 
   viewRowCount(sheet: SheetId): number {
-    return this.orderBySheet.get(sheet)?.length ?? this.sheets.sheetMeta(sheet).rowCount;
+    return this.order_by_sheet.get(sheet)?.length ?? this.sheets.sheetMeta(sheet).rowCount;
   }
 
   hasView(sheet: SheetId): boolean {
-    return this.orderBySheet.has(sheet);
+    return this.order_by_sheet.has(sheet);
   }
 
   /** Refresh state after row/group/query metadata has been applied to the workbook. */
   metadataChanged(sheet: SheetId): void {
     const meta = this.sheets.sheetMeta(sheet);
-    const state = this.ensureState(sheet);
+    const state = this.ensure_state(sheet);
 
     state.sortKeys = meta.sortKeys?.map((key) => ({ ...key })) ?? [];
     state.filters = new Map(
@@ -205,7 +205,7 @@ export class StoreViewState {
 
   /** Filters and sort keys read cell values, so cells loaded after the sheet change the view. */
   cellsLoaded(sheet: SheetId): void {
-    const state = this.stateBySheet.get(sheet);
+    const state = this.state_by_sheet.get(sheet);
     if (state && (state.filters.size > 0 || state.sortKeys.length > 0)) this.recompute(sheet);
   }
 
@@ -215,7 +215,7 @@ export class StoreViewState {
    * AutoFilter's do in Excel when rows are inserted or deleted.
    */
   rowsChanged(sheet: SheetId): void {
-    const state = this.stateBySheet.get(sheet);
+    const state = this.state_by_sheet.get(sheet);
     if (state) {
       const meta = this.sheets.sheetMeta(sheet);
       meta.sortKeys = [];
@@ -232,7 +232,7 @@ export class StoreViewState {
    * filters move with their columns; a removed column's filter goes.
    */
   columnsChanged(sheet: SheetId, remap: (col: number) => number | null): void {
-    const state = this.stateBySheet.get(sheet);
+    const state = this.state_by_sheet.get(sheet);
     if (state) {
       const meta = this.sheets.sheetMeta(sheet);
       const filters: Array<[number, ColumnFilter]> = [];
@@ -250,66 +250,66 @@ export class StoreViewState {
   }
 
   removeSheet(sheet: SheetId): void {
-    this.stateBySheet.delete(sheet);
-    this.orderBySheet.delete(sheet);
-    this.rowIndexBySheet.delete(sheet);
-    this.engineHiddenRows.removeSheet(sheet);
+    this.state_by_sheet.delete(sheet);
+    this.order_by_sheet.delete(sheet);
+    this.row_index_by_sheet.delete(sheet);
+    this.engine_hidden_rows.removeSheet(sheet);
   }
 
   resourceOwners(): ResourceOwnerBytes[] {
-    let orderBytes = 0;
-    let orderEntries = 0;
+    let order_bytes = 0;
+    let order_entries = 0;
 
-    for (const order of this.orderBySheet.values()) {
-      orderBytes += order.byteLength;
-      orderEntries += order.length;
+    for (const order of this.order_by_sheet.values()) {
+      order_bytes += order.byteLength;
+      order_entries += order.length;
     }
 
-    let inverseBytes = 0;
-    let inverseEntries = 0;
+    let inverse_bytes = 0;
+    let inverse_entries = 0;
 
-    for (const index of this.rowIndexBySheet.values()) {
-      inverseBytes += index.storage.byteLength;
-      inverseEntries += index.storage.length;
+    for (const index of this.row_index_by_sheet.values()) {
+      inverse_bytes += index.storage.byteLength;
+      inverse_entries += index.storage.length;
     }
 
-    let configEntries = 0;
+    let config_entries = 0;
 
-    for (const state of this.stateBySheet.values()) {
-      configEntries +=
+    for (const state of this.state_by_sheet.values()) {
+      config_entries +=
         state.sortKeys.length + state.filters.size + state.hiddenRows.size + state.groups.length;
     }
 
     return [
       {
         owner: "js.view.order",
-        logicalBytes: orderBytes,
-        allocatedBytes: orderBytes,
-        entries: orderEntries,
+        logicalBytes: order_bytes,
+        allocatedBytes: order_bytes,
+        entries: order_entries,
         measurement: "typed-array-byte-length",
       },
       {
         owner: "js.view.inverse-index",
-        logicalBytes: inverseBytes,
-        allocatedBytes: inverseBytes,
-        entries: inverseEntries,
+        logicalBytes: inverse_bytes,
+        allocatedBytes: inverse_bytes,
+        entries: inverse_entries,
         measurement: "typed-array-byte-length",
       },
       {
         owner: "js.view.configuration",
         logicalBytes: 0,
         allocatedBytes: 0,
-        entries: configEntries,
+        entries: config_entries,
         measurement: "entry-count-only",
       },
     ];
   }
 
   dispose(): void {
-    this.stateBySheet.clear();
-    this.orderBySheet.clear();
-    this.rowIndexBySheet.clear();
-    this.engineHiddenRows.dispose();
+    this.state_by_sheet.clear();
+    this.order_by_sheet.clear();
+    this.row_index_by_sheet.clear();
+    this.engine_hidden_rows.dispose();
   }
 
   /**
@@ -334,23 +334,23 @@ export class StoreViewState {
     const numbers = column.takeNumbers();
     // Every text in one string, decoded once, then sliced by UTF-16 length.
     const text = column.takeTextJoined();
-    const textLengths = column.takeTextLengths();
+    const text_lengths = column.takeTextLengths();
     const styles = column.takeStyles();
     const counts = column.takeCounts();
     column.free();
 
     const out: CellScalar[] = new Array(kinds.length);
-    let numberAt = 0;
-    let textIndex = 0;
-    let textOffset = 0;
+    let number_at = 0;
+    let text_index = 0;
+    let text_offset = 0;
 
     for (let i = 0; i < kinds.length; i++) {
-      if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
+      if (kinds[i] === KIND_NUMBER) out[i] = numbers[number_at++] ?? null;
       else if (kinds[i] === KIND_STRING) {
-        const end = textOffset + (textLengths[textIndex++] ?? 0);
-        out[i] = text.slice(textOffset, end);
-        textOffset = end;
-      } else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
+        const end = text_offset + (text_lengths[text_index++] ?? 0);
+        out[i] = text.slice(text_offset, end);
+        text_offset = end;
+      } else if (kinds[i] === KIND_BOOL) out[i] = (numbers[number_at++] ?? 0) !== 0;
       else out[i] = null;
     }
 
@@ -359,49 +359,49 @@ export class StoreViewState {
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
   filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
-    return this.runFilters(this.sheets.handleOf(sheet), filters);
+    return this.run_filters(this.sheets.handleOf(sheet), filters);
   }
 
   private recompute(sheet: SheetId): void {
-    const state = this.stateBySheet.get(sheet);
-    const hidden = state ? this.hiddenRowSet(state) : null;
+    const state = this.state_by_sheet.get(sheet);
+    const hidden = state ? this.hidden_row_set(state) : null;
     const meta = this.sheets.sheetMeta(sheet);
-    const rowCount = meta.rowCount;
+    const row_count = meta.rowCount;
 
     if (
       state === undefined ||
       (state.sortKeys.length === 0 && state.filters.size === 0 && !hidden)
     ) {
-      this.engineHiddenRows.viewChanged(sheet, null, rowCount);
-      this.dropOrder(sheet);
+      this.engine_hidden_rows.viewChanged(sheet, null, row_count);
+      this.drop_order(sheet);
       return;
     }
 
-    const hasSort = state.sortKeys.length > 0;
+    const has_sort = state.sortKeys.length > 0;
     const handle = this.sheets.handleOf(sheet);
     let survivors: Uint32Array | null =
       state.filters.size > 0
-        ? keepOutsideAutoFilter(this.runFilters(handle, state.filters), meta.autoFilter, rowCount)
+        ? keepOutsideAutoFilter(this.run_filters(handle, state.filters), meta.autoFilter, row_count)
         : null;
-    this.engineHiddenRows.viewChanged(sheet, survivors, rowCount);
+    this.engine_hidden_rows.viewChanged(sheet, survivors, row_count);
 
     if (hidden) {
       if (survivors) {
         survivors = survivors.filter((row) => !hidden.has(row));
       } else {
         const kept: number[] = [];
-        for (let row = 0; row < rowCount; row++) if (!hidden.has(row)) kept.push(row);
+        for (let row = 0; row < row_count; row++) if (!hidden.has(row)) kept.push(row);
         survivors = Uint32Array.from(kept);
       }
     }
 
     if (survivors && survivors.length === 0) {
-      this.setOrder(sheet, EMPTY_U32);
+      this.set_order(sheet, EMPTY_U32);
       return;
     }
 
-    if (!hasSort) {
-      this.setOrder(sheet, survivors ?? EMPTY_U32);
+    if (!has_sort) {
+      this.set_order(sheet, survivors ?? EMPTY_U32);
       return;
     }
 
@@ -413,10 +413,10 @@ export class StoreViewState {
       ascending[i] = key.ascending ? 1 : 0;
     }
 
-    this.setOrder(sheet, this.wasm.sortRowsMulti(handle, cols, ascending, survivors ?? EMPTY_U32));
+    this.set_order(sheet, this.wasm.sortRowsMulti(handle, cols, ascending, survivors ?? EMPTY_U32));
   }
 
-  private runFilters(handle: number, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
+  private run_filters(handle: number, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
     if (filters.size === 1) {
       const [entry] = filters;
       const [col, filter] = entry!;
@@ -430,10 +430,10 @@ export class StoreViewState {
     const kinds = new Uint8Array(count);
     const flags = new Uint8Array(count);
     const nums = new Float64Array(count);
-    const numCounts = new Uint32Array(count);
-    const textCounts = new Uint32Array(count);
-    const valueNums: number[] = [];
-    const valueTexts: string[] = [];
+    const num_counts = new Uint32Array(count);
+    const text_counts = new Uint32Array(count);
+    const value_nums: number[] = [];
+    const value_texts: string[] = [];
 
     let i = 0;
     for (const [col, filter] of filters) {
@@ -441,33 +441,33 @@ export class StoreViewState {
       switch (filter.kind) {
         case "values": {
           kinds[i] = 0;
-          let includesNull = false;
-          let numberCount = 0;
-          let textCount = 0;
+          let includes_null = false;
+          let number_count = 0;
+          let text_count = 0;
           for (const value of filter.values) {
-            if (value === null) includesNull = true;
+            if (value === null) includes_null = true;
             else if (typeof value === "number") {
-              valueNums.push(value);
-              numberCount++;
+              value_nums.push(value);
+              number_count++;
             } else if (typeof value === "boolean") {
-              valueTexts.push(value ? "\0TRUE" : "\0FALSE");
-              textCount++;
+              value_texts.push(value ? "\0TRUE" : "\0FALSE");
+              text_count++;
             } else {
-              valueTexts.push(value);
-              textCount++;
+              value_texts.push(value);
+              text_count++;
             }
           }
 
-          numCounts[i] = numberCount;
-          textCounts[i] = textCount;
-          flags[i] = includesNull ? 1 : 0;
+          num_counts[i] = number_count;
+          text_counts[i] = text_count;
+          flags[i] = includes_null ? 1 : 0;
           break;
         }
         case "contains":
           kinds[i] = 1;
           flags[i] = filter.matchCase ? 1 : 0;
-          textCounts[i] = 1;
-          valueTexts.push(filter.text);
+          text_counts[i] = 1;
+          value_texts.push(filter.text);
           break;
         case "compare":
           kinds[i] = 2;
@@ -483,20 +483,21 @@ export class StoreViewState {
         case "custom":
           kinds[i] = 5;
           flags[i] = filter.join === "or" ? 1 : 0;
-          textCounts[i] = filter.conditions.length;
-          for (const condition of filter.conditions) valueTexts.push(conditionCriterion(condition));
+          text_counts[i] = filter.conditions.length;
+          for (const condition of filter.conditions)
+            value_texts.push(conditionCriterion(condition));
           break;
         case "dynamic": {
           // Relative spans compare serials; periods match months in Rust.
           const span = dynamicDateSpan(filter.type, new Date());
           if ("months" in span) {
             kinds[i] = 6;
-            numCounts[i] = span.months.length;
-            valueNums.push(...span.months);
+            num_counts[i] = span.months.length;
+            value_nums.push(...span.months);
           } else {
             kinds[i] = 5;
-            textCounts[i] = 2;
-            valueTexts.push(`>=${span.start}`, `<${span.end}`);
+            text_counts[i] = 2;
+            value_texts.push(`>=${span.start}`, `<${span.end}`);
           }
           break;
         }
@@ -511,23 +512,23 @@ export class StoreViewState {
       kinds,
       flags,
       nums,
-      numCounts,
-      textCounts,
-      Float64Array.from(valueNums),
-      valueTexts,
+      num_counts,
+      text_counts,
+      Float64Array.from(value_nums),
+      value_texts,
     );
   }
 
-  private hiddenRowSet(state: ViewState): ReadonlySet<number> | null {
-    let hasCollapsed = false;
+  private hidden_row_set(state: ViewState): ReadonlySet<number> | null {
+    let has_collapsed = false;
     for (const group of state.groups) {
       if (group.collapsed) {
-        hasCollapsed = true;
+        has_collapsed = true;
         break;
       }
     }
 
-    if (!hasCollapsed) return state.hiddenRows.size > 0 ? state.hiddenRows : null;
+    if (!has_collapsed) return state.hiddenRows.size > 0 ? state.hiddenRows : null;
 
     const hidden = new Set<number>(state.hiddenRows);
     for (const group of state.groups) {
@@ -538,8 +539,8 @@ export class StoreViewState {
     return hidden.size > 0 ? hidden : null;
   }
 
-  private ensureState(sheet: SheetId): ViewState {
-    let state = this.stateBySheet.get(sheet);
+  private ensure_state(sheet: SheetId): ViewState {
+    let state = this.state_by_sheet.get(sheet);
     if (!state) {
       const meta = this.sheets.sheetMeta(sheet);
       state = {
@@ -548,19 +549,19 @@ export class StoreViewState {
         hiddenRows: new Set(meta.hiddenRows ?? []),
         groups: meta.rowGroups?.map((group) => ({ ...group })) ?? [],
       };
-      this.stateBySheet.set(sheet, state);
+      this.state_by_sheet.set(sheet, state);
     }
 
     return state;
   }
 
-  private rebuildRowIndex(
+  private rebuild_row_index(
     sheet: SheetId,
     order: Uint32Array,
-    logicalRows: number,
+    logical_rows: number,
     reusable: PackedRowIndex | undefined,
   ): PackedRowIndex {
-    if (logicalRows > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
+    if (logical_rows > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
       throw new SheetwriteError(
         "resource-limit",
         "store",
@@ -569,18 +570,18 @@ export class StoreViewState {
       );
     }
 
-    const shape = packedIndexShape(logicalRows, order.length);
+    const shape = packed_index_shape(logical_rows, order.length);
     let index = reusable;
     if (!index || index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
       index = {
         kind: shape.kind,
         storage: shape.storageLength === 0 ? EMPTY_U32 : new Uint32Array(shape.storageLength),
-        logicalRows,
+        logicalRows: logical_rows,
         valid: false,
       };
-      this.rowIndexBySheet.set(sheet, index);
+      this.row_index_by_sheet.set(sheet, index);
     } else {
-      index.logicalRows = logicalRows;
+      index.logicalRows = logical_rows;
     }
 
     if (index.kind === "empty") {
@@ -590,46 +591,46 @@ export class StoreViewState {
 
     index.storage.fill(ABSENT_VIEW_ROW);
     if (index.kind === "dense") {
-      for (let viewRow = 0; viewRow < order.length; viewRow++) {
-        const dataRow = order[viewRow]!;
-        if (dataRow >= logicalRows) {
+      for (let view_row = 0; view_row < order.length; view_row++) {
+        const data_row = order[view_row]!;
+        if (data_row >= logical_rows) {
           throw new RangeError(
-            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+            `view order for sheet ${sheet} contains out-of-bounds data row ${data_row}`,
           );
         }
 
-        if (index.storage[dataRow] !== ABSENT_VIEW_ROW) {
+        if (index.storage[data_row] !== ABSENT_VIEW_ROW) {
           throw new RangeError(
-            `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+            `view order for sheet ${sheet} contains duplicate data row ${data_row}`,
           );
         }
 
-        index.storage[dataRow] = viewRow;
+        index.storage[data_row] = view_row;
       }
     } else {
       const capacity = index.storage.length / 2;
       const mask = capacity - 1;
-      for (let viewRow = 0; viewRow < order.length; viewRow++) {
-        const dataRow = order[viewRow]!;
-        if (dataRow >= logicalRows) {
+      for (let view_row = 0; view_row < order.length; view_row++) {
+        const data_row = order[view_row]!;
+        if (data_row >= logical_rows) {
           throw new RangeError(
-            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+            `view order for sheet ${sheet} contains out-of-bounds data row ${data_row}`,
           );
         }
 
-        let slot = hashDataRow(dataRow) & mask;
+        let slot = hash_data_row(data_row) & mask;
         for (;;) {
           const at = slot * 2;
-          const storedDataRow = index.storage[at]!;
-          if (storedDataRow === dataRow) {
+          const stored_data_row = index.storage[at]!;
+          if (stored_data_row === data_row) {
             throw new RangeError(
-              `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+              `view order for sheet ${sheet} contains duplicate data row ${data_row}`,
             );
           }
 
-          if (storedDataRow === ABSENT_VIEW_ROW) {
-            index.storage[at] = dataRow;
-            index.storage[at + 1] = viewRow;
+          if (stored_data_row === ABSENT_VIEW_ROW) {
+            index.storage[at] = data_row;
+            index.storage[at + 1] = view_row;
             break;
           }
 
@@ -642,21 +643,21 @@ export class StoreViewState {
     return index;
   }
 
-  private setOrder(sheet: SheetId, order: Uint32Array): void {
-    this.orderBySheet.set(sheet, order);
-    const index = this.rowIndexBySheet.get(sheet);
+  private set_order(sheet: SheetId, order: Uint32Array): void {
+    this.order_by_sheet.set(sheet, order);
+    const index = this.row_index_by_sheet.get(sheet);
     if (!index) return;
 
-    const shape = packedIndexShape(this.sheets.sheetMeta(sheet).rowCount, order.length);
+    const shape = packed_index_shape(this.sheets.sheetMeta(sheet).rowCount, order.length);
     if (index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
-      this.rowIndexBySheet.delete(sheet);
+      this.row_index_by_sheet.delete(sheet);
     } else {
       index.valid = false;
     }
   }
 
-  private dropOrder(sheet: SheetId): void {
-    this.orderBySheet.delete(sheet);
-    this.rowIndexBySheet.delete(sheet);
+  private drop_order(sheet: SheetId): void {
+    this.order_by_sheet.delete(sheet);
+    this.row_index_by_sheet.delete(sheet);
   }
 }

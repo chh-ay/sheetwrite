@@ -81,7 +81,7 @@ function measured(result: MachineResult | undefined): result is {
 }
 
 /** A result as words: its own text, why it is pending, or that the row has none. */
-function resultText(
+function result_text(
   result: MachineResult | undefined,
   describe: (value: { ratio: number; text: string }) => string,
 ): string {
@@ -103,7 +103,7 @@ export function ratioAxis(ratios: readonly number[]): RatioAxis {
 }
 
 /** "1/2×", "1×", "1,000×". */
-function ratioLabel(ratio: number): string {
+function ratio_label(ratio: number): string {
   return ratio >= 1 ? `${ratio.toLocaleString("en-US")}×` : `1/${Math.round(1 / ratio)}×`;
 }
 
@@ -119,7 +119,7 @@ export function ratioTicks(axis: RatioAxis): string {
     )
     .map(
       (ratio) =>
-        `<span style="left:${scalePosition(scale, ratio).toFixed(2)}%"${ratio === 1 ? " data-parity" : ""}>${ratioLabel(ratio)}</span>`,
+        `<span style="left:${scalePosition(scale, ratio).toFixed(2)}%"${ratio === 1 ? " data-parity" : ""}>${ratio_label(ratio)}</span>`,
     )
     .join("");
 }
@@ -145,7 +145,7 @@ function row(entry: MachineRow, comparison: MachineComparison, axis: RatioAxis):
         key: key.machine,
         label: key.name,
         value: measured(result) ? result.ratio : null,
-        valueText: resultText(result, (value) => value.text),
+        valueText: result_text(result, (value) => value.text),
         ...MACHINE_MARKS[key.machine],
       };
     }),
@@ -153,7 +153,7 @@ function row(entry: MachineRow, comparison: MachineComparison, axis: RatioAxis):
   const values = comparison.machines
     .map((key) => {
       const result = entry.results[key.machine];
-      return `<span data-machine="${key.machine}"${measured(result) ? "" : " data-pending"}>${legendMark(MACHINE_MARKS[key.machine].shape, MACHINE_MARKS[key.machine].tone)}${escapeHtml(key.name)} <b>${escapeHtml(resultText(result, (value) => value.text))}</b></span>`;
+      return `<span data-machine="${key.machine}"${measured(result) ? "" : " data-pending"}>${legendMark(MACHINE_MARKS[key.machine].shape, MACHINE_MARKS[key.machine].tone)}${escapeHtml(key.name)} <b>${escapeHtml(result_text(result, (value) => value.text))}</b></span>`;
     })
     .join("");
   const title = entry.id === undefined ? "" : ` title="${escapeHtml(entry.id)}"`;
@@ -171,7 +171,7 @@ function table(comparison: MachineComparison): string {
         `<tr><th scope="row">${escapeHtml(entry.label)}</th>${comparison.machines
           .map(
             (key) =>
-              `<td>${escapeHtml(resultText(entry.results[key.machine], (value) => value.text))}</td>`,
+              `<td>${escapeHtml(result_text(entry.results[key.machine], (value) => value.text))}</td>`,
           )
           .join("")}</tr>`,
     )
@@ -209,7 +209,7 @@ export function machineSwitch(
 }
 
 /** The rows; on phones the first `PHONE_ROWS`, and a toggle for the rest. */
-function phoneRows(comparison: MachineComparison, axis: RatioAxis): string[] {
+function phone_rows(comparison: MachineComparison, axis: RatioAxis): string[] {
   const rows = `<ul class="machines__rows">${comparison.rows.map((entry) => row(entry, comparison, axis)).join("")}</ul>`;
   const overflow = comparison.rows.length - PHONE_ROWS;
   if (overflow <= 0) return [rows];
@@ -236,7 +236,7 @@ export function renderMachineComparison(
     legend(comparison, icon),
     `<p class="machines__axis-title">${escapeHtml(comparison.measure)} on each machine, against its own baseline; log scale, 1× is ${escapeHtml(comparison.parity)}. Machines are never compared with each other.</p>`,
     `<div class="machines__axis" aria-hidden="true"><span class="machines__ticks">${ratioTicks(axis)}</span></div>`,
-    ...phoneRows(comparison, axis),
+    ...phone_rows(comparison, axis),
     comparison.quiet === undefined || comparison.quiet.rows.length === 0
       ? ""
       : `<details class="machines__more"><summary>${escapeHtml(comparison.quiet.summary)}</summary><p class="machines__quiet">${comparison.quiet.rows.map((entry) => escapeHtml(entry.label)).join(" · ")}</p></details>`,

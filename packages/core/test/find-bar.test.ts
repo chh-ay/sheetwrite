@@ -7,7 +7,7 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { ColumnarData, Grid, Workbook } from "../src/types.js";
 import { makeWorkbook, mountHost } from "./fixtures.js";
 
-let restoreCanvasStubs: () => void;
+let restore_canvas_stubs: () => void;
 const cleanups: (() => void)[] = [];
 
 beforeAll(async () => {
@@ -15,12 +15,12 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreCanvasStubs = installCanvasTestStubs();
+  restore_canvas_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
-  restoreCanvasStubs();
+  restore_canvas_stubs();
   document.body.innerHTML = "";
 });
 
@@ -46,21 +46,21 @@ function mount(data: ColumnarData, workbook: Workbook = makeWorkbook(data.rowCou
   const field = (name: string) => host.querySelector<HTMLInputElement>(`.sheetwrite-find-${name}`)!;
   const click = (name: string) =>
     host.querySelector<HTMLButtonElement>(`.sheetwrite-find-${name}`)!.click();
-  const typeInto = (input: HTMLInputElement, text: string) => {
+  const type_into = (input: HTMLInputElement, text: string) => {
     input.value = text;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   };
-  return { host, grid, bar, field, click, typeInto };
+  return { host, grid, bar, field, click, typeInto: type_into };
 }
 
 const value = (grid: Grid, row: number, col = 0) => grid.store.getCell(A(row, col)).resolved;
 
 describe("FindBar", () => {
   it("searches and replaces live cells without leaking field keystrokes", async () => {
-    const { host, grid, bar, field, click, typeInto } = mount(PEOPLE);
+    const { host, grid, bar, field, click, typeInto: type_into } = mount(PEOPLE);
     bar.open();
     const count = () => host.querySelector(".sheetwrite-find-count")?.textContent?.match(/\d+/g);
-    typeInto(field("input"), "Ada");
+    type_into(field("input"), "Ada");
     expect(count()).toEqual(["1", "2"]);
     click("next");
     expect(count()).toEqual(["2", "2"]);
@@ -94,7 +94,7 @@ describe("FindBar", () => {
     );
     expect(value(grid, 0)).toBe("Lovelace");
 
-    typeInto(field("input"), "Grace");
+    type_into(field("input"), "Grace");
     field("replace-input").value = "All";
     click("replace-all");
     expect(value(grid, 2)).toBe("All");
@@ -142,7 +142,7 @@ describe("FindBar options and Find All", () => {
     bar.open();
     const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
     const options = host.querySelector<HTMLElement>(".sheetwrite-find-options")!;
-    const [within, , lookIn] = options.querySelectorAll("select");
+    const [within, , look_in] = options.querySelectorAll("select");
 
     // Alt+C, Excel's Match case key, opens the options and ticks the box.
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", altKey: true, bubbles: true }));
@@ -152,22 +152,22 @@ describe("FindBar options and Find All", () => {
 
     within!.value = "workbook";
     within!.dispatchEvent(new Event("change"));
-    lookIn!.value = "values";
-    lookIn!.dispatchEvent(new Event("change"));
+    look_in!.value = "values";
+    look_in!.dispatchEvent(new Event("change"));
     expect(input.getAttribute("aria-label")).toBe("Find in workbook");
     input.value = "ada";
     input.dispatchEvent(new Event("input", { bubbles: true }));
 
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-all")!.click();
-    const findAll = host.querySelector<HTMLElement>(".sheetwrite-find-all-results")!;
+    const find_all = host.querySelector<HTMLElement>(".sheetwrite-find-all-results")!;
     const rows = [
-      ...findAll.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
+      ...find_all.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
     ];
     expect(rows.map((row) => [...row.children].map((cell) => cell.textContent))).toEqual([
       ["Sheet 1", "$A$1", "Ada", ""],
       ["Sheet 2", "$C$2", "ada", '="ada"'],
     ]);
-    expect(findAll.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+    expect(find_all.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
       "2 cells found",
     );
 
@@ -175,7 +175,7 @@ describe("FindBar options and Find All", () => {
     expect(grid.getActiveSheet()).toBe("s2");
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 1, col: 2 } });
     expect(
-      findAll.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
+      find_all.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
     ).toBe("Sheet 2");
 
     bar.destroy();
@@ -188,15 +188,15 @@ describe("FindBar Replace all preview", () => {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
 
   it("shows what Replace all will change before it applies, as one undo step", async () => {
-    const { host, grid, bar, field, click, typeInto } = mount(PEOPLE);
+    const { host, grid, bar, field, click, typeInto: type_into } = mount(PEOPLE);
     grid.applyTransaction({
       patches: [{ op: "set", addr: A(1, 2), value: { kind: "formula", src: '="Ada"' } }],
     });
     bar.open({ replace: true });
     const preview = host.querySelector<HTMLElement>(".sheetwrite-find-preview")!;
     const status = () => preview.querySelector(".sheetwrite-find-results-status")!.textContent;
-    typeInto(field("input"), "Ada");
-    typeInto(field("replace-input"), "Grace");
+    type_into(field("input"), "Ada");
+    type_into(field("replace-input"), "Grace");
     await settle();
 
     expect(status()).toBe("3 cells, 1 of them a formula");
@@ -220,7 +220,12 @@ describe("FindBar Replace all preview", () => {
   });
 
   it("plans the preview once typing pauses, not on every key", async () => {
-    const { grid, bar, field, typeInto } = mount({
+    const {
+      grid,
+      bar,
+      field,
+      typeInto: type_into,
+    } = mount({
       rowCount: 2,
       columns: { name: ["Ada", "Bob"], amount: [1, 2], city: ["", ""] },
     });
@@ -231,8 +236,8 @@ describe("FindBar Replace all preview", () => {
       return preview(replacement);
     };
     bar.open({ replace: true });
-    typeInto(field("input"), "Ada");
-    for (const text of ["G", "Gr", "Gra"]) typeInto(field("replace-input"), text);
+    type_into(field("input"), "Ada");
+    for (const text of ["G", "Gr", "Gra"]) type_into(field("replace-input"), text);
     expect(plans).toBe(0);
     await settle();
     expect(plans).toBe(1);
@@ -259,19 +264,19 @@ describe("Find in numbers with a number format", () => {
       },
       workbook,
     );
-    const format = (row: number, numberFormat: string) =>
+    const format = (row: number, number_format: string) =>
       grid.applyTransaction({
         patches: [
           {
             op: "setRangeStyle",
             range: { sheet: "s1", start: A(row, 1), end: A(row, 1) },
-            style: { numberFormat },
+            style: { numberFormat: number_format },
           },
         ],
       });
-    ["m/d/yyyy", "0%", "$#,##0.00"].forEach((numberFormat, row) => format(row, numberFormat));
-    const rows = (query: string, lookIn: "formulas" | "values") =>
-      grid.search(query, { lookIn }).matches.map((match) => match.row);
+    ["m/d/yyyy", "0%", "$#,##0.00"].forEach((number_format, row) => format(row, number_format));
+    const rows = (query: string, look_in: "formulas" | "values") =>
+      grid.search(query, { lookIn: look_in }).matches.map((match) => match.row);
 
     expect(rows("1/15/2026", "formulas")).toEqual([0]);
     expect(rows("1/15/2026", "values")).toEqual([0]);

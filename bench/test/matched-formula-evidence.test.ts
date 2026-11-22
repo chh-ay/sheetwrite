@@ -14,8 +14,8 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url));
 const sha256 = (path: string) => createHash("sha256").update(read(path)).digest("hex");
 
 const RAW_PATH = "../results/formula-regression-raw.json";
-const rawArtifactSha256 = sha256(RAW_PATH);
-const harnessSha256 = sha256("../src/matched-formula-harness.ts");
+const raw_artifact_sha256 = sha256(RAW_PATH);
+const harness_sha256 = sha256("../src/matched-formula-harness.ts");
 const ARTIFACT = JSON.parse(
   read("../results/formula-regression-results.json").toString(),
 ) as MatchedFormulaEvidence;
@@ -26,13 +26,16 @@ function rebuild(value: MatchedRawArtifact): MatchedFormulaEvidence {
   return buildMatchedEvidence(value, {
     baselineWasmSha256: ARTIFACT.wasmSha256.baseline,
     candidateWasmSha256: ARTIFACT.wasmSha256.candidate,
-    harnessSha256,
-    rawArtifactSha256,
+    harnessSha256: harness_sha256,
+    rawArtifactSha256: raw_artifact_sha256,
   });
 }
 
 const validate = (value: MatchedFormulaEvidence) =>
-  validateMatchedEvidence(value, { rawArtifactSha256, harnessSha256 });
+  validateMatchedEvidence(value, {
+    rawArtifactSha256: raw_artifact_sha256,
+    harnessSha256: harness_sha256,
+  });
 
 // The tracked raw artifact must not depend on the capturing machine's work
 // directory, and it must still produce the tracked evidence.

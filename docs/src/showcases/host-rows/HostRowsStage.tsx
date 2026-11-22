@@ -27,7 +27,7 @@ interface DeltaLogEntry {
 }
 
 /** One line per projection: what moved, named by account ID. */
-function describeProjection(projection: RowBridgeProjection<string>): string {
+function describe_projection(projection: RowBridgeProjection<string>): string {
   const details = projection.deltas.slice(0, 3).map((delta) => {
     if (delta.kind === "cell") {
       const value = delta.cell.next;
@@ -55,39 +55,41 @@ function describeProjection(projection: RowBridgeProjection<string>): string {
 /** The host rows showcase's island: the accounts grid beside the app's own store. */
 export function HostRowsStage() {
   let host!: HTMLDivElement;
-  const [accounts, setAccounts] = createSignal<AccountsGrid | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
-  const [entities, setEntities] = createSignal(
+  const [accounts, set_accounts] = createSignal<AccountsGrid | null>(null);
+  const [error, set_error] = createSignal<string | null>(null);
+  const [entities, set_entities] = createSignal(
     new Map(INITIAL_ACCOUNTS.map((row) => [row.id, row])),
   );
-  const [log, setLog] = createSignal<DeltaLogEntry[]>([]);
-  const [importResult, setImportResult] = createSignal<ImportTiming | null>(null);
-  let logSequence = 0;
+  const [log, set_log] = createSignal<DeltaLogEntry[]>([]);
+  const [import_result, set_import_result] = createSignal<ImportTiming | null>(null);
+  let log_sequence = 0;
 
-  const applyProjection = (projection: RowBridgeProjection<string>) => {
-    const text = describeProjection(projection);
-    setLog((entries) =>
-      [{ id: logSequence++, status: projection.status, text }, ...entries].slice(0, LOG_LIMIT),
+  const apply_projection = (projection: RowBridgeProjection<string>) => {
+    const text = describe_projection(projection);
+    set_log((entries) =>
+      [{ id: log_sequence++, status: projection.status, text }, ...entries].slice(0, LOG_LIMIT),
     );
-    setEntities((current) => applyHostProjection(current, projection));
+    set_entities((current) => applyHostProjection(current, projection));
   };
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       import("./boot.js")
-        .then(({ startAccountsGrid }) => startAccountsGrid(host, { onProjection: applyProjection }))
+        .then(({ startAccountsGrid: start_accounts_grid }) =>
+          start_accounts_grid(host, { onProjection: apply_projection }),
+        )
         .then((started) => {
           if (disposed) return started.dispose();
-          setAccounts(started);
+          set_accounts(started);
         })
         .catch((cause: unknown) => {
-          if (!disposed) setError(errorText(cause));
+          if (!disposed) set_error(errorText(cause));
         });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       accounts()?.dispose();
     });
   });
@@ -95,7 +97,7 @@ export function HostRowsStage() {
   const ready = () => accounts() !== null;
   const grid = () => accounts()?.grid;
   const arr = () => [...entities().values()].reduce((total, row) => total + row.amount, 0);
-  const remoteUpdate = () => {
+  const remote_update = () => {
     const account = entities().get("account-001");
     if (!account) return;
     grid()?.applyRemoteOperations([
@@ -106,10 +108,10 @@ export function HostRowsStage() {
       },
     ]);
   };
-  const importLeads = () => {
+  const import_leads = () => {
     const current = accounts();
-    if (!current || importResult()) return;
-    setImportResult(current.importLeads(entities().size));
+    if (!current || import_result()) return;
+    set_import_result(current.importLeads(entities().size));
   };
 
   return (
@@ -122,12 +124,12 @@ export function HostRowsStage() {
           >
             <Button
               data-testid="host-import-leads"
-              disabled={!ready() || importResult() !== null}
-              onClick={importLeads}
+              disabled={!ready() || import_result() !== null}
+              onClick={import_leads}
               variant="primary"
             >
               <Icon name="upload" />
-              {importResult()
+              {import_result()
                 ? `${LEAD_IMPORT_ROWS.toLocaleString("en")} leads imported`
                 : `Import ${LEAD_IMPORT_ROWS.toLocaleString("en")} leads`}
             </Button>
@@ -146,8 +148,8 @@ export function HostRowsStage() {
                   label: "Import time",
                   value: (
                     <output aria-live="polite" data-testid="host-import-timing">
-                      {importResult()
-                        ? `${importResult()?.insertMs.toFixed(1)} ms · ${importResult()?.batches} commits`
+                      {import_result()
+                        ? `${import_result()?.insertMs.toFixed(1)} ms · ${import_result()?.batches} commits`
                         : "Not run"}
                     </output>
                   ),
@@ -156,7 +158,7 @@ export function HostRowsStage() {
             />
           </ShowcaseControlGroup>
           <ShowcaseControlGroup title="Host changes">
-            <Button disabled={!ready() || !entities().has("account-001")} onClick={remoteUpdate}>
+            <Button disabled={!ready() || !entities().has("account-001")} onClick={remote_update}>
               <Icon name="refresh" />
               Remote update
             </Button>

@@ -37,13 +37,13 @@ let grid: Grid;
 let host: HTMLDivElement;
 let restore: () => void;
 /** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
-let restoreXlsxSlots: () => void;
+let restore_xlsx_slots: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreXlsxSlots = keepXlsxSlots();
+  restore_xlsx_slots = keepXlsxSlots();
   restore = installCanvasTestStubs();
   host = document.createElement("div");
   document.body.append(host);
@@ -53,7 +53,7 @@ afterEach(() => {
   grid.destroy();
   host.remove();
   restore();
-  restoreXlsxSlots();
+  restore_xlsx_slots();
 });
 
 it.each(["new", "s1"])(
@@ -125,12 +125,12 @@ it("releases the old engine storage after replacement", async () => {
 
 it.each(["online", "offline"] as const)(
   "blocks replacement while a %s collaboration session is attached",
-  async (initialConnection) => {
+  async (initial_connection) => {
     const before = grid.exportSnapshot();
     const sync = new SyncCoordinator(grid, new MemoryPersistenceAdapter(), {
       documentId: "sync-doc",
       serverVersion: 0,
-      initialConnection,
+      initialConnection: initial_connection,
     });
     await expect(grid.importWorkbook(IMPORTED)).rejects.toMatchObject({ code: "unavailable" });
     expect(grid.exportSnapshot()).toEqual(before);
@@ -178,9 +178,9 @@ it("stops an old-document summary before it can read the replacement", async () 
     range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 2 } },
   });
   const read = Promise.withResolvers<void>();
-  const getWindow = grid.store.getVisibleWindow.bind(grid.store);
+  const get_window = grid.store.getVisibleWindow.bind(grid.store);
   const observe = spyOn(grid.store, "getVisibleWindow").mockImplementation((...args) => {
-    const window = getWindow(...args);
+    const window = get_window(...args);
     read.resolve();
     return window;
   });
@@ -196,11 +196,11 @@ it("stops an old-document summary before it can read the replacement", async () 
 it("offers the accessible File command only with a backend and imports the chosen file", async () => {
   grid.setConfig({ ribbon: true });
   await elementAdded(host, ".sheetwrite-ribbon", HTMLDivElement);
-  const fileTab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+  const file_tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
     (tab) => tab.textContent === "File",
   );
-  if (!fileTab) throw new Error("Expected File tab");
-  expect(fileTab.hidden).toBe(true);
+  if (!file_tab) throw new Error("Expected File tab");
+  expect(file_tab.hidden).toBe(true);
 
   setXlsxWorkbookBackend({
     name: "picker-test",
@@ -210,18 +210,18 @@ it("offers the accessible File command only with a backend and imports the chose
   grid.setConfig({ ribbon: { mode: "compact" } });
   // The ribbon opens on Home; File's panel is built when the tab is chosen.
   await elementAdded(host, '.sheetwrite-ribbon[data-mode="compact"]', HTMLDivElement);
-  const nextFileTab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+  const next_file_tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
     (tab) => tab.textContent === "File",
   );
-  if (!nextFileTab) throw new Error("Expected File tab");
-  expect(nextFileTab.hidden).toBe(false);
-  nextFileTab.click();
+  if (!next_file_tab) throw new Error("Expected File tab");
+  expect(next_file_tab.hidden).toBe(false);
+  next_file_tab.click();
   const command = host.querySelector('[aria-label="Import XLSX"]');
   if (!(command instanceof HTMLButtonElement)) throw new Error("Expected import button");
   expect(command.disabled).toBe(false);
-  const pickerAdded = elementAdded(host, 'input[type="file"]', HTMLInputElement);
+  const picker_added = elementAdded(host, 'input[type="file"]', HTMLInputElement);
   command.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-  const picker = await pickerAdded;
+  const picker = await picker_added;
   expect(picker.getAttribute("aria-label")).toBe("Import XLSX");
   const imported = Promise.withResolvers<void>();
   const stop = grid.on("active-sheet", () => imported.resolve());

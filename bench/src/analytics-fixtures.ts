@@ -24,7 +24,7 @@ export const CHART_DATA_SHEET = "data";
 export const CHART_EDIT = { row: 5, col: 1 } as const;
 const SERIES_NAMES = ["North", "South", "East", "West"] as const;
 
-function chartRange(col: number, rows: number): ChartRange {
+function chart_range(col: number, rows: number): ChartRange {
   return {
     sheet: CHART_DATA_SHEET,
     start: { row: 0, col },
@@ -32,11 +32,11 @@ function chartRange(col: number, rows: number): ChartRange {
   };
 }
 
-function seriesOver(count: number, rows: number, firstCol = 1): ChartDefinition["series"] {
+function series_over(count: number, rows: number, first_col = 1): ChartDefinition["series"] {
   return Array.from({ length: count }, (_, index) => ({
     name: SERIES_NAMES[index % SERIES_NAMES.length] ?? "Series",
-    values: chartRange(firstCol + index, rows),
-    categories: chartRange(0, rows),
+    values: chart_range(first_col + index, rows),
+    categories: chart_range(0, rows),
   }));
 }
 
@@ -44,7 +44,7 @@ function seriesOver(count: number, rows: number, firstCol = 1): ChartDefinition[
 const CHART_AREA_COLUMNS = 12;
 
 /** Data columns: a text category and one number column per series name, then the chart area. */
-function chartColumns(): Sheet["columns"] {
+function chart_columns(): Sheet["columns"] {
   return [
     { key: "day", header: "Day", width: 80, type: "text" },
     ...SERIES_NAMES.map((name) => ({
@@ -62,7 +62,7 @@ function chartColumns(): Sheet["columns"] {
   ];
 }
 
-function chartData(rows: number): ColumnarData {
+function chart_data(rows: number): ColumnarData {
   const columns: ColumnarData["columns"] = {
     day: Array.from({ length: rows }, (_, row) => `Day ${row + 1}`),
   };
@@ -89,7 +89,7 @@ export function chartWorkbook(
     kind,
     title: "Daily revenue",
     anchor: { row: 1, col: 6, offsetX: 0, offsetY: 0, width: 520, height: 300 },
-    series: seriesOver(seriesCount, CHART_ROWS),
+    series: series_over(seriesCount, CHART_ROWS),
   };
   return {
     workbook: {
@@ -99,12 +99,12 @@ export function chartWorkbook(
           id: CHART_DATA_SHEET,
           name: "Data",
           rowCount: CHART_ROWS,
-          columns: chartColumns(),
+          columns: chart_columns(),
           charts: [chart],
         },
       ],
     },
-    data: chartData(CHART_ROWS),
+    data: chart_data(CHART_ROWS),
   };
 }
 
@@ -134,7 +134,7 @@ export function scrollWorkbook(count: number): { workbook: Workbook; data: Colum
     const kind = SCROLL_KINDS[index % SCROLL_KINDS.length] ?? "column";
     const round = kind === "pie" || kind === "doughnut";
     const start = index * 15;
-    const series = seriesOver(round ? 1 : 3, SCROLL_CHART_ROWS).map((entry) => ({
+    const series = series_over(round ? 1 : 3, SCROLL_CHART_ROWS).map((entry) => ({
       ...entry,
       values:
         entry.values === "#REF!"
@@ -166,12 +166,12 @@ export function scrollWorkbook(count: number): { workbook: Workbook; data: Colum
           id: CHART_DATA_SHEET,
           name: "Data",
           rowCount: SCROLL_ROWS,
-          columns: chartColumns(),
+          columns: chart_columns(),
           charts,
         },
       ],
     },
-    data: chartData(SCROLL_ROWS),
+    data: chart_data(SCROLL_ROWS),
   };
 }
 
@@ -190,7 +190,7 @@ export const MODEL_ROWS = 100_000;
 /** Orders column the edit rows change. */
 export const REVENUE_COL = 4;
 
-function ordersTable(rows: number): WorkbookTable {
+function orders_table(rows: number): WorkbookTable {
   return {
     id: "orders",
     name: "Orders",
@@ -216,7 +216,7 @@ export function orderRow(index: number): CellScalar[] {
   return [`ORD-${7001 + index}`, region, channel, product, revenue];
 }
 
-function ordersSheet(rows: number): Sheet {
+function orders_sheet(rows: number): Sheet {
   return {
     id: ORDERS_SHEET,
     name: "Orders",
@@ -228,13 +228,13 @@ function ordersSheet(rows: number): Sheet {
       width,
       type: index === REVENUE_COL ? ("number" as const) : ("text" as const),
     })),
-    tables: [ordersTable(rows)],
+    tables: [orders_table(rows)],
   };
 }
 
 /** The Orders table as columnar data: the header row, then `rows` orders. */
 export function ordersData(rows: number): ColumnarData {
-  const names = ordersTable(rows).columns.map((column) => column.name);
+  const names = orders_table(rows).columns.map((column) => column.name);
   const columns: ColumnarData["columns"] = {};
   names.forEach((name, col) => {
     const values = new Array<CellScalar>(rows + 1);
@@ -257,7 +257,7 @@ export function orderOperations(rows: number): DocumentOp[] {
     addr: { sheet: ORDERS_SHEET, row, col },
     value: { kind: "literal", value },
   });
-  const operations = ordersTable(rows).columns.map((column, col) => set(0, col, column.name));
+  const operations = orders_table(rows).columns.map((column, col) => set(0, col, column.name));
   for (let index = 0; index < rows; index++) {
     orderRow(index).forEach((value, col) => operations.push(set(index + 1, col, value)));
   }
@@ -273,13 +273,13 @@ export function orderOperations(rows: number): DocumentOp[] {
   return operations;
 }
 
-function tablePivot(id: string, name: string, rowField: number): PivotDefinition {
+function table_pivot(id: string, name: string, row_field: number): PivotDefinition {
   return {
     id,
     name,
     source: { table: "orders" },
     anchor: { row: 0, col: 0 },
-    rows: [rowField],
+    rows: [row_field],
     columns: [],
     values: [{ field: REVENUE_COL, aggregation: "SUM", name: "Revenue", numberFormat: MONEY }],
   };
@@ -352,7 +352,7 @@ export function showcaseWorkbook(): Workbook {
         charts: [structuredClone(REGION_CHART)],
         dashboard: { items },
       },
-      ordersSheet(SHOWCASE_ROWS),
+      orders_sheet(SHOWCASE_ROWS),
     ],
   };
 }
@@ -360,9 +360,9 @@ export function showcaseWorkbook(): Workbook {
 /** The showcase's pivots, applied after its orders. */
 export function showcaseOperations(): DocumentOp[] {
   return [
-    tablePivot("by-region", "Revenue by region", 1),
-    tablePivot("by-channel", "Revenue by channel", 2),
-    tablePivot("by-product", "Revenue by product", 3),
+    table_pivot("by-region", "Revenue by region", 1),
+    table_pivot("by-channel", "Revenue by channel", 2),
+    table_pivot("by-product", "Revenue by product", 3),
   ].map((pivot) => ({ op: "setPivot", sheet: DASHBOARD_SHEET, pivot }));
 }
 
@@ -409,7 +409,7 @@ export function modelWorkbook(rows: number): { workbook: Workbook; data: Columna
     { id: "region-chart", kind: "chart", chart: REGION_CHART.id, box: { x: 0, y: 3, w: 6, h: 6 } },
     { id: "channel-pivot", kind: "pivot", pivot: "by-channel", box: { x: 6, y: 3, w: 6, h: 6 } },
   ];
-  const channelPivot: PivotDefinition = {
+  const channel_pivot: PivotDefinition = {
     id: "by-channel",
     name: "Revenue by channel",
     source: {
@@ -434,7 +434,7 @@ export function modelWorkbook(rows: number): { workbook: Workbook; data: Columna
       activeSheet: ORDERS_SHEET,
       dataModel: { relationships: [], measures: MODEL_MEASURES.map((entry) => ({ ...entry })) },
       sheets: [
-        ordersSheet(rows),
+        orders_sheet(rows),
         {
           id: DASHBOARD_SHEET,
           name: "Sales dashboard",
@@ -442,7 +442,7 @@ export function modelWorkbook(rows: number): { workbook: Workbook; data: Columna
           rowCount: 0,
           columns: [],
           charts: [structuredClone(REGION_CHART)],
-          pivots: [tablePivot("by-region", "Revenue by region", 1), channelPivot],
+          pivots: [table_pivot("by-region", "Revenue by region", 1), channel_pivot],
           dashboard: { items },
         },
       ],

@@ -340,14 +340,14 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     const created = createGridController(host, options, handlers, input.rowBridge);
     owned = created;
     applied = previous = options;
-    const currentGeneration = ++generation;
+    const current_generation = ++generation;
     const attachment = lifetime;
     function failed(error: unknown): void {
       if (attachment.closed || owned !== created) return;
       try {
         if (owned === created) retire();
-      } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], "Grid publication and retirement failed");
+      } catch (cleanup_error) {
+        throw new AggregateError([error, cleanup_error], "Grid publication and retirement failed");
       }
       throw error;
     }
@@ -355,7 +355,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
       if (attachment.closed || owned !== created) return;
       try {
         publication.setInitializationState("ready");
-        handlers.onReady?.({ grid: created.grid, generation: currentGeneration, reason });
+        handlers.onReady?.({ grid: created.grid, generation: current_generation, reason });
       } catch (error) {
         failed(error);
       }
@@ -378,15 +378,15 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
   function initialize(): void {
     if (!input) return;
     const operation = initialization.next();
-    const alreadyReady = isSheetwriteReady();
-    if (!alreadyReady) publication.setInitializationState("loading");
+    const already_ready = isSheetwriteReady();
+    if (!already_ready) publication.setInitializationState("loading");
     const pending = initSheetwrite({ source: input.wasmSource });
     const attachment = lifetime;
     void pending
       .then(
         () => {
           // Initialization is shared: an earlier source can make this attachment ready.
-          if (alreadyReady || attachment.closed) return;
+          if (already_ready || attachment.closed) return;
           try {
             create();
           } catch (error) {
@@ -416,7 +416,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
       },
     };
     if (!host) return;
-    const sourceChanged = !old || old.wasmSource !== input.wasmSource;
+    const source_changed = !old || old.wasmSource !== input.wasmSource;
     if (
       owned &&
       old &&
@@ -428,7 +428,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
       applyChangedLiveGridOptions(owned, applied, input.options);
       applied = input.options;
     }
-    if (sourceChanged) initialize();
+    if (source_changed) initialize();
     else create();
   }
 
@@ -521,7 +521,7 @@ export interface SimpleGridInput {
   presentation: "data-grid";
 }
 
-function invalidSimpleColumn(message: string): SheetwriteError {
+function invalid_simple_column(message: string): SheetwriteError {
   return new SheetwriteError("invalid-argument", "create-grid", message);
 }
 
@@ -538,12 +538,12 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   const keys = new Set<string>();
   const columns = options.columns.map((column) => {
     if (!column.key) {
-      throw invalidSimpleColumn("Sheetwrite: every simple column requires a non-empty key");
+      throw invalid_simple_column("Sheetwrite: every simple column requires a non-empty key");
     }
     if (!column.title)
-      throw invalidSimpleColumn("Sheetwrite: every simple column requires a title");
+      throw invalid_simple_column("Sheetwrite: every simple column requires a title");
     if (keys.has(column.key)) {
-      throw invalidSimpleColumn(`Sheetwrite: duplicate simple column key "${column.key}"`);
+      throw invalid_simple_column(`Sheetwrite: duplicate simple column key "${column.key}"`);
     }
     keys.add(column.key);
     return {
@@ -559,28 +559,28 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
     };
   });
 
-  const dataColumns: Record<string, CellScalar[]> = Object.fromEntries(
+  const data_columns: Record<string, CellScalar[]> = Object.fromEntries(
     columns.map((column) => [column.key, new Array<CellScalar>(options.defaultRows.length)]),
   );
-  for (let rowIndex = 0; rowIndex < options.defaultRows.length; rowIndex += 1) {
-    const row = options.defaultRows[rowIndex]!;
-    for (const column of columns) dataColumns[column.key]![rowIndex] = row[column.key] ?? null;
+  for (let row_index = 0; row_index < options.defaultRows.length; row_index += 1) {
+    const row = options.defaultRows[row_index]!;
+    for (const column of columns) data_columns[column.key]![row_index] = row[column.key] ?? null;
   }
 
-  const sheetId = DEFAULT_SHEET_ID;
+  const sheet_id = DEFAULT_SHEET_ID;
   return {
     workbook: {
-      activeSheet: sheetId,
+      activeSheet: sheet_id,
       sheets: [
         {
-          id: sheetId,
+          id: sheet_id,
           name: options.sheetName ?? "Sheet 1",
           columns,
           rowCount: options.defaultRows.length,
         },
       ],
     },
-    data: { rowCount: options.defaultRows.length, columns: dataColumns },
+    data: { rowCount: options.defaultRows.length, columns: data_columns },
     presentation: "data-grid",
   };
 }

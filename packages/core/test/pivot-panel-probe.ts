@@ -13,7 +13,7 @@ import { elementAdded, installCoreStyles } from "./fixtures.js";
 
 await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
-const removeStyles = installCoreStyles();
+const remove_styles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
 document.body.appendChild(host);
@@ -34,10 +34,10 @@ const grid = createGrid(host, {
 await elementAdded(host, ".sheetwrite-ribbon", HTMLDivElement);
 
 const ops: PivotDefinition[] = [];
-const setPivot = grid.setPivot.bind(grid);
+const set_pivot = grid.setPivot.bind(grid);
 grid.setPivot = (pivot, sheet) => {
   ops.push(structuredClone(pivot));
-  return setPivot(pivot, sheet);
+  return set_pivot(pivot, sheet);
 };
 
 const press = (target: Element) =>
@@ -47,18 +47,18 @@ const find = <T extends Element = HTMLElement>(selector: string): T => {
   if (element === null) throw new Error(`nothing matches ${selector}`);
   return element;
 };
-const byLabel = <T extends Element = HTMLButtonElement>(label: string): T =>
+const by_label = <T extends Element = HTMLButtonElement>(label: string): T =>
   find<T>(`[aria-label="${label}"]`);
 /** Open a field's menu from the keyboard and run the entry named `entry`. */
-const runMenu = (button: string, entry: string): void => {
-  press(byLabel(button));
+const run_menu = (button: string, entry: string): void => {
+  press(by_label(button));
   const item = [
     ...host.querySelectorAll<HTMLElement>('.sheetwrite-panel-menu [role="menuitem"]'),
   ].find((candidate) => candidate.textContent === entry);
   if (item === undefined) throw new Error(`no "${entry}" in ${button}`);
   press(item);
 };
-const lastOp = (): PivotDefinition => {
+const last_op = (): PivotDefinition => {
   const op = ops.at(-1);
   if (op === undefined) throw new Error("no setPivot ran");
   return op;
@@ -85,11 +85,11 @@ try {
   grid.setSelection({ kind: "range", range: source });
 
   // Insert › PivotTable at a typed cell.
-  const insertTab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+  const insert_tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
     (tab) => tab.textContent === "Insert",
   );
-  if (insertTab === undefined) throw new Error("the ribbon has no Insert tab");
-  insertTab.click();
+  if (insert_tab === undefined) throw new Error("the ribbon has no Insert tab");
+  insert_tab.click();
   // Let the tab's fit frame settle before opening its popup, just as a user
   // clicks after the tab has painted. A fit pass closes floating surfaces.
   const fitted = Promise.withResolvers<void>();
@@ -127,7 +127,7 @@ try {
   form.dispatchEvent(new Event("submit", { cancelable: true }));
   await loadPanels(grid);
   await Promise.resolve();
-  assert.deepEqual(lastOp(), {
+  assert.deepEqual(last_op(), {
     id: "pivot-1",
     name: "PivotTable1",
     source: { range: source },
@@ -145,70 +145,70 @@ try {
   );
 
   // Each menu action sets the expected definition.
-  runMenu("Region field actions", "Add to Rows");
-  assert.deepEqual(lastOp().rows, [0]);
+  run_menu("Region field actions", "Add to Rows");
+  assert.deepEqual(last_op().rows, [0]);
 
-  runMenu("Amount field actions", "Add to Values");
-  assert.deepEqual(lastOp().values, [{ field: 2, aggregation: "SUM" }]);
+  run_menu("Amount field actions", "Add to Values");
+  assert.deepEqual(last_op().values, [{ field: 2, aggregation: "SUM" }]);
 
-  runMenu("Month field actions", "Add to Rows");
-  assert.deepEqual(lastOp().rows, [0, 1]);
-  runMenu("Month in Rows actions", "Move Up");
-  assert.deepEqual(lastOp().rows, [1, 0]);
+  run_menu("Month field actions", "Add to Rows");
+  assert.deepEqual(last_op().rows, [0, 1]);
+  run_menu("Month in Rows actions", "Move Up");
+  assert.deepEqual(last_op().rows, [1, 0]);
 
-  runMenu("Month in Rows actions", "Move to Columns");
-  assert.deepEqual([lastOp().rows, lastOp().columns], [[0], [1]]);
+  run_menu("Month in Rows actions", "Move to Columns");
+  assert.deepEqual([last_op().rows, last_op().columns], [[0], [1]]);
 
-  const aggregation = byLabel<HTMLSelectElement>("Summarize Amount by");
+  const aggregation = by_label<HTMLSelectElement>("Summarize Amount by");
   aggregation.value = "AVERAGE";
   aggregation.dispatchEvent(new Event("change", { bubbles: true }));
-  assert.deepEqual(lastOp().values, [{ field: 2, aggregation: "AVERAGE" }]);
+  assert.deepEqual(last_op().values, [{ field: 2, aggregation: "AVERAGE" }]);
 
-  const sort = byLabel<HTMLSelectElement>("Sort Region");
+  const sort = by_label<HTMLSelectElement>("Sort Region");
   sort.value = "descending";
   sort.dispatchEvent(new Event("change", { bubbles: true }));
-  assert.deepEqual(lastOp().sort, [{ axis: "rows", field: 0, descending: true }]);
+  assert.deepEqual(last_op().sort, [{ axis: "rows", field: 0, descending: true }]);
 
-  runMenu("Region field actions", "Add to Filters");
-  assert.deepEqual(lastOp().filters, [{ field: 0, values: ["East", "West"] }]);
+  run_menu("Region field actions", "Add to Filters");
+  assert.deepEqual(last_op().filters, [{ field: 0, values: ["East", "West"] }]);
   const west = [...host.querySelectorAll<HTMLInputElement>(".sheetwrite-panel-check input")][1];
   assert.ok(west);
   west.checked = false;
   west.dispatchEvent(new Event("change", { bubbles: true }));
-  assert.deepEqual(lastOp().filters, [{ field: 0, values: ["East"] }]);
+  assert.deepEqual(last_op().filters, [{ field: 0, values: ["East"] }]);
 
-  runMenu("Region in Filters actions", "Remove");
-  assert.deepEqual([lastOp().filters, lastOp().rows], [[], [0]]);
-  runMenu("Region in Rows actions", "Remove");
-  assert.deepEqual(lastOp().rows, []);
+  run_menu("Region in Filters actions", "Remove");
+  assert.deepEqual([last_op().filters, last_op().rows], [[], [0]]);
+  run_menu("Region in Rows actions", "Remove");
+  assert.deepEqual(last_op().rows, []);
 
   // Drag and drop: a source field onto Rows, then out of its area.
   const drop = (target: Element) =>
     target.dispatchEvent(new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 1e6 }));
-  const regionItem = byLabel("Region field actions").closest("li");
-  assert.ok(regionItem);
-  regionItem.dispatchEvent(new Event("dragstart", { bubbles: true }));
+  const region_item = by_label("Region field actions").closest("li");
+  assert.ok(region_item);
+  region_item.dispatchEvent(new Event("dragstart", { bubbles: true }));
   drop(find('.sheetwrite-panel-area[data-area="rows"]'));
-  assert.deepEqual(lastOp().rows, [0]);
+  assert.deepEqual(last_op().rows, [0]);
 
-  byLabel("Region in Rows actions")
+  by_label("Region in Rows actions")
     .closest("li")
     ?.dispatchEvent(new Event("dragstart", { bubbles: true }));
   drop(find(".sheetwrite-panel-fields"));
-  assert.deepEqual(lastOp().rows, []);
+  assert.deepEqual(last_op().rows, []);
   assert.equal(ops.length, 14, "one setPivot per action");
 
   // Undo from elsewhere updates the list in place.
   grid.undo();
-  assert.ok(byLabel("Region in Rows actions"), "undo puts Region back in Rows");
+  assert.ok(by_label("Region in Rows actions"), "undo puts Region back in Rows");
 
   // While the list is open, a commit rebuilds it only when what it shows
   // changed, and reads the source fields only when they can have changed.
-  let fieldReads = 0;
-  const getPivotFields = grid.getPivotFields.bind(grid);
+  let field_reads = 0;
+  const get_pivot_fields = grid.getPivotFields.bind(grid);
   grid.getPivotFields = (sheet: string, id: string) => {
-    fieldReads += 1;
-    return getPivotFields(sheet, id);
+    field_reads += 1;
+    return get_pivot_fields(sheet, id);
   };
   const write = (
     sheet: string,
@@ -227,26 +227,26 @@ try {
     assert.equal(grid.applyTransaction({ patches: [patch] }).status, "applied");
   };
   /** Field reads of one write. */
-  const readsOf = (run: () => void): number => {
-    const before = fieldReads;
+  const reads_of = (run: () => void): number => {
+    const before = field_reads;
     run();
-    return fieldReads - before;
+    return field_reads - before;
   };
-  const fieldList = (): Element => find(".sheetwrite-panel-fields");
+  const field_list = (): Element => find(".sheetwrite-panel-fields");
   const badges = (): (string | null)[] =>
     [...host.querySelectorAll(".sheetwrite-panel-fields .sheetwrite-panel-badge")].map(
       (badge) => badge.textContent,
     );
-  const shown = fieldList();
+  const shown = field_list();
   write("data", 20, 9, "elsewhere");
-  assert.equal(fieldList(), shown, "a cell edit outside the source keeps the list");
+  assert.equal(field_list(), shown, "a cell edit outside the source keeps the list");
   const widened = grid.applyTransaction({
     patches: [{ op: "setColumn", sheet: "data", col: 9, patch: { width: 120 } }],
   });
   assert.equal(widened.status, "applied");
-  assert.equal(fieldList(), shown, "a column width change keeps the list");
+  assert.equal(field_list(), shown, "a column width change keeps the list");
 
-  const notesAdded = grid.applyTransaction({
+  const notes_added = grid.applyTransaction({
     patches: [
       {
         op: "addSheet",
@@ -254,19 +254,19 @@ try {
       },
     ],
   });
-  assert.equal(notesAdded.status, "applied");
-  assert.equal(fieldList(), shown, "a new sheet keeps the list");
+  assert.equal(notes_added.status, "applied");
+  assert.equal(field_list(), shown, "a new sheet keeps the list");
   assert.equal(
-    readsOf(() => write("notes", 0, 0, 1)),
+    reads_of(() => write("notes", 0, 0, 1)),
     0,
     "literal sources ignore other sheets",
   );
   assert.equal(
-    readsOf(() => write("data", 21, 9, { formula: "=1+1" })),
+    reads_of(() => write("data", 21, 9, { formula: "=1+1" })),
     1,
   );
   assert.equal(
-    readsOf(() => write("notes", 0, 0, 2)),
+    reads_of(() => write("notes", 0, 0, 2)),
     1,
     "a formula on the source sheet counts",
   );
@@ -280,24 +280,24 @@ try {
   });
   assert.equal(cleared.status, "applied");
   assert.equal(
-    readsOf(() => write("notes", 0, 0, 3)),
+    reads_of(() => write("notes", 0, 0, 3)),
     0,
     "a cleared formula stops counting",
   );
   const removed = grid.applyTransaction({ patches: [{ op: "removeSheet", sheet: "notes" }] });
   assert.equal(removed.status, "applied");
-  assert.equal(fieldList(), shown, "other sheets' edits never rebuilt the list");
+  assert.equal(field_list(), shown, "other sheets' edits never rebuilt the list");
 
   write("data", 1, 2, "ten");
-  assert.notEqual(fieldList(), shown, "a source edit that changes a field type rebuilds the list");
+  assert.notEqual(field_list(), shown, "a source edit that changes a field type rebuilds the list");
   assert.deepEqual(badges(), ["Text", "Text", "Mixed"]);
   write("data", 1, 2, 10);
   assert.deepEqual(badges(), ["Text", "Text", "Number"]);
   write("data", 0, 0, "Area");
-  assert.ok(byLabel("Area field actions"), "a header edit renames the field");
+  assert.ok(by_label("Area field actions"), "a header edit renames the field");
   write("data", 0, 0, "Region");
-  assert.ok(byLabel("Region in Rows actions"), "the renamed field keeps its area");
-  grid.getPivotFields = getPivotFields;
+  assert.ok(by_label("Region in Rows actions"), "the renamed field keeps its area");
+  grid.getPivotFields = get_pivot_fields;
 
   // Selecting a cell of the output opens the field list.
   grid.openPanel(null);
@@ -330,6 +330,6 @@ try {
   );
 } finally {
   grid.destroy();
-  removeStyles();
+  remove_styles();
   restore();
 }

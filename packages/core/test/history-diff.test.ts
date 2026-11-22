@@ -100,12 +100,18 @@ function grid(
       rowCount: rows,
       colCount: cols,
       cells: Array.from({ length: rows * cols }, (_, at) => {
-        const rowOffset = Math.floor(at / cols);
-        const colOffset = at % cols;
-        const literal = value(rowOffset, colOffset);
+        const row_offset = Math.floor(at / cols);
+        const col_offset = at % cols;
+        const literal = value(row_offset, col_offset);
         return literal === undefined
           ? []
-          : [{ rowOffset, colOffset, value: { kind: "literal" as const, value: literal } }];
+          : [
+              {
+                rowOffset: row_offset,
+                colOffset: col_offset,
+                value: { kind: "literal" as const, value: literal },
+              },
+            ];
       }).flat(),
     },
   ];
@@ -247,7 +253,7 @@ async function* each<T>(items: readonly T[]): AsyncGenerator<T> {
  * The whole-version compare the archive did before pages: both versions
  * rebuilt in full, then one scan over the log between them.
  */
-async function wholeDiff(
+async function whole_diff(
   authority: Authority,
   from: HistoryVersion,
   to: HistoryVersion,
@@ -512,7 +518,7 @@ function seeded(seed: number): () => number {
 const INSERT_COUNTS = [1, 5, 16, 32];
 
 /** One random commit on sheet "data": edits, formulas, clears, styles, and row and column inserts and deletes. */
-function randomOperations(
+function random_operations(
   random: () => number,
   store: SheetwriteStore,
   step: number,
@@ -593,7 +599,7 @@ function randomOperations(
 }
 
 /** Every page of a compare, following the cursor. */
-async function allPages(
+async function all_pages(
   compare: (cursor: HistoryDiffPage["cursor"]) => Promise<HistoryDiffPage>,
 ): Promise<HistoryDiffPage[]> {
   const pages: HistoryDiffPage[] = [];
@@ -608,14 +614,16 @@ async function allPages(
 }
 
 /** Every page of a compare by page and of the whole-version compare, from `from` to `to`. */
-async function bothCompares(authority: Authority, from: HistoryVersion, to: HistoryVersion) {
+async function both_compares(authority: Authority, from: HistoryVersion, to: HistoryVersion) {
   const request = { maxEntries: 25 };
-  const byPage = await allPages((cursor) =>
+  const by_page = await all_pages((cursor) =>
     authority.archive.diffVersions({ ...request, from: from.id, to: to.id, cursor }),
   );
-  const whole = await allPages((cursor) => wholeDiff(authority, from, to, { ...request, cursor }));
+  const whole = await all_pages((cursor) =>
+    whole_diff(authority, from, to, { ...request, cursor }),
+  );
 
-  return { byPage, whole };
+  return { byPage: by_page, whole };
 }
 
 /**
@@ -627,7 +635,7 @@ const ODD_ROWS = 402;
 const ONE_ODD_ROW = (row: number, col: number) => (row === 356 ? 9 : col);
 
 /** Row `row` of sheet "data" set to `value(col)` across 8 columns. */
-function setRow(row: number, value: (col: number) => number): DocumentOp[] {
+function set_row(row: number, value: (col: number) => number): DocumentOp[] {
   return Array.from({ length: 8 }, (_, col) => set("data", row, col, value(col)));
 }
 
@@ -649,7 +657,7 @@ const histories: Array<[string, Partial<HistoryLimits>, (authority: Authority) =
         await authority.save("before delete");
         await authority.commit("alice", [{ op: "removeRows", sheet: "data", at: 352, count: 2 }]);
         // Row 356 moved up to 354; put the odd row back at 356, so page 352..367 has the same content ID.
-        await authority.commit("bob", [...setRow(354, (col) => col), ...setRow(356, () => 9)]);
+        await authority.commit("bob", [...set_row(354, (col) => col), ...set_row(356, () => 9)]);
       },
     ],
   ];
@@ -664,8 +672,8 @@ describe("history diff by page", () => {
       const [first] = authority.versions;
       if (!first) throw new Error("No earlier version");
 
-      const { byPage, whole } = await bothCompares(authority, first, end);
-      expect(byPage).toEqual(whole);
+      const { byPage: by_page, whole } = await both_compares(authority, first, end);
+      expect(by_page).toEqual(whole);
     },
   );
 
@@ -682,7 +690,7 @@ describe("history diff by page", () => {
       for (let step = 1; step <= 12; step++) {
         await authority.commit(
           step % 2 ? "alice" : "bob",
-          randomOperations(random, authority.store, step),
+          random_operations(random, authority.store, step),
         );
         if (random() < 0.5) {
           versions.push(await authority.save(`v${step}`));
@@ -703,9 +711,9 @@ describe("history diff by page", () => {
 
       for (const [from, to] of pairs) {
         if (!from || !to) continue;
-        const { byPage, whole } = await bothCompares(authority, from, to);
+        const { byPage: by_page, whole } = await both_compares(authority, from, to);
 
-        expect({ seed, from: from.name, to: to.name, pages: byPage }).toEqual({
+        expect({ seed, from: from.name, to: to.name, pages: by_page }).toEqual({
           seed,
           from: from.name,
           to: to.name,
@@ -757,7 +765,7 @@ describe("history diff by page", () => {
       page = await authority.archive.diffVersions({ from: start.id, to: end.id });
     });
 
-    expect(page).toEqual(await wholeDiff(authority, start, end, {}));
+    expect(page).toEqual(await whole_diff(authority, start, end, {}));
     expect(reads).toBe((await authority.wholeReads(start)) + (await authority.wholeReads(end)));
   });
 });

@@ -9,7 +9,7 @@ import { expect, test } from "./fixtures.js";
 const GRID = ".host-rows-showcase .sheetwrite";
 
 /** Selects the ARR cell (column B) of a data row, starting from A1. */
-async function selectArrCell(page: Page, row: number): Promise<void> {
+async function select_arr_cell(page: Page, row: number): Promise<void> {
   await page.locator(GRID).focus();
   await page.keyboard.press("ControlOrMeta+Home");
   for (let step = 0; step < row; step++) await page.keyboard.press("ArrowDown");
@@ -17,9 +17,9 @@ async function selectArrCell(page: Page, row: number): Promise<void> {
 }
 
 /** Reads an ARR cell through the Grid's own copy command. */
-async function copiedArrCell(page: Page, row: number): Promise<string> {
+async function copied_arr_cell(page: Page, row: number): Promise<string> {
   await page.evaluate(() => navigator.clipboard.writeText(""));
-  await selectArrCell(page, row);
+  await select_arr_cell(page, row);
   await page.keyboard.press("ControlOrMeta+c");
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).not.toBe("");
   return page.evaluate(() => navigator.clipboard.readText());
@@ -89,20 +89,20 @@ test("pasted, cleared and host-transformed ARR cells agree between the Grid and 
   const second = accounts.locator('[data-account-id="account-002"]');
   const total = page.getByTestId("host-arr-total").locator("strong");
   await expect(first).toContainText("$120,000");
-  const totalBefore = Number((await total.innerText()).replace(/[$,]/g, ""));
+  const total_before = Number((await total.innerText()).replace(/[$,]/g, ""));
 
-  await selectArrCell(page, 0);
+  await select_arr_cell(page, 0);
   await page.evaluate(() => navigator.clipboard.writeText("90000"));
   await page.keyboard.press("ControlOrMeta+v");
   await expect(first).toContainText("$90,000");
-  await expect(total).toHaveText(`$${(totalBefore - 30_000).toLocaleString("en-US")}`);
+  await expect(total).toHaveText(`$${(total_before - 30_000).toLocaleString("en-US")}`);
   // The host render that follows must not rebuild the Grid from its first rows.
-  expect(await copiedArrCell(page, 0)).toBe("90000");
+  expect(await copied_arr_cell(page, 0)).toBe("90000");
 
-  await selectArrCell(page, 0);
+  await select_arr_cell(page, 0);
   await page.keyboard.press("Delete");
   await expect(first).toContainText("$0");
-  await expect(total).toHaveText(`$${(totalBefore - 120_000).toLocaleString("en-US")}`);
+  await expect(total).toHaveText(`$${(total_before - 120_000).toLocaleString("en-US")}`);
 
   // A server that stores another value than the one sent: the Grid shows it,
   // and the host hears of it once, as the transformed acceptance.
@@ -110,7 +110,7 @@ test("pasted, cleared and host-transformed ARR cells agree between the Grid and 
   const logged = await log.locator("li").count();
   await page.getByRole("button", { name: "Transformed accept" }).click();
   await expect(second).toContainText("$80,000");
-  expect(await copiedArrCell(page, 1)).toBe("80000");
+  expect(await copied_arr_cell(page, 1)).toBe("80000");
   await expect(log.locator("li")).toHaveCount(logged + 1);
   await expect(log.locator('li[data-status="transformed"]')).toHaveCount(1);
 });

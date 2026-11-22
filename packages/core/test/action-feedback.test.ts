@@ -5,19 +5,19 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, ToolbarItem } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 let grid: Grid | undefined;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
 });
 afterEach(() => {
   grid?.destroy();
   grid = undefined;
-  restoreCanvas();
+  restore_canvas();
   document.body.replaceChildren();
 });
 

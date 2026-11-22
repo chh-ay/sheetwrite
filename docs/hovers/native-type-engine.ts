@@ -139,7 +139,7 @@ const TYPE_PARAMETER_ARGUMENT = /\bextends\b|(?:^|,\s*)[A-Z][A-Za-z]{0,2}(?:,|$)
  * form to the defaults, which is what the server answers in the other runs. Returns
  * undefined for any other hover.
  */
-function ownerWithDefaults(text: string): string | undefined {
+function owner_with_defaults(text: string): string | undefined {
   const match = GENERIC_MEMBER_OWNER.exec(text);
   const owner = match?.[1];
   if (!match || owner === undefined || !/\bextends\b|=/.test(owner)) return undefined;
@@ -163,10 +163,10 @@ function ownerWithDefaults(text: string): string | undefined {
     if (!declared?.[1] || !declared[2]) return undefined;
     defaults.set(declared[1], declared[2]);
   }
-  const ownerEnd = match.index + match[0].indexOf(`<${owner}>`) + owner.length + 2;
-  const head = text.slice(0, ownerEnd - owner.length - 2);
+  const owner_end = match.index + match[0].indexOf(`<${owner}>`) + owner.length + 2;
+  const head = text.slice(0, owner_end - owner.length - 2);
   const rest = text
-    .slice(ownerEnd)
+    .slice(owner_end)
     .replace(/[A-Za-z_$][\w$]*/g, (name) => defaults.get(name) ?? name);
   return `${head}<${[...defaults.values()].join(", ")}>${rest}`;
 }
@@ -191,7 +191,7 @@ const LITERAL_PROPERTY = /^\(property\) [\w$]+: /;
  */
 const OWNED_PROPERTY = /^\(property\) [\w$]+(?:<[^>]*>)?\.[\w$]+\??: /;
 
-function normalizedPath(path: string): string {
+function normalized_path(path: string): string {
   return path.replaceAll("\\", "/").replace(/\/{2,}/g, "/");
 }
 
@@ -203,19 +203,19 @@ function hash(...parts: readonly string[]): string {
 
 /**
  * Where a hovered symbol's definitions live; drives the docs hover-quality gate.
- * `libraryDirectory` holds the server's built-in `lib.*.d.ts` files, which count as lib
+ * `library_directory` holds the server's built-in `lib.*.d.ts` files, which count as lib
  * wherever the server is installed.
  */
-function hoverOrigin(
-  definitionFiles: readonly string[],
-  sampleFile: string,
-  libraryDirectory: string,
+function hover_origin(
+  definition_files: readonly string[],
+  sample_file: string,
+  library_directory: string,
 ): SheetwriteHoverOrigin | undefined {
   let origin: SheetwriteHoverOrigin | undefined;
-  for (const definitionFile of definitionFiles) {
-    const file = normalizedPath(definitionFile);
-    if (file === sampleFile) return "snippet";
-    if (!file.includes("/node_modules/") && !file.startsWith(libraryDirectory)) {
+  for (const definition_file of definition_files) {
+    const file = normalized_path(definition_file);
+    if (file === sample_file) return "snippet";
+    if (!file.includes("/node_modules/") && !file.startsWith(library_directory)) {
       return "workspace";
     }
     origin = "lib";
@@ -228,7 +228,7 @@ function hoverOrigin(
  * line, or the line its comment-led statement starts on), without leading `*` and without
  * the `@tag` section, as the language server shows it. Empty when there is none.
  */
-function jsDocSummaryBefore(lines: readonly string[], line: number): string {
+function js_doc_summary_before(lines: readonly string[], line: number): string {
   let end = line - 1;
   while (end >= 0 && (lines[end] ?? "").trim() === "") end -= 1;
   if (!(lines[end] ?? "").trim().endsWith("*/")) return "";
@@ -242,11 +242,11 @@ function jsDocSummaryBefore(lines: readonly string[], line: number): string {
     .replace(/\*\/\s*$/, "")
     .split("\n")
     .map((text) => text.replace(/^\s*\* ?/, ""));
-  const tagStart = body.findIndex((text) => /^\s*@\w/.test(text));
-  return (tagStart < 0 ? body : body.slice(0, tagStart)).join("\n").trim();
+  const tag_start = body.findIndex((text) => /^\s*@\w/.test(text));
+  return (tag_start < 0 ? body : body.slice(0, tag_start)).join("\n").trim();
 }
 
-function lineStarts(text: string): number[] {
+function line_starts(text: string): number[] {
   const starts = [0];
   for (let index = 0; index < text.length; index++) {
     if (text.charCodeAt(index) === 10) starts.push(index + 1);
@@ -254,7 +254,7 @@ function lineStarts(text: string): number[] {
   return starts;
 }
 
-function positionAt(
+function position_at(
   starts: readonly number[],
   offset: number,
 ): { line: number; character: number } {
@@ -268,22 +268,22 @@ function positionAt(
   return { line: low, character: offset - (starts[low] ?? 0) };
 }
 
-function nativeCompilerPath(): string {
-  const packageJson = createRequire(import.meta.url).resolve("typescript/package.json");
-  const platformPackage = `@typescript/typescript-${process.platform}-${process.arch}/package.json`;
-  const platformDirectory = dirname(createRequire(packageJson).resolve(platformPackage));
-  return join(platformDirectory, "lib", process.platform === "win32" ? "tsc.exe" : "tsc");
+function native_compiler_path(): string {
+  const package_json = createRequire(import.meta.url).resolve("typescript/package.json");
+  const platform_package = `@typescript/typescript-${process.platform}-${process.arch}/package.json`;
+  const platform_directory = dirname(createRequire(package_json).resolve(platform_package));
+  return join(platform_directory, "lib", process.platform === "win32" ? "tsc.exe" : "tsc");
 }
 
 /**
  * The language server to run: TypeScript 7.1's `tsc`, or another server with the same
  * `--lsp --stdio` interface (such as tsrs) named by `SHEETWRITE_HOVER_COMPILER`.
  */
-function serverExecutable(): string {
-  return process.env.SHEETWRITE_HOVER_COMPILER || nativeCompilerPath();
+function server_executable(): string {
+  return process.env.SHEETWRITE_HOVER_COMPILER || native_compiler_path();
 }
 
-function setReferenced(handle: object | null | undefined, referenced: boolean): void {
+function set_referenced(handle: object | null | undefined, referenced: boolean): void {
   if (!handle) return;
   if (referenced && "ref" in handle && typeof handle.ref === "function") handle.ref();
   if (!referenced && "unref" in handle && typeof handle.unref === "function") handle.unref();
@@ -294,7 +294,7 @@ class LanguageServer {
   private readonly child: ChildProcess;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly versions = new Map<string, number>();
-  private nextId = 1;
+  private next_id = 1;
   private buffered = Buffer.alloc(0);
 
   constructor(executable: string) {
@@ -427,8 +427,8 @@ class LanguageServer {
   }
 
   private request(method: string, params: unknown): Promise<unknown> {
-    const id = this.nextId++;
-    if (this.pending.size === 0) this.setReferenced(true);
+    const id = this.next_id++;
+    if (this.pending.size === 0) this.set_referenced(true);
     // The docs tsconfig targets ES2022, which has no Promise.withResolvers.
     const result = new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -441,10 +441,10 @@ class LanguageServer {
     this.send({ method, params });
   }
 
-  private setReferenced(referenced: boolean): void {
-    setReferenced(this.child, referenced);
-    setReferenced(this.child.stdin, referenced);
-    setReferenced(this.child.stdout, referenced);
+  private set_referenced(referenced: boolean): void {
+    set_referenced(this.child, referenced);
+    set_referenced(this.child.stdin, referenced);
+    set_referenced(this.child.stdout, referenced);
   }
 
   private send(message: JsonRpcMessage): void {
@@ -455,14 +455,14 @@ class LanguageServer {
   private receive(chunk: Buffer): void {
     this.buffered = Buffer.concat([this.buffered, chunk]);
     for (;;) {
-      const headerEnd = this.buffered.indexOf(HEADER_SEPARATOR);
-      if (headerEnd < 0) return;
-      const header = this.buffered.toString("ascii", 0, headerEnd);
+      const header_end = this.buffered.indexOf(HEADER_SEPARATOR);
+      if (header_end < 0) return;
+      const header = this.buffered.toString("ascii", 0, header_end);
       const length = Number(CONTENT_LENGTH.exec(header)?.[1]);
-      const bodyStart = headerEnd + HEADER_SEPARATOR.length;
-      if (this.buffered.length < bodyStart + length) return;
-      const body = this.buffered.toString("utf8", bodyStart, bodyStart + length);
-      this.buffered = this.buffered.subarray(bodyStart + length);
+      const body_start = header_end + HEADER_SEPARATOR.length;
+      if (this.buffered.length < body_start + length) return;
+      const body = this.buffered.toString("utf8", body_start, body_start + length);
+      this.buffered = this.buffered.subarray(body_start + length);
       this.dispatch(JSON.parse(body) as JsonRpcMessage);
     }
   }
@@ -479,40 +479,40 @@ class LanguageServer {
     const pending = this.pending.get(id);
     if (!pending) throw new Error(`TypeScript 7.1 language server answered unknown request ${id}`);
     this.pending.delete(id);
-    if (this.pending.size === 0) this.setReferenced(false);
+    if (this.pending.size === 0) this.set_referenced(false);
     if (message.error) pending.reject(new Error(message.error.message));
     else pending.resolve(message.result);
   }
 }
 
 export class NativeTypeEngine {
-  private readonly projectDirectory: string;
-  private readonly inFlight = new Map<string, Promise<SheetwriteTypeHover[]>>();
+  private readonly project_directory: string;
+  private readonly in_flight = new Map<string, Promise<SheetwriteTypeHover[]>>();
   /**
    * Hovers at declarations outside the samples (libraries, Sheetwrite's declarations),
    * JSDoc summaries by declaration file and line, and declaration file lines. Many
    * samples of a batch ask about the same declarations, so each is asked or read once
    * per batch; `drain` clears them after every batch.
    */
-  private readonly declarationHovers = new Map<string, Promise<NativeQuickInfo | undefined>>();
-  private readonly declarationDocs = new Map<string, string>();
-  private readonly declarationFiles = new Map<string, string[]>();
+  private readonly declaration_hovers = new Map<string, Promise<NativeQuickInfo | undefined>>();
+  private readonly declaration_docs = new Map<string, string>();
+  private readonly declaration_files = new Map<string, string[]>();
   /** Names each batch's project directory. */
   private batches = 0;
   private queue: Sample[] = [];
-  private flushScheduled = false;
+  private flush_scheduled = false;
   private session: Promise<LanguageServer> | undefined;
   /** The API session holds the process open, so it closes once no batch has run for a moment. */
   private parser: Promise<API<boolean>> | undefined;
-  private parserIdle: NodeJS.Timeout | undefined;
+  private parser_idle: NodeJS.Timeout | undefined;
   /** Samples waiting for a batch, and the loop that runs batches while any wait. */
   private readonly pending: Sample[] = [];
   private worker: Promise<void> | undefined;
   /** The server's own directory, which holds its built-in `lib.*.d.ts` files. */
-  private readonly libraryDirectory = `${normalizedPath(dirname(realpathSync(serverExecutable())))}/`;
+  private readonly library_directory = `${normalized_path(dirname(realpathSync(server_executable())))}/`;
 
   constructor(private readonly options: NativeTypeEngineOptions) {
-    this.projectDirectory = normalizedPath(PROJECT_DIRECTORY);
+    this.project_directory = normalized_path(PROJECT_DIRECTORY);
   }
 
   /**
@@ -524,42 +524,42 @@ export class NativeTypeEngine {
     language: Language,
     selection?: IdentifierSelection,
   ): Promise<SheetwriteTypeHover[]> {
-    return new Promise((resolveHovers, reject) => {
+    return new Promise((resolve_hovers, reject) => {
       this.queue.push({
         key: hash(language, source, selection?.key ?? ""),
         source,
         language,
         ...(selection ? { selection } : {}),
-        resolve: resolveHovers,
+        resolve: resolve_hovers,
         reject,
       });
-      if (this.flushScheduled) return;
-      this.flushScheduled = true;
+      if (this.flush_scheduled) return;
+      this.flush_scheduled = true;
       // Every sample requested in this turn of the event loop goes into one batch.
       setTimeout(() => void this.flush(), 0);
     });
   }
 
   async dispose(): Promise<void> {
-    await this.closeParser();
+    await this.close_parser();
     if (!this.session) return;
     const server = await this.session;
     this.session = undefined;
     await server.shutdown();
   }
 
-  private async closeParser(): Promise<void> {
-    clearTimeout(this.parserIdle);
+  private async close_parser(): Promise<void> {
+    clearTimeout(this.parser_idle);
     const parser = this.parser;
     this.parser = undefined;
     await (await parser)?.close();
   }
 
-  private sampleFile(sample: Pick<Sample, "key" | "language">, project: string): string {
-    return `${this.projectDirectory}/${project}/${sample.key.slice(0, 16)}.${sample.language}`;
+  private sample_file(sample: Pick<Sample, "key" | "language">, project: string): string {
+    return `${this.project_directory}/${project}/${sample.key.slice(0, 16)}.${sample.language}`;
   }
 
-  private projectConfig(files: readonly string[]): string {
+  private project_config(files: readonly string[]): string {
     return JSON.stringify({
       compilerOptions: {
         target: "ES2022",
@@ -594,10 +594,10 @@ export class NativeTypeEngine {
 
   private start(): Promise<LanguageServer> {
     this.session ??= (async () => {
-      const server = new LanguageServer(serverExecutable());
+      const server = new LanguageServer(server_executable());
       await server.initialize(this.options.cwd);
-      for (const [fileName, text] of this.options.fsMap ?? []) {
-        server.open(pathToFileURL(fileName).href, languageId(fileName), text);
+      for (const [file_name, text] of this.options.fsMap ?? []) {
+        server.open(pathToFileURL(file_name).href, language_id(file_name), text);
       }
       return server;
     })();
@@ -609,8 +609,8 @@ export class NativeTypeEngine {
    * socket it opens on request, instead of starting a second TypeScript process. A server
    * without that request gets a separate API process.
    */
-  private parserSession(server: LanguageServer): Promise<API<boolean>> {
-    clearTimeout(this.parserIdle);
+  private parser_session(server: LanguageServer): Promise<API<boolean>> {
+    clearTimeout(this.parser_idle);
     this.parser ??= server.apiPipe().then(
       (pipe) => API.fromLSPConnection({ pipe }),
       () => new API({ cwd: this.options.cwd }),
@@ -621,20 +621,20 @@ export class NativeTypeEngine {
   private async flush(): Promise<void> {
     const batch = this.queue;
     this.queue = [];
-    this.flushScheduled = false;
+    this.flush_scheduled = false;
     try {
       const server = await this.start();
       for (const sample of batch) {
         // The same sample text requested again while it is still being analyzed.
-        const known = this.inFlight.get(sample.key);
+        const known = this.in_flight.get(sample.key);
         if (known) {
           Promise.resolve(known).then(sample.resolve, sample.reject);
           continue;
         }
-        const result = new Promise<SheetwriteTypeHover[]>((resolveHovers, reject) => {
-          this.pending.push({ ...sample, resolve: resolveHovers, reject });
+        const result = new Promise<SheetwriteTypeHover[]>((resolve_hovers, reject) => {
+          this.pending.push({ ...sample, resolve: resolve_hovers, reject });
         });
-        this.inFlight.set(sample.key, result);
+        this.in_flight.set(sample.key, result);
         result.then(sample.resolve, sample.reject);
       }
       this.worker ??= this.drain(server);
@@ -665,33 +665,33 @@ export class NativeTypeEngine {
         }
         try {
           // A fresh directory per batch: its tsconfig is new, so no change needs announcing.
-          await this.analyzeTogether(server, samples, `batch-${this.batches++}`);
+          await this.analyze_together(server, samples, `batch-${this.batches++}`);
         } catch (error) {
           const failure = error instanceof Error ? error : new Error(String(error));
           for (const sample of samples) sample.reject(failure);
         } finally {
-          this.declarationHovers.clear();
-          this.declarationDocs.clear();
-          this.declarationFiles.clear();
+          this.declaration_hovers.clear();
+          this.declaration_docs.clear();
+          this.declaration_files.clear();
         }
       }
     } finally {
       this.worker = undefined;
       if (this.parser) {
-        this.parserIdle = setTimeout(() => void this.closeParser(), PARSER_IDLE_MS);
+        this.parser_idle = setTimeout(() => void this.close_parser(), PARSER_IDLE_MS);
       }
     }
   }
 
   /** One project holds the samples while the server answers all their requests in parallel. */
-  private async analyzeTogether(
+  private async analyze_together(
     server: LanguageServer,
     samples: readonly Sample[],
     project: string,
   ): Promise<void> {
-    const parser = await this.parserSession(server);
-    const files = samples.map((sample) => this.sampleFile(sample, project));
-    const directory = `${this.projectDirectory}/${project}`;
+    const parser = await this.parser_session(server);
+    const files = samples.map((sample) => this.sample_file(sample, project));
+    const directory = `${this.project_directory}/${project}`;
     // The samples are written next to the batch tsconfig instead of opened one by one:
     // the server handled each `didOpen` before any request after it (5.8 s of a pass on
     // the Mac), while files on disk load with the project in one step. One sample is
@@ -700,34 +700,34 @@ export class NativeTypeEngine {
     mkdirSync(directory, { recursive: true });
     for (const [index, sample] of samples.entries())
       writeFileSync(files[index] ?? "", sample.source);
-    server.writeProject(directory, this.projectConfig(files));
+    server.writeProject(directory, this.project_config(files));
     const anchor = pathToFileURL(files[0] ?? "").href;
-    server.open(anchor, languageId(files[0] ?? ""), samples[0]?.source ?? "");
+    server.open(anchor, language_id(files[0] ?? ""), samples[0]?.source ?? "");
     // Hovers at declarations outside the samples make the server look up those files'
     // projects, which in the middle of checking 64 samples cost 14 s of server CPU. They
     // wait until every sample of the batch has its own answers.
     let checking = samples.length;
-    let startLookups: () => void = () => {};
+    let start_lookups: () => void = () => {};
     const lookups = new Promise<void>((resolve) => {
-      startLookups = resolve;
+      start_lookups = resolve;
     });
-    const sampleChecked = () => {
+    const sample_checked = () => {
       checking -= 1;
-      if (checking === 0) startLookups();
+      if (checking === 0) start_lookups();
     };
     await Promise.all(
       samples.map(async (sample) => {
         try {
-          const shared = await this.sampleHovers(server, parser, sample, project, {
-            checked: sampleChecked,
+          const shared = await this.sample_hovers(server, parser, sample, project, {
+            checked: sample_checked,
             lookups,
           });
-          const hovers = await this.recheckGenericOwners(server, sample, shared);
+          const hovers = await this.recheck_generic_owners(server, sample, shared);
           sample.resolve(hovers);
         } catch (error) {
           sample.reject(error instanceof Error ? error : new Error(String(error)));
         } finally {
-          this.inFlight.delete(sample.key);
+          this.in_flight.delete(sample.key);
         }
       }),
     );
@@ -740,7 +740,7 @@ export class NativeTypeEngine {
    * parameters. One request at a time, in source order, so the answer does not depend on
    * which request the server happened to check first.
    */
-  private async recheckGenericOwners(
+  private async recheck_generic_owners(
     server: LanguageServer,
     sample: Sample,
     hovers: SheetwriteTypeHover[],
@@ -751,11 +751,11 @@ export class NativeTypeEngine {
     });
     if (suspects.length === 0) return hovers;
     const project = `alone-${sample.key.slice(0, 16)}`;
-    const file = this.sampleFile(sample, project);
+    const file = this.sample_file(sample, project);
     const uri = pathToFileURL(file).href;
-    const directory = `${this.projectDirectory}/${project}`;
-    server.writeProject(directory, this.projectConfig([file]));
-    server.open(uri, languageId(file), sample.source);
+    const directory = `${this.project_directory}/${project}`;
+    server.writeProject(directory, this.project_config([file]));
+    server.open(uri, language_id(file), sample.source);
     try {
       const answers = new Map<SheetwriteTypeHover, NativeQuickInfo | undefined>();
       for (const hover of suspects) {
@@ -766,8 +766,8 @@ export class NativeTypeEngine {
         );
       }
       return hovers.map((hover) => {
-        const quickInfo = answers.get(hover);
-        return quickInfo?.text ? this.hover(quickInfo, hover, hover.origin) : hover;
+        const quick_info = answers.get(hover);
+        return quick_info?.text ? this.hover(quick_info, hover, hover.origin) : hover;
       });
     } finally {
       server.close(uri);
@@ -776,17 +776,17 @@ export class NativeTypeEngine {
   }
 
   private hover(
-    quickInfo: NativeQuickInfo,
+    quick_info: NativeQuickInfo,
     position: Pick<SheetwriteTypeHover, "start" | "length" | "target" | "line" | "character">,
     origin: SheetwriteHoverOrigin | undefined,
   ): SheetwriteTypeHover {
-    const tags = quickInfo.tags.filter(
+    const tags = quick_info.tags.filter(
       ([, value]) => !value || !this.options.internalTagText.test(value),
     );
     return {
       type: "hover",
-      text: quickInfo.text,
-      ...(quickInfo.docs ? { docs: quickInfo.docs } : {}),
+      text: quick_info.text,
+      ...(quick_info.docs ? { docs: quick_info.docs } : {}),
       ...(tags.length ? { tags } : {}),
       ...(origin ? { origin } : {}),
       start: position.start,
@@ -797,14 +797,14 @@ export class NativeTypeEngine {
     };
   }
 
-  private async sampleHovers(
+  private async sample_hovers(
     server: LanguageServer,
     parser: API<boolean>,
     sample: Sample,
     project: string,
     phases: { checked(): void; lookups: Promise<void> },
   ): Promise<SheetwriteTypeHover[]> {
-    const file = this.sampleFile(sample, project);
+    const file = this.sample_file(sample, project);
     const uri = pathToFileURL(file).href;
     let answers: {
       identifier: NativeIdentifier;
@@ -817,12 +817,16 @@ export class NativeTypeEngine {
       const found = await Promise.all(
         identifiers.map(async (identifier) => {
           const markdown = await server.hover(uri, identifier);
-          const quickInfo = markdown
+          const quick_info = markdown
             ? parseNativeHover(markdown, this.options.internalTagText)
             : undefined;
-          if (!quickInfo?.text) return undefined;
+          if (!quick_info?.text) return undefined;
           // Only positions with a hover ask where their symbol is declared.
-          return { identifier, quickInfo, definitions: await server.definitions(uri, identifier) };
+          return {
+            identifier,
+            quickInfo: quick_info,
+            definitions: await server.definitions(uri, identifier),
+          };
         }),
       );
       answers = found.filter((answer) => answer !== undefined);
@@ -832,21 +836,21 @@ export class NativeTypeEngine {
     await phases.lookups;
     const hovers = await Promise.all(
       answers.map(async ({ identifier, definitions, ...answer }) => {
-        let { quickInfo } = answer;
-        if (identifier.propertyName && LITERAL_PROPERTY.test(quickInfo.text)) {
-          quickInfo = (await this.declaredProperty(server, definitions, file)) ?? quickInfo;
+        let { quickInfo: quick_info } = answer;
+        if (identifier.propertyName && LITERAL_PROPERTY.test(quick_info.text)) {
+          quick_info = (await this.declared_property(server, definitions, file)) ?? quick_info;
         } else if (identifier.jsxAttribute) {
-          const text = ownerWithDefaults(quickInfo.text);
-          if (text) quickInfo = { ...quickInfo, text };
+          const text = owner_with_defaults(quick_info.text);
+          if (text) quick_info = { ...quick_info, text };
         }
-        if (!quickInfo.docs) {
-          const docs = this.mergedDeclarationDocs(definitions, file);
-          if (docs) quickInfo = { ...quickInfo, docs };
+        if (!quick_info.docs) {
+          const docs = this.merged_declaration_docs(definitions, file);
+          if (docs) quick_info = { ...quick_info, docs };
         }
-        const origin = hoverOrigin(
+        const origin = hover_origin(
           definitions.map((definition) => definition.file),
           file,
-          this.libraryDirectory,
+          this.library_directory,
         );
         const position = {
           start: identifier.start,
@@ -855,7 +859,7 @@ export class NativeTypeEngine {
           line: identifier.line,
           character: identifier.character,
         };
-        return this.hover(quickInfo, position, origin);
+        return this.hover(quick_info, position, origin);
       }),
     );
     return hovers;
@@ -867,17 +871,17 @@ export class NativeTypeEngine {
    * with the literal's own property (`header: string`, no docs). The definition still
    * points at the declared property, so its hover is used when it names the declaring type.
    */
-  private async declaredProperty(
+  private async declared_property(
     server: LanguageServer,
     definitions: readonly Definition[],
-    sampleFile: string,
+    sample_file: string,
   ): Promise<NativeQuickInfo | undefined> {
     const declared = definitions.filter(
-      (definition) => normalizedPath(definition.file) !== sampleFile,
+      (definition) => normalized_path(definition.file) !== sample_file,
     );
     if (declared.length !== 1 || !declared[0]) return undefined;
-    const quickInfo = await this.declarationHover(server, declared[0]);
-    return quickInfo && OWNED_PROPERTY.test(quickInfo.text) ? quickInfo : undefined;
+    const quick_info = await this.declaration_hover(server, declared[0]);
+    return quick_info && OWNED_PROPERTY.test(quick_info.text) ? quick_info : undefined;
   }
 
   /**
@@ -887,51 +891,51 @@ export class NativeTypeEngine {
    * with a JSDoc comment supplies them. The comment is read from the declaration file:
    * hovering there made the server load a project for every library file it touched.
    */
-  private mergedDeclarationDocs(
+  private merged_declaration_docs(
     definitions: readonly Definition[],
-    sampleFile: string,
+    sample_file: string,
   ): string | undefined {
     const declarations = definitions.filter(
-      (definition) => normalizedPath(definition.file) !== sampleFile,
+      (definition) => normalized_path(definition.file) !== sample_file,
     );
     if (declarations.length < 2) return undefined;
     for (const declaration of declarations) {
       const key = `${declaration.file}:${declaration.position.line}`;
-      let docs = this.declarationDocs.get(key);
+      let docs = this.declaration_docs.get(key);
       if (docs === undefined) {
-        docs = jsDocSummaryBefore(
-          this.declarationText(declaration.file),
+        docs = js_doc_summary_before(
+          this.declaration_text(declaration.file),
           declaration.position.line,
         );
-        this.declarationDocs.set(key, docs);
+        this.declaration_docs.set(key, docs);
       }
       if (docs) return docs;
     }
     return undefined;
   }
 
-  private declarationText(file: string): string[] {
-    let lines = this.declarationFiles.get(file);
+  private declaration_text(file: string): string[] {
+    let lines = this.declaration_files.get(file);
     if (!lines) {
       lines = readFileSync(file, "utf8").split("\n");
-      this.declarationFiles.set(file, lines);
+      this.declaration_files.set(file, lines);
     }
     return lines;
   }
 
-  private declarationHover(
+  private declaration_hover(
     server: LanguageServer,
     definition: Definition,
   ): Promise<NativeQuickInfo | undefined> {
     const key = `${definition.uri}:${definition.position.line}:${definition.position.character}`;
-    let hover = this.declarationHovers.get(key);
+    let hover = this.declaration_hovers.get(key);
     if (!hover) {
       hover = server
         .hover(definition.uri, definition.position)
         .then((markdown) =>
           markdown ? parseNativeHover(markdown, this.options.internalTagText) : undefined,
         );
-      this.declarationHovers.set(key, hover);
+      this.declaration_hovers.set(key, hover);
     }
     return hover;
   }
@@ -942,7 +946,7 @@ export class NativeTypeEngine {
     sample: Sample,
   ): Promise<NativeIdentifier[]> {
     if (sample.language !== "vue")
-      return this.scriptIdentifiers(parser, file, sample.source, 0, sample.language);
+      return this.script_identifiers(parser, file, sample.source, 0, sample.language);
     // Script blocks are parsed; template names are found by pattern. The server answers
     // only positions the content mapper maps, so text words drop out on their own.
     const identifiers: NativeIdentifier[] = [];
@@ -952,16 +956,23 @@ export class NativeTypeEngine {
       const start = (block.index ?? 0) + (block[1]?.length ?? 0);
       const kind = /\blang=["']tsx["']/.test(block[1] ?? "") ? "tsx" : "ts";
       identifiers.push(
-        ...(await this.scriptIdentifiers(parser, file, sample.source, start, kind, block[3] ?? "")),
+        ...(await this.script_identifiers(
+          parser,
+          file,
+          sample.source,
+          start,
+          kind,
+          block[3] ?? "",
+        )),
       );
     }
-    const starts = lineStarts(sample.source);
+    const starts = line_starts(sample.source);
     for (const word of sample.source.matchAll(TEMPLATE_NAME)) {
       const start = word.index ?? 0;
-      const inBlock = blocks.some(
+      const in_block = blocks.some(
         (block) => start >= (block.index ?? 0) && start < (block.index ?? 0) + block[0].length,
       );
-      if (inBlock || RESERVED_WORDS.has(word[0])) continue;
+      if (in_block || RESERVED_WORDS.has(word[0])) continue;
       const text = word[0];
       identifiers.push({
         text,
@@ -969,14 +980,14 @@ export class NativeTypeEngine {
         end: start + text.length,
         propertyName: false,
         jsxAttribute: false,
-        ...positionAt(starts, start),
+        ...position_at(starts, start),
       });
     }
     return identifiers.sort((left, right) => left.start - right.start);
   }
 
   /** Identifiers of `code`, a script that starts at `offset` in the sample's source. */
-  private async scriptIdentifiers(
+  private async script_identifiers(
     parser: API<boolean>,
     file: string,
     source: string,
@@ -988,35 +999,35 @@ export class NativeTypeEngine {
       scriptKind: language === "tsx" ? ScriptKind.TSX : ScriptKind.TS,
     });
     try {
-      const { sourceFile } = lease;
-      const starts = lineStarts(source);
+      const { sourceFile: source_file } = lease;
+      const starts = line_starts(source);
       const identifiers: NativeIdentifier[] = [];
-      const propertyNames = new Set<Node>();
-      const jsxAttributeNames = new Set<Node>();
+      const property_names = new Set<Node>();
+      const jsx_attribute_names = new Set<Node>();
       const visit = (node: Node, parent?: Node): void => {
         if (
           (isPropertyAssignment(node) || isShorthandPropertyAssignment(node)) &&
           parent !== undefined &&
           isObjectLiteralExpression(parent)
         ) {
-          propertyNames.add(node.name);
+          property_names.add(node.name);
         }
-        if (isJsxAttribute(node)) jsxAttributeNames.add(node.name);
+        if (isJsxAttribute(node)) jsx_attribute_names.add(node.name);
         if (isIdentifier(node) && !this.options.internalIdentifier.test(node.text)) {
-          const start = offset + node.getStart(sourceFile);
+          const start = offset + node.getStart(source_file);
           identifiers.push({
             text: node.text,
             start,
             end: offset + node.end,
-            propertyName: propertyNames.has(node),
-            jsxAttribute: jsxAttributeNames.has(node),
-            ...positionAt(starts, start),
+            propertyName: property_names.has(node),
+            jsxAttribute: jsx_attribute_names.has(node),
+            ...position_at(starts, start),
           });
         }
         // API nodes carry no reliable `parent`, so the visitor passes it down.
         node.forEachChild((child) => visit(child, node));
       };
-      visit(sourceFile);
+      visit(source_file);
       return identifiers;
     } finally {
       await lease.dispose();
@@ -1024,7 +1035,7 @@ export class NativeTypeEngine {
   }
 }
 
-function languageId(fileName: string): string {
-  if (fileName.endsWith(".vue")) return "vue";
-  return fileName.endsWith(".tsx") ? "typescriptreact" : "typescript";
+function language_id(file_name: string): string {
+  if (file_name.endsWith(".vue")) return "vue";
+  return file_name.endsWith(".tsx") ? "typescriptreact" : "typescript";
 }

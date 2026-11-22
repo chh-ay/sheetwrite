@@ -174,7 +174,7 @@ const PUBLIC_KIND: Readonly<Partial<Record<RawToken["kind"], FormulaTokenKind>>>
   bad: "invalid",
 };
 
-function publicKind(tokens: readonly RawToken[], index: number): FormulaTokenKind {
+function public_kind(tokens: readonly RawToken[], index: number): FormulaTokenKind {
   const token = tokens[index];
   if (token === undefined) return "invalid";
 
@@ -186,18 +186,18 @@ function publicKind(tokens: readonly RawToken[], index: number): FormulaTokenKin
   return "name";
 }
 
-function publicTokens(
+function public_tokens(
   tokens: readonly RawToken[],
   references: readonly FormulaReference[],
 ): FormulaToken[] {
-  const inReference = (token: RawToken): boolean =>
+  const in_reference = (token: RawToken): boolean =>
     references.some((reference) => token.from >= reference.from && token.to <= reference.to);
 
   return tokens.map((token, index) => {
-    const kind = publicKind(tokens, index);
-    const isReferencePart = kind === "name" || kind === "number";
+    const kind = public_kind(tokens, index);
+    const is_reference_part = kind === "name" || kind === "number";
     return {
-      kind: isReferencePart && inReference(token) ? "reference" : kind,
+      kind: is_reference_part && in_reference(token) ? "reference" : kind,
       from: token.from,
       to: token.to,
     };
@@ -217,7 +217,7 @@ export function argumentOf(
 }
 
 /** The innermost call whose parentheses hold `cursor`. */
-function callAt(
+function call_at(
   tokens: readonly RawToken[],
   cursor: number,
   functions: ReadonlyMap<string, FormulaFunctionMetadata>,
@@ -237,16 +237,16 @@ function callAt(
   };
 }
 
-function byLengthThenName(left: FormulaCompletionItem, right: FormulaCompletionItem): number {
-  const lengthOrder = left.name.length - right.name.length;
-  if (lengthOrder !== 0) return lengthOrder;
-  const leftKey = left.name.toUpperCase();
-  const rightKey = right.name.toUpperCase();
-  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+function by_length_then_name(left: FormulaCompletionItem, right: FormulaCompletionItem): number {
+  const length_order = left.name.length - right.name.length;
+  if (length_order !== 0) return length_order;
+  const left_key = left.name.toUpperCase();
+  const right_key = right.name.toUpperCase();
+  return left_key < right_key ? -1 : left_key > right_key ? 1 : 0;
 }
 
 /** Whether `name` starts with `prefix`, ignoring letter case. */
-function startsWith(name: string, prefix: string): boolean {
+function starts_with(name: string, prefix: string): boolean {
   return name.slice(0, prefix.length).toUpperCase() === prefix.toUpperCase();
 }
 
@@ -254,7 +254,7 @@ function startsWith(name: string, prefix: string): boolean {
  * Functions, defined names and tables that start with the name the cursor
  * ends or sits in, shortest first.
  */
-function nameCompletion(
+function name_completion(
   tokens: readonly RawToken[],
   cursor: number,
   functions: readonly FormulaFunctionMetadata[],
@@ -271,7 +271,7 @@ function nameCompletion(
   const prefix = token.text.slice(0, cursor - token.from);
   const matches: FormulaCompletionItem[] = [];
   for (const fn of functions) {
-    if (!startsWith(fn.name, prefix)) continue;
+    if (!starts_with(fn.name, prefix)) continue;
     matches.push({
       kind: "function",
       name: fn.name,
@@ -281,16 +281,16 @@ function nameCompletion(
     });
   }
   for (const name of names.names) {
-    if (startsWith(name, prefix)) {
+    if (starts_with(name, prefix)) {
       matches.push({ kind: "name", name, insert: name, description: "Defined name" });
     }
   }
   for (const table of names.tables) {
-    if (startsWith(table.name, prefix)) {
+    if (starts_with(table.name, prefix)) {
       matches.push({ kind: "table", name: table.name, insert: table.name, description: "Table" });
     }
   }
-  matches.sort(byLengthThenName);
+  matches.sort(by_length_then_name);
   return matches.length === 0 ? null : { from: token.from, to: token.to, matches };
 }
 
@@ -300,7 +300,7 @@ function nameCompletion(
  * between the innermost open `[` and the cursor. `Table1[` names the table;
  * a `[` with no name before it names the table that holds the formula's cell.
  */
-function tableCompletion(
+function table_completion(
   tokens: readonly RawToken[],
   text: string,
   cursor: number,
@@ -314,9 +314,9 @@ function tableCompletion(
   if (token === undefined) return null;
 
   const before = tokens[index - 1];
-  const tableName =
+  const table_name =
     before?.kind === "ident" && before.to === token.from ? before.text : names.cellTable;
-  const key = tableName?.toUpperCase();
+  const key = table_name?.toUpperCase();
   const table = names.tables.find((candidate) => candidate.name.toUpperCase() === key);
   if (table === undefined) return null;
 
@@ -334,14 +334,14 @@ function tableCompletion(
   const to = cursor + (/^[^[\],]*/.exec(text.slice(cursor, token.to))?.[0].length ?? 0);
   const section = text.charAt(start - 1) === "[" && start - 1 === token.from;
   const matches: FormulaCompletionItem[] = section
-    ? TABLE_SECTIONS.filter(([name]) => startsWith(name, prefix)).map(([name, description]) => ({
+    ? TABLE_SECTIONS.filter(([name]) => starts_with(name, prefix)).map(([name, description]) => ({
         kind: "column" as const,
         name,
         insert: name,
         description,
       }))
     : table.columns
-        .filter((column) => startsWith(column, prefix))
+        .filter((column) => starts_with(column, prefix))
         .map((column) => ({
           kind: "column" as const,
           name: column,
@@ -357,7 +357,7 @@ function tableCompletion(
  * with the argument's text before the cursor. None once the text is a whole
  * value, so Enter commits it.
  */
-function choiceCompletion(
+function choice_completion(
   tokens: readonly RawToken[],
   text: string,
   cursor: number,
@@ -387,7 +387,7 @@ function choiceCompletion(
   const from = cursor - prefix.length;
   const to = cursor + (/^[\w."]*/.exec(text.slice(cursor))?.[0].length ?? 0);
   const matches = choices
-    .filter((choice) => startsWith(choice.value, prefix))
+    .filter((choice) => starts_with(choice.value, prefix))
     .map(({ value, description }) => ({
       kind: "choice" as const,
       name: value,
@@ -443,21 +443,21 @@ export function analyzeFormula(
 ): FormulaAnalysis {
   if (!text.startsWith("=")) return NOT_A_FORMULA;
 
-  const byName = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
+  const by_name = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
   const tokens = formulaTokens(text);
   const references = findReferences(tokens);
   const error = syntaxError(text);
-  const call = callAt(tokens, cursor, byName);
+  const call = call_at(tokens, cursor, by_name);
 
   return {
-    tokens: publicTokens(tokens, references),
+    tokens: public_tokens(tokens, references),
     references,
     call,
     completion:
-      tableCompletion(tokens, text, cursor, names) ??
-      choiceCompletion(tokens, text, cursor, call) ??
-      nameCompletion(tokens, cursor, functions, names),
-    diagnostics: [...(error === null ? [] : [error]), ...checkCalls(tokens, byName)].sort(
+      table_completion(tokens, text, cursor, names) ??
+      choice_completion(tokens, text, cursor, call) ??
+      name_completion(tokens, cursor, functions, names),
+    diagnostics: [...(error === null ? [] : [error]), ...checkCalls(tokens, by_name)].sort(
       (left, right) => left.from - right.from,
     ),
   };

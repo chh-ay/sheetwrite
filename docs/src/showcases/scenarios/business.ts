@@ -72,7 +72,7 @@ export function createBusinessData(): ColumnarData {
   const category: string[] = new Array(BUSINESS_ROWS);
   const status: string[] = new Array(BUSINESS_ROWS);
   const qty = new Float64Array(BUSINESS_ROWS);
-  const unitCost = new Float64Array(BUSINESS_ROWS);
+  const unit_cost = new Float64Array(BUSINESS_ROWS);
   const total: CellValue[] = new Array(BUSINESS_ROWS);
 
   for (let row = 0; row < BUSINESS_ROWS; row++) {
@@ -81,13 +81,13 @@ export function createBusinessData(): ColumnarData {
     category[row] = SUPPLIER_CATEGORIES[row % BUSINESS_SUPPLIERS.length] ?? "Logistics";
     status[row] = BUSINESS_STATUSES[(row * 7) % BUSINESS_STATUSES.length] ?? "";
     qty[row] = businessQty(row);
-    unitCost[row] = businessUnitCost(row);
+    unit_cost[row] = businessUnitCost(row);
     total[row] = { kind: "formula", src: `=E${row + 1}*F${row + 1}` };
   }
 
   return {
     rowCount: BUSINESS_ROWS,
-    columns: { po, supplier, category, status, qty, unitCost, total },
+    columns: { po, supplier, category, status, qty, unitCost: unit_cost, total },
   };
 }
 
@@ -151,7 +151,7 @@ export const BUSINESS_SUPPLIER_ROWS: ReadonlyArray<[name: string, region: string
   ];
 
 export function createBusinessWorkbook(): Workbook {
-  const totalRange = BUSINESS_TOTALS_PROTECTION.range;
+  const total_range = BUSINESS_TOTALS_PROTECTION.range;
   return {
     activeSheet: BUSINESS_SHEET_ID,
     sheets: [
@@ -186,7 +186,7 @@ export function createBusinessWorkbook(): Workbook {
         notes: [...BUSINESS_NOTES],
         conditionalFormats: [
           {
-            range: totalRange,
+            range: total_range,
             when: { kind: "greaterThan", value: 400_000 },
             style: { backgroundColor: "#42b88324", bold: true },
           },
@@ -248,12 +248,12 @@ export function businessSuppliersSeedOps(): DocumentOp[] {
 export function createBusinessSeedSnapshot(): WorkbookSnapshot {
   const data = createBusinessData();
   const workbook = createBusinessWorkbook();
-  const columnKeys = ["po", "supplier", "category", "status", "qty", "unitCost", "total"] as const;
+  const column_keys = ["po", "supplier", "category", "status", "qty", "unitCost", "total"] as const;
 
   const cells: SnapshotCell[] = [];
   for (let row = 0; row < BUSINESS_ROWS; row++) {
-    for (let col = 0; col < columnKeys.length; col++) {
-      const column = data.columns[columnKeys[col] ?? ""];
+    for (let col = 0; col < column_keys.length; col++) {
+      const column = data.columns[column_keys[col] ?? ""];
       const raw = column?.[row];
       if (raw === undefined || raw === null) continue;
       const value: CellValue =
@@ -287,7 +287,7 @@ export function createBusinessSeedSnapshot(): WorkbookSnapshot {
                 startRow: 0,
                 startCol: 0,
                 rowCount: BUSINESS_ROWS,
-                colCount: columnKeys.length,
+                colCount: column_keys.length,
                 cells,
               },
             ]

@@ -167,27 +167,27 @@ const ADAPTER_DOC_CONTRACT = {
  */
 export function adapterContractIssues(manifest: PublicApiManifest): string[] {
   const failures: string[] = [];
-  const exportOf = (packageName: string, name: string): ApiExport | undefined =>
+  const export_of = (package_name: string, name: string): ApiExport | undefined =>
     manifest.packages
-      .find((pkg) => pkg.name === packageName)
+      .find((pkg) => pkg.name === package_name)
       ?.entryPoints.find((entry) => entry.subpath === ".")
       ?.exports.find((item) => item.name === name);
 
-  const gridOptions = exportOf("@sheetwrite/core", "GridOptions");
-  const expectedInputs = ADAPTER_DOC_CONTRACT.inputs.filter((name) => name !== "wasmSource");
-  if (gridOptions === undefined) {
+  const grid_options = export_of("@sheetwrite/core", "GridOptions");
+  const expected_inputs = ADAPTER_DOC_CONTRACT.inputs.filter((name) => name !== "wasmSource");
+  if (grid_options === undefined) {
     failures.push("@sheetwrite/core does not export GridOptions");
   } else {
-    const implementedInputs = new Set(gridOptions.memberDocs.map((member) => member.name));
-    for (const input of expectedInputs) {
-      if (!implementedInputs.has(input)) {
+    const implemented_inputs = new Set(grid_options.memberDocs.map((member) => member.name));
+    for (const input of expected_inputs) {
+      if (!implemented_inputs.has(input)) {
         failures.push(
           `GridOptions member ${input} is missing from the adapter documentation contract`,
         );
       }
     }
-    for (const input of implementedInputs) {
-      if (!(expectedInputs as readonly string[]).includes(input)) {
+    for (const input of implemented_inputs) {
+      if (!(expected_inputs as readonly string[]).includes(input)) {
         failures.push(
           `GridOptions member ${input} is not covered by the adapter documentation contract`,
         );
@@ -195,14 +195,14 @@ export function adapterContractIssues(manifest: PublicApiManifest): string[] {
     }
   }
 
-  const requireMembers = (
-    packageName: string,
-    exportName: string,
+  const require_members = (
+    package_name: string,
+    export_name: string,
     members: readonly string[],
   ): void => {
-    const item = exportOf(packageName, exportName);
+    const item = export_of(package_name, export_name);
     if (item === undefined) {
-      failures.push(`${packageName} does not export ${exportName}`);
+      failures.push(`${package_name} does not export ${export_name}`);
       return;
     }
     const documented = new Set(item.memberDocs.map((member) => member.name));
@@ -213,57 +213,57 @@ export function adapterContractIssues(manifest: PublicApiManifest): string[] {
         !item.signature.includes(`"${member}":`) &&
         !item.signature.includes(`"${member}"?:`)
       ) {
-        failures.push(`${packageName} ${exportName} does not declare ${member}`);
+        failures.push(`${package_name} ${export_name} does not declare ${member}`);
       } else if (!documented.has(member)) {
-        failures.push(`${packageName} ${exportName} member ${member} has no documentation`);
+        failures.push(`${package_name} ${export_name} member ${member} has no documentation`);
       }
     }
   };
 
-  for (const packageName of ADAPTER_DOC_CONTRACT.packages) {
-    requireMembers(packageName, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.inputs);
-    if (packageName === "@sheetwrite/vue") {
-      requireMembers(packageName, "SheetwriteGridEmits", ADAPTER_DOC_CONTRACT.vueEvents);
+  for (const package_name of ADAPTER_DOC_CONTRACT.packages) {
+    require_members(package_name, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.inputs);
+    if (package_name === "@sheetwrite/vue") {
+      require_members(package_name, "SheetwriteGridEmits", ADAPTER_DOC_CONTRACT.vueEvents);
     } else {
-      requireMembers(packageName, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.handlerEvents);
+      require_members(package_name, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.handlerEvents);
     }
-    requireMembers(packageName, "GridReadyEvent", ["grid", "generation", "reason"]);
+    require_members(package_name, "GridReadyEvent", ["grid", "generation", "reason"]);
   }
 
-  const adapterEntry = manifest.packages
+  const adapter_entry = manifest.packages
     .find((pkg) => pkg.name === "@sheetwrite/core")
     ?.entryPoints.find((entry) => entry.subpath === "./adapter");
-  const documentedReasons = new Set<string>();
+  const documented_reasons = new Set<string>();
   for (const name of ["GridReadyReason", "GridResetReason"]) {
-    const item = adapterEntry?.exports.find((candidate) => candidate.name === name);
+    const item = adapter_entry?.exports.find((candidate) => candidate.name === name);
     for (const match of item?.signature.matchAll(/"([a-z-]+)"/g) ?? []) {
-      documentedReasons.add(match[1] ?? "");
+      documented_reasons.add(match[1] ?? "");
     }
   }
-  const canonicalReasons: readonly string[] = ADAPTER_DOC_CONTRACT.readyReasons;
-  if (documentedReasons.size === 0) {
+  const canonical_reasons: readonly string[] = ADAPTER_DOC_CONTRACT.readyReasons;
+  if (documented_reasons.size === 0) {
     failures.push("@sheetwrite/core ./adapter does not document GridReadyReason");
   } else if (
-    canonicalReasons.some((reason) => !documentedReasons.has(reason)) ||
-    [...documentedReasons].some((literal) => !canonicalReasons.includes(literal))
+    canonical_reasons.some((reason) => !documented_reasons.has(reason)) ||
+    [...documented_reasons].some((literal) => !canonical_reasons.includes(literal))
   ) {
     failures.push(
-      `GridReadyReason documents [${[...documentedReasons].sort().join(", ")}] but adapters implement [${canonicalReasons.join(", ")}]`,
+      `GridReadyReason documents [${[...documented_reasons].sort().join(", ")}] but adapters implement [${canonical_reasons.join(", ")}]`,
     );
   }
   return failures;
 }
 
 export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promise<ExpectedFile[]> {
-  const compatibilityIssues = [
+  const compatibility_issues = [
     ...collectCompatibilityIssues(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES),
     ...collectMissingCompatibilityFiles(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES, (path) =>
       existsSync(join(repositoryRoot, path)),
     ),
     ...(await collectCompatibilityDigestIssues()),
   ];
-  if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const [formulaInventory, formulaReferenceEntries, publishedCompatibilityResults] =
+  if (compatibility_issues.length > 0) throw new Error(compatibility_issues.join("\n"));
+  const [formula_inventory, formula_reference_entries, published_compatibility_results] =
     await Promise.all([
       loadFormulaContractInventory(repositoryRoot),
       loadFormulaReferenceEntries(repositoryRoot),
@@ -277,48 +277,48 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       pkg.entryPoints.flatMap((entry) => entry.exports.map((item) => parseableDeclaration(item))),
     ),
   );
-  const documentationLinkIssues = unresolvedDocumentationLinks(manifest);
-  if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
+  const documentation_link_issues = unresolvedDocumentationLinks(manifest);
+  if (documentation_link_issues.length > 0) throw new Error(documentation_link_issues.join("\n"));
 
-  const linkRoutes = documentationLinkRoutes(manifest);
+  const link_routes = documentationLinkRoutes(manifest);
   // "Referenced by" reads the whole API surface, so it is indexed once here
   // rather than per symbol page.
   const consumers = consumerIndex(manifest);
-  const apiFiles: ExpectedFile[] = [
+  const api_files: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
     { path: join(generatedDataRoot, "landing-story.html"), content: await renderLandingStory() },
   ];
-  const symbolOwners = new Map<string, string>();
+  const symbol_owners = new Map<string, string>();
   for (const pkg of manifest.packages) {
     for (const entry of pkg.entryPoints) {
-      apiFiles.push({
+      api_files.push({
         path: join(contentRoot, `api/${entrySlug(pkg.name, entry.subpath)}.md`),
-        content: renderEntryPage(pkg, entry, linkRoutes),
+        content: renderEntryPage(pkg, entry, link_routes),
       });
       for (const item of entry.exports) {
-        const symbolPath = join(contentRoot, `${symbolPagePath(pkg, entry, item)}.md`);
+        const symbol_path = join(contentRoot, `${symbolPagePath(pkg, entry, item)}.md`);
         const owner = `${pkg.name}|${entry.subpath}|${item.name}`;
         // Hosts and file systems that ignore letter case serve one page for two
         // paths that differ only in case, so owners are keyed case-folded.
-        const foldedPath = symbolPath.toLowerCase();
-        const existingOwner = symbolOwners.get(foldedPath);
-        if (existingOwner !== undefined) {
+        const folded_path = symbol_path.toLowerCase();
+        const existing_owner = symbol_owners.get(folded_path);
+        if (existing_owner !== undefined) {
           throw new Error(
-            `API pages of ${existingOwner} and ${owner} fold to the same path ${symbolPath}`,
+            `API pages of ${existing_owner} and ${owner} fold to the same path ${symbol_path}`,
           );
         }
-        symbolOwners.set(foldedPath, owner);
-        apiFiles.push({
-          path: symbolPath,
-          content: await renderSymbolPage(pkg, entry, item, linkRoutes, consumers),
+        symbol_owners.set(folded_path, owner);
+        api_files.push({
+          path: symbol_path,
+          content: await renderSymbolPage(pkg, entry, item, link_routes, consumers),
         });
       }
     }
   }
-  const exportCount = manifest.packages.reduce(
+  const export_count = manifest.packages.reduce(
     (count, pkg) =>
-      count + pkg.entryPoints.reduce((entryCount, entry) => entryCount + entry.exports.length, 0),
+      count + pkg.entryPoints.reduce((entry_count, entry) => entry_count + entry.exports.length, 0),
     0,
   );
   const contract = {
@@ -328,26 +328,26 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     movedPages: MOVED_PAGES,
     requiredSearchTerms: REQUIRED_SEARCH_TERMS,
     entryPointCount: manifest.packages.reduce((count, pkg) => count + pkg.entryPoints.length, 0),
-    exportCount,
-    symbolPageCount: exportCount,
+    exportCount: export_count,
+    symbolPageCount: export_count,
     apiSha256: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
     compatibilitySha256: createHash("sha256")
       .update(JSON.stringify([COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES]))
       .digest("hex"),
     formulaContractSha256: createHash("sha256")
-      .update(JSON.stringify(formulaInventory))
+      .update(JSON.stringify(formula_inventory))
       .digest("hex"),
   };
-  const formulaNames = new Set<string>();
+  const formula_names = new Set<string>();
   if (
-    !formulaInventory ||
-    typeof formulaInventory !== "object" ||
-    !("functions" in formulaInventory) ||
-    !Array.isArray(formulaInventory.functions)
+    !formula_inventory ||
+    typeof formula_inventory !== "object" ||
+    !("functions" in formula_inventory) ||
+    !Array.isArray(formula_inventory.functions)
   ) {
     throw new Error("Formula inventory must contain functions");
   }
-  const formulas: unknown[] = formulaInventory.functions;
+  const formulas: unknown[] = formula_inventory.functions;
   for (const formula of formulas) {
     if (
       !formula ||
@@ -359,20 +359,20 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ) {
       throw new Error("Formula inventory must contain canonical names and aliases");
     }
-    formulaNames.add(formula.canonical);
+    formula_names.add(formula.canonical);
     for (const alias of formula.aliases) {
       if (typeof alias !== "string") throw new Error("Formula aliases must be strings");
-      formulaNames.add(alias);
+      formula_names.add(alias);
     }
   }
 
-  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaReferenceEntries);
-  const excelCatalog: unknown = JSON.parse(
+  const formula_pages = renderFormulaFunctionPages(formula_inventory, formula_reference_entries);
+  const excel_catalog: unknown = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );
-  const excelCoverage = renderExcelCoveragePage(formulaInventory, excelCatalog);
+  const excel_coverage = renderExcelCoveragePage(formula_inventory, excel_catalog);
   const files: ExpectedFile[] = [
-    ...apiFiles,
+    ...api_files,
     {
       path: join(contentRoot, "reference/package-entry-points.md"),
       content: renderEntryPointInventory(manifest),
@@ -385,8 +385,11 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(contentRoot, "reference/compatibility-results.md"),
       content: renderCompatibilityResults(),
     },
-    ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
-    ...formulaPages.flatMap(({ table }) =>
+    ...formula_pages.map((page) => ({
+      path: join(contentRoot, page.route),
+      content: page.content,
+    })),
+    ...formula_pages.flatMap(({ table }) =>
       table === undefined
         ? []
         : [
@@ -396,11 +399,11 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
             },
           ],
     ),
-    { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
-    ...siteDataFiles(manifest, formulaPages),
+    { path: join(contentRoot, excel_coverage.route), content: excel_coverage.content },
+    ...siteDataFiles(manifest, formula_pages),
     {
       path: join(generatedDataRoot, "formula-summary.json"),
-      content: stableJson({ functionCount: formulaNames.size }),
+      content: stableJson({ functionCount: formula_names.size }),
     },
     {
       path: join(generatedDataRoot, "compatibility.json"),
@@ -415,12 +418,12 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     },
     {
       path: join(generatedDataRoot, "compatibility-results.json"),
-      content: stableJson(publishedCompatibilityResults),
+      content: stableJson(published_compatibility_results),
     },
     // The landing shows the counts only; the full results ship with their own page.
     {
       path: join(generatedDataRoot, "compatibility-summary.json"),
-      content: stableJson(publishedCompatibilityResults.testSet),
+      content: stableJson(published_compatibility_results.testSet),
     },
     // Each figure leaves its page for a static HTML asset, so the page's script carries a placeholder.
     ...splitPerformancePages(await renderEvidenceText()).flatMap((page) => {
@@ -450,7 +453,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
 }
 
 /** Every file under `root`, recursively; empty when `root` does not exist. */
-async function filesUnder(root: string): Promise<string[]> {
+async function files_under(root: string): Promise<string[]> {
   if (!(await exists(root))) return [];
   const entries = await readdir(root, { recursive: true, withFileTypes: true });
   return entries
@@ -463,7 +466,7 @@ async function filesUnder(root: string): Promise<string[]> {
  * source is gone (a removed export's API page, a renamed data file), then the
  * directories that leaves empty.
  */
-async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Promise<void> {
+async function remove_stale_generated_files(expected: readonly ExpectedFile[]): Promise<void> {
   const keep = new Set(expected.map((file) => file.path));
   const roots = [
     generatedDataRoot,
@@ -471,7 +474,7 @@ async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Pro
     ...generatedPublicRoots,
   ];
   for (const root of roots) {
-    for (const path of await filesUnder(root)) {
+    for (const path of await files_under(root)) {
       if (!keep.has(path)) await rm(path);
     }
     const directories = (await exists(root))
@@ -492,7 +495,7 @@ async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Pro
  * are ignored, so the check needs no earlier generation and a stale copy
  * cannot hide a broken link.
  */
-async function siteDocuments(expected: readonly ExpectedFile[]): Promise<MarkdownDocument[]> {
+async function site_documents(expected: readonly ExpectedFile[]): Promise<MarkdownDocument[]> {
   const authored = (await markdownDocuments(contentRoot)).filter(
     (document) => !isGeneratedContent(document.path),
   );
@@ -501,35 +504,35 @@ async function siteDocuments(expected: readonly ExpectedFile[]): Promise<Markdow
   );
   // The site inlines a formula table into the page that names it
   // (docs/src/islands/content.tsx), so the table's row ids are that page's anchors.
-  const tableRoot = join(generatedDataRoot, "formula-tables");
+  const table_root = join(generatedDataRoot, "formula-tables");
   const tables = new Map(
     expected
-      .filter((file) => file.path.startsWith(`${tableRoot}${sep}`))
+      .filter((file) => file.path.startsWith(`${table_root}${sep}`))
       .map((file): [string, string] => [
-        relative(tableRoot, file.path).replace(/\.html$/, ""),
+        relative(table_root, file.path).replace(/\.html$/, ""),
         file.content,
       ]),
   );
-  const withTables = generated.map((file) => {
+  const with_tables = generated.map((file) => {
     const table = tables.get(/<FormulaReference family="([^"]+)">/.exec(file.content)?.[1] ?? "");
     return table === undefined ? file : { ...file, content: `${file.content}\n${table}` };
   });
-  return [...authored, ...withTables];
+  return [...authored, ...with_tables];
 }
 
-async function checkDocs(
+async function check_docs(
   manifest: PublicApiManifest,
   expected: readonly ExpectedFile[],
-  apiIssues: readonly { code: string; message: string }[],
+  api_issues: readonly { code: string; message: string }[],
 ): Promise<string[]> {
-  const failures = apiIssues.map((issue) => `${issue.code}: ${issue.message}`);
+  const failures = api_issues.map((issue) => `${issue.code}: ${issue.message}`);
 
-  for (const oldPath of Object.keys(MIGRATION_ROUTES)) {
-    if (await exists(join(repositoryRoot, oldPath)))
-      failures.push(`duplicate migrated guide remains: ${oldPath}`);
+  for (const old_path of Object.keys(MIGRATION_ROUTES)) {
+    if (await exists(join(repositoryRoot, old_path)))
+      failures.push(`duplicate migrated guide remains: ${old_path}`);
   }
 
-  const documents = await siteDocuments(expected);
+  const documents = await site_documents(expected);
   for (const route of Object.values(MIGRATION_ROUTES)) {
     if (contentPathForRoute(route, documents) === undefined) {
       failures.push(`migration route has no page: ${route}`);
@@ -546,25 +549,28 @@ async function checkDocs(
   );
   failures.push(...(await siteLinkIssues(documents)));
   failures.push(...trackerReferenceIssues(documents));
-  const publicRoot = join(repositoryRoot, "docs/public");
-  const generatedPublicFiles = new Set(
+  const public_root = join(repositoryRoot, "docs/public");
+  const generated_public_files = new Set(
     expected
-      .filter((file) => file.path.startsWith(`${publicRoot}${sep}`))
-      .map((file) => `/${posix(relative(publicRoot, file.path))}`),
+      .filter((file) => file.path.startsWith(`${public_root}${sep}`))
+      .map((file) => `/${posix(relative(public_root, file.path))}`),
   );
-  failures.push(...(await validateMarkdown(documents, manifest, generatedPublicFiles)));
+  failures.push(...(await validateMarkdown(documents, manifest, generated_public_files)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
   failures.push(...adapterContractIssues(manifest));
 
-  const searchedText = documents.map((document) => document.content).join("\n");
+  const searched_text = documents.map((document) => document.content).join("\n");
   for (const term of REQUIRED_SEARCH_TERMS) {
-    if (!searchedText.includes(term)) failures.push(`required search term is absent: ${term}`);
+    if (!searched_text.includes(term)) failures.push(`required search term is absent: ${term}`);
   }
-  const allDocumentation = [...documents, ...(await readReadmes())];
-  const removedDirectory = ["examples", "site"].join("/");
-  const removedPackage = ["@sheetwrite", "example-site"].join("/");
-  for (const document of allDocumentation) {
-    if (document.content.includes(removedDirectory) || document.content.includes(removedPackage)) {
+  const all_documentation = [...documents, ...(await readReadmes())];
+  const removed_directory = ["examples", "site"].join("/");
+  const removed_package = ["@sheetwrite", "example-site"].join("/");
+  for (const document of all_documentation) {
+    if (
+      document.content.includes(removed_directory) ||
+      document.content.includes(removed_package)
+    ) {
       failures.push(
         `${posix(relative(repositoryRoot, document.path))} references the removed example site`,
       );
@@ -578,7 +584,7 @@ async function checkDocs(
     }
   }
 
-  const apiPageKeys = new Set(
+  const api_page_keys = new Set(
     expected
       .filter(
         (file) =>
@@ -587,70 +593,70 @@ async function checkDocs(
       )
       .map((file) => file.path),
   );
-  const entryPageKeys = new Set(
+  const entry_page_keys = new Set(
     manifest.packages.flatMap((pkg) =>
       pkg.entryPoints.map((entry) =>
         join(contentRoot, `api/${entrySlug(pkg.name, entry.subpath)}.md`),
       ),
     ),
   );
-  const symbolPageKeys = new Set(
+  const symbol_page_keys = new Set(
     manifest.packages.flatMap((pkg) =>
       pkg.entryPoints.flatMap((entry) =>
         entry.exports.map((item) => join(contentRoot, `${symbolPagePath(pkg, entry, item)}.md`)),
       ),
     ),
   );
-  const entryCount = entryPageKeys.size;
-  const exportCount = manifest.packages.reduce(
+  const entry_count = entry_page_keys.size;
+  const export_count = manifest.packages.reduce(
     (count, pkg) =>
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
   );
-  if (symbolPageKeys.size !== exportCount) {
+  if (symbol_page_keys.size !== export_count) {
     failures.push(
-      `API symbol route coverage mismatch: expected ${exportCount}, received ${symbolPageKeys.size}`,
+      `API symbol route coverage mismatch: expected ${export_count}, received ${symbol_page_keys.size}`,
     );
   }
-  for (const symbolPagePath of symbolPageKeys) {
-    if (!apiPageKeys.has(symbolPagePath)) {
-      failures.push(`generated API symbol page is missing: ${symbolPagePath}`);
+  for (const symbol_page_path of symbol_page_keys) {
+    if (!api_page_keys.has(symbol_page_path)) {
+      failures.push(`generated API symbol page is missing: ${symbol_page_path}`);
     }
   }
-  if (apiPageKeys.size !== entryCount + symbolPageKeys.size) {
+  if (api_page_keys.size !== entry_count + symbol_page_keys.size) {
     failures.push(
-      `API page coverage mismatch: expected ${entryCount + symbolPageKeys.size}, received ${apiPageKeys.size}`,
+      `API page coverage mismatch: expected ${entry_count + symbol_page_keys.size}, received ${api_page_keys.size}`,
     );
   }
 
-  const apiIndex =
+  const api_index =
     expected.find((file) => file.path === join(contentRoot, "api/index.md"))?.content ?? "";
-  for (const apiPagePath of entryPageKeys) {
-    const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
+  for (const api_page_path of entry_page_keys) {
+    const route = `/docs/${posix(relative(contentRoot, api_page_path)).replace(/\.md$/, "/")}`;
     // The index links entries from raw-HTML table rows; markdown links stay
     // recognized so prose references also satisfy the contract.
-    if (!apiIndex.includes(`](${route})`) && !apiIndex.includes(`href="${route}"`)) {
+    if (!api_index.includes(`](${route})`) && !api_index.includes(`href="${route}"`)) {
       failures.push(`generated API entry page is missing from the API index: ${route}`);
     }
   }
 
-  const navigationSource = await readFile(
+  const navigation_source = await readFile(
     join(repositoryRoot, "docs/src/lib/navigation.ts"),
     "utf8",
   );
-  if (!navigationSource.includes('href: "/docs/api/"')) {
+  if (!navigation_source.includes('href: "/docs/api/"')) {
     failures.push("generated API index is missing from the documentation navigation");
   }
 
-  const testPages = [
+  const test_pages = [
     join(repositoryRoot, "docs/src/routes/test.xlsx.tsx"),
     join(repositoryRoot, "docs/src/routes/test.collaboration.tsx"),
   ];
-  for (const testPage of testPages) {
-    if (!(await exists(testPage))) {
-      failures.push(`${posix(relative(repositoryRoot, testPage))} is missing`);
-    } else if (!(await readFile(testPage, "utf8")).includes("noindex, nofollow")) {
-      failures.push(`${posix(relative(repositoryRoot, testPage))} is not marked noindex`);
+  for (const test_page of test_pages) {
+    if (!(await exists(test_page))) {
+      failures.push(`${posix(relative(repositoryRoot, test_page))} is missing`);
+    } else if (!(await readFile(test_page, "utf8")).includes("noindex, nofollow")) {
+      failures.push(`${posix(relative(repositoryRoot, test_page))} is not marked noindex`);
     }
   }
   return [...new Set(failures)].sort();
@@ -666,16 +672,19 @@ const FATAL_ANALYSIS_ISSUES: Readonly<Record<string, true>> = {
 
 /** Writes every generated docs file and removes the ones no source produces any more. */
 export async function generateDocs(analysis: PublicApiAnalysis): Promise<string> {
-  const fatalIssues = analysis.issues.filter((issue) => FATAL_ANALYSIS_ISSUES[issue.code] === true);
-  if (fatalIssues.length > 0) throw new Error(fatalIssues.map((issue) => issue.message).join("\n"));
+  const fatal_issues = analysis.issues.filter(
+    (issue) => FATAL_ANALYSIS_ISSUES[issue.code] === true,
+  );
+  if (fatal_issues.length > 0)
+    throw new Error(fatal_issues.map((issue) => issue.message).join("\n"));
   const expected = await expectedGeneratedFiles(analysis.manifest);
-  await removeStaleGeneratedFiles(expected);
+  await remove_stale_generated_files(expected);
   for (const file of expected) await writeIfChanged(file.path, file.content);
-  const entryCount = analysis.manifest.packages.reduce(
+  const entry_count = analysis.manifest.packages.reduce(
     (count, pkg) => count + pkg.entryPoints.length,
     0,
   );
-  const symbolCount = analysis.manifest.packages.reduce(
+  const symbol_count = analysis.manifest.packages.reduce(
     (count, pkg) =>
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
@@ -687,7 +696,7 @@ export async function generateDocs(analysis: PublicApiAnalysis): Promise<string>
         `  ${api.packageName}: ${api.members.length} members, ${api.parameters.length} parameters, ${api.returns.length} return values`,
     );
   return [
-    `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`,
+    `Generated ${entry_count} API entry-point indexes, ${symbol_count} symbol pages, and documentation contracts`,
     ...(undocumented.length === 0
       ? []
       : ["Shown without a description in the API reference:", ...undocumented]),
@@ -735,21 +744,21 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/formulas": ["load"],
 };
 
-function requireApiExamples(manifest: PublicApiManifest): void {
+function require_api_examples(manifest: PublicApiManifest): void {
   const failures: string[] = [];
-  for (const [packageName, names] of Object.entries(REQUIRED_API_EXAMPLES)) {
+  for (const [package_name, names] of Object.entries(REQUIRED_API_EXAMPLES)) {
     const entry = manifest.packages
-      .find((pkg) => pkg.name === packageName)
+      .find((pkg) => pkg.name === package_name)
       ?.entryPoints.find((candidate) => candidate.subpath === ".");
     for (const name of names) {
-      const [symbolName, memberName] = name.split(".");
-      const apiExport = entry?.exports.find((candidate) => candidate.name === symbolName);
+      const [symbol_name, member_name] = name.split(".");
+      const api_export = entry?.exports.find((candidate) => candidate.name === symbol_name);
       const documentation =
-        memberName === undefined
-          ? apiExport?.documentation
-          : apiExport?.memberDocs.find((member) => member.name === memberName)?.documentation;
+        member_name === undefined
+          ? api_export?.documentation
+          : api_export?.memberDocs.find((member) => member.name === member_name)?.documentation;
       if (!/(?:^|\n)@example\s*\n[\s\S]*?```(?:ts|tsx)\s*\n[\s\S]+?```/.test(documentation ?? "")) {
-        failures.push(`${packageName} ${name} requires an @example with a TypeScript code block`);
+        failures.push(`${package_name} ${name} requires an @example with a TypeScript code block`);
       }
     }
   }
@@ -762,9 +771,9 @@ function requireApiExamples(manifest: PublicApiManifest): void {
  * capability contract. Throws every failure at once.
  */
 export async function verifyDocs(analysis: PublicApiAnalysis): Promise<string> {
-  requireApiExamples(analysis.manifest);
+  require_api_examples(analysis.manifest);
   const expected = await expectedGeneratedFiles(analysis.manifest);
-  const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
+  const failures = await check_docs(analysis.manifest, expected, analysis.issues);
 
   // The showcase capability contract gates the docs build: a capability
   // without an owner, route, browser contract, or shared binding must not ship.

@@ -3,10 +3,10 @@ import { expect, test } from "./fixtures.js";
 test("a refresh brings new orders and a changed step into the tables", async ({ page }) => {
   await page.goto("/showcases/queries/");
   const matched = page.getByText("Tables match the sources");
-  const ordersCounted = page.getByTestId("queries-formula-Orders counted");
+  const orders_counted = page.getByTestId("queries-formula-Orders counted");
   const fetches = page.getByTestId("queries-fetches");
-  const count = async () => Number((await ordersCounted.textContent())?.replace(/,/g, ""));
-  const refreshAll = async () => {
+  const count = async () => Number((await orders_counted.textContent())?.replace(/,/g, ""));
+  const refresh_all = async () => {
     await page.getByRole("button", { name: "Refresh All" }).last().click();
     await expect(matched).toBeVisible();
   };
@@ -19,15 +19,15 @@ test("a refresh brings new orders and a changed step into the tables", async ({ 
   await expect(page.getByText("New orders in the feed: Refresh All to load them")).toBeVisible();
   await expect(matched).toHaveCount(0);
   expect(await count()).toBe(shipped);
-  await refreshAll();
-  const withNewOrders = await count();
-  expect(withNewOrders).toBeGreaterThan(shipped);
+  await refresh_all();
+  const with_new_orders = await count();
+  expect(with_new_orders).toBeGreaterThan(shipped);
 
   // A changed step is saved at once and applied by the next refresh.
   await page.getByRole("radio", { name: "All statuses" }).click();
   await expect(page.getByText("Query changed: Refresh All to apply it")).toBeVisible();
-  await refreshAll();
-  expect(await count()).toBeGreaterThan(withNewOrders);
+  await refresh_all();
+  expect(await count()).toBeGreaterThan(with_new_orders);
 
   // Undo restores the recorded values without another source load.
   const loads = (await fetches.textContent()) ?? "";
@@ -35,6 +35,6 @@ test("a refresh brings new orders and a changed step into the tables", async ({ 
     .getByRole("complementary", { name: "Controls" })
     .getByRole("button", { name: "Undo" })
     .click();
-  await expect(ordersCounted).toHaveText(withNewOrders.toLocaleString("en"));
+  await expect(orders_counted).toHaveText(with_new_orders.toLocaleString("en"));
   await expect(fetches).toHaveText(loads);
 });

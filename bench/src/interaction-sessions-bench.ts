@@ -10,7 +10,7 @@ const WARMUPS = 3;
 const SAMPLES = 11;
 const DRAG_STEPS = 20;
 await initSheetwrite();
-const restoreCanvas = installCanvasTestStubs();
+const restore_canvas = installCanvasTestStubs();
 const workbook: Workbook = {
   activeSheet: "s1",
   sheets: [
@@ -68,13 +68,13 @@ try {
       for (let iteration = 0; iteration < iterations; iteration++) {
         const started = performance.now();
         if (workload === "column-resize" || workload === "row-resize") {
-          const isColumn = workload === "column-resize";
-          const x = isColumn ? DEFAULT_THEME.rowHeaderWidth + 160 : 10;
-          const y = isColumn ? 10 : DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
+          const is_column = workload === "column-resize";
+          const x = is_column ? DEFAULT_THEME.rowHeaderWidth + 160 : 10;
+          const y = is_column ? 10 : DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
           pointer("pointerdown", x, y);
           for (let step = 1; step <= DRAG_STEPS; step++)
-            pointer("pointermove", x + (isColumn ? step : 0), y + (isColumn ? 0 : step));
-          pointer("pointerup", x + (isColumn ? DRAG_STEPS : 0), y + (isColumn ? 0 : DRAG_STEPS));
+            pointer("pointermove", x + (is_column ? step : 0), y + (is_column ? 0 : step));
+          pointer("pointerup", x + (is_column ? DRAG_STEPS : 0), y + (is_column ? 0 : DRAG_STEPS));
         } else if (workload === "edit") {
           grid.beginEdit(0, 0, "Timing edit");
           const editor = host.querySelector("textarea.sheetwrite-editor");
@@ -114,5 +114,5 @@ try {
 } finally {
   grid.destroy();
   host.remove();
-  restoreCanvas();
+  restore_canvas();
 }

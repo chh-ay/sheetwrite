@@ -25,16 +25,16 @@ const THEME: Theme = {
   highlight: "#1d1e1f",
 };
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 const mounted: Array<{ host: HTMLElement; grid: GridImpl }> = [];
-const injectedStyles: HTMLStyleElement[] = [];
+const injected_styles: HTMLStyleElement[] = [];
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
@@ -42,13 +42,13 @@ afterEach(() => {
     grid.destroy();
     host.remove();
   }
-  for (const style of injectedStyles.splice(0)) style.remove();
-  restoreStubs();
+  for (const style of injected_styles.splice(0)) style.remove();
+  restore_stubs();
 });
 
 // The grid mounts the default toolbar, which loads lazily: awaiting its module
 // runs the grid's mount callback first.
-async function makeGrid(): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
+async function make_grid(): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
   const workbook = makeWorkbook();
   const store = new SheetwriteStore(workbook, makeColumnarData(50));
   const host = mountHost();
@@ -58,18 +58,18 @@ async function makeGrid(): Promise<{ host: HTMLDivElement; grid: GridImpl }> {
   return { host, grid };
 }
 
-function injectStyle(css: string): void {
+function inject_style(css: string): void {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
-  injectedStyles.push(style);
+  injected_styles.push(style);
 }
 
 describe("built-in widget styling", () => {
   // No widget paints a light-theme colour under a dark theme. The menu shadow
   // and the disabled row opacity are the same in every theme.
   it("derives every unseeded widget custom property from seeded ones", async () => {
-    const { host } = await makeGrid();
+    const { host } = await make_grid();
     const seeded = (name: string) => host.style.getPropertyValue(name) !== "";
     const constants: Readonly<Record<string, true>> = {
       "--sheetwrite-menu-shadow": true,
@@ -107,17 +107,17 @@ describe("built-in widget styling", () => {
 
   // A host rule on the widget wins over the value the root seeds, without !important.
   it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
-    injectStyle(coreStyles());
-    const { host } = await makeGrid();
+    inject_style(coreStyles());
+    const { host } = await make_grid();
     // Ctrl+F on the host loads the find bar's chunk and shows the bar.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    const findEl = await elementAdded(host, ".sheetwrite-find", HTMLDivElement);
-    const toolbarEl = host.querySelector(".sheetwrite-toolbar")!;
+    const find_el = await elementAdded(host, ".sheetwrite-find", HTMLDivElement);
+    const toolbar_el = host.querySelector(".sheetwrite-toolbar")!;
 
-    expect(getComputedStyle(findEl).background).toBe(THEME.bg);
-    expect(getComputedStyle(toolbarEl).background).toBe(THEME.headerBg);
-    injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
-    expect(getComputedStyle(findEl).background).toBe("#abcabc");
+    expect(getComputedStyle(find_el).background).toBe(THEME.bg);
+    expect(getComputedStyle(toolbar_el).background).toBe(THEME.headerBg);
+    inject_style(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
+    expect(getComputedStyle(find_el).background).toBe("#abcabc");
   });
 });
 
@@ -127,14 +127,14 @@ describe("stylesheet parts", () => {
   it.each([
     ["development", "1"],
     ["production", "0"],
-  ])("checks missing styles in %s builds", async (mode, expectedWarnings) => {
+  ])("checks missing styles in %s builds", async (mode, expected_warnings) => {
     const probe = Bun.spawn(
       [
         process.execPath,
         "--preload",
         "./test-setup.ts",
         "./packages/core/test/style-parts-probe.ts",
-        expectedWarnings,
+        expected_warnings,
       ],
       {
         cwd: new URL("../../..", import.meta.url).pathname,
@@ -143,11 +143,15 @@ describe("stylesheet parts", () => {
         stderr: "pipe",
       },
     );
-    const [exitCode, stdout, stderr] = await Promise.all([
+    const [exit_code, stdout, stderr] = await Promise.all([
       probe.exited,
       new Response(probe.stdout).text(),
       new Response(probe.stderr).text(),
     ]);
-    expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+    expect({ exitCode: exit_code, stdout, stderr }).toEqual({
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
+    });
   });
 });

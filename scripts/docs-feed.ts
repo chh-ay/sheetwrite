@@ -33,7 +33,7 @@ const FEED_DESCRIPTION =
   "New features, changes, fixes and performance results in each Sheetwrite release.";
 
 /** Text for an XML element or attribute value. */
-function escapeXml(text: string): string {
+function escape_xml(text: string): string {
   return text
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -48,29 +48,29 @@ export function rfc822Date(date: string): string {
 }
 
 /** The item description: the summary, then the highlights as a list, as escaped HTML. */
-function itemDescription(release: FeedRelease): string {
+function item_description(release: FeedRelease): string {
   const highlights = release.highlights ?? [];
   const list =
     highlights.length === 0
       ? ""
-      : `<ul>${highlights.map((highlight) => `<li>${escapeXml(highlight)}</li>`).join("")}</ul>`;
-  return escapeXml(`<p>${escapeXml(release.summary)}</p>${list}`);
+      : `<ul>${highlights.map((highlight) => `<li>${escape_xml(highlight)}</li>`).join("")}</ul>`;
+  return escape_xml(`<p>${escape_xml(release.summary)}</p>${list}`);
 }
 
 /** The feed document for `releases`, newest first. */
 export function changelogFeed(releases: readonly FeedRelease[]): string {
-  const channelLink = `${SITE_URL}${RELEASES_HREF}`;
-  const feedUrl = `${SITE_URL}${CHANGELOG_FEED_HREF}`;
+  const channel_link = `${SITE_URL}${RELEASES_HREF}`;
+  const feed_url = `${SITE_URL}${CHANGELOG_FEED_HREF}`;
   const newest = releases[0];
   const items = releases.map((release) => {
     const link = `${SITE_URL}${releaseHref(release.version)}`;
     return [
       "    <item>",
-      `      <title>Sheetwrite ${escapeXml(release.version)}</title>`,
-      `      <link>${escapeXml(link)}</link>`,
-      `      <guid isPermaLink="true">${escapeXml(link)}</guid>`,
+      `      <title>Sheetwrite ${escape_xml(release.version)}</title>`,
+      `      <link>${escape_xml(link)}</link>`,
+      `      <guid isPermaLink="true">${escape_xml(link)}</guid>`,
       `      <pubDate>${rfc822Date(release.date)}</pubDate>`,
-      `      <description>${itemDescription(release)}</description>`,
+      `      <description>${item_description(release)}</description>`,
       "    </item>",
     ].join("\n");
   });
@@ -78,15 +78,15 @@ export function changelogFeed(releases: readonly FeedRelease[]): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
     "  <channel>",
-    `    <title>${escapeXml(CHANGELOG_FEED_TITLE)}</title>`,
-    `    <link>${escapeXml(channelLink)}</link>`,
+    `    <title>${escape_xml(CHANGELOG_FEED_TITLE)}</title>`,
+    `    <link>${escape_xml(channel_link)}</link>`,
     `    <description>${FEED_DESCRIPTION}</description>`,
     "    <language>en</language>",
     // The newest release date, not the build time, so a rebuild writes the same bytes.
     ...(newest === undefined
       ? []
       : [`    <lastBuildDate>${rfc822Date(newest.date)}</lastBuildDate>`]),
-    `    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />`,
+    `    <atom:link href="${escape_xml(feed_url)}" rel="self" type="application/rss+xml" />`,
     ...items,
     "  </channel>",
     "</rss>",

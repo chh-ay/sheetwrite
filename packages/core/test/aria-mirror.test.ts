@@ -14,24 +14,24 @@ const SCROLLED_ROWS = 100;
 const WIDE_SHEET_WIDTHS = Array.from({ length: 40 }, (_, col) => (col % 3 === 0 ? 150 : 60));
 /** Scrolled part of the first, 150 px column: one more column comes into the window. */
 const SCROLLED_LEFT_PX = 60;
-let restoreCanvas: () => void;
-let originalFrame: typeof requestAnimationFrame;
-let originalCancelFrame: typeof cancelAnimationFrame;
+let restore_canvas: () => void;
+let original_frame: typeof requestAnimationFrame;
+let original_cancel_frame: typeof cancelAnimationFrame;
 const frames = new Map<number, FrameRequestCallback>();
-let nextFrame = 0;
+let next_frame = 0;
 let mounted: { grid: Grid; host: HTMLElement } | null = null;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
-  originalFrame = globalThis.requestAnimationFrame;
-  originalCancelFrame = globalThis.cancelAnimationFrame;
+  restore_canvas = installCanvasTestStubs();
+  original_frame = globalThis.requestAnimationFrame;
+  original_cancel_frame = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = (callback) => {
-    nextFrame += 1;
-    frames.set(nextFrame, callback);
-    return nextFrame;
+    next_frame += 1;
+    frames.set(next_frame, callback);
+    return next_frame;
   };
   globalThis.cancelAnimationFrame = (id) => frames.delete(id);
 });
@@ -40,12 +40,12 @@ afterEach(() => {
   mounted?.host.remove();
   mounted = null;
   frames.clear();
-  globalThis.requestAnimationFrame = originalFrame;
-  globalThis.cancelAnimationFrame = originalCancelFrame;
-  restoreCanvas();
+  globalThis.requestAnimationFrame = original_frame;
+  globalThis.cancelAnimationFrame = original_cancel_frame;
+  restore_canvas();
 });
 
-function flushFrames(): void {
+function flush_frames(): void {
   while (frames.size > 0) {
     const pending = [...frames.values()];
     frames.clear();
@@ -75,20 +75,23 @@ const PRODUCTS: SheetSpec = {
 };
 
 function mount(
-  { rowCount, columns, data }: SheetSpec = PRODUCTS,
-  { runFrames = true }: { runFrames?: boolean } = {},
+  { rowCount: row_count, columns, data }: SheetSpec = PRODUCTS,
+  { runFrames: run_frames = true }: { runFrames?: boolean } = {},
 ): { grid: Grid; host: HTMLElement } {
   const host = document.createElement("div");
   Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
   Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
   document.body.appendChild(host);
   const grid = createGrid(host, {
-    workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "One", rowCount, columns }] },
+    workbook: {
+      activeSheet: "s1",
+      sheets: [{ id: "s1", name: "One", rowCount: row_count, columns }],
+    },
     data,
     config: { toolbar: false, find: false, contextMenu: false },
   });
   mounted = { grid, host };
-  if (runFrames) flushFrames();
+  if (run_frames) flush_frames();
   return mounted;
 }
 
@@ -98,11 +101,11 @@ function mirror(host: HTMLElement): HTMLElement {
   return element;
 }
 
-function gridCell(host: HTMLElement, row: number, col: number): HTMLElement | null {
+function grid_cell(host: HTMLElement, row: number, col: number): HTMLElement | null {
   return mirror(host).querySelector<HTMLElement>(`[role="gridcell"][id$="-${row}-${col}"]`);
 }
 
-function scrollTo(host: HTMLElement, row: number, left = 0): void {
+function scroll_to(host: HTMLElement, row: number, left = 0): void {
   const scroller = scrollerOf(host);
   scroller.scrollTop = row * DEFAULT_THEME.rowHeight;
   scroller.scrollLeft = left;
@@ -125,7 +128,7 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   const { grid, host } = mount();
   grid.setNote({ sheet: "s1", row: 1, col: 1 }, "Checked");
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-  flushFrames();
+  flush_frames();
 
   const id = mirror(host).id;
   expect(mirror(host).getAttribute("role")).toBe("grid");
@@ -141,14 +144,14 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   expect(shown.map((header) => header.textContent)).toEqual(["A", "B", "C"]);
   expect(attrs(shown, "aria-colindex")).toEqual(["1", "2", "3"]);
   expect(attrs(rows(host), "aria-rowindex").slice(0, 3)).toEqual(["1", "2", "3"]);
-  const focused = gridCell(host, 0, 0);
+  const focused = grid_cell(host, 0, 0);
   expect(focused?.textContent).toBe("Item 0");
   expect(focused?.getAttribute("aria-selected")).toBe("true");
   expect(focused?.getAttribute("aria-colindex")).toBe("1");
-  expect(gridCell(host, 0, 1)?.textContent).toBe("0");
-  expect(gridCell(host, 0, 1)?.hasAttribute("aria-selected")).toBe(false);
-  expect(gridCell(host, 1, 1)?.getAttribute("aria-description")).toBe("Note: Checked");
-  expect(gridCell(host, 1, 0)?.hasAttribute("aria-description")).toBe(false);
+  expect(grid_cell(host, 0, 1)?.textContent).toBe("0");
+  expect(grid_cell(host, 0, 1)?.hasAttribute("aria-selected")).toBe(false);
+  expect(grid_cell(host, 1, 1)?.getAttribute("aria-description")).toBe("Note: Checked");
+  expect(grid_cell(host, 1, 0)?.hasAttribute("aria-description")).toBe(false);
 });
 
 it("shows a validation rule's input message beside its selected cell and in its description", () => {
@@ -162,25 +165,25 @@ it("shows a validation rule's input message beside its selected cell and in its 
     inputMessage: "Units ordered.",
   });
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-  flushFrames();
+  flush_frames();
   expect(host.querySelector(".sheetwrite-input-message")?.textContent).toBe(
     "QuantityUnits ordered.",
   );
-  expect(gridCell(host, 0, 1)?.getAttribute("aria-description")).toBe("Quantity: Units ordered.");
+  expect(grid_cell(host, 0, 1)?.getAttribute("aria-description")).toBe("Quantity: Units ordered.");
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-  flushFrames();
+  flush_frames();
   expect(host.querySelector(".sheetwrite-input-message")).toBeNull();
 });
 
 it("marks a selected column's header and a selected row", () => {
   const { grid, host } = mount();
   grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
-  flushFrames();
+  flush_frames();
   expect(attrs(headers(host), "aria-selected").slice(0, 3)).toEqual([null, "true", null]);
 
   grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
-  flushFrames();
+  flush_frames();
   expect(attrs(rows(host), "aria-selected").slice(0, 4)).toEqual([null, null, null, "true"]);
   expect(headers(host).some((header) => header.hasAttribute("aria-selected"))).toBe(false);
 });
@@ -188,20 +191,20 @@ it("marks a selected column's header and a selected row", () => {
 it("follows a scrolled window, naming no active cell outside it", () => {
   const { grid, host } = mount();
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-  flushFrames();
+  flush_frames();
 
-  scrollTo(host, SCROLLED_ROWS);
-  flushFrames();
+  scroll_to(host, SCROLLED_ROWS);
+  flush_frames();
 
   const indices = attrs(rows(host), "aria-rowindex");
   expect(indices[0]).toBe("1");
   expect(indices).toContain(String(SCROLLED_ROWS + 2));
   expect(indices).not.toContain("2");
-  expect(gridCell(host, SCROLLED_ROWS, 0)?.textContent).toBe(`Item ${SCROLLED_ROWS}`);
-  expect(gridCell(host, 0, 0)).toBeNull();
+  expect(grid_cell(host, SCROLLED_ROWS, 0)?.textContent).toBe(`Item ${SCROLLED_ROWS}`);
+  expect(grid_cell(host, 0, 0)).toBeNull();
   expect(host.hasAttribute("aria-activedescendant")).toBe(false);
-  scrollTo(host, 0);
-  flushFrames();
+  scroll_to(host, 0);
+  flush_frames();
   expect(host.getAttribute("aria-activedescendant")).toBe(`${mirror(host).id}-0-0`);
 });
 
@@ -215,22 +218,22 @@ it("keeps its cells when a sideways scroll changes how many columns show", () =>
       width,
     })),
   });
-  const columnsBefore = headers(host).length;
-  const firstRow = rows(host)[1];
-  const firstCell = firstRow?.querySelector('[role="gridcell"]');
+  const columns_before = headers(host).length;
+  const first_row = rows(host)[1];
+  const first_cell = first_row?.querySelector('[role="gridcell"]');
 
-  scrollTo(host, 0, SCROLLED_LEFT_PX);
-  flushFrames();
+  scroll_to(host, 0, SCROLLED_LEFT_PX);
+  flush_frames();
 
   const shown = headers(host);
-  expect(shown.length).toBe(columnsBefore + 1);
+  expect(shown.length).toBe(columns_before + 1);
   // The nodes stay; the new column's cells are added to them.
-  expectSame(rows(host)[1], firstRow);
-  expectSame(firstRow?.querySelector('[role="gridcell"]'), firstCell);
-  const lastColumn = Number(shown.at(-1)?.getAttribute("aria-colindex")) - 1;
-  const lastCell = firstRow?.querySelectorAll('[role="gridcell"]')[shown.length - 1];
-  expect(lastCell?.id).toBe(`${mirror(host).id}-0-${lastColumn}`);
-  expect(lastCell?.getAttribute("aria-colindex")).toBe(String(lastColumn + 1));
+  expectSame(rows(host)[1], first_row);
+  expectSame(first_row?.querySelector('[role="gridcell"]'), first_cell);
+  const last_column = Number(shown.at(-1)?.getAttribute("aria-colindex")) - 1;
+  const last_cell = first_row?.querySelectorAll('[role="gridcell"]')[shown.length - 1];
+  expect(last_cell?.id).toBe(`${mirror(host).id}-0-${last_column}`);
+  expect(last_cell?.getAttribute("aria-colindex")).toBe(String(last_column + 1));
   for (const row of rows(host).slice(1)) {
     expect(row.querySelectorAll('[role="gridcell"]').length).toBe(shown.length);
   }
@@ -243,13 +246,13 @@ it("writes the mirror on mount and on a synchronous paint, before any frame", ()
       .slice(0, 2)
       .map((header) => header.textContent),
   ).toEqual(["A", "B"]);
-  expect(gridCell(host, 0, 0)?.textContent).toBe("Item 0");
+  expect(grid_cell(host, 0, 0)?.textContent).toBe("Item 0");
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
   grid.refresh();
   expect(host.getAttribute("aria-activedescendant")).toBe(`${mirror(host).id}-2-1`);
-  expect(gridCell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
-  expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
+  expect(grid_cell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
+  expect(grid_cell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
 });
 
 it("reads each cell as the canvas shows it, in the cell's number format", () => {
@@ -269,7 +272,7 @@ it("reads each cell as the canvas shows it, in the cell's number format", () => 
     data: { rowCount: 1, columns: { due: [45351], rate: [0.125], share: [1 / 3] } },
   });
 
-  expect([0, 1, 2].map((col) => gridCell(host, 0, col)?.textContent)).toEqual([
+  expect([0, 1, 2].map((col) => grid_cell(host, 0, col)?.textContent)).toEqual([
     "2024-02-29",
     "12.5%",
     "0.333333333",
@@ -281,8 +284,8 @@ it("leaves the host clean when a listener destroys the grid during a paint", () 
   grid.on("scroll", () => grid.destroy());
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
 
-  scrollTo(host, SCROLLED_ROWS);
-  flushFrames();
+  scroll_to(host, SCROLLED_ROWS);
+  flush_frames();
 
   expect(host.querySelector(".sheetwrite-aria")).toBeNull();
   for (const name of ["role", "aria-rowcount", "aria-activedescendant"]) {

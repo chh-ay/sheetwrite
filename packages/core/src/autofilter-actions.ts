@@ -40,7 +40,7 @@ const menus = new WeakMap<AutoFilterHost, AutoFilterMenu>();
 
 /** Open the dropdown of `col`'s header cell, as its button or Alt+Down does. */
 export function openAutoFilterMenu(host: AutoFilterHost, col: number): void {
-  const request = autoFilterRequest(host, col);
+  const request = auto_filter_request(host, col);
   if (!request) return;
   let menu = menus.get(host);
   if (!menu) {
@@ -60,7 +60,7 @@ export function openAutoFilterMenu(host: AutoFilterHost, col: number): void {
  * Excel, the kind of most listed values wins: a number in a date format is a
  * date. A date column is dates; a column with no values goes by its type.
  */
-function autoFilterColumnKind(
+function auto_filter_column_kind(
   column: Column | undefined,
   values: readonly CellScalar[],
   formats: readonly (string | undefined)[],
@@ -86,7 +86,7 @@ function autoFilterColumnKind(
 }
 
 /** What the dropdown of `col` shows and does; `null` without an AutoFilter there. */
-function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuRequest | null {
+function auto_filter_request(host: AutoFilterHost, col: number): AutoFilterMenuRequest | null {
   const { grid } = host;
   const sheet = host.sheet();
   const range = sheet.autoFilter?.range;
@@ -102,34 +102,36 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
     col,
     AUTO_FILTER_VALUE_LIMIT,
   );
-  const kind = autoFilterColumnKind(column, values, formats);
+  const kind = auto_filter_column_kind(column, values, formats);
   // Each listed value shows as its first cell shows it, else in the column's
   // format. Typed condition values take the format of the first listed date.
-  const formatOf = new Map<CellScalar, string | undefined>();
-  for (const [index, value] of values.entries()) formatOf.set(value, formats[index]);
-  const typedFormat =
+  const format_of = new Map<CellScalar, string | undefined>();
+  for (const [index, value] of values.entries()) format_of.set(value, formats[index]);
+  const typed_format =
     (kind === "date" ? formats.find((code) => DATE_FORMAT.test(code ?? "")) : undefined) ??
     column?.numberFormat;
-  const shownFormat = (value: number): string | undefined =>
-    formatOf.has(value) ? (formatOf.get(value) ?? column?.numberFormat) : typedFormat;
+  const shown_format = (value: number): string | undefined =>
+    format_of.has(value) ? (format_of.get(value) ?? column?.numberFormat) : typed_format;
   const format = (value: CellScalar): string =>
     typeof value === "number"
-      ? formatNumber(value, shownFormat(value), column?.numberLocale)
+      ? formatNumber(value, shown_format(value), column?.numberLocale)
       : typeof value === "boolean"
         ? value
           ? "TRUE"
           : "FALSE"
         : (value ?? "");
-  const headerValue = grid.store.getCell({ sheet: sheet.id, row: range.start.row, col }).resolved;
+  const header_value = grid.store.getCell({ sheet: sheet.id, row: range.start.row, col }).resolved;
   return {
     anchor,
     header:
-      headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
+      header_value === null || header_value === ""
+        ? `Column ${colToA1(col)}`
+        : format(header_value),
     kind,
     // As in Excel, only numbers that show as dates group by year, month and day.
     isDate: (value) =>
       column?.type === "date" ||
-      DATE_FORMAT.test(formatOf.get(value) ?? column?.numberFormat ?? ""),
+      DATE_FORMAT.test(format_of.get(value) ?? column?.numberFormat ?? ""),
     values,
     counts,
     kept,

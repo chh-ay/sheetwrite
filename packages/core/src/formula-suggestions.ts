@@ -35,14 +35,14 @@ export function formulaSuggester(store: Store): FormulaSuggester | null {
 }
 
 /** The workbook reads of a suggestion session, through the store and its engine. */
-function sheetReads(store: Store): FormulaSheetReads {
+function sheet_reads(store: Store): FormulaSheetReads {
   return {
     workbook: () => store.getWorkbook(),
     formula: (sheet, row, col) => store.getFormula({ sheet, row, col }),
     value: (sheet, row, col) => store.getCell({ sheet, row, col }).resolved,
     // A custom store without an engine has no Ctrl+Arrow scan: the edge is the cell itself.
-    edge: (sheet, row, col, dRow, dCol) =>
-      storeEngine(store)?.dataEdge(sheet, row, col, dRow, dCol) ?? (dRow === 0 ? col : row),
+    edge: (sheet, row, col, d_row, d_col) =>
+      storeEngine(store)?.dataEdge(sheet, row, col, d_row, d_col) ?? (d_row === 0 ? col : row),
     translate: shiftA1Refs,
   };
 }
@@ -53,7 +53,7 @@ export function formulaEdit(
   cell: Readonly<CellAddress>,
   functions: () => readonly FormulaFunctionMetadata[],
 ): FormulaEdit {
-  return { cell: { ...cell }, reads: sheetReads(store), functions };
+  return { cell: { ...cell }, reads: sheet_reads(store), functions };
 }
 
 /**

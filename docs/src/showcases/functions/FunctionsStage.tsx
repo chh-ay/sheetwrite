@@ -32,20 +32,20 @@ type Family = FunctionFamilyChoice;
 type ScenarioAction = ReturnType<typeof createScenarioAction<FunctionsScenario>>;
 
 /** A typed number stays a number; anything else is text, as a cell entry would be. */
-const parsedInput = (text: string) =>
+const parsed_input = (text: string) =>
   text.trim() !== "" && Number.isFinite(Number(text)) ? Number(text) : text;
 
 /** The first input of the shown family, set as typing into B2 would. */
 function InputForm(props: { readonly family: Family; readonly action: ScenarioAction }) {
   const first = () => props.family.firstInput;
-  const [draft, setDraft] = createSignal("");
+  const [draft, set_draft] = createSignal("");
   return (
     <form
       class="sw-feature-input"
       onSubmit={(event) => {
         event.preventDefault();
         void props.action.run("The input", (current) =>
-          current.setFirstInput(parsedInput(draft())),
+          current.setFirstInput(parsed_input(draft())),
         );
       }}
     >
@@ -55,7 +55,7 @@ function InputForm(props: { readonly family: Family; readonly action: ScenarioAc
         </span>
         <input
           disabled={props.action.disabled()}
-          onInput={(event) => setDraft(event.currentTarget.value)}
+          onInput={(event) => set_draft(event.currentTarget.value)}
           placeholder={String(first().value)}
           value={draft()}
         />
@@ -76,13 +76,15 @@ function InputForm(props: { readonly family: Family; readonly action: ScenarioAc
 
 /** The functions showcase's island: one sheet per family, its input and live results. */
 export function FunctionsStage(props: FunctionsStageProps) {
-  const familyOf = (id: FamilyId | undefined): Family =>
+  const family_of = (id: FamilyId | undefined): Family =>
     props.families.find((family) => family.id === id) ?? props.firstFamily;
   const live = createLiveScenario<FunctionsScenario, FunctionsSnapshot>(() =>
-    import("./boot.js").then(({ createFunctionsScenario }) => createFunctionsScenario),
+    import("./boot.js").then(
+      ({ createFunctionsScenario: create_functions_scenario }) => create_functions_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
-  const family = () => familyOf(live.snapshot()?.family);
+  const family = () => family_of(live.snapshot()?.family);
   // Before the engine is ready, each row holds its place with "…".
   const results = () =>
     live.snapshot()?.results ?? family().formulaNames.map((name) => ({ name, value: "…" }));

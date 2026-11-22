@@ -101,7 +101,7 @@ interface ChangeAxis {
   readonly high: number;
 }
 
-function changeAxis(changed: readonly Judged[]): ChangeAxis {
+function change_axis(changed: readonly Judged[]): ChangeAxis {
   const exponents = changed.map((entry) => Math.log2(entry.speedup));
   return {
     low: Math.min(0, Math.floor(Math.min(0, ...exponents))),
@@ -115,24 +115,24 @@ function position(speedup: number, axis: ChangeAxis): number {
 }
 
 /** "1/2×", "1×", "4×": a power of two as a ratio label. */
-function ratioLabel(exponent: number): string {
+function ratio_label(exponent: number): string {
   return exponent >= 0 ? `${(2 ** exponent).toLocaleString("en-US")}×` : `1/${2 ** -exponent}×`;
 }
 
-function axisTicks(axis: ChangeAxis): string {
+function axis_ticks(axis: ChangeAxis): string {
   const step = axis.high - axis.low + 1 > MAX_TICKS ? 2 : 1;
   const ticks: string[] = [];
   for (let exponent = axis.low; exponent <= axis.high; exponent += 1) {
     // Every other power of two is labelled on a long axis; 1× always is.
     if (exponent !== 0 && exponent % step !== 0) continue;
     ticks.push(
-      `<span style="left:${position(2 ** exponent, axis).toFixed(2)}%"${exponent === 0 ? ' data-centre=""' : ""}>${ratioLabel(exponent)}</span>`,
+      `<span style="left:${position(2 ** exponent, axis).toFixed(2)}%"${exponent === 0 ? ' data-centre=""' : ""}>${ratio_label(exponent)}</span>`,
     );
   }
   return ticks.join("");
 }
 
-function dotRow(judged: Judged, axis: ChangeAxis, icon: PerfIconMarkup): string {
+function dot_row(judged: Judged, axis: ChangeAxis, icon: PerfIconMarkup): string {
   const lane = laneHtml({
     label: judged.workload.label,
     scale: { kind: "log", domain: [2 ** axis.low, 2 ** axis.high] },
@@ -182,7 +182,7 @@ function middle(sorted: readonly number[]): number {
 }
 
 /** "Median 2.5× faster (1.5× to 16.7×)": how much the changed workloads changed. */
-function sizeOfChange(entries: readonly Judged[], word: "faster" | "slower"): string {
+function size_of_change(entries: readonly Judged[], word: "faster" | "slower"): string {
   if (entries.length === 0) return "";
   const factors = entries
     .map((entry) => (word === "faster" ? entry.speedup : 1 / entry.speedup))
@@ -200,7 +200,7 @@ interface MachineVerdicts {
   readonly noise: readonly Judged[];
 }
 
-function verdictsOf(change: ReleaseChange, machine: ChangeMachine): MachineVerdicts | undefined {
+function verdicts_of(change: ReleaseChange, machine: ChangeMachine): MachineVerdicts | undefined {
   if (machine.workloads === undefined) return undefined;
   const judged = judge(change, machine.workloads);
   return {
@@ -229,8 +229,8 @@ function counts(verdicts: MachineVerdicts): string {
 function sizes(verdicts: MachineVerdicts): string {
   return (
     [
-      ["better", sizeOfChange(verdicts.faster, "faster")],
-      ["worse", sizeOfChange(verdicts.slower, "slower")],
+      ["better", size_of_change(verdicts.faster, "faster")],
+      ["worse", size_of_change(verdicts.slower, "slower")],
     ] as const
   )
     .filter(([, text]) => text !== "")
@@ -238,15 +238,19 @@ function sizes(verdicts: MachineVerdicts): string {
     .join("");
 }
 
-function machinePanel(change: ReleaseChange, machine: ChangeMachine, icon: PerfIconMarkup): string {
+function machine_panel(
+  change: ReleaseChange,
+  machine: ChangeMachine,
+  icon: PerfIconMarkup,
+): string {
   const heading = `<p class="change__machine">${icon(MACHINE_ICONS[machine.machine])}<b>${escapeHtml(machine.name)}</b><span class="change__detail">${escapeHtml(machine.detail)}</span>${machine.note === undefined ? "" : `<span class="change__note">${escapeHtml(machine.note)}</span>`}</p>`;
-  const verdicts = verdictsOf(change, machine);
+  const verdicts = verdicts_of(change, machine);
   if (verdicts === undefined) {
     return `<section class="change__panel" data-machine="${machine.machine}" aria-label="${escapeHtml(machine.name)}">${heading}<p class="change__pending">${escapeHtml(machine.pending ?? "Not measured yet.")}</p></section>`;
   }
   const { judged, faster, slower, noise } = verdicts;
   const changed = [...faster, ...slower];
-  const axis = changeAxis(changed);
+  const axis = change_axis(changed);
   const direction =
     slower.length > 0 ? "left of 1× is slower, right is faster" : "right of 1× is faster";
   const overflow = changed.length - PHONE_ROWS;
@@ -258,10 +262,10 @@ function machinePanel(change: ReleaseChange, machine: ChangeMachine, icon: PerfI
     sizes(verdicts),
     changed.length === 0
       ? ""
-      : `<div class="change__overview"><p class="change__axis-title">Speedup against ${escapeHtml(change.baseName)} for each workload that changed, log scale: ${direction}. Workloads whose run ranges overlap are within noise, listed below.</p><div class="change__axis" aria-hidden="true"><span class="change__ticks">${axisTicks(axis)}</span></div>${
+      : `<div class="change__overview"><p class="change__axis-title">Speedup against ${escapeHtml(change.baseName)} for each workload that changed, log scale: ${direction}. Workloads whose run ranges overlap are within noise, listed below.</p><div class="change__axis" aria-hidden="true"><span class="change__ticks">${axis_ticks(axis)}</span></div>${
           // Phones show the largest changes first; the rest open on request.
           overflow > 0 ? `<input type="checkbox" class="change__toggle" id="${id}-all">` : ""
-        }<ul class="change__rows">${changed.map((entry) => dotRow(entry, axis, icon)).join("")}</ul>${
+        }<ul class="change__rows">${changed.map((entry) => dot_row(entry, axis, icon)).join("")}</ul>${
           overflow > 0
             ? `<label class="change__toggle-label" for="${id}-all"><span data-closed>Show ${overflow} more ${overflow === 1 ? "workload" : "workloads"}</span><span data-open>Show the first ${PHONE_ROWS} only</span></label>`
             : ""
@@ -275,12 +279,12 @@ function machinePanel(change: ReleaseChange, machine: ChangeMachine, icon: PerfI
 }
 
 /** Every machine side by side: counts and median lines per machine, then a mark per machine per workload. */
-function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
-  const perMachine = change.machines.map((machine) => ({
+function all_panel(change: ReleaseChange, icon: PerfIconMarkup): string {
+  const per_machine = change.machines.map((machine) => ({
     machine,
-    verdicts: verdictsOf(change, machine),
+    verdicts: verdicts_of(change, machine),
   }));
-  const columns = perMachine
+  const columns = per_machine
     .map(
       ({ machine, verdicts }) =>
         `<div class="change__column" data-machine="${machine.machine}"><p class="change__machine">${icon(MACHINE_ICONS[machine.machine])}<b>${escapeHtml(machine.name)}</b></p>${
@@ -290,15 +294,15 @@ function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
         }</div>`,
     )
     .join("");
-  const order = perMachine.find(({ verdicts }) => verdicts !== undefined)?.verdicts?.judged ?? [];
+  const order = per_machine.find(({ verdicts }) => verdicts !== undefined)?.verdicts?.judged ?? [];
   const labels = new Map(order.map((entry) => [entry.workload.id, entry.workload.label] as const));
-  for (const { machine } of perMachine) {
+  for (const { machine } of per_machine) {
     for (const workload of machine.workloads ?? []) labels.set(workload.id, workload.label);
   }
-  const allRows = [...labels].map(([id, label]) => ({
+  const all_rows = [...labels].map(([id, label]) => ({
     label,
     results: Object.fromEntries(
-      perMachine.map(({ machine, verdicts }) => {
+      per_machine.map(({ machine, verdicts }) => {
         const entry = verdicts?.judged.find((judged) => judged.workload.id === id);
         return [
           machine.machine,
@@ -310,10 +314,10 @@ function allPanel(change: ReleaseChange, icon: PerfIconMarkup): string {
     ),
   }));
   // A row is drawn when some machine measured a change; rows within noise everywhere are listed.
-  const changed = (entry: (typeof allRows)[number]) =>
+  const changed = (entry: (typeof all_rows)[number]) =>
     Object.values(entry.results).some((result) => "ratio" in result && !result.noise);
-  const rows = allRows.filter(changed);
-  const quiet = allRows.filter((entry) => !changed(entry));
+  const rows = all_rows.filter(changed);
+  const quiet = all_rows.filter((entry) => !changed(entry));
   return `<section class="change__panel" data-machine="${ALL_MACHINES}" aria-label="Every machine"><div class="change__columns">${columns}</div>${renderMachineComparison(
     {
       id: `${change.id}-all`,
@@ -355,8 +359,8 @@ export function renderReleaseChange(change: ReleaseChange, icon: PerfIconMarkup)
           icon,
         )
       : "",
-    ...change.machines.map((machine) => machinePanel(change, machine, icon)),
-    switched ? allPanel(change, icon) : "",
+    ...change.machines.map((machine) => machine_panel(change, machine, icon)),
+    switched ? all_panel(change, icon) : "",
     "</figure>",
   ].join("");
 }

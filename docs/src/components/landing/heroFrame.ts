@@ -168,7 +168,7 @@ export interface Frame {
   ripple: number;
 }
 
-function routeAt(t: number): { from: Target; to: Target; k: number } {
+function route_at(t: number): { from: Target; to: Target; k: number } {
   let index = 0;
   while (index + 1 < ROUTE.length && (ROUTE[index + 1]?.[0] ?? Infinity) <= t) index++;
 
@@ -194,54 +194,54 @@ export function frameAt(t: number): Frame {
   const grow = span(t, 5.3, 6.3);
 
   // Act 2: B3 takes 140 and its dependents recalculate.
-  const onB3 = t >= 9.6 && !reset;
+  const on_b3 = t >= 9.6 && !reset;
   const editing = t >= 9.8 && t < 11.0;
-  const typedIndex = t < 10.0 ? -1 : t < 10.25 ? 0 : t < 10.5 ? 1 : 2;
+  const typed_index = t < 10.0 ? -1 : t < 10.25 ? 0 : t < 10.5 ? 1 : 2;
   const committed = t >= 11.0 && !reset;
   const b3 = editing
-    ? (TYPED[typedIndex] ?? "")
+    ? (TYPED[typed_index] ?? "")
     : committed
       ? String(EDITED_UNITS)
       : String(SALES[WEST]?.units ?? 0);
   const d3k = reset ? 0 : span(t, 11.1, 11.7);
-  const totalsK = reset ? 0 : span(t, 11.7, 12.4);
-  const westK = reset ? 0 : span(t, 11.2, 12.0);
+  const totals_k = reset ? 0 : span(t, 11.7, 12.4);
+  const west_k = reset ? 0 : span(t, 11.2, 12.0);
   const pulse = (start: number) => {
     const age = t - start;
     return age > 0 && age < 1.2 ? 1 - age / 1.2 : 0;
   };
 
   // Act 3: a Pivot sheet with its field list; Units joins the values.
-  const pivotOn = t >= 17.4 && t < 23.6;
-  const pivotView = span(t, 17.4, 17.8) * (1 - span(t, 23.6, 24.2));
-  const unitsChecked = t >= 19.2 && t < 23.6;
+  const pivot_on = t >= 17.4 && t < 23.6;
+  const pivot_view = span(t, 17.4, 17.8) * (1 - span(t, 23.6, 24.2));
+  const units_checked = t >= 19.2 && t < 23.6;
 
-  const westBefore = BEFORE_REVENUE[WEST] ?? 0;
-  const westAfter = AFTER_REVENUE[WEST] ?? 0;
+  const west_before = BEFORE_REVENUE[WEST] ?? 0;
+  const west_after = AFTER_REVENUE[WEST] ?? 0;
   const bars = BEFORE_REVENUE.map(
     (value, index) =>
-      ((index === WEST ? lerp(westBefore, westAfter, westK) : value) / CHART_MAX) * grow,
+      ((index === WEST ? lerp(west_before, west_after, west_k) : value) / CHART_MAX) * grow,
   );
 
   const badge = BADGES.find((item) => t >= item.from && t <= item.to);
-  const route = routeAt(t);
+  const route = route_at(t);
   const visible = Math.max(...POINTER_WINDOWS.map(([from, to]) => fadeWindow(t, from, to, 0.3)));
-  const lastClick = Math.max(...CLICKS.filter((click) => click <= t), -Infinity);
-  const age = t - lastClick;
+  const last_click = Math.max(...CLICKS.filter((click) => click <= t), -Infinity);
+  const age = t - last_click;
 
   return {
     act,
     tab: t >= 3.4 && t < 23.6 ? "insert" : "home",
-    sheet: pivotOn ? "pivot" : "sales",
+    sheet: pivot_on ? "pivot" : "sales",
     menuOpen: t >= 4.35 && t < 5.0,
-    name: pivotOn ? "A1" : onB3 ? "B3" : "A1",
-    formula: pivotOn ? "Region" : onB3 ? b3 : "Region",
+    name: pivot_on ? "A1" : on_b3 ? "B3" : "A1",
+    formula: pivot_on ? "Region" : on_b3 ? b3 : "Region",
     editing,
-    selection: onB3 ? { c: 1, r: 2, w: 1, h: 1 } : reset ? { c: 0, r: 0, w: 1, h: 1 } : range,
+    selection: on_b3 ? { c: 1, r: 2, w: 1, h: 1 } : reset ? { c: 0, r: 0, w: 1, h: 1 } : range,
     b3,
-    d3: money(lerp(westBefore, westAfter, d3k)),
-    b6: count(lerp(UNITS_BEFORE, UNITS_AFTER, totalsK)),
-    d6: money(lerp(sum(BEFORE_REVENUE), sum(AFTER_REVENUE), totalsK)),
+    d3: money(lerp(west_before, west_after, d3k)),
+    b6: count(lerp(UNITS_BEFORE, UNITS_AFTER, totals_k)),
+    d6: money(lerp(sum(BEFORE_REVENUE), sum(AFTER_REVENUE), totals_k)),
     pulses: reset ? [0, 0, 0] : [pulse(11.1), pulse(11.7), pulse(11.7)],
     chart,
     chartSelected: t >= 5.05 && t < 9.6,
@@ -252,10 +252,10 @@ export function frameAt(t: number): Frame {
     },
     enter: fadeWindow(t, 10.8, 11.5, 0.15),
     pivotTab: span(t, 17.25, 17.55) * (1 - span(t, 23.6, 24.0)),
-    pivotView,
+    pivotView: pivot_view,
     fields: span(t, 17.6, 18.2) * (1 - span(t, 23.2, 23.8)),
-    unitsChecked,
-    unitsColumn: unitsChecked ? span(t, 19.3, 19.8) : 0,
+    unitsChecked: units_checked,
+    unitsColumn: units_checked ? span(t, 19.3, 19.8) : 0,
     pointer: { ...route, opacity: visible },
     ripple: age >= 0 && age < CLICK_SECONDS ? age / CLICK_SECONDS : 1,
   };

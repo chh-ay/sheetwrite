@@ -30,16 +30,16 @@ const RETAINED_BYTES = 1024;
 
 type Fixture = CompleteFormulaBenchmarkResult;
 
-function formulaFixture(mode: "full" | "smoke" = "smoke"): Fixture {
-  const sampleCount = mode === "smoke" ? 2 : 5;
-  const samples = Array.from({ length: sampleCount }, () => 1);
+function formula_fixture(mode: "full" | "smoke" = "smoke"): Fixture {
+  const sample_count = mode === "smoke" ? 2 : 5;
+  const samples = Array.from({ length: sample_count }, () => 1);
   const allocation = {
     retainedBytes: RETAINED_BYTES,
     peakTransientBytes: 0,
     transientAllocations: 0,
   };
   const files = Object.fromEntries(FORMULA_SOURCE_FILES.map((path) => [path, SOURCE_HASH]));
-  const sourceDigest = formulaSourceDigest(COMMIT, files);
+  const source_digest = formulaSourceDigest(COMMIT, files);
   return {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
@@ -64,10 +64,10 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): Fixture {
       concurrency: 1,
       gc: "Bun.gc(true) before every measured sample",
     },
-    source: { protocol: FORMULA_PROTOCOL, commit: COMMIT, files, digest: sourceDigest },
+    source: { protocol: FORMULA_PROTOCOL, commit: COMMIT, files, digest: source_digest },
     methodology: {
       warmupSamples: 1,
-      measuredSamples: sampleCount,
+      measuredSamples: sample_count,
       timing: TIMING_METHOD,
       allocation: ALLOCATION_METHOD,
       correctness: CORRECTNESS_METHOD,
@@ -96,18 +96,18 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): Fixture {
     gates: {
       passed: true,
       tolerance: FORMULA_GATE_TOLERANCE,
-      regression: { status: "passed", baselineCommit: COMMIT, baselineSourceDigest: sourceDigest },
+      regression: { status: "passed", baselineCommit: COMMIT, baselineSourceDigest: source_digest },
     },
   };
 }
 
-const firstWorkload = (result: Fixture) => must(result.workloads[0], "workload");
+const first_workload = (result: Fixture) => must(result.workloads[0], "workload");
 
 /** A full capture whose first workload has `samples` as its timings. */
-function withSamples(samples: number[]): Fixture {
-  const result = formulaFixture("full");
-  firstWorkload(result).samplesMs = samples;
-  firstWorkload(result).stat = summarize(samples);
+function with_samples(samples: number[]): Fixture {
+  const result = formula_fixture("full");
+  first_workload(result).samplesMs = samples;
+  first_workload(result).stat = summarize(samples);
   return result;
 }
 
@@ -130,7 +130,7 @@ describe("formula benchmark schema", () => {
         "named workload",
       );
     const key = "workload=independent-parse-load;size=1000";
-    expectRejections(formulaFixture, (result) => validateFormulaBenchmark(result, "smoke"), [
+    expectRejections(formula_fixture, (result) => validateFormulaBenchmark(result, "smoke"), [
       [
         (result) => result.workloads.splice(result.workloads.indexOf(named(result)), 1),
         `missing ${key}`,
@@ -139,7 +139,7 @@ describe("formula benchmark schema", () => {
       [
         (result) =>
           result.workloads.push({
-            ...structuredClone(firstWorkload(result)),
+            ...structuredClone(first_workload(result)),
             id: "not-declared",
             size: 7,
           }),
@@ -150,20 +150,20 @@ describe("formula benchmark schema", () => {
         "formula workload contains a malformed identity",
       ],
       [
-        (result) => (firstWorkload(result).samplesMs = []),
+        (result) => (first_workload(result).samplesMs = []),
         "must contain 2 post-warmup raw samples",
       ],
       [
-        (result) => (firstWorkload(result).allocationSamples = []),
+        (result) => (first_workload(result).allocationSamples = []),
         "allocationSamples must contain 2 raw samples",
       ],
       [
-        (result) => (firstWorkload(result).stat = { ...firstWorkload(result).stat, stddev: 0.1 }),
+        (result) => (first_workload(result).stat = { ...first_workload(result).stat, stddev: 0.1 }),
         "does not match raw samples",
       ],
       [
         (result) => {
-          const stat = firstWorkload(result).allocationStat;
+          const stat = first_workload(result).allocationStat;
           stat.retainedBytes = { ...stat.retainedBytes, stddev: 0.1 };
         },
         "does not match raw samples",
@@ -185,13 +185,13 @@ describe("formula benchmark schema", () => {
 
 describe("formula regression gate", () => {
   it("gates median and p95 from raw samples, with a 0.3 ms median floor below 1 ms", () => {
-    const subMillisecond = withSamples([0.5, 0.5, 0.5, 0.5, 0.5]);
-    const millisecond = withSamples([1, 1, 1, 1, 1]);
+    const sub_millisecond = with_samples([0.5, 0.5, 0.5, 0.5, 0.5]);
+    const millisecond = with_samples([1, 1, 1, 1, 1]);
     for (const [baseline, samples, error] of [
-      [subMillisecond, [0.5, 0.5, 0.5, 0.5, 3], null],
-      [subMillisecond, [0.75, 0.75, 0.75, 0.75, 0.75], null],
+      [sub_millisecond, [0.5, 0.5, 0.5, 0.5, 3], null],
+      [sub_millisecond, [0.75, 0.75, 0.75, 0.75, 0.75], null],
       [
-        subMillisecond,
+        sub_millisecond,
         [0.85, 0.85, 0.85, 0.85, 0.85],
         ".median regression: baseline 0.5, candidate 0.85, limit 0.8",
       ],
@@ -203,18 +203,18 @@ describe("formula regression gate", () => {
       ],
       [millisecond, [1, 1, 1, 1, 1.4], ".p95 regression"],
     ] as const) {
-      const check = () => validateFormulaRegression(withSamples([...samples]), baseline);
+      const check = () => validateFormulaRegression(with_samples([...samples]), baseline);
       if (error === null) expect(check).not.toThrow();
       else expect(check).toThrow(error);
     }
   });
 
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {
-    const baseline = formulaFixture("full");
-    expectRejections(formulaFixture, (result) => validateFormulaRegression(result, baseline), [
+    const baseline = formula_fixture("full");
+    expectRejections(formula_fixture, (result) => validateFormulaRegression(result, baseline), [
       [
         (result) => {
-          const workload = firstWorkload(result);
+          const workload = first_workload(result);
           for (const sample of workload.allocationSamples) sample.retainedBytes++;
           workload.allocationStat.retainedBytes = summarize(
             workload.allocationSamples.map((sample) => sample.retainedBytes),
@@ -227,8 +227,8 @@ describe("formula regression gate", () => {
   });
 
   it("binds a candidate to the exact baseline source provenance", () => {
-    const baseline = formulaFixture("full");
-    const candidate = formulaFixture();
+    const baseline = formula_fixture("full");
+    const candidate = formula_fixture();
     Reflect.set(candidate.gates.regression, "baselineSourceDigest", "b".repeat(64));
     const unbound = "not bound to the supplied baseline provenance";
     expect(() => validateFormulaRegression(candidate, baseline)).toThrow(unbound);
@@ -236,16 +236,16 @@ describe("formula regression gate", () => {
   });
 
   it("compares a smoke candidate with the compatible workloads of a legacy full baseline", () => {
-    const baseline = formulaFixture("full");
+    const baseline = formula_fixture("full");
     baseline.workloads = baseline.workloads.filter((workload) => workload.id !== "history-diff");
-    expect(() => validateFormulaRegression(formulaFixture("smoke"), baseline)).not.toThrow();
+    expect(() => validateFormulaRegression(formula_fixture("smoke"), baseline)).not.toThrow();
   });
 });
 
 describe("release baseline capture", () => {
   /** A full output capture without the `left` workload, optionally of an earlier release's engine. */
-  function capture(left: string, olderEngine: boolean): Fixture {
-    const result = formulaFixture("full");
+  function capture(left: string, older_engine: boolean): Fixture {
+    const result = formula_fixture("full");
     result.workloads = result.workloads.filter((workload) => workload.id !== left);
     result.runner.command = ["bun", "run", "src/formula-bench.ts", "--output", "formula.json"];
     result.gates = {
@@ -253,7 +253,7 @@ describe("release baseline capture", () => {
       tolerance: FORMULA_GATE_TOLERANCE,
       regression: { status: "blocked", blocker: OUTPUT_CAPTURE_BLOCKER },
     };
-    if (olderEngine) {
+    if (older_engine) {
       const runtime = [
         "loader-node.mjs",
         "loader-state.mjs",
@@ -271,8 +271,8 @@ describe("release baseline capture", () => {
         currentWasmFiles: { "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "b".repeat(64) },
       };
     }
-    const { files, baselineContext } = result.source;
-    result.source.digest = formulaSourceDigest(COMMIT, files, baselineContext);
+    const { files, baselineContext: baseline_context } = result.source;
+    result.source.digest = formulaSourceDigest(COMMIT, files, baseline_context);
     return result;
   }
 

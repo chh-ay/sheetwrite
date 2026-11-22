@@ -21,18 +21,18 @@ export type HostCall = (
   textEnds: Uint32Array,
 ) => string | undefined;
 
-function decodeArguments(
+function decode_arguments(
   shapes: Uint32Array,
   kinds: Uint8Array,
   numbers: Float64Array,
   text: string,
-  textEnds: Uint32Array,
+  text_ends: Uint32Array,
 ): FormulaArgument[] {
   const values: FormulaArgument[] = [];
   let cell = 0;
-  let textIndex = 0;
+  let text_index = 0;
 
-  const nextScalar = (): FormulaScalar => {
+  const next_scalar = (): FormulaScalar => {
     const kind = kinds[cell];
     const number = numbers[cell] ?? 0;
     cell += 1;
@@ -40,25 +40,25 @@ function decodeArguments(
     if (kind === KIND_BOOLEAN) return number !== 0;
     if (kind !== KIND_TEXT) return null;
 
-    const start = textIndex === 0 ? 0 : (textEnds[textIndex - 1] ?? 0);
-    const end = textEnds[textIndex] ?? start;
-    textIndex += 1;
+    const start = text_index === 0 ? 0 : (text_ends[text_index - 1] ?? 0);
+    const end = text_ends[text_index] ?? start;
+    text_index += 1;
     return text.slice(start, end);
   };
 
   for (let shape = 0; shape + 1 < shapes.length; shape += 2) {
-    const rowCount = shapes[shape] ?? 0;
-    const colCount = shapes[shape + 1] ?? 0;
+    const row_count = shapes[shape] ?? 0;
+    const col_count = shapes[shape + 1] ?? 0;
 
     // One cell reads as its scalar, so `F(A1)` and `F(1)` receive the same value.
-    if (rowCount <= 1 && colCount <= 1) {
-      values.push(rowCount * colCount === 0 ? null : nextScalar());
+    if (row_count <= 1 && col_count <= 1) {
+      values.push(row_count * col_count === 0 ? null : next_scalar());
       continue;
     }
 
     const rows: FormulaScalar[][] = [];
-    for (let row = 0; row < rowCount; row += 1) {
-      rows.push(Array.from({ length: colCount }, nextScalar));
+    for (let row = 0; row < row_count; row += 1) {
+      rows.push(Array.from({ length: col_count }, next_scalar));
     }
     values.push(rows);
   }
@@ -67,7 +67,7 @@ function decodeArguments(
 }
 
 /** Only a scalar has a tag; a promise or any other value becomes `#VALUE!`. */
-function encodeResult(result: unknown): string | undefined {
+function encode_result(result: unknown): string | undefined {
   if (result === null || result === undefined) return undefined;
   if (typeof result === "number") return `n${result}`;
   if (typeof result === "string") return `s${result}`;
@@ -86,11 +86,11 @@ export function hostCall(
   implementation: FormulaFunction,
   onCall: (running: boolean) => void,
 ): HostCall {
-  return (shapes, kinds, numbers, text, textEnds) => {
+  return (shapes, kinds, numbers, text, text_ends) => {
     onCall(true);
     try {
-      return encodeResult(
-        implementation(...decodeArguments(shapes, kinds, numbers, text, textEnds)),
+      return encode_result(
+        implementation(...decode_arguments(shapes, kinds, numbers, text, text_ends)),
       );
     } catch {
       // The documented result of a failing host function; the formula shows it.

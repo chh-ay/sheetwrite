@@ -19,12 +19,12 @@ beforeAll(async () => {
   await initSheetwrite({ addons: [historyAddon()] });
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -114,7 +114,7 @@ function panel(host: HTMLElement): HTMLElement {
   return element;
 }
 
-function buttonIn(root: ParentNode, text: string): HTMLButtonElement {
+function button_in(root: ParentNode, text: string): HTMLButtonElement {
   const button = [...root.querySelectorAll<HTMLButtonElement>("button")].find((candidate) =>
     candidate.textContent?.startsWith(text),
   );
@@ -143,7 +143,7 @@ it("saves a named version, shows the edit and its author, and restores it as one
     host.querySelector<HTMLInputElement>('[data-focus-key="version-name"]'),
   );
   name.value = "Before price change";
-  buttonIn(panel(host), "Save Version").click();
+  button_in(panel(host), "Save Version").click();
   await until(() =>
     host.querySelector(".history-version")?.textContent?.includes("Before price change")
       ? true
@@ -156,15 +156,15 @@ it("saves a named version, shows the edit and its author, and restores it as one
     value: { kind: "literal", value: 5 },
   });
 
-  buttonIn(panel(host), "Before price change").click();
+  button_in(panel(host), "Before price change").click();
   const change = await until(() => host.querySelector(".history-change"));
   expect(change.textContent).toContain("Changed (≠) Data!A1");
   expect(change.textContent).toContain("1 → 5");
   expect(change.textContent).toContain("Last changed by Alice");
 
-  buttonIn(panel(host), "Restore…").click();
+  button_in(panel(host), "Restore…").click();
   const confirm = await until(() => host.querySelector('[role="alertdialog"]'));
-  buttonIn(confirm, "Confirm restore").click();
+  button_in(confirm, "Confirm restore").click();
   await until(() =>
     grid.store.getCell({ sheet: "data", row: 0, col: 0 }).resolved === 1 ? true : null,
   );

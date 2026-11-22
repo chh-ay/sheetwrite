@@ -12,12 +12,12 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
 });
 
 it("inserts, deletes and hides as many rows and columns as are selected", () => {

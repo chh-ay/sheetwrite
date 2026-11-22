@@ -33,12 +33,12 @@ const { values } = parseArgs({
 });
 
 const root = resolve(values.root);
-const engineName = values.engine;
-if (engineName !== "wasm" && engineName !== "formulas")
+const engine_name = values.engine;
+if (engine_name !== "wasm" && engine_name !== "formulas")
   throw new Error("Expected wasm or formulas");
 
 /** Artifacts name a checkout by commit, so they never record a machine path. */
-function checkoutCommit(checkout: string): string {
+function checkout_commit(checkout: string): string {
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: checkout, encoding: "utf8" }).trim();
 }
 
@@ -58,7 +58,7 @@ const RECALCULATIONS_PER_SAMPLE = 32;
 const WINDOW_ROWS = 64;
 const GC_TURNS = 5;
 
-async function collectGarbage(): Promise<void> {
+async function collect_garbage(): Promise<void> {
   for (let turn = 0; turn < GC_TURNS; turn++) {
     const next = Promise.withResolvers<void>();
     setImmediate(next.resolve);
@@ -102,7 +102,7 @@ const address = (row: number, col: number): Core.CellAddress => ({ sheet: "s1", 
 const LOCAL_COLUMNS = 20;
 
 /** A sheet of `MEMORY_ROWS` rows past the dense cell limit, which loads in local pages. */
-function localWorkbook(): Core.Workbook {
+function local_workbook(): Core.Workbook {
   return {
     activeSheet: "s1",
     sheets: [
@@ -121,8 +121,8 @@ function localWorkbook(): Core.Workbook {
   };
 }
 
-/** Every cell of {@link localWorkbook} filled: the local cell budget's full cost. */
-function localColumnar(): Core.ColumnarData {
+/** Every cell of {@link local_workbook} filled: the local cell budget's full cost. */
+function local_columnar(): Core.ColumnarData {
   const columns: Record<string, Float64Array> = {};
   for (let col = 0; col < LOCAL_COLUMNS; col++) {
     columns[`n${col}`] = new Float64Array(MEMORY_ROWS).fill(col);
@@ -135,14 +135,14 @@ async function paths(): Promise<PathCapture> {
     pathToFileURL(resolve(root, "packages/core/src/index.ts")).href
   );
   const provider: typeof Wasm = await import(
-    pathToFileURL(resolve(root, `packages/${engineName}/loader-node.mjs`)).href
+    pathToFileURL(resolve(root, `packages/${engine_name}/loader-node.mjs`)).href
   );
   await core.initSheetwrite({ engine: provider });
 
   const source = columnar(PATH_ROWS);
-  const editStore = new core.SheetwriteStore(workbook(PATH_ROWS), source);
-  const calcStore = new core.SheetwriteStore(workbook(PATH_ROWS), source);
-  calcStore.applyTransaction({
+  const edit_store = new core.SheetwriteStore(workbook(PATH_ROWS), source);
+  const calc_store = new core.SheetwriteStore(workbook(PATH_ROWS), source);
+  calc_store.applyTransaction({
     patches: [
       { op: "set", addr: address(0, 2), value: { kind: "formula", src: `=SUM(B1:B${PATH_ROWS})` } },
     ],
@@ -152,7 +152,7 @@ async function paths(): Promise<PathCapture> {
 
   try {
     for (const metric of metrics.filter((metric) => !values.metric || values.metric === metric)) {
-      const samplesMs: number[] = [];
+      const samples_ms: number[] = [];
       for (let sample = -WARMUPS; sample < SAMPLES; sample++) {
         const started = performance.now();
         let operations = 1;
@@ -160,7 +160,7 @@ async function paths(): Promise<PathCapture> {
           case "edit":
             operations = EDITS_PER_SAMPLE;
             for (let edit = 0; edit < operations; edit++) {
-              const result = editStore.applyTransaction({
+              const result = edit_store.applyTransaction({
                 patches: [
                   {
                     op: "set",
@@ -176,7 +176,7 @@ async function paths(): Promise<PathCapture> {
             operations = READS_PER_SAMPLE;
             for (let read = 0; read < operations; read++) {
               const start = (read * 307) % (PATH_ROWS - WINDOW_ROWS);
-              editStore.getVisibleWindow("s1", { start, end: start + WINDOW_ROWS }, [0, 1, 2]);
+              edit_store.getVisibleWindow("s1", { start, end: start + WINDOW_ROWS }, [0, 1, 2]);
             }
             break;
           case "ingest": {
@@ -188,7 +188,7 @@ async function paths(): Promise<PathCapture> {
           case "recalculation":
             operations = RECALCULATIONS_PER_SAMPLE;
             for (let calculation = 0; calculation < operations; calculation++) {
-              const result = calcStore.applyTransaction({
+              const result = calc_store.applyTransaction({
                 patches: [
                   {
                     op: "set",
@@ -204,31 +204,31 @@ async function paths(): Promise<PathCapture> {
         }
 
         const elapsed = (performance.now() - started) / operations;
-        if (sample >= 0) samplesMs.push(elapsed);
+        if (sample >= 0) samples_ms.push(elapsed);
         if (metric === "edit")
           assert.equal(
-            editStore.getCell(address(EDITS_PER_SAMPLE - 1, 1)).resolved,
+            edit_store.getCell(address(EDITS_PER_SAMPLE - 1, 1)).resolved,
             EDITS_PER_SAMPLE - 1 + sample,
           );
         if (metric === "recalculation")
           assert.equal(
-            calcStore.getCell(address(0, 2)).resolved,
+            calc_store.getCell(address(0, 2)).resolved,
             PATH_ROWS * 17 - 17 + RECALCULATIONS_PER_SAMPLE - 1 + sample,
           );
       }
 
-      capture[metric] = { medianMs: median(samplesMs), samplesMs };
+      capture[metric] = { medianMs: median(samples_ms), samplesMs: samples_ms };
     }
 
     return capture;
   } finally {
-    editStore.dispose();
-    calcStore.dispose();
+    edit_store.dispose();
+    calc_store.dispose();
   }
 }
 
 async function compare(baseline: string) {
-  async function sample(selectedRoot: string): Promise<PathCapture> {
+  async function sample(selected_root: string): Promise<PathCapture> {
     const child = Bun.spawn(
       [
         process.execPath,
@@ -236,9 +236,9 @@ async function compare(baseline: string) {
         "--mode",
         "paths",
         "--root",
-        selectedRoot,
+        selected_root,
         "--engine",
-        engineName,
+        engine_name,
       ],
       { stdout: "pipe", stderr: "pipe" },
     );
@@ -278,7 +278,7 @@ async function compare(baseline: string) {
   }
 
   const summary = metrics.map((metric) => {
-    const noisePct = Math.max(
+    const noise_pct = Math.max(
       ...controls.map(
         (control) =>
           Math.abs(
@@ -288,31 +288,31 @@ async function compare(baseline: string) {
           ) * 100,
       ),
     );
-    const baselineRounds = rounds.map((round) =>
+    const baseline_rounds = rounds.map((round) =>
       median(round.baseline.map((capture) => capture[metric].medianMs)),
     );
-    const changedRounds = rounds.map((round) =>
+    const changed_rounds = rounds.map((round) =>
       median(round.changed.map((capture) => capture[metric].medianMs)),
     );
-    const baselineMs = median(baselineRounds);
-    const changedMs = median(changedRounds);
-    const deltaPct = (changedMs / baselineMs - 1) * 100;
+    const baseline_ms = median(baseline_rounds);
+    const changed_ms = median(changed_rounds);
+    const delta_pct = (changed_ms / baseline_ms - 1) * 100;
     return {
       metric,
-      noisePct,
-      baselineRounds,
-      changedRounds,
-      baselineMs,
-      changedMs,
-      deltaPct,
-      pass: deltaPct <= 3 + noisePct,
+      noisePct: noise_pct,
+      baselineRounds: baseline_rounds,
+      changedRounds: changed_rounds,
+      baselineMs: baseline_ms,
+      changedMs: changed_ms,
+      deltaPct: delta_pct,
+      pass: delta_pct <= 3 + noise_pct,
     };
   });
 
   return {
-    baseline: checkoutCommit(baseline),
-    changed: checkoutCommit(root),
-    engine: engineName,
+    baseline: checkout_commit(baseline),
+    changed: checkout_commit(root),
+    engine: engine_name,
     warmups: WARMUPS,
     samples: SAMPLES,
     controls,
@@ -327,13 +327,13 @@ async function memory() {
     pathToFileURL(resolve(root, "packages/core/src/index.ts")).href
   );
   const provider: typeof Wasm = await import(
-    pathToFileURL(resolve(root, `packages/${engineName}/loader-node.mjs`)).href
+    pathToFileURL(resolve(root, `packages/${engine_name}/loader-node.mjs`)).href
   );
   const testing = await import(pathToFileURL(resolve(root, "packages/core/src/testing.ts")).href);
   const engine = await import(pathToFileURL(resolve(root, "packages/core/src/engine.ts")).href);
   await core.initSheetwrite({ engine: provider });
 
-  const restoreCanvas = testing.installCanvasTestStubs();
+  const restore_canvas = testing.installCanvasTestStubs();
   const observations: Array<{
     scenario: string;
     rows: number;
@@ -357,9 +357,9 @@ async function memory() {
     };
   }
 
-  const freshFloors = new Map<string, number>();
+  const fresh_floors = new Map<string, number>();
 
-  let localFullWasmBytes = 0;
+  let local_full_wasm_bytes = 0;
   for (const scenario of [
     "empty-dense",
     "dense-clear",
@@ -370,7 +370,7 @@ async function memory() {
     await core.releaseEngineMemory();
     const fresh =
       scenario === "local-shrink"
-        ? new core.SheetwriteStore(localWorkbook())
+        ? new core.SheetwriteStore(local_workbook())
         : new core.SheetwriteStore(
             workbook(MEMORY_ROWS),
             undefined,
@@ -422,7 +422,7 @@ async function memory() {
         });
       }
 
-      freshFloors.set(scenario, engine.getEngine().getMemory().buffer.byteLength);
+      fresh_floors.set(scenario, engine.getEngine().getMemory().buffer.byteLength);
     } finally {
       history?.dispose();
       fresh.dispose();
@@ -431,15 +431,16 @@ async function memory() {
 
   await core.releaseEngineMemory();
 
-  async function capture(scenario: string, verify: () => void, compactHistoryBytes = 0) {
-    const freshWasmBytesFloor = freshFloors.get(scenario);
-    if (freshWasmBytesFloor === undefined) throw new Error(`Missing fresh floor for ${scenario}`);
+  async function capture(scenario: string, verify: () => void, compact_history_bytes = 0) {
+    const fresh_wasm_bytes_floor = fresh_floors.get(scenario);
+    if (fresh_wasm_bytes_floor === undefined)
+      throw new Error(`Missing fresh floor for ${scenario}`);
 
-    await collectGarbage();
+    await collect_garbage();
     const before = observe();
     const retired = new WeakRef(engine.getEngine().getMemory());
     const report = await core.releaseEngineMemory();
-    await collectGarbage();
+    await collect_garbage();
     const after = observe();
     verify();
     assert.equal(retired.deref(), undefined, "Retired WebAssembly.Memory must be collectible");
@@ -454,9 +455,9 @@ async function memory() {
       // and directory entry per page it once held (under 1 MiB), not their rows.
       const slack = scenario === "local-shrink" ? 1024 * 1024 : 0;
       assert.ok(
-        after.wasmBytes <= freshWasmBytesFloor * 1.1 + slack,
+        after.wasmBytes <= fresh_wasm_bytes_floor * 1.1 + slack,
         `${scenario}: import exceeded the fresh floor by over 10%: ${after.wasmBytes} B ` +
-          `after, ${freshWasmBytesFloor} B fresh`,
+          `after, ${fresh_wasm_bytes_floor} B fresh`,
       );
     }
 
@@ -467,9 +468,9 @@ async function memory() {
       after,
       report,
       oldMemoryCollected: true,
-      freshWasmBytesFloor,
-      compactHistoryBytes,
-      bytesAboveFreshFloor: Math.max(0, after.wasmBytes - freshWasmBytesFloor),
+      freshWasmBytesFloor: fresh_wasm_bytes_floor,
+      compactHistoryBytes: compact_history_bytes,
+      bytesAboveFreshFloor: Math.max(0, after.wasmBytes - fresh_wasm_bytes_floor),
     });
   }
 
@@ -512,10 +513,10 @@ async function memory() {
     }
 
     // A sheet past the dense cell limit, filled to the local cell budget, then shrunk.
-    const local = new core.SheetwriteStore(localWorkbook(), localColumnar());
+    const local = new core.SheetwriteStore(local_workbook(), local_columnar());
     try {
       assert.equal(local.isPaged("s1"), false);
-      localFullWasmBytes = engine.getEngine().getMemory().buffer.byteLength;
+      local_full_wasm_bytes = engine.getEngine().getMemory().buffer.byteLength;
       assert.equal(
         local.applyTransaction({
           patches: [{ op: "removeRows", sheet: "s1", at: 10, count: MEMORY_ROWS - 10 }],
@@ -613,15 +614,15 @@ async function memory() {
     }
 
     return {
-      engine: engineName,
-      root: checkoutCommit(root),
+      engine: engine_name,
+      root: checkout_commit(root),
       jsHeapMeasurement: "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
       /** Committed WASM memory with a sheet filled to the local cell budget. */
-      localFullWasmBytes,
+      localFullWasmBytes: local_full_wasm_bytes,
       observations,
     };
   } finally {
-    restoreCanvas();
+    restore_canvas();
   }
 }
 

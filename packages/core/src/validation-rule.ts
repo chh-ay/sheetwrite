@@ -34,20 +34,20 @@ export interface ValidationList {
 /** The list of `items`. */
 export function validationList(items: readonly CellScalar[]): ValidationList {
   const keys = new Set<string>();
-  for (const item of items) if (item !== null) keys.add(itemKey(item));
+  for (const item of items) if (item !== null) keys.add(item_key(item));
   return { items, keys };
 }
 
 /** The keys of each rule's own items, made once per list. */
-const valueKeys = new WeakMap<readonly CellScalar[], ReadonlySet<string>>();
+const value_keys = new WeakMap<readonly CellScalar[], ReadonlySet<string>>();
 /** The keys of a source that names no range. */
 const NO_KEYS: ReadonlySet<string> = new Set();
 
-function ownItemKeys(values: readonly CellScalar[]): ReadonlySet<string> {
-  let keys = valueKeys.get(values);
+function own_item_keys(values: readonly CellScalar[]): ReadonlySet<string> {
+  let keys = value_keys.get(values);
   if (!keys) {
     keys = validationList(values).keys;
-    valueKeys.set(values, keys);
+    value_keys.set(values, keys);
   }
   return keys;
 }
@@ -158,7 +158,11 @@ export function mapValidationFormulas(
 }
 
 /** `formula`, written for the top-left cell of `rule`, as the cell `addr` reads it. */
-function formulaAt(rule: DataValidationRule, formula: string, addr: Readonly<CellAddress>): string {
+function formula_at(
+  rule: DataValidationRule,
+  formula: string,
+  addr: Readonly<CellAddress>,
+): string {
   const origin = normalizedRange(rule.range).start;
   return shiftA1Refs(formula, addr.row - origin.row, addr.col - origin.col);
 }
@@ -175,26 +179,26 @@ export function validationListItems(
   const condition = rule.condition;
   if (condition.kind !== "list") return [];
   if ("values" in condition) return condition.values;
-  return sourceList(rule, condition.source, addr, reads)?.items ?? [];
+  return source_list(rule, condition.source, addr, reads)?.items ?? [];
 }
 
 /** The list of a rule's `source` in the cell `addr`. */
-function sourceList(
+function source_list(
   rule: DataValidationRule,
   source: string,
   addr: Readonly<CellAddress>,
   reads: ValidationReads | undefined,
 ): ValidationList | undefined {
-  return reads?.list(formulaAt(rule, source, addr).replace(/^=/, ""), addr);
+  return reads?.list(formula_at(rule, source, addr).replace(/^=/, ""), addr);
 }
 
 /** A list item's text as Excel compares it with an entry: without case. */
-function itemKey(value: CellScalar): string {
+function item_key(value: CellScalar): string {
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   return String(value ?? "").toLocaleUpperCase();
 }
 
-function operandValue(
+function operand_value(
   rule: DataValidationRule,
   operand: DataValidationOperand,
   addr: Readonly<CellAddress> | undefined,
@@ -202,12 +206,12 @@ function operandValue(
 ): number | undefined {
   if (typeof operand === "number") return operand;
   if (!addr || !reads) return undefined;
-  const result = reads.formula(formulaAt(rule, operand, addr), addr);
+  const result = reads.formula(formula_at(rule, operand, addr), addr);
   return typeof result === "number" ? result : undefined;
 }
 
 /** Whether `value` meets `comparison`; a bound the engine cannot tell lets it pass. */
-function comparisonAccepts(
+function comparison_accepts(
   rule: DataValidationRule,
   comparison: DataValidationComparison,
   value: number,
@@ -215,7 +219,7 @@ function comparisonAccepts(
   reads: ValidationReads | undefined,
 ): boolean {
   if ("value" in comparison) {
-    const bound = operandValue(rule, comparison.value, addr, reads);
+    const bound = operand_value(rule, comparison.value, addr, reads);
     if (bound === undefined) return true;
     switch (comparison.operator) {
       case "equal":
@@ -232,8 +236,8 @@ function comparisonAccepts(
         return value <= bound;
     }
   }
-  const min = operandValue(rule, comparison.min, addr, reads);
-  const max = operandValue(rule, comparison.max, addr, reads);
+  const min = operand_value(rule, comparison.min, addr, reads);
+  const max = operand_value(rule, comparison.max, addr, reads);
   if (min === undefined || max === undefined) return true;
   const inside = value >= min && value <= max;
   return comparison.operator === "between" ? inside : !inside;
@@ -259,11 +263,11 @@ export function validationAccepts(
     case "list": {
       if (condition.allowCustom === true) return true;
       let keys: ReadonlySet<string>;
-      if ("values" in condition) keys = ownItemKeys(condition.values);
+      if ("values" in condition) keys = own_item_keys(condition.values);
       else if (addr && reads)
-        keys = sourceList(rule, condition.source, addr, reads)?.keys ?? NO_KEYS;
+        keys = source_list(rule, condition.source, addr, reads)?.keys ?? NO_KEYS;
       else return true;
-      return keys.has(itemKey(value));
+      return keys.has(item_key(value));
     }
     case "checkbox": {
       const checked = condition.checkedValue ?? true;
@@ -272,7 +276,7 @@ export function validationAccepts(
     }
     case "custom": {
       if (!addr || !reads) return true;
-      const result = reads.formula(formulaAt(rule, condition.formula, addr), addr, value);
+      const result = reads.formula(formula_at(rule, condition.formula, addr), addr, value);
       if (result === undefined) return true;
       return result === true || (typeof result === "number" && result !== 0);
     }
@@ -281,7 +285,7 @@ export function validationAccepts(
       if (typeof value !== "string" && typeof value !== "number") return false;
       const length = String(value).length;
       if (condition.comparison) {
-        return comparisonAccepts(rule, condition.comparison, length, addr, reads);
+        return comparison_accepts(rule, condition.comparison, length, addr, reads);
       }
       return (
         (condition.min === undefined || length >= condition.min) &&
@@ -296,7 +300,7 @@ export function validationAccepts(
         return false;
       }
       if (condition.comparison) {
-        return comparisonAccepts(rule, condition.comparison, value, addr, reads);
+        return comparison_accepts(rule, condition.comparison, value, addr, reads);
       }
       return (
         (condition.min === undefined || value >= condition.min) &&
@@ -333,7 +337,7 @@ export function failingValidationRule(
   return broken;
 }
 
-function comparisonMessage(subject: string, comparison: DataValidationComparison): string {
+function comparison_message(subject: string, comparison: DataValidationComparison): string {
   switch (comparison.operator) {
     case "between":
       return `${subject} must be between ${comparison.min} and ${comparison.max}, inclusive`;
@@ -367,19 +371,19 @@ export function validationIssueMessage(rule: DataValidationRule): string {
       return `Value must make ${condition.formula} true`;
     case "number":
       return condition.comparison
-        ? comparisonMessage("Value", condition.comparison)
+        ? comparison_message("Value", condition.comparison)
         : "Value must be within the allowed numeric range";
     case "date":
       return condition.comparison
-        ? comparisonMessage("Date", condition.comparison)
+        ? comparison_message("Date", condition.comparison)
         : "Date must be within the allowed range";
     case "time":
       return condition.comparison
-        ? comparisonMessage("Time", condition.comparison)
+        ? comparison_message("Time", condition.comparison)
         : "Time must be within the allowed range";
     case "textLength":
       return condition.comparison
-        ? comparisonMessage("Text length", condition.comparison)
+        ? comparison_message("Text length", condition.comparison)
         : "Text length is outside the allowed range";
     case "checkbox":
       return "Value must be a valid checkbox state";

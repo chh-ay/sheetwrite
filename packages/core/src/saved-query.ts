@@ -52,11 +52,11 @@ export interface SavedQueryIssueSink {
   push(...issues: SavedQueryIssue[]): number;
 }
 
-function isBoundedString(value: unknown, max: number): value is string {
+function is_bounded_string(value: unknown, max: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= max;
 }
 
-function isIndex(value: unknown): value is number {
+function is_index(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
@@ -64,13 +64,13 @@ function invalid(issues: SavedQueryIssueSink, path: string, message: string): vo
   issues.push({ path, code: "invalid-value", message });
 }
 
-function requireId(
+function require_id(
   record: PlainRecord,
   key: string,
   path: string,
   issues: SavedQueryIssueSink,
 ): void {
-  if (!isBoundedString(ownValue(record, key), MAX_ID_LENGTH)) {
+  if (!is_bounded_string(ownValue(record, key), MAX_ID_LENGTH)) {
     invalid(
       issues,
       `${path}.${key}`,
@@ -79,7 +79,7 @@ function requireId(
   }
 }
 
-function optionalBoolean(
+function optional_boolean(
   record: PlainRecord,
   key: string,
   path: string,
@@ -95,10 +95,10 @@ function optionalBoolean(
  * A locator is public: a URL with a user name or password is rejected, so a
  * credential cannot be saved by mistake in the workbook.
  */
-function validateLocator(value: unknown, path: string, issues: SavedQueryIssueSink): void {
+function validate_locator(value: unknown, path: string, issues: SavedQueryIssueSink): void {
   if (value === undefined) return;
 
-  if (!isBoundedString(value, MAX_LOCATOR_LENGTH)) {
+  if (!is_bounded_string(value, MAX_LOCATOR_LENGTH)) {
     invalid(issues, path, `locator must be a non-empty string of at most ${MAX_LOCATOR_LENGTH}`);
     return;
   }
@@ -111,7 +111,7 @@ function validateLocator(value: unknown, path: string, issues: SavedQueryIssueSi
   }
 }
 
-function validateColumns(value: unknown, path: string, issues: SavedQueryIssueSink): void {
+function validate_columns(value: unknown, path: string, issues: SavedQueryIssueSink): void {
   if (!Array.isArray(value) || value.length === 0) {
     invalid(issues, path, "columns must be a non-empty array");
     return;
@@ -127,23 +127,23 @@ function validateColumns(value: unknown, path: string, issues: SavedQueryIssueSi
   }
 
   value.forEach((column: unknown, index) => {
-    const columnPath = `${path}[${index}]`;
+    const column_path = `${path}[${index}]`;
     if (!isPlainRecord(column)) {
-      invalid(issues, columnPath, "column must be an object");
+      invalid(issues, column_path, "column must be an object");
       return;
     }
 
-    requireId(column, "id", columnPath, issues);
-    requireId(column, "name", columnPath, issues);
+    require_id(column, "id", column_path, issues);
+    require_id(column, "name", column_path, issues);
 
     const type = ownValue(column, "type");
     if (typeof type !== "string" || COLUMN_TYPES[type] !== true) {
-      invalid(issues, `${columnPath}.type`, "type must be a query column type");
+      invalid(issues, `${column_path}.type`, "type must be a query column type");
     }
   });
 }
 
-function validateSourceShape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
+function validate_source_shape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
   if (!isPlainRecord(value)) {
     invalid(issues, path, "source must be an object");
     return;
@@ -155,39 +155,39 @@ function validateSourceShape(value: unknown, path: string, issues: SavedQueryIss
     return;
   }
 
-  requireId(value, "sourceId", path, issues);
-  validateColumns(ownValue(value, "columns"), `${path}.columns`, issues);
+  require_id(value, "sourceId", path, issues);
+  validate_columns(ownValue(value, "columns"), `${path}.columns`, issues);
 
   if (kind === "host") return;
 
-  validateLocator(ownValue(value, "locator"), `${path}.locator`, issues);
+  validate_locator(ownValue(value, "locator"), `${path}.locator`, issues);
 
   if (kind === "csv") {
     const delimiter = ownValue(value, "delimiter");
     if (
       delimiter !== undefined &&
-      (!isIndex(delimiter) || delimiter === 0 || delimiter > MAX_ASCII)
+      (!is_index(delimiter) || delimiter === 0 || delimiter > MAX_ASCII)
     ) {
       invalid(issues, `${path}.delimiter`, "delimiter must be an ASCII byte other than NUL");
     }
 
-    optionalBoolean(value, "headers", path, issues);
-    optionalBoolean(value, "emptyIsNull", path, issues);
+    optional_boolean(value, "headers", path, issues);
+    optional_boolean(value, "emptyIsNull", path, issues);
     return;
   }
 
-  const recordPath = ownValue(value, "path");
+  const record_path = ownValue(value, "path");
   if (
-    recordPath !== undefined &&
-    (!Array.isArray(recordPath) ||
-      recordPath.length > MAX_PATH_LENGTH ||
-      !recordPath.every((field: unknown) => typeof field === "string"))
+    record_path !== undefined &&
+    (!Array.isArray(record_path) ||
+      record_path.length > MAX_PATH_LENGTH ||
+      !record_path.every((field: unknown) => typeof field === "string"))
   ) {
     invalid(issues, `${path}.path`, `path must be at most ${MAX_PATH_LENGTH} member names`);
   }
 }
 
-function validateStepsShape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
+function validate_steps_shape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
   if (!Array.isArray(value)) {
     invalid(issues, path, "steps must be an array");
     return;
@@ -203,24 +203,24 @@ function validateStepsShape(value: unknown, path: string, issues: SavedQueryIssu
   }
 
   value.forEach((step: unknown, index) => {
-    const stepPath = `${path}[${index}]`;
+    const step_path = `${path}[${index}]`;
     if (!isPlainRecord(step)) {
-      invalid(issues, stepPath, "step must be an object");
+      invalid(issues, step_path, "step must be an object");
       return;
     }
 
     const kind = ownValue(step, "kind");
     if (typeof kind !== "string" || STEP_KINDS[kind] !== true) {
-      invalid(issues, `${stepPath}.kind`, "kind must be a query step kind");
+      invalid(issues, `${step_path}.kind`, "kind must be a query step kind");
       return;
     }
 
     // Dependencies are checked here; the rest of each step is checked by the engine.
-    if (kind === "join") requireId(step, "input", stepPath, issues);
+    if (kind === "join") require_id(step, "input", step_path, issues);
   });
 }
 
-function validateOutputShape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
+function validate_output_shape(value: unknown, path: string, issues: SavedQueryIssueSink): void {
   if (value === undefined) return;
 
   if (!isPlainRecord(value)) {
@@ -228,15 +228,15 @@ function validateOutputShape(value: unknown, path: string, issues: SavedQueryIss
     return;
   }
 
-  requireId(value, "table", path, issues);
-  requireId(value, "tableName", path, issues);
+  require_id(value, "table", path, issues);
+  require_id(value, "tableName", path, issues);
 
   const anchor = ownValue(value, "anchor");
   if (
     !isPlainRecord(anchor) ||
-    !isBoundedString(ownValue(anchor, "sheet"), MAX_ID_LENGTH) ||
-    !isIndex(ownValue(anchor, "row")) ||
-    !isIndex(ownValue(anchor, "col"))
+    !is_bounded_string(ownValue(anchor, "sheet"), MAX_ID_LENGTH) ||
+    !is_index(ownValue(anchor, "row")) ||
+    !is_index(ownValue(anchor, "col"))
   ) {
     invalid(issues, `${path}.anchor`, "anchor must be a cell address");
   }
@@ -253,15 +253,15 @@ export function validateSavedQueryShape(
     return;
   }
 
-  requireId(value, "id", path, issues);
-  requireId(value, "name", path, issues);
-  validateSourceShape(ownValue(value, "source"), `${path}.source`, issues);
-  validateStepsShape(ownValue(value, "steps"), `${path}.steps`, issues);
-  validateOutputShape(ownValue(value, "output"), `${path}.output`, issues);
+  require_id(value, "id", path, issues);
+  require_id(value, "name", path, issues);
+  validate_source_shape(ownValue(value, "source"), `${path}.source`, issues);
+  validate_steps_shape(ownValue(value, "steps"), `${path}.steps`, issues);
+  validate_output_shape(ownValue(value, "output"), `${path}.output`, issues);
 }
 
 /** IDs of the saved queries that `query` joins, in step order. */
-function queryDependencies(query: SavedQuery): string[] {
+function query_dependencies(query: SavedQuery): string[] {
   const inputs: string[] = [];
   for (const step of query.steps) {
     if (step.kind === "join") inputs.push(step.input);
@@ -275,7 +275,7 @@ function queryDependencies(query: SavedQuery): string[] {
  * ASCII letter case is ignored, joins that name another existing query, no
  * join cycle, and at most one query per output table.
  */
-function validateQueryStructure(
+function validate_query_structure(
   queries: readonly SavedQuery[],
   path: string,
   issues: SavedQueryIssueSink,
@@ -294,10 +294,10 @@ function validateQueryStructure(
   const tables = new Set<string>();
 
   queries.forEach((query, index) => {
-    const itemPath = `${path}[${index}]`;
+    const item_path = `${path}[${index}]`;
     if (indexes.has(query.id)) {
       issues.push({
-        path: `${itemPath}.id`,
+        path: `${item_path}.id`,
         code: "duplicate-id",
         message: "Query IDs must be unique in the workbook",
       });
@@ -307,7 +307,7 @@ function validateQueryStructure(
     const name = query.name.toLowerCase();
     if (names.has(name)) {
       issues.push({
-        path: `${itemPath}.name`,
+        path: `${item_path}.name`,
         code: "duplicate-id",
         message: "Query names must be unique when letter case is ignored",
       });
@@ -317,7 +317,7 @@ function validateQueryStructure(
     if (query.output) {
       if (tables.has(query.output.table)) {
         issues.push({
-          path: `${itemPath}.output.table`,
+          path: `${item_path}.output.table`,
           code: "duplicate-id",
           message: "At most one query may own an output table",
         });
@@ -327,7 +327,7 @@ function validateQueryStructure(
   });
 
   queries.forEach((query, index) => {
-    for (const input of queryDependencies(query)) {
+    for (const input of query_dependencies(query)) {
       if (!indexes.has(input)) {
         issues.push({
           path: `${path}[${index}].steps`,
@@ -338,13 +338,13 @@ function validateQueryStructure(
     }
   });
 
-  if (hasDependencyCycle(queries, indexes)) {
+  if (has_dependency_cycle(queries, indexes)) {
     issues.push({ path, code: "invalid-value", message: "Query joins must not form a cycle" });
   }
 }
 
 /** Iterative three-colour depth-first search, so a long chain cannot overflow the stack. */
-function hasDependencyCycle(
+function has_dependency_cycle(
   queries: readonly SavedQuery[],
   indexes: ReadonlyMap<string, number>,
 ): boolean {
@@ -352,7 +352,7 @@ function hasDependencyCycle(
   const DONE = 2;
   const states = new Uint8Array(queries.length);
   const dependencies = queries.map((query) =>
-    queryDependencies(query).flatMap((input) => {
+    query_dependencies(query).flatMap((input) => {
       const index = indexes.get(input);
       return index === undefined ? [] : [index];
     }),
@@ -408,17 +408,17 @@ export function validateSavedQueriesShape(
     return;
   }
 
-  const shapeIssues: SavedQueryIssue[] = [];
+  const shape_issues: SavedQueryIssue[] = [];
   value.forEach((entry, index) => {
-    validateSavedQueryShape(entry, `${path}[${index}]`, shapeIssues);
+    validateSavedQueryShape(entry, `${path}[${index}]`, shape_issues);
   });
-  if (shapeIssues.length > 0) {
-    issues.push(...shapeIssues);
+  if (shape_issues.length > 0) {
+    issues.push(...shape_issues);
     return;
   }
 
   // The shape checks above prove every entry is a saved query.
-  validateQueryStructure(value as SavedQuery[], path, issues);
+  validate_query_structure(value as SavedQuery[], path, issues);
 }
 
 /** Admission checks for a shape-valid query that replaces the one with its ID. */
@@ -427,7 +427,7 @@ export function validateQueryAdmission(
   queries: readonly SavedQuery[] | undefined,
   issues: SavedQueryIssueSink,
 ): void {
-  validateQueryStructure(withQuery(queries, query) ?? [], "queries", issues);
+  validate_query_structure(withQuery(queries, query) ?? [], "queries", issues);
 }
 
 /**
@@ -444,10 +444,10 @@ export function validateQueryRemoval(
     return;
   }
 
-  validateQueryStructure(withoutQuery(queries, id) ?? [], "queries", issues);
+  validate_query_structure(withoutQuery(queries, id) ?? [], "queries", issues);
 }
 
-function cloneSource(source: SavedQuerySource): SavedQuerySource {
+function clone_source(source: SavedQuerySource): SavedQuerySource {
   // Sources are plain JSON data, so a structured clone keeps every defined field.
   return structuredClone(source);
 }
@@ -457,7 +457,7 @@ export function cloneQuery(query: SavedQuery): SavedQuery {
   return {
     id: query.id,
     name: query.name,
-    source: cloneSource(query.source),
+    source: clone_source(query.source),
     steps: structuredClone(query.steps),
     ...(query.output
       ? {
@@ -472,7 +472,7 @@ export function cloneQuery(query: SavedQuery): SavedQuery {
 }
 
 /** Deep copies of `queries`, or none. */
-function cloneQueries(queries: readonly SavedQuery[] | undefined): SavedQuery[] {
+function clone_queries(queries: readonly SavedQuery[] | undefined): SavedQuery[] {
   return (queries ?? []).map(cloneQuery);
 }
 
@@ -484,7 +484,7 @@ export function withQuery(
   queries: readonly SavedQuery[] | undefined,
   query: SavedQuery,
 ): SavedQuery[] {
-  const next = cloneQueries(queries);
+  const next = clone_queries(queries);
   const index = next.findIndex((candidate) => candidate.id === query.id);
   if (index < 0) next.push(cloneQuery(query));
   else next[index] = cloneQuery(query);
@@ -496,7 +496,7 @@ export function withoutQuery(
   queries: readonly SavedQuery[] | undefined,
   id: string,
 ): SavedQuery[] | undefined {
-  const next = cloneQueries(queries).filter((candidate) => candidate.id !== id);
+  const next = clone_queries(queries).filter((candidate) => candidate.id !== id);
   return next.length > 0 ? next : undefined;
 }
 

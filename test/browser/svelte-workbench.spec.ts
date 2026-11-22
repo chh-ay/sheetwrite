@@ -66,9 +66,9 @@ test("svelte workbench shows live presence; offline edits queue durably, survive
   // theme-change reseeds the toolbar palette with the colours the Grid now paints.
   const toolbar = page.locator(".sw-svw .sheetwrite-command-toolbar");
   const background = () => toolbar.evaluate((element) => getComputedStyle(element).backgroundColor);
-  const initialBackground = await background();
+  const initial_background = await background();
   await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
-  await expect.poll(background).not.toBe(initialBackground);
+  await expect.poll(background).not.toBe(initial_background);
 
   // Offline edits queue durably, survive an island remount, and drain in order on reconnect.
   await toggle.click();
@@ -88,9 +88,9 @@ test("svelte workbench shows live presence; offline edits queue durably, survive
 
   // The new generation hydrates the pending edits from IndexedDB and
   // re-applies them locally; nothing was sent while offline.
-  const recoveryScenarios = page.getByTestId("rare-actions");
-  if (!(await recoveryScenarios.evaluate((element) => (element as HTMLDetailsElement).open))) {
-    await recoveryScenarios.locator("summary").click();
+  const recovery_scenarios = page.getByTestId("rare-actions");
+  if (!(await recovery_scenarios.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await recovery_scenarios.locator("summary").click();
   }
   await page.getByTestId("remount-button").click();
   await expect(page.locator(".sw-svw")).toHaveAttribute("data-generation", "2", {

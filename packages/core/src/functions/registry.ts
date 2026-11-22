@@ -27,12 +27,12 @@ export function invalidFunction(message: string, name: string): SheetwriteError 
   });
 }
 
-function isStringArray(value: unknown): value is readonly string[] {
+function is_string_array(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
 /** A copy that later changes to the caller's object cannot alter. */
-function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetadata {
+function frozen_metadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetadata {
   if (typeof metadata !== "object" || metadata === null) {
     throw invalidFunction("Function metadata must be an object", "");
   }
@@ -50,12 +50,12 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
   if (!Array.isArray(metadata.arguments)) {
     throw invalidFunction("Function arguments must be an array", name);
   }
-  if (metadata.examples !== undefined && !isStringArray(metadata.examples)) {
+  if (metadata.examples !== undefined && !is_string_array(metadata.examples)) {
     throw invalidFunction("Function examples must be strings", name);
   }
 
-  const argumentsMetadata = metadata.arguments.map((argument) => {
-    if (typeof argument?.name !== "string" || !isStringArray(argument.types)) {
+  const arguments_metadata = metadata.arguments.map((argument) => {
+    if (typeof argument?.name !== "string" || !is_string_array(argument.types)) {
       throw invalidFunction("Each argument needs a name and a types array", name);
     }
 
@@ -70,7 +70,7 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
   return Object.freeze({
     name: name.toUpperCase(),
     description: metadata.description,
-    arguments: Object.freeze(argumentsMetadata),
+    arguments: Object.freeze(arguments_metadata),
     returnKind: metadata.returnKind,
     examples: Object.freeze([...(metadata.examples ?? [])]),
     volatile: metadata.volatile === true,
@@ -83,21 +83,21 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
  * call and bundlers split it into its own chunk, with the values Excel's
  * Formula AutoComplete lists for some arguments.
  */
-async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
+async function built_in_functions(): Promise<FormulaFunctionMetadata[]> {
   const { BUILT_IN_FUNCTIONS, ARGUMENT_CHOICES } =
     await import("../generated/function-metadata.js");
-  const engineFlag =
+  const engine_flag =
     engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;
 
   return BUILT_IN_FUNCTIONS.functions.flatMap(([name, family, profile, flags, names]) => {
-    const familyTitle = BUILT_IN_FUNCTIONS.families[family];
+    const family_title = BUILT_IN_FUNCTIONS.families[family];
     const signature = BUILT_IN_FUNCTIONS.profiles[profile];
-    const argumentNames = BUILT_IN_FUNCTIONS.argumentNames[names];
+    const argument_names = BUILT_IN_FUNCTIONS.argumentNames[names];
     if (
-      (flags & engineFlag) === 0 ||
-      familyTitle === undefined ||
+      (flags & engine_flag) === 0 ||
+      family_title === undefined ||
       signature === undefined ||
-      argumentNames === undefined
+      argument_names === undefined
     ) {
       return [];
     }
@@ -106,11 +106,11 @@ async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
     return [
       {
         name,
-        description: `${familyTitle} function.`,
+        description: `${family_title} function.`,
         arguments: signature.arguments.map((argument, index) => {
-          const argumentChoices = choices?.[index];
-          const named = { ...argument, name: argumentNames[index] ?? "" };
-          return argumentChoices === undefined ? named : { ...named, choices: argumentChoices };
+          const argument_choices = choices?.[index];
+          const named = { ...argument, name: argument_names[index] ?? "" };
+          return argument_choices === undefined ? named : { ...named, choices: argument_choices };
         }),
         returnKind: signature.returnKind,
         examples: [],
@@ -126,9 +126,9 @@ async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
  * built-in functions.
  */
 export async function storeFunctions(store: Store): Promise<FormulaFunctionMetadata[]> {
-  const hostFunctions = storeEngine(store)?.hostFunctions?.metadata() ?? [];
+  const host_functions = storeEngine(store)?.hostFunctions?.metadata() ?? [];
 
-  return [...(await builtInFunctions()), ...hostFunctions];
+  return [...(await built_in_functions()), ...host_functions];
 }
 
 type HostFunctionSetter = (
@@ -139,9 +139,9 @@ type HostFunctionSetter = (
 ) => boolean;
 
 /** Only the full engine (`@sheetwrite/formulas`) has the host function bridge. */
-function setterOf(wasm: RecomputingCellStore): HostFunctionSetter {
-  const setHostFunction = wasm.setHostFunction;
-  if (setHostFunction === undefined) {
+function setter_of(wasm: RecomputingCellStore): HostFunctionSetter {
+  const set_host_function = wasm.setHostFunction;
+  if (set_host_function === undefined) {
     throw new SheetwriteError(
       "optional-backend-unavailable",
       "host-function",
@@ -149,7 +149,7 @@ function setterOf(wasm: RecomputingCellStore): HostFunctionSetter {
     );
   }
 
-  return setHostFunction.bind(wasm);
+  return set_host_function.bind(wasm);
 }
 
 /**
@@ -159,7 +159,7 @@ function setterOf(wasm: RecomputingCellStore): HostFunctionSetter {
  */
 export class HostFunctionRegistry implements HostFunctionHooks {
   private readonly entries = new Map<string, HostFunctionEntry>();
-  private runningCalls = 0;
+  private running_calls = 0;
   private wasm: RecomputingCellStore | undefined;
 
   /**
@@ -170,7 +170,7 @@ export class HostFunctionRegistry implements HostFunctionHooks {
    * call that can reach the engine refuses before it starts.
    */
   assertIdle(): void {
-    if (this.runningCalls === 0) return;
+    if (this.running_calls === 0) return;
 
     throw new SheetwriteError(
       "blocked",
@@ -192,9 +192,9 @@ export class HostFunctionRegistry implements HostFunctionHooks {
   restore(wasm: RecomputingCellStore): void {
     if (this.entries.size === 0) return;
 
-    const setHostFunction = setterOf(wasm);
+    const set_host_function = setter_of(wasm);
     for (const { metadata, call } of this.entries.values()) {
-      if (!setHostFunction(metadata.name, call, metadata.volatile === true, false)) {
+      if (!set_host_function(metadata.name, call, metadata.volatile === true, false)) {
         throw invalidFunction(
           "The replacement engine refused a registered function",
           metadata.name,
@@ -204,13 +204,13 @@ export class HostFunctionRegistry implements HostFunctionHooks {
   }
 
   register(metadata: FormulaFunctionMetadata, implementation: FormulaFunction): void {
-    const frozen = frozenMetadata(metadata);
+    const frozen = frozen_metadata(metadata);
     if (typeof implementation !== "function") {
       throw invalidFunction("Function implementation must be a function", frozen.name);
     }
 
     const call = hostCall(implementation, (running) => {
-      this.runningCalls += running ? 1 : -1;
+      this.running_calls += running ? 1 : -1;
     });
     if (!this.adopted()(frozen.name, call, frozen.volatile === true, true)) {
       throw invalidFunction(
@@ -239,6 +239,6 @@ export class HostFunctionRegistry implements HostFunctionHooks {
       throw new SheetwriteError("unavailable", "host-function", "The registry has no engine");
     }
 
-    return setterOf(this.wasm);
+    return setter_of(this.wasm);
   }
 }

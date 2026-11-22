@@ -23,30 +23,32 @@ export interface FormattingStageProps {
 /** The formatting showcase's island: the budget, its style controls and the XLSX proof. */
 export function FormattingStage(props: FormattingStageProps) {
   let host!: HTMLDivElement;
-  let formulaHost!: HTMLDivElement;
-  const [budget, setBudget] = createSignal<FormattingBudget | null>(null);
-  const [status, setStatus] = createSignal("Loading the budget…");
-  const [bootError, setBootError] = createSignal<string | null>(null);
-  const [format, setFormat] = createSignal("$#,##0.00");
+  let formula_host!: HTMLDivElement;
+  const [budget, set_budget] = createSignal<FormattingBudget | null>(null);
+  const [status, set_status] = createSignal("Loading the budget…");
+  const [boot_error, set_boot_error] = createSignal<string | null>(null);
+  const [format, set_format] = createSignal("$#,##0.00");
   const action = useAction();
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       import("./boot.js")
-        .then(({ startFormattingBudget }) => startFormattingBudget(host, formulaHost))
+        .then(({ startFormattingBudget: start_formatting_budget }) =>
+          start_formatting_budget(host, formula_host),
+        )
         .then((started) => {
           if (disposed) return started.dispose();
-          setBudget(started);
-          setStatus("Ready · editing B3:C3");
+          set_budget(started);
+          set_status("Ready · editing B3:C3");
         })
         .catch((cause: unknown) => {
-          if (!disposed) setBootError(errorText(cause));
+          if (!disposed) set_boot_error(errorText(cause));
         });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       budget()?.dispose();
     });
   });
@@ -87,7 +89,7 @@ export function FormattingStage(props: FormattingStageProps) {
                     onClick={() =>
                       run((current) => {
                         current.applyStyleCommand(command);
-                        setStatus(`${command} applied · B3:C3`);
+                        set_status(`${command} applied · B3:C3`);
                       })
                     }
                   >
@@ -111,8 +113,8 @@ export function FormattingStage(props: FormattingStageProps) {
                     onClick={() =>
                       run((current) => {
                         current.applyNumberFormat(option.code);
-                        setFormat(option.code);
-                        setStatus(`${option.label} applied · B3:C3`);
+                        set_format(option.code);
+                        set_status(`${option.label} applied · B3:C3`);
                       })
                     }
                   >
@@ -132,7 +134,7 @@ export function FormattingStage(props: FormattingStageProps) {
                     onClick={() =>
                       run((current) => {
                         current.styleTarget({ fontFamily: family });
-                        setStatus(`${family} applied · B3:C3`);
+                        set_status(`${family} applied · B3:C3`);
                       })
                     }
                   >
@@ -156,13 +158,15 @@ export function FormattingStage(props: FormattingStageProps) {
                 )}
               </For>
               <For each={["top", "middle", "bottom"] as const}>
-                {(verticalAlign) => (
+                {(vertical_align) => (
                   <Button
                     data-size="sm"
                     disabled={disabled()}
-                    onClick={() => run((current) => current.styleTarget({ verticalAlign }))}
+                    onClick={() =>
+                      run((current) => current.styleTarget({ verticalAlign: vertical_align }))
+                    }
                   >
-                    {verticalAlign}
+                    {vertical_align}
                   </Button>
                 )}
               </For>
@@ -208,7 +212,7 @@ export function FormattingStage(props: FormattingStageProps) {
                 ? `${report()?.differences.length === 0 ? "Verified" : "Mismatch"} · ${report()?.checkedCells} cells compared · ${report()?.byteLength.toLocaleString("en-US")} XLSX bytes · ${report()?.differences.length} differences · ${report()?.warnings.length} warnings`
                 : "Not run yet. The proof uses your current workbook, including live edits."}
             </output>
-            <ActionError error={bootError() ?? action.error} />
+            <ActionError error={boot_error() ?? action.error} />
           </ShowcaseControlGroup>
         </>
       }
@@ -217,7 +221,7 @@ export function FormattingStage(props: FormattingStageProps) {
           <div
             class="sw-formatting-formula"
             ref={(element) => {
-              formulaHost = element;
+              formula_host = element;
             }}
           />
           <div

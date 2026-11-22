@@ -6,9 +6,9 @@ import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 import { writeStringColumn } from "./packed-fixture.js";
 import { median } from "./stats.js";
 
-const wasmRoot =
+const wasm_root =
   process.env.STRING_POOL_WASM_ROOT ?? new URL("../../packages/wasm/", import.meta.url).pathname;
-const { CellStore, load } = (await import(`${wasmRoot}/loader-node.mjs`)) as typeof WasmModule;
+const { CellStore, load } = (await import(`${wasm_root}/loader-node.mjs`)) as typeof WasmModule;
 
 const ROWS = 1_000_000;
 const BATCH = 10_000;
@@ -16,7 +16,7 @@ const EDITS = 100_000;
 const SAMPLES = 7;
 const mode = process.env.STRING_POOL_BENCH_MODE ?? "controls";
 
-await load(readFileSync(`${wasmRoot}/pkg/sheetwrite_wasm_bg.wasm`));
+await load(readFileSync(`${wasm_root}/pkg/sheetwrite_wasm_bg.wasm`));
 
 function measure(operation: () => void): number {
   const start = performance.now();
@@ -43,7 +43,7 @@ function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
 // stored strings: on Linux, develop's setSparseBlock read ×1.22 slower than
 // 0.6.1's with identical engine state, and ×0.989 after one full collection
 // (#651). Collect before each read row so every writer starts from the same heap.
-function settledMeasure(operation: () => void): number {
+function settled_measure(operation: () => void): number {
   Bun.gc(true);
   return measure(operation);
 }
@@ -65,7 +65,7 @@ function controls() {
             store.commitSources();
           }
         }),
-        read: settledMeasure(() => {
+        read: settled_measure(() => {
           for (let read = 0; read < 10_000; read++) {
             const start = (read * 64) % (ROWS - 64);
             const window = store.getWindow(sheet, start, start + 64, new Uint32Array([0]));
@@ -103,7 +103,7 @@ function lifetime() {
   try {
     const sheet = store.addSheet(1, ROWS);
     ingest(store, sheet, true);
-    const sweepPausesMs = Array.from({ length: SAMPLES + 1 }, () =>
+    const sweep_pauses_ms = Array.from({ length: SAMPLES + 1 }, () =>
       measure(() => store.compactStringStorage()),
     );
 
@@ -125,9 +125,9 @@ function lifetime() {
     }
 
     return {
-      pauseMs: Math.max(...sweepPausesMs),
-      warmupPauseMs: sweepPausesMs[0],
-      sweepSamplesMs: sweepPausesMs.slice(1),
+      pauseMs: Math.max(...sweep_pauses_ms),
+      warmupPauseMs: sweep_pauses_ms[0],
+      sweepSamplesMs: sweep_pauses_ms.slice(1),
       retainedAfterEdits: Array.from(store.memoryStats()),
     };
   } finally {

@@ -15,9 +15,9 @@ export async function mountLiveGrid(host: HTMLElement, name: string): Promise<()
   const { workbook, data } = load();
   await initSheetwrite();
   const grid = createGrid(host, { workbook, data, theme: siteGridTheme(host) });
-  const stopTheme = observeSiteTheme(() => grid.replaceTheme(siteGridTheme(host)));
+  const stop_theme = observeSiteTheme(() => grid.replaceTheme(siteGridTheme(host)));
   return () => {
-    stopTheme();
+    stop_theme();
     grid.destroy();
   };
 }

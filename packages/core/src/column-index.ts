@@ -13,13 +13,13 @@ export class ColumnIndex {
     this.columns = Int32Array.from(columns);
     this.offsets = new Float64Array(count + 1);
 
-    let maxColumn = -1;
+    let max_column = -1;
     for (let i = 0; i < count; i++) {
       const column = columns[i];
-      if (column !== undefined && column > maxColumn) maxColumn = column;
+      if (column !== undefined && column > max_column) max_column = column;
     }
 
-    this.positions = new Int32Array(maxColumn + 1);
+    this.positions = new Int32Array(max_column + 1);
     this.positions.fill(-1);
 
     let total = 0;
@@ -62,9 +62,9 @@ export class ColumnIndex {
 
   /** Visible-column position of `absoluteCol`, or -1 when hidden/out of range. */
   positionOf(absoluteCol: number): number {
-    const inRange =
+    const in_range =
       Number.isInteger(absoluteCol) && absoluteCol >= 0 && absoluteCol < this.positions.length;
-    if (!inRange) return -1;
+    if (!in_range) return -1;
 
     return this.positions[absoluteCol] ?? -1;
   }

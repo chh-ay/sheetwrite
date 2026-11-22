@@ -5,11 +5,11 @@ import { type ActionGuard, type ActionState, createActionGuard } from "../../lib
 
 /** React binding for {@link createActionGuard}: one guard per component instance. */
 function useAction(): ActionGuard & ActionState {
-  const [state, setState] = useState<ActionState>({ pending: false, error: null });
+  const [state, set_state] = useState<ActionState>({ pending: false, error: null });
   const guard = useRef<ActionGuard | null>(null);
-  guard.current ??= createActionGuard(setState);
-  const { run, clearError } = guard.current;
-  return { ...state, state, run, clearError };
+  guard.current ??= createActionGuard(set_state);
+  const { run, clearError: clear_error } = guard.current;
+  return { ...state, state, run, clearError: clear_error };
 }
 
 /** Attributes that mark a button as working on its action (styled by the site CSS). */

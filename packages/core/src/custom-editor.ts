@@ -11,7 +11,7 @@ import type {
 
 const NO_EDITOR_ERROR = Symbol("no-editor-error");
 
-function reportCustomEditorError(error: unknown): void {
+function report_custom_editor_error(error: unknown): void {
   const reporter = "reportError" in globalThis ? globalThis.reportError : undefined;
   if (typeof reporter === "function") {
     reporter(error);
@@ -22,7 +22,7 @@ function reportCustomEditorError(error: unknown): void {
   });
 }
 
-function snapshotColumn(column: Readonly<Column>): Column {
+function snapshot_column(column: Readonly<Column>): Column {
   return structuredClone(column);
 }
 
@@ -93,7 +93,7 @@ export class CustomEditorController {
         ...options,
         address: { ...options.address },
         viewAddress: { ...options.viewAddress },
-        column: snapshotColumn(options.column),
+        column: snapshot_column(options.column),
       },
       rect: options.rect,
       onCommit: options.onCommit,
@@ -106,10 +106,10 @@ export class CustomEditorController {
     this.host.appendChild(wrapper);
     this.position(options.rect);
 
-    wrapper.addEventListener("compositionstart", this.onCompositionStart);
-    wrapper.addEventListener("compositionend", this.onCompositionEnd);
-    wrapper.addEventListener("keydown", this.onKeyDown);
-    wrapper.addEventListener("focusout", this.onFocusOut);
+    wrapper.addEventListener("compositionstart", this.on_composition_start);
+    wrapper.addEventListener("compositionend", this.on_composition_end);
+    wrapper.addEventListener("keydown", this.on_key_down);
+    wrapper.addEventListener("focusout", this.on_focus_out);
 
     const context = this.context(active);
     try {
@@ -118,16 +118,16 @@ export class CustomEditorController {
         try {
           instance.destroy();
         } catch (error) {
-          reportCustomEditorError(error);
+          report_custom_editor_error(error);
         }
         return;
       }
       active.instance = instance;
       instance.reposition(options.rect);
-      this.focusEditor(active);
+      this.focus_editor(active);
     } catch (error) {
-      const teardownError = this.teardown(active);
-      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
+      const teardown_error = this.teardown(active);
+      if (teardown_error !== NO_EDITOR_ERROR) report_custom_editor_error(teardown_error);
       throw error;
     }
   }
@@ -141,7 +141,7 @@ export class CustomEditorController {
     active.state = {
       ...active.state,
       ...state,
-      column: state.column ? snapshotColumn(state.column) : active.state.column,
+      column: state.column ? snapshot_column(state.column) : active.state.column,
     };
     active.wrapper.setAttribute("aria-label", active.state.label);
     active.instance.update(this.context(active));
@@ -162,18 +162,18 @@ export class CustomEditorController {
     const active = this.active;
     if (!active) return;
     active.abort.abort();
-    let cancelError: unknown = NO_EDITOR_ERROR;
+    let cancel_error: unknown = NO_EDITOR_ERROR;
     try {
       active.instance?.cancel();
     } catch (error) {
-      cancelError = error;
+      cancel_error = error;
     }
-    const teardownError = this.teardown(active);
+    const teardown_error = this.teardown(active);
     try {
       if (notify) active.onCancel();
     } finally {
-      if (cancelError !== NO_EDITOR_ERROR) reportCustomEditorError(cancelError);
-      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
+      if (cancel_error !== NO_EDITOR_ERROR) report_custom_editor_error(cancel_error);
+      if (teardown_error !== NO_EDITOR_ERROR) report_custom_editor_error(teardown_error);
     }
   }
 
@@ -187,7 +187,7 @@ export class CustomEditorController {
       ...active.state,
       address: { ...active.state.address },
       viewAddress: { ...active.state.viewAddress },
-      column: snapshotColumn(active.state.column),
+      column: snapshot_column(active.state.column),
       signal: active.abort.signal,
       commit: (value, navigation = "none") => {
         if (this.active?.generation !== generation || active.abort.signal.aborted) return;
@@ -195,7 +195,7 @@ export class CustomEditorController {
           this.cancel();
           return;
         }
-        this.finishCommit(active, value, navigation);
+        this.finish_commit(active, value, navigation);
       },
       cancel: () => {
         if (this.active?.generation !== generation || active.abort.signal.aborted) return;
@@ -204,18 +204,18 @@ export class CustomEditorController {
     };
   }
 
-  private focusEditor(active: ActiveEditor): void {
+  private focus_editor(active: ActiveEditor): void {
     const target = active.wrapper.querySelector<HTMLElement>(
       "input,textarea,select,button,[contenteditable=true],[tabindex]",
     );
-    const focusTarget = target ?? active.wrapper;
-    if (!focusTarget.hasAttribute("aria-label") && !focusTarget.hasAttribute("aria-labelledby")) {
-      focusTarget.setAttribute("aria-label", active.state.label);
+    const focus_target = target ?? active.wrapper;
+    if (!focus_target.hasAttribute("aria-label") && !focus_target.hasAttribute("aria-labelledby")) {
+      focus_target.setAttribute("aria-label", active.state.label);
     }
-    focusTarget.focus({ preventScroll: true });
+    focus_target.focus({ preventScroll: true });
   }
 
-  private requestCommit(active: ActiveEditor, navigation: CellEditorNavigation): void {
+  private request_commit(active: ActiveEditor, navigation: CellEditorNavigation): void {
     if (
       this.active !== active ||
       active.abort.signal.aborted ||
@@ -233,7 +233,7 @@ export class CustomEditorController {
       return;
     }
     if (typeof result === "string") {
-      this.finishCommit(active, result, navigation);
+      this.finish_commit(active, result, navigation);
       return;
     }
     if (result === undefined) {
@@ -248,7 +248,7 @@ export class CustomEditorController {
         if (this.active !== active || active.abort.signal.aborted) return;
         active.commitPending = false;
         active.wrapper.removeAttribute("aria-busy");
-        if (typeof value === "string") this.finishCommit(active, value, navigation);
+        if (typeof value === "string") this.finish_commit(active, value, navigation);
         else this.cancel();
       },
       () => {
@@ -260,17 +260,17 @@ export class CustomEditorController {
     );
   }
 
-  private finishCommit(
+  private finish_commit(
     active: ActiveEditor,
     value: string,
     navigation: CellEditorNavigation,
   ): void {
     if (this.active !== active || active.abort.signal.aborted) return;
-    const teardownError = this.teardown(active);
+    const teardown_error = this.teardown(active);
     try {
       active.onCommit(value, navigation);
     } finally {
-      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
+      if (teardown_error !== NO_EDITOR_ERROR) report_custom_editor_error(teardown_error);
     }
   }
 
@@ -279,10 +279,10 @@ export class CustomEditorController {
     active.tearingDown = true;
     this.active = null;
     active.abort.abort();
-    active.wrapper.removeEventListener("compositionstart", this.onCompositionStart);
-    active.wrapper.removeEventListener("compositionend", this.onCompositionEnd);
-    active.wrapper.removeEventListener("keydown", this.onKeyDown);
-    active.wrapper.removeEventListener("focusout", this.onFocusOut);
+    active.wrapper.removeEventListener("compositionstart", this.on_composition_start);
+    active.wrapper.removeEventListener("compositionend", this.on_composition_end);
+    active.wrapper.removeEventListener("keydown", this.on_key_down);
+    active.wrapper.removeEventListener("focusout", this.on_focus_out);
     let error: unknown = NO_EDITOR_ERROR;
     try {
       active.instance?.destroy();
@@ -296,15 +296,15 @@ export class CustomEditorController {
     return error;
   }
 
-  private readonly onCompositionStart = (): void => {
+  private readonly on_composition_start = (): void => {
     if (this.active) this.active.composing = true;
   };
 
-  private readonly onCompositionEnd = (): void => {
+  private readonly on_composition_end = (): void => {
     if (this.active) this.active.composing = false;
   };
 
-  private readonly onKeyDown = (event: KeyboardEvent): void => {
+  private readonly on_key_down = (event: KeyboardEvent): void => {
     const active = this.active;
     if (!active || active.composing || event.isComposing || event.defaultPrevented) return;
     let navigation: CellEditorNavigation | null = null;
@@ -319,13 +319,13 @@ export class CustomEditorController {
     if (!navigation || !active.instance) return;
     event.preventDefault();
     event.stopPropagation();
-    this.requestCommit(active, navigation);
+    this.request_commit(active, navigation);
   };
 
-  private readonly onFocusOut = (event: FocusEvent): void => {
+  private readonly on_focus_out = (event: FocusEvent): void => {
     const active = this.active;
     if (!active || active.tearingDown || active.commitPending) return;
     if (event.relatedTarget instanceof Node && active.wrapper.contains(event.relatedTarget)) return;
-    this.requestCommit(active, "none");
+    this.request_commit(active, "none");
   };
 }

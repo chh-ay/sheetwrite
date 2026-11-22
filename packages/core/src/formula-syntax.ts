@@ -163,7 +163,7 @@ function arity(args: readonly FormulaArgumentMetadata[]): { min: number; max: nu
   return { min, max: repeats ? Number.POSITIVE_INFINITY : args.length };
 }
 
-function argumentWord(count: number): string {
+function argument_word(count: number): string {
   return count === 1 ? "argument" : "arguments";
 }
 
@@ -183,7 +183,7 @@ export function checkCalls(
 ): FormulaDiagnostic[] {
   if (functions.size === 0) return [];
 
-  const bareNames = new Set(
+  const bare_names = new Set(
     tokens
       .filter((token, index) => token.kind === "ident" && !isCallName(tokens, index))
       .map((token) => token.text.toUpperCase()),
@@ -194,7 +194,7 @@ export function checkCalls(
     const key = call.name.text.toUpperCase();
     const fn = functions.get(key);
     if (fn === undefined) {
-      if (!bareNames.has(key) && !key.startsWith(FUTURE_FUNCTION_PREFIX)) {
+      if (!bare_names.has(key) && !key.startsWith(FUTURE_FUNCTION_PREFIX)) {
         diagnostics.push(mark(call.name, `${key} is not a known function. The cell shows #NAME?.`));
       }
       continue;
@@ -204,9 +204,9 @@ export function checkCalls(
     const count = call.empty ? 0 : call.commas + 1;
     const { min, max } = arity(fn.arguments);
     if (count < min) {
-      diagnostics.push(mark(call.name, `${key} needs at least ${min} ${argumentWord(min)}.`));
+      diagnostics.push(mark(call.name, `${key} needs at least ${min} ${argument_word(min)}.`));
     } else if (count > max) {
-      diagnostics.push(mark(call.name, `${key} takes at most ${max} ${argumentWord(max)}.`));
+      diagnostics.push(mark(call.name, `${key} takes at most ${max} ${argument_word(max)}.`));
     }
   }
 

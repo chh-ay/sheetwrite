@@ -19,7 +19,7 @@ import { join, resolve } from "node:path";
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\/$/, /^\/404\/$/];
 /** A last path segment with an extension (`llms.txt`) is a file, not an HTML page. */
 const FILE_PATH = /\.[a-z0-9]+$/i;
-const repositoryRoot = resolve(import.meta.dir, "..");
+const repository_root = resolve(import.meta.dir, "..");
 /** A page's "Edit this page" or "Source" link names the file it renders. */
 const SOURCE_LINK =
   /href="https:\/\/github\.com\/chh-ay\/sheetwrite\/(?:blob|edit)\/develop\/([^"#?]+)/g;
@@ -94,48 +94,48 @@ export function setLastmods(xml: string, lastmodOf: (pathname: string) => string
   });
 }
 
-const commitDates = new Map<string, string>();
+const commit_dates = new Map<string, string>();
 
 /** The date (YYYY-MM-DD) of the last commit to `path`, or of HEAD for no path. */
-function commitDate(path?: string): string {
+function commit_date(path?: string): string {
   const key = path ?? "";
-  const known = commitDates.get(key);
+  const known = commit_dates.get(key);
   if (known !== undefined) return known;
   const result = Bun.spawnSync(
     ["git", "log", "-1", "--format=%cs", ...(path === undefined ? [] : ["--", path])],
     {
-      cwd: repositoryRoot,
+      cwd: repository_root,
     },
   );
   if (!result.success) throw new Error(`git log failed for ${key}: ${result.stderr.toString()}`);
   const date = result.stdout.toString().trim();
-  commitDates.set(key, date);
+  commit_dates.set(key, date);
   return date;
 }
 
 /** The newest commit date of a page's existing sources; HEAD's date when it has none. */
-function pageLastmod(clientDirectory: string, pathname: string): string {
-  const html = readFileSync(join(clientDirectory, pathname, "index.html"), "utf8");
+function page_lastmod(client_directory: string, pathname: string): string {
+  const html = readFileSync(join(client_directory, pathname, "index.html"), "utf8");
   const dates = pageSources(pathname, html)
-    .filter((path) => existsSync(join(repositoryRoot, path)))
-    .map((path) => commitDate(path))
+    .filter((path) => existsSync(join(repository_root, path)))
+    .map((path) => commit_date(path))
     .filter((date) => date.length > 0);
   return dates.length === 0
-    ? commitDate()
+    ? commit_date()
     : dates.reduce((newest, date) => (date > newest ? date : newest));
 }
 
 if (import.meta.main) {
-  const [clientDirectory] = process.argv.slice(2);
-  if (clientDirectory === undefined) {
+  const [client_directory] = process.argv.slice(2);
+  if (client_directory === undefined) {
     throw new Error("usage: bun scripts/normalize-sitemap.ts <built client directory>");
   }
-  const path = resolve(clientDirectory, "sitemap.xml");
+  const path = resolve(client_directory, "sitemap.xml");
   const { xml, kept, dropped } = normalizeSitemap(readFileSync(path, "utf8"));
   if (kept === 0) throw new Error("sitemap normalization produced zero URLs");
   writeFileSync(
     path,
-    setLastmods(xml, (pathname) => pageLastmod(clientDirectory, pathname)),
+    setLastmods(xml, (pathname) => page_lastmod(client_directory, pathname)),
   );
   console.log(`sitemap normalized: ${kept} urls kept, ${dropped} dropped`);
 }

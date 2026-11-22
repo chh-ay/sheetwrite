@@ -49,7 +49,7 @@ export interface ControlledComparisonInput {
   readonly runner: ControlledRunnerFingerprint;
 }
 
-function seededRandom(seed: number): () => number {
+function seeded_random(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) | 0;
@@ -59,7 +59,7 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function seedForKey(key: string): number {
+function seed_for_key(key: string): number {
   let hash = 0x811c9dc5;
   for (let index = 0; index < key.length; index++) {
     hash ^= key.charCodeAt(index);
@@ -68,7 +68,7 @@ function seedForKey(key: string): number {
   return hash >>> 0;
 }
 
-function sampleMedian(source: readonly number[], random: () => number, scratch: number[]): number {
+function sample_median(source: readonly number[], random: () => number, scratch: number[]): number {
   for (let index = 0; index < source.length; index++) {
     scratch[index] = source[Math.floor(random() * source.length)]!;
   }
@@ -96,71 +96,72 @@ export function independentMedianDeltaLowerBound(
   if (!Number.isInteger(familySize) || familySize <= 0) {
     throw new Error("controlled comparison family size must be a positive integer");
   }
-  const baselineFirst = baseline[0]!;
-  const freshFirst = fresh[0]!;
+  const baseline_first = baseline[0]!;
+  const fresh_first = fresh[0]!;
   if (
-    baseline.every((sample) => sample === baselineFirst) &&
-    fresh.every((sample) => sample === freshFirst)
+    baseline.every((sample) => sample === baseline_first) &&
+    fresh.every((sample) => sample === fresh_first)
   ) {
-    return freshFirst - baselineFirst;
+    return fresh_first - baseline_first;
   }
-  const random = seededRandom(seedForKey(key));
-  const baselineScratch = new Array<number>(baseline.length);
-  const freshScratch = new Array<number>(fresh.length);
+  const random = seeded_random(seed_for_key(key));
+  const baseline_scratch = new Array<number>(baseline.length);
+  const fresh_scratch = new Array<number>(fresh.length);
   const deltas = new Array<number>(CONTROLLED_COMPARISON_POLICY.resamples);
   for (let index = 0; index < deltas.length; index++) {
     deltas[index] =
-      sampleMedian(fresh, random, freshScratch) - sampleMedian(baseline, random, baselineScratch);
+      sample_median(fresh, random, fresh_scratch) -
+      sample_median(baseline, random, baseline_scratch);
   }
   deltas.sort((left, right) => left - right);
-  const perCellLowerTail =
+  const per_cell_lower_tail =
     (1 - CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel) / familySize;
-  const lowerIndex = Math.ceil(perCellLowerTail * deltas.length) - 1;
-  return deltas[Math.max(0, Math.min(deltas.length - 1, lowerIndex))]!;
+  const lower_index = Math.ceil(per_cell_lower_tail * deltas.length) - 1;
+  return deltas[Math.max(0, Math.min(deltas.length - 1, lower_index))]!;
 }
 
 export function compareControlledRender(
   input: ControlledComparisonInput,
 ): ControlledComparisonRow[] {
-  const baselineArtifact = parseControlledBaseline(input.baseline);
-  const freshArtifact = validateRenderGateArtifact(input.fresh, "full", {
+  const baseline_artifact = parseControlledBaseline(input.baseline);
+  const fresh_artifact = validateRenderGateArtifact(input.fresh, "full", {
     rounds: input.fresh.metadata.rounds,
   });
-  if (freshArtifact.metadata.rounds !== baselineArtifact.source.rounds) {
+  if (fresh_artifact.metadata.rounds !== baseline_artifact.source.rounds) {
     throw new Error(
-      `controlled fresh rounds must match baseline: expected ${baselineArtifact.source.rounds}, observed ${freshArtifact.metadata.rounds}`,
+      `controlled fresh rounds must match baseline: expected ${baseline_artifact.source.rounds}, observed ${fresh_artifact.metadata.rounds}`,
     );
   }
-  const harnessMismatches = fingerprintMismatches(
-    baselineArtifact.harness,
+  const harness_mismatches = fingerprintMismatches(
+    baseline_artifact.harness,
     input.harness,
     "harness",
   );
-  if (harnessMismatches.length > 0) {
-    throw new Error(`protocol/harness mismatch:\n${harnessMismatches.join("\n")}`);
+  if (harness_mismatches.length > 0) {
+    throw new Error(`protocol/harness mismatch:\n${harness_mismatches.join("\n")}`);
   }
-  const runnerMismatches = fingerprintMismatches(baselineArtifact.runner, input.runner, "runner");
-  if (runnerMismatches.length > 0) {
-    throw new Error(`uncontrolled/unmatched runner:\n${runnerMismatches.join("\n")}`);
+  const runner_mismatches = fingerprintMismatches(baseline_artifact.runner, input.runner, "runner");
+  if (runner_mismatches.length > 0) {
+    throw new Error(`uncontrolled/unmatched runner:\n${runner_mismatches.join("\n")}`);
   }
 
-  const freshSamples = samplesByControlledCell(freshArtifact);
-  const baselineByKey = new Map(baselineArtifact.cells.map((cell) => [cell.key, cell]));
+  const fresh_samples = samplesByControlledCell(fresh_artifact);
+  const baseline_by_key = new Map(baseline_artifact.cells.map((cell) => [cell.key, cell]));
   const rows: ControlledComparisonRow[] = [];
-  for (const [key, samples] of freshSamples) {
-    const baseline = baselineByKey.get(key);
+  for (const [key, samples] of fresh_samples) {
+    const baseline = baseline_by_key.get(key);
     if (!baseline) throw new Error(`missing baseline ${key}`);
     const fresh = summarizeFinite(samples);
     if (baseline.medianMs <= 0) {
       throw new Error(`${key} baseline median must be positive for a numeric comparison`);
     }
-    const absoluteDelta = fresh.median - baseline.medianMs;
+    const absolute_delta = fresh.median - baseline.medianMs;
     const ratio = fresh.median / baseline.medianMs;
-    const lowerConfidenceBoundMs = independentMedianDeltaLowerBound(
+    const lower_confidence_bound_ms = independentMedianDeltaLowerBound(
       baseline.samplesMs,
       samples,
       key,
-      baselineArtifact.cells.length,
+      baseline_artifact.cells.length,
     );
     rows.push({
       key,
@@ -170,21 +171,21 @@ export function compareControlledRender(
       freshMedian: fresh.median,
       freshP95: fresh.p95,
       freshMad: fresh.mad,
-      absoluteDelta,
+      absoluteDelta: absolute_delta,
       ratio,
-      lowerConfidenceBoundMs,
-      regression: lowerConfidenceBoundMs > CONTROLLED_COMPARISON_POLICY.maximumRegressionMs,
+      lowerConfidenceBoundMs: lower_confidence_bound_ms,
+      regression: lower_confidence_bound_ms > CONTROLLED_COMPARISON_POLICY.maximumRegressionMs,
     });
   }
   return rows.sort((left, right) => left.key.localeCompare(right.key));
 }
 
-function controlledRunner(
+function controlled_runner(
   fresh: RenderBenchmarkArtifact,
-  powerMode: string,
+  power_mode: string,
   concurrency: number,
 ): ControlledRunnerFingerprint {
-  if (powerMode.length === 0) throw new Error("--power-mode is required for a controlled check");
+  if (power_mode.length === 0) throw new Error("--power-mode is required for a controlled check");
   if (!Number.isInteger(concurrency) || concurrency <= 0) {
     throw new Error("--concurrency must be a positive integer for a controlled check");
   }
@@ -195,12 +196,12 @@ function controlledRunner(
     bun: fresh.metadata.bunVersion,
     node: fresh.metadata.nodeVersion,
     browser: fresh.metadata.browserVersion,
-    powerMode,
+    powerMode: power_mode,
     concurrency,
   };
 }
 
-function printTable(rows: readonly ControlledComparisonRow[]): void {
+function print_table(rows: readonly ControlledComparisonRow[]): void {
   const confidence = `${(CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel * 100).toFixed(0)}%`;
   const lines = [
     `| cell | baseline median | baseline p95 | baseline MAD | fresh median | fresh p95 | fresh MAD | median Δ | ratio | ${confidence} familywise lower Δ | status |`,
@@ -214,7 +215,7 @@ function printTable(rows: readonly ControlledComparisonRow[]): void {
   console.log(lines.join("\n"));
 }
 
-function gitHead(): string {
+function git_head(): string {
   const result = Bun.spawnSync(["git", "rev-parse", "HEAD"], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
@@ -227,8 +228,8 @@ function gitHead(): string {
 }
 
 export async function runCheck(args: readonly string[]): Promise<number> {
-  const reportOnly = args.includes("--report-only");
-  if (reportOnly) {
+  const report_only = args.includes("--report-only");
+  if (report_only) {
     process.stderr.write(
       "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" +
         "REPORT ONLY — NON-GATING PERFORMANCE DIAGNOSTIC\n" +
@@ -238,22 +239,22 @@ export async function runCheck(args: readonly string[]): Promise<number> {
   }
 
   try {
-    const baselinePath = resolve(optionValue(args, "--baseline") ?? DEFAULT_BASELINE_PATH);
-    const freshPath = resolve(optionValue(args, "--fresh") ?? DEFAULT_FRESH_PATH);
-    const powerMode = optionValue(args, "--power-mode") ?? "";
+    const baseline_path = resolve(optionValue(args, "--baseline") ?? DEFAULT_BASELINE_PATH);
+    const fresh_path = resolve(optionValue(args, "--fresh") ?? DEFAULT_FRESH_PATH);
+    const power_mode = optionValue(args, "--power-mode") ?? "";
     const concurrency = Number(optionValue(args, "--concurrency") ?? Number.NaN);
-    const baselineJson = readFileSync(baselinePath, "utf8");
-    const freshJson = readFileSync(freshPath, "utf8");
-    const baseline = parseControlledBaseline(JSON.parse(baselineJson) as unknown);
+    const baseline_json = readFileSync(baseline_path, "utf8");
+    const fresh_json = readFileSync(fresh_path, "utf8");
+    const baseline = parseControlledBaseline(JSON.parse(baseline_json) as unknown);
     validateControlledBaselineProvenance(baseline, REPOSITORY_ROOT);
-    const fresh = validateRenderGateArtifact(JSON.parse(freshJson) as unknown, "full", {
+    const fresh = validateRenderGateArtifact(JSON.parse(fresh_json) as unknown, "full", {
       rounds: baseline.source.rounds,
       nowMs: Date.now(),
       maxAgeMs: FRESH_RESULT_MAX_AGE_MS,
     });
     if (fresh.metadata.dirty)
       throw new Error("fresh controlled result was recorded from a dirty tree");
-    const head = gitHead();
+    const head = git_head();
     if (fresh.metadata.commit !== head) {
       throw new Error(
         `stale controlled result commit: expected ${head}, observed ${fresh.metadata.commit}`,
@@ -267,15 +268,15 @@ export async function runCheck(args: readonly string[]): Promise<number> {
       baseline,
       fresh,
       harness,
-      runner: controlledRunner(fresh, powerMode, concurrency),
+      runner: controlled_runner(fresh, power_mode, concurrency),
     });
-    printTable(rows);
+    print_table(rows);
     const regressions = rows.filter((row) => row.regression);
     if (regressions.length > 0) {
       process.stderr.write(
         `\n✖ ${regressions.length} statistically significant slowdown(s) at a zero-millisecond regression threshold and ${(CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel * 100).toFixed(0)}% familywise confidence\n`,
       );
-      return reportOnly ? 0 : 1;
+      return report_only ? 0 : 1;
     }
     process.stderr.write(
       "\n✔ complete matched comparison found no statistically detected regression\n",
@@ -284,7 +285,7 @@ export async function runCheck(args: readonly string[]): Promise<number> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`\n✖ performance gate invalid: ${message}\n`);
-    return reportOnly ? 0 : 1;
+    return report_only ? 0 : 1;
   }
 }
 

@@ -115,7 +115,11 @@ interface RuntimeDiagnostics {
   readonly pageErrors: readonly string[];
 }
 
-function positiveIntegerArgument(args: readonly string[], name: string, fallback: number): number {
+function positive_integer_argument(
+  args: readonly string[],
+  name: string,
+  fallback: number,
+): number {
   const raw = optionValue(args, name);
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
@@ -125,7 +129,7 @@ function positiveIntegerArgument(args: readonly string[], name: string, fallback
   return parsed;
 }
 
-function nonNegativeIntegerArgument(
+function non_negative_integer_argument(
   args: readonly string[],
   name: string,
   fallback: number,
@@ -140,53 +144,58 @@ function nonNegativeIntegerArgument(
 }
 
 /** The Markdown view written beside a JSON artifact: `x.json` → `x.md`, any other name gains `.md`. */
-function markdownPathFor(jsonPath: string): string {
-  return jsonPath.endsWith(".json") ? `${jsonPath.slice(0, -".json".length)}.md` : `${jsonPath}.md`;
+function markdown_path_for(json_path: string): string {
+  return json_path.endsWith(".json")
+    ? `${json_path.slice(0, -".json".length)}.md`
+    : `${json_path}.md`;
 }
 
-function isWindowTransferScenario(scenario: ScenarioId): boolean {
+function is_window_transfer_scenario(scenario: ScenarioId): boolean {
   return WINDOW_TRANSFER_SCENARIO_IDS.includes(scenario as WindowTransferScenarioId);
 }
 
 /** Driver options from the command line; throws on an invalid combination. */
 export function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const smoke = args.includes("--smoke");
-  const scenarioSet = optionValue(args, "--scenario-set") ?? "gate";
-  if (scenarioSet !== "gate" && scenarioSet !== "diagnostic") {
+  const scenario_set = optionValue(args, "--scenario-set") ?? "gate";
+  if (scenario_set !== "gate" && scenario_set !== "diagnostic") {
     throw new TypeError("--scenario-set must be gate or diagnostic");
   }
-  const diagnostic = scenarioSet === "diagnostic";
-  const setScenarios: readonly ScenarioId[] = diagnostic
+  const diagnostic = scenario_set === "diagnostic";
+  const set_scenarios: readonly ScenarioId[] = diagnostic
     ? DIAGNOSTIC_RENDER_SCENARIOS.map((scenario) => scenario.id)
     : RENDER_SCENARIOS.map((scenario) => scenario.id);
   // `--scenarios a,b` runs only those scenarios of the chosen set, for A/B runs of one row.
-  const scenariosArg = optionValue(args, "--scenarios");
+  const scenarios_arg = optionValue(args, "--scenarios");
   const scenarios =
-    scenariosArg === undefined
-      ? setScenarios
-      : scenariosArg.split(",").map((id) => {
-          const scenario = setScenarios.find((candidate) => candidate === id);
+    scenarios_arg === undefined
+      ? set_scenarios
+      : scenarios_arg.split(",").map((id) => {
+          const scenario = set_scenarios.find((candidate) => candidate === id);
           if (scenario === undefined) {
-            throw new TypeError(`--scenarios: ${id} is not in the ${scenarioSet} set`);
+            throw new TypeError(`--scenarios: ${id} is not in the ${scenario_set} set`);
           }
           return scenario;
         });
   // The window-transfer pair is measured against itself, so a run takes both rows or neither.
-  const windowTransferCount = scenarios.filter(isWindowTransferScenario).length;
-  if (windowTransferCount !== 0 && windowTransferCount !== WINDOW_TRANSFER_SCENARIO_IDS.length) {
+  const window_transfer_count = scenarios.filter(is_window_transfer_scenario).length;
+  if (
+    window_transfer_count !== 0 &&
+    window_transfer_count !== WINDOW_TRANSFER_SCENARIO_IDS.length
+  ) {
     throw new TypeError(
       `--scenarios: ${WINDOW_TRANSFER_SCENARIO_IDS.join(" and ")} run together or not at all`,
     );
   }
-  const engineArg = optionValue(args, "--engine");
+  const engine_arg = optionValue(args, "--engine");
   const engines: readonly EngineId[] =
-    engineArg === undefined
+    engine_arg === undefined
       ? diagnostic
         ? ["sheetwrite"]
         : ENGINE_IDS
       : [
-          ENGINE_IDS.includes(engineArg as EngineId)
-            ? (engineArg as EngineId)
+          ENGINE_IDS.includes(engine_arg as EngineId)
+            ? (engine_arg as EngineId)
             : (() => {
                 throw new TypeError(`--engine must be one of: ${ENGINE_IDS.join(", ")}`);
               })(),
@@ -194,9 +203,9 @@ export function parseConfiguration(args: readonly string[]): DriverConfiguration
   if (diagnostic && engines.some((engine) => engine !== "sheetwrite")) {
     throw new TypeError("the diagnostic scenario set currently supports only sheetwrite");
   }
-  const rowsArg = optionValue(args, "--rows");
-  const rows = rowsArg
-    ? rowsArg.split(",").map((entry) => {
+  const rows_arg = optionValue(args, "--rows");
+  const rows = rows_arg
+    ? rows_arg.split(",").map((entry) => {
         const parsed = Number(entry);
         if (!Number.isInteger(parsed) || parsed < 30) {
           throw new TypeError("--rows values must be integers >= 30");
@@ -206,66 +215,66 @@ export function parseConfiguration(args: readonly string[]): DriverConfiguration
     : [smoke ? 200 : 100_000];
   if (new Set(rows).size !== rows.length) throw new TypeError("--rows values must be unique");
 
-  const compactSamples = args.includes("--compact-samples");
-  const outputArg = optionValue(args, "--output");
-  const markdownArg = optionValue(args, "--markdown-output");
-  const outputPath =
-    outputArg ?? (smoke ? undefined : diagnostic ? DIAGNOSTIC_JSON_PATH : DEFAULT_JSON_PATH);
-  const markdownPath =
-    markdownArg ??
-    (outputPath === undefined
+  const compact_samples = args.includes("--compact-samples");
+  const output_arg = optionValue(args, "--output");
+  const markdown_arg = optionValue(args, "--markdown-output");
+  const output_path =
+    output_arg ?? (smoke ? undefined : diagnostic ? DIAGNOSTIC_JSON_PATH : DEFAULT_JSON_PATH);
+  const markdown_path =
+    markdown_arg ??
+    (output_path === undefined
       ? undefined
-      : outputArg === undefined
+      : output_arg === undefined
         ? diagnostic
           ? DIAGNOSTIC_MARKDOWN_PATH
           : DEFAULT_MARKDOWN_PATH
-        : markdownPathFor(outputPath));
+        : markdown_path_for(output_path));
   return {
     smoke,
     engines,
     rows,
     scenarios,
     diagnostic,
-    windowTransfer: diagnostic && windowTransferCount > 0,
-    rounds: positiveIntegerArgument(args, "--rounds", smoke ? 1 : 2),
-    measuredSamples: positiveIntegerArgument(args, "--samples", smoke ? 1 : 3),
-    warmupSamples: nonNegativeIntegerArgument(args, "--warmups", 1),
+    windowTransfer: diagnostic && window_transfer_count > 0,
+    rounds: positive_integer_argument(args, "--rounds", smoke ? 1 : 2),
+    measuredSamples: positive_integer_argument(args, "--samples", smoke ? 1 : 3),
+    warmupSamples: non_negative_integer_argument(args, "--warmups", 1),
     minimumSampleDurationMs: Math.max(
       RENDER_MINIMUM_SAMPLE_MS,
-      positiveIntegerArgument(args, "--minimum-sample-ms", RENDER_MINIMUM_SAMPLE_MS),
+      positive_integer_argument(args, "--minimum-sample-ms", RENDER_MINIMUM_SAMPLE_MS),
     ),
-    timeoutMs: positiveIntegerArgument(args, "--timeout-ms", smoke ? 120_000 : 300_000),
+    timeoutMs: positive_integer_argument(args, "--timeout-ms", smoke ? 120_000 : 300_000),
     browserExecutable: optionValue(args, "--browser-executable"),
-    outputPath,
-    markdownPath,
-    compactSamples,
+    outputPath: output_path,
+    markdownPath: markdown_path,
+    compactSamples: compact_samples,
   };
 }
 
-function normalizedError(error: unknown): Error {
+function normalized_error(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-function failureForScenario(
+function failure_for_scenario(
   configuration: CombinationConfiguration,
-  scenarioId: ScenarioId,
+  scenario_id: ScenarioId,
   stage: FailureStage,
   error: unknown,
   diagnostics: RuntimeDiagnostics,
   timeout: boolean,
   crash: boolean,
-  partialSamples: FailedScenario["partialSamples"] = [],
+  partial_samples: FailedScenario["partialSamples"] = [],
 ): FailedScenario {
-  const failure = normalizedError(error);
-  const dataValidity = scenarioDataValidity(scenarioId);
+  const failure = normalized_error(error);
+  const data_validity = scenarioDataValidity(scenario_id);
   return {
     runId: configuration.runId,
     round: configuration.round,
     engine: configuration.engine,
     rows: configuration.rows,
-    scenarioId,
-    group: scenarioGroup(scenarioId),
-    ...(dataValidity === undefined ? {} : { dataValidity }),
+    scenarioId: scenario_id,
+    group: scenarioGroup(scenario_id),
+    ...(data_validity === undefined ? {} : { dataValidity: data_validity }),
     status: "failed",
     stage,
     errorClass: failure.name || "Error",
@@ -274,13 +283,13 @@ function failureForScenario(
     crash,
     consoleErrors: diagnostics.consoleErrors,
     pageErrors: diagnostics.pageErrors,
-    partialSamples,
+    partialSamples: partial_samples,
     validation: [],
     memory: { beforeBytes: null, afterBytes: null, deltaBytes: null },
   };
 }
 
-function combinationScenarios(configuration: CombinationConfiguration): readonly ScenarioId[] {
+function combination_scenarios(configuration: CombinationConfiguration): readonly ScenarioId[] {
   return configuration.scenarios ?? RENDER_SCENARIOS.map((scenario) => scenario.id);
 }
 
@@ -292,19 +301,22 @@ export function createCombinationFailures(
   timeout = false,
   crash = false,
 ): FailedScenario[] {
-  return combinationScenarios(configuration).map((scenarioId) =>
-    failureForScenario(configuration, scenarioId, stage, error, diagnostics, timeout, crash),
+  return combination_scenarios(configuration).map((scenario_id) =>
+    failure_for_scenario(configuration, scenario_id, stage, error, diagnostics, timeout, crash),
   );
 }
 
-function pageStage(value: unknown, fallback: FailureStage): FailureStage {
+function page_stage(value: unknown, fallback: FailureStage): FailureStage {
   return typeof value === "string" &&
     ["build", "launch", "mount", "warmup", "measure", "validate", "teardown"].includes(value)
     ? (value as FailureStage)
     : fallback;
 }
 
-function identityMatches(result: ScenarioResult, configuration: CombinationConfiguration): boolean {
+function identity_matches(
+  result: ScenarioResult,
+  configuration: CombinationConfiguration,
+): boolean {
   return (
     result.runId === configuration.runId &&
     result.round === configuration.round &&
@@ -313,7 +325,7 @@ function identityMatches(result: ScenarioResult, configuration: CombinationConfi
   );
 }
 
-function diagnosticsFailure(
+function diagnostics_failure(
   result: ScenarioResult,
   configuration: CombinationConfiguration,
   diagnostics: RuntimeDiagnostics,
@@ -325,7 +337,7 @@ function diagnosticsFailure(
       pageErrors: [...result.pageErrors, ...diagnostics.pageErrors],
     };
   }
-  return failureForScenario(
+  return failure_for_scenario(
     configuration,
     result.scenarioId,
     "validate",
@@ -337,7 +349,7 @@ function diagnosticsFailure(
   );
 }
 
-function normalizeBrowserOutput(
+function normalize_browser_output(
   value: unknown,
   configuration: CombinationConfiguration,
   diagnostics: RuntimeDiagnostics,
@@ -385,20 +397,20 @@ function normalizeBrowserOutput(
   }
 
   const normalized: ScenarioResult[] = [];
-  for (const scenarioId of combinationScenarios(configuration)) {
+  for (const scenario_id of combination_scenarios(configuration)) {
     const matches = input.results.filter(
       (entry) =>
         entry !== null &&
         typeof entry === "object" &&
         !Array.isArray(entry) &&
         "scenarioId" in entry &&
-        entry.scenarioId === scenarioId,
+        entry.scenarioId === scenario_id,
     );
     if (matches.length !== 1) {
       normalized.push(
-        failureForScenario(
+        failure_for_scenario(
           configuration,
-          scenarioId,
+          scenario_id,
           "validate",
           new Error(
             matches.length === 0
@@ -418,24 +430,32 @@ function normalizeBrowserOutput(
         configuration.measuredSamples,
         configuration.minimumSampleDurationMs,
       );
-      if (!identityMatches(result, configuration)) {
+      if (!identity_matches(result, configuration)) {
         throw new TypeError("scenario identity does not match its browser process");
       }
       normalized.push(
         diagnostics.consoleErrors.length > 0 || diagnostics.pageErrors.length > 0
-          ? diagnosticsFailure(result, configuration, diagnostics)
+          ? diagnostics_failure(result, configuration, diagnostics)
           : result,
       );
     } catch (error) {
       normalized.push(
-        failureForScenario(configuration, scenarioId, "validate", error, diagnostics, false, false),
+        failure_for_scenario(
+          configuration,
+          scenario_id,
+          "validate",
+          error,
+          diagnostics,
+          false,
+          false,
+        ),
       );
     }
   }
   return normalized;
 }
 
-async function readPartialPageState(page: Page): Promise<{
+async function read_partial_page_state(page: Page): Promise<{
   readonly result?: BrowserCombinationResult;
   readonly error?: string;
   readonly stage?: string;
@@ -451,17 +471,17 @@ async function readPartialPageState(page: Page): Promise<{
   }
 }
 
-async function runCombination(
-  baseUrl: string,
+async function run_combination(
+  base_url: string,
   configuration: CombinationConfiguration,
 ): Promise<CombinationOutput> {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  const diagnostics = { consoleErrors, pageErrors };
-  const launchAttempts: BrowserLaunchAttempt[] = [];
+  const console_errors: string[] = [];
+  const page_errors: string[] = [];
+  const diagnostics = { consoleErrors: console_errors, pageErrors: page_errors };
+  const launch_attempts: BrowserLaunchAttempt[] = [];
   let browser: Browser | undefined;
   let page: Page | undefined;
-  let browserVersion: string | undefined;
+  let browser_version: string | undefined;
   let crashed = false;
   let stage: FailureStage = "launch";
 
@@ -473,8 +493,8 @@ async function runCombination(
           executablePath: configuration.browserExecutable,
           args: ["--enable-precise-memory-info"],
         });
-        browserVersion = browser.version();
-        launchAttempts.push({
+        browser_version = browser.version();
+        launch_attempts.push({
           round: configuration.round,
           engine: configuration.engine,
           rows: configuration.rows,
@@ -485,8 +505,8 @@ async function runCombination(
         });
         break;
       } catch (error) {
-        const failure = normalizedError(error);
-        launchAttempts.push({
+        const failure = normalized_error(error);
+        launch_attempts.push({
           round: configuration.round,
           engine: configuration.engine,
           rows: configuration.rows,
@@ -502,19 +522,19 @@ async function runCombination(
     if (!browser) throw new Error("browser launch attempts completed without a browser");
     page = await browser.newPage({
       viewport: { width: RENDER_VIEWPORT.width + 480, height: RENDER_VIEWPORT.height + 180 },
-      deviceScaleFactor: combinationScenarios(configuration).includes(
+      deviceScaleFactor: combination_scenarios(configuration).includes(
         "scroll-fractional.same-window",
       )
         ? 1.25
         : 1,
     });
     page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "error") console_errors.push(message.text());
     });
-    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("pageerror", (error) => page_errors.push(error.message));
     page.on("response", (response) => {
       if (response.status() >= 400) {
-        consoleErrors.push(`HTTP ${response.status()} ${response.url()}`);
+        console_errors.push(`HTTP ${response.status()} ${response.url()}`);
       }
     });
     page.on("crash", () => {
@@ -527,13 +547,13 @@ async function runCombination(
       window.__benchDone = false;
     });
 
-    const url = new URL(baseUrl);
+    const url = new URL(base_url);
     url.searchParams.set("auto", "1");
     url.searchParams.set("runId", configuration.runId);
     url.searchParams.set("round", String(configuration.round));
     url.searchParams.set("engine", configuration.engine);
     url.searchParams.set("rows", String(configuration.rows));
-    url.searchParams.set("scenarios", combinationScenarios(configuration).join(","));
+    url.searchParams.set("scenarios", combination_scenarios(configuration).join(","));
     url.searchParams.set("samples", String(configuration.measuredSamples));
     url.searchParams.set("warmups", String(configuration.warmupSamples));
     url.searchParams.set("minimumSampleMs", String(configuration.minimumSampleDurationMs));
@@ -545,48 +565,52 @@ async function runCombination(
     await page.waitForFunction(() => window.__benchDone === true, undefined, {
       timeout: configuration.timeoutMs,
     });
-    const state = await readPartialPageState(page);
+    const state = await read_partial_page_state(page);
     if (state.error && !state.result) throw new Error(state.error);
     return {
-      results: normalizeBrowserOutput(state.result, configuration, diagnostics),
-      browserVersion,
-      launchAttempts,
+      results: normalize_browser_output(state.result, configuration, diagnostics),
+      browserVersion: browser_version,
+      launchAttempts: launch_attempts,
     };
   } catch (error) {
-    const state = page ? await readPartialPageState(page) : {};
-    const normalized = normalizedError(error);
-    const timedOut = normalized.name === "TimeoutError" || /timed out/iu.test(normalized.message);
-    const observedStage = pageStage(state.stage, stage);
+    const state = page ? await read_partial_page_state(page) : {};
+    const normalized = normalized_error(error);
+    const timed_out = normalized.name === "TimeoutError" || /timed out/iu.test(normalized.message);
+    const observed_stage = page_stage(state.stage, stage);
     if (state.result) {
-      const partial = normalizeBrowserOutput(state.result, configuration, diagnostics);
-      const byScenario = new Map(partial.map((result) => [result.scenarioId, result]));
-      const completed = combinationScenarios(configuration).map((scenarioId) => {
-        const result = byScenario.get(scenarioId);
+      const partial = normalize_browser_output(state.result, configuration, diagnostics);
+      const by_scenario = new Map(partial.map((result) => [result.scenarioId, result]));
+      const completed = combination_scenarios(configuration).map((scenario_id) => {
+        const result = by_scenario.get(scenario_id);
         if (result && result.status === "success") return result;
-        return failureForScenario(
+        return failure_for_scenario(
           configuration,
-          scenarioId,
-          observedStage,
+          scenario_id,
+          observed_stage,
           state.error ? new Error(state.error) : normalized,
           diagnostics,
-          timedOut,
+          timed_out,
           crashed,
           result?.status === "failed" ? result.partialSamples : [],
         );
       });
-      return { results: completed, browserVersion, launchAttempts };
+      return {
+        results: completed,
+        browserVersion: browser_version,
+        launchAttempts: launch_attempts,
+      };
     }
     return {
       results: createCombinationFailures(
         configuration,
-        observedStage,
+        observed_stage,
         state.error ? new Error(state.error) : normalized,
         diagnostics,
-        timedOut,
+        timed_out,
         crashed,
       ),
-      browserVersion,
-      launchAttempts,
+      browserVersion: browser_version,
+      launchAttempts: launch_attempts,
     };
   } finally {
     if (browser) {
@@ -597,75 +621,75 @@ async function runCombination(
   }
 }
 
-function gitOutput(args: readonly string[]): string {
-  const processResult = Bun.spawnSync(["git", ...args], {
+function git_output(args: readonly string[]): string {
+  const process_result = Bun.spawnSync(["git", ...args], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
     stderr: "pipe",
   });
-  if (processResult.exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed: ${processResult.stderr.toString().trim()}`);
+  if (process_result.exitCode !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${process_result.stderr.toString().trim()}`);
   }
-  return processResult.stdout.toString().trim();
+  return process_result.stdout.toString().trim();
 }
 
-function stableJson(value: RenderBenchmarkArtifact): string {
+function stable_json(value: RenderBenchmarkArtifact): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-async function validateExistingArtifact(
+async function validate_existing_artifact(
   path: string,
-  gateMode: BenchmarkMode | undefined,
+  gate_mode: BenchmarkMode | undefined,
 ): Promise<void> {
   const json = await Bun.file(path).text();
   const value: unknown = JSON.parse(json);
-  const artifact = gateMode
-    ? validateRenderGateArtifact(value, gateMode)
+  const artifact = gate_mode
+    ? validateRenderGateArtifact(value, gate_mode)
     : parseRenderArtifactJson(json);
-  const markdownPath = markdownPathFor(path);
-  const expectedMarkdown = renderBenchmarkMarkdown(artifact);
-  const observedMarkdown = await Bun.file(markdownPath).text();
-  if (observedMarkdown !== expectedMarkdown) {
-    throw new Error(`${markdownPath} is not the byte-stable view of ${path}`);
+  const markdown_path = markdown_path_for(path);
+  const expected_markdown = renderBenchmarkMarkdown(artifact);
+  const observed_markdown = await Bun.file(markdown_path).text();
+  if (observed_markdown !== expected_markdown) {
+    throw new Error(`${markdown_path} is not the byte-stable view of ${path}`);
   }
   console.log(
     `validated ${artifact.completeness.expectedKeys.length} render cells (${artifact.completeness.failedKeys.length} structured failures)`,
   );
 }
 
-async function runDriver(args: readonly string[]): Promise<void> {
-  const validatePath = optionValue(args, "--validate");
-  if (validatePath) {
-    const modeArgument = optionValue(args, "--gate-mode");
-    const gateMode =
-      modeArgument === undefined
+async function run_driver(args: readonly string[]): Promise<void> {
+  const validate_path = optionValue(args, "--validate");
+  if (validate_path) {
+    const mode_argument = optionValue(args, "--gate-mode");
+    const gate_mode =
+      mode_argument === undefined
         ? undefined
-        : modeArgument === "full" || modeArgument === "smoke"
-          ? modeArgument
+        : mode_argument === "full" || mode_argument === "smoke"
+          ? mode_argument
           : (() => {
               throw new TypeError("--gate-mode must be full or smoke");
             })();
-    await validateExistingArtifact(resolve(process.cwd(), validatePath), gateMode);
+    await validate_existing_artifact(resolve(process.cwd(), validate_path), gate_mode);
     return;
   }
 
   const configuration = parseConfiguration(args);
-  const runId = crypto.randomUUID();
-  const engineOrder = counterbalancedOrder(
+  const run_id = crypto.randomUUID();
+  const engine_order = counterbalancedOrder(
     configuration.engines,
     configuration.rounds,
     RENDER_ORDER_SEED,
   );
-  const windowTransferScenarioOrder = configuration.windowTransfer
+  const window_transfer_scenario_order = configuration.windowTransfer
     ? counterbalancedOrder(
         WINDOW_TRANSFER_SCENARIO_IDS,
         configuration.rounds,
         WINDOW_TRANSFER_ORDER_SEED,
       )
     : undefined;
-  const datasetHashes: Record<string, string> = {};
+  const dataset_hashes: Record<string, string> = {};
   for (const rows of configuration.rows) {
-    datasetHashes[String(rows)] = datasetChecksum(makeColumnar(rows, DEFAULT_SEED));
+    dataset_hashes[String(rows)] = datasetChecksum(makeColumnar(rows, DEFAULT_SEED));
   }
   Bun.gc(true);
 
@@ -684,25 +708,27 @@ async function runDriver(args: readonly string[]): Promise<void> {
   });
 
   const results: ScenarioResult[] = [];
-  const launchAttempts: BrowserLaunchAttempt[] = [];
-  let browserVersion = "unavailable";
+  const launch_attempts: BrowserLaunchAttempt[] = [];
+  let browser_version = "unavailable";
   try {
-    for (let roundIndex = 0; roundIndex < engineOrder.length; roundIndex++) {
-      const round = roundIndex + 1;
+    for (let round_index = 0; round_index < engine_order.length; round_index++) {
+      const round = round_index + 1;
       const scenarios =
-        windowTransferScenarioOrder === undefined
+        window_transfer_scenario_order === undefined
           ? configuration.scenarios
           : [
-              ...configuration.scenarios.filter((scenario) => !isWindowTransferScenario(scenario)),
-              ...windowTransferScenarioOrder[roundIndex]!,
+              ...configuration.scenarios.filter(
+                (scenario) => !is_window_transfer_scenario(scenario),
+              ),
+              ...window_transfer_scenario_order[round_index]!,
             ];
-      for (const engine of engineOrder[roundIndex]!) {
+      for (const engine of engine_order[round_index]!) {
         for (const rows of configuration.rows) {
           process.stderr.write(
             `render benchmark: round ${round}/${configuration.rounds}, ${engine}, ${rows.toLocaleString("en-US")} rows\n`,
           );
-          const output = await runCombination(`http://${server.hostname}:${server.port}/`, {
-            runId,
+          const output = await run_combination(`http://${server.hostname}:${server.port}/`, {
+            runId: run_id,
             round,
             engine,
             rows,
@@ -711,13 +737,13 @@ async function runDriver(args: readonly string[]): Promise<void> {
             warmupSamples: configuration.warmupSamples,
             minimumSampleDurationMs: configuration.minimumSampleDurationMs,
             timeoutMs: configuration.timeoutMs,
-            datasetHash: datasetHashes[String(rows)]!,
+            datasetHash: dataset_hashes[String(rows)]!,
             browserExecutable: configuration.browserExecutable,
             windowTransferDiagnostic: configuration.windowTransfer,
           });
           results.push(...output.results);
-          launchAttempts.push(...output.launchAttempts);
-          if (output.browserVersion) browserVersion = output.browserVersion;
+          launch_attempts.push(...output.launchAttempts);
+          if (output.browserVersion) browser_version = output.browserVersion;
         }
       }
     }
@@ -733,14 +759,14 @@ async function runDriver(args: readonly string[]): Promise<void> {
   const timestamp = new Date().toISOString();
   const artifact: RenderBenchmarkArtifact = {
     protocolVersion: RENDER_PROTOCOL_VERSION,
-    runId,
+    runId: run_id,
     metadata: {
-      commit: gitOutput(["rev-parse", "HEAD"]),
+      commit: git_output(["rev-parse", "HEAD"]),
       dirty: sourceTreeDirty(false),
       timestamp,
       bunVersion: Bun.version,
       nodeVersion: process.versions.node,
-      browserVersion,
+      browserVersion: browser_version,
       os: `${process.platform} ${release()}`,
       arch: process.arch,
       cpu: cpus()[0]?.model ?? "unknown",
@@ -749,16 +775,18 @@ async function runDriver(args: readonly string[]): Promise<void> {
         handsontable: packageVersion("bench/node_modules/handsontable/package.json"),
       },
       datasetSeed: DEFAULT_SEED,
-      datasetHashes,
+      datasetHashes: dataset_hashes,
       viewport: RENDER_VIEWPORT,
       measuredSamples: configuration.measuredSamples,
       warmupSamples: configuration.warmupSamples,
       minimumSampleDurationMs: configuration.minimumSampleDurationMs,
       rounds: configuration.rounds,
       orderSeed: RENDER_ORDER_SEED,
-      engineOrder,
-      launchAttempts,
-      ...(windowTransferScenarioOrder === undefined ? {} : { windowTransferScenarioOrder }),
+      engineOrder: engine_order,
+      launchAttempts: launch_attempts,
+      ...(window_transfer_scenario_order === undefined
+        ? {}
+        : { windowTransferScenarioOrder: window_transfer_scenario_order }),
     },
     config,
     results,
@@ -771,21 +799,21 @@ async function runDriver(args: readonly string[]): Promise<void> {
           "bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine handsontable",
         ],
   };
-  const json = stableJson(artifact);
-  const parsed = parseRenderArtifactJson(json, { expectedRunId: runId });
+  const json = stable_json(artifact);
+  const parsed = parseRenderArtifactJson(json, { expectedRunId: run_id });
   const markdown = renderBenchmarkMarkdown(parsed);
   // Aggregate-only artifacts (docs evidence) drop per-sample arrays AFTER the
   // protocol self-parse above validated them; gate/baseline artifacts keep
   // raw rounds for spread verification.
-  const outputJson = configuration.compactSamples
-    ? stableJson({
+  const output_json = configuration.compactSamples
+    ? stable_json({
         ...artifact,
         results: artifact.results.map((result) => ({ ...result, rawSamples: [] })),
       })
     : json;
 
   if (configuration.outputPath) {
-    await Bun.write(configuration.outputPath, outputJson);
+    await Bun.write(configuration.outputPath, output_json);
     if (!configuration.markdownPath) throw new Error("JSON output requires a Markdown output path");
     await Bun.write(configuration.markdownPath, markdown);
     process.stderr.write(
@@ -800,5 +828,5 @@ async function runDriver(args: readonly string[]): Promise<void> {
 
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  await runDriver(args);
+  await run_driver(args);
 }

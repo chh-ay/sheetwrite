@@ -9,7 +9,7 @@ export const TRANSITIONAL_REL =
 const STRICT_REL = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const MACRO_WORKBOOK = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
 
-function resolveTarget(source: string, target: string): string {
+function resolve_target(source: string, target: string): string {
   if (target.startsWith("/")) return target.slice(1);
   const segments = source.split("/").slice(0, -1);
   for (const segment of target.split("/")) {
@@ -27,14 +27,14 @@ function resolveTarget(source: string, target: string): string {
 export function packageProblems(bytes: Uint8Array): string[] {
   const files = unzipSync(bytes);
   const problems: string[] = [];
-  const contentTypes = strFromU8(files["[Content_Types].xml"] ?? new Uint8Array());
+  const content_types = strFromU8(files["[Content_Types].xml"] ?? new Uint8Array());
   const defaults = new Set(
-    [...contentTypes.matchAll(/<Default Extension="([^"]+)"/g)].map((match) =>
+    [...content_types.matchAll(/<Default Extension="([^"]+)"/g)].map((match) =>
       match[1]?.toLowerCase(),
     ),
   );
   const overrides = new Map(
-    [...contentTypes.matchAll(/<Override PartName="\/([^"]+)" ContentType="([^"]+)"/g)].map(
+    [...content_types.matchAll(/<Override PartName="\/([^"]+)" ContentType="([^"]+)"/g)].map(
       (match) => [match[1], match[2]],
     ),
   );
@@ -58,7 +58,7 @@ export function packageProblems(bytes: Uint8Array): string[] {
       if (ids.has(id)) problems.push(`duplicate ${id} in ${part}`);
       ids.add(id);
       if (attributes.includes('TargetMode="External"')) continue;
-      const target = resolveTarget(source, /Target="([^"]+)"/.exec(attributes)?.[1] ?? "");
+      const target = resolve_target(source, /Target="([^"]+)"/.exec(attributes)?.[1] ?? "");
       if (!files[target]) problems.push(`${part} ${id} points at missing ${target}`);
     }
     relationships.set(source, ids);
@@ -151,23 +151,23 @@ export function rawXlsx(options: RawXlsxOptions): Uint8Array {
       : []),
     ...(options.extraOverrides ?? []),
   ];
-  let nextRelationship = sheets.length + 1;
-  const workbookRelationships = [
+  let next_relationship = sheets.length + 1;
+  const workbook_relationships = [
     ...sheets.map(
       (_, index) =>
         `<Relationship Id="rId${index + 1}" Type="${rel}/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`,
     ),
     ...(options.styles
-      ? [`<Relationship Id="rId${nextRelationship++}" Type="${rel}/styles" Target="styles.xml"/>`]
+      ? [`<Relationship Id="rId${next_relationship++}" Type="${rel}/styles" Target="styles.xml"/>`]
       : []),
     ...(options.sharedStrings
       ? [
-          `<Relationship Id="rId${nextRelationship++}" Type="${rel}/sharedStrings" Target="sharedStrings.xml"/>`,
+          `<Relationship Id="rId${next_relationship++}" Type="${rel}/sharedStrings" Target="sharedStrings.xml"/>`,
         ]
       : []),
     ...(options.theme
       ? [
-          `<Relationship Id="rId${nextRelationship++}" Type="${rel}/theme" Target="theme/theme1.xml"/>`,
+          `<Relationship Id="rId${next_relationship++}" Type="${rel}/theme" Target="theme/theme1.xml"/>`,
         ]
       : []),
     options.workbookRelationships ?? "",
@@ -181,7 +181,7 @@ export function rawXlsx(options: RawXlsxOptions): Uint8Array {
           `<sheet name="${sheet.name ?? `Raw${index + 1}`}" sheetId="${index + 1}"${sheet.state && sheet.state !== "visible" ? ` state="${sheet.state}"` : ""} r:id="rId${index + 1}"/>`,
       )
       .join("")}</sheets>${options.workbookExtra ?? ""}</workbook>`,
-    "xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}">${workbookRelationships}</Relationships>`,
+    "xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships xmlns="${PACKAGE_REL}">${workbook_relationships}</Relationships>`,
     ...Object.fromEntries(
       sheets.flatMap((sheet, index) => {
         const number = index + 1;

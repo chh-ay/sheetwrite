@@ -186,7 +186,7 @@ interface ArtifactStamp {
   readonly timestamp: string | undefined;
 }
 
-function gitOutput(args: readonly string[]): string {
+function git_output(args: readonly string[]): string {
   const result = Bun.spawnSync(["git", ...args], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
@@ -198,7 +198,7 @@ function gitOutput(args: readonly string[]): string {
   return result.stdout.toString().trim();
 }
 
-function runStep(name: string, command: readonly string[]): void {
+function run_step(name: string, command: readonly string[]): void {
   process.stderr.write(`\n=== ${name}: bun run ${command.join(" ")}\n`);
   const child = Bun.spawnSync(["bun", "run", ...command], {
     cwd: BENCH_ROOT,
@@ -215,7 +215,7 @@ function runStep(name: string, command: readonly string[]): void {
  * `metadata`; the promoted regression baseline states the commit under
  * `source` and carries no dirty flag of its own.
  */
-async function artifactStamp(path: string): Promise<ArtifactStamp | undefined> {
+async function artifact_stamp(path: string): Promise<ArtifactStamp | undefined> {
   const file = Bun.file(path);
   if (!(await file.exists())) return undefined;
   const value = (await file.json()) as {
@@ -238,7 +238,7 @@ async function artifactStamp(path: string): Promise<ArtifactStamp | undefined> {
 }
 
 /** Substitute run-time values into a step's arguments. */
-function resolveCommands(
+function resolve_commands(
   commands: readonly (readonly string[])[],
   options: ReleaseOptions,
 ): readonly (readonly string[])[] {
@@ -254,7 +254,7 @@ function resolveCommands(
  * needs a prepared checkout of that commit before the run starts: failing here
  * costs seconds, failing after the browser capture costs the whole run.
  */
-function requireXlsxBaselineRoot(argument: string | undefined): string {
+function require_xlsx_baseline_root(argument: string | undefined): string {
   if (argument === undefined) {
     throw new Error(
       `the release capture needs --xlsx-baseline-root: a checkout of ${XLSX_BASELINE_COMMIT} with its packages built, for example\n` +
@@ -274,22 +274,22 @@ async function main(): Promise<void> {
   const options: ReleaseOptions = {
     xlsxBaselineRoot: smoke
       ? ""
-      : requireXlsxBaselineRoot(optionValue(args, "--xlsx-baseline-root")),
+      : require_xlsx_baseline_root(optionValue(args, "--xlsx-baseline-root")),
   };
-  const commit = gitOutput(["rev-parse", "HEAD"]);
-  const dirtyTree = gitOutput(["status", "--porcelain", "--untracked-files=no"]).length > 0;
-  if (dirtyTree) {
+  const commit = git_output(["rev-parse", "HEAD"]);
+  const dirty_tree = git_output(["status", "--porcelain", "--untracked-files=no"]).length > 0;
+  if (dirty_tree) {
     throw new Error(
       "the working tree has uncommitted changes; every published artifact must stamp a clean commit",
     );
   }
-  const resultsDir = resolve(BENCH_ROOT, smoke ? SCRATCH_DIRECTORY : "results");
+  const results_dir = resolve(BENCH_ROOT, smoke ? SCRATCH_DIRECTORY : "results");
   process.stderr.write(
     [
       `release capture at ${commit.slice(0, 12)}${smoke ? " (smoke rehearsal)" : ""}`,
       smoke
-        ? `writing rehearsals to ${resultsDir}; tracked evidence is not touched`
-        : `writing evidence to ${resultsDir}`,
+        ? `writing rehearsals to ${results_dir}; tracked evidence is not touched`
+        : `writing evidence to ${results_dir}`,
       smoke
         ? "the engine captures and the regression baseline have no smoke matrix and are skipped; run without --smoke for the release set"
         : "run on an otherwise idle machine, with no concurrent builds or timing captures; release comparison evidence needs each suite captured on its own through src/capture-scope.ts with BENCH_MEMORY_MAX=8G (non-formula suites on one reserved CPU, formula suites on the full CPU mask under exclusive quiet-machine isolation), as bench/README.md describes",
@@ -304,9 +304,9 @@ async function main(): Promise<void> {
       process.stderr.write(`\n=== ${step.name}: skipped (no smoke matrix)\n`);
       continue;
     }
-    for (const command of resolveCommands(commands, options)) runStep(step.name, command);
+    for (const command of resolve_commands(commands, options)) run_step(step.name, command);
     for (const artifact of step.artifacts) {
-      const stamp = await artifactStamp(resolve(resultsDir, artifact));
+      const stamp = await artifact_stamp(resolve(results_dir, artifact));
       if (stamp === undefined) {
         throw new Error(`${step.name} did not write ${artifact} with a capture stamp`);
       }

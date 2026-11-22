@@ -37,12 +37,12 @@ export interface PointCells {
   readonly contiguous: boolean;
 }
 
-function cellAt(cells: PivotCells["cells"], row: number, col: number): CellScalar {
+function cell_at(cells: PivotCells["cells"], row: number, col: number): CellScalar {
   return cells[row]?.[col] ?? null;
 }
 
 /** The rows, from `start`, whose cells in `col` hold each category in order; null when one is missing. */
-function categoryRows(
+function category_rows(
   cells: PivotCells["cells"],
   start: number,
   col: number,
@@ -51,7 +51,7 @@ function categoryRows(
   const rows: number[] = [];
   let row = start;
   for (const category of categories) {
-    while (row < cells.length && cellAt(cells, row, col) !== category) row += 1;
+    while (row < cells.length && cell_at(cells, row, col) !== category) row += 1;
     if (row === cells.length) return null;
     rows.push(row);
     row += 1;
@@ -64,7 +64,7 @@ function categoryRows(
  * a gap is a cell without a number. Of several such columns, the one headed
  * by the series name wins, as a pivot writes it above its data.
  */
-function valueCol(
+function value_col(
   cells: PivotCells["cells"],
   rows: readonly number[],
   series: ChartSeriesView,
@@ -74,27 +74,27 @@ function valueCol(
   let found: number | null = null;
   for (let col = from; col < width; col += 1) {
     const matches = rows.every((row, index) => {
-      const cell = cellAt(cells, row, col);
+      const cell = cell_at(cells, row, col);
       return (series.values[index] ?? null) === (typeof cell === "number" ? cell : null);
     });
     if (!matches) continue;
-    if (String(cellAt(cells, (rows[0] ?? 0) - 1, col)) === series.name) return col;
+    if (String(cell_at(cells, (rows[0] ?? 0) - 1, col)) === series.name) return col;
     found ??= col;
   }
   return found;
 }
 
-/** Whether each outer level sits in its own column left of `innerCol`, blank where its group continues. */
-function levelsBeside(
+/** Whether each outer level sits in its own column left of `inner_col`, blank where its group continues. */
+function levels_beside(
   cells: PivotCells["cells"],
   rows: readonly number[],
-  innerCol: number,
+  inner_col: number,
   series: ChartSeriesView,
 ): boolean {
   const levels = series.categoryLevels;
   return levels.every((level, depth) => {
-    const col = innerCol - levels.length + depth;
-    return col >= 0 && rows.every((row, index) => cellAt(cells, row, col) === level.labels[index]);
+    const col = inner_col - levels.length + depth;
+    return col >= 0 && rows.every((row, index) => cell_at(cells, row, col) === level.labels[index]);
   });
 }
 
@@ -112,29 +112,29 @@ export function locatePoints(view: ChartView, source: PivotCells): PointCells | 
   const outer = first.categoryLevels.length;
   for (let start = 0; start < cells.length; start += 1) {
     for (let col = 0; col < width; col += 1) {
-      if (cellAt(cells, start, col) !== first.categories[0]) continue;
-      const rows = categoryRows(cells, start, col, first.categories);
+      if (cell_at(cells, start, col) !== first.categories[0]) continue;
+      const rows = category_rows(cells, start, col, first.categories);
       if (rows === null) continue;
 
       // Series follow the pivot's data columns from left to right.
-      const valueCols: number[] = [];
+      const value_cols: number[] = [];
       let from = col + 1;
       for (const series of view.series) {
-        const found = valueCol(cells, rows, series, from, width);
+        const found = value_col(cells, rows, series, from, width);
         if (found === null) break;
-        valueCols.push(found);
+        value_cols.push(found);
         from = found + 1;
       }
-      if (valueCols.length < view.series.length) continue;
+      if (value_cols.length < view.series.length) continue;
 
       const filled = (rows.at(-1) ?? 0) - (rows[0] ?? 0) === rows.length - 1;
-      const contiguous = filled && levelsBeside(cells, rows, col, first);
+      const contiguous = filled && levels_beside(cells, rows, col, first);
       // A tabular pivot writes outer labels left of the inner ones; compact writes them in one column.
-      const firstLabel = col >= outer ? col - outer : col;
+      const first_label = col >= outer ? col - outer : col;
       return {
         rows: rows.map((row) => origin.row + row),
-        labelCols: [origin.col + firstLabel, origin.col + col],
-        valueCols: valueCols.map((value) => origin.col + value),
+        labelCols: [origin.col + first_label, origin.col + col],
+        valueCols: value_cols.map((value) => origin.col + value),
         contiguous,
       };
     }

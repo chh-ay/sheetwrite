@@ -16,23 +16,23 @@ import { type XmlElement, xmlAttribute, xmlBoolean, xmlChild, xmlChildren } from
  * declarations cost one pass over the columns, not one per declaration.
  */
 export function lastColumnDeclarations(spans: readonly number[]): Int32Array {
-  let columnCount = 0;
+  let column_count = 0;
   for (let at = 1; at < spans.length; at += 2) {
-    columnCount = Math.max(columnCount, (spans[at] ?? 0) + 1);
+    column_count = Math.max(column_count, (spans[at] ?? 0) + 1);
   }
 
-  const owners = new Int32Array(columnCount).fill(-1);
-  // `nextFree[col]` leads to the first unclaimed column at or after `col`.
-  const nextFree = Int32Array.from({ length: columnCount + 1 }, (_, col) => col);
-  const firstFree = (col: number): number => {
+  const owners = new Int32Array(column_count).fill(-1);
+  // `next_free[col]` leads to the first unclaimed column at or after `col`.
+  const next_free = Int32Array.from({ length: column_count + 1 }, (_, col) => col);
+  const first_free = (col: number): number => {
     let free = col;
-    while (nextFree[free] !== free) free = nextFree[free] ?? columnCount;
+    while (next_free[free] !== free) free = next_free[free] ?? column_count;
 
     // Point every column on the walked path at the answer, so no path is walked twice.
     let step = col;
     while (step !== free) {
-      const next = nextFree[step] ?? columnCount;
-      nextFree[step] = free;
+      const next = next_free[step] ?? column_count;
+      next_free[step] = free;
       step = next;
     }
     return free;
@@ -41,9 +41,9 @@ export function lastColumnDeclarations(spans: readonly number[]): Int32Array {
   for (let declaration = spans.length / 2 - 1; declaration >= 0; declaration--) {
     const first = spans[declaration * 2] ?? 0;
     const last = spans[declaration * 2 + 1] ?? -1;
-    for (let col = firstFree(first); col <= last; col = firstFree(col + 1)) {
+    for (let col = first_free(first); col <= last; col = first_free(col + 1)) {
       owners[col] = declaration;
-      nextFree[col] = col + 1;
+      next_free[col] = col + 1;
     }
   }
 
@@ -54,7 +54,7 @@ export function lastColumnDeclarations(spans: readonly number[]): Int32Array {
  * The column type a style's number format gives: `text` for Excel's Text
  * format `@`, then `date`, `currency` or `number`; none for General.
  */
-function formatType(record: ParsedCellStyle): Column["type"] | undefined {
+function format_type(record: ParsedCellStyle): Column["type"] | undefined {
   if (record.date) return "date";
   const format = record.numberFormat;
   if (!format) return undefined;
@@ -79,11 +79,11 @@ export function parseColumns(
     const max = parseUnsigned(xmlAttribute(element, "max"), "column maximum");
     if (min < 1 || max < min) return readerFailure("column range is invalid");
     assertResource(context, "maxColumnsPerSheet", max);
-    const columnOutline = Number(xmlAttribute(element, "outlineLevel") ?? 0);
-    if (!Number.isInteger(columnOutline) || columnOutline < 0 || columnOutline > 7) {
+    const column_outline = Number(xmlAttribute(element, "outlineLevel") ?? 0);
+    if (!Number.isInteger(column_outline) || column_outline < 0 || column_outline > 7) {
       return readerFailure("column outline level is invalid");
     }
-    if (columnOutline > 0 || xmlBoolean(xmlAttribute(element, "collapsed"))) {
+    if (column_outline > 0 || xmlBoolean(xmlAttribute(element, "collapsed"))) {
       emitWarning(context, {
         code: "unsupported-feature",
         message:
@@ -91,17 +91,19 @@ export function parseColumns(
         part,
       });
     }
-    const widthText = xmlAttribute(element, "width");
-    const widthChars = widthText === undefined ? undefined : Number(widthText);
-    if (widthChars !== undefined && (!Number.isFinite(widthChars) || widthChars <= 0)) {
+    const width_text = xmlAttribute(element, "width");
+    const width_chars = width_text === undefined ? undefined : Number(width_text);
+    if (width_chars !== undefined && (!Number.isFinite(width_chars) || width_chars <= 0)) {
       return readerFailure("column width is invalid");
     }
-    const styleText = xmlAttribute(element, "style");
-    const style = styles.at(styleText === undefined ? 0 : parseUnsigned(styleText, "column style"));
-    const type = formatType(style);
+    const style_text = xmlAttribute(element, "style");
+    const style = styles.at(
+      style_text === undefined ? 0 : parseUnsigned(style_text, "column style"),
+    );
+    const type = format_type(style);
     spans.push(min - 1, max - 1);
     definitions.push({
-      ...(widthChars !== undefined ? { width: columnWidthPixels(widthChars) } : {}),
+      ...(width_chars !== undefined ? { width: columnWidthPixels(width_chars) } : {}),
       ...(xmlAttribute(element, "hidden") !== undefined
         ? { visible: !xmlBoolean(xmlAttribute(element, "hidden")) }
         : {}),
@@ -127,35 +129,35 @@ export function columnFromParsed(
 ): Column {
   const definition = sheet.columns.get(col);
   const formats = new Set<string>();
-  const semanticTypes = new Set<Column["type"]>();
+  const semantic_types = new Set<Column["type"]>();
   const cells = sheet.columnCells.get(col);
-  for (const styleIndex of cells?.styleIndices ?? []) {
-    const record = styles.at(styleIndex);
+  for (const style_index of cells?.styleIndices ?? []) {
+    const record = styles.at(style_index);
     if (record.numberFormat) formats.add(record.numberFormat);
-    const type = formatType(record);
-    if (type) semanticTypes.add(type);
+    const type = format_type(record);
+    if (type) semantic_types.add(type);
   }
-  if (definition?.type) semanticTypes.add(definition.type);
+  if (definition?.type) semantic_types.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
   // A column default is chosen only when every formatted cell agrees; cells
   // that differ keep their own format (see the snapshot cell mapping below).
-  const mixed = semanticTypes.size > 1 || formats.size > 1;
-  const onlyType = semanticTypes.values().next().value;
-  const numberFormat = mixed
+  const mixed = semantic_types.size > 1 || formats.size > 1;
+  const only_type = semantic_types.values().next().value;
+  const number_format = mixed
     ? undefined
     : (definition?.numberFormat ?? formats.values().next().value);
   // Without one format for the column, it reads typing as Excel's General
   // does; each cell keeps its stored value and format.
-  const type: Column["type"] = mixed ? "general" : (definition?.type ?? onlyType ?? "general");
-  const defaultStyle = definition?.cellStyle ?? styles.at(0).style;
+  const type: Column["type"] = mixed ? "general" : (definition?.type ?? only_type ?? "general");
+  const default_style = definition?.cellStyle ?? styles.at(0).style;
   return {
     key,
     header: colToA1(col),
     width: definition?.width ?? 75,
     type,
-    ...(numberFormat ? { numberFormat } : {}),
-    ...(defaultStyle && Object.keys(defaultStyle).length > 0
-      ? { cellStyle: structuredClone(defaultStyle) }
+    ...(number_format ? { numberFormat: number_format } : {}),
+    ...(default_style && Object.keys(default_style).length > 0
+      ? { cellStyle: structuredClone(default_style) }
       : {}),
     ...(definition?.visible === false ? { visible: false } : {}),
   };

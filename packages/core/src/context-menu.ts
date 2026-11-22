@@ -20,13 +20,13 @@ import { seedWidgetTheme } from "./widget-theme.js";
  * Row and column commands sit in short submenus, so the menu stays about ten
  * rows tall instead of listing every verb for both axes.
  */
-function defaultItems(grid: Grid): ContextMenuItem[] {
-  const hasNote = (context: ContextMenuContext): boolean =>
+function default_items(grid: Grid): ContextMenuItem[] {
+  const has_note = (context: ContextMenuContext): boolean =>
     context.cell !== null && grid.getNote(context.cell) !== null;
 
   // The field list edits the pivot, so a grid that cannot edit (read-only) does
   // not offer it. `clearFormat` is the ribbon's stand-in for every edit command.
-  const inPivot = (context: ContextMenuContext): boolean =>
+  const in_pivot = (context: ContextMenuContext): boolean =>
     context.cell !== null &&
     !grid.getCommandState("clearFormat").disabled &&
     pivotAt(grid, context.cell) !== null;
@@ -130,11 +130,11 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
     { action: "formatCells" },
     { action: "pickFromList", visible: (context) => context.cell !== null },
     { action: "separator" },
-    { action: "pivotFields", visible: inPivot },
+    { action: "pivotFields", visible: in_pivot },
     { action: "separator" },
-    { action: "editNote", label: "New note", visible: (context) => !hasNote(context) },
-    { action: "editNote", visible: hasNote },
-    { action: "deleteNote", visible: hasNote },
+    { action: "editNote", label: "New note", visible: (context) => !has_note(context) },
+    { action: "editNote", visible: has_note },
+    { action: "deleteNote", visible: has_note },
   ];
 }
 
@@ -189,7 +189,7 @@ const ACTION_ICON: Record<
 };
 
 /** Drops hidden rows, then leading, trailing and doubled separators. */
-function visibleItems(
+function visible_items(
   items: readonly ContextMenuItem[],
   context: ContextMenuContext,
 ): ContextMenuItem[] {
@@ -251,7 +251,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   pickFromList: "Pick from drop-down list…",
 };
 
-function actionHandler(
+function action_handler(
   action: ContextMenuActionName | undefined,
   actions: GridActions,
 ): () => unknown {
@@ -418,8 +418,8 @@ export class ContextMenu {
   private readonly grid: Grid;
   /** Open submenus, outermost first; index i is menu level i + 1. */
   private submenus: Submenu[] = [];
-  private returnFocus: HTMLElement | null = null;
-  private hoverTimer: number | undefined;
+  private return_focus: HTMLElement | null = null;
+  private hover_timer: number | undefined;
 
   constructor(
     host: HTMLElement,
@@ -434,7 +434,7 @@ export class ContextMenu {
     this.grid = grid;
 
     seedWidgetTheme(host, theme);
-    this.el = this.createMenuElement("sheetwrite-context-menu");
+    this.el = this.create_menu_element("sheetwrite-context-menu");
   }
 
   /**
@@ -442,9 +442,9 @@ export class ContextMenu {
    * that belong to something other than a cell (a chart).
    */
   open(context: ContextMenuContext, items?: readonly ContextMenuItem[]): void {
-    this.closeSubmenusFrom(0);
+    this.close_submenus_from(0);
     const active = document.activeElement;
-    this.returnFocus = active instanceof HTMLElement && !this.ownsElement(active) ? active : null;
+    this.return_focus = active instanceof HTMLElement && !this.owns_element(active) ? active : null;
 
     const configured = this.config.contextMenu;
     const rows =
@@ -453,7 +453,7 @@ export class ContextMenu {
         ? configured(context)
         : Array.isArray(configured)
           ? configured
-          : defaultItems(this.grid));
+          : default_items(this.grid));
     this.fill(this.el, rows, context);
 
     const menu = this.el;
@@ -461,40 +461,43 @@ export class ContextMenu {
     checkStylePart(menu, "context-menu", "The context menu");
     checkIconStyles(menu, "The context menu");
 
-    const clampedX = Math.max(0, Math.min(context.clientX, window.innerWidth - menu.offsetWidth));
-    const clampedY = Math.max(0, Math.min(context.clientY, window.innerHeight - menu.offsetHeight));
+    const clamped_x = Math.max(0, Math.min(context.clientX, window.innerWidth - menu.offsetWidth));
+    const clamped_y = Math.max(
+      0,
+      Math.min(context.clientY, window.innerHeight - menu.offsetHeight),
+    );
 
-    menu.style.left = `${clampedX}px`;
-    menu.style.top = `${clampedY}px`;
+    menu.style.left = `${clamped_x}px`;
+    menu.style.top = `${clamped_y}px`;
 
-    this.addDismissListeners();
-    this.enabledRows(menu)[0]?.focus({ preventScroll: true });
+    this.add_dismiss_listeners();
+    this.enabled_rows(menu)[0]?.focus({ preventScroll: true });
   }
 
   close(): void {
-    window.clearTimeout(this.hoverTimer);
-    const hadFocus = this.ownsElement(document.activeElement);
-    this.closeSubmenusFrom(0);
+    window.clearTimeout(this.hover_timer);
+    const had_focus = this.owns_element(document.activeElement);
+    this.close_submenus_from(0);
     this.el.style.display = "none";
-    this.removeDismissListeners();
+    this.remove_dismiss_listeners();
 
     // Give focus back only when the menu holds it; an outside click has
     // already chosen where focus goes.
-    const target = this.returnFocus;
-    this.returnFocus = null;
-    if (hadFocus && target?.isConnected) target.focus({ preventScroll: true });
+    const target = this.return_focus;
+    this.return_focus = null;
+    if (had_focus && target?.isConnected) target.focus({ preventScroll: true });
   }
 
   destroy(): void {
-    window.clearTimeout(this.hoverTimer);
-    this.closeSubmenusFrom(0);
-    this.removeDismissListeners();
+    window.clearTimeout(this.hover_timer);
+    this.close_submenus_from(0);
+    this.remove_dismiss_listeners();
     this.el.remove();
   }
 
-  private createMenuElement(className: string): HTMLDivElement {
+  private create_menu_element(class_name: string): HTMLDivElement {
     const menu = document.createElement("div");
-    menu.className = className;
+    menu.className = class_name;
     menu.setAttribute("role", "menu");
     // Fixed positioning + visibility toggle are behavior; cosmetics live in styles.css.
     menu.style.position = "fixed";
@@ -502,25 +505,25 @@ export class ContextMenu {
 
     // Keep grid focus so selection-based actions act on the right cells.
     menu.addEventListener("mousedown", (e) => e.preventDefault());
-    menu.addEventListener("keydown", (e) => this.onMenuKey(e, menu));
+    menu.addEventListener("keydown", (e) => this.on_menu_key(e, menu));
 
     this.host.appendChild(menu);
     return menu;
   }
 
   /** Root menu is level 0; submenu i is level i + 1. */
-  private levelOf(menu: HTMLElement): number {
+  private level_of(menu: HTMLElement): number {
     return menu === this.el ? 0 : this.submenus.findIndex((sub) => sub.element === menu) + 1;
   }
 
-  private ownsElement(node: Element | null): boolean {
+  private owns_element(node: Element | null): boolean {
     return (
       node !== null &&
       (this.el.contains(node) || this.submenus.some((sub) => sub.element.contains(node)))
     );
   }
 
-  private enabledRows(menu: HTMLElement): HTMLElement[] {
+  private enabled_rows(menu: HTMLElement): HTMLElement[] {
     return [
       ...menu.querySelectorAll<HTMLElement>(
         ":scope > .sheetwrite-context-menu-item:not(.sheetwrite-context-menu-item-disabled), " +
@@ -536,7 +539,7 @@ export class ContextMenu {
     context: ContextMenuContext,
   ): void {
     menu.replaceChildren();
-    for (const item of visibleItems(items, context)) {
+    for (const item of visible_items(items, context)) {
       if (item.action === "separator") {
         const separator = document.createElement("div");
         separator.className = "sheetwrite-context-menu-sep";
@@ -546,8 +549,8 @@ export class ContextMenu {
       }
       menu.appendChild(
         item.inline && item.items
-          ? this.renderInlineRow(menu, item, item.items, context)
-          : this.renderRow(menu, item, context),
+          ? this.render_inline_row(menu, item, item.items, context)
+          : this.render_row(menu, item, context),
       );
     }
   }
@@ -556,7 +559,7 @@ export class ContextMenu {
    * A row of icon buttons under its label, as Excel's "Paste Options:". Each
    * button names itself in its tooltip and to screen readers.
    */
-  private renderInlineRow(
+  private render_inline_row(
     menu: HTMLDivElement,
     item: ContextMenuItem,
     children: readonly ContextMenuItem[],
@@ -571,9 +574,9 @@ export class ContextMenu {
     label.textContent = `${item.label ?? ""}:`;
     group.setAttribute("aria-label", item.label ?? "");
     const buttons = document.createElement("div");
-    for (const child of visibleItems(children, context)) {
+    for (const child of visible_items(children, context)) {
       if (child.action === "separator") continue;
-      const button = this.renderRow(menu, child, context);
+      const button = this.render_row(menu, child, context);
       const name = button.querySelector(".sheetwrite-context-menu-label")?.textContent ?? "";
       const shortcut = button.querySelector(".sheetwrite-context-menu-shortcut")?.textContent;
       button.title = shortcut ? `${name} (${shortcut})` : name;
@@ -584,7 +587,7 @@ export class ContextMenu {
     return group;
   }
 
-  private renderRow(
+  private render_row(
     menu: HTMLDivElement,
     item: ContextMenuItem,
     context: ContextMenuContext,
@@ -594,55 +597,55 @@ export class ContextMenu {
     row.setAttribute("role", "menuitem");
     row.tabIndex = -1;
     const action = item.action;
-    const rowId = item.id ?? action;
-    if (rowId) row.dataset.contextMenuItem = rowId;
+    const row_id = item.id ?? action;
+    if (row_id) row.dataset.contextMenuItem = row_id;
     const key = action ?? item.id ?? item.label ?? "item";
     const feedback = actionFeedbackFor(this.grid);
     const pending = feedback?.isRunning(key) ?? false;
 
-    const isDisabled =
+    const is_disabled =
       pending ||
       (typeof item.disabled === "function" ? item.disabled(context) : item.disabled === true);
-    if (isDisabled) {
+    if (is_disabled) {
       row.classList.add("sheetwrite-context-menu-item-disabled");
       row.setAttribute("aria-disabled", "true");
     }
 
     // Separators never reach here (fill draws them); the guard narrows the type.
-    const builtIn = action === "separator" ? undefined : action;
+    const built_in = action === "separator" ? undefined : action;
 
     // Every row keeps the icon column, so labels line up with or without a glyph.
-    const iconSlot = document.createElement("span");
-    iconSlot.className = "sheetwrite-context-menu-icon";
-    iconSlot.setAttribute("aria-hidden", "true");
-    const iconName =
+    const icon_slot = document.createElement("span");
+    icon_slot.className = "sheetwrite-context-menu-icon";
+    icon_slot.setAttribute("aria-hidden", "true");
+    const icon_name =
       item.icon ??
-      (builtIn !== undefined && builtIn !== "pickFromList" ? ACTION_ICON[builtIn] : undefined);
-    if (iconName) iconSlot.append(iconNode(iconName, this.config.icons));
-    row.appendChild(iconSlot);
+      (built_in !== undefined && built_in !== "pickFromList" ? ACTION_ICON[built_in] : undefined);
+    if (icon_name) icon_slot.append(iconNode(icon_name, this.config.icons));
+    row.appendChild(icon_slot);
 
     const label = document.createElement("span");
     label.className = "sheetwrite-context-menu-label";
-    label.textContent = item.label ?? (builtIn ? DEFAULT_LABEL[builtIn] : "");
+    label.textContent = item.label ?? (built_in ? DEFAULT_LABEL[built_in] : "");
     if (pending) {
       row.setAttribute("aria-busy", "true");
       label.textContent = `Running ${label.textContent}…`;
     }
     row.appendChild(label);
 
-    const binding: RowBinding = { menu, row, context, isDisabled };
+    const binding: RowBinding = { menu, row, context, isDisabled: is_disabled };
     const children = item.items;
-    if (children !== undefined) this.bindSubmenuRow(binding, children);
-    else this.bindActionRow(binding, item, key, feedback);
+    if (children !== undefined) this.bind_submenu_row(binding, children);
+    else this.bind_action_row(binding, item, key, feedback);
 
     row.addEventListener("pointerenter", () => {
-      if (!isDisabled) row.focus({ preventScroll: true });
-      window.clearTimeout(this.hoverTimer);
-      this.hoverTimer = window.setTimeout(() => {
-        if (children !== undefined && !isDisabled) {
-          this.openSubmenu(menu, row, children, context, false);
+      if (!is_disabled) row.focus({ preventScroll: true });
+      window.clearTimeout(this.hover_timer);
+      this.hover_timer = window.setTimeout(() => {
+        if (children !== undefined && !is_disabled) {
+          this.open_submenu(menu, row, children, context, false);
         } else {
-          this.closeSubmenusFrom(this.levelOf(menu));
+          this.close_submenus_from(this.level_of(menu));
         }
       }, SUBMENU_HOVER_MS);
     });
@@ -650,8 +653,8 @@ export class ContextMenu {
   }
 
   /** Adds the submenu arrow; a click opens `children` beside the row. */
-  private bindSubmenuRow(binding: RowBinding, children: readonly ContextMenuItem[]): void {
-    const { menu, row, context, isDisabled } = binding;
+  private bind_submenu_row(binding: RowBinding, children: readonly ContextMenuItem[]): void {
+    const { menu, row, context, isDisabled: is_disabled } = binding;
     row.setAttribute("aria-haspopup", "menu");
     row.setAttribute("aria-expanded", "false");
     const arrow = document.createElement("span");
@@ -660,25 +663,25 @@ export class ContextMenu {
     row.appendChild(arrow);
 
     row.addEventListener("click", () => {
-      if (!isDisabled) this.openSubmenu(menu, row, children, context);
+      if (!is_disabled) this.open_submenu(menu, row, children, context);
     });
   }
 
   /** Adds the shortcut hint; a click runs the row's command and closes the menu. */
-  private bindActionRow(
+  private bind_action_row(
     binding: RowBinding,
     item: ContextMenuItem,
     key: string,
     feedback: ActionFeedback | undefined,
   ): void {
-    const { row, context, isDisabled } = binding;
-    this.appendShortcut(row, item, item.action);
+    const { row, context, isDisabled: is_disabled } = binding;
+    this.append_shortcut(row, item, item.action);
     const run = item.onClick
       ? () => item.onClick?.(this.grid, context.cell)
-      : actionHandler(item.action, this.actions);
+      : action_handler(item.action, this.actions);
 
     row.addEventListener("click", () => {
-      if (isDisabled) return;
+      if (is_disabled) return;
       // The menu closes at once; a refused clipboard or a failed export
       // still reaches the user through the grid's action status.
       if (feedback) void feedback.run(key, run);
@@ -687,13 +690,13 @@ export class ContextMenu {
     });
   }
 
-  private appendShortcut(
+  private append_shortcut(
     row: HTMLElement,
     item: ContextMenuItem,
     action: ContextMenuActionName | undefined,
   ): void {
     const binding = item.shortcut ?? (action && isKeyboardAction(action) ? action : undefined);
-    const shortcutLabel =
+    const shortcut_label =
       binding === undefined
         ? ""
         : typeof binding === "string" && isKeyboardAction(binding)
@@ -704,10 +707,10 @@ export class ContextMenu {
                 typeof this.config.keyboard === "object" ? this.config.keyboard : undefined,
               )
           : formatShortcut(parseShortcut(binding));
-    if (!shortcutLabel) return;
+    if (!shortcut_label) return;
     const shortcut = document.createElement("span");
     shortcut.className = "sheetwrite-context-menu-shortcut";
-    shortcut.textContent = shortcutLabel;
+    shortcut.textContent = shortcut_label;
     row.appendChild(shortcut);
   }
 
@@ -715,17 +718,19 @@ export class ContextMenu {
    * Opens `items` beside `row`, replacing any deeper submenu. Keyboard and
    * click openings move focus to the first row; hover leaves it on the parent.
    */
-  private openSubmenu(
+  private open_submenu(
     parent: HTMLDivElement,
     row: HTMLElement,
     items: readonly ContextMenuItem[],
     context: ContextMenuContext,
-    focusFirst = true,
+    focus_first = true,
   ): void {
-    const level = this.levelOf(parent);
+    const level = this.level_of(parent);
     if (this.submenus[level]?.parentRow !== row) {
-      this.closeSubmenusFrom(level);
-      const element = this.createMenuElement("sheetwrite-context-menu sheetwrite-context-menu-sub");
+      this.close_submenus_from(level);
+      const element = this.create_menu_element(
+        "sheetwrite-context-menu sheetwrite-context-menu-sub",
+      );
       this.fill(element, items, context);
       element.style.display = "block";
       this.place(element, parent, row);
@@ -733,76 +738,76 @@ export class ContextMenu {
       this.submenus.push({ element, parentRow: row });
     }
     const submenu = this.submenus[level]?.element;
-    if (focusFirst && submenu) this.enabledRows(submenu)[0]?.focus({ preventScroll: true });
+    if (focus_first && submenu) this.enabled_rows(submenu)[0]?.focus({ preventScroll: true });
   }
 
   /** Beside the parent row, flipped to the left when the right edge would clip it. */
   private place(submenu: HTMLElement, parent: HTMLElement, row: HTMLElement): void {
-    const parentRect = parent.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    let left = parentRect.right - SUBMENU_OVERLAP_PX;
+    const parent_rect = parent.getBoundingClientRect();
+    const row_rect = row.getBoundingClientRect();
+    let left = parent_rect.right - SUBMENU_OVERLAP_PX;
     if (left + submenu.offsetWidth > window.innerWidth) {
-      left = Math.max(0, parentRect.left - submenu.offsetWidth + SUBMENU_OVERLAP_PX);
+      left = Math.max(0, parent_rect.left - submenu.offsetWidth + SUBMENU_OVERLAP_PX);
     }
     const top = Math.max(
       0,
-      Math.min(rowRect.top - MENU_PADDING_PX, window.innerHeight - submenu.offsetHeight),
+      Math.min(row_rect.top - MENU_PADDING_PX, window.innerHeight - submenu.offsetHeight),
     );
     submenu.style.left = `${left}px`;
     submenu.style.top = `${top}px`;
   }
 
   /** Closes the submenus at `level` and deeper (0 closes all of them). */
-  private closeSubmenusFrom(level: number): void {
+  private close_submenus_from(level: number): void {
     for (const sub of this.submenus.splice(level)) {
       sub.parentRow.setAttribute("aria-expanded", "false");
       sub.element.remove();
     }
   }
 
-  private onMenuKey(event: KeyboardEvent, menu: HTMLDivElement): void {
-    const rows = this.enabledRows(menu);
+  private on_menu_key(event: KeyboardEvent, menu: HTMLDivElement): void {
+    const rows = this.enabled_rows(menu);
     const active = document.activeElement;
     const index = rows.findIndex((row) => row === active);
-    const level = this.levelOf(menu);
-    const focusAt = (next: number): void => {
+    const level = this.level_of(menu);
+    const focus_at = (next: number): void => {
       rows[(next + rows.length) % rows.length]?.focus({ preventScroll: true });
     };
     // A row of icon buttons is one stop for Up and Down; Left and Right move inside it.
-    const groupOf = (row: Element | null | undefined): Element | null =>
+    const group_of = (row: Element | null | undefined): Element | null =>
       row?.closest(".sheetwrite-context-menu-inline") ?? null;
-    const group = active instanceof HTMLElement ? groupOf(active) : null;
+    const group = active instanceof HTMLElement ? group_of(active) : null;
 
-    const backToParent = (): void => {
-      const parentRow = this.submenus[level - 1]?.parentRow;
-      this.closeSubmenusFrom(level - 1);
-      parentRow?.focus({ preventScroll: true });
+    const back_to_parent = (): void => {
+      const parent_row = this.submenus[level - 1]?.parentRow;
+      this.close_submenus_from(level - 1);
+      parent_row?.focus({ preventScroll: true });
     };
 
     switch (event.key) {
       case "ArrowDown": {
         let next = index + 1;
-        while (group && groupOf(rows[next]) === group) next++;
-        focusAt(next);
+        while (group && group_of(rows[next]) === group) next++;
+        focus_at(next);
         break;
       }
 
       case "ArrowUp": {
         let next = index < 0 ? -1 : index - 1;
-        while (group && next >= 0 && groupOf(rows[next]) === group) next--;
+        while (group && next >= 0 && group_of(rows[next]) === group) next--;
         // Coming up into a row of buttons lands on its first button.
-        const above = groupOf(rows.at(next));
-        while (above && next > 0 && groupOf(rows[next - 1]) === above) next--;
-        focusAt(next);
+        const above = group_of(rows.at(next));
+        while (above && next > 0 && group_of(rows[next - 1]) === above) next--;
+        focus_at(next);
         break;
       }
 
       case "Home":
-        focusAt(0);
+        focus_at(0);
         break;
 
       case "End":
-        focusAt(-1);
+        focus_at(-1);
         break;
 
       case "Enter":
@@ -812,7 +817,7 @@ export class ContextMenu {
 
       case "ArrowRight":
         if (group) {
-          if (groupOf(rows[index + 1]) === group) focusAt(index + 1);
+          if (group_of(rows[index + 1]) === group) focus_at(index + 1);
         } else if (
           active instanceof HTMLElement &&
           active.getAttribute("aria-haspopup") === "menu"
@@ -824,12 +829,12 @@ export class ContextMenu {
 
       case "ArrowLeft":
         if (group) {
-          if (index > 0 && groupOf(rows[index - 1]) === group) focusAt(index - 1);
-        } else if (level > 0) backToParent();
+          if (index > 0 && group_of(rows[index - 1]) === group) focus_at(index - 1);
+        } else if (level > 0) back_to_parent();
         break;
 
       case "Escape":
-        if (level > 0) backToParent();
+        if (level > 0) back_to_parent();
         else this.close();
         break;
 
@@ -847,16 +852,16 @@ export class ContextMenu {
   }
 
   /** A press, wheel turn or touch drag outside the menu closes it. */
-  private readonly onOutsideInput = (e: Event): void => {
-    if (!(e.target instanceof Element) || !this.ownsElement(e.target)) this.close();
+  private readonly on_outside_input = (e: Event): void => {
+    if (!(e.target instanceof Element) || !this.owns_element(e.target)) this.close();
   };
 
   // The menu does not handle Page Up and Page Down, so they scroll the page.
-  private readonly onKeyDown = (e: KeyboardEvent): void => {
+  private readonly on_key_down = (e: KeyboardEvent): void => {
     if (e.key === "Escape" || e.key === "PageUp" || e.key === "PageDown") this.close();
   };
 
-  private readonly onDismiss = (): void => {
+  private readonly on_dismiss = (): void => {
     this.close();
   };
 
@@ -864,19 +869,19 @@ export class ContextMenu {
   // not for `scroll` events. The page's own scrolls, such as the one that
   // brings the grid into view when it takes the focus, send their `scroll`
   // event at the next frame, which can come after a right-click opened the menu.
-  private addDismissListeners(): void {
-    document.addEventListener("pointerdown", this.onOutsideInput, true);
-    document.addEventListener("wheel", this.onOutsideInput, { capture: true, passive: true });
-    document.addEventListener("touchmove", this.onOutsideInput, { capture: true, passive: true });
-    document.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("resize", this.onDismiss, { once: true });
+  private add_dismiss_listeners(): void {
+    document.addEventListener("pointerdown", this.on_outside_input, true);
+    document.addEventListener("wheel", this.on_outside_input, { capture: true, passive: true });
+    document.addEventListener("touchmove", this.on_outside_input, { capture: true, passive: true });
+    document.addEventListener("keydown", this.on_key_down);
+    window.addEventListener("resize", this.on_dismiss, { once: true });
   }
 
-  private removeDismissListeners(): void {
-    document.removeEventListener("pointerdown", this.onOutsideInput, true);
-    document.removeEventListener("wheel", this.onOutsideInput, true);
-    document.removeEventListener("touchmove", this.onOutsideInput, true);
-    document.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("resize", this.onDismiss);
+  private remove_dismiss_listeners(): void {
+    document.removeEventListener("pointerdown", this.on_outside_input, true);
+    document.removeEventListener("wheel", this.on_outside_input, true);
+    document.removeEventListener("touchmove", this.on_outside_input, true);
+    document.removeEventListener("keydown", this.on_key_down);
+    window.removeEventListener("resize", this.on_dismiss);
   }
 }

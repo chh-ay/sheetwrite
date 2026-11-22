@@ -31,26 +31,28 @@ export async function copyEngineLoaders(packageDirectory: string): Promise<void>
 
 /** Keep wasm-bindgen's closure-local caches and finalizers isolated per engine. */
 export async function generateWasmFactory(packageDirectory: string): Promise<void> {
-  const wasmPath = resolve(packageDirectory, "pkg/sheetwrite_wasm_bg.wasm");
-  const { wasm, largestFunctions } = checkWasmFunctionSizes(await readFile(wasmPath));
+  const wasm_path = resolve(packageDirectory, "pkg/sheetwrite_wasm_bg.wasm");
+  const { wasm, largestFunctions: largest_functions } = checkWasmFunctionSizes(
+    await readFile(wasm_path),
+  );
   process.stdout.write(
     [
       `WASM function sizes (${basename(resolve(packageDirectory))}; budget ${WASM_FUNCTION_BUDGET_BYTES} bytes)`,
       "| Bytes | Function |",
       "| ---: | --- |",
-      ...largestFunctions.map((entry) => `| ${entry.bytes} | ${entry.name} |`),
+      ...largest_functions.map((entry) => `| ${entry.bytes} | ${entry.name} |`),
       "",
     ].join("\n"),
   );
-  await writeFile(wasmPath, wasm);
+  await writeFile(wasm_path, wasm);
 
-  const gluePath = resolve(packageDirectory, "pkg/sheetwrite_wasm.js");
-  const source = await readFile(gluePath, "utf8");
+  const glue_path = resolve(packageDirectory, "pkg/sheetwrite_wasm.js");
+  const source = await readFile(glue_path, "utf8");
   const declarations = [...source.matchAll(/^export (?:class|function|const|let) (\w+)/gm)].map(
     (match) => match[1],
   );
   if (!declarations.includes("CellStore") || !/\bfunction initSync\b/.test(source)) {
-    throw new Error(`Unrecognized wasm-bindgen exports in ${gluePath}`);
+    throw new Error(`Unrecognized wasm-bindgen exports in ${glue_path}`);
   }
 
   const implementation = source
@@ -62,12 +64,12 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
       "if (wasm !== undefined && wasm !== lazyWasm) return wasm;",
     );
   const exports = [...new Set([...declarations, "initSync"])];
-  const memoryCaches = [...source.matchAll(/^let (cached\w+Memory\d+) = null;/gm)].map(
+  const memory_caches = [...source.matchAll(/^let (cached\w+Memory\d+) = null;/gm)].map(
     (match) => `${match[1]} = null;`,
   );
-  if (memoryCaches.length === 0) throw new Error(`Unrecognized memory caches in ${gluePath}`);
+  if (memory_caches.length === 0) throw new Error(`Unrecognized memory caches in ${glue_path}`);
 
-  const retire = `wasm = undefined; wasmInstance = undefined; wasmModule = undefined; ${memoryCaches.join(" ")}`;
+  const retire = `wasm = undefined; wasmInstance = undefined; wasmModule = undefined; ${memory_caches.join(" ")}`;
   await writeFile(
     resolve(packageDirectory, "pkg/sheetwrite_wasm_factory.js"),
     `// Generated from wasm-bindgen glue; do not edit.
@@ -102,15 +104,15 @@ return { ${exports.join(", ")}, init: __wbg_init, getModule: () => { if (!wasmMo
   // Preserve the published singleton exports without shipping a second copy of
   // the glue implementation. Core uses independent instances from the same factory.
   await writeFile(
-    gluePath,
+    glue_path,
     `// Generated singleton loader; do not edit.\nimport { createInstance } from "./sheetwrite_wasm_factory.js";\nconst singleton = createInstance(true);\nexport const { ${exports.join(", ")} } = singleton;\nexport default singleton.init;\n`,
   );
 }
 
 if (import.meta.main) {
-  const packageDirectory = process.argv[2];
-  if (!packageDirectory) throw new Error("Expected an engine package directory");
+  const package_directory = process.argv[2];
+  if (!package_directory) throw new Error("Expected an engine package directory");
 
-  await generateWasmFactory(packageDirectory);
-  await copyEngineLoaders(packageDirectory);
+  await generateWasmFactory(package_directory);
+  await copyEngineLoaders(package_directory);
 }

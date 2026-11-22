@@ -38,16 +38,16 @@ export interface EditorFieldMetrics {
 /** Null when the line height is not a length (`normal`). */
 export function readEditorFieldMetrics(field: HTMLTextAreaElement): EditorFieldMetrics | null {
   const style = getComputedStyle(field);
-  const lineHeight = Number.parseFloat(style.lineHeight);
-  if (!Number.isFinite(lineHeight)) return null;
-  const borderTop = Number.parseFloat(style.borderTopWidth);
-  const borderBottom = Number.parseFloat(style.borderBottomWidth);
+  const line_height = Number.parseFloat(style.lineHeight);
+  if (!Number.isFinite(line_height)) return null;
+  const border_top = Number.parseFloat(style.borderTopWidth);
+  const border_bottom = Number.parseFloat(style.borderBottomWidth);
   const inset =
     Number.parseFloat(style.paddingTop) +
     Number.parseFloat(style.paddingBottom) +
-    borderTop +
-    borderBottom;
-  return { lineHeight, inset, borders: borderTop + borderBottom };
+    border_top +
+    border_bottom;
+  return { lineHeight: line_height, inset, borders: border_top + border_bottom };
 }
 
 /**
@@ -65,6 +65,6 @@ export function sizeEditorTextarea(
   const height = Math.max(minimumHeight, lines * metrics.lineHeight + metrics.inset);
   field.style.height = `${height}px`;
   // Classic scrollbars consume a line's space; overlay scrollbars do not.
-  const scrollbarHeight = field.offsetHeight - field.clientHeight - metrics.borders;
-  if (scrollbarHeight > 0) field.style.height = `${height + scrollbarHeight}px`;
+  const scrollbar_height = field.offsetHeight - field.clientHeight - metrics.borders;
+  if (scrollbar_height > 0) field.style.height = `${height + scrollbar_height}px`;
 }

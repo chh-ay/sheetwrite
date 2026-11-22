@@ -44,7 +44,7 @@ export const Route = createFileRoute("/showcases/performance")({
   component: PerformanceShowcase,
 });
 
-const formatSize = (bytes: number): string => formatBytes(bytes, { kib: 1, mib: 1, gib: 2 });
+const format_size = (bytes: number): string => formatBytes(bytes, { kib: 1, mib: 1, gib: 2 });
 
 /** Below this change, the current value reads as unchanged rather than improved. */
 const DELTA_FLAT_PERCENT = 0.5;
@@ -59,7 +59,7 @@ interface InteractionWin {
 }
 
 /** Percentage change against the previous release. All four metrics are lower-is-better. */
-function interactionDelta(current: number, previous: number | undefined) {
+function interaction_delta(current: number, previous: number | undefined) {
   if (previous === undefined || !Number.isFinite(current) || !Number.isFinite(previous)) {
     return null;
   }
@@ -85,32 +85,32 @@ function interactionDelta(current: number, previous: number | undefined) {
  * line appears only when the evidence file records a previous capture of the
  * same schema.
  */
-function interactionWinList(): InteractionWin[] {
+function interaction_win_list(): InteractionWin[] {
   const { current, previous, ceilings } = INTERACTION_EVIDENCE;
   return [
     {
       label: "Lookup latency",
       value: `${current.lookupMedianNs.toFixed(2)} ns`,
-      delta: interactionDelta(current.lookupMedianNs, previous?.lookupMedianNs),
+      delta: interaction_delta(current.lookupMedianNs, previous?.lookupMedianNs),
       note: `Median address lookup. p95 ${current.lookupP95Ns.toFixed(0)} ns, release ceiling ${ceilings.lookupP95Ns.toLocaleString("en-US")} ns.`,
     },
     {
       label: "Inverse index",
-      value: formatSize(current.viewIndexBytes),
-      delta: interactionDelta(current.viewIndexBytes, previous?.viewIndexBytes),
-      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatSize(ceilings.inverseIndexBytes)}.`,
+      value: format_size(current.viewIndexBytes),
+      delta: interaction_delta(current.viewIndexBytes, previous?.viewIndexBytes),
+      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${format_size(ceilings.inverseIndexBytes)}.`,
     },
     {
       label: "100 distant edits",
-      value: formatSize(current.dirty100Bytes),
-      delta: interactionDelta(current.dirty100Bytes, previous?.dirty100Bytes),
-      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatSize(ceilings.dirty100Bytes)}.`,
+      value: format_size(current.dirty100Bytes),
+      delta: interaction_delta(current.dirty100Bytes, previous?.dirty100Bytes),
+      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${format_size(ceilings.dirty100Bytes)}.`,
     },
     {
       label: "Owned cold long task",
       value: `${current.coldOwnedLongTaskMs.toFixed(1)} ms`,
       testId: "scale-evidence-cold",
-      delta: interactionDelta(current.coldOwnedLongTaskMs, previous?.coldOwnedLongTaskMs),
+      delta: interaction_delta(current.coldOwnedLongTaskMs, previous?.coldOwnedLongTaskMs),
       note: `Longest Sheetwrite-owned task during a cold page load. Ceiling ${ceilings.ownedColdLongTaskMs} ms.`,
     },
   ];
@@ -156,7 +156,7 @@ function EvidenceSection() {
         </Show>
 
         <div class="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
-          <For each={interactionWinList()}>
+          <For each={interaction_win_list()}>
             {(win) => (
               <article>
                 <span>{win.label}</span>
@@ -209,7 +209,7 @@ function EvidenceSection() {
               </div>
               <div>
                 <dt>Peak allocated</dt>
-                <dd>{formatSize(PAGED_EVIDENCE.peakAllocatedBytes)}</dd>
+                <dd>{format_size(PAGED_EVIDENCE.peakAllocatedBytes)}</dd>
               </div>
             </dl>
           </section>

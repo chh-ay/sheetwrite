@@ -49,11 +49,11 @@ const RUST_CRATES = [
   },
 ] as const;
 
-async function filesRecursively(root: string): Promise<string[]> {
+async function files_recursively(root: string): Promise<string[]> {
   const output: string[] = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
     const path = `${root}/${entry.name}`;
-    if (entry.isDirectory()) output.push(...(await filesRecursively(path)));
+    if (entry.isDirectory()) output.push(...(await files_recursively(path)));
     else if (entry.isFile()) output.push(path);
   }
   return output;
@@ -68,7 +68,7 @@ export async function discoverRuntimePaths(
     // #[cfg(test)] modules, so they are not runtime sources.
     const paths: string[] = [];
     for (const crate of RUST_CRATES) {
-      paths.push(...(await filesRecursively(resolve(root, crate.directory, "src"))));
+      paths.push(...(await files_recursively(resolve(root, crate.directory, "src"))));
     }
 
     return paths
@@ -78,9 +78,9 @@ export async function discoverRuntimePaths(
   }
 
   const paths: string[] = [];
-  for (const sourceRoot of TYPESCRIPT_ROOTS) {
+  for (const source_root of TYPESCRIPT_ROOTS) {
     paths.push(
-      ...(await filesRecursively(resolve(root, sourceRoot)))
+      ...(await files_recursively(resolve(root, source_root)))
         .filter((path) => TYPESCRIPT_EXTENSIONS.has(extname(path)) && !path.endsWith(".d.ts"))
         .map((path) => path.slice(resolve(root).length + 1).replaceAll("\\", "/")),
     );
@@ -100,16 +100,16 @@ async function run(command: readonly string[], root: string): Promise<void> {
     stdout: "inherit",
     stderr: "inherit",
   });
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
 }
 
-async function outputOf(command: readonly string[], root: string): Promise<string> {
+async function output_of(command: readonly string[], root: string): Promise<string> {
   const stdout = await captureProcess(command, {
     cwd: root,
     stdin: "ignore",
-    failure: ({ stderr, exitCode }) =>
-      `${command.join(" ")} failed with exit code ${exitCode}: ${stderr.trim()}`,
+    failure: ({ stderr, exitCode: exit_code }) =>
+      `${command.join(" ")} failed with exit code ${exit_code}: ${stderr.trim()}`,
   });
   return stdout.trim();
 }
@@ -119,7 +119,7 @@ function ratio(counts: { covered: number; total: number }): string {
   return `${percent.toFixed(2)}% (${counts.covered}/${counts.total})`;
 }
 
-function printTable(records: readonly CoverageRecord[], totals: CoverageTotals): void {
+function print_table(records: readonly CoverageRecord[], totals: CoverageTotals): void {
   console.log(
     "Source                                                   Lines              Functions          Regions",
   );
@@ -134,7 +134,7 @@ function printTable(records: readonly CoverageRecord[], totals: CoverageTotals):
   );
 }
 
-function lineRanges(lines: readonly number[]): string {
+function line_ranges(lines: readonly number[]): string {
   const ranges: Array<[number, number]> = [];
   for (const line of [...new Set(lines)].sort((left, right) => left - right)) {
     const last = ranges.at(-1);
@@ -146,15 +146,15 @@ function lineRanges(lines: readonly number[]): string {
     .join(", ");
 }
 
-function uncoveredDiagnostics(records: readonly CoverageRecord[]): string {
+function uncovered_diagnostics(records: readonly CoverageRecord[]): string {
   const sections = [...records]
     .filter((record) => record.uncoveredLines.length > 0)
     .sort((left, right) => left.path.localeCompare(right.path))
-    .map((record) => `${record.path}: ${lineRanges(record.uncoveredLines)}`);
+    .map((record) => `${record.path}: ${line_ranges(record.uncoveredLines)}`);
   return `${sections.join("\n")}\n`;
 }
 
-function normalizedJson(language: CoverageLanguage, records: readonly CoverageRecord[]): string {
+function normalized_json(language: CoverageLanguage, records: readonly CoverageRecord[]): string {
   return `${JSON.stringify(
     {
       schemaVersion: 1,
@@ -172,7 +172,7 @@ function normalizedJson(language: CoverageLanguage, records: readonly CoverageRe
   )}\n`;
 }
 
-async function loadPolicy(root: string) {
+async function load_policy(root: string) {
   const text = await readFile(resolve(root, "scripts/coverage-thresholds.json"), "utf8");
   let raw: unknown;
   try {
@@ -185,31 +185,31 @@ async function loadPolicy(root: string) {
   return parseCoveragePolicy(raw);
 }
 
-async function writeArtifacts(options: {
+async function write_artifacts(options: {
   root: string;
   language: CoverageLanguage;
   artifactRoot: string;
   records: readonly CoverageRecord[];
 }): Promise<void> {
-  const { root, language, artifactRoot, records } = options;
+  const { root, language, artifactRoot: artifact_root, records } = options;
   await writeFile(
-    resolve(root, artifactRoot, "normalized.json"),
-    normalizedJson(language, records),
+    resolve(root, artifact_root, "normalized.json"),
+    normalized_json(language, records),
   );
-  await writeFile(resolve(root, artifactRoot, "lcov.info"), serialiseNormalizedLcov(records));
-  await writeFile(resolve(root, artifactRoot, "uncovered.txt"), uncoveredDiagnostics(records));
+  await writeFile(resolve(root, artifact_root, "lcov.info"), serialiseNormalizedLcov(records));
+  await writeFile(resolve(root, artifact_root, "uncovered.txt"), uncovered_diagnostics(records));
 }
 
 export async function runTypeScriptCoverage(root = resolve(import.meta.dir, "..")): Promise<void> {
-  const artifactRoot = "test-results/coverage/typescript";
-  const rawRoot = `${artifactRoot}/raw`;
-  await rm(resolve(root, artifactRoot), { recursive: true, force: true });
-  await mkdir(resolve(root, rawRoot), { recursive: true });
+  const artifact_root = "test-results/coverage/typescript";
+  const raw_root = `${artifact_root}/raw`;
+  await rm(resolve(root, artifact_root), { recursive: true, force: true });
+  await mkdir(resolve(root, raw_root), { recursive: true });
 
-  const coverageRuns = [
-    { directory: `${rawRoot}/unified`, tests: [...COVERED_PACKAGE_TEST_ROOTS] },
+  const coverage_runs = [
+    { directory: `${raw_root}/unified`, tests: [...COVERED_PACKAGE_TEST_ROOTS] },
     {
-      directory: `${rawRoot}/loader-default`,
+      directory: `${raw_root}/loader-default`,
       tests: [
         "packages/core/test/wasm-loader.test.mjs",
         "--test-name-pattern",
@@ -218,62 +218,67 @@ export async function runTypeScriptCoverage(root = resolve(import.meta.dir, ".."
     },
   ];
   const reports: Array<readonly LcovRecord[]> = [];
-  for (const coverageRun of coverageRuns) {
-    await mkdir(resolve(root, coverageRun.directory), { recursive: true });
+  for (const coverage_run of coverage_runs) {
+    await mkdir(resolve(root, coverage_run.directory), { recursive: true });
     await run(
       [
         "bun",
         "test",
-        ...coverageRun.tests,
+        ...coverage_run.tests,
         "--coverage",
         "--coverage-reporter=lcov",
-        `--coverage-dir=${coverageRun.directory}`,
+        `--coverage-dir=${coverage_run.directory}`,
       ],
       root,
     );
     reports.push(
-      parseLcov(await readFile(resolve(root, coverageRun.directory, "lcov.info"), "utf8"), root),
+      parseLcov(await readFile(resolve(root, coverage_run.directory, "lcov.info"), "utf8"), root),
     );
   }
-  const rawRecords = mergeLcovRecords(reports);
-  await writeFile(resolve(root, rawRoot, "lcov.info"), serialiseNormalizedLcov(rawRecords));
-  const policy = await loadPolicy(root);
-  const scoredPaths = scoredRuntimePaths(
+  const raw_records = mergeLcovRecords(reports);
+  await writeFile(resolve(root, raw_root, "lcov.info"), serialiseNormalizedLcov(raw_records));
+  const policy = await load_policy(root);
+  const scored_paths = scoredRuntimePaths(
     policy,
     "typescript",
     await discoverRuntimePaths(root, "typescript"),
   );
-  const records = filterRuntimeRecords(rawRecords, scoredPaths);
-  await writeArtifacts({ root, language: "typescript", artifactRoot, records });
-  const totals = evaluateCoveragePolicy({ policy, language: "typescript", records, scoredPaths });
-  printTable(records, totals);
+  const records = filterRuntimeRecords(raw_records, scored_paths);
+  await write_artifacts({ root, language: "typescript", artifactRoot: artifact_root, records });
+  const totals = evaluateCoveragePolicy({
+    policy,
+    language: "typescript",
+    records,
+    scoredPaths: scored_paths,
+  });
+  print_table(records, totals);
   console.log(`TypeScript source coverage passed for ${records.length} scored runtime files`);
 }
 
 export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Promise<void> {
-  const artifactRoot = "test-results/coverage/rust";
-  const rawRoot = `${artifactRoot}/raw`;
-  await rm(resolve(root, artifactRoot), { recursive: true, force: true });
-  await mkdir(resolve(root, rawRoot), { recursive: true });
+  const artifact_root = "test-results/coverage/rust";
+  const raw_root = `${artifact_root}/raw`;
+  await rm(resolve(root, artifact_root), { recursive: true, force: true });
+  await mkdir(resolve(root, raw_root), { recursive: true });
 
-  const cargoVersion = await outputOf(["cargo", "llvm-cov", "--version"], root);
-  if (cargoVersion !== `cargo-llvm-cov ${CARGO_LLVM_COV_VERSION}`) {
+  const cargo_version = await output_of(["cargo", "llvm-cov", "--version"], root);
+  if (cargo_version !== `cargo-llvm-cov ${CARGO_LLVM_COV_VERSION}`) {
     throw new Error(
-      `Expected cargo-llvm-cov ${CARGO_LLVM_COV_VERSION}, received ${cargoVersion || "no version"}`,
+      `Expected cargo-llvm-cov ${CARGO_LLVM_COV_VERSION}, received ${cargo_version || "no version"}`,
     );
   }
-  const rustVersion = await outputOf(["rustc", "--version"], root);
-  if (!rustVersion.startsWith(`rustc ${RUST_VERSION} `)) {
-    throw new Error(`Expected rustc ${RUST_VERSION}, received ${rustVersion || "no version"}`);
+  const rust_version = await output_of(["rustc", "--version"], root);
+  if (!rust_version.startsWith(`rustc ${RUST_VERSION} `)) {
+    throw new Error(`Expected rustc ${RUST_VERSION}, received ${rust_version || "no version"}`);
   }
 
-  const repositorySources = ["--ignore-filename-regex", String.raw`\.cargo|\.rustup`] as const;
+  const repository_sources = ["--ignore-filename-regex", String.raw`\.cargo|\.rustup`] as const;
   const normalized: CoverageRecord[] = [];
 
   for (const crate of RUST_CRATES) {
     const common = ["--manifest-path", `${crate.directory}/Cargo.toml`] as const;
-    const crateRawRoot = `${rawRoot}/${crate.name}`;
-    await mkdir(resolve(root, crateRawRoot), { recursive: true });
+    const crate_raw_root = `${raw_root}/${crate.name}`;
+    await mkdir(resolve(root, crate_raw_root), { recursive: true });
 
     // Each independent crate owns its instrumented target and raw reports. CI
     // restores the target from a cache, and `--no-report` keeps old profiles
@@ -286,10 +291,10 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
         "llvm-cov",
         "report",
         ...common,
-        ...repositorySources,
+        ...repository_sources,
         "--lcov",
         "--output-path",
-        `${crateRawRoot}/lcov.info`,
+        `${crate_raw_root}/lcov.info`,
       ],
       root,
     );
@@ -299,28 +304,33 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
         "llvm-cov",
         "report",
         ...common,
-        ...repositorySources,
+        ...repository_sources,
         "--json",
         "--output-path",
-        `${crateRawRoot}/raw.json`,
+        `${crate_raw_root}/raw.json`,
       ],
       root,
     );
 
-    const lcovText = await readFile(resolve(root, crateRawRoot, "lcov.info"), "utf8");
-    const lcovRecords = parseLcov(lcovText, root, "recompute");
-    const llvmJson: unknown = JSON.parse(
-      await readFile(resolve(root, crateRawRoot, "raw.json"), "utf8"),
+    const lcov_text = await readFile(resolve(root, crate_raw_root, "lcov.info"), "utf8");
+    const lcov_records = parseLcov(lcov_text, root, "recompute");
+    const llvm_json: unknown = JSON.parse(
+      await readFile(resolve(root, crate_raw_root, "raw.json"), "utf8"),
     );
-    normalized.push(...normalizeRustCoverage(llvmJson, lcovRecords, root));
+    normalized.push(...normalizeRustCoverage(llvm_json, lcov_records, root));
   }
 
-  const policy = await loadPolicy(root);
-  const scoredPaths = scoredRuntimePaths(policy, "rust", await discoverRuntimePaths(root, "rust"));
-  const records = filterRuntimeRecords(normalized, scoredPaths);
-  await writeArtifacts({ root, language: "rust", artifactRoot, records });
-  const totals = evaluateCoveragePolicy({ policy, language: "rust", records, scoredPaths });
-  printTable(records, totals);
+  const policy = await load_policy(root);
+  const scored_paths = scoredRuntimePaths(policy, "rust", await discoverRuntimePaths(root, "rust"));
+  const records = filterRuntimeRecords(normalized, scored_paths);
+  await write_artifacts({ root, language: "rust", artifactRoot: artifact_root, records });
+  const totals = evaluateCoveragePolicy({
+    policy,
+    language: "rust",
+    records,
+    scoredPaths: scored_paths,
+  });
+  print_table(records, totals);
   console.log(`Rust source coverage passed for ${records.length} scored runtime files`);
 }
 
@@ -334,9 +344,9 @@ async function main(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
     const language = command === "rust" ? "rust" : "typescript";
-    const artifactRoot = resolve(root, "test-results/coverage", language);
-    await mkdir(artifactRoot, { recursive: true });
-    await writeFile(resolve(artifactRoot, "failure.txt"), `${message}\n`);
+    const artifact_root = resolve(root, "test-results/coverage", language);
+    await mkdir(artifact_root, { recursive: true });
+    await writeFile(resolve(artifact_root, "failure.txt"), `${message}\n`);
     throw error;
   }
 }

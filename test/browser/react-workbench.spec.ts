@@ -21,7 +21,7 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByTestId("generation")).toHaveText("1", { timeout: 20_000 });
 }
 
-function expectRowsVisible(page: Page, rows: number) {
+function expect_rows_visible(page: Page, rows: number) {
   return expect(page.getByTestId("rows-visible")).toHaveText(rows.toLocaleString("en-US"), {
     timeout: 15_000,
   });
@@ -35,7 +35,7 @@ test("clipboard edits go through React history; controlled filters survive a dat
   await expect(page.locator(GRID)).toBeInViewport();
   // The page owns the one main landmark; the workbench inside it adds none.
   await expect(page.getByRole("main")).toHaveCount(1);
-  await expectRowsVisible(page, ANALYTICS_ROWS);
+  await expect_rows_visible(page, ANALYTICS_ROWS);
   await expect
     .poll(() => gridCellTexts(page, GRID), { timeout: 15_000 })
     .toContain(ANALYTICS_EXPECTED.firstDataCell.text);
@@ -77,7 +77,7 @@ test("clipboard edits go through React history; controlled filters survive a dat
     .locator(".sw-demo-select__trigger")
     .click();
   await page.getByRole("option", { name: "Tokyo" }).click();
-  await expectRowsVisible(page, TOKYO_ROWS);
+  await expect_rows_visible(page, TOKYO_ROWS);
   await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR));
 
   // Controlled state survives an input-reset: the fresh grid is reconciled from React.
@@ -85,18 +85,18 @@ test("clipboard edits go through React history; controlled filters survive a dat
   await page.getByRole("button", { name: "Reload dataset" }).click();
   await expect(page.getByTestId("generation")).toHaveText("2", { timeout: 20_000 });
   await expect(page.getByTestId("ready-reason")).toHaveText("input-reset");
-  await expectRowsVisible(page, TOKYO_ROWS);
+  await expect_rows_visible(page, TOKYO_ROWS);
   await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR), {
     timeout: 15_000,
   });
 
   // Read-only is a live option: no new generation, editing surface disabled.
-  const readOnlyToggle = page.getByRole("button", { name: "Read-only" });
-  await readOnlyToggle.click();
-  await expect(readOnlyToggle).toHaveAttribute("aria-pressed", "true");
+  const read_only_toggle = page.getByRole("button", { name: "Read-only" });
+  await read_only_toggle.click();
+  await expect(read_only_toggle).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("formula-input")).toBeDisabled();
   await expect(page.getByTestId("generation")).toHaveText("2");
-  await readOnlyToggle.click();
+  await read_only_toggle.click();
 
   // Renderer selection is reset-sensitive and reported through React state.
   await page.getByRole("radio", { name: "Web Worker" }).click();

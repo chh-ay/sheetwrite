@@ -42,7 +42,7 @@ interface NotePopoverDependencies {
   returnFocus(): void;
 }
 
-function sameCell(a: NoteCell | null, b: NoteCell): boolean {
+function same_cell(a: NoteCell | null, b: NoteCell): boolean {
   return (
     a !== null &&
     a.address.sheet === b.address.sheet &&
@@ -59,7 +59,7 @@ function sameCell(a: NoteCell | null, b: NoteCell): boolean {
 export class NotePopover {
   private readonly card: HTMLDivElement;
   private readonly editor: HTMLTextAreaElement;
-  private hoverTimer: number | undefined;
+  private hover_timer: number | undefined;
   /**
    * Last cell under the pointer, with or without a note; null after the card
    * hides. A move inside this cell skips the note lookup, which scans every note.
@@ -82,18 +82,18 @@ export class NotePopover {
     this.editor = document.createElement("textarea");
     this.editor.className = "sheetwrite-note-editor";
     this.editor.style.position = "fixed";
-    this.editor.addEventListener("keydown", this.onEditorKeyDown);
-    this.editor.addEventListener("blur", this.onEditorBlur);
+    this.editor.addEventListener("keydown", this.on_editor_key_down);
+    this.editor.addEventListener("blur", this.on_editor_blur);
 
-    deps.scroller.addEventListener("pointermove", this.onPointerMove);
-    deps.scroller.addEventListener("pointerleave", this.onPointerLeave);
-    deps.scroller.addEventListener("scroll", this.onScroll, { passive: true });
+    deps.scroller.addEventListener("pointermove", this.on_pointer_move);
+    deps.scroller.addEventListener("pointerleave", this.on_pointer_leave);
+    deps.scroller.addEventListener("scroll", this.on_scroll, { passive: true });
   }
 
   /** Open the editor on `cell` with its current note, or empty for a new note. */
   edit(cell: NoteCell): void {
     this.hideCard();
-    this.closeEditor();
+    this.close_editor();
 
     const original = this.deps.noteAt(cell.address);
     this.editing = { cell, original };
@@ -128,8 +128,8 @@ export class NotePopover {
 
   /** Hide the hover card; an open editor stays open. */
   hideCard(): void {
-    window.clearTimeout(this.hoverTimer);
-    this.hoverTimer = undefined;
+    window.clearTimeout(this.hover_timer);
+    this.hover_timer = undefined;
     this.hovered = null;
     this.card.remove();
   }
@@ -137,16 +137,16 @@ export class NotePopover {
   /** Hide the card and drop any unsaved editor text, e.g. on a sheet switch. */
   dismiss(): void {
     this.hideCard();
-    this.closeEditor();
+    this.close_editor();
   }
 
   destroy(): void {
     this.dismiss();
-    this.editor.removeEventListener("keydown", this.onEditorKeyDown);
-    this.editor.removeEventListener("blur", this.onEditorBlur);
-    this.deps.scroller.removeEventListener("pointermove", this.onPointerMove);
-    this.deps.scroller.removeEventListener("pointerleave", this.onPointerLeave);
-    this.deps.scroller.removeEventListener("scroll", this.onScroll);
+    this.editor.removeEventListener("keydown", this.on_editor_key_down);
+    this.editor.removeEventListener("blur", this.on_editor_blur);
+    this.deps.scroller.removeEventListener("pointermove", this.on_pointer_move);
+    this.deps.scroller.removeEventListener("pointerleave", this.on_pointer_leave);
+    this.deps.scroller.removeEventListener("scroll", this.on_scroll);
   }
 
   private show(cell: NoteCell): void {
@@ -162,22 +162,22 @@ export class NotePopover {
    * Close the editor first, so the blur that removing a focused element can
    * fire finds no session and commits nothing.
    */
-  private closeEditor(): void {
+  private close_editor(): void {
     if (!this.editing) return;
     this.editing = null;
     this.editor.remove();
   }
 
-  private commit(returnFocus: boolean): void {
+  private commit(return_focus: boolean): void {
     const session = this.editing;
     if (!session) return;
     const value = this.editor.value;
-    this.closeEditor();
+    this.close_editor();
 
     // Blank text has nothing to show, so it removes the note.
     const text = value.trim() === "" ? null : value;
     if (text !== session.original) this.deps.commit(session.cell.address, text);
-    if (returnFocus) this.deps.returnFocus();
+    if (return_focus) this.deps.returnFocus();
   }
 
   /**
@@ -193,47 +193,47 @@ export class NotePopover {
     const rect = this.deps.cellRect(cell);
 
     const right = rect.right + CARD_GAP;
-    const fitsRight = right + origin.width <= window.innerWidth - POPUP_VIEWPORT_MARGIN;
-    const left = fitsRight ? right : rect.left - CARD_GAP - origin.width;
+    const fits_right = right + origin.width <= window.innerWidth - POPUP_VIEWPORT_MARGIN;
+    const left = fits_right ? right : rect.left - CARD_GAP - origin.width;
 
-    const fitsBelow = rect.top + origin.height <= window.innerHeight - POPUP_VIEWPORT_MARGIN;
-    const top = fitsBelow ? rect.top : rect.bottom - origin.height;
+    const fits_below = rect.top + origin.height <= window.innerHeight - POPUP_VIEWPORT_MARGIN;
+    const top = fits_below ? rect.top : rect.bottom - origin.height;
 
     surface.style.left = `${Math.max(POPUP_VIEWPORT_MARGIN, left) - origin.left}px`;
     surface.style.top = `${Math.max(POPUP_VIEWPORT_MARGIN, top) - origin.top}px`;
   }
 
-  private readonly onPointerMove = (event: PointerEvent): void => {
+  private readonly on_pointer_move = (event: PointerEvent): void => {
     // Touch has no hover; a tap must not leave a card behind.
     if (event.pointerType === "touch") return;
 
     const cell = this.deps.cellAt(event.clientX, event.clientY);
-    if (cell && sameCell(this.hovered, cell)) return;
+    if (cell && same_cell(this.hovered, cell)) return;
 
     this.hideCard();
     this.hovered = cell;
     if (!cell || this.deps.noteAt(cell.address) === null) return;
-    if (this.editing && sameCell(this.editing.cell, cell)) return;
+    if (this.editing && same_cell(this.editing.cell, cell)) return;
 
-    this.hoverTimer = window.setTimeout(() => {
-      this.hoverTimer = undefined;
+    this.hover_timer = window.setTimeout(() => {
+      this.hover_timer = undefined;
       this.show(cell);
     }, NOTE_HOVER_DELAY_MS);
   };
 
-  private readonly onPointerLeave = (): void => {
+  private readonly on_pointer_leave = (): void => {
     this.hideCard();
   };
 
-  private readonly onScroll = (): void => {
+  private readonly on_scroll = (): void => {
     this.hideCard();
   };
 
-  private readonly onEditorKeyDown = (event: KeyboardEvent): void => {
+  private readonly on_editor_key_down = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      this.closeEditor();
+      this.close_editor();
       this.deps.returnFocus();
       return;
     }
@@ -246,7 +246,7 @@ export class NotePopover {
     }
   };
 
-  private readonly onEditorBlur = (): void => {
+  private readonly on_editor_blur = (): void => {
     this.commit(false);
   };
 }

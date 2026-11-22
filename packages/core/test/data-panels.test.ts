@@ -32,11 +32,11 @@ afterEach(() => {
   restore();
 });
 
-const table = (id: string, col: number, columnIds: [string, string]): WorkbookTable => ({
+const table = (id: string, col: number, column_ids: [string, string]): WorkbookTable => ({
   id,
   name: id[0]?.toUpperCase() + id.slice(1),
   range: { sheet: "s1", start: { row: 0, col }, end: { row: 3, col: col + 1 } },
-  columns: columnIds.map((columnId) => ({ id: columnId, name: columnId })),
+  columns: column_ids.map((column_id) => ({ id: column_id, name: column_id })),
   headerRow: true,
   totalsRow: false,
 });
@@ -94,7 +94,7 @@ class FakeCommands implements QueryCommands {
   }
 }
 
-async function setup(xlsxSource?: Workbook["xlsxSource"]) {
+async function setup(xlsx_source?: Workbook["xlsxSource"]) {
   const columns = ["a", "b", "c", "d", "e"].map((key) => ({
     key,
     header: key.toUpperCase(),
@@ -102,7 +102,7 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
     width: 100,
   }));
   const workbook: Workbook = {
-    ...(xlsxSource === undefined ? {} : { xlsxSource }),
+    ...(xlsx_source === undefined ? {} : { xlsxSource: xlsx_source }),
     activeSheet: "s1",
     sheets: [{ id: "s1", name: "Sheet1", rowCount: 20, columns }],
   };
@@ -121,7 +121,7 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
     const element = host.querySelector<HTMLButtonElement>(`${scope} [aria-label="${label}"]`);
     return element === null || element.closest("[hidden]") !== null ? null : element;
   };
-  const openTab = (name: string): void => {
+  const open_tab = (name: string): void => {
     const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
       (candidate) => candidate.textContent === name,
     );
@@ -142,21 +142,21 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
     select.value = value;
     select.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const addTable = (definition: WorkbookTable) => {
+  const add_table = (definition: WorkbookTable) => {
     const patch: DocumentOp = { op: "addTable", table: definition };
     expect(grid.applyTransaction({ patches: [patch] }).status).toBe("applied");
   };
-  const openPanel = async (command: string) => {
-    openTab("Data");
+  const open_panel = async (command: string) => {
+    open_tab("Data");
     const button = control(command);
     if (button === null) throw new Error(`missing ${command} command`);
     press(button);
     await loadPanels(grid);
     await Promise.resolve();
   };
-  const input = <T extends HTMLElement = HTMLInputElement>(focusKey: string): T => {
-    const element = host.querySelector<T>(`[data-focus-key="${focusKey}"]`);
-    if (element === null) throw new Error(`no panel control "${focusKey}"`);
+  const input = <T extends HTMLElement = HTMLInputElement>(focus_key: string): T => {
+    const element = host.querySelector<T>(`[data-focus-key="${focus_key}"]`);
+    if (element === null) throw new Error(`no panel control "${focus_key}"`);
     return element;
   };
   const submit = () =>
@@ -164,7 +164,7 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
       .querySelector("form")
       ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   /** A Data command's button while the ribbon shows it; hidden commands stay in the DOM. */
-  const commandButton = (id: string): HTMLButtonElement => {
+  const command_button = (id: string): HTMLButtonElement => {
     const button = host.querySelector<HTMLButtonElement>(
       `.sheetwrite-ribbon [data-command="${id}"]`,
     );
@@ -174,15 +174,15 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
     if (button === null) throw new Error(`no command ${id}`);
     return button;
   };
-  const openQueryPanel = async (id: string): Promise<void> => {
-    openTab("Data");
-    press(commandButton(id));
+  const open_query_panel = async (id: string): Promise<void> => {
+    open_tab("Data");
+    press(command_button(id));
     await loadPanels(grid);
     await import(QUERY_PANEL_MODULE);
     await Promise.resolve();
     await Promise.resolve();
   };
-  const buttonLabelled = (label: string): HTMLButtonElement => {
+  const button_labelled = (label: string): HTMLButtonElement => {
     const found = [...host.querySelectorAll<HTMLButtonElement>(".sheetwrite-panel button")].find(
       (candidate) => candidate.textContent === label && !candidate.hidden,
     );
@@ -195,22 +195,30 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
     field,
     press,
     choose,
-    addTable,
-    openPanel,
+    addTable: add_table,
+    openPanel: open_panel,
     input,
     submit,
-    openTab,
-    commandButton,
-    openQueryPanel,
-    buttonLabelled,
+    openTab: open_tab,
+    commandButton: command_button,
+    openQueryPanel: open_query_panel,
+    buttonLabelled: button_labelled,
   };
 }
 
 it("creates, edits and deletes a relationship as single undo steps", async () => {
-  const { grid, host, field, press, choose, addTable, openPanel } = await setup();
-  addTable(table("orders", 0, ["customer", "amount"]));
-  addTable(table("customers", 3, ["id", "region"]));
-  await openPanel("Relationships");
+  const {
+    grid,
+    host,
+    field,
+    press,
+    choose,
+    addTable: add_table,
+    openPanel: open_panel,
+  } = await setup();
+  add_table(table("orders", 0, ["customer", "amount"]));
+  add_table(table("customers", 3, ["id", "region"]));
+  await open_panel("Relationships");
 
   expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain(
     "Orders: 2 columns, 3 rows",
@@ -257,9 +265,9 @@ it("creates, edits and deletes a relationship as single undo steps", async () =>
 });
 
 it("creates, renames and removes a measure from Data › Measures, each as one undo step", async () => {
-  const { grid, input, press, submit, addTable, openPanel } = await setup();
-  addTable(orders);
-  await openPanel("Measures");
+  const { grid, input, press, submit, addTable: add_table, openPanel: open_panel } = await setup();
+  add_table(orders);
+  await open_panel("Measures");
   const measures = () => grid.store.getWorkbook().dataModel?.measures ?? [];
 
   input("measure-name").value = "Total";
@@ -297,9 +305,9 @@ it("creates, renames and removes a measure from Data › Measures, each as one u
 });
 
 it("keeps the form and shows the reason when the model refuses a measure", async () => {
-  const { grid, input, submit, addTable, openPanel } = await setup();
-  addTable(orders);
-  await openPanel("Measures");
+  const { grid, input, submit, addTable: add_table, openPanel: open_panel } = await setup();
+  add_table(orders);
+  await open_panel("Measures");
 
   // A measure name may not repeat a column name of its home table.
   input("measure-name").value = "Amount";
@@ -311,19 +319,19 @@ it("keeps the form and shows the reason when the model refuses a measure", async
 });
 
 it("runs one Refresh All, and a second press cancels it", async () => {
-  const { grid, host, commandButton, openTab, press } = await setup();
+  const { grid, host, commandButton: command_button, openTab: open_tab, press } = await setup();
   const commands = new FakeCommands(grid);
   registerQueryCommands(grid, commands);
-  openTab("Data");
-  const refreshAll = commandButton("refreshAll");
+  open_tab("Data");
+  const refresh_all = command_button("refreshAll");
 
-  press(refreshAll);
+  press(refresh_all);
   expect(commands.refreshes).toHaveLength(1);
   expect(commands.refreshes[0]?.ids).toBeNull();
   // A user's second click is a later task; the first press's busy state has ended.
   await Promise.resolve();
 
-  press(refreshAll);
+  press(refresh_all);
   expect(commands.refreshes).toHaveLength(1);
   expect(commands.refreshes[0]?.signal.aborted).toBe(true);
   await Promise.resolve();
@@ -332,10 +340,10 @@ it("runs one Refresh All, and a second press cancels it", async () => {
 });
 
 it("saves a new query from Get Data through the session's define", async () => {
-  const { grid, press, openQueryPanel, input } = await setup();
+  const { grid, press, openQueryPanel: open_query_panel, input } = await setup();
   const commands = new FakeCommands(grid);
   registerQueryCommands(grid, commands);
-  await openQueryPanel("getData");
+  await open_query_panel("getData");
 
   input<HTMLInputElement>("query-name").value = "Sales";
   input<HTMLInputElement>("query-source-id").value = "sales-feed";
@@ -378,7 +386,13 @@ it("saves a new query from Get Data through the session's define", async () => {
 });
 
 it("lists saved queries, removes one undoably and shows kept unsupported members read-only", async () => {
-  const { grid, host, press, openQueryPanel, buttonLabelled } = await setup({
+  const {
+    grid,
+    host,
+    press,
+    openQueryPanel: open_query_panel,
+    buttonLabelled: button_labelled,
+  } = await setup({
     parts: [
       {
         name: "customXml/item1.xml",
@@ -405,7 +419,7 @@ it("lists saved queries, removes one undoably and shows kept unsupported members
     "applied",
   );
   registerQueryCommands(grid, new FakeCommands(grid));
-  await openQueryPanel("queries");
+  await open_query_panel("queries");
 
   expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain("Sales");
   const kept = host.querySelector('.sheetwrite-query-row[aria-disabled="true"]');
@@ -415,7 +429,7 @@ it("lists saved queries, removes one undoably and shows kept unsupported members
     "stays in the file unchanged while the saved queries are not edited",
   );
 
-  press(buttonLabelled("Remove"));
+  press(button_labelled("Remove"));
   expect(grid.store.getWorkbook().queries ?? []).toEqual([]);
   grid.undo();
   expect(grid.store.getWorkbook().queries).toEqual([sales]);

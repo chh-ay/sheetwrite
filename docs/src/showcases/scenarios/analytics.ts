@@ -49,13 +49,13 @@ export const ANALYTICS_THEME: Partial<Theme> = { ...SCENARIO_THEME };
  * Deterministic integer ARR per row. Integer dollars keep aggregate
  * expectations exact (no float drift) across engine and test recomputation.
  */
-function analyticsArr(row: number): number {
-  const annualSeatPrice = ANNUAL_SEAT_PRICES[(row * 3) % ANALYTICS_SEGMENTS.length] ?? 240;
-  return analyticsSeats(row) * annualSeatPrice;
+function analytics_arr(row: number): number {
+  const annual_seat_price = ANNUAL_SEAT_PRICES[(row * 3) % ANALYTICS_SEGMENTS.length] ?? 240;
+  return analytics_seats(row) * annual_seat_price;
 }
 
 /** Seat bands follow the customer segment; prices and totals use whole dollars. */
-function analyticsSeats(row: number): number {
+function analytics_seats(row: number): number {
   const segment = (row * 3) % ANALYTICS_SEGMENTS.length;
   const base = SEAT_BASES[segment] ?? 220;
   const spread = SEAT_SPREADS[segment] ?? 1280;
@@ -76,8 +76,8 @@ export function buildAnalyticsData(): ColumnarData {
     account[row] = revenueAccountName(row);
     market[row] = ANALYTICS_MARKETS[row % ANALYTICS_MARKETS.length] ?? "";
     segment[row] = ANALYTICS_SEGMENTS[(row * 3) % ANALYTICS_SEGMENTS.length] ?? "";
-    seats[row] = analyticsSeats(row);
-    arr[row] = analyticsArr(row);
+    seats[row] = analytics_seats(row);
+    arr[row] = analytics_arr(row);
   }
 
   return { rowCount: ANALYTICS_ROWS, columns: { id, account, market, segment, seats, arr } };
@@ -85,7 +85,7 @@ export function buildAnalyticsData(): ColumnarData {
 
 /** Pipeline + empty Summary sheet the KPI formulas are seeded into. */
 export function createAnalyticsWorkbook(): Workbook {
-  const arrRange = {
+  const arr_range = {
     sheet: ANALYTICS_SHEET_ID,
     start: { row: 0, col: ANALYTICS_COLUMNS.arr },
     end: { row: ANALYTICS_ROWS - 1, col: ANALYTICS_COLUMNS.arr },
@@ -93,7 +93,7 @@ export function createAnalyticsWorkbook(): Workbook {
 
   return {
     activeSheet: ANALYTICS_SHEET_ID,
-    namedRanges: [{ name: ANALYTICS_ARR_NAME, range: arrRange }],
+    namedRanges: [{ name: ANALYTICS_ARR_NAME, range: arr_range }],
     sheets: [
       {
         id: ANALYTICS_SHEET_ID,
@@ -110,13 +110,13 @@ export function createAnalyticsWorkbook(): Workbook {
         conditionalFormats: [
           {
             // Enterprise contracts draw a tinted, bold value.
-            range: arrRange,
+            range: arr_range,
             when: { kind: "greaterThan", value: 200_000 },
             style: { backgroundColor: "#58c4dc24", bold: true },
           },
           {
             // Self-serve bands top out at $522, so red marks floor deals under $1,000.
-            range: arrRange,
+            range: arr_range,
             when: { kind: "lessThan", value: 1_000 },
             style: { color: "#fb7185" },
           },
@@ -171,26 +171,26 @@ export function analyticsSummarySeedOps(): DocumentOp[] {
   ]);
 }
 
-function computeAnalyticsTotals(): {
+function compute_analytics_totals(): {
   totalArr: number;
   marketTotals: Record<string, number>;
   marketRowCounts: Record<string, number>;
 } {
-  let totalArr = 0;
-  const marketTotals: Record<string, number> = {};
-  const marketRowCounts: Record<string, number> = {};
+  let total_arr = 0;
+  const market_totals: Record<string, number> = {};
+  const market_row_counts: Record<string, number> = {};
   for (const market of ANALYTICS_MARKETS) {
-    marketTotals[market] = 0;
-    marketRowCounts[market] = 0;
+    market_totals[market] = 0;
+    market_row_counts[market] = 0;
   }
   for (let row = 0; row < ANALYTICS_ROWS; row++) {
-    const amount = analyticsArr(row);
-    totalArr += amount;
+    const amount = analytics_arr(row);
+    total_arr += amount;
     const market = ANALYTICS_MARKETS[row % ANALYTICS_MARKETS.length] ?? "";
-    marketTotals[market] = (marketTotals[market] ?? 0) + amount;
-    marketRowCounts[market] = (marketRowCounts[market] ?? 0) + 1;
+    market_totals[market] = (market_totals[market] ?? 0) + amount;
+    market_row_counts[market] = (market_row_counts[market] ?? 0) + 1;
   }
-  return { totalArr, marketTotals, marketRowCounts };
+  return { totalArr: total_arr, marketTotals: market_totals, marketRowCounts: market_row_counts };
 }
 
 /** Observable states browser contracts assert against (exact — integer math). */
@@ -202,5 +202,5 @@ export const ANALYTICS_EXPECTED = {
   },
   rowCount: ANALYTICS_ROWS,
   kpiCount: ANALYTICS_KPIS.length,
-  ...computeAnalyticsTotals(),
+  ...compute_analytics_totals(),
 } as const;

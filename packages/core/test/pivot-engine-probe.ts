@@ -16,7 +16,7 @@ import { installCoreStyles } from "./fixtures.js";
 
 await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
-const removeStyles = installCoreStyles();
+const remove_styles = installCoreStyles();
 const host = document.createElement("div");
 document.body.appendChild(host);
 const pivot: PivotDefinition = {
@@ -74,20 +74,20 @@ try {
     { index: 0, header: "Region", type: "text" },
     { index: 1, header: "Amount", type: "number" },
   ]);
-  const savedPivot = { ...pivot, savedOutput: { rows: 1, cols: 1, cells: [999] } };
-  const savedStore = new SheetwriteStore({
+  const saved_pivot = { ...pivot, savedOutput: { rows: 1, cols: 1, cells: [999] } };
+  const saved_store = new SheetwriteStore({
     activeSheet: "report",
     sheets: [
-      { id: "report", name: "Report", rowCount: 20, columns, pivots: [savedPivot] },
+      { id: "report", name: "Report", rowCount: 20, columns, pivots: [saved_pivot] },
       { id: "data", name: "Data", rowCount: 10, columns },
     ],
   });
   try {
-    assert.equal(savedStore.getPivotResult("report", "sales")?.status, "ok");
-    assert.ok(!savedStore.getPivotResult("report", "sales")?.cells.includes(999));
-    assert.deepEqual(savedStore.getPivots()[0]?.savedOutput, savedPivot.savedOutput);
+    assert.equal(saved_store.getPivotResult("report", "sales")?.status, "ok");
+    assert.ok(!saved_store.getPivotResult("report", "sales")?.cells.includes(999));
+    assert.deepEqual(saved_store.getPivots()[0]?.savedOutput, saved_pivot.savedOutput);
   } finally {
-    savedStore.dispose();
+    saved_store.dispose();
   }
   for (const operation of [
     { op: "removeRows", sheet: "report", at: 1, count: 3 },
@@ -268,10 +268,10 @@ try {
   );
 
   // An anchor on user data shows #SPILL! but the data stays user-owned.
-  const literalAnchor = { sheet: "report", row: 15, col: 4 };
+  const literal_anchor = { sheet: "report", row: 15, col: 4 };
   assert.equal(
     grid.applyTransaction({
-      patches: [{ op: "set", addr: literalAnchor, value: { kind: "literal", value: 7 } }],
+      patches: [{ op: "set", addr: literal_anchor, value: { kind: "literal", value: 7 } }],
     }).status,
     "applied",
   );
@@ -284,16 +284,16 @@ try {
     }).status,
     "applied",
   );
-  const movedAnchor = { ...literalAnchor, row: 16 };
+  const moved_anchor = { ...literal_anchor, row: 16 };
   assert.equal(
-    grid.store.getCell(movedAnchor).resolved,
+    grid.store.getCell(moved_anchor).resolved,
     7,
     "moving a blocked anchor keeps its user value",
   );
   assert.equal(
     grid.applyTransaction({
       patches: [
-        { op: "clearRange", range: { sheet: "report", start: movedAnchor, end: movedAnchor } },
+        { op: "clearRange", range: { sheet: "report", start: moved_anchor, end: moved_anchor } },
       ],
     }).status,
     "applied",
@@ -303,6 +303,6 @@ try {
 } finally {
   grid.destroy();
   host.remove();
-  removeStyles();
+  remove_styles();
   restore();
 }

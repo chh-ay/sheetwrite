@@ -47,20 +47,20 @@ export function cardLayout(
     .join(" → ");
   const nodes: BlueprintNode[][] = [];
   let x = 0;
-  columns.forEach((column, columnIndex) => {
+  columns.forEach((column, column_index) => {
     const w = Math.max(...column.map((box) => nodeTextWidth(box))) + 2 * SPACING.card.insetX;
     // A single box that a fan joins is tall enough for its arrows to land apart.
     const fan = Math.max(
-      columns[columnIndex - 1]?.length ?? 0,
-      columns[columnIndex + 1]?.length ?? 0,
+      columns[column_index - 1]?.length ?? 0,
+      columns[column_index + 1]?.length ?? 0,
     );
-    const fanHeight = column.length === 1 && fan > 1 ? FAN_ARROW_SPACING * (fan + 1) : 0;
-    const heights = column.map((box) => Math.max(nodeHeight(box, true), fanHeight));
+    const fan_height = column.length === 1 && fan > 1 ? FAN_ARROW_SPACING * (fan + 1) : 0;
+    const heights = column.map((box) => Math.max(nodeHeight(box, true), fan_height));
     let y = -(heights.reduce((sum, h) => sum + h, 0) + (column.length - 1) * SPACING.card.tile) / 2;
     nodes.push(
       column.map((box, row) => {
         const h = heights[row] ?? 0;
-        const node = { id: `c${columnIndex}r${row}`, ...box, rect: { x, y, w, h } };
+        const node = { id: `c${column_index}r${row}`, ...box, rect: { x, y, w, h } };
         y += h + SPACING.card.tile;
         return node;
       }),

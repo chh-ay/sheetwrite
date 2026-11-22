@@ -8,7 +8,7 @@ import { contentComponents } from "../src/lib/content-components.ts";
 import { RELEASES } from "../src/lib/releases.ts";
 
 /** Drops the page's imports and exports, which only the docs build can resolve. */
-function withoutModuleCode() {
+function without_module_code() {
   return (tree: { children: Array<{ type: string }> }) => {
     tree.children = tree.children.filter((child) => child.type !== "mdxjsEsm");
   };
@@ -18,7 +18,7 @@ function withoutModuleCode() {
 async function render(source: string): Promise<string> {
   const { default: Page } = await evaluate(source, {
     ...runtime,
-    rehypePlugins: [contentComponents, withoutModuleCode],
+    rehypePlugins: [contentComponents, without_module_code],
   });
   return renderToStaticMarkup(runtime.jsx(Page, {}));
 }
@@ -52,13 +52,13 @@ describe("content components", () => {
   });
 
   it("links the stylesheets of the components a page uses that most pages do not", async () => {
-    const moduleCode = async (source: string) =>
+    const module_code = async (source: string) =>
       String(await compile(source, { rehypePlugins: [contentComponents] }));
-    const code = await moduleCode(
+    const code = await module_code(
       `<Accordion title="Why">Because.</Accordion>\n\n<Note>Plain.</Note>`,
     );
     expect(code).toContain('import stylesheet0 from "/src/styles/content/accordion.css?url";');
     expect(code).toContain("export const stylesheets = [stylesheet0];");
-    expect(await moduleCode("<Note>Only shared styles.</Note>")).not.toContain("stylesheets");
+    expect(await module_code("<Note>Only shared styles.</Note>")).not.toContain("stylesheets");
   });
 });

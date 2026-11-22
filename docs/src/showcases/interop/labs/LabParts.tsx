@@ -24,9 +24,9 @@ export interface LabAnswerProps {
 }
 
 export function LabAnswer(props: LabAnswerProps) {
-  const hasFigure = "figure" in props;
+  const has_figure = "figure" in props;
   return (
-    <div class="sw-lab-answer" data-has-figure={hasFigure ? "true" : undefined}>
+    <div class="sw-lab-answer" data-has-figure={has_figure ? "true" : undefined}>
       <div class="sw-lab-answer__text">
         <p class="sw-lab-eyebrow">
           <Icon name={props.icon} />
@@ -85,7 +85,7 @@ const COPIED_MS = 1_600;
 
 /** An icon button that copies `value`, and says it did. */
 export function CopyButton(props: Readonly<{ value: string; label: string; testId?: string }>) {
-  const [copied, setCopied] = createSignal(false);
+  const [copied, set_copied] = createSignal(false);
   let timer: number | undefined;
   onCleanup(() => clearTimeout(timer));
   return (
@@ -96,9 +96,9 @@ export function CopyButton(props: Readonly<{ value: string; label: string; testI
       data-testid={props.testId}
       onClick={() => {
         void navigator.clipboard.writeText(props.value).then(() => {
-          setCopied(true);
+          set_copied(true);
           window.clearTimeout(timer);
-          timer = window.setTimeout(() => setCopied(false), COPIED_MS);
+          timer = window.setTimeout(() => set_copied(false), COPIED_MS);
         });
       }}
       title={`Copy ${props.label}`}

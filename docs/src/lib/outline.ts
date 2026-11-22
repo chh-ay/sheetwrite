@@ -30,29 +30,29 @@ interface EstreeNode {
   [key: string]: unknown;
 }
 
-function classesOf(node: HastElement): string[] {
+function classes_of(node: HastElement): string[] {
   return [node.properties?.className ?? []].flat().map(String);
 }
 
-function hasClass(node: HastElement, name: string): boolean {
-  return classesOf(node).includes(name);
+function has_class(node: HastElement, name: string): boolean {
+  return classes_of(node).includes(name);
 }
 
-function textOf(node: HastElement, skip: (child: HastElement) => boolean = () => false): string {
+function text_of(node: HastElement, skip: (child: HastElement) => boolean = () => false): string {
   if (node.type === "text") return node.value ?? "";
   return (node.children ?? [])
     .filter((child) => !skip(child))
-    .map((child) => textOf(child, skip))
+    .map((child) => text_of(child, skip))
     .join("");
 }
 
-function findElement(
+function find_element(
   node: HastElement,
   test: (element: HastElement) => boolean,
 ): HastElement | undefined {
   if (node.type === "element" && test(node)) return node;
   for (const child of node.children ?? []) {
-    const found = findElement(child, test);
+    const found = find_element(child, test);
     if (found !== undefined) return found;
   }
   return undefined;
@@ -65,33 +65,33 @@ function findElement(
  * group headings, Properties and Methods, stand in for them); a member's
  * inner headings and search anchors are left out.
  */
-function collectOutline(tree: HastElement): OutlineItem[] {
-  const listsMembers =
-    findElement(tree, (node) => hasClass(node, "api-member-index")) === undefined;
+function collect_outline(tree: HastElement): OutlineItem[] {
+  const lists_members =
+    find_element(tree, (node) => has_class(node, "api-member-index")) === undefined;
   const collected: OutlineItem[] = [];
-  const visit = (node: HastElement, insideMember: boolean): void => {
+  const visit = (node: HastElement, inside_member: boolean): void => {
     for (const child of node.children ?? []) {
       if (child.type !== "element") continue;
       const id = child.properties?.id;
-      const isMember = child.tagName === "article" && hasClass(child, "api-member");
-      const isHeading = child.tagName === "h2" || child.tagName === "h3";
+      const is_member = child.tagName === "article" && has_class(child, "api-member");
+      const is_heading = child.tagName === "h2" || child.tagName === "h3";
       const skipped =
-        hasClass(child, "api-search-anchor") ||
-        (listsMembers && hasClass(child, "api-member-group"));
+        has_class(child, "api-search-anchor") ||
+        (lists_members && has_class(child, "api-member-group"));
       if (typeof id === "string" && !skipped) {
-        const label = isMember
-          ? listsMembers
+        const label = is_member
+          ? lists_members
             ? String(child.properties?.dataMember ?? "")
             : ""
-          : isHeading && !insideMember
-            ? textOf(child, (element) => hasClass(element, "api-count")).trim()
+          : is_heading && !inside_member
+            ? text_of(child, (element) => has_class(element, "api-count")).trim()
             : "";
         const previous = collected.at(-1);
         if (label !== "" && !(previous?.label === label && previous.depth === 1)) {
-          collected.push({ id, label, depth: isMember || child.tagName === "h3" ? 1 : 0 });
+          collected.push({ id, label, depth: is_member || child.tagName === "h3" ? 1 : 0 });
         }
       }
-      visit(child, insideMember || isMember);
+      visit(child, inside_member || is_member);
     }
   };
   visit(tree, false);
@@ -99,7 +99,7 @@ function collectOutline(tree: HastElement): OutlineItem[] {
 }
 
 /** `key: value` as an estree object property. */
-function estreeProperty(key: string, value: unknown): EstreeNode {
+function estree_property(key: string, value: unknown): EstreeNode {
   return {
     type: "Property",
     kind: "init",
@@ -107,24 +107,24 @@ function estreeProperty(key: string, value: unknown): EstreeNode {
     shorthand: false,
     computed: false,
     key: { type: "Identifier", name: key },
-    value: estreeValue(value),
+    value: estree_value(value),
   };
 }
 
 /** A JSON-like value as an estree expression. */
-function estreeValue(value: unknown): EstreeNode {
-  if (Array.isArray(value)) return { type: "ArrayExpression", elements: value.map(estreeValue) };
+function estree_value(value: unknown): EstreeNode {
+  if (Array.isArray(value)) return { type: "ArrayExpression", elements: value.map(estree_value) };
   if (value !== null && typeof value === "object") {
     return {
       type: "ObjectExpression",
-      properties: Object.entries(value).map(([key, entry]) => estreeProperty(key, entry)),
+      properties: Object.entries(value).map(([key, entry]) => estree_property(key, entry)),
     };
   }
   return { type: "Literal", value };
 }
 
 /** The object literal of `export const frontmatter = {…}` in an MDX ESM node. */
-function frontmatterObject(program: EstreeNode | undefined): EstreeNode | undefined {
+function frontmatter_object(program: EstreeNode | undefined): EstreeNode | undefined {
   for (const statement of (program?.body as EstreeNode[] | undefined) ?? []) {
     const declaration = statement.declaration as EstreeNode | undefined;
     for (const declarator of (declaration?.declarations as EstreeNode[] | undefined) ?? []) {
@@ -143,10 +143,10 @@ function frontmatterObject(program: EstreeNode | undefined): EstreeNode | undefi
 export function exportOutline() {
   return (tree: HastElement): void => {
     const esm = tree.children?.find(
-      (node) => node.type === "mdxjsEsm" && frontmatterObject(node.data?.estree) !== undefined,
+      (node) => node.type === "mdxjsEsm" && frontmatter_object(node.data?.estree) !== undefined,
     );
-    const object = frontmatterObject(esm?.data?.estree);
+    const object = frontmatter_object(esm?.data?.estree);
     if (object === undefined) return;
-    (object.properties as EstreeNode[]).push(estreeProperty("outline", collectOutline(tree)));
+    (object.properties as EstreeNode[]).push(estree_property("outline", collect_outline(tree)));
   };
 }

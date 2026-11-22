@@ -58,7 +58,7 @@ interface CheckScope {
   spent: number;
 }
 
-function previewResult(preview: FormulaPreview): FormulaPreviewValue | undefined {
+function preview_result(preview: FormulaPreview): FormulaPreviewValue | undefined {
   if (preview.status === "value") return preview.value;
   return preview.status === "array" ? preview.first : undefined;
 }
@@ -117,7 +117,7 @@ export function storeValidationReads(
   return {
     formula(formula, addr, trial) {
       charge(FORMULA_COST);
-      return previewResult(
+      return preview_result(
         trial === undefined
           ? source.previewFormula(addr, formula)
           : source.previewFormulaWith(addr, formula, trial),
@@ -128,19 +128,19 @@ export function storeValidationReads(
         const range = resolve(reference, addr);
         return range ? read(range) : undefined;
       }
-      const referenceKey = `${addr.sheet}\u0000${reference}`;
-      let range = scope.ranges.get(referenceKey);
-      if (range === undefined && !scope.ranges.has(referenceKey)) {
+      const reference_key = `${addr.sheet}\u0000${reference}`;
+      let range = scope.ranges.get(reference_key);
+      if (range === undefined && !scope.ranges.has(reference_key)) {
         range = resolve(reference, addr);
-        scope.ranges.set(referenceKey, range);
+        scope.ranges.set(reference_key, range);
       }
       if (!range) return undefined;
       const { start, end } = range;
-      const listKey = `${range.sheet}\u0000${start.row}:${start.col}:${end.row}:${end.col}`;
-      let list = scope.lists.get(listKey);
+      const list_key = `${range.sheet}\u0000${start.row}:${start.col}:${end.row}:${end.col}`;
+      let list = scope.lists.get(list_key);
       if (!list) {
         list = read(range);
-        scope.lists.set(listKey, list);
+        scope.lists.set(list_key, list);
       }
       return list;
     },

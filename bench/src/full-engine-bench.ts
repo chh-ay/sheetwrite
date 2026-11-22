@@ -83,7 +83,7 @@ const SOURCE_PATHS = [
 function hash(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
-function sourceDigest(
+function source_digest(
   result: Pick<FullEngineResult, "meta" | "sourceFiles" | "baselineContext">,
 ): string {
   return hash(
@@ -94,11 +94,11 @@ function sourceDigest(
     }),
   );
 }
-function exactKeys(value: object, keys: readonly string[], label: string): void {
+function exact_keys(value: object, keys: readonly string[], label: string): void {
   validateExactMatrix(label, keys, Object.keys(value));
 }
 export function validateFullEngineResult(result: FullEngineResult): void {
-  exactKeys(
+  exact_keys(
     result,
     [
       "schemaVersion",
@@ -114,7 +114,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
   );
   if (Buffer.byteLength(JSON.stringify(result)) > 4 * 1024 * 1024)
     throw new Error("engine artifact exceeds the 4 MiB bound");
-  exactKeys(result.meta, ["commit", "dirty", "timestamp"], "engine metadata");
+  exact_keys(result.meta, ["commit", "dirty", "timestamp"], "engine metadata");
   if (
     !/^[0-9a-f]{40}$/u.test(result.meta.commit) ||
     typeof result.meta.dirty !== "boolean" ||
@@ -124,7 +124,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     throw new Error("invalid engine metadata");
   if (result.schemaVersion !== 2 || result.initializationMethod !== INIT_METHOD)
     throw new Error("engine protocol mismatch");
-  exactKeys(
+  exact_keys(
     result.sourceFiles,
     FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles)
       ? SOURCE_PATHS
@@ -135,7 +135,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
   );
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
-    result.sourceDigest !== sourceDigest(result)
+    result.sourceDigest !== source_digest(result)
   )
     throw new Error("engine source digest mismatch");
   if (result.baselineContext !== undefined) {
@@ -152,7 +152,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     result.engines.map((capture) => capture.engine),
   );
   for (const capture of result.engines) {
-    exactKeys(capture, ["engine", "shared", "wasm", "initialization"], "engine capture fields");
+    exact_keys(capture, ["engine", "shared", "wasm", "initialization"], "engine capture fields");
     validateRecordedFormulaCapture(capture.shared);
     if (
       capture.shared.mode !== "full" ||
@@ -160,53 +160,53 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       capture.shared.meta.dirty !== result.meta.dirty
     )
       throw new Error("engine capture provenance mismatch");
-    const childBaseline = capture.shared.source.baselineContext;
+    const child_baseline = capture.shared.source.baselineContext;
     if (result.baselineContext !== undefined) {
-      const parentBaseline = result.baselineContext;
-      const packagePrefix = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/`;
+      const parent_baseline = result.baselineContext;
+      const package_prefix = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/`;
       if (
-        childBaseline === undefined ||
-        childBaseline.engineCommit !== parentBaseline.engineCommit ||
-        childBaseline.harnessCommit !== parentBaseline.harnessCommit ||
-        JSON.stringify(childBaseline.engineFiles) !==
+        child_baseline === undefined ||
+        child_baseline.engineCommit !== parent_baseline.engineCommit ||
+        child_baseline.harnessCommit !== parent_baseline.harnessCommit ||
+        JSON.stringify(child_baseline.engineFiles) !==
           JSON.stringify(
             Object.fromEntries(
-              Object.entries(parentBaseline.engineFiles).filter(([path]) =>
-                path.startsWith(packagePrefix),
+              Object.entries(parent_baseline.engineFiles).filter(([path]) =>
+                path.startsWith(package_prefix),
               ),
             ),
           ) ||
-        JSON.stringify(childBaseline.currentWasmFiles) !==
+        JSON.stringify(child_baseline.currentWasmFiles) !==
           JSON.stringify(
             Object.fromEntries(
-              Object.entries(parentBaseline.currentWasmFiles).filter(([path]) =>
-                path.startsWith(packagePrefix),
+              Object.entries(parent_baseline.currentWasmFiles).filter(([path]) =>
+                path.startsWith(package_prefix),
               ),
             ),
           )
       )
         throw new Error("Shared baseline engine provenance mismatch");
-    } else if (childBaseline !== undefined) {
+    } else if (child_baseline !== undefined) {
       throw new Error("Unexpected shared baseline engine provenance");
     }
-    exactKeys(capture.wasm, ["rawBytes", "brotliBytes", "sha256"], "engine wasm fields");
-    const enginePackage = capture.engine === "full" ? "formulas" : "wasm";
-    const wasmPath = `packages/${enginePackage}/pkg/sheetwrite_wasm_bg.wasm`;
+    exact_keys(capture.wasm, ["rawBytes", "brotliBytes", "sha256"], "engine wasm fields");
+    const engine_package = capture.engine === "full" ? "formulas" : "wasm";
+    const wasm_path = `packages/${engine_package}/pkg/sheetwrite_wasm_bg.wasm`;
     // The shared capture keys its hashes by the package it loaded; older
     // captures keyed both engines under `packages/wasm/`.
-    const sharedPackage = formulaSourceEnginePackage(capture.shared.source.files);
+    const shared_package = formulaSourceEnginePackage(capture.shared.source.files);
     if (
-      (sharedPackage !== "wasm" && sharedPackage !== enginePackage) ||
-      capture.wasm.sha256 !== result.sourceFiles[wasmPath] ||
+      (shared_package !== "wasm" && shared_package !== engine_package) ||
+      capture.wasm.sha256 !== result.sourceFiles[wasm_path] ||
       capture.wasm.sha256 !==
-        capture.shared.source.files[`packages/${sharedPackage}/pkg/sheetwrite_wasm_bg.wasm`] ||
+        capture.shared.source.files[`packages/${shared_package}/pkg/sheetwrite_wasm_bg.wasm`] ||
       !Number.isSafeInteger(capture.wasm.rawBytes) ||
       !Number.isSafeInteger(capture.wasm.brotliBytes) ||
       capture.wasm.brotliBytes <= 0 ||
       capture.wasm.rawBytes < capture.wasm.brotliBytes
     )
       throw new Error("engine wasm evidence mismatch");
-    exactKeys(
+    exact_keys(
       capture.initialization,
       ["node", "samplesMs", "stat"],
       "engine initialization fields",
@@ -238,20 +238,20 @@ export function validateFullEngineResult(result: FullEngineResult): void {
         1e-7 * Math.max(1, Math.abs(workload.output))
     )
       throw new Error("analysis output or samples mismatch");
-    exactKeys(
+    exact_keys(
       workload,
       ["id", "size", "samplesMs", "stat", "allocationSamples", "allocationStat", "output"],
       "analysis fields",
     );
     validateRawStat(workload.samplesMs, workload.stat, workload.id);
     if (workload.stat.p95 >= 30_000) throw new Error("analysis exceeded the 30 second ceiling");
-    exactKeys(
+    exact_keys(
       workload.allocationStat,
       ["retainedBytes", "peakTransientBytes", "transientAllocations"],
       "analysis allocation fields",
     );
     for (const sample of workload.allocationSamples)
-      exactKeys(
+      exact_keys(
         sample,
         ["retainedBytes", "peakTransientBytes", "transientAllocations"],
         "analysis allocation sample fields",
@@ -266,7 +266,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     }
   }
 }
-function analysisFixture(formulas: typeof Formulas, formula: string) {
+function analysis_fixture(formulas: typeof Formulas, formula: string) {
   const store = new formulas.CellStore();
   const sheet = store.addSheet(6, ANALYSIS_COUNT);
   writeNumberColumn(
@@ -340,9 +340,9 @@ function analysisFixture(formulas: typeof Formulas, formula: string) {
 
 async function capture(): Promise<void> {
   const meta = protocolCaptureMeta();
-  const baselineContext = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
+  const baseline_context = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const resultsDir = resultsDirectory(args);
+  const results_dir = resultsDirectory(args);
   const engines: EngineCapture[] = [];
 
   for (const engine of ENGINE_IDS) {
@@ -364,7 +364,7 @@ async function capture(): Promise<void> {
       ),
     );
 
-    const samplesMs: number[] = [];
+    const samples_ms: number[] = [];
     let node = "";
 
     // Each initialization sample needs a fresh process to exclude module reuse.
@@ -385,7 +385,7 @@ async function capture(): Promise<void> {
       if (node !== "" && node !== probe.node)
         throw new Error("Node version changed during capture");
       node = probe.node;
-      samplesMs.push(probe.elapsedMs);
+      samples_ms.push(probe.elapsedMs);
     }
 
     engines.push({
@@ -397,7 +397,7 @@ async function capture(): Promise<void> {
           .length,
         sha256: hash(bytes),
       },
-      initialization: { node, samplesMs, stat: summarize(samplesMs) },
+      initialization: { node, samplesMs: samples_ms, stat: summarize(samples_ms) },
     });
   }
 
@@ -410,13 +410,13 @@ async function capture(): Promise<void> {
     collectFixture(
       scenario.id,
       ANALYSIS_COUNT,
-      () => analysisFixture(formulas, scenario.formula),
+      () => analysis_fixture(formulas, scenario.formula),
       SAMPLE_COUNT,
       scenario.expected * ANALYSIS_COUNT,
     ),
   );
 
-  const sourceFiles = Object.fromEntries(
+  const source_files = Object.fromEntries(
     SOURCE_PATHS.map((path) => [
       path,
       hash(
@@ -431,9 +431,13 @@ async function capture(): Promise<void> {
   const result: FullEngineResult = {
     schemaVersion: 2,
     meta,
-    sourceFiles,
-    ...(baselineContext === undefined ? {} : { baselineContext }),
-    sourceDigest: sourceDigest({ meta, sourceFiles, baselineContext }),
+    sourceFiles: source_files,
+    ...(baseline_context === undefined ? {} : { baselineContext: baseline_context }),
+    sourceDigest: source_digest({
+      meta,
+      sourceFiles: source_files,
+      baselineContext: baseline_context,
+    }),
     initializationMethod: INIT_METHOD,
     engines,
     analysis,
@@ -442,13 +446,13 @@ async function capture(): Promise<void> {
 
   for (const capture of engines) {
     await Bun.write(
-      resolve(resultsDir, `formula-${capture.engine}-results.json`),
+      resolve(results_dir, `formula-${capture.engine}-results.json`),
       `${JSON.stringify(capture.shared, null, 2)}\n`,
     );
   }
 
   await Bun.write(
-    resolve(resultsDir, "full-engine-results.json"),
+    resolve(results_dir, "full-engine-results.json"),
     `${JSON.stringify(result, null, 2)}\n`,
   );
 }

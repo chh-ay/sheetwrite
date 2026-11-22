@@ -67,16 +67,16 @@ interface ActivityEntry {
 
 const EMPTY_KPIS: KpiValues = { total: null, average: null, largest: null, market: null };
 
-function readSummaryNumber(grid: Grid, row: number): number | null {
+function read_summary_number(grid: Grid, row: number): number | null {
   const cell = grid.store.getCell({ sheet: ANALYTICS_SUMMARY_SHEET_ID, row, col: 1 });
   return typeof cell.resolved === "number" ? cell.resolved : null;
 }
 
-function columnFormat(col: number): CellFormat {
-  const workbookColumn = createAnalyticsWorkbook().sheets.find(
+function column_format(col: number): CellFormat {
+  const workbook_column = createAnalyticsWorkbook().sheets.find(
     (sheet) => sheet.id === ANALYTICS_SHEET_ID,
   )?.columns?.[col];
-  return workbookColumn?.type ?? "text";
+  return workbook_column?.type ?? "text";
 }
 
 /** Scenario widths, captured once so repeated fits never compound a scale. */
@@ -100,8 +100,8 @@ const MIN_COLUMN_SCALE = 0.85;
 export function fitColumnsToHost(workbook: Workbook, hostWidth: number): void {
   const target = Math.floor(hostWidth) - rowGutterWidth(ANALYTICS_ROWS);
   if (target <= 0) return;
-  workbook.sheets.forEach((sheet, sheetIndex) => {
-    const natural = NATURAL_WIDTHS[sheetIndex];
+  workbook.sheets.forEach((sheet, sheet_index) => {
+    const natural = NATURAL_WIDTHS[sheet_index];
     if (!natural) return;
     const widths = fitColumnPixels(natural, target, {
       minimumScale: MIN_COLUMN_SCALE,
@@ -122,27 +122,27 @@ interface AnalyticsWorkbenchOptions {
 
 /** Controlled-analytics workbench state machine over the shared scenario. */
 export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
-  const { gridHostWidth = 0 } = options;
-  const gridRef = useRef<Grid>(null);
-  const csvAction = useAction();
-  const xlsxAction = useAction();
-  const importAction = useAction();
-  const { run: runCsv } = csvAction;
-  const { run: runXlsx } = xlsxAction;
-  const { run: runImport } = importAction;
-  const [initializationError, setInitializationError] = useState<string | null>(null);
-  const activityId = useRef(0);
-  const rendererCleanup = useRef<() => void>(() => {});
-  const formulaDirty = useRef(false);
+  const { gridHostWidth: grid_host_width = 0 } = options;
+  const grid_ref = useRef<Grid>(null);
+  const csv_action = useAction();
+  const xlsx_action = useAction();
+  const import_action = useAction();
+  const { run: run_csv } = csv_action;
+  const { run: run_xlsx } = xlsx_action;
+  const { run: run_import } = import_action;
+  const [initialization_error, set_initialization_error] = useState<string | null>(null);
+  const activity_id = useRef(0);
+  const renderer_cleanup = useRef<() => void>(() => {});
+  const formula_dirty = useRef(false);
 
   // The measured host width is a workbook input: the Grid must be constructed
   // with fitted widths, so the workbook is rebuilt once the stage reports its
   // width and the Grid mounts on that render instead of before it.
   const workbook = useMemo(() => {
     const next = createAnalyticsWorkbook();
-    fitColumnsToHost(next, gridHostWidth);
+    fitColumnsToHost(next, grid_host_width);
     return next;
-  }, [gridHostWidth]);
+  }, [grid_host_width]);
 
   /**
    * Re-fit the columns after the stage changes width. The workbook object is
@@ -151,12 +151,12 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
    * repaints and the documented geometry setters commit history, so the theme
    * is re-derived to rebuild the column index and layout from the store.
    */
-  const fitGridColumns = useCallback(
-    (hostWidth: number): void => {
-      const grid = gridRef.current;
-      if (!grid || hostWidth <= 0) return;
+  const fit_grid_columns = useCallback(
+    (host_width: number): void => {
+      const grid = grid_ref.current;
+      if (!grid || host_width <= 0) return;
       const before = workbook.sheets.map((sheet) => sheet.columns.map((column) => column.width));
-      fitColumnsToHost(workbook, hostWidth);
+      fitColumnsToHost(workbook, host_width);
       const changed = workbook.sheets.some((sheet, index) =>
         sheet.columns.some((column, col) => column.width !== before[index]?.[col]),
       );
@@ -164,65 +164,66 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     },
     [workbook],
   );
-  const [dataset, setDataset] = useState<ColumnarData>(() => buildAnalyticsData());
+  const [dataset, set_dataset] = useState<ColumnarData>(() => buildAnalyticsData());
 
   // Controlled query/view state — the single source of truth the grid is
   // reconciled against after every reset.
-  const [market, setMarket] = useState("all");
-  const [segment, setSegment] = useState("all");
-  const [query, setQuery] = useState("");
-  const [replacement, setReplacement] = useState("");
-  const [ranked, setRanked] = useState(false);
-  const [matches, setMatches] = useState<SearchResult | null>(null);
-  const [readOnly, setReadOnly] = useState(false);
+  const [market, set_market] = useState("all");
+  const [segment, set_segment] = useState("all");
+  const [query, set_query] = useState("");
+  const [replacement, set_replacement] = useState("");
+  const [ranked, set_ranked] = useState(false);
+  const [matches, set_matches] = useState<SearchResult | null>(null);
+  const [read_only, set_read_only] = useState(false);
 
   // Grid-derived state.
-  const [visibleRows, setVisibleRows] = useState(ANALYTICS_ROWS);
-  const [kpis, setKpis] = useState<KpiValues>(EMPTY_KPIS);
-  const [selection, setSelection] = useState("No selection");
-  const [formulaAddress, setFormulaAddress] = useState<CellAddress | null>(null);
-  const [formulaDraft, setFormulaDraft] = useState("");
-  const [generation, setGeneration] = useState(0);
-  const [readyReason, setReadyReason] = useState<GridReadyReason>("initial");
-  const [renderer, setRenderer] = useState<RenderingMode>("canvas");
-  const [activeRenderer, setActiveRenderer] = useState<RenderingMode>("canvas");
-  const [rendererFallback, setRendererFallback] = useState<{
+  const [visible_rows, set_visible_rows] = useState(ANALYTICS_ROWS);
+  const [kpis, set_kpis] = useState<KpiValues>(EMPTY_KPIS);
+  const [selection, set_selection] = useState("No selection");
+  const [formula_address, set_formula_address] = useState<CellAddress | null>(null);
+  const [formula_draft, set_formula_draft] = useState("");
+  const [generation, set_generation] = useState(0);
+  const [ready_reason, set_ready_reason] = useState<GridReadyReason>("initial");
+  const [renderer, set_renderer] = useState<RenderingMode>("canvas");
+  const [active_renderer, set_active_renderer] = useState<RenderingMode>("canvas");
+  const [renderer_fallback, set_renderer_fallback] = useState<{
     count: number;
     reason: string;
   } | null>(null);
-  const [activity, setActivity] = useState<ActivityEntry[]>([
+  const [activity, set_activity] = useState<ActivityEntry[]>([
     { id: 0, message: "Workbench initialized" },
   ]);
 
-  useEffect(() => () => rendererCleanup.current(), []);
+  useEffect(() => () => renderer_cleanup.current(), []);
 
   const record = useCallback((message: string): void => {
-    const id = ++activityId.current;
-    setActivity((items) => [{ id, message }, ...items].slice(0, 3));
+    const id = ++activity_id.current;
+    set_activity((items) => [{ id, message }, ...items].slice(0, 3));
   }, []);
 
-  const refreshKpis = useCallback((grid: Grid, focusedMarket: string): void => {
-    const total = readSummaryNumber(grid, KPI_ROW.total);
-    const marketIndex = ANALYTICS_MARKETS.indexOf(
-      focusedMarket as (typeof ANALYTICS_MARKETS)[number],
+  const refresh_kpis = useCallback((grid: Grid, focused_market: string): void => {
+    const total = read_summary_number(grid, KPI_ROW.total);
+    const market_index = ANALYTICS_MARKETS.indexOf(
+      focused_market as (typeof ANALYTICS_MARKETS)[number],
     );
-    setKpis({
+    set_kpis({
       total,
-      average: readSummaryNumber(grid, KPI_ROW.average),
-      largest: readSummaryNumber(grid, KPI_ROW.largest),
-      market: marketIndex >= 0 ? readSummaryNumber(grid, MARKET_KPI_START + marketIndex) : total,
+      average: read_summary_number(grid, KPI_ROW.average),
+      largest: read_summary_number(grid, KPI_ROW.largest),
+      market:
+        market_index >= 0 ? read_summary_number(grid, MARKET_KPI_START + market_index) : total,
     });
-    setVisibleRows(grid.store.viewRowCount(ANALYTICS_SHEET_ID));
+    set_visible_rows(grid.store.viewRowCount(ANALYTICS_SHEET_ID));
   }, []);
 
-  const marketFilter = useCallback((grid: Grid, value: string): void => {
+  const market_filter = useCallback((grid: Grid, value: string): void => {
     grid.setColumnFilter(
       ANALYTICS_COLUMNS.market,
       value === "all" ? null : { kind: "values", values: [value] },
     );
   }, []);
 
-  const segmentFilter = useCallback((grid: Grid, value: string): void => {
+  const segment_filter = useCallback((grid: Grid, value: string): void => {
     grid.setColumnFilter(
       ANALYTICS_COLUMNS.segment,
       value === "all" ? null : { kind: "values", values: [value] },
@@ -230,191 +231,191 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   }, []);
 
   /** Push every piece of controlled view state onto a (possibly fresh) grid. */
-  const reconcileView = useCallback(
+  const reconcile_view = useCallback(
     (grid: Grid): void => {
-      marketFilter(grid, market);
-      segmentFilter(grid, segment);
+      market_filter(grid, market);
+      segment_filter(grid, segment);
       if (ranked) grid.setViewSort([{ col: ANALYTICS_COLUMNS.arr, ascending: false }]);
       if (query.trim().length > 0) {
         const result = grid.search(query.trim());
-        setMatches(result);
+        set_matches(result);
         if (result.matches.length > 0) grid.findNext();
       } else {
-        setMatches(null);
+        set_matches(null);
       }
     },
-    [market, marketFilter, query, ranked, segment, segmentFilter],
+    [market, market_filter, query, ranked, segment, segment_filter],
   );
 
-  const onReady = useCallback(
-    ({ grid, generation: nextGeneration, reason }: GridReadyEvent): void => {
-      setInitializationError(null);
+  const on_ready = useCallback(
+    ({ grid, generation: next_generation, reason }: GridReadyEvent): void => {
+      set_initialization_error(null);
       grid.setFrozen(0, 1);
       grid.store.applyTransaction({ patches: analyticsSummarySeedOps() });
 
-      rendererCleanup.current();
-      setActiveRenderer(grid.rendererKind());
-      rendererCleanup.current = grid.on("renderer-fallback", ({ error }) => {
-        setActiveRenderer("canvas");
-        setRendererFallback((current) => ({
+      renderer_cleanup.current();
+      set_active_renderer(grid.rendererKind());
+      renderer_cleanup.current = grid.on("renderer-fallback", ({ error }) => {
+        set_active_renderer("canvas");
+        set_renderer_fallback((current) => ({
           count: (current?.count ?? 0) + 1,
           reason: errorText(error),
         }));
       });
 
-      setGeneration(nextGeneration);
-      setReadyReason(reason);
-      setFormulaAddress(null);
-      setFormulaDraft("");
-      formulaDirty.current = false;
+      set_generation(next_generation);
+      set_ready_reason(reason);
+      set_formula_address(null);
+      set_formula_draft("");
+      formula_dirty.current = false;
 
-      if (nextGeneration > 1) {
+      if (next_generation > 1) {
         // Controlled reconciliation: the new grid instance adopts the React
         // state that outlived its predecessor.
-        reconcileView(grid);
+        reconcile_view(grid);
         record(`Grid rebuilt (${reason}) · view reconciled from React state`);
       } else {
         record(`Grid ready · ${ANALYTICS_ROWS.toLocaleString()} rows ingested`);
       }
-      refreshKpis(grid, market);
+      refresh_kpis(grid, market);
     },
-    [market, reconcileView, record, refreshKpis],
+    [market, reconcile_view, record, refresh_kpis],
   );
 
-  const onGridChange = useCallback(
-    ({ transaction, commitReason }: ChangeEvent): void => {
-      const grid = gridRef.current;
+  const on_grid_change = useCallback(
+    ({ transaction, commitReason: commit_reason }: ChangeEvent): void => {
+      const grid = grid_ref.current;
       const ops = transaction.patches.length;
       record(
-        `${ops} op${ops === 1 ? "" : "s"} committed (${commitReason}) · formulas recalculated`,
+        `${ops} op${ops === 1 ? "" : "s"} committed (${commit_reason}) · formulas recalculated`,
       );
-      if (grid) refreshKpis(grid, market);
+      if (grid) refresh_kpis(grid, market);
     },
-    [market, record, refreshKpis],
+    [market, record, refresh_kpis],
   );
 
-  const onSelectionChange = useCallback((value: Selection | null): void => {
-    setSelection(selectionLabel(value, "No selection"));
-    const grid = gridRef.current;
+  const on_selection_change = useCallback((value: Selection | null): void => {
+    set_selection(selectionLabel(value, "No selection"));
+    const grid = grid_ref.current;
     if (!grid) return;
     if (value?.kind !== "cell" || value.addr.sheet !== ANALYTICS_SHEET_ID) {
-      if (!formulaDirty.current) {
-        setFormulaAddress(null);
-        setFormulaDraft("");
+      if (!formula_dirty.current) {
+        set_formula_address(null);
+        set_formula_draft("");
       }
       return;
     }
     // Controlled-input reconciliation: grid selection refreshes the draft
     // unless the user is mid-edit in the formula input.
-    setFormulaAddress(value.addr);
-    if (!formulaDirty.current) {
+    set_formula_address(value.addr);
+    if (!formula_dirty.current) {
       const formula = grid.store.getFormula(value.addr);
       if (formula !== null) {
-        setFormulaDraft(formula);
+        set_formula_draft(formula);
       } else {
         const { resolved } = grid.store.getCell(value.addr);
-        setFormulaDraft(resolved === null ? "" : String(resolved));
+        set_formula_draft(resolved === null ? "" : String(resolved));
       }
     }
   }, []);
 
-  const editFormulaDraft = useCallback((text: string): void => {
-    formulaDirty.current = true;
-    setFormulaDraft(text);
+  const edit_formula_draft = useCallback((text: string): void => {
+    formula_dirty.current = true;
+    set_formula_draft(text);
   }, []);
 
-  const commitFormulaDraft = useCallback((): void => {
-    const grid = gridRef.current;
-    if (!grid || !formulaAddress || readOnly) return;
-    const value = parseCellInput(formulaDraft, columnFormat(formulaAddress.col));
-    grid.applyTransaction({ patches: [{ op: "set", addr: formulaAddress, value }] });
-    formulaDirty.current = false;
+  const commit_formula_draft = useCallback((): void => {
+    const grid = grid_ref.current;
+    if (!grid || !formula_address || read_only) return;
+    const value = parseCellInput(formula_draft, column_format(formula_address.col));
+    grid.applyTransaction({ patches: [{ op: "set", addr: formula_address, value }] });
+    formula_dirty.current = false;
     record(
       value.kind === "formula"
-        ? `Formula ${formulaDraft} committed at R${formulaAddress.row + 1}`
-        : `Cell R${formulaAddress.row + 1} C${formulaAddress.col + 1} set`,
+        ? `Formula ${formula_draft} committed at R${formula_address.row + 1}`
+        : `Cell R${formula_address.row + 1} C${formula_address.col + 1} set`,
     );
-  }, [formulaAddress, formulaDraft, readOnly, record]);
+  }, [formula_address, formula_draft, read_only, record]);
 
-  const chooseMarket = useCallback(
+  const choose_market = useCallback(
     (next: string): void => {
-      setMarket(next);
-      const grid = gridRef.current;
+      set_market(next);
+      const grid = grid_ref.current;
       if (!grid) return;
-      marketFilter(grid, next);
-      refreshKpis(grid, next);
+      market_filter(grid, next);
+      refresh_kpis(grid, next);
       record(next === "all" ? "Showing all markets" : `Filtered to ${next}`);
     },
-    [marketFilter, record, refreshKpis],
+    [market_filter, record, refresh_kpis],
   );
 
-  const chooseSegment = useCallback(
+  const choose_segment = useCallback(
     (next: string): void => {
-      setSegment(next);
-      const grid = gridRef.current;
+      set_segment(next);
+      const grid = grid_ref.current;
       if (!grid) return;
-      segmentFilter(grid, next);
-      refreshKpis(grid, market);
+      segment_filter(grid, next);
+      refresh_kpis(grid, market);
       record(next === "all" ? "Showing all segments" : `Filtered to ${next} segment`);
     },
-    [market, record, refreshKpis, segmentFilter],
+    [market, record, refresh_kpis, segment_filter],
   );
 
-  const runSearch = useCallback(
-    (nextQuery: string): void => {
-      const grid = gridRef.current;
+  const run_search = useCallback(
+    (next_query: string): void => {
+      const grid = grid_ref.current;
       if (!grid) return;
-      setQuery(nextQuery);
-      if (nextQuery.trim().length === 0) {
+      set_query(next_query);
+      if (next_query.trim().length === 0) {
         grid.clearSearch();
-        setMatches(null);
+        set_matches(null);
         record("Search cleared");
         return;
       }
-      const result = grid.search(nextQuery.trim());
-      setMatches(result);
+      const result = grid.search(next_query.trim());
+      set_matches(result);
       if (result.matches.length > 0) grid.findNext();
       record(`${result.matches.length.toLocaleString()} search matches`);
     },
     [record],
   );
 
-  const findNext = useCallback((): void => {
-    const grid = gridRef.current;
-    if (grid) setMatches(grid.findNext());
+  const find_next = useCallback((): void => {
+    const grid = grid_ref.current;
+    if (grid) set_matches(grid.findNext());
   }, []);
 
-  const findPrev = useCallback((): void => {
-    const grid = gridRef.current;
-    if (grid) setMatches(grid.findPrev());
+  const find_prev = useCallback((): void => {
+    const grid = grid_ref.current;
+    if (grid) set_matches(grid.findPrev());
   }, []);
 
-  const replaceCurrent = useCallback((): void => {
-    const grid = gridRef.current;
-    if (!grid || readOnly) return;
-    setMatches(grid.replaceCurrent(replacement));
+  const replace_current = useCallback((): void => {
+    const grid = grid_ref.current;
+    if (!grid || read_only) return;
+    set_matches(grid.replaceCurrent(replacement));
     record("Replaced active match");
-  }, [readOnly, record, replacement]);
+  }, [read_only, record, replacement]);
 
-  const replaceAll = useCallback((): void => {
-    const grid = gridRef.current;
-    if (!grid || readOnly) return;
+  const replace_all = useCallback((): void => {
+    const grid = grid_ref.current;
+    if (!grid || read_only) return;
     const { replaced, result } = grid.replaceAll(replacement);
-    setMatches(result);
+    set_matches(result);
     record(`Replaced ${replaced.toLocaleString()} cell${replaced === 1 ? "" : "s"}`);
-  }, [readOnly, record, replacement]);
+  }, [read_only, record, replacement]);
 
-  const rankByArr = useCallback((): void => {
-    const grid = gridRef.current;
+  const rank_by_arr = useCallback((): void => {
+    const grid = grid_ref.current;
     if (!grid) return;
     grid.setViewSort([{ col: ANALYTICS_COLUMNS.arr, ascending: false }]);
-    setRanked(true);
-    refreshKpis(grid, market);
+    set_ranked(true);
+    refresh_kpis(grid, market);
     record("Ranked by ARR, high to low");
-  }, [market, record, refreshKpis]);
+  }, [market, record, refresh_kpis]);
 
   const undo = useCallback((): void => {
-    const grid = gridRef.current;
+    const grid = grid_ref.current;
     if (!grid) return;
     if (grid.getCommandState("undo").disabled) {
       record("Nothing to undo");
@@ -425,7 +426,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   }, [record]);
 
   const redo = useCallback((): void => {
-    const grid = gridRef.current;
+    const grid = grid_ref.current;
     if (!grid) return;
     if (grid.getCommandState("redo").disabled) {
       record("Nothing to redo");
@@ -436,43 +437,43 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   }, [record]);
 
   /** Clear the controlled view (filters/sort/search) without touching data. */
-  const resetView = useCallback((): void => {
-    setMarket("all");
-    setSegment("all");
-    setQuery("");
-    setRanked(false);
-    setMatches(null);
-    const grid = gridRef.current;
+  const reset_view = useCallback((): void => {
+    set_market("all");
+    set_segment("all");
+    set_query("");
+    set_ranked(false);
+    set_matches(null);
+    const grid = grid_ref.current;
     if (!grid) return;
     grid.clearView();
     grid.clearSearch();
-    refreshKpis(grid, "all");
+    refresh_kpis(grid, "all");
     record("View reset · filters, sort, and search cleared");
-  }, [record, refreshKpis]);
+  }, [record, refresh_kpis]);
 
   /**
    * Input-reset lifecycle: a fresh dataset object replaces the `data` prop, the
-   * adapter rebuilds the grid, and `onReady` reconciles the surviving React
+   * adapter rebuilds the grid, and `on_ready` reconciles the surviving React
    * view state onto the new instance.
    */
-  const reloadDataset = useCallback((): void => {
-    setDataset(buildAnalyticsData());
+  const reload_dataset = useCallback((): void => {
+    set_dataset(buildAnalyticsData());
     record("Reloading pristine dataset · local edits discarded");
   }, [record]);
 
-  const toggleReadOnly = useCallback((): void => {
-    setReadOnly((current) => {
+  const toggle_read_only = useCallback((): void => {
+    set_read_only((current) => {
       record(current ? "Editing enabled" : "Workbench is read-only");
       return !current;
     });
   }, [record]);
 
-  const exportCsv = useCallback((): void => {
-    const grid = gridRef.current;
+  const export_csv = useCallback((): void => {
+    const grid = grid_ref.current;
     if (!grid) return;
     const sheet = grid.store.getWorkbook().sheets.find((entry) => entry.id === ANALYTICS_SHEET_ID);
     if (!sheet) return;
-    void runCsv(
+    void run_csv(
       () => {
         // `grid.exportCsv` counts the viewport's presentation-padding columns
         // against the default 1M-cell ceiling (100k rows × ~14 padded columns),
@@ -486,12 +487,12 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
       },
       (error) => `Cannot export CSV: ${String(error)}. Try again.`,
     );
-  }, [record, runCsv]);
+  }, [record, run_csv]);
 
-  const exportXlsx = useCallback(async (): Promise<void> => {
-    const grid = gridRef.current;
+  const export_xlsx = useCallback(async (): Promise<void> => {
+    const grid = grid_ref.current;
     if (!grid) return;
-    await runXlsx(
+    await run_xlsx(
       async () => {
         await installXlsx();
         await grid.exportXlsx("analytics-pipeline.xlsx");
@@ -499,17 +500,17 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
       },
       (error) => `Cannot export XLSX: ${String(error)}. Try again.`,
     );
-  }, [record, runXlsx]);
+  }, [record, run_xlsx]);
 
   /**
    * CSV workflow entry point: parse with the shared core codec and overlay the
    * parsed rows onto the top of the pipeline as ONE undoable commit.
    */
-  const importCsv = useCallback(
+  const import_csv = useCallback(
     async (file: File): Promise<void> => {
-      const grid = gridRef.current;
-      if (!grid || readOnly) return;
-      await runImport(
+      const grid = grid_ref.current;
+      if (!grid || read_only) return;
+      await run_import(
         async () => {
           const columns = workbook.sheets[0]?.columns ?? [];
           const parsed = fromCsv(await file.text(), columns);
@@ -543,71 +544,71 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
         (error) => `Cannot import CSV: ${String(error)}. Check the file and try again.`,
       );
     },
-    [readOnly, record, workbook, runImport],
+    [read_only, record, workbook, run_import],
   );
 
-  const chooseRenderer = useCallback((mode: RenderingMode): void => {
-    setRenderer(mode);
-    setRendererFallback(null);
+  const choose_renderer = useCallback((mode: RenderingMode): void => {
+    set_renderer(mode);
+    set_renderer_fallback(null);
   }, []);
 
-  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(ANALYTICS_THEME)), []);
+  useEffect(() => observeSiteTheme(() => grid_ref.current?.replaceTheme(ANALYTICS_THEME)), []);
 
   return {
-    csvAction,
-    xlsxAction,
-    importAction,
-    initializationError,
+    csvAction: csv_action,
+    xlsxAction: xlsx_action,
+    importAction: import_action,
+    initializationError: initialization_error,
     onInitializationError: (error: unknown) =>
-      setInitializationError(`Cannot load the workbook: ${String(error)}`),
+      set_initialization_error(`Cannot load the workbook: ${String(error)}`),
     // Grid inputs.
-    gridRef,
+    gridRef: grid_ref,
     workbook,
     dataset,
-    readOnly,
+    readOnly: read_only,
     renderer,
     // Adapter events.
-    onReady,
-    onGridChange,
-    onSelectionChange,
+    onReady: on_ready,
+    onGridChange: on_grid_change,
+    onSelectionChange: on_selection_change,
     // Controlled state and derived summaries.
     market,
     segment,
     query,
-    setQuery,
+    setQuery: set_query,
     replacement,
-    setReplacement,
+    setReplacement: set_replacement,
     matches,
-    visibleRows,
+    visibleRows: visible_rows,
     kpis,
     selection,
-    formulaAddress,
-    formulaDraft,
+    formulaAddress: formula_address,
+    formulaDraft: formula_draft,
     generation,
-    readyReason,
-    activeRenderer,
-    rendererFallback,
+    readyReason: ready_reason,
+    activeRenderer: active_renderer,
+    rendererFallback: renderer_fallback,
     activity,
     // Actions.
-    fitGridColumns,
-    editFormulaDraft,
-    commitFormulaDraft,
-    chooseMarket,
-    chooseSegment,
-    runSearch,
-    findNext,
-    findPrev,
-    replaceCurrent,
-    replaceAll,
-    rankByArr,
+    fitGridColumns: fit_grid_columns,
+    editFormulaDraft: edit_formula_draft,
+    commitFormulaDraft: commit_formula_draft,
+    chooseMarket: choose_market,
+    chooseSegment: choose_segment,
+    runSearch: run_search,
+    findNext: find_next,
+    findPrev: find_prev,
+    replaceCurrent: replace_current,
+    replaceAll: replace_all,
+    rankByArr: rank_by_arr,
     undo,
     redo,
-    resetView,
-    reloadDataset,
-    toggleReadOnly,
-    exportCsv,
-    exportXlsx,
-    importCsv,
-    chooseRenderer,
+    resetView: reset_view,
+    reloadDataset: reload_dataset,
+    toggleReadOnly: toggle_read_only,
+    exportCsv: export_csv,
+    exportXlsx: export_xlsx,
+    importCsv: import_csv,
+    chooseRenderer: choose_renderer,
   };
 }

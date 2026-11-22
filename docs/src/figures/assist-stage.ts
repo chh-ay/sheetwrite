@@ -21,7 +21,7 @@ declare global {
   }
 }
 
-async function mountStage(host: HTMLElement, params: URLSearchParams): Promise<void> {
+async function mount_stage(host: HTMLElement, params: URLSearchParams): Promise<void> {
   document.documentElement.dataset.theme = params.get("theme") === "dark" ? "dark" : "light";
   await initSheetwrite({ engine: formulas, addons: [formulaAssistAddon()] });
   const shell = createSpreadsheetShell(host, {
@@ -42,4 +42,4 @@ async function mountStage(host: HTMLElement, params: URLSearchParams): Promise<v
 
 const stage = document.getElementById("stage");
 if (stage === null) throw new Error("The stage page has no #stage element");
-await mountStage(stage, new URLSearchParams(location.search));
+await mount_stage(stage, new URLSearchParams(location.search));

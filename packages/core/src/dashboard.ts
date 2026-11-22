@@ -46,11 +46,11 @@ function invalid(issues: DataModelIssueSink, path: string, message: string): voi
   issues.push({ path, code: "invalid-value", message });
 }
 
-function isText(value: unknown): value is string {
+function is_text(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_TEXT_LENGTH;
 }
 
-function isIntegerIn(value: unknown, min: number, max: number): value is number {
+function is_integer_in(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;
 }
 
@@ -65,50 +65,50 @@ export function dashboardTakes(op: DocumentOp["op"]): boolean {
 }
 
 /** Whether `value` is a box inside the grid. */
-function isBox(value: unknown): boolean {
+function is_box(value: unknown): boolean {
   if (!isPlainRecord(value)) return false;
   const x = ownValue(value, "x");
   const y = ownValue(value, "y");
   const w = ownValue(value, "w");
   const h = ownValue(value, "h");
   return (
-    isIntegerIn(x, 0, DASHBOARD_COLUMNS - 1) &&
-    isIntegerIn(w, 1, DASHBOARD_COLUMNS - x) &&
-    isIntegerIn(h, 1, MAX_ITEM_HEIGHT) &&
-    isIntegerIn(y, 0, MAX_DASHBOARD_ROWS - h)
+    is_integer_in(x, 0, DASHBOARD_COLUMNS - 1) &&
+    is_integer_in(w, 1, DASHBOARD_COLUMNS - x) &&
+    is_integer_in(h, 1, MAX_ITEM_HEIGHT) &&
+    is_integer_in(y, 0, MAX_DASHBOARD_ROWS - h)
   );
 }
 
 /** Whether `value` names a table and one of its columns. */
-function isColumnRef(value: unknown): boolean {
+function is_column_ref(value: unknown): boolean {
   return (
-    isPlainRecord(value) && isText(ownValue(value, "table")) && isText(ownValue(value, "column"))
+    isPlainRecord(value) && is_text(ownValue(value, "table")) && is_text(ownValue(value, "column"))
   );
 }
 
 /** Whether the kind-specific fields of an item are valid. */
-function isItemBody(item: PlainRecord): boolean {
+function is_item_body(item: PlainRecord): boolean {
   const kind = ownValue(item, "kind");
-  if (kind === "pivot") return isText(ownValue(item, "pivot"));
-  if (kind === "chart") return isText(ownValue(item, "chart"));
+  if (kind === "pivot") return is_text(ownValue(item, "pivot"));
+  if (kind === "chart") return is_text(ownValue(item, "chart"));
   if (kind === "kpi") {
     const title = ownValue(item, "title");
-    const numberFormat = ownValue(item, "numberFormat");
+    const number_format = ownValue(item, "numberFormat");
     return (
-      isText(ownValue(item, "measure")) &&
-      (title === undefined || isText(title)) &&
-      (numberFormat === undefined || isText(numberFormat))
+      is_text(ownValue(item, "measure")) &&
+      (title === undefined || is_text(title)) &&
+      (number_format === undefined || is_text(number_format))
     );
   }
   if (kind !== "slicer") return false;
 
   const title = ownValue(item, "title");
   const selected = ownValue(item, "selected");
-  const noData = ownValue(item, "itemsWithNoData");
+  const no_data = ownValue(item, "itemsWithNoData");
   return (
-    (noData === undefined || noData === "dim" || noData === "hide" || noData === "show") &&
-    isColumnRef(ownValue(item, "field")) &&
-    (title === undefined || isText(title)) &&
+    (no_data === undefined || no_data === "dim" || no_data === "hide" || no_data === "show") &&
+    is_column_ref(ownValue(item, "field")) &&
+    (title === undefined || is_text(title)) &&
     (selected === undefined ||
       (Array.isArray(selected) &&
         selected.length <= MAX_PIVOT_FILTER_VALUES &&
@@ -124,9 +124,9 @@ export function validateDashboardItemShape(
 ): void {
   const valid =
     isPlainRecord(value) &&
-    isText(ownValue(value, "id")) &&
-    isBox(ownValue(value, "box")) &&
-    isItemBody(value);
+    is_text(ownValue(value, "id")) &&
+    is_box(ownValue(value, "box")) &&
+    is_item_body(value);
   if (!valid) invalid(issues, path, "Dashboard item is invalid; see DashboardItem");
 }
 
@@ -145,7 +145,7 @@ export function boxesOverlap(left: DashboardBox, right: DashboardBox): boolean {
  * that do not overlap. A pivot item may name a pivot that is not there: it
  * shows `#REF!`, so removing a pivot and undoing it do not depend on order.
  */
-function validateItems(
+function validate_items(
   items: readonly DashboardItem[],
   path: string,
   issues: DataModelIssueSink,
@@ -162,7 +162,7 @@ function validateItems(
 }
 
 /** Whether an untrusted pivot reads a cell range. */
-function readsRange(pivot: unknown): boolean {
+function reads_range(pivot: unknown): boolean {
   const source = isPlainRecord(pivot) ? ownValue(pivot, "source") : undefined;
   return isPlainRecord(source) && ownValue(source, "range") !== undefined;
 }
@@ -195,7 +195,7 @@ export function validateSheetKindShape(
     Array.isArray(columns) &&
     columns.length === 0 &&
     (!Array.isArray(cells) || cells.length === 0) &&
-    (!Array.isArray(pivots) || !pivots.some(readsRange)) &&
+    (!Array.isArray(pivots) || !pivots.some(reads_range)) &&
     (dashboard === undefined || Array.isArray(items));
   if (!valid) {
     invalid(issues, path, "A dashboard has no rows, columns, cells or range pivots");
@@ -203,14 +203,14 @@ export function validateSheetKindShape(
   }
   if (!Array.isArray(items)) return;
 
-  const shapeIssues: DataModelIssue[] = [];
+  const shape_issues: DataModelIssue[] = [];
   items.slice(0, MAX_DASHBOARD_ITEMS + 1).forEach((item, index) => {
-    validateDashboardItemShape(item, `${path}.dashboard.items[${index}]`, shapeIssues);
+    validateDashboardItemShape(item, `${path}.dashboard.items[${index}]`, shape_issues);
   });
-  issues.push(...shapeIssues);
+  issues.push(...shape_issues);
   // The shape checks above prove every entry is an item.
-  if (shapeIssues.length === 0)
-    validateItems(items as DashboardItem[], `${path}.dashboard`, issues);
+  if (shape_issues.length === 0)
+    validate_items(items as DashboardItem[], `${path}.dashboard`, issues);
 }
 
 /**
@@ -223,7 +223,7 @@ export function validateDashboardItemAdmission(
   issues: DataModelIssueSink,
 ): void {
   if (!isDashboard(sheet)) invalid(issues, "sheet", "Items go on a dashboard");
-  else validateItems(withDashboardItem(sheet.dashboard, item).items, "dashboard", issues);
+  else validate_items(withDashboardItem(sheet.dashboard, item).items, "dashboard", issues);
 }
 
 /** Whether a sheet can take `pivot`: a dashboard pivot does not read a range. */
@@ -232,7 +232,7 @@ export function dashboardPivotAllowed(sheet: DashboardSheet, pivot: PivotDefinit
 }
 
 /** Reading order: top to bottom, then left to right. Items do not overlap, so no two are equal. */
-function byReadingOrder(left: DashboardItem, right: DashboardItem): number {
+function by_reading_order(left: DashboardItem, right: DashboardItem): number {
   return left.box.y - right.box.y || left.box.x - right.box.x;
 }
 
@@ -241,7 +241,7 @@ function byReadingOrder(left: DashboardItem, right: DashboardItem): number {
  * history of edits keeps undo, sync and snapshots exact.
  */
 export function cloneDashboard(dashboard: Dashboard): Dashboard {
-  return { items: structuredClone(dashboard.items).sort(byReadingOrder) };
+  return { items: structuredClone(dashboard.items).sort(by_reading_order) };
 }
 
 /**
@@ -272,7 +272,7 @@ export function withDashboardItem(
   item: DashboardItem,
 ): Dashboard {
   const items = (dashboard?.items ?? []).filter((candidate) => candidate.id !== item.id);
-  return { items: [...items, structuredClone(item)].sort(byReadingOrder) };
+  return { items: [...items, structuredClone(item)].sort(by_reading_order) };
 }
 
 /** A copy of `dashboard` without the item with `id`. */

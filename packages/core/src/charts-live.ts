@@ -63,26 +63,26 @@ type CategoryLevelLayout = "columns" | "rows";
  * level per row when the values run along a row. Scatter charts read X
  * values, which have no levels.
  */
-function categoryLevelLayout(kind: ChartKind, series: ChartSeries): CategoryLevelLayout | null {
+function category_level_layout(kind: ChartKind, series: ChartSeries): CategoryLevelLayout | null {
   const { categories, values } = series;
   if (kind === "scatter" || categories === undefined || categories === "#REF!") return null;
   if (categories.start.row === categories.end.row || categories.start.col === categories.end.col) {
     return null;
   }
 
-  const alongRow =
+  const along_row =
     values !== "#REF!" &&
     values.start.row === values.end.row &&
     values.start.col !== values.end.col;
-  return alongRow ? "rows" : "columns";
+  return along_row ? "rows" : "columns";
 }
 
 /**
  * Clip a range to its sheet and to the rows that hold the first
- * `MAX_CHART_POINTS` cells. With `allRows`, the columns are clipped first so
+ * `MAX_CHART_POINTS` cells. With `all_rows`, the columns are clipped first so
  * that every row fits, because each row is one category level.
  */
-function readRect(sheets: SheetLookup, range: ChartRange, allRows = false): ReadRect | null {
+function read_rect(sheets: SheetLookup, range: ChartRange, all_rows = false): ReadRect | null {
   if (range === "#REF!") return null;
 
   const sheet = sheets(range.sheet);
@@ -90,20 +90,20 @@ function readRect(sheets: SheetLookup, range: ChartRange, allRows = false): Read
 
   const r0 = Math.min(range.start.row, range.end.row);
   const c0 = Math.min(range.start.col, range.end.col);
-  const lastRow = Math.min(Math.max(range.start.row, range.end.row), sheet.rowCount - 1);
-  const lastCol = Math.min(Math.max(range.start.col, range.end.col), sheet.columns.length - 1);
-  const rowCount = lastRow - r0 + 1;
-  const maxWidth = allRows
-    ? Math.max(1, Math.floor(MAX_CHART_POINTS / rowCount))
+  const last_row = Math.min(Math.max(range.start.row, range.end.row), sheet.rowCount - 1);
+  const last_col = Math.min(Math.max(range.start.col, range.end.col), sheet.columns.length - 1);
+  const row_count = last_row - r0 + 1;
+  const max_width = all_rows
+    ? Math.max(1, Math.floor(MAX_CHART_POINTS / row_count))
     : MAX_CHART_POINTS;
-  const c1 = Math.min(lastCol, c0 + maxWidth - 1);
-  if (r0 > lastRow || c0 > c1) return null;
+  const c1 = Math.min(last_col, c0 + max_width - 1);
+  if (r0 > last_row || c0 > c1) return null;
 
   // Row-major truncation keeps whole leading rows plus a partial last row.
   const width = c1 - c0 + 1;
-  const rowsNeeded = Math.ceil(MAX_CHART_POINTS / width);
-  const r1 = Math.min(lastRow, r0 + rowsNeeded - 1);
-  const truncated = rowCount * (lastCol - c0 + 1) > MAX_CHART_POINTS;
+  const rows_needed = Math.ceil(MAX_CHART_POINTS / width);
+  const r1 = Math.min(last_row, r0 + rows_needed - 1);
+  const truncated = row_count * (last_col - c0 + 1) > MAX_CHART_POINTS;
   return { sheet, r0, r1, c0, c1, truncated };
 }
 
@@ -114,7 +114,7 @@ type SheetLookup = (id: SheetId) => Sheet | undefined;
  * The engine's index of sheets by ID. Only a custom store, which has no
  * engine, gets a map built for the one call.
  */
-function sheetLookup(store: Store): SheetLookup {
+function sheet_lookup(store: Store): SheetLookup {
   const engine = storeEngine(store);
   if (engine) return (id) => engine.sheets.find(id);
 
@@ -124,16 +124,16 @@ function sheetLookup(store: Store): SheetLookup {
 }
 
 /**
- * One bulk window read per range; never one read per cell. `allRows` reads
- * every row of the range, as `readRect` does.
+ * One bulk window read per range; never one read per cell. `all_rows` reads
+ * every row of the range, as `read_rect` does.
  */
-function readRange(
+function read_range(
   store: Store,
   sheets: SheetLookup,
   range: ChartRange,
-  allRows = false,
+  all_rows = false,
 ): RangeRead {
-  const rect = readRect(sheets, range, allRows);
+  const rect = read_rect(sheets, range, all_rows);
   if (!rect) return EMPTY_READ;
 
   const sheet = rect.sheet;
@@ -173,14 +173,14 @@ type CategoryView = Pick<ChartSeriesView, "categories" | "categoryFormats" | "ca
  * read. The last column (or row) is the innermost level and labels each
  * point. A partial last row of a truncated read is dropped.
  */
-function categoryLevels(read: RangeRead, layout: CategoryLevelLayout): CategoryView {
+function category_levels(read: RangeRead, layout: CategoryLevelLayout): CategoryView {
   const width = read.width;
   const rows = Math.floor(read.values.length / Math.max(1, width));
-  const levelCount = layout === "columns" ? width : rows;
+  const level_count = layout === "columns" ? width : rows;
   const points = layout === "columns" ? rows : width;
   const levels: ChartCategoryLevel[] = [];
 
-  for (let level = 0; level < levelCount; level++) {
+  for (let level = 0; level < level_count; level++) {
     const labels = new Array<CellScalar>(points);
     const formats = new Array<string | null>(points);
     for (let point = 0; point < points; point++) {
@@ -200,7 +200,7 @@ function categoryLevels(read: RangeRead, layout: CategoryLevelLayout): CategoryV
 }
 
 /** The categories of `source` in a chart of `kind`, with their levels. */
-function readCategories(
+function read_categories(
   store: Store,
   sheets: SheetLookup,
   kind: ChartKind,
@@ -210,8 +210,8 @@ function readCategories(
     return { categories: [], categoryFormats: [], categoryLevels: [], truncated: false };
   }
 
-  const layout = categoryLevelLayout(kind, source);
-  const read = readRange(store, sheets, source.categories, layout === "rows");
+  const layout = category_level_layout(kind, source);
+  const read = read_range(store, sheets, source.categories, layout === "rows");
   if (layout === null) {
     return {
       categories: read.values,
@@ -220,19 +220,24 @@ function readCategories(
       truncated: read.truncated,
     };
   }
-  return { ...categoryLevels(read, layout), truncated: read.truncated };
+  return { ...category_levels(read, layout), truncated: read.truncated };
 }
 
-/** What decides the categories `readCategories` returns for `source`: its range and level layout. */
-function categoryKey(kind: ChartKind, source: ChartSeries): string {
+/** What decides the categories `read_categories` returns for `source`: its range and level layout. */
+function category_key(kind: ChartKind, source: ChartSeries): string {
   const { categories } = source;
   if (categories === undefined || categories === "#REF!") return String(categories);
 
-  const layout = categoryLevelLayout(kind, source);
+  const layout = category_level_layout(kind, source);
   return JSON.stringify([layout, categories.sheet, categories.start, categories.end]);
 }
 
-function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, index: number): string {
+function series_name(
+  store: Store,
+  sheets: SheetLookup,
+  series: ChartSeries,
+  index: number,
+): string {
   if (series.name !== undefined) return series.name;
   if (series.nameRange === "#REF!") return "#REF!";
   if (series.nameRange) {
@@ -240,7 +245,7 @@ function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, inde
     // Backwards ranges from custom stores still start at their top-left cell.
     const { start, end } = series.nameRange;
     const first = { row: Math.min(start.row, end.row), col: Math.min(start.col, end.col) };
-    const name = readRange(store, sheets, {
+    const name = read_range(store, sheets, {
       sheet: series.nameRange.sheet,
       start: first,
       end: first,
@@ -251,20 +256,20 @@ function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, inde
 }
 
 /** Freeze `value` and everything it holds; frozen parts are not visited again. */
-function deepFreeze(value: object): void {
+function deep_freeze(value: object): void {
   if (Object.isFrozen(value)) return;
   Object.freeze(value);
   for (const child of Object.values(value)) {
-    if (typeof child === "object" && child !== null) deepFreeze(child);
+    if (typeof child === "object" && child !== null) deep_freeze(child);
   }
 }
 
 /** Builds the view of a chart over a pivot; set by the pivot view chunk when it loads. */
-let pivotCharts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
+let pivot_charts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
   null;
 
 /** Engines whose pivot views are computed or loading, so each asks for them once. */
-const pivotEngines = new WeakSet<StoreDataEngine>();
+const pivot_engines = new WeakSet<StoreDataEngine>();
 
 /**
  * Set how charts over pivots resolve, after the engine of `store` computed
@@ -275,7 +280,7 @@ export function setPivotChartViews(
   store: Store,
   views: (store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView,
 ): void {
-  pivotCharts = views;
+  pivot_charts = views;
   TRACKERS.get(store)?.pivotViewsChanged();
 }
 
@@ -284,11 +289,11 @@ export function setPivotChartViews(
  * views, once per engine. A failed load tries again at the next request. A
  * store disposed while the chunk loads is not called again.
  */
-function requestPivotViews(store: Store): void {
+function request_pivot_views(store: Store): void {
   const engine = storeEngine(store);
-  if (engine === null || pivotEngines.has(engine)) return;
+  if (engine === null || pivot_engines.has(engine)) return;
 
-  pivotEngines.add(engine);
+  pivot_engines.add(engine);
   void import("./dashboard/dashboard-engine.js").then(
     (module) => {
       if (engine.isDisposed) return;
@@ -296,7 +301,7 @@ function requestPivotViews(store: Store): void {
       setPivotChartViews(store, module.pivotChartViewOf);
     },
     (error: unknown) => {
-      pivotEngines.delete(engine);
+      pivot_engines.delete(engine);
       throw error;
     },
   );
@@ -320,30 +325,30 @@ function requestPivotViews(store: Store): void {
  * @returns The chart's resolved series, labels and settings, or `null`.
  */
 export function resolveChartView(store: Store, sheet: SheetId, id: string): ChartView | null {
-  const sheets = sheetLookup(store);
+  const sheets = sheet_lookup(store);
   const chart = sheets(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
   // The view shares the store's definition; a development build catches a write into it.
-  if (isDevelopmentBuild()) deepFreeze(chart);
+  if (isDevelopmentBuild()) deep_freeze(chart);
   if (chart.pivot !== undefined) {
-    requestPivotViews(store);
-    return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };
+    request_pivot_views(store);
+    return pivot_charts?.(store, sheet, chart) ?? { chart, series: [] };
   }
 
   // The series of a chart usually share one category range. It is read once,
   // and those series share its arrays, as the view shares the definition.
-  const categoryReads = new Map<string, ReturnType<typeof readCategories>>();
+  const category_reads = new Map<string, ReturnType<typeof read_categories>>();
   const series = chart.series.map((source, index): ChartSeriesView => {
-    const values = readRange(store, sheets, source.values);
-    const key = categoryKey(chart.kind, source);
-    let categories = categoryReads.get(key);
+    const values = read_range(store, sheets, source.values);
+    const key = category_key(chart.kind, source);
+    let categories = category_reads.get(key);
     if (categories === undefined) {
-      categories = readCategories(store, sheets, chart.kind, source);
-      categoryReads.set(key, categories);
+      categories = read_categories(store, sheets, chart.kind, source);
+      category_reads.set(key, categories);
     }
 
     return {
-      name: seriesName(store, sheets, source, index),
+      name: series_name(store, sheets, source, index),
       values: values.values.map((value) => (typeof value === "number" ? value : null)),
       categories: categories.categories,
       categoryLevels: categories.categoryLevels,
@@ -376,15 +381,15 @@ interface SourceEntry {
  * every chart.
  */
 class SheetSources {
-  private readonly blockMaxEnd: Int32Array;
+  private readonly block_max_end: Int32Array;
 
   constructor(private readonly entries: SourceEntry[]) {
     entries.sort((left, right) => left.rect.r0 - right.rect.r0);
-    this.blockMaxEnd = new Int32Array(Math.ceil(entries.length / SOURCE_BLOCK));
+    this.block_max_end = new Int32Array(Math.ceil(entries.length / SOURCE_BLOCK));
     for (let index = 0; index < entries.length; index++) {
       const block = (index / SOURCE_BLOCK) | 0;
-      this.blockMaxEnd[block] = Math.max(
-        this.blockMaxEnd[block] ?? 0,
+      this.block_max_end[block] = Math.max(
+        this.block_max_end[block] ?? 0,
         entries[index]?.rect.r1 ?? 0,
       );
     }
@@ -411,7 +416,7 @@ class SheetSources {
     }
 
     for (let block = 0; block * SOURCE_BLOCK < low; block++) {
-      if ((this.blockMaxEnd[block] ?? -1) < r0) continue;
+      if ((this.block_max_end[block] ?? -1) < r0) continue;
 
       const end = Math.min(low, (block + 1) * SOURCE_BLOCK);
       for (let index = block * SOURCE_BLOCK; index < end; index++) {
@@ -439,7 +444,7 @@ class ChartIndex {
   readonly pivots: ChartRef[] = [];
 
   constructor(store: Store) {
-    const sheets = sheetLookup(store);
+    const sheets = sheet_lookup(store);
     const entries = new Map<SheetId, SourceEntry[]>();
 
     for (const sheet of store.getWorkbook().sheets) {
@@ -457,7 +462,7 @@ class ChartIndex {
           this.pivots.push(ref);
           this.pivotIndices.push(chart);
         } else {
-          this.addSources(definition, chart, sheets, entries);
+          this.add_sources(definition, chart, sheets, entries);
         }
       }
     }
@@ -471,7 +476,7 @@ class ChartIndex {
   }
 
   /** Index each source rectangle once, independent of the cells it currently holds. */
-  private addSources(
+  private add_sources(
     definition: ChartDefinition,
     chart: number,
     sheets: SheetLookup,
@@ -479,10 +484,10 @@ class ChartIndex {
   ): void {
     for (const series of definition.series) {
       // Category levels in rows are read with every row, so the index covers the same cells.
-      const levelRows = categoryLevelLayout(definition.kind, series) === "rows";
+      const level_rows = category_level_layout(definition.kind, series) === "rows";
       for (const range of [series.nameRange, series.values, series.categories]) {
         if (range === undefined) continue;
-        const rect = readRect(sheets, range, levelRows && range === series.categories);
+        const rect = read_rect(sheets, range, level_rows && range === series.categories);
         if (!rect) continue;
 
         const list = entries.get(rect.sheet.id);
@@ -542,10 +547,10 @@ interface PatchContext {
 }
 
 /** Classify committed patches against the old index before rebuilding rewritten sources. */
-function classifyPatch(patch: DocumentOp, context: PatchContext): void {
+function classify_patch(patch: DocumentOp, context: PatchContext): void {
   const { index, hits, direct } = context;
   const hit = (chart: number) => hits.add(chart);
-  const sheetWide = (sheet: SheetId) => index.sources.get(sheet)?.all(hit);
+  const sheet_wide = (sheet: SheetId) => index.sources.get(sheet)?.all(hit);
 
   switch (patch.op) {
     case "set":
@@ -599,7 +604,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "moveColumns":
     case "removeSheet":
       // Structural edits rewrite both sources and owned anchors.
-      sheetWide(patch.sheet);
+      sheet_wide(patch.sheet);
       for (const chart of index.owned.get(patch.sheet) ?? []) hits.add(chart);
       context.valuesChanged = true;
       context.rebuild = true;
@@ -607,8 +612,8 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
 
     case "moveCells":
       // The moved cells take their sources along, and both blocks change.
-      sheetWide(patch.range.sheet);
-      sheetWide(patch.to.sheet);
+      sheet_wide(patch.range.sheet);
+      sheet_wide(patch.to.sheet);
       context.valuesChanged = true;
       context.rebuild = true;
       return;
@@ -636,7 +641,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "removePivot":
       // Output cells on the anchor sheet appear, move or clear with no cell op on them,
       // and a source can start or stop reading pivot output.
-      sheetWide(patch.sheet);
+      sheet_wide(patch.sheet);
       context.valuesChanged = true;
       context.rebuild = true;
       return;
@@ -645,7 +650,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
     case "updateTable":
     case "removeTable":
       // Table edits can write header and total cells.
-      sheetWide(patch.op === "addTable" ? patch.table.range.sheet : patch.sheet);
+      sheet_wide(patch.op === "addTable" ? patch.table.range.sheet : patch.sheet);
       context.valuesChanged = true;
       return;
 
@@ -705,7 +710,7 @@ class ChartTracker {
   private index: ChartIndex;
   private readonly hits = new ChartHits();
   /** One bound callback for every index query, so a commit allocates none. */
-  private readonly addHit = (chart: number): void => this.hits.add(chart);
+  private readonly add_hit = (chart: number): void => this.hits.add(chart);
   private readonly engine: StoreDataEngine | null;
   private readonly detach: () => void;
 
@@ -713,7 +718,7 @@ class ChartTracker {
     this.index = new ChartIndex(store);
     this.engine = storeEngine(store);
     this.engine?.trackChartRecalculation(true);
-    this.detach = store.on("change", (event) => this.onChange(event));
+    this.detach = store.on("change", (event) => this.on_change(event));
   }
 
   dispose(): void {
@@ -738,7 +743,7 @@ class ChartTracker {
    * recalculated in commit `epoch`. False when the engine cannot tell, so
    * the caller names every chart.
    */
-  private queryRecalculated(epoch: number | undefined, index: ChartIndex): boolean {
+  private query_recalculated(epoch: number | undefined, index: ChartIndex): boolean {
     const engine = this.engine;
     const rects = engine?.recalculatedRects(epoch);
     if (!engine || !rects) return false;
@@ -754,13 +759,13 @@ class ChartTracker {
         (rects[offset + 2] ?? 0) - 1,
         rects[offset + 3] ?? 0,
         (rects[offset + 4] ?? 0) - 1,
-        this.addHit,
+        this.add_hit,
       );
     }
     return true;
   }
 
-  private onChange(event: ChangeEvent): void {
+  private on_change(event: ChangeEvent): void {
     const index = this.index;
     const hits = this.hits;
     hits.reset(index.charts.length);
@@ -772,11 +777,11 @@ class ChartTracker {
       valuesChanged: event.transaction.patches.length === 0,
       rebuild: false,
     };
-    for (const patch of event.transaction.patches) classifyPatch(patch, context);
+    for (const patch of event.transaction.patches) classify_patch(patch, context);
 
-    const { direct, valuesChanged, rebuild } = context;
-    const precise = this.queryRecalculated(event.epoch, index);
-    if (valuesChanged) {
+    const { direct, valuesChanged: values_changed, rebuild } = context;
+    const precise = this.query_recalculated(event.epoch, index);
+    if (values_changed) {
       if (precise) {
         // Pivot views have no worksheet source rectangle; their asynchronous
         // refresh also names them through pivotViewsChanged().
@@ -814,8 +819,8 @@ class ChartTracker {
       charts.push(ref);
     }
 
-    const changeEvent: ChartChangeEvent = { epoch: event.epoch, charts };
-    for (const listener of this.listeners) listener(changeEvent);
+    const change_event: ChartChangeEvent = { epoch: event.epoch, charts };
+    for (const listener of this.listeners) listener(change_event);
   }
 }
 

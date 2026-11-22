@@ -23,24 +23,24 @@ import { writeIfChanged } from "./script-io.js";
 const USAGE = "Usage: bun scripts/docs-cli.ts <generate|check>";
 
 /** Runs one docs mode and returns its summary line. */
-async function runDocs(mode: string | undefined): Promise<string> {
+async function run_docs(mode: string | undefined): Promise<string> {
   if (mode !== "generate" && mode !== "check") throw new Error(USAGE);
-  const repositoryRoot = resolve(import.meta.dir, "..");
-  const analysis = await analyzePublicApi(repositoryRoot);
-  const formulaPages = renderFormulaFunctionPages(
-    await loadFormulaContractInventory(repositoryRoot),
-    await loadFormulaReferenceEntries(repositoryRoot),
+  const repository_root = resolve(import.meta.dir, "..");
+  const analysis = await analyzePublicApi(repository_root);
+  const formula_pages = renderFormulaFunctionPages(
+    await loadFormulaContractInventory(repository_root),
+    await loadFormulaReferenceEntries(repository_root),
   );
-  for (const file of siteDataFiles(analysis.manifest, formulaPages)) {
+  for (const file of siteDataFiles(analysis.manifest, formula_pages)) {
     await writeIfChanged(file.path, file.content);
   }
   // Loaded after the JSON above exists: a static import would fail to resolve it.
-  const { generateDocs, verifyDocs } = await import("./docs.js");
-  if (mode === "check") return verifyDocs(analysis);
-  await generateFunctionMetadata(repositoryRoot);
-  return generateDocs(analysis);
+  const { generateDocs: generate_docs, verifyDocs: verify_docs } = await import("./docs.js");
+  if (mode === "check") return verify_docs(analysis);
+  await generateFunctionMetadata(repository_root);
+  return generate_docs(analysis);
 }
 
 if (import.meta.main) {
-  process.stdout.write(`${await runDocs(process.argv[2])}\n`);
+  process.stdout.write(`${await run_docs(process.argv[2])}\n`);
 }

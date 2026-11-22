@@ -23,8 +23,8 @@ export interface GridTransactionAdmissionGuard {
   readonly preservesOperations?: true;
 }
 
-const guardsByGrid = new WeakMap<Grid, Set<GridTransactionAdmissionGuard>>();
-const storageRevisionByTransaction = new WeakMap<Transaction, bigint>();
+const guards_by_grid = new WeakMap<Grid, Set<GridTransactionAdmissionGuard>>();
+const storage_revision_by_transaction = new WeakMap<Transaction, bigint>();
 
 /** Owns the temporary inverse resources of one durable local replay. */
 export interface TransactionReplayRollback {
@@ -33,42 +33,42 @@ export interface TransactionReplayRollback {
   dispose(): void;
 }
 
-const replayRollbackByTransaction = new WeakMap<Transaction, TransactionReplayRollback>();
-const replayRollbackRequests = new WeakSet<readonly DocumentOp[]>();
+const replay_rollback_by_transaction = new WeakMap<Transaction, TransactionReplayRollback>();
+const replay_rollback_requests = new WeakSet<readonly DocumentOp[]>();
 
 /** Only the restore owner may defer history and retain inverse resources. */
 export function requestTransactionReplayRollback(
   operations: readonly DocumentOp[],
 ): readonly DocumentOp[] {
-  replayRollbackRequests.add(operations);
+  replay_rollback_requests.add(operations);
   return operations;
 }
 
 export function takeTransactionReplayRollbackRequest(operations: readonly DocumentOp[]): boolean {
-  return replayRollbackRequests.delete(operations);
+  return replay_rollback_requests.delete(operations);
 }
 
 export function setTransactionReplayRollback(
   transaction: Transaction,
   rollback: TransactionReplayRollback,
 ): void {
-  replayRollbackByTransaction.set(transaction, rollback);
+  replay_rollback_by_transaction.set(transaction, rollback);
 }
 
 export function takeTransactionReplayRollback(
   transaction: Transaction,
 ): TransactionReplayRollback | undefined {
-  const rollback = replayRollbackByTransaction.get(transaction);
-  replayRollbackByTransaction.delete(transaction);
+  const rollback = replay_rollback_by_transaction.get(transaction);
+  replay_rollback_by_transaction.delete(transaction);
   return rollback;
 }
 
 export function setTransactionStorageRevision(transaction: Transaction, revision: bigint): void {
-  storageRevisionByTransaction.set(transaction, revision);
+  storage_revision_by_transaction.set(transaction, revision);
 }
 
 export function transactionStorageRevision(transaction: Transaction): bigint | undefined {
-  return storageRevisionByTransaction.get(transaction);
+  return storage_revision_by_transaction.get(transaction);
 }
 const EMPTY_RESERVATION: GridTransactionAdmissionReservation = Object.freeze({
   cancel: () => {},
@@ -83,8 +83,8 @@ export function registerGridTransactionAdmission(
   grid: Grid,
   guard: GridTransactionAdmissionGuard,
 ): () => void {
-  const guards = guardsByGrid.get(grid) ?? new Set<GridTransactionAdmissionGuard>();
-  guardsByGrid.set(grid, guards);
+  const guards = guards_by_grid.get(grid) ?? new Set<GridTransactionAdmissionGuard>();
+  guards_by_grid.set(grid, guards);
   guards.add(guard);
   let active = true;
 
@@ -92,26 +92,26 @@ export function registerGridTransactionAdmission(
     if (!active) return;
     active = false;
     guards.delete(guard);
-    if (guards.size === 0) guardsByGrid.delete(grid);
+    if (guards.size === 0) guards_by_grid.delete(grid);
   };
 }
 
 /** Document replacement cannot run while a session owns local admission. */
 export function hasGridTransactionAdmission(grid: Grid): boolean {
-  return (guardsByGrid.get(grid)?.size ?? 0) > 0;
+  return (guards_by_grid.get(grid)?.size ?? 0) > 0;
 }
 
 export function beginGridTransactionAdmission(
   grid: Grid,
   operations: readonly DocumentOp[],
 ): GridTransactionAdmissionDecision {
-  const guards = guardsByGrid.get(grid);
+  const guards = guards_by_grid.get(grid);
   if (!guards || guards.size === 0) return EMPTY_DECISION;
 
   // Guards receive the operations; measurements after them must not trust them.
   releaseOwnedArrays();
   const reservations: GridTransactionAdmissionReservation[] = [];
-  let inspectedOperations = false;
+  let inspected_operations = false;
   try {
     for (const guard of guards) {
       const decision = guard.reserve(operations);
@@ -120,21 +120,21 @@ export function beginGridTransactionAdmission(
         return decision;
       }
       reservations.push(decision.reservation);
-      if (!guard.preservesOperations) inspectedOperations = true;
+      if (!guard.preservesOperations) inspected_operations = true;
     }
   } catch (error) {
     for (const reservation of reservations) reservation.cancel();
     throw error;
   }
 
-  const soleReservation = reservations[0];
-  if (reservations.length === 1 && soleReservation) {
-    return { ok: true, reservation: soleReservation, inspectedOperations };
+  const sole_reservation = reservations[0];
+  if (reservations.length === 1 && sole_reservation) {
+    return { ok: true, reservation: sole_reservation, inspectedOperations: inspected_operations };
   }
   let finished = false;
   return {
     ok: true,
-    inspectedOperations,
+    inspectedOperations: inspected_operations,
     reservation: {
       cancel() {
         if (finished) return;

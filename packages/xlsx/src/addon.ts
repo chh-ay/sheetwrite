@@ -7,18 +7,18 @@ import type {
 } from "@sheetwrite/core";
 
 /** Loads the codec chunk. */
-function importCodec() {
+function import_codec() {
   return import("./codec.js");
 }
 
-type Codec = Awaited<ReturnType<typeof importCodec>>;
+type Codec = Awaited<ReturnType<typeof import_codec>>;
 
 /**
  * Backends that load the codec on their first call. Once it loads, the
  * codec's own backends replace them, which also turns on the check of kept
  * parts when a store loads a snapshot.
  */
-function lazyBackends(context: SheetwriteAddonContext): {
+function lazy_backends(context: SheetwriteAddonContext): {
   workbook: XlsxWorkbookBackend;
   tableImport: XlsxTableImportBackend;
   tableExport: XlsxTableExportBackend;
@@ -26,7 +26,7 @@ function lazyBackends(context: SheetwriteAddonContext): {
   let pending: Promise<Codec> | undefined;
 
   const codec = (): Promise<Codec> => {
-    pending ??= importCodec().then((loaded) => {
+    pending ??= import_codec().then((loaded) => {
       context.xlsx({
         workbook: loaded.sheetwriteWorkbookBackend,
         tableImport: loaded.sheetwriteTableImportBackend,
@@ -40,16 +40,16 @@ function lazyBackends(context: SheetwriteAddonContext): {
   return {
     workbook: {
       name: "sheetwrite-ooxml",
-      async toXlsxWorkbook(snapshot, options, exportContext) {
+      async toXlsxWorkbook(snapshot, options, export_context) {
         const loaded = await codec();
-        return loaded.sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot, options, exportContext);
+        return loaded.sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot, options, export_context);
       },
-      async *toXlsxWorkbookStream(snapshot, options, exportContext) {
+      async *toXlsxWorkbookStream(snapshot, options, export_context) {
         const loaded = await codec();
         yield* loaded.sheetwriteWorkbookBackend.toXlsxWorkbookStream(
           snapshot,
           options,
-          exportContext,
+          export_context,
         );
       },
       async fromXlsxWorkbook(data, options) {
@@ -104,7 +104,7 @@ export function xlsxAddon(): SheetwriteAddon {
   return {
     name: "xlsx",
     setup(context) {
-      context.xlsx(lazyBackends(context));
+      context.xlsx(lazy_backends(context));
     },
   };
 }

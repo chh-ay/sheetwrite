@@ -64,7 +64,7 @@ const MODEL_PIVOT = {
 } as const;
 
 /** The three tables in a row, each as wide as its text, the pivot under all three. */
-function dataModelWide(): BlueprintLayout {
+function data_model_wide(): BlueprintLayout {
   const texts = [
     { ...PRODUCTS_TABLE, lines: ["Product ID,", "Product, Category"] },
     { ...ORDERS_TABLE, lines: ["Order, Product,", "Region, Units, Amount"] },
@@ -100,7 +100,7 @@ function dataModelWide(): BlueprintLayout {
  * under it, and the pivot under them; Orders reaches the pivot down its
  * right side.
  */
-function dataModelNarrow(): BlueprintLayout {
+function data_model_narrow(): BlueprintLayout {
   const width = NARROW - BRACKET;
   const half = (width - SPACING.tile) / 2;
   const orders = node({ ...ORDERS_TABLE, lines: ["Product,", "Region"], x: 0, y: 0, w: width });
@@ -108,12 +108,12 @@ function dataModelNarrow(): BlueprintLayout {
     { ...PRODUCTS_TABLE, lines: ["Product ID"] },
     { ...REGIONS_TABLE, lines: ["Code"] },
   ];
-  const rowY = orders.rect.h + SPACING.row;
-  const rowHeight = Math.max(...pair.map((table) => nodeHeight(table)));
+  const row_y = orders.rect.h + SPACING.row;
+  const row_height = Math.max(...pair.map((table) => nodeHeight(table)));
   const tables = pair.map((table, index) =>
-    node({ ...table, x: index * (half + SPACING.tile), y: rowY, w: half, h: rowHeight }),
+    node({ ...table, x: index * (half + SPACING.tile), y: row_y, w: half, h: row_height }),
   );
-  const pivot = node({ ...MODEL_PIVOT, x: 0, y: rowY + rowHeight + SPACING.row, w: width });
+  const pivot = node({ ...MODEL_PIVOT, x: 0, y: row_y + row_height + SPACING.row, w: width });
   return {
     nodes: [orders, ...tables, pivot],
     edges: [
@@ -140,10 +140,10 @@ function dataModelNarrow(): BlueprintLayout {
 export function DataModelDiagram(): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={dataModelNarrow()}
+      narrow={data_model_narrow()}
       note="Average order is a measure: =SUM(Orders[Amount])/COUNT(Orders[Amount])."
       text={DATA_MODEL_TEXT}
-      wide={dataModelWide()}
+      wide={data_model_wide()}
     />
   );
 }
@@ -170,7 +170,7 @@ export function CommandModelDiagram(): JSX.Element {
   );
 }
 
-function seamLayout(
+function seam_layout(
   interfaces: readonly (readonly [name: string, methods: readonly string[]])[],
 ): BlueprintLayout {
   let y = 0;
@@ -192,7 +192,7 @@ function seamLayout(
 export function BoundarySeam(
   props: Readonly<{ interfaces: readonly (readonly [name: string, methods: readonly string[]])[] }>,
 ): JSX.Element {
-  const layout = () => seamLayout(props.interfaces);
+  const layout = () => seam_layout(props.interfaces);
   return (
     <BlueprintDiagram
       narrow={layout()}

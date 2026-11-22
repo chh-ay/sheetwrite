@@ -21,7 +21,7 @@ const NUMERIC_HEADING = 2;
 const EDITED_ROW = 3;
 
 export function SpillStory() {
-  const rowY = (index: number) => 76 + index * 30;
+  const row_y = (index: number) => 76 + index * 30;
   return (
     <svg aria-hidden="true" class="sr sr-spill" viewBox="0 0 640 330">
       <g class="sr-table">
@@ -45,27 +45,27 @@ export function SpillStory() {
                 class="sr-rule"
                 x1={28}
                 x2={304}
-                y1={rowY(index()) - 10}
-                y2={rowY(index()) - 10}
+                y1={row_y(index()) - 10}
+                y2={row_y(index()) - 10}
               />
-              <text class="sr-cell" x={36} y={rowY(index()) + 10}>
+              <text class="sr-cell" x={36} y={row_y(index()) + 10}>
                 {region}
               </text>
-              <text class="sr-cell" x={112} y={rowY(index()) + 10}>
+              <text class="sr-cell" x={112} y={row_y(index()) + 10}>
                 {product}
               </text>
               {index() === EDITED_ROW ? (
                 <g class="sr-change">
-                  <rect class="sr-flash" height={30} width={90} x={214} y={rowY(index()) - 10} />
-                  <text class="sr-cell sr-before" data-num="" x={296} y={rowY(index()) + 10}>
+                  <rect class="sr-flash" height={30} width={90} x={214} y={row_y(index()) - 10} />
+                  <text class="sr-cell sr-before" data-num="" x={296} y={row_y(index()) + 10}>
                     {revenue}
                   </text>
-                  <text class="sr-cell sr-after" data-num="" x={296} y={rowY(index()) + 10}>
+                  <text class="sr-cell sr-after" data-num="" x={296} y={row_y(index()) + 10}>
                     5,200
                   </text>
                 </g>
               ) : (
-                <text class="sr-cell" data-num="" x={296} y={rowY(index()) + 10}>
+                <text class="sr-cell" data-num="" x={296} y={row_y(index()) + 10}>
                   {revenue}
                 </text>
               )}

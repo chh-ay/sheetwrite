@@ -10,7 +10,7 @@ const MAX_TASKS = 50;
 
 it("draws the charts of a grid created after install once the drawing code loads", async () => {
   await initSheetwrite({ addons: [chartsAddon()] });
-  const restoreCanvas = installCanvasTestStubs();
+  const restore_canvas = installCanvasTestStubs();
   const host = document.body.appendChild(document.createElement("div"));
   const grid = createGrid(host, {
     workbook: chartWorkbook(),
@@ -29,6 +29,6 @@ it("draws the charts of a grid created after install once the drawing code loads
   } finally {
     grid.destroy();
     host.remove();
-    restoreCanvas();
+    restore_canvas();
   }
 });

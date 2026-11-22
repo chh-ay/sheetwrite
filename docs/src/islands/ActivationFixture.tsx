@@ -13,21 +13,21 @@ export function ActivationFixture(props: {
   readonly name: string;
 }) {
   let field: HTMLInputElement | undefined;
-  const [presses, setPresses] = createSignal(0);
-  const [checked, setChecked] = createSignal(false);
-  const [text, setText] = createSignal("");
+  const [presses, set_presses] = createSignal(0);
+  const [checked, set_checked] = createSignal(false);
+  const [text, set_text] = createSignal("");
   // Text typed before the island hydrated is in the field already.
-  onMount(() => setText(field?.value ?? ""));
+  onMount(() => set_text(field?.value ?? ""));
   return (
     <div class="sw-activation-fixture" data-control={props.control}>
       <Switch>
         <Match when={props.control === "button"}>
-          <button onClick={() => setPresses((count) => count + 1)} type="button">
+          <button onClick={() => set_presses((count) => count + 1)} type="button">
             Press
           </button>
         </Match>
         <Match when={props.control === "link"}>
-          <a href="#followed" onClick={() => setPresses((count) => count + 1)}>
+          <a href="#followed" onClick={() => set_presses((count) => count + 1)}>
             Follow
           </a>
         </Match>
@@ -35,7 +35,7 @@ export function ActivationFixture(props: {
           <label>
             <input
               checked={checked()}
-              onChange={(event) => setChecked(event.currentTarget.checked)}
+              onChange={(event) => set_checked(event.currentTarget.checked)}
               type="checkbox"
             />
             Check
@@ -44,7 +44,7 @@ export function ActivationFixture(props: {
         <Match when={props.control === "text"}>
           <input
             aria-label="Type"
-            onInput={(event) => setText(event.currentTarget.value)}
+            onInput={(event) => set_text(event.currentTarget.value)}
             ref={(element) => {
               field = element;
             }}

@@ -13,7 +13,7 @@ import { analyzePublicApi } from "./public-api.js";
 
 const roots: string[] = [];
 
-const canonicalDeclarations = `
+const canonical_declarations = `
 /** Canonical document operation. */
 export type DocumentOp = { op: "set" };
 /** Cancellable host datasource contract. */
@@ -51,28 +51,28 @@ export interface Box<T extends string = string> { value: T; }
 `;
 
 async function fixture(
-  index = canonicalDeclarations,
-  extraFiles?: Record<string, string>,
+  index = canonical_declarations,
+  extra_files?: Record<string, string>,
 ): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-api-policy-"));
   roots.push(root);
-  const packageRoot = join(root, "packages/core");
-  await mkdir(packageRoot, { recursive: true });
+  const package_root = join(root, "packages/core");
+  await mkdir(package_root, { recursive: true });
   await writeFile(
     join(root, "package.json"),
     JSON.stringify({ private: true, workspaces: ["packages/*"] }),
   );
   await writeFile(
-    join(packageRoot, "package.json"),
+    join(package_root, "package.json"),
     JSON.stringify({
       name: "@sheetwrite/core",
       types: "./index.d.ts",
       exports: { ".": { types: "./index.d.ts", default: "./index.js" } },
     }),
   );
-  await writeFile(join(packageRoot, "index.d.ts"), index);
-  for (const [name, content] of Object.entries(extraFiles ?? {})) {
-    const path = join(packageRoot, name);
+  await writeFile(join(package_root, "index.d.ts"), index);
+  for (const [name, content] of Object.entries(extra_files ?? {})) {
+    const path = join(package_root, name);
     await mkdir(join(path, ".."), { recursive: true });
     await writeFile(path, content);
   }
@@ -86,7 +86,7 @@ afterEach(async () => {
 describe("re-export documentation", () => {
   it("keeps interface kind, signature, and member docs through re-exports", async () => {
     const root = await fixture(
-      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\nexport type { ExternalService } from "framework";\n`,
+      `${canonical_declarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\nexport type { ExternalService } from "framework";\n`,
       {
         "generated.d.ts":
           "export interface GeneratedOutput {\n  /** Shared linear memory. */\n  readonly memory: object;\n}\n",
@@ -145,7 +145,7 @@ describe("re-export documentation", () => {
       "}",
     ].join("\n");
     const { manifest } = await analyzePublicApi(
-      await fixture(`${canonicalDeclarations}\n${tagged}`),
+      await fixture(`${canonical_declarations}\n${tagged}`),
     );
     const service = manifest.packages[0]?.entryPoints[0]?.exports.find(
       (candidate) => candidate.name === "Service",
@@ -184,7 +184,7 @@ describe("re-export documentation", () => {
       "export declare function nothing(): number;",
     ].join("\n");
     const { manifest } = await analyzePublicApi(
-      await fixture(`${canonicalDeclarations}\n${tagged}`),
+      await fixture(`${canonical_declarations}\n${tagged}`),
     );
     const exports = manifest.packages[0]?.entryPoints[0]?.exports ?? [];
     const documentation = (name: string) =>
@@ -199,7 +199,7 @@ describe("re-export documentation", () => {
 describe("public API policy", () => {
   it("rejects untyped error payloads, Error subclasses and ambiguous re-exports", async () => {
     const root = await fixture(
-      `${canonicalDeclarations}
+      `${canonical_declarations}
 /** Untyped operational failure. */
 export interface OperationalFailure { error: unknown; }
 /** Non-canonical public exception. */
@@ -262,13 +262,13 @@ export * from "./right.js";`,
 
   it("reports unlisted, removed and changed signatures but not documentation edits", async () => {
     const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
-    const issuesAfter = async (from: string, to: string) =>
+    const issues_after = async (from: string, to: string) =>
       checkPublicApiBaseline(
-        (await analyzePublicApi(await fixture(canonicalDeclarations.replace(from, to)))).manifest,
+        (await analyzePublicApi(await fixture(canonical_declarations.replace(from, to)))).manifest,
         baseline,
       ).map((issue) => [issue.code, issue.symbol]);
 
-    expect(await issuesAfter("interface DataSource", "interface DataProvider")).toEqual([
+    expect(await issues_after("interface DataSource", "interface DataProvider")).toEqual([
       ["unlisted-export", "DataProvider"],
       ["removed-export", "DataSource"],
     ]);
@@ -277,10 +277,10 @@ export * from "./right.js";`,
       ['{ op: "set" };', '{ op: "set" } | { op: "clear" };', "DocumentOp"],
       ["Box<T extends string = string>", "Box<T extends string | number = string>", "Box"],
     ] as const) {
-      expect(await issuesAfter(from, to)).toContainEqual(["changed-signature", symbol]);
+      expect(await issues_after(from, to)).toContainEqual(["changed-signature", symbol]);
     }
     expect(
-      await issuesAfter(
+      await issues_after(
         "/** Canonical document operation. */",
         "/** Changed document operation. */",
       ),

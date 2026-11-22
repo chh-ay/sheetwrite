@@ -11,7 +11,7 @@ export const STORE_MEMORY_PROTOCOL_VERSION = 3 as const;
 export const STORE_MEMORY_HASH_ESTIMATE_VERSION = 1 as const;
 
 /** A resource report or store-memory encoding that breaks its protocol. */
-function invalidResourceReport(message: string): SheetwriteError {
+function invalid_resource_report(message: string): SheetwriteError {
   return new SheetwriteError("invalid-argument", "resource-diagnostics", message);
 }
 
@@ -248,33 +248,33 @@ export class BoundaryResourceAccounting {
     calls = 1,
     largestTransferBytes = bytes,
   ): void {
-    assertNonNegativeSafeInteger(bytes, "boundary bytes");
-    assertNonNegativeSafeInteger(calls, "boundary calls");
-    assertNonNegativeSafeInteger(largestTransferBytes, "largest boundary transfer bytes");
+    assert_non_negative_safe_integer(bytes, "boundary bytes");
+    assert_non_negative_safe_integer(calls, "boundary calls");
+    assert_non_negative_safe_integer(largestTransferBytes, "largest boundary transfer bytes");
     const counter = this.counters[OPERATION_INDEX[operation]]!;
-    const nextFfiCalls = safeCounterSum(counter.ffiCalls, calls, "boundary FFI calls");
-    const nextJsToWasm =
+    const next_ffi_calls = safe_counter_sum(counter.ffiCalls, calls, "boundary FFI calls");
+    const next_js_to_wasm =
       direction === "js-to-wasm"
-        ? safeCounterSum(counter.jsToWasmBytes, bytes, "JS-to-WASM bytes")
+        ? safe_counter_sum(counter.jsToWasmBytes, bytes, "JS-to-WASM bytes")
         : counter.jsToWasmBytes;
-    const nextWasmToJs =
+    const next_wasm_to_js =
       direction === "wasm-to-js"
-        ? safeCounterSum(counter.wasmToJsBytes, bytes, "WASM-to-JS bytes")
+        ? safe_counter_sum(counter.wasmToJsBytes, bytes, "WASM-to-JS bytes")
         : counter.wasmToJsBytes;
-    const nextBulkCalls =
+    const next_bulk_calls =
       kind === "bulk"
-        ? safeCounterSum(counter.bulkCalls, calls, "bulk boundary calls")
+        ? safe_counter_sum(counter.bulkCalls, calls, "bulk boundary calls")
         : counter.bulkCalls;
-    const nextScalarCalls =
+    const next_scalar_calls =
       kind === "scalar"
-        ? safeCounterSum(counter.scalarCalls, calls, "scalar boundary calls")
+        ? safe_counter_sum(counter.scalarCalls, calls, "scalar boundary calls")
         : counter.scalarCalls;
-    counter.ffiCalls = nextFfiCalls;
-    counter.jsToWasmBytes = nextJsToWasm;
-    counter.wasmToJsBytes = nextWasmToJs;
+    counter.ffiCalls = next_ffi_calls;
+    counter.jsToWasmBytes = next_js_to_wasm;
+    counter.wasmToJsBytes = next_wasm_to_js;
     counter.largestTransferBytes = Math.max(counter.largestTransferBytes, largestTransferBytes);
-    counter.bulkCalls = nextBulkCalls;
-    counter.scalarCalls = nextScalarCalls;
+    counter.bulkCalls = next_bulk_calls;
+    counter.scalarCalls = next_scalar_calls;
   }
 
   /** Sets every counter back to zero. */
@@ -309,61 +309,61 @@ export function decodeStoreMemoryStats(
   encoded: ArrayLike<number>,
   wasmCommittedBytes: number | null,
 ): StoreMemoryBreakdown {
-  const expectedLength = 5 + WASM_MEMORY_OWNERS.length * 3;
-  if (encoded.length !== expectedLength) {
-    throw invalidResourceReport(
-      `Store memory protocol length ${encoded.length}; expected ${expectedLength}`,
+  const expected_length = 5 + WASM_MEMORY_OWNERS.length * 3;
+  if (encoded.length !== expected_length) {
+    throw invalid_resource_report(
+      `Store memory protocol length ${encoded.length}; expected ${expected_length}`,
     );
   }
 
   if (encoded[0] !== STORE_MEMORY_PROTOCOL_VERSION) {
-    throw invalidResourceReport(`Unsupported store memory protocol ${encoded[0]}`);
+    throw invalid_resource_report(`Unsupported store memory protocol ${encoded[0]}`);
   }
 
   if (encoded[1] !== WASM_MEMORY_OWNERS.length) {
-    throw invalidResourceReport(
+    throw invalid_resource_report(
       `Store memory owner count ${encoded[1]}; expected ${WASM_MEMORY_OWNERS.length}`,
     );
   }
 
   if (encoded[2] !== STORE_MEMORY_HASH_ESTIMATE_VERSION) {
-    throw invalidResourceReport(`Unsupported hash-table estimate ${encoded[2]}`);
+    throw invalid_resource_report(`Unsupported hash-table estimate ${encoded[2]}`);
   }
 
   const owners: ResourceOwnerBytes[] = [];
   for (const [index, owner] of WASM_MEMORY_OWNERS.entries()) {
     const offset = 3 + index * 3;
-    const logicalBytes = encoded[offset]!;
-    const allocatedBytes = encoded[offset + 1]!;
+    const logical_bytes = encoded[offset]!;
+    const allocated_bytes = encoded[offset + 1]!;
     const entries = encoded[offset + 2]!;
-    assertOwnerValues(owner, logicalBytes, allocatedBytes, entries);
+    assert_owner_values(owner, logical_bytes, allocated_bytes, entries);
     owners.push({
       owner,
-      logicalBytes,
-      allocatedBytes,
+      logicalBytes: logical_bytes,
+      allocatedBytes: allocated_bytes,
       entries,
       measurement: HASH_CAPACITY_OWNERS[owner] ? "hash-capacity-v1" : "exact-capacity",
     });
   }
 
-  const logicalLiveBytes = encoded[encoded.length - 2]!;
-  const allocatedCapacityBytes = encoded[encoded.length - 1]!;
-  const ownerLogical = sumOwnerBytes(owners, "logicalBytes");
-  const ownerAllocated = sumOwnerBytes(owners, "allocatedBytes");
-  if (logicalLiveBytes !== ownerLogical || allocatedCapacityBytes !== ownerAllocated) {
-    throw invalidResourceReport(
-      `Store memory totals drift: encoded ${logicalLiveBytes}/${allocatedCapacityBytes}, owners ${ownerLogical}/${ownerAllocated}`,
+  const logical_live_bytes = encoded[encoded.length - 2]!;
+  const allocated_capacity_bytes = encoded[encoded.length - 1]!;
+  const owner_logical = sum_owner_bytes(owners, "logicalBytes");
+  const owner_allocated = sum_owner_bytes(owners, "allocatedBytes");
+  if (logical_live_bytes !== owner_logical || allocated_capacity_bytes !== owner_allocated) {
+    throw invalid_resource_report(
+      `Store memory totals drift: encoded ${logical_live_bytes}/${allocated_capacity_bytes}, owners ${owner_logical}/${owner_allocated}`,
     );
   }
 
   if (wasmCommittedBytes !== null)
-    assertNonNegativeSafeInteger(wasmCommittedBytes, "WASM committed bytes");
+    assert_non_negative_safe_integer(wasmCommittedBytes, "WASM committed bytes");
   return {
     protocolVersion: STORE_MEMORY_PROTOCOL_VERSION,
     hashTableEstimateVersion: STORE_MEMORY_HASH_ESTIMATE_VERSION,
     owners,
-    logicalLiveBytes,
-    allocatedCapacityBytes,
+    logicalLiveBytes: logical_live_bytes,
+    allocatedCapacityBytes: allocated_capacity_bytes,
     wasmCommittedBytes,
     allocatorMarginBytes: null,
     unaccountedBytes: 0,
@@ -398,22 +398,22 @@ export function createRuntimeResourceSnapshot(input: {
   boundary?: readonly BoundaryOperationStats[];
   runtime?: RuntimeMemoryObservation;
 }): RuntimeResourceSnapshot {
-  const jsOwners = input.jsOwners ? [...input.jsOwners] : [];
+  const js_owners = input.jsOwners ? [...input.jsOwners] : [];
   const boundary = input.boundary ? [...input.boundary] : [];
-  for (const owner of jsOwners) {
-    assertOwnerValues(owner.owner, owner.logicalBytes, owner.allocatedBytes, owner.entries);
+  for (const owner of js_owners) {
+    assert_owner_values(owner.owner, owner.logicalBytes, owner.allocatedBytes, owner.entries);
   }
   const totals = {
-    logicalLiveBytes: input.wasm.logicalLiveBytes + sumOwnerBytes(jsOwners, "logicalBytes"),
+    logicalLiveBytes: input.wasm.logicalLiveBytes + sum_owner_bytes(js_owners, "logicalBytes"),
     allocatedCapacityBytes:
-      input.wasm.allocatedCapacityBytes + sumOwnerBytes(jsOwners, "allocatedBytes"),
+      input.wasm.allocatedCapacityBytes + sum_owner_bytes(js_owners, "allocatedBytes"),
   };
   const snapshot: RuntimeResourceSnapshot = {
     schemaVersion: RUNTIME_RESOURCE_SCHEMA_VERSION,
     operation: input.operation,
     phase: input.phase,
     wasm: input.wasm,
-    jsOwners,
+    jsOwners: js_owners,
     boundary,
     runtime: input.runtime ?? observeRuntimeMemory(),
     totals,
@@ -425,26 +425,26 @@ export function createRuntimeResourceSnapshot(input: {
 /** Reject overlap, negative values, and attempts to fold runtime observations into owner totals. */
 export function assertRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot): void {
   if (snapshot.schemaVersion !== RUNTIME_RESOURCE_SCHEMA_VERSION) {
-    throw invalidResourceReport(`Unsupported runtime resource schema ${snapshot.schemaVersion}`);
+    throw invalid_resource_report(`Unsupported runtime resource schema ${snapshot.schemaVersion}`);
   }
   const owners = [...snapshot.wasm.owners, ...snapshot.jsOwners];
   const seen = new Set<string>();
   for (const owner of owners) {
     if (seen.has(owner.owner))
-      throw invalidResourceReport(`Resource owner counted twice: ${owner.owner}`);
+      throw invalid_resource_report(`Resource owner counted twice: ${owner.owner}`);
     seen.add(owner.owner);
-    assertOwnerValues(owner.owner, owner.logicalBytes, owner.allocatedBytes, owner.entries);
+    assert_owner_values(owner.owner, owner.logicalBytes, owner.allocatedBytes, owner.entries);
   }
   if (snapshot.wasm.unaccountedBytes !== 0) {
-    throw invalidResourceReport(`Unaccounted WASM bytes: ${snapshot.wasm.unaccountedBytes}`);
+    throw invalid_resource_report(`Unaccounted WASM bytes: ${snapshot.wasm.unaccountedBytes}`);
   }
-  const logical = sumOwnerBytes(owners, "logicalBytes");
-  const allocated = sumOwnerBytes(owners, "allocatedBytes");
+  const logical = sum_owner_bytes(owners, "logicalBytes");
+  const allocated = sum_owner_bytes(owners, "allocatedBytes");
   if (
     snapshot.totals.logicalLiveBytes !== logical ||
     snapshot.totals.allocatedCapacityBytes !== allocated
   ) {
-    throw invalidResourceReport(
+    throw invalid_resource_report(
       `Runtime resource totals double-count or omit bytes: ${snapshot.totals.logicalLiveBytes}/${snapshot.totals.allocatedCapacityBytes} != ${logical}/${allocated}`,
     );
   }
@@ -462,21 +462,21 @@ export function diffRuntimeResourcePhases(
   after: RuntimeResourceSnapshot,
 ): RuntimeResourcePhaseDelta {
   if (before.operation !== after.operation) {
-    throw invalidResourceReport(`Cannot diff ${before.operation} against ${after.operation}`);
+    throw invalid_resource_report(`Cannot diff ${before.operation} against ${after.operation}`);
   }
 
   assertRuntimeResourceSnapshot(before);
   assertRuntimeResourceSnapshot(after);
-  const beforeOwners = new Map(
+  const before_owners = new Map(
     [...before.wasm.owners, ...before.jsOwners].map((owner) => [owner.owner, owner] as const),
   );
-  const afterOwners = new Map(
+  const after_owners = new Map(
     [...after.wasm.owners, ...after.jsOwners].map((owner) => [owner.owner, owner] as const),
   );
-  const names = new Set([...beforeOwners.keys(), ...afterOwners.keys()]);
+  const names = new Set([...before_owners.keys(), ...after_owners.keys()]);
   const owners = [...names].sort().map((owner): ResourceOwnerDelta => {
-    const previous = beforeOwners.get(owner);
-    const next = afterOwners.get(owner);
+    const previous = before_owners.get(owner);
+    const next = after_owners.get(owner);
     return {
       owner,
       logicalBytes: (next?.logicalBytes ?? 0) - (previous?.logicalBytes ?? 0),
@@ -492,13 +492,13 @@ export function diffRuntimeResourcePhases(
     to: after.phase,
     owners,
     runtime: {
-      usedJSHeapSize: nullableDelta(before.runtime.usedJSHeapSize, after.runtime.usedJSHeapSize),
-      arrayBufferBytes: nullableDelta(
+      usedJSHeapSize: nullable_delta(before.runtime.usedJSHeapSize, after.runtime.usedJSHeapSize),
+      arrayBufferBytes: nullable_delta(
         before.runtime.arrayBufferBytes,
         after.runtime.arrayBufferBytes,
       ),
-      externalBytes: nullableDelta(before.runtime.externalBytes, after.runtime.externalBytes),
-      browserBackingStoreBytes: nullableDelta(
+      externalBytes: nullable_delta(before.runtime.externalBytes, after.runtime.externalBytes),
+      browserBackingStoreBytes: nullable_delta(
         before.runtime.browserBackingStoreBytes,
         after.runtime.browserBackingStoreBytes,
       ),
@@ -508,70 +508,70 @@ export function diffRuntimeResourcePhases(
 
 /** Observe runtime memory buckets available in the current JS host without fabricating missing data. */
 export function observeRuntimeMemory(): RuntimeMemoryObservation {
-  const performanceMemory = (
+  const performance_memory = (
     globalThis.performance as Performance & {
       memory?: { usedJSHeapSize?: number };
     }
   ).memory;
-  const processMemory = (
+  const process_memory = (
     globalThis as typeof globalThis & {
       process?: { memoryUsage?: () => { arrayBuffers?: number; external?: number } };
     }
   ).process?.memoryUsage?.();
-  const usedJSHeapSize = finiteObservation(performanceMemory?.usedJSHeapSize);
-  const arrayBufferBytes = finiteObservation(processMemory?.arrayBuffers);
-  const externalBytes = finiteObservation(processMemory?.external);
+  const used_js_heap_size = finite_observation(performance_memory?.usedJSHeapSize);
+  const array_buffer_bytes = finite_observation(process_memory?.arrayBuffers);
+  const external_bytes = finite_observation(process_memory?.external);
   return {
-    usedJSHeapSize,
-    arrayBufferBytes,
-    externalBytes,
+    usedJSHeapSize: used_js_heap_size,
+    arrayBufferBytes: array_buffer_bytes,
+    externalBytes: external_bytes,
     // Chromium's backing-store bucket is only available through CDP metrics;
     // browser benchmarks inject it into the serialized artifact separately.
     browserBackingStoreBytes: null,
   };
 }
 
-function sumOwnerBytes(
+function sum_owner_bytes(
   owners: readonly ResourceOwnerBytes[],
   field: "logicalBytes" | "allocatedBytes",
 ): number {
   return owners.reduce((total, owner) => total + owner[field], 0);
 }
 
-function assertOwnerValues(
+function assert_owner_values(
   owner: string,
-  logicalBytes: number,
-  allocatedBytes: number,
+  logical_bytes: number,
+  allocated_bytes: number,
   entries: number,
 ): void {
-  if (!owner) throw invalidResourceReport("Resource owner name must not be empty");
-  assertNonNegativeSafeInteger(logicalBytes, `${owner} logical bytes`);
-  assertNonNegativeSafeInteger(allocatedBytes, `${owner} allocated bytes`);
-  assertNonNegativeSafeInteger(entries, `${owner} entries`);
-  if (allocatedBytes < logicalBytes) {
-    throw invalidResourceReport(
-      `${owner} allocated bytes ${allocatedBytes} are below logical ${logicalBytes}`,
+  if (!owner) throw invalid_resource_report("Resource owner name must not be empty");
+  assert_non_negative_safe_integer(logical_bytes, `${owner} logical bytes`);
+  assert_non_negative_safe_integer(allocated_bytes, `${owner} allocated bytes`);
+  assert_non_negative_safe_integer(entries, `${owner} entries`);
+  if (allocated_bytes < logical_bytes) {
+    throw invalid_resource_report(
+      `${owner} allocated bytes ${allocated_bytes} are below logical ${logical_bytes}`,
     );
   }
 }
 
-function assertNonNegativeSafeInteger(value: number, name: string): void {
+function assert_non_negative_safe_integer(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
-    throw invalidResourceReport(`${name} must be a non-negative safe integer; received ${value}`);
+    throw invalid_resource_report(`${name} must be a non-negative safe integer; received ${value}`);
   }
 }
 
-function finiteObservation(value: number | undefined): number | null {
+function finite_observation(value: number | undefined): number | null {
   return value !== undefined && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 }
 
-function safeCounterSum(current: number, increment: number, name: string): number {
+function safe_counter_sum(current: number, increment: number, name: string): number {
   const value = current + increment;
   if (!Number.isSafeInteger(value))
-    throw invalidResourceReport(`${name} exceeded Number.MAX_SAFE_INTEGER`);
+    throw invalid_resource_report(`${name} exceeded Number.MAX_SAFE_INTEGER`);
   return value;
 }
 
-function nullableDelta(before: number | null, after: number | null): number | null {
+function nullable_delta(before: number | null, after: number | null): number | null {
   return before === null || after === null ? null : after - before;
 }

@@ -30,7 +30,7 @@ export function toggleAutoFilter(host: AutoFilterCommandsHost): void {
     host.grid.setAutoFilter(null);
     return;
   }
-  const range = autoFilterTarget(host);
+  const range = auto_filter_target(host);
   if (range) host.grid.setAutoFilter(range);
   else host.feedback("Select a cell in a range of data to filter.");
 }
@@ -53,7 +53,7 @@ export function filterBySelection(host: AutoFilterCommandsHost): void {
     return;
   }
 
-  const range = autoFilterTarget(host);
+  const range = auto_filter_target(host);
   if (!range) return;
   host.commit({
     op: "setSheetMeta",
@@ -67,7 +67,7 @@ export function filterBySelection(host: AutoFilterCommandsHost): void {
  * at the focus cell without its totals row, else the selected range, else
  * the current region around the focus cell. `null` on an empty cell.
  */
-function autoFilterTarget(host: AutoFilterCommandsHost): Range | null {
+function auto_filter_target(host: AutoFilterCommandsHost): Range | null {
   const addr = host.focus();
   if (!addr) return null;
   const table = host.sheet().tables?.find((candidate) => rangeContains(candidate.range, addr));

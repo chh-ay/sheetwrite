@@ -84,10 +84,10 @@ const encoder = new TextEncoder();
  */
 export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
   private readonly database: IDBDatabase;
-  private readonly maxTailRecords: number;
-  private readonly maxTailBytes: number;
-  private readonly maxConflictTailVersions: number;
-  private readonly statsListeners = new Set<(stats: ShowcaseDatabaseStats) => void>();
+  private readonly max_tail_records: number;
+  private readonly max_tail_bytes: number;
+  private readonly max_conflict_tail_versions: number;
+  private readonly stats_listeners = new Set<(stats: ShowcaseDatabaseStats) => void>();
   private gauges: ShowcaseDatabaseStats;
   private queue: Promise<unknown> = Promise.resolve();
 
@@ -97,9 +97,9 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
     gauges: ShowcaseDatabaseStats,
   ) {
     this.database = database;
-    this.maxTailRecords = options.compaction?.maxTailRecords ?? DEFAULT_MAX_TAIL_RECORDS;
-    this.maxTailBytes = options.compaction?.maxTailBytes ?? DEFAULT_MAX_TAIL_BYTES;
-    this.maxConflictTailVersions =
+    this.max_tail_records = options.compaction?.maxTailRecords ?? DEFAULT_MAX_TAIL_RECORDS;
+    this.max_tail_bytes = options.compaction?.maxTailBytes ?? DEFAULT_MAX_TAIL_BYTES;
+    this.max_conflict_tail_versions =
       options.maxConflictTailVersions ?? DEFAULT_MAX_CONFLICT_TAIL_VERSIONS;
     this.gauges = gauges;
   }
@@ -122,39 +122,39 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
     if (!checked.value.documentId) {
       throw new PersistenceError("invalid-snapshot", "Seed snapshots require documentId");
     }
-    const documentId = checked.value.documentId;
-    const database = await openDatabase(options.databaseName);
+    const document_id = checked.value.documentId;
+    const database = await open_database(options.databaseName);
     let reads = 0;
     let writes = 0;
 
-    const readTx = database.transaction([DOCUMENTS, TAIL], "readonly");
+    const read_tx = database.transaction([DOCUMENTS, TAIL], "readonly");
     const existing = await request<DocumentRecord | undefined>(
-      readTx.objectStore(DOCUMENTS).get(documentId),
+      read_tx.objectStore(DOCUMENTS).get(document_id),
     );
     reads += 1;
     let document = existing;
     if (!document) {
       const version = checked.value.version ?? 0;
-      document = { documentId, snapshot: cloneJson({ ...checked.value, version }) };
-      const seedTx = database.transaction(DOCUMENTS, "readwrite");
-      await request(seedTx.objectStore(DOCUMENTS).put(document));
+      document = { documentId: document_id, snapshot: clone_json({ ...checked.value, version }) };
+      const seed_tx = database.transaction(DOCUMENTS, "readwrite");
+      await request(seed_tx.objectStore(DOCUMENTS).put(document));
       writes += 1;
     }
-    const tailTx = database.transaction(TAIL, "readonly");
+    const tail_tx = database.transaction(TAIL, "readonly");
     const tail = await request<TailRecord[]>(
-      tailTx.objectStore(TAIL).getAll(documentBounds(documentId)),
+      tail_tx.objectStore(TAIL).getAll(document_bounds(document_id)),
     );
     reads += 1;
 
-    const snapshotVersion = document.snapshot.version ?? 0;
+    const snapshot_version = document.snapshot.version ?? 0;
     const gauges: ShowcaseDatabaseStats = {
       reads,
       writes,
       storedBytes:
         encoder.encode(JSON.stringify(document.snapshot)).length +
         tail.reduce((total, record) => total + record.bytes, 0),
-      currentVersion: tail.at(-1)?.version ?? snapshotVersion,
-      snapshotVersion,
+      currentVersion: tail.at(-1)?.version ?? snapshot_version,
+      snapshotVersion: snapshot_version,
       tailLength: tail.length,
     };
     return new ShowcaseIndexedDbAdapter(database, options, gauges);
@@ -165,8 +165,8 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
   }
 
   subscribeStats(listener: (stats: ShowcaseDatabaseStats) => void): () => void {
-    this.statsListeners.add(listener);
-    return () => this.statsListeners.delete(listener);
+    this.stats_listeners.add(listener);
+    return () => this.stats_listeners.delete(listener);
   }
 
   close(): void {
@@ -175,53 +175,53 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
 
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
     return this.enqueue(async () => {
-      throwIfAborted(signal);
-      const { document, tail } = await this.readDocument(documentId);
-      throwIfAborted(signal);
+      throw_if_aborted(signal);
+      const { document, tail } = await this.read_document(documentId);
+      throw_if_aborted(signal);
       const snapshot = this.materialize(document.snapshot, tail);
-      this.publishStats();
+      this.publish_stats();
       return snapshot;
     });
   }
 
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
     return this.enqueue(async () => {
-      throwIfAborted(request.signal);
-      const applied = await this.readMutation(request.documentId, request.clientMutationId);
+      throw_if_aborted(request.signal);
+      const applied = await this.read_mutation(request.documentId, request.clientMutationId);
       if (applied) {
-        this.publishStats();
+        this.publish_stats();
         return {
           status: "duplicate" as const,
           version: applied.version,
           clientMutationId: request.clientMutationId,
         };
       }
-      const { document, tail } = await this.readDocument(request.documentId);
-      const snapshotVersion = document.snapshot.version ?? 0;
-      const currentVersion = tail.at(-1)?.version ?? snapshotVersion;
-      throwIfAborted(request.signal);
+      const { document, tail } = await this.read_document(request.documentId);
+      const snapshot_version = document.snapshot.version ?? 0;
+      const current_version = tail.at(-1)?.version ?? snapshot_version;
+      throw_if_aborted(request.signal);
 
-      if (request.baseVersion !== currentVersion) {
-        const response = this.conflictResponse(request.baseVersion, document, tail);
-        this.publishStats();
+      if (request.baseVersion !== current_version) {
+        const response = this.conflict_response(request.baseVersion, document, tail);
+        this.publish_stats();
         return response;
       }
 
       const next = this.materialize(document.snapshot, tail, request.operations);
-      throwIfAborted(request.signal);
-      await this.persistCommit(request, next, document, tail);
-      this.publishStats();
+      throw_if_aborted(request.signal);
+      await this.persist_commit(request, next, document, tail);
+      this.publish_stats();
       return {
         status: "applied" as const,
-        version: next.version ?? currentVersion + 1,
+        version: next.version ?? current_version + 1,
         clientMutationId: request.clientMutationId,
       };
     });
   }
   commitBatch(commit: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
     return this.enqueue(async () => {
-      throwIfAborted(commit.signal);
-      const applied = await this.readMutation(commit.documentId, commit.clientMutationId);
+      throw_if_aborted(commit.signal);
+      const applied = await this.read_mutation(commit.documentId, commit.clientMutationId);
       if (applied) {
         return {
           status: "duplicate",
@@ -229,10 +229,10 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
           clientMutationId: commit.clientMutationId,
         };
       }
-      const { document, tail } = await this.readDocument(commit.documentId);
-      const currentVersion = tail.at(-1)?.version ?? document.snapshot.version ?? 0;
-      if (commit.baseVersion !== currentVersion) {
-        return this.conflictResponse(commit.baseVersion, document, tail);
+      const { document, tail } = await this.read_document(commit.documentId);
+      const current_version = tail.at(-1)?.version ?? document.snapshot.version ?? 0;
+      if (commit.baseVersion !== current_version) {
+        return this.conflict_response(commit.baseVersion, document, tail);
       }
       // The reference adapter validates every version and applies to a scratch
       // document before any IndexedDB write can become visible.
@@ -242,18 +242,18 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
       const next = await scratch.load(commit.documentId, commit.signal);
       let offset = 0;
       const records: TailRecord[] = commit.versionOperationCounts.map((count, index) => {
-        const operations = cloneJson(commit.operations.slice(offset, offset + count));
+        const operations = clone_json(commit.operations.slice(offset, offset + count));
         offset += count;
         return {
           documentId: commit.documentId,
-          version: currentVersion + index + 1,
+          version: current_version + index + 1,
           clientMutationId: commit.clientMutationId,
           operations,
           bytes: encoder.encode(JSON.stringify(operations)).length,
           batch: { index, count: commit.versionOperationCounts.length },
         };
       });
-      throwIfAborted(commit.signal);
+      throw_if_aborted(commit.signal);
       const tx = this.database.transaction([TAIL, MUTATIONS], "readwrite");
       const complete = new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
@@ -268,15 +268,15 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
       } satisfies MutationRecord);
       await complete;
       this.gauges.writes += records.length + 1;
-      const tailBytes = [...tail, ...records].reduce((bytes, record) => bytes + record.bytes, 0);
+      const tail_bytes = [...tail, ...records].reduce((bytes, record) => bytes + record.bytes, 0);
       this.gauges.currentVersion = response.version;
       this.gauges.tailLength = tail.length + records.length;
       this.gauges.storedBytes =
-        encoder.encode(JSON.stringify(document.snapshot)).length + tailBytes;
-      if (this.gauges.tailLength > this.maxTailRecords || tailBytes > this.maxTailBytes) {
+        encoder.encode(JSON.stringify(document.snapshot)).length + tail_bytes;
+      if (this.gauges.tailLength > this.max_tail_records || tail_bytes > this.max_tail_bytes) {
         await this.compact(commit.documentId, next);
       }
-      this.publishStats();
+      this.publish_stats();
       return response;
     });
   }
@@ -288,56 +288,60 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
     return result;
   }
 
-  private async readDocument(
-    documentId: string,
+  private async read_document(
+    document_id: string,
   ): Promise<{ document: DocumentRecord; tail: TailRecord[] }> {
     const tx = this.database.transaction([DOCUMENTS, TAIL], "readonly");
-    const documentRequest = tx.objectStore(DOCUMENTS).get(documentId);
-    const tailRequest = tx.objectStore(TAIL).getAll(documentBounds(documentId));
-    const document = await request<DocumentRecord | undefined>(documentRequest);
-    const tail = await request<TailRecord[]>(tailRequest);
+    const document_request = tx.objectStore(DOCUMENTS).get(document_id);
+    const tail_request = tx.objectStore(TAIL).getAll(document_bounds(document_id));
+    const document = await request<DocumentRecord | undefined>(document_request);
+    const tail = await request<TailRecord[]>(tail_request);
     this.gauges.reads += 2;
-    if (!document) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
+    if (!document) throw new PersistenceError("not-found", `Unknown document: ${document_id}`);
     return { document, tail };
   }
 
-  private async readMutation(
-    documentId: string,
-    clientMutationId: string,
+  private async read_mutation(
+    document_id: string,
+    client_mutation_id: string,
   ): Promise<MutationRecord | undefined> {
     const tx = this.database.transaction(MUTATIONS, "readonly");
     const record = await request<MutationRecord | undefined>(
-      tx.objectStore(MUTATIONS).get([documentId, clientMutationId]),
+      tx.objectStore(MUTATIONS).get([document_id, client_mutation_id]),
     );
     this.gauges.reads += 1;
     return record;
   }
 
-  private conflictResponse(
-    baseVersion: number,
+  private conflict_response(
+    base_version: number,
     document: DocumentRecord,
     tail: readonly TailRecord[],
   ): PersistenceCommitResponse {
-    const snapshotVersion = document.snapshot.version ?? 0;
-    const currentVersion = tail.at(-1)?.version ?? snapshotVersion;
-    const withinTail = baseVersion >= snapshotVersion;
-    const bounded = currentVersion - baseVersion <= this.maxConflictTailVersions;
-    if (withinTail && bounded && baseVersion <= currentVersion) {
-      const operationsSinceBase: VersionedOperation[] = tail
-        .filter((record) => record.version > baseVersion)
+    const snapshot_version = document.snapshot.version ?? 0;
+    const current_version = tail.at(-1)?.version ?? snapshot_version;
+    const within_tail = base_version >= snapshot_version;
+    const bounded = current_version - base_version <= this.max_conflict_tail_versions;
+    if (within_tail && bounded && base_version <= current_version) {
+      const operations_since_base: VersionedOperation[] = tail
+        .filter((record) => record.version > base_version)
         .map((record) => ({
           version: record.version,
           clientMutationId: record.clientMutationId,
-          operations: cloneJson(record.operations),
+          operations: clone_json(record.operations),
           ...(record.batch ? { batch: { ...record.batch } } : {}),
         }));
-      if (operationsSinceBase.length === currentVersion - baseVersion) {
-        return { status: "conflict", currentVersion, operationsSinceBase };
+      if (operations_since_base.length === current_version - base_version) {
+        return {
+          status: "conflict",
+          currentVersion: current_version,
+          operationsSinceBase: operations_since_base,
+        };
       }
     }
     return {
       status: "conflict",
-      currentVersion,
+      currentVersion: current_version,
       snapshot: this.materialize(document.snapshot, tail),
     };
   }
@@ -350,9 +354,9 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
   private materialize(
     snapshot: WorkbookSnapshot,
     tail: readonly TailRecord[],
-    nextOperations?: readonly DocumentOp[],
+    next_operations?: readonly DocumentOp[],
   ): WorkbookSnapshot {
-    if (tail.length === 0 && nextOperations === undefined) return cloneJson(snapshot);
+    if (tail.length === 0 && next_operations === undefined) return clone_json(snapshot);
     const store = SheetwriteStore.fromSnapshot(snapshot);
     let version = snapshot.version ?? 0;
     try {
@@ -360,8 +364,8 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
         this.apply(store, record.operations);
         version = record.version;
       }
-      if (nextOperations !== undefined) {
-        this.apply(store, nextOperations);
+      if (next_operations !== undefined) {
+        this.apply(store, next_operations);
         version += 1;
       }
       return { ...store.exportSnapshot(), version };
@@ -380,14 +384,14 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
     }
   }
 
-  private async persistCommit(
+  private async persist_commit(
     commit: PersistenceCommitRequest,
     next: WorkbookSnapshot,
     document: DocumentRecord,
     tail: readonly TailRecord[],
   ): Promise<void> {
     const version = next.version ?? 0;
-    const operations = cloneJson(commit.operations);
+    const operations = clone_json(commit.operations);
     const record: TailRecord = {
       documentId: commit.documentId,
       version,
@@ -396,46 +400,46 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
       bytes: encoder.encode(JSON.stringify(operations)).length,
     };
     const tx = this.database.transaction([TAIL, MUTATIONS], "readwrite");
-    const tailPut = tx.objectStore(TAIL).put(record);
-    const mutationPut = tx.objectStore(MUTATIONS).put({
+    const tail_put = tx.objectStore(TAIL).put(record);
+    const mutation_put = tx.objectStore(MUTATIONS).put({
       documentId: commit.documentId,
       clientMutationId: commit.clientMutationId,
       version,
     } satisfies MutationRecord);
-    await request(tailPut);
-    await request(mutationPut);
+    await request(tail_put);
+    await request(mutation_put);
     this.gauges.writes += 2;
 
-    const tailLength = tail.length + 1;
-    const tailBytes = tail.reduce((total, entry) => total + entry.bytes, record.bytes);
+    const tail_length = tail.length + 1;
+    const tail_bytes = tail.reduce((total, entry) => total + entry.bytes, record.bytes);
     this.gauges.currentVersion = version;
-    this.gauges.tailLength = tailLength;
-    this.gauges.storedBytes = encoder.encode(JSON.stringify(document.snapshot)).length + tailBytes;
+    this.gauges.tailLength = tail_length;
+    this.gauges.storedBytes = encoder.encode(JSON.stringify(document.snapshot)).length + tail_bytes;
 
-    if (tailLength > this.maxTailRecords || tailBytes > this.maxTailBytes) {
+    if (tail_length > this.max_tail_records || tail_bytes > this.max_tail_bytes) {
       await this.compact(commit.documentId, next);
     }
   }
 
   /** Folds the tail into one snapshot record and deletes the folded log rows. */
-  private async compact(documentId: string, snapshot: WorkbookSnapshot): Promise<void> {
-    const compacted: DocumentRecord = { documentId, snapshot: cloneJson(snapshot) };
+  private async compact(document_id: string, snapshot: WorkbookSnapshot): Promise<void> {
+    const compacted: DocumentRecord = { documentId: document_id, snapshot: clone_json(snapshot) };
     const tx = this.database.transaction([DOCUMENTS, TAIL], "readwrite");
-    const documentPut = tx.objectStore(DOCUMENTS).put(compacted);
-    const tailDelete = tx
+    const document_put = tx.objectStore(DOCUMENTS).put(compacted);
+    const tail_delete = tx
       .objectStore(TAIL)
-      .delete(documentBounds(documentId, snapshot.version ?? 0));
-    await request(documentPut);
-    await request(tailDelete);
+      .delete(document_bounds(document_id, snapshot.version ?? 0));
+    await request(document_put);
+    await request(tail_delete);
     this.gauges.writes += 2;
     this.gauges.snapshotVersion = snapshot.version ?? 0;
     this.gauges.tailLength = 0;
     this.gauges.storedBytes = encoder.encode(JSON.stringify(compacted.snapshot)).length;
   }
 
-  private publishStats(): void {
+  private publish_stats(): void {
     const stats = this.stats();
-    for (const listener of this.statsListeners) listener(stats);
+    for (const listener of this.stats_listeners) listener(stats);
   }
 }
 
@@ -444,7 +448,7 @@ export async function deleteShowcaseDatabase(databaseName: string): Promise<void
   await deleteDatabase(databaseName, { error: "reject", blocked: "reject" });
 }
 
-function openDatabase(name: string): Promise<IDBDatabase> {
+function open_database(name: string): Promise<IDBDatabase> {
   const { promise, resolve, reject } = Promise.withResolvers<IDBDatabase>();
   const open = indexedDB.open(name, 1);
   open.onupgradeneeded = () => {
@@ -464,19 +468,22 @@ function openDatabase(name: string): Promise<IDBDatabase> {
   return promise;
 }
 
-function request<T>(idbRequest: IDBRequest<T>): Promise<T> {
+function request<T>(idb_request: IDBRequest<T>): Promise<T> {
   const { promise, resolve, reject } = Promise.withResolvers<T>();
-  idbRequest.onsuccess = () => resolve(idbRequest.result);
-  idbRequest.onerror = () => reject(idbRequest.error ?? new Error("IndexedDB request failed"));
+  idb_request.onsuccess = () => resolve(idb_request.result);
+  idb_request.onerror = () => reject(idb_request.error ?? new Error("IndexedDB request failed"));
   return promise;
 }
 
 /** All keys for one document across `[documentId, number]` key ranges. */
-function documentBounds(documentId: string, upToVersion?: number): IDBKeyRange {
-  return IDBKeyRange.bound([documentId, 0], [documentId, upToVersion ?? Number.MAX_SAFE_INTEGER]);
+function document_bounds(document_id: string, up_to_version?: number): IDBKeyRange {
+  return IDBKeyRange.bound(
+    [document_id, 0],
+    [document_id, up_to_version ?? Number.MAX_SAFE_INTEGER],
+  );
 }
 
-function throwIfAborted(signal?: AbortSignal): void {
+function throw_if_aborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new PersistenceError("aborted", "Persistence operation aborted", {
       cause: signal.reason,
@@ -484,6 +491,6 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 }
 
-function cloneJson<T>(value: T): T {
+function clone_json<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }

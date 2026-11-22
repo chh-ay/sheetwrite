@@ -59,13 +59,13 @@ export type {
  */
 export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
   // The bridge also stays lazy: unused queries must not allocate text codecs.
-  const [wasm, { createEngine }] = await Promise.all([
+  const [wasm, { createEngine: create_engine }] = await Promise.all([
     import("../pkg/sheetwrite_queries.js"),
     import("./bridge.js"),
   ]);
   await wasm.default(options.wasm === undefined ? undefined : { module_or_path: options.wasm });
 
-  return createEngine(wasm);
+  return create_engine(wasm);
 }
 
 /**
@@ -121,11 +121,11 @@ export function queriesAddon(
 export async function loadPowerQueryCodec(
   options: QueryEngineOptions = {},
 ): Promise<PowerQueryCodec> {
-  const [wasm, { createPowerQueryCodec }] = await Promise.all([
+  const [wasm, { createPowerQueryCodec: create_power_query_codec }] = await Promise.all([
     import("../pkg/sheetwrite_queries.js"),
     import("./power-query.js"),
   ]);
   await wasm.default(options.wasm === undefined ? undefined : { module_or_path: options.wasm });
 
-  return createPowerQueryCodec(wasm);
+  return create_power_query_codec(wasm);
 }

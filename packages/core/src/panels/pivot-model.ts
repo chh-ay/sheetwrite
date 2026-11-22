@@ -61,18 +61,18 @@ export function defaultAggregation(type: PivotFieldType | undefined): PivotAggre
   return type === "number" ? "SUM" : "COUNTA";
 }
 
-function insertAt<T>(list: readonly T[], at: number | undefined, entry: T): T[] {
+function insert_at<T>(list: readonly T[], at: number | undefined, entry: T): T[] {
   const next = [...list];
   next.splice(at === undefined ? next.length : Math.max(0, Math.min(at, next.length)), 0, entry);
   return next;
 }
 
-function withoutIndex<T>(list: readonly T[], index: number): T[] {
+function without_index<T>(list: readonly T[], index: number): T[] {
   return list.filter((_, position) => position !== index);
 }
 
 /** Sort keys may only name fields that group their axis. */
-function pruneSort(pivot: PivotDefinition): PivotDefinition {
+function prune_sort(pivot: PivotDefinition): PivotDefinition {
   if (pivot.sort === undefined) return pivot;
   const sort = pivot.sort.filter((entry) =>
     (entry.axis === "rows" ? pivot.rows : pivot.columns).includes(entry.field),
@@ -87,7 +87,7 @@ interface MovedField {
   readonly filterValues?: CellScalar[];
 }
 
-function removePlacement(
+function remove_placement(
   pivot: PivotDefinition,
   { area, index }: PivotPlacement,
 ): [PivotDefinition, MovedField | null] {
@@ -95,20 +95,20 @@ function removePlacement(
     case "rows": {
       const field = pivot.rows[index];
       if (field === undefined) return [pivot, null];
-      return [{ ...pivot, rows: withoutIndex(pivot.rows, index) }, { field }];
+      return [{ ...pivot, rows: without_index(pivot.rows, index) }, { field }];
     }
     case "columns": {
       const field = pivot.columns[index];
       if (field === undefined) return [pivot, null];
-      return [{ ...pivot, columns: withoutIndex(pivot.columns, index) }, { field }];
+      return [{ ...pivot, columns: without_index(pivot.columns, index) }, { field }];
     }
     case "values": {
       const value = pivot.values[index];
       if (value === undefined) return [pivot, null];
       if ("measure" in value)
-        return [{ ...pivot, values: withoutIndex(pivot.values, index) }, null];
+        return [{ ...pivot, values: without_index(pivot.values, index) }, null];
       return [
-        { ...pivot, values: withoutIndex(pivot.values, index) },
+        { ...pivot, values: without_index(pivot.values, index) },
         { field: value.field, value },
       ];
     }
@@ -117,7 +117,7 @@ function removePlacement(
       const filter = filters[index];
       if (filter === undefined) return [pivot, null];
       return [
-        { ...pivot, filters: withoutIndex(filters, index) },
+        { ...pivot, filters: without_index(filters, index) },
         { field: filter.field, filterValues: filter.values },
       ];
     }
@@ -149,7 +149,7 @@ export function placeField(
   let next = pivot;
   let moved: MovedField = { field };
   if (from !== null) {
-    const [removed, entry] = removePlacement(pivot, from);
+    const [removed, entry] = remove_placement(pivot, from);
     if (entry === null) return pivot;
     next = removed;
     moved = entry;
@@ -162,23 +162,23 @@ export function placeField(
       const columns = next.columns.filter((candidate) => candidate !== field);
       next =
         to === "rows"
-          ? { ...next, rows: insertAt(rows, at, field), columns }
-          : { ...next, rows, columns: insertAt(columns, at, field) };
+          ? { ...next, rows: insert_at(rows, at, field), columns }
+          : { ...next, rows, columns: insert_at(columns, at, field) };
       break;
     }
     case "values": {
       const value = moved.value ?? { field, aggregation: defaultAggregation(facts.type) };
-      next = { ...next, values: insertAt(next.values, at, value) };
+      next = { ...next, values: insert_at(next.values, at, value) };
       break;
     }
     case "filters": {
       const filters = (next.filters ?? []).filter((filter) => filter.field !== field);
       const values = moved.filterValues ?? facts.distinctValues();
-      next = { ...next, filters: insertAt(filters, at, { field, values }) };
+      next = { ...next, filters: insert_at(filters, at, { field, values }) };
       break;
     }
   }
-  return pruneSort(next);
+  return prune_sort(next);
 }
 
 /** Remove one entry from its area. */
@@ -187,11 +187,11 @@ export function removeField(pivot: PivotDefinition, placement: PivotPlacement): 
   // is the one edit it takes.
   const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
   if (value !== undefined && "measure" in value) {
-    return { ...pivot, values: withoutIndex(pivot.values, placement.index) };
+    return { ...pivot, values: without_index(pivot.values, placement.index) };
   }
 
-  const [next, entry] = removePlacement(pivot, placement);
-  return entry === null ? pivot : pruneSort(next);
+  const [next, entry] = remove_placement(pivot, placement);
+  return entry === null ? pivot : prune_sort(next);
 }
 
 /** Move one entry up (`-1`) or down (`1`) inside its area; the ends do not wrap. */
@@ -359,7 +359,7 @@ export function relatedTables(
  * table's columns as fields in order, so field indices stay the same. Null
  * for a range source.
  */
-function modelSourceOf(
+function model_source_of(
   pivot: PivotDefinition,
   tables: readonly WorkbookTable[],
 ): { table: string; fields: TableColumnRef[] } | null {
@@ -389,7 +389,7 @@ export function withModelField(
   tables: readonly WorkbookTable[],
   column: TableColumnRef,
 ): { pivot: PivotDefinition; field: number } | null {
-  const model = modelSourceOf(pivot, tables);
+  const model = model_source_of(pivot, tables);
   if (model === null) return null;
   const fields = model.fields;
 
@@ -414,7 +414,7 @@ export function withMeasureValue(
   id: string,
 ): PivotDefinition | null {
   if (pivot.values.some((value) => "measure" in value && value.measure === id)) return null;
-  const model = modelSourceOf(pivot, tables);
+  const model = model_source_of(pivot, tables);
   if (model === null) return null;
   return { ...pivot, source: { model }, values: [...pivot.values, { measure: id }] };
 }
@@ -451,8 +451,8 @@ export function compareScalars(a: CellScalar, b: CellScalar): number {
         : typeof value === "boolean"
           ? 2
           : 3;
-  const byRank = rank(a) - rank(b);
-  if (byRank !== 0) return byRank;
+  const by_rank = rank(a) - rank(b);
+  if (by_rank !== 0) return by_rank;
   if (typeof a === "number" && typeof b === "number") return a - b;
   if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
   return Number(a) - Number(b);

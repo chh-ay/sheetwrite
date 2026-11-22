@@ -39,8 +39,8 @@ async function run(command: readonly [string, ...string[]], cwd?: string): Promi
     stdout: "inherit",
     stderr: "inherit",
   });
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
 }
 
 export async function installWasmPack(): Promise<void> {
@@ -48,37 +48,37 @@ export async function installWasmPack(): Promise<void> {
   if (!release) {
     throw new Error(`No reviewed wasm-pack binary for ${process.platform}-${process.arch}`);
   }
-  const archiveName = `wasm-pack-v${WASM_PACK_VERSION}-${release.target}.tar.gz`;
-  const url = `https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/${archiveName}`;
+  const archive_name = `wasm-pack-v${WASM_PACK_VERSION}-${release.target}.tar.gz`;
+  const url = `https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/${archive_name}`;
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) throw new Error(`Unable to download ${url}: HTTP ${response.status}`);
   const archive = new Uint8Array(await response.arrayBuffer());
   const digest = new Bun.CryptoHasher("sha256").update(archive).digest("hex");
   if (digest !== release.sha256) {
     throw new Error(
-      `Checksum mismatch for ${archiveName}: expected ${release.sha256}, received ${digest}`,
+      `Checksum mismatch for ${archive_name}: expected ${release.sha256}, received ${digest}`,
     );
   }
 
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-wasm-pack-"));
+  const temporary_root = await mkdtemp(join(tmpdir(), "sheetwrite-wasm-pack-"));
   try {
-    const archivePath = join(temporaryRoot, archiveName);
-    await writeFile(archivePath, archive);
-    await run(["tar", "-xzf", archivePath, "-C", temporaryRoot]);
-    const executableName = process.platform === "win32" ? "wasm-pack.exe" : "wasm-pack";
+    const archive_path = join(temporary_root, archive_name);
+    await writeFile(archive_path, archive);
+    await run(["tar", "-xzf", archive_path, "-C", temporary_root]);
+    const executable_name = process.platform === "win32" ? "wasm-pack.exe" : "wasm-pack";
     const source = join(
-      temporaryRoot,
+      temporary_root,
       `wasm-pack-v${WASM_PACK_VERSION}-${release.target}`,
-      executableName,
+      executable_name,
     );
-    const cargoBin = join(process.env.CARGO_HOME ?? join(homedir(), ".cargo"), "bin");
-    const destination = join(cargoBin, executableName);
-    await mkdir(cargoBin, { recursive: true });
+    const cargo_bin = join(process.env.CARGO_HOME ?? join(homedir(), ".cargo"), "bin");
+    const destination = join(cargo_bin, executable_name);
+    await mkdir(cargo_bin, { recursive: true });
     await copyFile(source, destination);
     if (process.platform !== "win32") await chmod(destination, 0o755);
     await run([destination, "--version"]);
   } finally {
-    await rm(temporaryRoot, { recursive: true, force: true });
+    await rm(temporary_root, { recursive: true, force: true });
   }
 }
 

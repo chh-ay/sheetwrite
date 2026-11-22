@@ -22,11 +22,11 @@ import { RELEASES, releaseHref } from "../lib/releases.ts";
 import { ogImagePath } from "../lib/seo.ts";
 
 const DOCS = join(import.meta.dir, "../..");
-const [clientDirectory] = process.argv.slice(2);
-if (clientDirectory === undefined) {
+const [client_directory] = process.argv.slice(2);
+if (client_directory === undefined) {
   throw new Error("usage: bun og-images.ts <built client directory>");
 }
-const CLIENT = resolve(clientDirectory);
+const CLIENT = resolve(client_directory);
 const ILLUSTRATIONS = join(DOCS, "public/figures/illustrations");
 const WIDTH = 1200;
 /** Social platforms fetch cards on demand; each stays small. */
@@ -107,7 +107,7 @@ const ART_COLOURS: Readonly<Record<string, string>> = {
 };
 
 /** The TrueType font inside a WOFF 1.0 file: each table inflated and laid out again. */
-function unpackWoff(woff: Buffer): Buffer {
+function unpack_woff(woff: Buffer): Buffer {
   const count = woff.readUInt16BE(12);
   const directory = Buffer.alloc(12 + count * 16);
   directory.writeUInt32BE(woff.readUInt32BE(4), 0);
@@ -143,10 +143,10 @@ interface Page {
   description: string;
 }
 
-const escapeXml = (text: string) =>
+const escape_xml = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-const decodeEntities = (text: string) =>
+const decode_entities = (text: string) =>
   text
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
       String.fromCodePoint(Number.parseInt(hex, 16)),
@@ -158,7 +158,7 @@ const decodeEntities = (text: string) =>
     .replaceAll("&amp;", "&");
 
 /** Every prerendered docs page that search engines index. */
-function docsPages(): Page[] {
+function docs_pages(): Page[] {
   const pages: Page[] = [];
   const walk = (directory: string) => {
     for (const entry of readdirSync(directory)) {
@@ -178,8 +178,8 @@ function docsPages(): Page[] {
         const href = `/${relative(CLIENT, dirname(path)).split("\\").join("/")}/`;
         pages.push({
           href,
-          title: decodeEntities(title).trim(),
-          description: decodeEntities(description),
+          title: decode_entities(title).trim(),
+          description: decode_entities(description),
         });
       }
     }
@@ -196,7 +196,7 @@ const NEXT_RELEASE_HREFS = new Set(
 );
 
 /** The sidebar section that lists `href`, or the section its path names; an unpublished release post is the next release. */
-function sectionOf(href: string): string {
+function section_of(href: string): string {
   if (NEXT_RELEASE_HREFS.has(href)) return "Next release";
   const lists = (items: readonly NavigationItem[]): boolean =>
     items.some((item) => item.href === href || lists(item.items ?? []));
@@ -205,24 +205,24 @@ function sectionOf(href: string): string {
   return section?.label ?? PATH_SECTIONS[segment] ?? "Documentation";
 }
 
-/** Greedy word wrap to `maxLines`, the last line ending in an ellipsis when cut. */
-function wrap(text: string, maxChars: number, maxLines: number): string[] {
+/** Greedy word wrap to `max_lines`, the last line ending in an ellipsis when cut. */
+function wrap(text: string, max_chars: number, max_lines: number): string[] {
   const lines: string[] = [];
   let line = "";
   for (const word of text.split(/\s+/)) {
     const next = line === "" ? word : `${line} ${word}`;
-    if (next.length <= maxChars) {
+    if (next.length <= max_chars) {
       line = next;
       continue;
     }
     lines.push(line);
     line = word;
-    if (lines.length === maxLines) break;
+    if (lines.length === max_lines) break;
   }
-  if (lines.length < maxLines && line !== "") lines.push(line);
-  else if (lines.length === maxLines && line !== "") {
-    const last = lines[maxLines - 1] ?? "";
-    lines[maxLines - 1] = `${last.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+  if (lines.length < max_lines && line !== "") lines.push(line);
+  else if (lines.length === max_lines && line !== "") {
+    const last = lines[max_lines - 1] ?? "";
+    lines[max_lines - 1] = `${last.slice(0, Math.max(0, max_chars - 1)).trimEnd()}…`;
   }
   return lines;
 }
@@ -241,7 +241,7 @@ function art(name: string): string {
 }
 
 const ART_CACHE = new Map<string, string>();
-const artFor = (href: string) => {
+const art_for = (href: string) => {
   const name = SECTION_ART[href.split("/")[2] ?? ""] ?? "grid";
   let drawing = ART_CACHE.get(name);
   if (drawing === undefined) {
@@ -262,21 +262,25 @@ const L = {
   art: { x: 660, y: 150, width: 460, height: 300 },
 };
 
-function cardSvg(page: Page): string {
-  const titleLines = wrap(page.title, Math.floor(L.textWidth / (L.titleSize * DISPLAY_ADVANCE)), 3);
-  const bodyLines = wrap(
+function card_svg(page: Page): string {
+  const title_lines = wrap(
+    page.title,
+    Math.floor(L.textWidth / (L.titleSize * DISPLAY_ADVANCE)),
+    3,
+  );
+  const body_lines = wrap(
     page.description,
     Math.floor(L.textWidth / (L.bodySize * BODY_ADVANCE)),
     // The description gets the lines the title leaves.
-    4 - titleLines.length,
+    4 - title_lines.length,
   );
-  const titleTop = 236;
-  const bodyTop = titleTop + titleLines.length * L.titleLeading + 18;
+  const title_top = 236;
+  const body_top = title_top + title_lines.length * L.titleLeading + 18;
   const text = (lines: string[], y: number, leading: number) =>
     lines
       .map(
         (line, index) =>
-          `<tspan x="${L.margin}" y="${y + index * leading}">${escapeXml(line)}</tspan>`,
+          `<tspan x="${L.margin}" y="${y + index * leading}">${escape_xml(line)}</tspan>`,
       )
       .join("");
   const { x, y, width, height } = L.art;
@@ -288,30 +292,30 @@ function cardSvg(page: Page): string {
   <rect x="3" y="3" width="26" height="26" rx="5"/><path d="M3 11h26M11 3v26M20 11v18M11 20h18"/>
 </g>
 <text x="${L.margin + 46}" y="98" font-family="${DISPLAY_FONT}" font-weight="700" font-size="30" fill="${C.fg}">Sheetwrite</text>
-<text x="${L.margin}" y="178" font-family="${MONO_FONT}" font-size="22" letter-spacing="1.5" fill="${C.accentStrong}">${escapeXml(sectionOf(page.href).toUpperCase())}</text>
-<text font-family="${DISPLAY_FONT}" font-weight="700" font-size="${L.titleSize}" fill="${C.fg}">${text(titleLines, titleTop, L.titleLeading)}</text>
-<text font-family="${BODY_FONT}" font-size="${L.bodySize}" fill="${C.muted}">${text(bodyLines, bodyTop + L.bodySize, L.bodyLeading)}</text>
-<text x="${L.margin}" y="${HEIGHT - 64}" font-family="${MONO_FONT}" font-size="22" fill="${C.muted}">sheetwrite.dev${escapeXml(page.href)}</text>
+<text x="${L.margin}" y="178" font-family="${MONO_FONT}" font-size="22" letter-spacing="1.5" fill="${C.accentStrong}">${escape_xml(section_of(page.href).toUpperCase())}</text>
+<text font-family="${DISPLAY_FONT}" font-weight="700" font-size="${L.titleSize}" fill="${C.fg}">${text(title_lines, title_top, L.titleLeading)}</text>
+<text font-family="${BODY_FONT}" font-size="${L.bodySize}" fill="${C.muted}">${text(body_lines, body_top + L.bodySize, L.bodyLeading)}</text>
+<text x="${L.margin}" y="${HEIGHT - 64}" font-family="${MONO_FONT}" font-size="22" fill="${C.muted}">sheetwrite.dev${escape_xml(page.href)}</text>
 <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="20" fill="${C.raised}" stroke="${C.border}" stroke-width="2"/>
-<g transform="translate(${x + 20} ${y + (height - 160 * scale) / 2}) scale(${scale})">${artFor(page.href)}</g>
+<g transform="translate(${x + 20} ${y + (height - 160 * scale) / 2}) scale(${scale})">${art_for(page.href)}</g>
 </svg>`;
 }
 
 const started = performance.now();
 // resvg loads fonts from files: unpack each WOFF once into a scratch folder.
 const scratch = mkdtempSync(join(tmpdir(), "sheetwrite-og-"));
-const fontFiles = FONT_FILES.map((path, index) => {
+const font_files = FONT_FILES.map((path, index) => {
   const font = join(scratch, `${index}.ttf`);
-  writeFileSync(font, unpackWoff(readFileSync(path)));
+  writeFileSync(font, unpack_woff(readFileSync(path)));
   return font;
 });
-const pages = docsPages();
+const pages = docs_pages();
 const queue = [...pages];
 let largest = 0;
 const worker = async () => {
   for (let page = queue.pop(); page !== undefined; page = queue.pop()) {
-    const image = await renderAsync(cardSvg(page), {
-      font: { fontFiles, loadSystemFonts: false, defaultFontFamily: BODY_FONT },
+    const image = await renderAsync(card_svg(page), {
+      font: { fontFiles: font_files, loadSystemFonts: false, defaultFontFamily: BODY_FONT },
     });
     const png = image.asPng();
     if (png.length > MAX_CARD_BYTES) throw new Error(`The card of ${page.href} is ${png.length} B`);

@@ -28,20 +28,20 @@ async function open(page: Page) {
 }
 
 /** The pivot's value for one month and region, found by its labels, not its position. */
-function pivotValue(page: Page, month: string, region: string) {
+function pivot_value(page: Page, month: string, region: string) {
   return page.evaluate(
-    ([sheet, id, rowLabel, colLabel]) => {
+    ([sheet, id, row_label, col_label]) => {
       const result = window.__sheetwriteAnalysisGrid?.getPivotResult(sheet, id);
       if (!result || result.status !== "ok") return null;
       const at = (row: number, col: number) => result.cells[row * result.cols + col];
       // Column labels and value captions share the header rows: search them all.
       let col = -1;
       for (let c = result.labelCols; c < result.cols; c++) {
-        for (let r = 0; r < result.headerRows; r++) if (at(r, c) === colLabel) col = c;
+        for (let r = 0; r < result.headerRows; r++) if (at(r, c) === col_label) col = c;
       }
       let row = -1;
       for (let r = result.headerRows; r < result.rows; r++) {
-        if (at(r, result.labelCols - 1) === rowLabel) row = r;
+        if (at(r, result.labelCols - 1) === row_label) row = r;
       }
       return row < 0 || col < 0 ? null : Number(at(row, col));
     },
@@ -54,30 +54,30 @@ function charts(page: Page) {
 }
 
 const chart = (page: Page) => page.getByRole("group", { name: /Monthly revenue by region/ });
-const chartImage = (page: Page) =>
+const chart_image = (page: Page) =>
   chart(page).getByRole("img", { name: /Monthly revenue by region/ });
-const chartObjects = (page: Page) => page.locator('[aria-roledescription="chart"]');
+const chart_objects = (page: Page) => page.locator('[aria-roledescription="chart"]');
 
 test("editing an order moves its pivot total and redraws the chart", async ({ page }) => {
   await open(page);
   // One series per region, named from the pivot's region labels.
-  const description = await chartImage(page).locator("desc").textContent();
+  const description = await chart_image(page).locator("desc").textContent();
   for (const region of ["Americas", "APAC", DIP_REGION, "LATAM"]) {
     expect(description).toContain(region);
   }
-  const before = (await pivotValue(page, DIP_MONTH, DIP_REGION)) ?? 0;
+  const before = (await pivot_value(page, DIP_MONTH, DIP_REGION)) ?? 0;
   expect(before).toBeGreaterThan(0);
-  const drawnBefore = await chartImage(page).innerHTML();
+  const drawn_before = await chart_image(page).innerHTML();
 
   await page.getByRole("button", { name: "Go to the order" }).click();
   const revenue = Number(await page.getByRole("textbox", { name: "Formula bar" }).inputValue());
   await page.keyboard.type(String(revenue + REVENUE_INCREASE));
   await page.keyboard.press("Enter");
   await expect
-    .poll(() => pivotValue(page, DIP_MONTH, DIP_REGION))
+    .poll(() => pivot_value(page, DIP_MONTH, DIP_REGION))
     .toBeCloseTo(before + REVENUE_INCREASE, 6);
   await page.getByRole("tab", { name: "Summary" }).click();
-  await expect.poll(() => chartImage(page).innerHTML()).not.toBe(drawnBefore);
+  await expect.poll(() => chart_image(page).innerHTML()).not.toBe(drawn_before);
 });
 
 test("a selected chart moves with the arrow keys, deletes from its menu, stays at its cells on focus, and undo works", async ({
@@ -98,12 +98,12 @@ test("a selected chart moves with the arrow keys, deletes from its menu, stays a
   const menu = page.locator(".sheetwrite-context-menu");
   await expect(menu.getByText("Edit chart")).toBeVisible();
   await menu.getByText("Delete chart").click();
-  await expect(chartObjects(page)).toHaveCount(0);
+  await expect(chart_objects(page)).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.closest(".sheetwrite") != null))
     .toBe(true);
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(chartObjects(page)).toHaveCount(1);
+  await expect(chart_objects(page)).toHaveCount(1);
 
   // Narrow enough that the chart runs past the grid's right edge. Focus and
   // scrollIntoView, as keyboard users and find-in-page do, must not slide the
@@ -120,9 +120,9 @@ test("a selected chart moves with the arrow keys, deletes from its menu, stays a
 
 test("the Chart menu inserts the picked kind", async ({ page }) => {
   await open(page);
-  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  await nameBox.fill("A2:C8");
-  await nameBox.press("Enter");
+  const name_box = page.getByRole("textbox", { name: "Cell reference" });
+  await name_box.fill("A2:C8");
+  await name_box.press("Enter");
   const ribbon = page.getByRole("region", { name: "Ribbon" });
   await ribbon.getByRole("tab", { name: "Insert" }).click();
   // A2 is in the pivot, so PivotChart and its "PivotChart options" show too.
@@ -131,7 +131,7 @@ test("the Chart menu inserts the picked kind", async ({ page }) => {
   await expect
     .poll(async () => (await charts(page)).map((entry) => entry.kind))
     .toEqual(["line", "pie"]);
-  await expect(chartObjects(page)).toHaveCount(2);
+  await expect(chart_objects(page)).toHaveCount(2);
 });
 
 // #700: a wide bar chart drew its value-axis labels into each other.
@@ -179,7 +179,7 @@ test("a chart and a PivotChart sit on the grid's themed background", async ({ pa
     },
     [SUMMARY, CHART, PIVOT] as const,
   );
-  await expect(chartObjects(page)).toHaveCount(2);
+  await expect(chart_objects(page)).toHaveCount(2);
 
   /** The grid's effective background and text colour, and what each chart computes. */
   const colors = () =>
@@ -204,16 +204,16 @@ test("a chart and a PivotChart sit on the grid's themed background", async ({ pa
 
   // The showcase themes its grid from the site's tokens and follows the site's
   // scheme. rgb(11, 11, 12) is the stylesheet's dark default, which the charts kept before.
-  let previousBackground = "rgb(11, 11, 12)";
+  let previous_background = "rgb(11, 11, 12)";
   for (const scheme of ["light", "dark"]) {
-    await page.evaluate((colorScheme) => {
-      document.documentElement.dataset.theme = colorScheme;
+    await page.evaluate((color_scheme) => {
+      document.documentElement.dataset.theme = color_scheme;
     }, scheme);
-    await expect.poll(async () => (await colors()).grid.bg).not.toBe(previousBackground);
+    await expect.poll(async () => (await colors()).grid.bg).not.toBe(previous_background);
     const site = await colors();
     expect(site.grid.bg).not.toBe("rgb(11, 11, 12)");
     expect(site.charts).toEqual([site.grid, site.grid]);
-    previousBackground = site.grid.bg;
+    previous_background = site.grid.bg;
   }
 
   for (const [theme, computed] of [

@@ -6,10 +6,10 @@
  * next flag as a path.
  */
 export function optionValue(args: readonly string[], name: string): string | undefined {
-  const inlinePrefix = `${name}=`;
+  const inline_prefix = `${name}=`;
   for (const [index, argument] of args.entries()) {
-    if (argument.startsWith(inlinePrefix)) {
-      const value = argument.slice(inlinePrefix.length);
+    if (argument.startsWith(inline_prefix)) {
+      const value = argument.slice(inline_prefix.length);
       if (value === "") throw new Error(`${name} requires a value`);
       return value;
     }

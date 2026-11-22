@@ -22,7 +22,7 @@ import {
   telemetry,
 } from "./workbench.js";
 
-function formatByteDelta(bytes: number): string {
+function format_byte_delta(bytes: number): string {
   if (bytes === 0) return "0 B";
   return `${bytes > 0 ? "+" : "−"}${formatSize(Math.abs(bytes))}`;
 }
@@ -393,8 +393,9 @@ function CrossingsSection() {
                     <For each={changedResourceOwners()}>
                       {(owner) => (
                         <li>
-                          <code>{owner.owner}</code>: logical {formatByteDelta(owner.logicalBytes)},
-                          allocated {formatByteDelta(owner.allocatedBytes)}, entries{" "}
+                          <code>{owner.owner}</code>: logical{" "}
+                          {format_byte_delta(owner.logicalBytes)}, allocated{" "}
+                          {format_byte_delta(owner.allocatedBytes)}, entries{" "}
                           {owner.entries > 0 ? "+" : ""}
                           {owner.entries.toLocaleString("en")}
                         </li>

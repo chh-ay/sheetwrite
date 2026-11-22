@@ -26,38 +26,38 @@ import type { Store } from "./types/store.js";
  * file is reopened in Excel/Sheets. Numeric values are legitimate data and pass
  * through untouched — a negative number is a number, not an attack vector.
  */
-function safeText(value: CellScalar): string {
+function safe_text(value: CellScalar): string {
   return typeof value === "string" ? neutralizeInjection(value) : cellScalarToText(value);
 }
 
 /** Harden a column header (always text) exactly as a text cell value. */
-function safeHeader(header: string): string {
+function safe_header(header: string): string {
   return neutralizeInjection(header);
 }
 
-function assertCompleteData(store: Store, sheet: string): void {
+function assert_complete_data(store: Store, sheet: string): void {
   const capability = store.queryCapability?.(sheet);
   if (capability?.status === "incomplete") throw new IncompleteDataError(sheet, capability);
 }
 
 /** Visible CSV view rows, read one bounded store window at a time. */
-function csvRows(
+function csv_rows(
   sheet: Sheet,
   store: Store,
   options: DelimitedTextOptions,
 ): Iterable<readonly string[]> {
-  assertCompleteData(store, sheet.id);
+  assert_complete_data(store, sheet.id);
   const limits = resolveDelimitedTextResourceLimits(options);
   const cols = visibleColumns(sheet);
-  const viewRows = store.viewRowCount(sheet.id);
-  assertDelimitedTextDimensions(viewRows + 1, cols.length, limits, "export");
+  const view_rows = store.viewRowCount(sheet.id);
+  assertDelimitedTextDimensions(view_rows + 1, cols.length, limits, "export");
 
   function* rows(): Generator<readonly string[]> {
-    yield cols.map((column) => safeHeader(sheet.columns[column]!.header));
-    for (let start = 0; start < viewRows; start += limits.maxWriterWindowRows) {
-      const end = Math.min(viewRows, start + limits.maxWriterWindowRows);
+    yield cols.map((column) => safe_header(sheet.columns[column]!.header));
+    for (let start = 0; start < view_rows; start += limits.maxWriterWindowRows) {
+      const end = Math.min(view_rows, start + limits.maxWriterWindowRows);
       options.signal?.throwIfAborted();
-      if (store.viewRowCount(sheet.id) !== viewRows) {
+      if (store.viewRowCount(sheet.id) !== view_rows) {
         throw new SheetwriteError(
           "export-failed",
           "delimited-export",
@@ -71,7 +71,7 @@ function csvRows(
       for (let row = 0; row < end - start; row++) {
         const fields: string[] = new Array(cols.length);
         for (let column = 0; column < cols.length; column++) {
-          fields[column] = safeText(view.values[row * cols.length + column] ?? null);
+          fields[column] = safe_text(view.values[row * cols.length + column] ?? null);
         }
         yield fields;
       }
@@ -93,7 +93,7 @@ function csvRows(
  * @returns The whole CSV file as one string, starting with the BOM.
  */
 export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions = {}): string {
-  return encodeDelimitedText(csvRows(sheet, store, options), ",", options, {
+  return encodeDelimitedText(csv_rows(sheet, store, options), ",", options, {
     bom: true,
     operation: "export",
   });
@@ -112,7 +112,7 @@ export function toCsvStream(
 ): ReadableStream<Uint8Array> {
   return readableBytes(
     utf8Chunks(
-      encodeDelimitedTextChunks(csvRows(sheet, store, options), ",", options, {
+      encodeDelimitedTextChunks(csv_rows(sheet, store, options), ",", options, {
         bom: true,
         operation: "export",
       }),
@@ -121,42 +121,42 @@ export function toCsvStream(
 }
 
 /** Canonical data-space rows of a range, read one bounded store window at a time. */
-function tsvRows(
+function tsv_rows(
   range: Range,
   store: Store,
   options: DelimitedTextOptions,
 ): Iterable<readonly string[]> {
-  assertCompleteData(store, range.sheet);
+  assert_complete_data(store, range.sheet);
   const limits = resolveDelimitedTextResourceLimits(options);
-  const startRow = Math.min(range.start.row, range.end.row);
-  const endRow = Math.max(range.start.row, range.end.row);
-  const startColumn = Math.min(range.start.col, range.end.col);
-  const endColumn = Math.max(range.start.col, range.end.col);
-  const rowCount = endRow - startRow + 1;
-  const columnCount = endColumn - startColumn + 1;
-  assertDelimitedTextDimensions(rowCount, columnCount, limits, "export");
+  const start_row = Math.min(range.start.row, range.end.row);
+  const end_row = Math.max(range.start.row, range.end.row);
+  const start_column = Math.min(range.start.col, range.end.col);
+  const end_column = Math.max(range.start.col, range.end.col);
+  const row_count = end_row - start_row + 1;
+  const column_count = end_column - start_column + 1;
+  assertDelimitedTextDimensions(row_count, column_count, limits, "export");
 
   function* rows(): Generator<readonly string[]> {
-    const columns = Array.from({ length: columnCount }, (_, index) => startColumn + index);
+    const columns = Array.from({ length: column_count }, (_, index) => start_column + index);
     for (
-      let chunkStart = startRow;
-      chunkStart <= endRow;
-      chunkStart += limits.maxWriterWindowRows
+      let chunk_start = start_row;
+      chunk_start <= end_row;
+      chunk_start += limits.maxWriterWindowRows
     ) {
-      const chunkEnd = Math.min(endRow + 1, chunkStart + limits.maxWriterWindowRows);
+      const chunk_end = Math.min(end_row + 1, chunk_start + limits.maxWriterWindowRows);
       options.signal?.throwIfAborted();
       const window = store.getDataWindow?.(
         range.sheet,
-        { start: chunkStart, end: chunkEnd },
+        { start: chunk_start, end: chunk_end },
         columns,
       );
-      for (let row = chunkStart; row < chunkEnd; row++) {
-        const fields: string[] = new Array(columnCount);
-        for (let column = 0; column < columnCount; column++) {
+      for (let row = chunk_start; row < chunk_end; row++) {
+        const fields: string[] = new Array(column_count);
+        for (let column = 0; column < column_count; column++) {
           const value = window
-            ? (window.values[(row - chunkStart) * columnCount + column] ?? null)
-            : store.getCell({ sheet: range.sheet, row, col: startColumn + column }).resolved;
-          fields[column] = safeText(value);
+            ? (window.values[(row - chunk_start) * column_count + column] ?? null)
+            : store.getCell({ sheet: range.sheet, row, col: start_column + column }).resolved;
+          fields[column] = safe_text(value);
         }
         yield fields;
       }
@@ -178,7 +178,7 @@ function tsvRows(
  * @returns The range as TSV text, ready for the clipboard.
  */
 export function toTsv(range: Range, store: Store, options: DelimitedTextOptions = {}): string {
-  return encodeDelimitedText(tsvRows(range, store, options), "\t", options, {
+  return encodeDelimitedText(tsv_rows(range, store, options), "\t", options, {
     operation: "export",
   });
 }
@@ -196,7 +196,7 @@ export function toTsvStream(
 ): ReadableStream<Uint8Array> {
   return readableBytes(
     utf8Chunks(
-      encodeDelimitedTextChunks(tsvRows(range, store, options), "\t", options, {
+      encodeDelimitedTextChunks(tsv_rows(range, store, options), "\t", options, {
         operation: "export",
       }),
     ),
@@ -245,7 +245,7 @@ export function fromCsv(
     ({ type }) => type === "number" || type === "currency" || type === "date",
   );
   const values: CellScalar[][] = Array.from({ length: projected.length }, () => []);
-  let scannedRows = 0;
+  let scanned_rows = 0;
   let cursor = 0;
   const append = (column: number, value: CellScalar): void => {
     while (cursor < column) {
@@ -284,29 +284,29 @@ export function fromCsv(
           }
           cursor = 0;
         }
-        scannedRows = row + 1;
+        scanned_rows = row + 1;
       },
     },
     options.signal,
   );
 
-  const rowCount = Math.max(0, scannedRows - 1);
-  assertDelimitedTextDimensions(rowCount, columns.length, limits, "import");
+  const row_count = Math.max(0, scanned_rows - 1);
+  assertDelimitedTextDimensions(row_count, columns.length, limits, "import");
 
   const result: Record<string, CellScalar[]> = Object.create(null);
-  let visibleIndex = 0;
+  let visible_index = 0;
   for (const column of columns) {
     if (column.visible === false) {
       // Keep declared key order without replacing a visible bucket for the same key.
-      result[column.key] ??= new Array<CellScalar>(rowCount).fill(null);
+      result[column.key] ??= new Array<CellScalar>(row_count).fill(null);
     } else {
-      const bucket = values[visibleIndex];
+      const bucket = values[visible_index];
       if (bucket !== undefined) result[column.key] = bucket;
-      visibleIndex += 1;
+      visible_index += 1;
     }
   }
 
-  return { rowCount, columns: result };
+  return { rowCount: row_count, columns: result };
 }
 
 /**
@@ -319,7 +319,7 @@ export function fromCsv(
  * @param mime - MIME type of the file, such as `text/csv`.
  */
 export function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void {
-  startDownload(bytes, filename, mime, (revoke) => setTimeout(revoke, 0));
+  start_download(bytes, filename, mime, (revoke) => setTimeout(revoke, 0));
 }
 
 /**
@@ -333,24 +333,24 @@ export function downloadBytesIn(
   filename: string,
   mime: string,
 ): void {
-  startDownload(bytes, filename, mime, (revoke) => owner.disposeAfter(revoke, 0));
+  start_download(bytes, filename, mime, (revoke) => owner.disposeAfter(revoke, 0));
 }
 
-function startDownload(
+function start_download(
   bytes: Uint8Array | string,
   filename: string,
   mime: string,
-  scheduleRevoke: (revoke: () => void) => void,
+  schedule_revoke: (revoke: () => void) => void,
 ): void {
   if (typeof document === "undefined") {
     throw new Error("Sheetwrite: downloadBytes requires a browser environment");
   }
 
-  const needsCopy =
+  const needs_copy =
     typeof bytes !== "string" &&
     typeof SharedArrayBuffer !== "undefined" &&
     bytes.buffer instanceof SharedArrayBuffer;
-  const part: BlobPart = needsCopy ? new Uint8Array(bytes) : (bytes as BlobPart);
+  const part: BlobPart = needs_copy ? new Uint8Array(bytes) : (bytes as BlobPart);
   const blob = new Blob([part], { type: mime });
   const url = URL.createObjectURL(blob);
   let anchor: HTMLAnchorElement | undefined;
@@ -365,7 +365,7 @@ function startDownload(
       anchor?.remove();
     } finally {
       // A synchronous revoke can race download navigation in some engines.
-      scheduleRevoke(() => URL.revokeObjectURL(url));
+      schedule_revoke(() => URL.revokeObjectURL(url));
     }
   }
 }

@@ -47,7 +47,7 @@ export function createSheetLifecycleState(
   };
 }
 
-function addSheetSnapshotIssue(
+function add_sheet_snapshot_issue(
   snapshot: SheetSnapshot,
   existing: readonly { id: SheetId; name: string }[],
 ): SheetLifecycleIssueCode | null {
@@ -138,7 +138,7 @@ export function canAddSheetSnapshot(
   snapshot: SheetSnapshot,
   existing: readonly { id: SheetId; name: string }[],
 ): boolean {
-  return addSheetSnapshotIssue(snapshot, existing) === null;
+  return add_sheet_snapshot_issue(snapshot, existing) === null;
 }
 
 /** Simulates and validates a serializable worksheet lifecycle operation. */
@@ -147,7 +147,7 @@ export function applySheetLifecycleOperation(
   operation: DocumentOp,
 ): SheetLifecycleOperationResult | null {
   if (operation.op === "addSheet") {
-    const issue = addSheetSnapshotIssue(operation.sheet, state.sheets);
+    const issue = add_sheet_snapshot_issue(operation.sheet, state.sheets);
     if (issue) return { ok: false, code: issue };
     const name = validateSheetName(
       operation.sheet.name,

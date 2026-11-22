@@ -9,18 +9,18 @@ import { mountGridWithData } from "./fixtures.js";
 // command, where it left the focus. The AutoFilter's case is in
 // autofilter-ui.test.ts; here the find bar takes the focus.
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 

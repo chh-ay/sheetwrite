@@ -9,15 +9,15 @@ import { makeColumnarData, makeWorkbook, mountGridWithData, mountHost } from "./
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
-const originalRaf = globalThis.requestAnimationFrame;
-let restoreStubs: () => void;
+const original_raf = globalThis.requestAnimationFrame;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback): number => {
     cb(0);
     return 0;
@@ -25,8 +25,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreStubs();
-  globalThis.requestAnimationFrame = originalRaf;
+  restore_stubs();
+  globalThis.requestAnimationFrame = original_raf;
 });
 
 const A = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });

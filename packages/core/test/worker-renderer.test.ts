@@ -8,7 +8,7 @@ import { WorkerRenderer } from "../src/worker-renderer.js";
 import { createWorkerMessageHandler, type WorkerAcknowledgement } from "../src/worker.js";
 import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
-let latestConstructedWorker: RecordingWorker | null = null;
+let latest_constructed_worker: RecordingWorker | null = null;
 
 class RecordingWorker extends EventTarget {
   readonly messages: Array<{ message: unknown; transfer?: Transferable[] }> = [];
@@ -16,7 +16,7 @@ class RecordingWorker extends EventTarget {
 
   constructor() {
     super();
-    latestConstructedWorker = this;
+    latest_constructed_worker = this;
   }
 
   postMessage(message: unknown, transfer?: Transferable[]): void {
@@ -38,8 +38,8 @@ class RecordingWorker extends EventTarget {
   }
 }
 
-const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
-const transferDescriptor = Object.getOwnPropertyDescriptor(
+const worker_descriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+const transfer_descriptor = Object.getOwnPropertyDescriptor(
   HTMLCanvasElement.prototype,
   "transferControlToOffscreen",
 );
@@ -50,7 +50,7 @@ function restore(target: object, key: string, descriptor: PropertyDescriptor | u
 }
 
 beforeEach(() => {
-  latestConstructedWorker = null;
+  latest_constructed_worker = null;
   const offscreen = new EventTarget();
   Object.defineProperties(offscreen, {
     width: { value: 0, writable: true },
@@ -66,12 +66,12 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
-  restore(globalThis, "Worker", workerDescriptor);
-  restore(HTMLCanvasElement.prototype, "transferControlToOffscreen", transferDescriptor);
+  restore(globalThis, "Worker", worker_descriptor);
+  restore(HTMLCanvasElement.prototype, "transferControlToOffscreen", transfer_descriptor);
 });
 
-function latestWorker(): RecordingWorker {
-  const worker = latestConstructedWorker;
+function latest_worker(): RecordingWorker {
+  const worker = latest_constructed_worker;
   if (!worker) throw new Error("worker was not constructed");
   return worker;
 }
@@ -85,7 +85,7 @@ interface TransferablePackedArrays {
   stringPoolUpdateIds?: Uint32Array;
 }
 
-function makePackedView(): VisibleWindowView {
+function make_packed_view(): VisibleWindowView {
   return {
     sheet: "s1",
     stringPoolEpoch: 17,
@@ -105,15 +105,15 @@ function makePackedView(): VisibleWindowView {
 }
 
 /** A worker handler that paints one text column and records the drawn text. */
-function textDrawingWorker() {
-  const drawnText: string[] = [];
+function text_drawing_worker() {
+  const drawn_text: string[] = [];
   const context = new Proxy<Record<string, unknown>>(
     {},
     {
       get(target, property) {
         if (property in target) return target[String(property)];
         if (property === "measureText") return (text: string) => ({ width: text.length * 7 });
-        if (property === "fillText") return (text: string) => drawnText.push(text);
+        if (property === "fillText") return (text: string) => drawn_text.push(text);
         return () => undefined;
       },
     },
@@ -142,7 +142,7 @@ function textDrawingWorker() {
   });
   const frame = {
     type: "paintPacked",
-    ...makePackedView(),
+    ...make_packed_view(),
     cols: [0],
     valueKinds: new Uint8Array([2]),
     numberValues: new Float64Array([0]),
@@ -153,7 +153,7 @@ function textDrawingWorker() {
     stringPoolUpdateValues: ["old epoch text"],
   };
 
-  return { handler, drawnText, frame };
+  return { handler, drawnText: drawn_text, frame };
 }
 
 describe("WorkerRenderer", () => {
@@ -162,9 +162,9 @@ describe("WorkerRenderer", () => {
     const worker = new RecordingWorker();
     Reflect.set(renderer, "worker", worker);
 
-    renderer.paint(makePackedView());
-    renderer.paint(makePackedView());
-    renderer.paint(makePackedView());
+    renderer.paint(make_packed_view());
+    renderer.paint(make_packed_view());
+    renderer.paint(make_packed_view());
 
     expect(worker.messages).toHaveLength(3);
     for (const { message } of worker.messages.slice(0, 2)) {
@@ -190,7 +190,7 @@ describe("WorkerRenderer", () => {
     const renderer = new WorkerRenderer();
     const worker = new RecordingWorker();
     Reflect.set(renderer, "worker", worker);
-    const packed = makePackedView();
+    const packed = make_packed_view();
     const generic: VisibleWindowView = {
       sheet: "s1",
       stringPoolEpoch: 0,
@@ -222,38 +222,38 @@ describe("WorkerRenderer", () => {
       panes: Array<{ packed?: TransferablePackedArrays; view?: VisibleWindowView }>;
     };
     expect(message.panes.map((pane) => pane.view)).toEqual([undefined, generic]);
-    const postedPacked = message.panes[0]!.packed!;
+    const posted_packed = message.panes[0]!.packed!;
     expect(posted.transfer).toEqual([
-      postedPacked.valueKinds.buffer,
-      postedPacked.numberValues.buffer,
-      postedPacked.stringPoolIds.buffer,
-      postedPacked.stringLocalIds.buffer,
-      postedPacked.styleIds.buffer,
-      postedPacked.stringPoolUpdateIds!.buffer,
+      posted_packed.valueKinds.buffer,
+      posted_packed.numberValues.buffer,
+      posted_packed.stringPoolIds.buffer,
+      posted_packed.stringLocalIds.buffer,
+      posted_packed.styleIds.buffer,
+      posted_packed.stringPoolUpdateIds!.buffer,
     ]);
-    expect(postedPacked.valueKinds).not.toBe(packed.valueKinds);
-    expect(postedPacked.styleIds).not.toBe(packed.styleIds);
+    expect(posted_packed.valueKinds).not.toBe(packed.valueKinds);
+    expect(posted_packed.styleIds).not.toBe(packed.styleIds);
   });
 
   it("drops its cached strings on a trim message", () => {
-    const { handler, drawnText, frame } = textDrawingWorker();
-    const withoutUpdates = {
+    const { handler, drawnText: drawn_text, frame } = text_drawing_worker();
+    const without_updates = {
       ...frame,
       stringPoolUpdateIds: undefined,
       stringPoolUpdateValues: undefined,
     };
     handler(frame);
-    drawnText.length = 0;
-    handler(withoutUpdates);
-    expect(drawnText).toContain("old epoch text");
+    drawn_text.length = 0;
+    handler(without_updates);
+    expect(drawn_text).toContain("old epoch text");
 
-    drawnText.length = 0;
+    drawn_text.length = 0;
     handler({ type: "trim" });
-    handler(withoutUpdates);
+    handler(without_updates);
 
-    expect(drawnText).not.toContain("old epoch text");
+    expect(drawn_text).not.toContain("old epoch text");
     handler(frame);
-    expect(drawnText).toContain("old epoch text");
+    expect(drawn_text).toContain("old epoch text");
     handler({ type: "destroy" });
   });
 
@@ -272,7 +272,7 @@ describe("WorkerRenderer", () => {
       const theme = DEFAULT_THEME;
 
       renderer.mount(host, theme);
-      const worker = latestWorker();
+      const worker = latest_worker();
       const canvas = host.querySelector("canvas");
       if (!(canvas instanceof HTMLCanvasElement)) throw new Error("worker canvas was not mounted");
 
@@ -283,33 +283,33 @@ describe("WorkerRenderer", () => {
       expect(canvas.style.width).toBe("640px");
       expect(canvas.style.height).toBe("480px");
 
-      const paintPayload = worker.messages.at(-1)?.message;
-      if (!paintPayload) throw new Error("paint payload was not posted");
-      const prematureAcknowledgements: unknown[] = [];
-      createWorkerMessageHandler((message) => prematureAcknowledgements.push(message))(
-        paintPayload,
+      const paint_payload = worker.messages.at(-1)?.message;
+      if (!paint_payload) throw new Error("paint payload was not posted");
+      const premature_acknowledgements: unknown[] = [];
+      createWorkerMessageHandler((message) => premature_acknowledgements.push(message))(
+        paint_payload,
       );
-      expect(prematureAcknowledgements).toEqual([]);
+      expect(premature_acknowledgements).toEqual([]);
 
       const acknowledgements: unknown[] = [];
-      const handleWorkerMessage = createWorkerMessageHandler((message) => {
+      const handle_worker_message = createWorkerMessageHandler((message) => {
         acknowledgements.push(message);
         worker.emitMessage(message);
       });
       for (const { message } of worker.messages.slice(0, -1)) {
-        handleWorkerMessage(message);
+        handle_worker_message(message);
       }
       expect(acknowledgements).toEqual([{ type: "ready" }]);
       jest.advanceTimersByTime(30_000);
       expect(failures).toHaveLength(0);
       expect(canvas.dataset.workerFrame).toBe("0");
 
-      handleWorkerMessage(paintPayload);
+      handle_worker_message(paint_payload);
       expect(acknowledgements).toEqual([{ type: "ready" }, { type: "painted" }]);
       expect(canvas.dataset.workerFrame).toBe("1");
 
       renderer.destroy();
-      handleWorkerMessage(worker.messages.at(-1)?.message);
+      handle_worker_message(worker.messages.at(-1)?.message);
       expect(acknowledgements).toEqual([{ type: "ready" }, { type: "painted" }]);
       expect(worker.terminations).toBe(1);
       expect(host.querySelector("canvas")).toBeNull();
@@ -322,7 +322,7 @@ describe("WorkerRenderer", () => {
     const failures: SheetwriteError[] = [];
     const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
     renderer.mount(document.createElement("div"), DEFAULT_THEME);
-    latestWorker().emitMessage({ type: "fatal", reason: "x".repeat(100_000) });
+    latest_worker().emitMessage({ type: "fatal", reason: "x".repeat(100_000) });
 
     expect(failures.map((error) => error.context?.failure)).toEqual(["fatal"]);
     expect(failures[0]?.message.length).toBe(256);
@@ -341,7 +341,7 @@ describe("WorkerRenderer", () => {
 
   it("falls back to the canvas exactly once when a constructed worker fails asynchronously", async () => {
     await initSheetwrite();
-    const restoreStubs = installCanvasTestStubs();
+    const restore_stubs = installCanvasTestStubs();
     try {
       const host = mountHost();
       const events: Array<GridEvents["renderer-fallback"]> = [];
@@ -354,7 +354,7 @@ describe("WorkerRenderer", () => {
       grid.on("renderer-fallback", (event) => events.push(event));
       expect(grid.rendererKind()).toBe("worker");
       expect(host.querySelectorAll("canvas")).toHaveLength(1);
-      const worker = latestWorker();
+      const worker = latest_worker();
 
       const failure = new Error("module load failed");
       worker.fail(failure);
@@ -376,7 +376,7 @@ describe("WorkerRenderer", () => {
       grid.destroy();
       expect(host.querySelectorAll("canvas")).toHaveLength(0);
     } finally {
-      restoreStubs();
+      restore_stubs();
     }
   });
 });

@@ -69,7 +69,7 @@ export function dataProperties(
   }
 }
 
-function validCoordinate(value: unknown): value is number {
+function valid_coordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
@@ -83,10 +83,10 @@ export function sanitizeRange(value: unknown): Range | null {
     range.sheet.length === 0 ||
     !start ||
     !end ||
-    !validCoordinate(start.row) ||
-    !validCoordinate(start.col) ||
-    !validCoordinate(end.row) ||
-    !validCoordinate(end.col)
+    !valid_coordinate(start.row) ||
+    !valid_coordinate(start.col) ||
+    !valid_coordinate(end.row) ||
+    !valid_coordinate(end.col)
   ) {
     return null;
   }

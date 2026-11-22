@@ -23,14 +23,14 @@ export class RangeSourceProjection {
   }
 
   formulaAt(offset: number): string | null {
-    const index = sortedIndexOf(this.formulaOffsets, offset);
+    const index = sorted_index_of(this.formulaOffsets, offset);
     return index < 0 ? null : (this.formulaSources[index] ?? null);
   }
 
   referenceAt(offset: number): CellAddress | null {
-    const index = sortedIndexOf(this.referenceOffsets, offset);
+    const index = sorted_index_of(this.referenceOffsets, offset);
     if (index < 0) return null;
-    return this.referenceTarget(index);
+    return this.reference_target(index);
   }
 
   *formulas(): IterableIterator<readonly [offset: number, source: string]> {
@@ -41,11 +41,11 @@ export class RangeSourceProjection {
 
   *references(): IterableIterator<readonly [offset: number, target: CellAddress]> {
     for (let index = 0; index < this.referenceOffsets.length; index++) {
-      yield [this.referenceOffsets[index]!, this.referenceTarget(index)];
+      yield [this.referenceOffsets[index]!, this.reference_target(index)];
     }
   }
 
-  private referenceTarget(index: number): CellAddress {
+  private reference_target(index: number): CellAddress {
     const target = index * 3;
     const sheet = this.sheetIds[this.referenceTargets[target]!];
     if (sheet === undefined) throw new Error("persisted reference targets an unknown sheet");
@@ -87,7 +87,7 @@ export function referenceTargetFromPacked(
   return sheet === undefined ? null : { sheet, row: packed[1]!, col: packed[2]! };
 }
 
-function sortedIndexOf(values: Uint32Array, target: number): number {
+function sorted_index_of(values: Uint32Array, target: number): number {
   let low = 0;
   let high = values.length;
   while (low < high) {

@@ -16,11 +16,11 @@ export interface SheetwriteEngine {
   functionNames?: () => string[];
 }
 
-let selectedEngine: SheetwriteEngine = defaultEngine;
-let pendingEngine: SheetwriteEngine | undefined;
-let engineInstance: defaultEngine.EngineInstance | undefined;
+let selected_engine: SheetwriteEngine = defaultEngine;
+let pending_engine: SheetwriteEngine | undefined;
+let engine_instance: defaultEngine.EngineInstance | undefined;
 let initialization: Promise<void> | undefined;
-let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
+let selected_source: Parameters<SheetwriteEngine["load"]>[0];
 
 /**
  * Counts engine stops. A store or grid keeps the value from its construction;
@@ -30,9 +30,9 @@ let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
 let generation = 0;
 
 /** Compiled module of a stopped instance; the restart instantiates it again without a fetch. */
-let stoppedModule: WebAssembly.Module | undefined;
+let stopped_module: WebAssembly.Module | undefined;
 
-const failureListeners = new Set<(failure: SheetwriteError) => void>();
+const failure_listeners = new Set<(failure: SheetwriteError) => void>();
 
 export let engineFunctionNames: readonly string[] | undefined;
 
@@ -53,8 +53,8 @@ export function engineFailedError(cause?: unknown): SheetwriteError {
 const CAUSE_DEPTH = 3;
 
 export function getEngine(): defaultEngine.EngineInstance {
-  if (!engineInstance) {
-    if (stoppedModule) throw engineFailedError();
+  if (!engine_instance) {
+    if (stopped_module) throw engineFailedError();
 
     throw new SheetwriteError(
       "initialization-required",
@@ -63,7 +63,7 @@ export function getEngine(): defaultEngine.EngineInstance {
     );
   }
 
-  return engineInstance;
+  return engine_instance;
 }
 
 /**
@@ -73,8 +73,8 @@ export function getEngine(): defaultEngine.EngineInstance {
  * instance releases its memory when `use` returns.
  */
 export async function lendEngine<T>(use: (engine: defaultEngine.EngineInstance) => T): Promise<T> {
-  const engine = engineInstance ?? (await defaultEngine.createEngine());
-  const temporary = engine !== engineInstance;
+  const engine = engine_instance ?? (await defaultEngine.createEngine());
+  const temporary = engine !== engine_instance;
   try {
     return use(engine);
   } finally {
@@ -83,7 +83,7 @@ export async function lendEngine<T>(use: (engine: defaultEngine.EngineInstance) 
 }
 
 export function isEngineLoaded(): boolean {
-  return engineInstance !== undefined;
+  return engine_instance !== undefined;
 }
 
 export function engineGeneration(): number {
@@ -120,13 +120,13 @@ export function isEngineTrap(error: unknown): boolean {
  */
 export function stopEngine(cause: unknown, owner: number): SheetwriteError {
   const failure = engineFailedError(cause);
-  if (owner !== generation || !engineInstance) return failure;
+  if (owner !== generation || !engine_instance) return failure;
 
-  stoppedModule = engineInstance.getModule();
-  engineInstance = undefined;
+  stopped_module = engine_instance.getModule();
+  engine_instance = undefined;
   generation += 1;
 
-  for (const listener of [...failureListeners]) {
+  for (const listener of [...failure_listeners]) {
     try {
       listener(failure);
     } catch (error) {
@@ -143,19 +143,19 @@ export function stopEngine(cause: unknown, owner: number): SheetwriteError {
 
 /** Called synchronously inside `stopEngine`; a listener must not call the engine. */
 export function onEngineFailure(listener: (failure: SheetwriteError) => void): () => void {
-  failureListeners.add(listener);
-  return () => failureListeners.delete(listener);
+  failure_listeners.add(listener);
+  return () => failure_listeners.delete(listener);
 }
 
 export async function loadEngine(
   source: Parameters<SheetwriteEngine["load"]>[0],
   engine?: SheetwriteEngine,
 ): Promise<void> {
-  const requested = engine ?? pendingEngine ?? selectedEngine;
-  const selected = engineInstance !== undefined || stoppedModule !== undefined;
+  const requested = engine ?? pending_engine ?? selected_engine;
+  const selected = engine_instance !== undefined || stopped_module !== undefined;
   if (
-    (pendingEngine && pendingEngine !== requested) ||
-    (selected && selectedEngine !== requested)
+    (pending_engine && pending_engine !== requested) ||
+    (selected && selected_engine !== requested)
   ) {
     throw new SheetwriteError(
       "initialization-failed",
@@ -165,7 +165,7 @@ export async function loadEngine(
   }
 
   if (initialization) {
-    if (source !== undefined && source !== selectedSource) {
+    if (source !== undefined && source !== selected_source) {
       throw new SheetwriteError(
         "initialization-failed",
         "initialize",
@@ -176,26 +176,26 @@ export async function loadEngine(
     return initialization;
   }
 
-  if (selected && source !== undefined && source !== selectedSource) {
+  if (selected && source !== undefined && source !== selected_source) {
     console.warn(
       "Sheetwrite: load() called with a different source after initialization; keeping the first module.",
     );
   }
 
-  if (engineInstance) return;
+  if (engine_instance) return;
 
-  const restart = stoppedModule;
-  pendingEngine = requested;
-  if (!restart) selectedSource = source;
+  const restart = stopped_module;
+  pending_engine = requested;
+  if (!restart) selected_source = source;
   initialization = (async () => {
     try {
       const instance = await requested.createEngine(restart ?? source);
-      selectedEngine = requested;
-      engineInstance = instance;
-      stoppedModule = undefined;
+      selected_engine = requested;
+      engine_instance = instance;
+      stopped_module = undefined;
       engineFunctionNames = instance.functionNames?.();
     } finally {
-      pendingEngine = undefined;
+      pending_engine = undefined;
       initialization = undefined;
     }
   })();
@@ -205,12 +205,12 @@ export async function loadEngine(
 
 /** Prepare without changing the live engine or retaining the old linear memory. */
 export function prepareEngineInstance(): Promise<defaultEngine.EngineInstance> {
-  return selectedEngine.createEngine(getEngine().getModule());
+  return selected_engine.createEngine(getEngine().getModule());
 }
 
 /** Called only after every live store has successfully prepared its replacement. */
 export function replaceEngineInstance(instance: defaultEngine.EngineInstance): void {
-  engineInstance = instance;
+  engine_instance = instance;
 }
 
 /**
@@ -223,12 +223,12 @@ export function buildOnEngineInstance<T>(
   instance: defaultEngine.EngineInstance,
   build: () => T,
 ): T {
-  const documentInstance = getEngine();
-  engineInstance = instance;
+  const document_instance = getEngine();
+  engine_instance = instance;
   try {
     return build();
   } finally {
     // A trap inside `build` stops the engine; do not revive a stopped generation.
-    if (engineInstance === instance) engineInstance = documentInstance;
+    if (engine_instance === instance) engine_instance = document_instance;
   }
 }

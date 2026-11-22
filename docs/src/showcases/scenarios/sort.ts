@@ -81,7 +81,7 @@ const WATCH = [
 /** Formulas in the workbook: one revenue formula per order, plus the Watch formulas. */
 export const FORMULA_COUNT = ORDER_COUNT + WATCH.length;
 
-function sortWorkbook(): Workbook {
+function sort_workbook(): Workbook {
   return {
     activeSheet: ORDERS_SHEET,
     sheets: [
@@ -105,7 +105,7 @@ function sortWorkbook(): Workbook {
 }
 
 /** A deterministic order list: values, plus a revenue formula in every row. */
-function orderOperations(): DocumentOp[] {
+function order_operations(): DocumentOp[] {
   const set = (sheet: string, row: number, col: number, value: string | number): DocumentOp => ({
     op: "set",
     addr: { sheet, row, col },
@@ -161,13 +161,13 @@ export interface SortScenario extends LiveScenario<SortSnapshot> {
   undo(): void;
 }
 
-function keyLabel(keys: readonly SortKey[]): string {
+function key_label(keys: readonly SortKey[]): string {
   return keys
     .map((key) => `${columnHeader(key.col)} ${key.ascending ? "A–Z" : "Z–A"}`)
     .join(", then ");
 }
 
-function readText(grid: Grid, addr: CellAddress, format?: string): string {
+function read_text(grid: Grid, addr: CellAddress, format?: string): string {
   const value = grid.store.getCell(addr).resolved;
   if (value === null) return "";
   return typeof value === "number" && format ? formatNumber(value, format) : String(value);
@@ -179,36 +179,36 @@ export function createSortScenario(host: HTMLElement): SortScenario {
   const listeners = createListeners();
   let grid: Grid | null = null;
   let dispose = () => {};
-  let startOrder: readonly string[] = [];
-  let lastReason: CommitReason | null = null;
+  let start_order: readonly string[] = [];
+  let last_reason: CommitReason | null = null;
 
-  const orderAt = (row: number) =>
-    grid ? readText(grid, { sheet: ORDERS_SHEET, row, col: column("order") }) : "";
+  const order_at = (row: number) =>
+    grid ? read_text(grid, { sheet: ORDERS_SHEET, row, col: column("order") }) : "";
 
   const ready = (async () => {
     // Column names in the headers: a view sort orders every row, so no header row sits in the cells.
     const shell = await mountShowcaseShell(
       host,
-      { workbook: sortWorkbook(), presentation: "data-grid" },
+      { workbook: sort_workbook(), presentation: "data-grid" },
       controller.signal,
     );
     if (!shell) return;
     grid = shell.grid;
     // Seed the document as a host load: it is not an undo step.
-    requireApplied(grid.applyRemoteOperations(orderOperations()), "The order list");
-    startOrder = Array.from({ length: ORDER_COUNT }, (_, row) => orderAt(row));
-    const stopChanges = grid.on("change", (event) => {
-      lastReason = event.commitReason;
+    requireApplied(grid.applyRemoteOperations(order_operations()), "The order list");
+    start_order = Array.from({ length: ORDER_COUNT }, (_, row) => order_at(row));
+    const stop_changes = grid.on("change", (event) => {
+      last_reason = event.commitReason;
       listeners.notify();
     });
     grid.setSelection({ kind: "cell", addr: { sheet: ORDERS_SHEET, row: 0, col: 0 } });
     dispose = () => {
-      stopChanges();
+      stop_changes();
       shell.dispose();
     };
   })();
 
-  const requireGrid = (): Grid => {
+  const require_grid = (): Grid => {
     if (!grid) throw new Error("The order list is still loading");
     return grid;
   };
@@ -226,37 +226,37 @@ export function createSortScenario(host: HTMLElement): SortScenario {
         watch: WATCH.map((watch, row) => ({
           label: watch.label,
           formula: watch.src,
-          value: readText(
+          value: read_text(
             current,
             { sheet: WATCH_SHEET, row, col: 1 },
             row === 1 ? REVENUE_FORMAT : undefined,
           ),
         })),
-        movedRows: startOrder.filter((order, row) => orderAt(row) !== order).length,
-        viewSort: keys.length > 0 ? keyLabel(keys) : null,
-        lastReason,
+        movedRows: start_order.filter((order, row) => order_at(row) !== order).length,
+        viewSort: keys.length > 0 ? key_label(keys) : null,
+        lastReason: last_reason,
       };
     },
     sortInPlace(id) {
       requireApplied(
-        requireGrid().sortRange(ORDERS_RANGE, SORTS[id].keys),
+        require_grid().sortRange(ORDERS_RANGE, SORTS[id].keys),
         `Sort by ${SORTS[id].label}`,
       );
     },
     sortView(id) {
-      requireApplied(requireGrid().setViewSort(SORTS[id].keys), `View sort ${SORTS[id].label}`);
+      requireApplied(require_grid().setViewSort(SORTS[id].keys), `View sort ${SORTS[id].label}`);
     },
     clearViewSort() {
-      requireApplied(requireGrid().setViewSort([]), "Clear the view sort");
+      requireApplied(require_grid().setViewSort([]), "Clear the view sort");
     },
     openSortPanel() {
-      const current = requireGrid();
+      const current = require_grid();
       current.setActiveSheet(ORDERS_SHEET);
       current.setSelection({ kind: "range", range: ORDERS_RANGE });
       current.actions.customSort();
     },
     undo() {
-      requireGrid().undo();
+      require_grid().undo();
     },
     dispose() {
       controller.abort();

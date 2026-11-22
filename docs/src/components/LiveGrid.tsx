@@ -26,7 +26,7 @@ type LiveGridState = "idle" | "loading" | "ready" | "failed";
 export function LiveGrid(rawProps: LiveGridProps) {
   const props = mergeProps({ height: DEFAULT_HEIGHT }, rawProps);
   let host!: HTMLDivElement;
-  const [state, setState] = createSignal<LiveGridState>("idle");
+  const [state, set_state] = createSignal<LiveGridState>("idle");
 
   createEffect(
     on(
@@ -39,16 +39,16 @@ export function LiveGrid(rawProps: LiveGridProps) {
           (entries) => {
             if (!entries.some((entry) => entry.isIntersecting)) return;
             observer.disconnect();
-            setState("loading");
+            set_state("loading");
             import("@docs/figures/live-grid.js")
-              .then(({ mountLiveGrid }) => mountLiveGrid(element, name))
+              .then(({ mountLiveGrid: mount_live_grid }) => mount_live_grid(element, name))
               .then(
                 (teardown) => {
                   if (removed) return teardown();
                   dispose = teardown;
-                  setState("ready");
+                  set_state("ready");
                 },
-                () => setState("failed"),
+                () => set_state("failed"),
               );
           },
           { rootMargin: PRELOAD_MARGIN },

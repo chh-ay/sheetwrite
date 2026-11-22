@@ -34,23 +34,23 @@ class LifetimeProbe {
   private destroyed = false;
   private readonly timers = new Set<unknown>();
   private readonly frames = new Map<number, FrameRequestCallback>();
-  private nextFrame = 1;
+  private next_frame = 1;
   private readonly listeners = new Set<object>();
-  private readonly listenerRecords = new WeakMap<EventListener, object>();
+  private readonly listener_records = new WeakMap<EventListener, object>();
   private readonly observers = new Set<object>();
-  private readonly objectUrls = new Set<string>();
+  private readonly object_urls = new Set<string>();
   private readonly restores: Array<() => void> = [];
 
   constructor() {
-    this.trackTimers();
-    this.trackFrames();
-    this.trackObservers();
-    this.trackObjectUrls();
+    this.track_timers();
+    this.track_frames();
+    this.track_observers();
+    this.track_object_urls();
     this.trackListeners(document);
     this.trackListeners(globalThis);
-    const matchMedia = globalThis.matchMedia;
+    const match_media = globalThis.matchMedia;
     this.replace(globalThis, "matchMedia", (query: string) => {
-      const list = matchMedia(query);
+      const list = match_media(query);
       this.trackListeners(list);
       return list;
     });
@@ -62,7 +62,7 @@ class LifetimeProbe {
       frames: this.frames.size,
       listeners: this.listeners.size,
       observers: this.observers.size,
-      objectUrls: this.objectUrls.size,
+      objectUrls: this.object_urls.size,
     };
   }
 
@@ -83,18 +83,18 @@ class LifetimeProbe {
     const add = target.addEventListener.bind(target);
     const remove = target.removeEventListener.bind(target);
     const wrappers = new Map<EventListenerOrEventListenerObject, Map<string, EventListener>>();
-    const keyOf = (type: string, options?: boolean | EventListenerOptions): string =>
+    const key_of = (type: string, options?: boolean | EventListenerOptions): string =>
       `${type}:${typeof options === "boolean" ? options : Boolean(options?.capture)}`;
 
-    const addListener: EventTarget["addEventListener"] = (type, listener, options) => {
+    const add_listener: EventTarget["addEventListener"] = (type, listener, options) => {
       const signal = typeof options === "object" ? options.signal : undefined;
       if (listener === null || signal?.aborted === true) {
         add(type, listener, options);
         return;
       }
-      const key = keyOf(type, options);
-      const byKey = wrappers.get(listener) ?? new Map<string, EventListener>();
-      if (byKey.has(key)) return;
+      const key = key_of(type, options);
+      const by_key = wrappers.get(listener) ?? new Map<string, EventListener>();
+      if (by_key.has(key)) return;
 
       const record = {};
       const once = typeof options === "object" && options.once === true;
@@ -104,15 +104,15 @@ class LifetimeProbe {
         if (typeof listener === "function") listener.call(target, event);
         else listener.handleEvent(event);
       };
-      byKey.set(key, wrapper);
-      wrappers.set(listener, byKey);
+      by_key.set(key, wrapper);
+      wrappers.set(listener, by_key);
       this.listeners.add(record);
-      this.listenerRecords.set(wrapper, record);
+      this.listener_records.set(wrapper, record);
       signal?.addEventListener("abort", () => this.listeners.delete(record), { once: true });
       add(type, wrapper, options);
     };
-    const removeListener: EventTarget["removeEventListener"] = (type, listener, options) => {
-      const key = keyOf(type, options);
+    const remove_listener: EventTarget["removeEventListener"] = (type, listener, options) => {
+      const key = key_of(type, options);
       const wrapper = listener === null ? undefined : wrappers.get(listener)?.get(key);
       if (listener === null || wrapper === undefined) {
         remove(type, listener, options);
@@ -120,39 +120,39 @@ class LifetimeProbe {
       }
 
       wrappers.get(listener)?.delete(key);
-      const record = this.listenerRecords.get(wrapper);
+      const record = this.listener_records.get(wrapper);
       if (record !== undefined) this.listeners.delete(record);
       remove(type, wrapper, options);
     };
-    this.replace(target, "addEventListener", addListener);
-    this.replace(target, "removeEventListener", removeListener);
+    this.replace(target, "addEventListener", add_listener);
+    this.replace(target, "removeEventListener", remove_listener);
   }
 
   restore(): void {
     for (const restore of this.restores.splice(0).reverse()) restore();
   }
 
-  private trackTimers(): void {
-    const setTimer = globalThis.setTimeout;
-    const clearTimer = globalThis.clearTimeout;
-    this.replace(globalThis, "setTimeout", (callback: () => void, delayMs?: number) => {
-      const timer = setTimer(() => {
+  private track_timers(): void {
+    const set_timer = globalThis.setTimeout;
+    const clear_timer = globalThis.clearTimeout;
+    this.replace(globalThis, "setTimeout", (callback: () => void, delay_ms?: number) => {
+      const timer = set_timer(() => {
         this.timers.delete(timer);
         if (this.destroyed) this.callsAfterDestroy += 1;
         callback();
-      }, delayMs);
+      }, delay_ms);
       this.timers.add(timer);
       return timer;
     });
     this.replace(globalThis, "clearTimeout", (timer: Parameters<typeof clearTimeout>[0]) => {
       this.timers.delete(timer);
-      clearTimer(timer);
+      clear_timer(timer);
     });
   }
 
-  private trackFrames(): void {
+  private track_frames(): void {
     this.replace(globalThis, "requestAnimationFrame", (callback: FrameRequestCallback) => {
-      const id = this.nextFrame++;
+      const id = this.next_frame++;
       this.frames.set(id, (time) => {
         if (this.destroyed) this.callsAfterDestroy += 1;
         callback(time);
@@ -164,7 +164,7 @@ class LifetimeProbe {
     });
   }
 
-  private trackObservers(): void {
+  private track_observers(): void {
     const observers = this.observers;
     class TrackedResizeObserver {
       observe(): void {
@@ -178,16 +178,16 @@ class LifetimeProbe {
     this.replace(globalThis, "ResizeObserver", TrackedResizeObserver);
   }
 
-  private trackObjectUrls(): void {
+  private track_object_urls(): void {
     let serial = 0;
     this.replace(URL, "createObjectURL", () => {
       serial += 1;
       const url = `blob:lifetime-probe-${serial}`;
-      this.objectUrls.add(url);
+      this.object_urls.add(url);
       return url;
     });
     this.replace(URL, "revokeObjectURL", (url: string) => {
-      this.objectUrls.delete(url);
+      this.object_urls.delete(url);
     });
     // A download click would navigate the test page.
     this.replace(HTMLAnchorElement.prototype, "click", () => {});
@@ -203,18 +203,18 @@ class LifetimeProbe {
   }
 }
 
-function mountHost(): HTMLDivElement {
+function mount_host(): HTMLDivElement {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 800 }, clientHeight: { value: 400 } });
   document.body.appendChild(host);
   return host;
 }
 
-async function mountTurns(): Promise<void> {
+async function mount_turns(): Promise<void> {
   for (let turn = 0; turn < MOUNT_TURNS; turn++) await Promise.resolve();
 }
 
-let restoreCanvas: (() => void) | undefined;
+let restore_canvas: (() => void) | undefined;
 let probe: LifetimeProbe | undefined;
 
 beforeAll(async () => {
@@ -224,8 +224,8 @@ beforeAll(async () => {
 afterEach(() => {
   probe?.restore();
   probe = undefined;
-  restoreCanvas?.();
-  restoreCanvas = undefined;
+  restore_canvas?.();
+  restore_canvas = undefined;
   document.body.replaceChildren();
 });
 
@@ -233,10 +233,10 @@ afterEach(() => {
 // tests exercise the chunk boundary, so the imports must stay dynamic.
 describe("grid destroy", () => {
   it("leaves no timer, frame, listener, observer or object URL that can run", async () => {
-    restoreCanvas = installCanvasTestStubs();
+    restore_canvas = installCanvasTestStubs();
     const lifetime = new LifetimeProbe();
     probe = lifetime;
-    const host = mountHost();
+    const host = mount_host();
     lifetime.trackListeners(host);
     const grid = createGrid(host, {
       workbook: makeWorkbook(ROWS),
@@ -246,7 +246,7 @@ describe("grid destroy", () => {
     await import("../src/ribbon/ribbon.js");
     grid.actions.find();
     await import("../src/find-bar.js");
-    await mountTurns();
+    await mount_turns();
 
     // Work in flight at destroy: a summary between chunks, an auto-fit
     // between frames, an export before its URL is revoked, a feedback
@@ -298,26 +298,26 @@ describe("grid destroy", () => {
   });
 
   it("drops shell chrome that loads after the shell is destroyed", async () => {
-    restoreCanvas = installCanvasTestStubs();
-    const host = mountHost();
+    restore_canvas = installCanvasTestStubs();
+    const host = mount_host();
     const shell = createSpreadsheetShell(host, {
       grid: { workbook: makeWorkbook(3) },
       ribbon: true,
     });
-    const toolbarRow = shell.element.querySelector(".sheetwrite-shell-toolbar-row");
+    const toolbar_row = shell.element.querySelector(".sheetwrite-shell-toolbar-row");
     shell.destroy();
     // A live shell's ribbon loads within the same wait.
-    const live = createSpreadsheetShell(mountHost(), {
+    const live = createSpreadsheetShell(mount_host(), {
       grid: { workbook: makeWorkbook(3) },
       ribbon: true,
     });
-    const liveRow = live.element.querySelector(".sheetwrite-shell-toolbar-row");
+    const live_row = live.element.querySelector(".sheetwrite-shell-toolbar-row");
 
     await import("../src/shell/ribbon-factory.js");
-    await mountTurns();
+    await mount_turns();
 
-    expect(toolbarRow?.childElementCount).toBe(0);
-    expect(liveRow?.childElementCount).toBeGreaterThan(0);
+    expect(toolbar_row?.childElementCount).toBe(0);
+    expect(live_row?.childElementCount).toBeGreaterThan(0);
     live.destroy();
   });
 });

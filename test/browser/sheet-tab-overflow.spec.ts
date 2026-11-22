@@ -16,7 +16,7 @@ declare global {
 
 const SHEETS = ["Dashboard", "Orders", "Report", "Pivot", "Formulas", "History"];
 
-async function open(page: Page, width: number, extraSheets: readonly string[]): Promise<void> {
+async function open(page: Page, width: number, extra_sheets: readonly string[]): Promise<void> {
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/showcases/spreadsheet/");
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
@@ -31,13 +31,13 @@ async function open(page: Page, width: number, extraSheets: readonly string[]): 
       });
     }
     grid?.setActiveSheet("sales");
-  }, extraSheets);
+  }, extra_sheets);
   await nextFrames(page);
   await nextFrames(page);
 }
 
 /** Whether the sheet's tab shows in full between the strip's arrows and + button. */
-function tabInView(page: Page, name: string): Promise<boolean> {
+function tab_in_view(page: Page, name: string): Promise<boolean> {
   return page.evaluate((sheet) => {
     const strip = document.querySelector(".sheetwrite-shell-tabs");
     const tab = strip?.querySelector(`[aria-label="${sheet} sheet"]`);
@@ -72,12 +72,12 @@ test("overflowing tabs show labelled scroll arrows that scroll by a sheet @porta
     expect(Math.round((box?.height ?? 0) * 100) / 100).toBeGreaterThanOrEqual(24);
   }
 
-  expect(await tabInView(page, "History")).toBe(false);
-  for (let press = 0; press < SHEETS.length && !(await tabInView(page, "History")); press++) {
+  expect(await tab_in_view(page, "History")).toBe(false);
+  for (let press = 0; press < SHEETS.length && !(await tab_in_view(page, "History")); press++) {
     await next.click();
     await nextFrames(page);
   }
-  expect(await tabInView(page, "History")).toBe(true);
+  expect(await tab_in_view(page, "History")).toBe(true);
   await expect(next).toHaveAttribute("aria-disabled", "true");
   await expect(previous).toHaveAttribute("aria-disabled", "false");
 });
@@ -99,7 +99,7 @@ test("a right-click, the context menu key or a long press on an arrow lists ever
   expect(await page.evaluate(() => window.__sheetwriteSpreadsheetGrid?.getActiveSheet())).toBe(
     "pivot",
   );
-  expect(await tabInView(page, "Pivot")).toBe(true);
+  expect(await tab_in_view(page, "Pivot")).toBe(true);
 
   // Keyboard: the context menu key (Shift+F10) on the focused arrow, then the arrow keys.
   await next.focus();
@@ -110,7 +110,7 @@ test("a right-click, the context menu key or a long press on an arrow lists ever
   expect(await page.evaluate(() => window.__sheetwriteSpreadsheetGrid?.getActiveSheet())).toBe(
     "history",
   );
-  expect(await tabInView(page, "History")).toBe(true);
+  expect(await tab_in_view(page, "History")).toBe(true);
 
   // Touch: a press held on the arrow.
   await next.dispatchEvent("pointerdown", { pointerType: "touch", clientX: 0, clientY: 0 });
@@ -148,7 +148,7 @@ test("cut tab text fades out before an arrow, only at an edge that hides tabs", 
   const next = page
     .locator(".sheetwrite-shell-tabs")
     .getByRole("button", { name: "Show later sheets" });
-  for (let press = 0; press < SHEETS.length && !(await tabInView(page, "History")); press++) {
+  for (let press = 0; press < SHEETS.length && !(await tab_in_view(page, "History")); press++) {
     await next.click();
     await nextFrames(page);
   }

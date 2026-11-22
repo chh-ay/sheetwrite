@@ -63,7 +63,7 @@ const RUNTIME_ENTRY_PATHS = [
   "./packages/vue/dist/index.js",
 ] as const;
 
-function packageDirectories(root: string): readonly string[] {
+function package_directories(root: string): readonly string[] {
   return readdirSync(resolve(root, "packages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => resolve(root, "packages", entry.name));
@@ -81,14 +81,14 @@ export function assertGeneratedOutputsAbsent(root: string): void {
 export function validateExportTargets(root: string): readonly string[] {
   const checked: string[] = [];
   const missing: string[] = [];
-  for (const packageRoot of packageDirectories(root)) {
+  for (const package_root of package_directories(root)) {
     const manifest = JSON.parse(
-      readFileSync(resolve(packageRoot, "package.json"), "utf8"),
+      readFileSync(resolve(package_root, "package.json"), "utf8"),
     ) as PackageManifest;
     if (!manifest.name || publishableIndex(manifest.name) === -1) continue;
     for (const target of packageTargets(manifest)) {
       checked.push(`${manifest.name}:./${target}`);
-      if (!existsSync(resolve(packageRoot, target))) missing.push(`${manifest.name}:./${target}`);
+      if (!existsSync(resolve(package_root, target))) missing.push(`${manifest.name}:./${target}`);
     }
   }
   if (missing.length > 0) {
@@ -111,43 +111,43 @@ async function run(
     stderr: capture ? "pipe" : "inherit",
   });
   if (capture) {
-    const [stdout, stderr, exitCode] = await Promise.all([
+    const [stdout, stderr, exit_code] = await Promise.all([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
       child.exited,
     ]);
-    if (exitCode !== 0) throw new Error(`${command.join(" ")} failed: ${stderr.trim()}`);
+    if (exit_code !== 0) throw new Error(`${command.join(" ")} failed: ${stderr.trim()}`);
     return stdout;
   }
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
   return "";
 }
 
-async function exportWorkspace(sourceRoot: string, destinationRoot: string): Promise<void> {
+async function export_workspace(source_root: string, destination_root: string): Promise<void> {
   const output = await run(
-    sourceRoot,
+    source_root,
     ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
     true,
   );
   const paths = output.split("\0").filter(Boolean);
   if (paths.length === 0) throw new Error("Git returned no source files for the clean export");
-  for (const relativePath of paths) {
-    const source = resolve(sourceRoot, relativePath);
-    const destination = resolve(destinationRoot, relativePath);
-    const sourceStat = await lstat(source);
-    if (!sourceStat.isFile() && !sourceStat.isSymbolicLink()) {
-      throw new Error(`Clean export encountered unsupported source entry: ${relativePath}`);
+  for (const relative_path of paths) {
+    const source = resolve(source_root, relative_path);
+    const destination = resolve(destination_root, relative_path);
+    const source_stat = await lstat(source);
+    if (!source_stat.isFile() && !source_stat.isSymbolicLink()) {
+      throw new Error(`Clean export encountered unsupported source entry: ${relative_path}`);
     }
     await mkdir(dirname(destination), { recursive: true });
     await cp(source, destination, { dereference: false });
   }
 }
 
-async function verifyRuntimeImports(root: string): Promise<void> {
-  const smokePath = resolve(root, ".sheetwrite-runtime-import-smoke.ts");
+async function verify_runtime_imports(root: string): Promise<void> {
+  const smoke_path = resolve(root, ".sheetwrite-runtime-import-smoke.ts");
   await writeFile(
-    smokePath,
+    smoke_path,
     `const entries = ${JSON.stringify(RUNTIME_ENTRY_PATHS)};\n` +
       "for (const entry of entries) {\n" +
       "  // Runtime-selected entry URLs intentionally exercise built module loading boundaries.\n" +
@@ -155,36 +155,36 @@ async function verifyRuntimeImports(root: string): Promise<void> {
       "}\n",
   );
   try {
-    await run(root, ["bun", smokePath]);
+    await run(root, ["bun", smoke_path]);
   } finally {
-    await rm(smokePath, { force: true });
+    await rm(smoke_path, { force: true });
   }
 }
 
 export async function validateBuiltWorkspace(root: string): Promise<void> {
   validateWorkspaceGraph(root);
   const checked = validateExportTargets(root);
-  await verifyRuntimeImports(root);
+  await verify_runtime_imports(root);
   console.log(
     `Validated ${checked.length} declared export target(s) and ${RUNTIME_ENTRY_PATHS.length} runtime entry import(s)`,
   );
 }
 
 export async function verifyCleanBuild(sourceRoot = resolve(import.meta.dir, "..")): Promise<void> {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-clean-build-"));
-  console.log(`Clean-build export: ${temporaryRoot}`);
+  const temporary_root = await mkdtemp(join(tmpdir(), "sheetwrite-clean-build-"));
+  console.log(`Clean-build export: ${temporary_root}`);
   try {
-    await exportWorkspace(sourceRoot, temporaryRoot);
-    assertGeneratedOutputsAbsent(temporaryRoot);
-    const lockBefore = await readFile(resolve(temporaryRoot, "bun.lock"));
-    await run(temporaryRoot, ["bun", "install", "--frozen-lockfile"]);
-    const lockAfter = await readFile(resolve(temporaryRoot, "bun.lock"));
-    if (!lockBefore.equals(lockAfter)) throw new Error("Frozen install changed bun.lock");
-    await run(temporaryRoot, ["bun", "run", "build:packages"]);
-    await run(temporaryRoot, ["bun", "run", "typecheck:packages"]);
-    await validateBuiltWorkspace(temporaryRoot);
+    await export_workspace(sourceRoot, temporary_root);
+    assertGeneratedOutputsAbsent(temporary_root);
+    const lock_before = await readFile(resolve(temporary_root, "bun.lock"));
+    await run(temporary_root, ["bun", "install", "--frozen-lockfile"]);
+    const lock_after = await readFile(resolve(temporary_root, "bun.lock"));
+    if (!lock_before.equals(lock_after)) throw new Error("Frozen install changed bun.lock");
+    await run(temporary_root, ["bun", "run", "build:packages"]);
+    await run(temporary_root, ["bun", "run", "typecheck:packages"]);
+    await validateBuiltWorkspace(temporary_root);
   } finally {
-    await rm(temporaryRoot, { recursive: true, force: true });
+    await rm(temporary_root, { recursive: true, force: true });
   }
 }
 

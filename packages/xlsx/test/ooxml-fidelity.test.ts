@@ -34,20 +34,20 @@ import {
 } from "./workbook-fixtures.js";
 
 const literal = (value: string | number): CellValue => ({ kind: "literal", value });
-const oneSheet = (body: string, options: Omit<RawXlsxOptions, "sheets"> = {}) =>
+const one_sheet = (body: string, options: Omit<RawXlsxOptions, "sheets"> = {}) =>
   rawXlsx({ ...options, sheets: [{ name: "Raw", xml: worksheet(body, options.strict) }] });
-const numberSheet = () =>
+const number_sheet = () =>
   sheet("s", "Sheet1", [], {
     rowCount: 2,
     columns: [{ key: "a", header: "A", width: 80, type: "number" }],
   });
-const roundTrip = async (bytes: Uint8Array) =>
+const round_trip = async (bytes: Uint8Array) =>
   backend.fromXlsxWorkbook(await backend.toXlsxWorkbook(await backend.fromXlsxWorkbook(bytes)));
 
 describe("raw spec-authored OOXML fidelity", () => {
   it("keeps scoped formula names and Excel LAMBDA prefixes through native OOXML", async () => {
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet("<sheetData/>", {
+      one_sheet("<sheetData/>", {
         workbookExtra:
           '<definedNames><definedName name="MYFN">_xlfn.LAMBDA(_xlpm.value,_xlpm.value+1)</definedName><definedName name="Rate" localSheetId="0">0.2</definedName></definedNames>',
       }),
@@ -68,7 +68,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   it("accepts Strict namespaces and relationship types", async () => {
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Strict</t></is></c></row></sheetData>',
         {
           strict: true,
@@ -86,7 +86,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     ).join("");
     const values = valuesOf(
       await backend.fromXlsxWorkbook(
-        oneSheet(`<dimension ref="A1:AB1"/><sheetData><row r="1">${cells}</row></sheetData>`),
+        one_sheet(`<dimension ref="A1:AB1"/><sheetData><row r="1">${cells}</row></sheetData>`),
       ),
     );
     expect(values).toHaveLength(28);
@@ -99,7 +99,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   it("moves whole columns and rows of a shared master and keeps names past the last column", async () => {
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<dimension ref="A1:D4"/><sheetData>' +
           '<row r="1"><c r="C1"><f t="shared" si="0" ref="C1:D1">SUM(A:A)+XYZ1</f></c><c r="D1"><f t="shared" si="0"/></c></row>' +
           '<row r="3"><c r="A3"><f t="shared" si="1" ref="A3:A4">SUM(1:1)*XFD1</f></c></row>' +
@@ -113,17 +113,17 @@ describe("raw spec-authored OOXML fidelity", () => {
   });
 
   it("warns and keeps a cell's own text or the master's text when a shared master does not lex", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     // An unterminated string: the engine's lexer cannot read it.
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<dimension ref="A1:A3"/><sheetData>' +
           '<row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A3">B1&amp;$C$1&amp;"open</f></c></row>' +
           '<row r="2"><c r="A2"><f t="shared" si="0">B2&amp;$C$1&amp;"own</f></c></row>' +
           '<row r="3"><c r="A3"><f t="shared" si="0"/></c></row>' +
           "</sheetData>",
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(valuesOf(imported)).toEqual(
       ['=B1&$C$1&"open', '=B2&$C$1&"own', '=B1&$C$1&"open'].map(formula),
@@ -136,12 +136,12 @@ describe("raw spec-authored OOXML fidelity", () => {
   });
 
   it("neutralizes external formulas and external-link workbook graphs", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet('<sheetData><row r="1"><c r="A1"><f>\'[1]Data\'!A1</f></c></row></sheetData>', {
+      one_sheet('<sheetData><row r="1"><c r="A1"><f>\'[1]Data\'!A1</f></c></row></sheetData>', {
         workbookRelationships: `<Relationship Id="rId9" Type="${TRANSITIONAL_REL}/externalLink" Target="externalLinks/externalLink1.xml"/>`,
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(valuesOf(imported)).toEqual([literal("='[1]Data'!A1")]);
     expect(warnings.map((warning) => warning.code)).toEqual(
@@ -151,10 +151,10 @@ describe("raw spec-authored OOXML fidelity", () => {
 
   describe("external workbook links", () => {
     const LINK_PART = "xl/externalLinks/externalLink1.xml";
-    const linkPart = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><externalBook r:id="rId1"><sheetNames><sheetName val="Annual Plan"/></sheetNames><sheetDataSet><sheetData sheetId="0"><row r="10"><cell r="C10"><v>7</v></cell><cell r="D10" t="str"><v>North</v></cell></row><row r="11"><cell r="C11"><v>5</v></cell><cell r="D11" t="e"><v>#N/A</v></cell></row></sheetData></sheetDataSet></externalBook></externalLink>`;
+    const link_part = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><externalBook r:id="rId1"><sheetNames><sheetName val="Annual Plan"/></sheetNames><sheetDataSet><sheetData sheetId="0"><row r="10"><cell r="C10"><v>7</v></cell><cell r="D10" t="str"><v>North</v></cell></row><row r="11"><cell r="C11"><v>5</v></cell><cell r="D11" t="e"><v>#N/A</v></cell></row></sheetData></sheetDataSet></externalBook></externalLink>`;
     const target = "file:///C:\\Reports\\Budget%202024.xlsx";
-    const linked = (formulas: readonly string[], part = linkPart) =>
-      oneSheet(
+    const linked = (formulas: readonly string[], part = link_part) =>
+      one_sheet(
         `<sheetData>${formulas.map((source, row) => `<row r="${row + 1}"><c r="A${row + 1}"><f>${source}</f></c></row>`).join("")}</sheetData>`,
         {
           workbookExtra:
@@ -201,7 +201,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     it("writes an unchanged link back byte for byte and a changed one from its values", async () => {
       const imported = await backend.fromXlsxWorkbook(linked(["SUM('[1]Annual Plan'!C10:C11)"]));
       const kept = await backend.toXlsxWorkbook(imported);
-      expect(partText(kept, LINK_PART)).toBe(linkPart);
+      expect(partText(kept, LINK_PART)).toBe(link_part);
       expect(partText(kept, "xl/workbook.xml")).toMatch(
         /<\/sheets><externalReferences><externalReference r:id="rId\d+"\/><\/externalReferences>/,
       );
@@ -210,12 +210,12 @@ describe("raw spec-authored OOXML fidelity", () => {
       );
 
       const changed = structuredClone(imported);
-      const linkedCell = changed.workbook.externalLinks?.[0]?.sheets[0]?.cells[0];
-      if (!linkedCell) throw new Error("the link has no saved cell");
-      linkedCell.value = 9;
-      const changedSheet = sheetAt(changed);
-      changedSheet.rowCount = 2;
-      changedSheet.cells.push({
+      const linked_cell = changed.workbook.externalLinks?.[0]?.sheets[0]?.cells[0];
+      if (!linked_cell) throw new Error("the link has no saved cell");
+      linked_cell.value = 9;
+      const changed_sheet = sheetAt(changed);
+      changed_sheet.rowCount = 2;
+      changed_sheet.cells.push({
         startRow: 1,
         startCol: 0,
         rowCount: 1,
@@ -244,13 +244,13 @@ describe("raw spec-authored OOXML fidelity", () => {
     // ECMA-376 Part 1, §18.14.5: a link part keeps the defined names of the
     // linked workbook, and `[1]!Total` names one in a formula.
     it("imports, keeps and rewrites the defined names of a link and formulas that use them", async () => {
-      const namedPart = linkPart.replace(
+      const named_part = link_part.replace(
         "</sheetNames>",
         '</sheetNames><definedNames><definedName name="Total" refersTo="=\'Annual Plan\'!$C$10"/>' +
           '<definedName name="Local" refersTo="=\'Annual Plan\'!$C$11" sheetId="0"/></definedNames>',
       );
       const imported = await backend.fromXlsxWorkbook(
-        linked(["[1]!Total*2", "'[1]Annual Plan'!Local"], namedPart),
+        linked(["[1]!Total*2", "'[1]Annual Plan'!Local"], named_part),
       );
       const names = [
         { name: "Total", refersTo: "='Annual Plan'!$C$10" },
@@ -264,12 +264,12 @@ describe("raw spec-authored OOXML fidelity", () => {
 
       const kept = await backend.toXlsxWorkbook(imported);
       expect(partText(kept, SHEET_PART)).toContain("<f>[1]!Total*2</f>");
-      expect(partText(kept, LINK_PART)).toBe(namedPart);
+      expect(partText(kept, LINK_PART)).toBe(named_part);
 
       const changed = structuredClone(imported);
-      const linkedCell = changed.workbook.externalLinks?.[0]?.sheets[0]?.cells[0];
-      if (!linkedCell) throw new Error("the link has no saved cell");
-      linkedCell.value = 9;
+      const linked_cell = changed.workbook.externalLinks?.[0]?.sheets[0]?.cells[0];
+      if (!linked_cell) throw new Error("the link has no saved cell");
+      linked_cell.value = 9;
       const written = await backend.toXlsxWorkbook(changed);
       expect(partText(written, "xl/externalLinks/sheetwriteLink1.xml")).toContain(
         '<sheetNames><sheetName val="Annual Plan"/></sheetNames><definedNames>' +
@@ -288,14 +288,14 @@ describe("raw spec-authored OOXML fidelity", () => {
     const body =
       '<sheetData><row r="1"><c r="A1" s="0"><v>0</v></c><c r="B1" s="0"><v>60</v></c><c r="C1" t="d"><v>2020-01-02T03:04:05</v></c></row></sheetData>';
     const mac = await backend.fromXlsxWorkbook(
-      oneSheet(body, { workbookPr: '<workbookPr date1904="1"/>', styles }),
+      one_sheet(body, { workbookPr: '<workbookPr date1904="1"/>', styles }),
     );
     expect(valuesOf(mac)).toEqual([
       literal(1462),
       literal(1522),
       literal(dateToSerial(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))),
     ]);
-    expect(valuesOf(await backend.fromXlsxWorkbook(oneSheet(body, { styles })))[1]).toEqual(
+    expect(valuesOf(await backend.fromXlsxWorkbook(one_sheet(body, { styles })))[1]).toEqual(
       literal(60),
     );
 
@@ -311,12 +311,12 @@ describe("raw spec-authored OOXML fidelity", () => {
   it("maps validation defaults, policies, whole semantics, and multiple ranges without broadening", async () => {
     const decimal = (attributes: string, sqref: string) =>
       `<dataValidation type="decimal" operator="between" showErrorMessage="1" ${attributes} sqref="${sqref}"><formula1>0</formula1><formula2>1</formula2></dataValidation>`;
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         `<dimension ref="A1:D2"/><sheetData/><dataValidations count="4"><dataValidation type="whole" operator="between" sqref="A1 A2"><formula1>1</formula1><formula2>3</formula2></dataValidation><dataValidation type="decimal" operator="equal" showErrorMessage="1" errorStyle="stop" sqref="B1"><formula1>2</formula1></dataValidation>${decimal('errorStyle="warning"', "C1")}${decimal(`errorStyle="information" prompt="${"x".repeat(256)}"`, "D1")}</dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     const rules = sheetAt(imported).validationRules ?? [];
     expect(rules[0]).toMatchObject({
@@ -333,9 +333,9 @@ describe("raw spec-authored OOXML fidelity", () => {
     const long = `LEN(C1)=${"1+".repeat(150)}1`;
     const rule = (attributes: string, sqref: string, formulas: string) =>
       `<dataValidation ${attributes} showErrorMessage="1" sqref="${sqref}">${formulas}</dataValidation>`;
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         `<dimension ref="A1:D1"/><sheetData/><dataValidations count="4">${[
           rule('type="custom"', "A1", `<formula1>${long}</formula1>`),
           rule('type="list"', "B1", `<formula1>${long}</formula1>`),
@@ -347,7 +347,7 @@ describe("raw spec-authored OOXML fidelity", () => {
           rule('type="custom"', "D1", "<formula1>ISNUMBER(D1)</formula1>"),
         ].join("")}</dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(sheetAt(imported).validationRules).toMatchObject([
       { condition: { kind: "custom", formula: "=ISNUMBER(D1)" } },
@@ -356,12 +356,12 @@ describe("raw spec-authored OOXML fidelity", () => {
   });
 
   it("round-trips the error alert and the input message of a validation rule", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         `<dimension ref="A1:B1"/><sheetData/><dataValidations count="2"><dataValidation type="whole" operator="greaterThan" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorStyle="information" errorTitle="Too small" error="Enter more than 0." promptTitle="Quantity" prompt="Units ordered." sqref="A1"><formula1>0</formula1></dataValidation><dataValidation type="whole" operator="greaterThan" showInputMessage="0" showErrorMessage="0" errorStyle="warning" prompt="Hidden." sqref="B1"><formula1>0</formula1></dataValidation></dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(warnings).toEqual([]);
     const expected = [
@@ -392,12 +392,12 @@ describe("raw spec-authored OOXML fidelity", () => {
     const rule = (row: number) =>
       `<dataValidation type="list" errorStyle="warning" showErrorMessage="1" sqref="A${row}"><formula1>$Z$1:$Z$32767</formula1></dataValidation>`;
     const count = MAX_VALIDATION_RULES + 5;
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         `<dimension ref="A1:A${count}"/><sheetData/><dataValidations count="${count}">${Array.from({ length: count }, (_, index) => rule(index + 1)).join("")}</dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     const rules = sheetAt(imported).validationRules ?? [];
     expect(rules).toHaveLength(MAX_VALIDATION_RULES);
@@ -409,9 +409,9 @@ describe("raw spec-authored OOXML fidelity", () => {
   it("round-trips every Data Validation type, formula sources and bounds, and the dropdown flag", async () => {
     const rule = (attributes: string, sqref: string, formulas = "") =>
       `<dataValidation ${attributes} showErrorMessage="1" sqref="${sqref}">${formulas}</dataValidation>`;
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         `<dimension ref="A1:F1"/><sheetData/><dataValidations count="6">${[
           rule('type="list" showDropDown="1"', "A1", "<formula1>$H$2:$H$5</formula1>"),
           rule('type="list"', "B1", "<formula1>Regions</formula1>"),
@@ -425,7 +425,7 @@ describe("raw spec-authored OOXML fidelity", () => {
           rule('type="none" promptTitle="Note" prompt="Any value."', "F1"),
         ].join("")}</dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(warnings).toEqual([]);
     const expected = [
@@ -464,7 +464,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       { operator: "lessThanOrEqual", value: 2 },
     ];
     // Operators with a range form import as min/max; the others keep their comparison.
-    const asRange: Partial<Record<DataValidationComparison["operator"], object>> = {
+    const as_range: Partial<Record<DataValidationComparison["operator"], object>> = {
       between: { min: 2, max: 4 },
       equal: { min: 2, max: 2 },
       greaterThanOrEqual: { min: 2 },
@@ -476,7 +476,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       date: { kind: "date" },
       textLength: { kind: "textLength" },
     };
-    const nativeRules = Object.keys(kinds).flatMap((type) =>
+    const native_rules = Object.keys(kinds).flatMap((type) =>
       comparisons.map((comparison) => {
         const formulas =
           "value" in comparison
@@ -485,22 +485,22 @@ describe("raw spec-authored OOXML fidelity", () => {
         return `<dataValidation type="${type}" operator="${comparison.operator}" showErrorMessage="1" sqref="A1">${formulas}</dataValidation>`;
       }),
     );
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
-        `<dimension ref="A1"/><sheetData/><dataValidations count="${nativeRules.length}">${nativeRules.join("")}</dataValidations>`,
+      one_sheet(
+        `<dimension ref="A1"/><sheetData/><dataValidations count="${native_rules.length}">${native_rules.join("")}</dataValidations>`,
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(warnings).toEqual([]);
     const rules = sheetAt(imported).validationRules ?? [];
-    expect(rules).toHaveLength(nativeRules.length);
+    expect(rules).toHaveLength(native_rules.length);
     expect(rules.map((rule) => rule.condition)).toEqual(
       expect.arrayContaining(
         Object.values(kinds).flatMap((kind) =>
           comparisons.map((comparison) => ({
             ...kind,
-            ...(asRange[comparison.operator] ?? { comparison }),
+            ...(as_range[comparison.operator] ?? { comparison }),
           })),
         ),
       ),
@@ -508,7 +508,7 @@ describe("raw spec-authored OOXML fidelity", () => {
 
     const source = book([
       {
-        ...numberSheet(),
+        ...number_sheet(),
         validationRules: comparisons.map((comparison, index) => ({
           id: `comparison-${index}`,
           range: range("s", 0, 0),
@@ -522,11 +522,11 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(xml).toContain(`<dataValidations count="${comparisons.length}">`);
     for (const comparison of comparisons)
       expect(xml).toContain(`operator="${comparison.operator}"`);
-    const roundTripped = await backend.fromXlsxWorkbook(exported);
-    expect(sheetAt(roundTripped).validationRules?.map((rule) => rule.condition)).toEqual(
+    const round_tripped = await backend.fromXlsxWorkbook(exported);
+    expect(sheetAt(round_tripped).validationRules?.map((rule) => rule.condition)).toEqual(
       expect.arrayContaining(
         comparisons
-          .filter((comparison) => !asRange[comparison.operator])
+          .filter((comparison) => !as_range[comparison.operator])
           .map((comparison) => ({ kind: "number", comparison })),
       ),
     );
@@ -538,7 +538,7 @@ describe("raw spec-authored OOXML fidelity", () => {
       '<fonts count="1"><font><color theme="1"/><sz val="12"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.4"/></patternFill></fill></fills><borders count="1"><border><left style="thin"><color indexed="2"/></left></border></borders><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="2" borderId="0"/></cellXfs>',
     );
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet('<sheetData><row r="1"><c r="A1" s="0"><v>1</v></c></row></sheetData>', {
+      one_sheet('<sheetData><row r="1"><c r="A1" s="0"><v>1</v></c></row></sheetData>', {
         styles,
         theme,
       }),
@@ -574,17 +574,17 @@ describe("raw spec-authored OOXML fidelity", () => {
       ],
       ['<calcPr calcId="191029" iterateCount="100" iterateDelta="0.001"/>', undefined],
     ];
-    for (const [calcPr, expected] of cases) {
-      const bytes = oneSheet("<sheetData/>", { workbookExtra: calcPr });
+    for (const [calc_pr, expected] of cases) {
+      const bytes = one_sheet("<sheetData/>", { workbookExtra: calc_pr });
       expect((await backend.fromXlsxWorkbook(bytes)).workbook.calculation).toEqual(expected);
-      expect((await roundTrip(bytes)).workbook.calculation).toEqual(expected);
+      expect((await round_trip(bytes)).workbook.calculation).toEqual(expected);
     }
 
-    const plain = await backend.toXlsxWorkbook(book([numberSheet()]));
+    const plain = await backend.toXlsxWorkbook(book([number_sheet()]));
     expect(partText(plain, "xl/workbook.xml")).toContain(
       '<calcPr fullCalcOnLoad="1" forceFullCalc="1"/>',
     );
-    const iterative = book([numberSheet()], {
+    const iterative = book([number_sheet()], {
       calculation: { iterate: true, maxIterations: 50, maxChange: 0.01 },
     });
     expect(partText(await backend.toXlsxWorkbook(iterative), "xl/workbook.xml")).toContain(
@@ -604,7 +604,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     };
     const source = book([
       {
-        ...numberSheet(),
+        ...number_sheet(),
         conditionalFormats: [
           { range: target, when: { kind: "greaterThan", value: 4 }, style },
           { range: target, when: { kind: "lessThan", value: 9 }, style },
@@ -629,27 +629,27 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(imported.conditionalFormats).toEqual(sheetAt(source).conditionalFormats);
     expect(imported.sortKeys).toEqual(sheetAt(source).sortKeys);
 
-    const externallyEdited = await backend.fromXlsxWorkbook(
+    const externally_edited = await backend.fromXlsxWorkbook(
       editParts(bytes, {
         "xl/worksheets/sheet1.xml": (text) =>
           text.replace("<formula>4</formula>", "<formula>6</formula>"),
         "xl/styles.xml": (text) => text.replace("FFDDEEFF", "FFABCDEF"),
       }),
     );
-    expect(sheetAt(externallyEdited).conditionalFormats?.[0]).toMatchObject({
+    expect(sheetAt(externally_edited).conditionalFormats?.[0]).toMatchObject({
       when: { kind: "greaterThan", value: 6 },
       style: { backgroundColor: "#ABCDEF" },
     });
   });
 
   it("reads the AutoFilter and warns rather than changing authorization semantics", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = sheetAt(
       await backend.fromXlsxWorkbook(
-        oneSheet(
+        one_sheet(
           '<dimension ref="A1:A2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Header</t></is></c></row><row r="2"><c r="A2"><v>1</v></c></row></sheetData><sheetProtection sheet="1"/><autoFilter ref="A1:A2"><filterColumn colId="0"><filters><filter val="1"/></filters></filterColumn></autoFilter><sortState ref="A1:A2"><sortCondition ref="A1:A2" descending="1"/></sortState>',
         ),
-        { onWarning },
+        { onWarning: on_warning },
       ),
     );
     expect(imported.autoFilter).toEqual({

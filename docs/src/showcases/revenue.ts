@@ -72,7 +72,7 @@ export function revenueAccountName(row: number): string {
   return `${root} ${place} ${sector}${location === 1 ? "" : ` · location ${location}`}`;
 }
 
-function buildRevenueData(): ColumnarData {
+function build_revenue_data(): ColumnarData {
   const id = new Float64Array(REVENUE_ROWS);
   const date: string[] = new Array(REVENUE_ROWS);
   const account: string[] = new Array(REVENUE_ROWS);
@@ -92,10 +92,10 @@ function buildRevenueData(): ColumnarData {
   return { rowCount: REVENUE_ROWS, columns: { id, date, account, city, owner, arr } };
 }
 
-export const REVENUE_DATA = buildRevenueData();
+export const REVENUE_DATA = build_revenue_data();
 
 export function createRevenueWorkbook(positiveFill = "#34d39924"): Workbook {
-  const arrRange = {
+  const arr_range = {
     sheet: "pipeline",
     start: { row: 0, col: REVENUE_AMOUNT_COLUMN },
     end: { row: REVENUE_ROWS - 1, col: REVENUE_AMOUNT_COLUMN },
@@ -124,12 +124,12 @@ export function createRevenueWorkbook(positiveFill = "#34d39924"): Workbook {
         ],
         conditionalFormats: [
           {
-            range: arrRange,
+            range: arr_range,
             when: { kind: "greaterThan", value: 20_000 },
             style: { backgroundColor: positiveFill, bold: true },
           },
           {
-            range: arrRange,
+            range: arr_range,
             when: { kind: "lessThan", value: 1_000 },
             style: { color: "#fb7185" },
           },

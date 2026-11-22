@@ -3,7 +3,7 @@ import type { PendingCommit, SyncMutationRecord, SyncMutationStatus } from "./ty
 /** Record statuses that decide the activity of a queue in queue order. */
 type BusyMutationStatus = Extract<SyncMutationStatus, "conflicted" | "sending" | "persisting">;
 
-function isBusyStatus(status: SyncMutationStatus): status is BusyMutationStatus {
+function is_busy_status(status: SyncMutationStatus): status is BusyMutationStatus {
   return status === "conflicted" || status === "sending" || status === "persisting";
 }
 
@@ -31,7 +31,7 @@ export class PendingRecordQueue {
    */
   private start = 0;
 
-  private readonly statusCounts: Record<SyncMutationStatus, number> = {
+  private readonly status_counts: Record<SyncMutationStatus, number> = {
     persisting: 0,
     pending: 0,
     sending: 0,
@@ -39,11 +39,11 @@ export class PendingRecordQueue {
     "storage-error": 0,
   };
 
-  private serverVersions = 0;
+  private server_versions = 0;
 
   /** Server versions the queued records occupy once acknowledged. */
   get versionCount(): number {
-    return this.serverVersions;
+    return this.server_versions;
   }
 
   get(clientMutationId: string): SyncMutationRecord | undefined {
@@ -60,7 +60,7 @@ export class PendingRecordQueue {
   }
 
   count(status: SyncMutationStatus): number {
-    return this.statusCounts[status];
+    return this.status_counts[status];
   }
 
   /** Records in queue order, in a new array. */
@@ -70,11 +70,11 @@ export class PendingRecordQueue {
 
   /** Status of the first record in queue order that is conflicted, sending, or persisting. */
   firstBusyStatus(): BusyMutationStatus | undefined {
-    const headStatus = this.head()?.status;
-    if (headStatus !== undefined && isBusyStatus(headStatus)) return headStatus;
-    const { conflicted, sending, persisting } = this.statusCounts;
-    const busyKinds = Number(conflicted > 0) + Number(sending > 0) + Number(persisting > 0);
-    if (busyKinds <= 1) {
+    const head_status = this.head()?.status;
+    if (head_status !== undefined && is_busy_status(head_status)) return head_status;
+    const { conflicted, sending, persisting } = this.status_counts;
+    const busy_kinds = Number(conflicted > 0) + Number(sending > 0) + Number(persisting > 0);
+    if (busy_kinds <= 1) {
       if (conflicted > 0) return "conflicted";
       if (sending > 0) return "sending";
       return persisting > 0 ? "persisting" : undefined;
@@ -82,7 +82,7 @@ export class PendingRecordQueue {
     // Only the head is ever sent, but a transport may report a conflict for a
     // later mutation through `handleResponse`. Queue order then decides.
     for (const record of this.records.values()) {
-      if (isBusyStatus(record.status)) return record.status;
+      if (is_busy_status(record.status)) return record.status;
     }
     return undefined;
   }
@@ -90,8 +90,8 @@ export class PendingRecordQueue {
   add(record: SyncMutationRecord): void {
     this.records.set(record.clientMutationId, record);
     this.order.push(record.clientMutationId);
-    this.statusCounts[record.status] += 1;
-    this.serverVersions += serverVersionsOf(record);
+    this.status_counts[record.status] += 1;
+    this.server_versions += serverVersionsOf(record);
   }
 
   remove(clientMutationId: string): void {
@@ -112,15 +112,15 @@ export class PendingRecordQueue {
     } else {
       this.order.splice(index, 1);
     }
-    this.statusCounts[record.status] -= 1;
-    this.serverVersions -= serverVersionsOf(record);
+    this.status_counts[record.status] -= 1;
+    this.server_versions -= serverVersionsOf(record);
   }
 
   /** Records that already left the queue change status without touching the totals. */
   setStatus(record: SyncMutationRecord, status: SyncMutationStatus): void {
     if (this.records.get(record.clientMutationId) === record) {
-      this.statusCounts[record.status] -= 1;
-      this.statusCounts[status] += 1;
+      this.status_counts[record.status] -= 1;
+      this.status_counts[status] += 1;
     }
     record.status = status;
   }
@@ -129,10 +129,10 @@ export class PendingRecordQueue {
     this.records.clear();
     this.order.length = 0;
     this.start = 0;
-    for (const status of Object.keys(this.statusCounts) as SyncMutationStatus[]) {
-      this.statusCounts[status] = 0;
+    for (const status of Object.keys(this.status_counts) as SyncMutationStatus[]) {
+      this.status_counts[status] = 0;
     }
-    this.serverVersions = 0;
+    this.server_versions = 0;
   }
 }
 

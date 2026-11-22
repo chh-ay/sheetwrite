@@ -13,14 +13,14 @@ function texts(svg: Element, selector: string): string[] {
   return [...svg.querySelectorAll(selector)].map((node) => node.textContent ?? "");
 }
 
-function numberAttribute(node: Element | null | undefined, name: string): number {
+function number_attribute(node: Element | null | undefined, name: string): number {
   const value = node?.getAttribute(name);
   if (value === null || value === undefined) throw new Error(`Missing attribute ${name}`);
   return Number(value);
 }
 
 /** Every coordinate pair of an `M x yL x y…` path. */
-function pathPoints(d: string | null | undefined): Array<[number, number]> {
+function path_points(d: string | null | undefined): Array<[number, number]> {
   return [...(d ?? "").matchAll(/[ML](-?[\d.e-]+) (-?[\d.e-]+)/g)].map((match) => [
     Number(match[1]),
     Number(match[2]),
@@ -40,13 +40,13 @@ describe("renderChartSvg", () => {
   it("lays bars along the category axis for column charts and across it for bar charts", () => {
     const sizes = (kind: ChartKind, name: string) =>
       [...render(chartView(kind, [SALES])).querySelectorAll(".sheetwrite-chart-bar")].map((rect) =>
-        numberAttribute(rect, name),
+        number_attribute(rect, name),
       );
     const [jan = 0, feb = 0, mar = 0] = sizes("column", "height");
-    const [janWidth = 0, febWidth = 0] = sizes("bar", "width");
+    const [jan_width = 0, feb_width = 0] = sizes("bar", "width");
 
     expect(feb > jan && jan > mar).toBe(true);
-    expect(febWidth).toBeGreaterThan(janWidth);
+    expect(feb_width).toBeGreaterThan(jan_width);
     expect(new Set(sizes("bar", "height")).size).toBe(1);
   });
 
@@ -105,11 +105,11 @@ describe("renderChartSvg", () => {
   });
 
   describe("multi-level category labels", () => {
-    const levelLabels = (svg: Element, level: number): Element[] => [
+    const level_labels = (svg: Element, level: number): Element[] => [
       ...svg.querySelectorAll(`.sheetwrite-chart-category-axis text[data-level="${level}"]`),
     ];
     const contents = (nodes: Element[]) => nodes.map((node) => node.textContent);
-    const isUpward = (node: Element) => node.getAttribute("transform")?.startsWith("rotate(-90");
+    const is_upward = (node: Element) => node.getAttribute("transform")?.startsWith("rotate(-90");
 
     it("draws the outer labels of a bar chart left of the inner labels, reading upward", () => {
       const regions = seriesView("Sales", [3, 5, 2, 4], {
@@ -119,15 +119,15 @@ describe("renderChartSvg", () => {
         ],
       });
       const svg = render(chartView("bar", [regions]));
-      const inner = levelLabels(svg, 0);
-      const outer = levelLabels(svg, 1);
-      const innerMiddle = (numberAttribute(inner[0], "y") + numberAttribute(inner[1], "y")) / 2;
+      const inner = level_labels(svg, 0);
+      const outer = level_labels(svg, 1);
+      const inner_middle = (number_attribute(inner[0], "y") + number_attribute(inner[1], "y")) / 2;
       const dividers = [...svg.querySelectorAll(".sheetwrite-chart-category-dividers line")];
 
       expect(contents(outer)).toEqual(["East", "West"]);
-      expect(outer.every(isUpward)).toBe(true);
-      expect(numberAttribute(outer[0], "x")).toBeLessThan(numberAttribute(inner[0], "x"));
-      expect(numberAttribute(outer[0], "y")).toBeCloseTo(innerMiddle);
+      expect(outer.every(is_upward)).toBe(true);
+      expect(number_attribute(outer[0], "x")).toBeLessThan(number_attribute(inner[0], "x"));
+      expect(number_attribute(outer[0], "y")).toBeCloseTo(inner_middle);
       expect(dividers.every((line) => line.getAttribute("y1") === line.getAttribute("y2"))).toBe(
         true,
       );
@@ -144,13 +144,13 @@ describe("renderChartSvg", () => {
         { categories, categoryLevels: [{ labels: groups, formats: groups.map(() => null) }] },
       );
       const svg = render(chartView("column", [series]));
-      const inner = levelLabels(svg, 0);
-      const outer = levelLabels(svg, 1);
+      const inner = level_labels(svg, 0);
+      const outer = level_labels(svg, 1);
 
       expect(contents(inner)).toEqual(categories);
-      expect(inner.every(isUpward)).toBe(true);
+      expect(inner.every(is_upward)).toBe(true);
       expect(contents(outer)).toEqual(["Group 1", "Group 2"]);
-      expect(outer.some(isUpward)).toBe(false);
+      expect(outer.some(is_upward)).toBe(false);
     });
 
     it("wraps an outer label onto more lines when its group is narrow", () => {
@@ -159,12 +159,12 @@ describe("renderChartSvg", () => {
         categories: ["a", "b", "c", "d", "e", "f", "g", "h"],
         categoryLevels: [{ labels, formats: labels.map(() => null) }],
       });
-      const outer = levelLabels(render(chartView("column", [series])), 1);
+      const outer = level_labels(render(chartView("column", [series])), 1);
       const [north, east] = outer;
 
       expect(contents(outer)).toEqual(["North", "East", "South"]);
-      expect(numberAttribute(east, "x")).toBe(numberAttribute(north, "x"));
-      expect(numberAttribute(east, "y")).toBeGreaterThan(numberAttribute(north, "y"));
+      expect(number_attribute(east, "x")).toBe(number_attribute(north, "x"));
+      expect(number_attribute(east, "y")).toBeGreaterThan(number_attribute(north, "y"));
     });
   });
 
@@ -202,11 +202,11 @@ describe("renderChartSvg", () => {
     }
 
     /** The box of an unrotated label from its anchor, baseline and estimated width. */
-    function labelBox(node: Element): LabelBox {
+    function label_box(node: Element): LabelBox {
       const text = node.textContent ?? "";
       const width = text.length * FONT_SIZE * GLYPH_WIDTH_RATIO;
-      const x = numberAttribute(node, "x");
-      const y = numberAttribute(node, "y");
+      const x = number_attribute(node, "x");
+      const y = number_attribute(node, "y");
       const anchor = node.getAttribute("text-anchor");
       const left = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
       const centered = node.getAttribute("dominant-baseline") === "central";
@@ -219,20 +219,20 @@ describe("renderChartSvg", () => {
       };
     }
 
-    function horizontalSpans(svg: Element, selector: string): Array<[number, number]> {
+    function horizontal_spans(svg: Element, selector: string): Array<[number, number]> {
       return [...svg.querySelectorAll(selector)]
-        .map(labelBox)
+        .map(label_box)
         .map((box): [number, number] => [box.left, box.right]);
     }
 
-    function verticalSpans(svg: Element, selector: string): Array<[number, number]> {
+    function vertical_spans(svg: Element, selector: string): Array<[number, number]> {
       return [...svg.querySelectorAll(selector)]
-        .map(labelBox)
+        .map(label_box)
         .map((box): [number, number] => [box.top, box.bottom])
-        .sort(([top], [otherTop]) => top - otherTop);
+        .sort(([top], [other_top]) => top - other_top);
     }
 
-    function expectApart(spans: Array<[number, number]>, end: number): void {
+    function expect_apart(spans: Array<[number, number]>, end: number): void {
       expect(spans.length).toBeGreaterThan(0);
       spans.slice(1).forEach(([start], index) => {
         expect(start).toBeGreaterThanOrEqual(spans[index]?.[1] ?? Number.POSITIVE_INFINITY);
@@ -246,8 +246,8 @@ describe("renderChartSvg", () => {
       ["scatter", chartView("scatter", [SPEND]), ".sheetwrite-chart-category-axis text"],
     ])("keeps the %s chart's horizontal value labels apart at every width", (_, view, selector) => {
       const counts = LENGTHS.map((width) => {
-        const spans = horizontalSpans(renderChartSvg(view, { width, height: 300 }), selector);
-        expectApart(spans, width);
+        const spans = horizontal_spans(renderChartSvg(view, { width, height: 300 }), selector);
+        expect_apart(spans, width);
         return spans.length;
       });
 
@@ -259,7 +259,7 @@ describe("renderChartSvg", () => {
     it("keeps the column chart's vertical value labels apart at every height", () => {
       for (const height of LENGTHS) {
         const svg = renderChartSvg(chartView("column", [REVENUE]), { width: 400, height });
-        expectApart(verticalSpans(svg, ".sheetwrite-chart-value-axis text"), height);
+        expect_apart(vertical_spans(svg, ".sheetwrite-chart-value-axis text"), height);
       }
     });
 
@@ -288,7 +288,7 @@ describe("renderChartSvg", () => {
           ...svg.querySelectorAll(
             ".sheetwrite-chart-value-axis text, .sheetwrite-chart-category-axis text",
           ),
-        ].map(labelBox);
+        ].map(label_box);
         const touching = boxes.flatMap((box, index) =>
           boxes
             .slice(index + 1)
@@ -316,7 +316,7 @@ describe("renderChartSvg", () => {
 
     // The first point stands alone between gaps, so it is a marker, not a segment.
     expect(lines).toHaveLength(1);
-    expect(pathPoints(lines[0]?.getAttribute("d"))).toHaveLength(2);
+    expect(path_points(lines[0]?.getAttribute("d"))).toHaveLength(2);
     expect(svg.querySelectorAll(".sheetwrite-chart-point")).toHaveLength(1);
     expect(columns.querySelectorAll(".sheetwrite-chart-bar")).toHaveLength(2);
     expect(texts(svg, ".sheetwrite-chart-note").join(" ")).toContain("Not all points are shown");
@@ -328,7 +328,7 @@ describe("renderChartSvg", () => {
       ".sheetwrite-chart-point",
     );
     const [first = 0, second = 0, third = 0] = [...points].map((point) =>
-      numberAttribute(point, "cx"),
+      number_attribute(point, "cx"),
     );
 
     expect((third - second) / (second - first)).toBeCloseTo(9);
@@ -339,7 +339,7 @@ describe("renderChartSvg", () => {
     values[4_321] = 100;
     values[7_654] = -100;
     const svg = render(chartView("line", [seriesView("Signal", values)]));
-    const ys = pathPoints(svg.querySelector(".sheetwrite-chart-line")?.getAttribute("d")).map(
+    const ys = path_points(svg.querySelector(".sheetwrite-chart-line")?.getAttribute("d")).map(
       ([, y]) => y,
     );
     const top = Math.min(...ys);

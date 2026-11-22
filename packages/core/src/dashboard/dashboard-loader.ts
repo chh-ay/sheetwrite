@@ -53,13 +53,13 @@ export function attachDashboardView(
   };
 
   // A sheet keeps its kind, so only a change of the active sheet shows or hides the view.
-  const stopSheet = grid.on("active-sheet", sync);
+  const stop_sheet = grid.on("active-sheet", sync);
   sync();
   return {
     sync,
     dispose() {
       disposed = true;
-      stopSheet();
+      stop_sheet();
       view?.dispose();
     },
   };

@@ -13,12 +13,12 @@ import { chromium } from "@playwright/test";
  */
 async function run(command: readonly [string, ...string[]]): Promise<void> {
   const child = Bun.spawn([...command], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
 }
 
 /** Why Chromium cannot start, or undefined when it starts. */
-async function chromiumStartFailure(): Promise<string | undefined> {
+async function chromium_start_failure(): Promise<string | undefined> {
   try {
     const browser = await chromium.launch({ headless: true });
     await browser.close();
@@ -29,10 +29,11 @@ async function chromiumStartFailure(): Promise<string | undefined> {
 }
 
 await run(["bun", "x", "playwright", "install", "chromium"]);
-const failure = await chromiumStartFailure();
+const failure = await chromium_start_failure();
 if (failure !== undefined) {
   console.log(`Chromium cannot start on this machine; installing its system packages.\n${failure}`);
   await run(["bun", "x", "playwright", "install-deps", "chromium"]);
-  const retryFailure = await chromiumStartFailure();
-  if (retryFailure !== undefined) throw new Error(`Chromium still cannot start:\n${retryFailure}`);
+  const retry_failure = await chromium_start_failure();
+  if (retry_failure !== undefined)
+    throw new Error(`Chromium still cannot start:\n${retry_failure}`);
 }

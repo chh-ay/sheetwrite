@@ -25,8 +25,8 @@ afterEach(() => {
 });
 
 // Column A mixes numbers, text and a blank; column B is all numbers, in
-// `numberFormat` when given.
-function setup(numberFormat?: string) {
+// `number_format` when given.
+function setup(number_format?: string) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -41,7 +41,7 @@ function setup(numberFormat?: string) {
             header: "B",
             type: "number",
             width: 100,
-            ...(numberFormat === undefined ? {} : { numberFormat }),
+            ...(number_format === undefined ? {} : { numberFormat: number_format }),
           },
         ],
       },
@@ -60,26 +60,26 @@ function setup(numberFormat?: string) {
   pieces.push(piece);
   const status = () => piece.element.textContent ?? "";
 
-  const selectAll = () =>
+  const select_all = () =>
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
     });
-  return { grid, host, piece, status, selectAll };
+  return { grid, host, piece, status, selectAll: select_all };
 }
 
 it("leaves out rows a filter hides", async () => {
-  const { grid, selectAll } = setup();
+  const { grid, selectAll: select_all } = setup();
   grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
-  selectAll();
+  select_all();
 
   // Only data rows 2 and 3 remain: A is blank and 2, B is 3 and 4.
   expect(await grid.summarizeSelection()).toMatchObject({ count: 3, sum: 9, min: 2, max: 4 });
 });
 
 it("shows Excel's Average, Count and Sum in the shell status line", async () => {
-  const { grid, status, selectAll } = setup();
-  selectAll();
+  const { grid, status, selectAll: select_all } = setup();
+  select_all();
 
   await grid.summarizeSelection();
   expect(status()).toContain("Count: 7");

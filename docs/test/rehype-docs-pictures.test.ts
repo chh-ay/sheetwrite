@@ -12,7 +12,7 @@ interface Heading {
 }
 
 /** Gives each h2 the id rehype-slug would: its lowercased words joined by hyphens. */
-const slugHeadings = () => (tree: { children: Heading[] }) => {
+const slug_headings = () => (tree: { children: Heading[] }) => {
   for (const node of tree.children) {
     if (node.tagName !== "h2") continue;
     const text = (node.children ?? []).map((child) => child.value ?? "").join("");
@@ -21,16 +21,16 @@ const slugHeadings = () => (tree: { children: Heading[] }) => {
 };
 
 /** Compiles `source` as the docs page at `page` (a path under docs/src/content/docs/). */
-async function compilePage(page: string, source: string): Promise<string> {
+async function compile_page(page: string, source: string): Promise<string> {
   const file = await compile(
     { value: source, path: `/repo/docs/src/content/docs/${page}` },
-    { ...SOLID_MDX_OPTIONS, rehypePlugins: [slugHeadings, rehypeDocsPictures] },
+    { ...SOLID_MDX_OPTIONS, rehypePlugins: [slug_headings, rehypeDocsPictures] },
   );
   return String(file);
 }
 
 test("a placed diagram follows its heading, and the page imports the picture and its stylesheet", async () => {
-  const output = await compilePage(
+  const output = await compile_page(
     "concepts/calculation-engine.md",
     [
       "Lead.",
@@ -50,18 +50,18 @@ test("a placed diagram follows its heading, and the page imports the picture and
 });
 
 test("a lead placement follows the first paragraph", async () => {
-  const output = await compilePage("start/first-grid.mdx", "Lead.\n\nMore.");
+  const output = await compile_page("start/first-grid.mdx", "Lead.\n\nMore.");
   expect(output).toContain('<p>{"Lead."}</p><DocsPicture name="first-grid" />');
 });
 
 test("a placement whose heading is gone fails the build", async () => {
-  await expect(compilePage("concepts/runtime-ownership.md", "## Something else")).rejects.toThrow(
+  await expect(compile_page("concepts/runtime-ownership.md", "## Something else")).rejects.toThrow(
     "/docs/concepts/runtime-ownership/: no heading #virtualization--scaled-scroll for the virtual-scroll diagram",
   );
 });
 
 test("a screenshot placement adds the framed capture, beside the page's diagram, and links both stylesheets", async () => {
-  const output = await compilePage(
+  const output = await compile_page(
     "features/grid/search.md",
     "Lead.\n\n## Options and result\n\n## Options and Find All in the find bar",
   );
@@ -76,20 +76,20 @@ test("a screenshot placement adds the framed capture, beside the page's diagram,
 });
 
 test("a screenshot placement with narrow crops shows each crop with its own caption", async () => {
-  const output = await compilePage("features/grid/index.md", "Cards.");
+  const output = await compile_page("features/grid/index.md", "Cards.");
   expect(output).toContain('src="/figures/shots/grid-overview-tablet-light-1x.avif"');
   expect(output).toContain('src="/figures/shots/grid-overview-phone-light-1x.avif"');
   expect(output).toContain("sw-frame__caption--narrow");
 });
 
 test("a start placement goes before the first element of the body", async () => {
-  const output = await compilePage("features/grid/index.md", "Cards.");
+  const output = await compile_page("features/grid/index.md", "Cards.");
   expect(output).toMatch(/<figure class="sw-frame">.*<p>\{"Cards\."\}<\/p>/s);
   expect(output).toContain('src="/figures/shots/grid-overview-light-1x.avif"');
 });
 
 test("a page without art compiles unchanged", async () => {
-  const output = await compilePage("reference/compatibility-results.md", "## Results");
+  const output = await compile_page("reference/compatibility-results.md", "## Results");
   expect(output).not.toContain("DocsPicture");
   expect(output).not.toContain("Stylesheet");
 });

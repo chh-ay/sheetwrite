@@ -28,37 +28,37 @@ function artifact(): RenderBenchmarkArtifact {
 }
 
 /** Window-read counters for `frames` logical frames; the upper bound reads nothing. */
-function transferCounters(isBaseline: boolean, frames: number) {
+function transfer_counters(is_baseline: boolean, frames: number) {
   return createWindowTransferMetrics({
     logicalFrames: frames,
     windowReadRequests: frames,
-    logicalWindowReads: isBaseline ? frames : 0,
-    copiedBytes: isBaseline ? frames * 1_024 : 0,
-    outputAllocationEvents: isBaseline ? frames * 7 : 0,
+    logicalWindowReads: is_baseline ? frames : 0,
+    copiedBytes: is_baseline ? frames * 1_024 : 0,
+    outputAllocationEvents: is_baseline ? frames * 7 : 0,
   });
 }
 
-function windowTransferArtifact(): DeepMutable<RenderBenchmarkArtifact> {
+function window_transfer_artifact(): DeepMutable<RenderBenchmarkArtifact> {
   const value = mutableCopy(
     makeRenderArtifact({
       engines: ["sheetwrite"],
       rows: [200],
       scenarios: WINDOW_TRANSFER_SCENARIO_IDS,
       measuredSamples: 2,
-      samples: (round, _engine, scenarioId) => {
-        const isBaseline = scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID;
-        const perOperationMs = isBaseline ? 5 + (round - 1) * 0.2 : 3 + (round - 1) * 0.1;
-        return [perOperationMs, perOperationMs];
+      samples: (round, _engine, scenario_id) => {
+        const is_baseline = scenario_id === WINDOW_TRANSFER_BASELINE_SCENARIO_ID;
+        const per_operation_ms = is_baseline ? 5 + (round - 1) * 0.2 : 3 + (round - 1) * 0.1;
+        return [per_operation_ms, per_operation_ms];
       },
     }),
   );
   for (const result of value.results) {
     if (result.status !== "success") throw new Error("fixture must be successful");
-    const isBaseline = result.scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID;
-    result.dataValidity = isBaseline ? "product-valid" : "pixel-data-invalid";
-    result.windowTransfer = transferCounters(isBaseline, result.operationCount);
+    const is_baseline = result.scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID;
+    result.dataValidity = is_baseline ? "product-valid" : "pixel-data-invalid";
+    result.windowTransfer = transfer_counters(is_baseline, result.operationCount);
     for (const sample of result.rawSamples) {
-      sample.windowTransfer = transferCounters(isBaseline, sample.operationCount);
+      sample.windowTransfer = transfer_counters(is_baseline, sample.operationCount);
     }
   }
   value.metadata.windowTransferScenarioOrder = counterbalancedOrder(
@@ -108,21 +108,21 @@ test("rejects non-finite summaries, also after a JSON round trip", () => {
 
 test("summarizes window transfer and fails closed on counters, labels and order", () => {
   const [comparison] = summarizeWindowTransferComparisons(
-    parseRenderArtifact(windowTransferArtifact()),
+    parseRenderArtifact(window_transfer_artifact()),
   );
   expect(comparison).toMatchObject({ rows: 200, resolved: true });
   expect(comparison?.estimatedWindowTransferCostMs).toBeCloseTo(2.05);
   expect(comparison?.maximumWithinVariantSpreadMs).toBeCloseTo(0.2);
 
-  const resultFor = (value: DeepMutable<RenderBenchmarkArtifact>, scenarioId: string) =>
+  const result_for = (value: DeepMutable<RenderBenchmarkArtifact>, scenario_id: string) =>
     must(
-      value.results.find((result) => result.scenarioId === scenarioId),
-      scenarioId,
+      value.results.find((result) => result.scenarioId === scenario_id),
+      scenario_id,
     );
-  expectRejections(windowTransferArtifact, parseRenderArtifact, [
+  expectRejections(window_transfer_artifact, parseRenderArtifact, [
     [
       (value) => {
-        const baseline = resultFor(value, WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
+        const baseline = result_for(value, WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
         if (baseline.status !== "success") throw new Error("fixture must be successful");
         Reflect.deleteProperty(must(baseline.rawSamples[0], "sample"), "windowTransfer");
       },
@@ -131,7 +131,7 @@ test("summarizes window transfer and fails closed on counters, labels and order"
     [
       (value) =>
         Reflect.set(
-          resultFor(value, WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID),
+          result_for(value, WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID),
           "dataValidity",
           "product-valid",
         ),

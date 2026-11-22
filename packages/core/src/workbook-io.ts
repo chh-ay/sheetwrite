@@ -92,12 +92,12 @@ export async function exportWorkbookFile(
   run.signal.throwIfAborted();
 
   const store = grid.store;
-  const storedWorkbook = store.getWorkbook();
-  const activeSheet = grid.getActiveSheet();
+  const stored_workbook = store.getWorkbook();
+  const active_sheet = grid.getActiveSheet();
   const workbook =
-    storedWorkbook.activeSheet === activeSheet
-      ? storedWorkbook
-      : { ...storedWorkbook, activeSheet };
+    stored_workbook.activeSheet === active_sheet
+      ? stored_workbook
+      : { ...stored_workbook, activeSheet: active_sheet };
 
   const bytes = await toXlsxTable(workbook, store, { signal: run.signal });
   run.signal.throwIfAborted();

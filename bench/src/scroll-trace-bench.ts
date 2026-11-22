@@ -66,7 +66,7 @@ interface ScrollPosition {
   readonly left: number;
 }
 
-function clampTop(top: number): number {
+function clamp_top(top: number): number {
   return Math.min(MAX_SCROLL_TOP_PX, Math.max(0, top));
 }
 
@@ -87,13 +87,13 @@ const WHEEL_BURSTS: readonly (readonly [number, number, number])[] = [
   [6, 50, 600],
 ];
 
-function wheelTrace(speed: number): ScrollPosition[] {
-  const notchTimes: { at: number; delta: number }[] = [];
+function wheel_trace(speed: number): ScrollPosition[] {
+  const notch_times: { at: number; delta: number }[] = [];
   let at = 0;
   for (const [notches, interval, pause] of WHEEL_BURSTS) {
     const delta = Math.sign(notches) * WHEEL_NOTCH_PX;
     for (let notch = 0; notch < Math.abs(notches); notch++) {
-      notchTimes.push({ at, delta });
+      notch_times.push({ at, delta });
       at += interval / speed;
     }
     at += pause;
@@ -103,8 +103,8 @@ function wheelTrace(speed: number): ScrollPosition[] {
   let top = START_TOP_PX;
   let next = 0;
   for (let time = 0; time <= at; time += FRAME_MS) {
-    for (let notch = notchTimes[next]; notch && notch.at <= time; notch = notchTimes[++next]) {
-      target = clampTop(target + notch.delta);
+    for (let notch = notch_times[next]; notch && notch.at <= time; notch = notch_times[++next]) {
+      target = clamp_top(target + notch.delta);
     }
     top += (target - top) * (1 - Math.exp(-FRAME_MS / WHEEL_EASING_MS));
     frames.push({ top: Math.round(top), left: 0 });
@@ -126,7 +126,7 @@ const FLINGS: readonly (readonly [number, number, number])[] = [
   [18, 0, 600],
 ];
 
-function flingTrace(speed: number): ScrollPosition[] {
+function fling_trace(speed: number): ScrollPosition[] {
   const frames: ScrollPosition[] = [];
   let top = START_TOP_PX;
   let left = 0;
@@ -138,7 +138,7 @@ function flingTrace(speed: number): ScrollPosition[] {
           ? time / FLING_RAMP_MS
           : Math.exp(-(time - FLING_RAMP_MS) / FLING_MOMENTUM_MS);
       if (time >= FLING_RAMP_MS && peak * scale < FLING_STOP_PX_PER_MS) break;
-      top = clampTop(top + vertical * speed * scale * FRAME_MS);
+      top = clamp_top(top + vertical * speed * scale * FRAME_MS);
       left = Math.min(
         MAX_SCROLL_LEFT_PX,
         Math.max(0, left + horizontal * speed * scale * FRAME_MS),
@@ -162,21 +162,21 @@ const DRAGS: readonly (readonly [number, number, number])[] = [
   [-80, 600, 600],
 ];
 
-function dragTrace(speed: number): ScrollPosition[] {
+function drag_trace(speed: number): ScrollPosition[] {
   const frames: ScrollPosition[] = [];
-  const contentPerThumbPx = MAX_SCROLL_TOP_PX / SCROLLBAR_TRACK_PX;
+  const content_per_thumb_px = MAX_SCROLL_TOP_PX / SCROLLBAR_TRACK_PX;
   let from = DRAG_START_THUMB_PX;
-  for (const [travel, dragMs, holdMs] of DRAGS) {
+  for (const [travel, drag_ms, hold_ms] of DRAGS) {
     let thumb = from;
-    for (let time = 0; time <= dragMs; time += FRAME_MS) {
-      const progress = Math.min(1, time / dragMs);
+    for (let time = 0; time <= drag_ms; time += FRAME_MS) {
+      const progress = Math.min(1, time / drag_ms);
       const eased = progress * progress * (3 - 2 * progress);
       thumb = Math.round(from + travel * speed * eased);
-      frames.push({ top: clampTop(thumb * contentPerThumbPx), left: 0 });
+      frames.push({ top: clamp_top(thumb * content_per_thumb_px), left: 0 });
     }
     from = thumb;
     const resting = frames.at(-1) ?? { top: 0, left: 0 };
-    for (let time = 0; time < holdMs; time += FRAME_MS) frames.push(resting);
+    for (let time = 0; time < hold_ms; time += FRAME_MS) frames.push(resting);
   }
   return frames;
 }
@@ -194,7 +194,7 @@ const PAGE_PHASES: readonly (readonly [number, number, number, number])[] = [
   [-1, 4, PAGE_PRESS_INTERVAL_MS, 600],
 ];
 
-function pageTrace(speed: number): ScrollPosition[] {
+function page_trace(speed: number): ScrollPosition[] {
   const presses: { at: number; delta: number }[] = [];
   let at = 0;
   for (const [pages, count, interval, pause] of PAGE_PHASES) {
@@ -209,7 +209,7 @@ function pageTrace(speed: number): ScrollPosition[] {
   let next = 0;
   for (let time = 0; time <= at; time += FRAME_MS) {
     for (let press = presses[next]; press && press.at <= time; press = presses[++next]) {
-      top = clampTop(top + press.delta);
+      top = clamp_top(top + press.delta);
     }
     frames.push({ top, left: 0 });
   }
@@ -224,10 +224,10 @@ function pageTrace(speed: number): ScrollPosition[] {
 const TRACE_SPEEDS = [0.8, 0.9, 1, 1.1, 1.25] as const;
 
 const TRACE_BUILDERS: Record<TraceId, (speed: number) => ScrollPosition[]> = {
-  wheel: wheelTrace,
-  fling: flingTrace,
-  drag: dragTrace,
-  page: pageTrace,
+  wheel: wheel_trace,
+  fling: fling_trace,
+  drag: drag_trace,
+  page: page_trace,
 };
 
 // --- Simulation ----------------------------------------------------------------
@@ -241,12 +241,12 @@ interface ScheduledFetch {
 
 class LogicalClock {
   now = 0;
-  private nextId = 1;
+  private next_id = 1;
   private readonly fetches: ScheduledFetch[] = [];
 
   schedule(delayMs: number, run: () => void): () => void {
     const fetch: ScheduledFetch = {
-      id: this.nextId++,
+      id: this.next_id++,
       at: this.now + delayMs,
       run,
       cancelled: false,
@@ -268,19 +268,19 @@ class LogicalClock {
       fetch.cancelled = true;
       this.now = fetch.at;
       fetch.run();
-      await settleMicrotasks();
+      await settle_microtasks();
     }
     for (let index = this.fetches.length - 1; index >= 0; index--) {
       if (this.fetches[index]?.cancelled) this.fetches.splice(index, 1);
     }
     this.now = target;
-    await settleMicrotasks();
+    await settle_microtasks();
   }
 }
 
 const MICROTASK_TURNS = 8;
 
-async function settleMicrotasks(): Promise<void> {
+async function settle_microtasks(): Promise<void> {
   for (let turn = 0; turn < MICROTASK_TURNS; turn++) await Promise.resolve();
 }
 
@@ -306,7 +306,7 @@ function workbook(): Workbook {
   };
 }
 
-function pageRows(start: number, end: number, bands: readonly DataSourceColumnBand[]): RowData[] {
+function page_rows(start: number, end: number, bands: readonly DataSourceColumnBand[]): RowData[] {
   const rows: RowData[] = [];
   for (let row = start; row < end; row++) {
     const values: RowData = {};
@@ -317,11 +317,11 @@ function pageRows(start: number, end: number, bands: readonly DataSourceColumnBa
 }
 
 /** Deterministic fetch-time jitter from the request sequence number. */
-function fetchDelayMs(nominalMs: number, sequence: number): number {
+function fetch_delay_ms(nominal_ms: number, sequence: number): number {
   const hash = Math.imul(sequence + 1, 2_654_435_761) >>> 0;
   const unit = hash / 0x1_0000_0000;
   const factor = sequence % SLOW_REQUEST_EVERY === SLOW_REQUEST_EVERY - 1 ? SLOW_REQUEST_FACTOR : 1;
-  return nominalMs * (JITTER_LOW + JITTER_SPAN * unit) * factor;
+  return nominal_ms * (JITTER_LOW + JITTER_SPAN * unit) * factor;
 }
 
 interface ViewWindow {
@@ -331,18 +331,18 @@ interface ViewWindow {
   readonly columnEnd: number;
 }
 
-function viewWindow(position: ScrollPosition): ViewWindow {
-  const rowStart = Math.floor(position.top / ROW_HEIGHT_PX);
-  const columnStart = Math.floor(position.left / COLUMN_WIDTH_PX);
+function view_window(position: ScrollPosition): ViewWindow {
+  const row_start = Math.floor(position.top / ROW_HEIGHT_PX);
+  const column_start = Math.floor(position.left / COLUMN_WIDTH_PX);
   return {
-    rowStart,
+    rowStart: row_start,
     rowEnd: Math.min(ROW_COUNT, Math.ceil((position.top + VIEW_HEIGHT_PX) / ROW_HEIGHT_PX)),
-    columnStart,
+    columnStart: column_start,
     columnEnd: Math.min(COLUMN_COUNT, Math.ceil((position.left + VIEW_WIDTH_PX) / COLUMN_WIDTH_PX)),
   };
 }
 
-function cellKey(row: number, column: number): number {
+function cell_key(row: number, column: number): number {
   return row * COLUMN_COUNT + column;
 }
 
@@ -370,15 +370,15 @@ export interface TraceResult {
   readonly updateP95Us: number;
 }
 
-async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
+async function run_trace(trace: TraceId, fetch_ms: number): Promise<TraceResult> {
   const episodes: number[] = [];
-  const updateUs: number[] = [];
-  let loadingCellMs = 0;
-  let frameCount = 0;
-  let fetchedCells = 0;
-  let neverShownCells = 0;
-  let requestCount = 0;
-  let abortCount = 0;
+  const update_us: number[] = [];
+  let loading_cell_ms = 0;
+  let frame_count = 0;
+  let fetched_cells = 0;
+  let never_shown_cells = 0;
+  let request_count = 0;
+  let abort_count = 0;
   for (const speed of TRACE_SPEEDS) {
     const frames = TRACE_BUILDERS[trace](speed);
     const clock = new LogicalClock();
@@ -387,32 +387,32 @@ async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
       chunkRows: CHUNK_ROWS,
       cacheBytes: CACHE_BYTES,
     });
-    const servedCells = new Set<number>();
-    const shownCells = new Set<number>();
-    const pendingSignals = new Set<AbortSignal>();
+    const served_cells = new Set<number>();
+    const shown_cells = new Set<number>();
+    const pending_signals = new Set<AbortSignal>();
     let requests = 0;
-    let abortedRequests = 0;
+    let aborted_requests = 0;
     const datasource: DataSource = {
       capabilities: { protocol: 2, columns: "windowed" },
       getRows({ start, end, columns, signal }) {
         const sequence = requests++;
-        pendingSignals.add(signal);
+        pending_signals.add(signal);
         const result = Promise.withResolvers<DataSourcePage>();
-        const cancel = clock.schedule(fetchDelayMs(fetchMs, sequence), () => {
-          pendingSignals.delete(signal);
+        const cancel = clock.schedule(fetch_delay_ms(fetch_ms, sequence), () => {
+          pending_signals.delete(signal);
           for (const band of columns) {
             for (let column = band.start; column < band.end; column++) {
-              for (let row = start; row < end; row++) servedCells.add(cellKey(row, column));
+              for (let row = start; row < end; row++) served_cells.add(cell_key(row, column));
             }
           }
-          result.resolve({ protocol: 2, start, columns, rows: pageRows(start, end, columns) });
+          result.resolve({ protocol: 2, start, columns, rows: page_rows(start, end, columns) });
         });
         signal.addEventListener(
           "abort",
           () => {
             cancel();
-            pendingSignals.delete(signal);
-            abortedRequests++;
+            pending_signals.delete(signal);
+            aborted_requests++;
             result.reject(new DOMException("Simulated fetch aborted", "AbortError"));
           },
           { once: true },
@@ -420,7 +420,7 @@ async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
         return result.promise;
       },
     };
-    let rowsLoaded = false;
+    let rows_loaded = false;
     const controller = new DatasourceController(
       {
         datasource,
@@ -432,7 +432,7 @@ async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
         isCellNewerThan: () => false,
         retainRevision: () => () => {},
         onRowsLoaded: () => {
-          rowsLoaded = true;
+          rows_loaded = true;
         },
         onError: (_request, error) => {
           throw error;
@@ -442,16 +442,16 @@ async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
       ROW_COUNT,
     );
 
-    const episodeLoadingMs = new Map<number, number>();
+    const episode_loading_ms = new Map<number, number>();
     let previous: ViewWindow | null = null;
-    let columnIndices: number[] = [];
-    const settleFrames = Math.ceil(SETTLE_MS / FRAME_MS);
-    const lastFrame = frames.at(-1) ?? { top: START_TOP_PX, left: 0 };
-    frameCount += frames.length + settleFrames;
+    let column_indices: number[] = [];
+    const settle_frames = Math.ceil(SETTLE_MS / FRAME_MS);
+    const last_frame = frames.at(-1) ?? { top: START_TOP_PX, left: 0 };
+    frame_count += frames.length + settle_frames;
 
-    for (let frame = 0; frame < frames.length + settleFrames; frame++) {
+    for (let frame = 0; frame < frames.length + settle_frames; frame++) {
       if (frame > 0) await clock.advance(FRAME_MS);
-      const view = viewWindow(frames[frame] ?? lastFrame);
+      const view = view_window(frames[frame] ?? last_frame);
       const moved =
         previous === null ||
         view.rowStart !== previous.rowStart ||
@@ -459,74 +459,74 @@ async function runTrace(trace: TraceId, fetchMs: number): Promise<TraceResult> {
         view.columnStart !== previous.columnStart ||
         view.columnEnd !== previous.columnEnd;
       if (moved) {
-        columnIndices = [];
+        column_indices = [];
         for (let column = view.columnStart; column < view.columnEnd; column++) {
-          columnIndices.push(column);
+          column_indices.push(column);
         }
       }
       // The grid renders, and so updates the viewport, after a scroll or a page load.
-      if (moved || rowsLoaded) {
-        rowsLoaded = false;
+      if (moved || rows_loaded) {
+        rows_loaded = false;
         const started = performance.now();
-        controller.updateViewport(view.rowStart, view.rowEnd, columnIndices);
-        updateUs.push((performance.now() - started) * 1_000);
-        await settleMicrotasks();
+        controller.updateViewport(view.rowStart, view.rowEnd, column_indices);
+        update_us.push((performance.now() - started) * 1_000);
+        await settle_microtasks();
       }
 
       const visible = new Set<number>();
       for (let row = view.rowStart; row < view.rowEnd; row++) {
-        const rowLoaded = store.areColumnsFullyLoaded("trace", row, row + 1, columnIndices);
-        for (const column of columnIndices) {
-          const key = cellKey(row, column);
+        const row_loaded = store.areColumnsFullyLoaded("trace", row, row + 1, column_indices);
+        for (const column of column_indices) {
+          const key = cell_key(row, column);
           visible.add(key);
-          shownCells.add(key);
+          shown_cells.add(key);
           const loading =
-            !rowLoaded && !store.areColumnsFullyLoaded("trace", row, row + 1, [column]);
-          const accumulated = episodeLoadingMs.get(key) ?? 0;
-          episodeLoadingMs.set(key, loading ? accumulated + FRAME_MS : accumulated);
-          if (loading) loadingCellMs += FRAME_MS;
+            !row_loaded && !store.areColumnsFullyLoaded("trace", row, row + 1, [column]);
+          const accumulated = episode_loading_ms.get(key) ?? 0;
+          episode_loading_ms.set(key, loading ? accumulated + FRAME_MS : accumulated);
+          if (loading) loading_cell_ms += FRAME_MS;
         }
       }
-      for (const [key, loadingMs] of episodeLoadingMs) {
+      for (const [key, loading_ms] of episode_loading_ms) {
         if (visible.has(key)) continue;
-        episodes.push(loadingMs);
-        episodeLoadingMs.delete(key);
+        episodes.push(loading_ms);
+        episode_loading_ms.delete(key);
       }
       previous = view;
     }
-    for (const loadingMs of episodeLoadingMs.values()) episodes.push(loadingMs);
+    for (const loading_ms of episode_loading_ms.values()) episodes.push(loading_ms);
 
     controller.destroy();
     store.dispose();
-    if (pendingSignals.size !== 0)
-      throw new Error(`${trace}: leaked ${pendingSignals.size} fetches`);
+    if (pending_signals.size !== 0)
+      throw new Error(`${trace}: leaked ${pending_signals.size} fetches`);
 
-    for (const key of servedCells) if (!shownCells.has(key)) neverShownCells++;
-    fetchedCells += servedCells.size;
-    requestCount += requests;
-    abortCount += abortedRequests;
+    for (const key of served_cells) if (!shown_cells.has(key)) never_shown_cells++;
+    fetched_cells += served_cells.size;
+    request_count += requests;
+    abort_count += aborted_requests;
   }
-  const loadingEpisodes = episodes.filter((loadingMs) => loadingMs > 0).length;
-  const totalLoadingMs = episodes.reduce((sum, loadingMs) => sum + loadingMs, 0);
+  const loading_episodes = episodes.filter((loading_ms) => loading_ms > 0).length;
+  const total_loading_ms = episodes.reduce((sum, loading_ms) => sum + loading_ms, 0);
   return {
     trace,
-    fetchMs,
-    frames: frameCount,
+    fetchMs: fetch_ms,
+    frames: frame_count,
     cellEpisodes: episodes.length,
-    loadingEpisodes,
+    loadingEpisodes: loading_episodes,
     loadingP50Ms: quantile(episodes, 0.5),
     loadingP95Ms: quantile(episodes, 0.95),
-    loadingMeanMs: episodes.length === 0 ? 0 : totalLoadingMs / episodes.length,
-    loadingCellMs,
-    fetchedCells,
-    neverShownCells,
-    neverShownRows: neverShownCells / VISIBLE_COLUMNS,
-    fetchedRows: fetchedCells / VISIBLE_COLUMNS,
-    requests: requestCount,
-    abortedRequests: abortCount,
-    updates: updateUs.length,
-    updateP50Us: quantile(updateUs, 0.5),
-    updateP95Us: quantile(updateUs, 0.95),
+    loadingMeanMs: episodes.length === 0 ? 0 : total_loading_ms / episodes.length,
+    loadingCellMs: loading_cell_ms,
+    fetchedCells: fetched_cells,
+    neverShownCells: never_shown_cells,
+    neverShownRows: never_shown_cells / VISIBLE_COLUMNS,
+    fetchedRows: fetched_cells / VISIBLE_COLUMNS,
+    requests: request_count,
+    abortedRequests: abort_count,
+    updates: update_us.length,
+    updateP50Us: quantile(update_us, 0.5),
+    updateP95Us: quantile(update_us, 0.95),
   };
 }
 
@@ -548,7 +548,7 @@ export async function runScrollTraceBenchmark(
   await initSheetwrite();
   const results: TraceResult[] = [];
   for (const trace of traces) {
-    for (const fetchMs of fetchTimes) results.push(await runTrace(trace, fetchMs));
+    for (const fetch_ms of fetchTimes) results.push(await run_trace(trace, fetch_ms));
   }
   return {
     benchmark: "scroll-trace-prefetch",
@@ -575,17 +575,17 @@ export function scrollTraceMarkdown(report: ScrollTraceReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-function optionValue(args: readonly string[], name: string): string | undefined {
+function option_value(args: readonly string[], name: string): string | undefined {
   const index = args.indexOf(name);
   return index < 0 ? undefined : args[index + 1];
 }
 
-function listOption<T extends string | number>(
+function list_option<T extends string | number>(
   args: readonly string[],
   name: string,
   allowed: readonly T[],
 ): readonly T[] {
-  const value = optionValue(args, name);
+  const value = option_value(args, name);
   if (value === undefined) return allowed;
   return value.split(",").map((entry) => {
     const match = allowed.find((candidate) => String(candidate) === entry);
@@ -598,10 +598,10 @@ function listOption<T extends string | number>(
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const report = await runScrollTraceBenchmark(
-    listOption(args, "--traces", TRACE_IDS),
-    listOption(args, "--fetch-ms", FETCH_TIMES_MS),
+    list_option(args, "--traces", TRACE_IDS),
+    list_option(args, "--fetch-ms", FETCH_TIMES_MS),
   );
-  const output = optionValue(args, "--output");
+  const output = option_value(args, "--output");
   if (output !== undefined) await Bun.write(output, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(scrollTraceMarkdown(report));
 }
