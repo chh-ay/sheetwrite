@@ -229,14 +229,30 @@ const fn is_text_date_or_test_of_values(func: Func) -> bool {
 }
 
 /// Whether a call of `func` with `args` is lifted: an argument that takes
-/// one value is an array.
+/// one value is an array. Most calls have no array argument, and this
+/// answers them inline in the shape check, from the arguments' own checks
+/// and without looking `func` up; the conditional-format rules ask it of
+/// every nested call in every visible cell. Each argument is checked once.
+#[inline]
 pub(super) fn lifts(func: Func, args: &[Ast], shapes: Shapes<'_>) -> bool {
+    args.iter()
+        .position(|arg| ast_produces_array(arg, shapes))
+        .is_some_and(|first| array_at_value_arg(func, args, first, shapes))
+}
+
+/// Whether an argument of `func` that takes one value is an array, given
+/// that the argument at `first` is the first array argument. Out of line,
+/// so the common case stays small.
+#[inline(never)]
+fn array_at_value_arg(func: Func, args: &[Ast], first: usize, shapes: Shapes<'_>) -> bool {
     let value_args = value_args(func);
-    !value_args.is_none()
-        && args
-            .iter()
-            .enumerate()
-            .any(|(index, arg)| value_args.takes(index) && ast_produces_array(arg, shapes))
+    value_args.takes(first)
+        || (!value_args.is_none()
+            && args
+                .iter()
+                .enumerate()
+                .skip(first + 1)
+                .any(|(index, arg)| value_args.takes(index) && ast_produces_array(arg, shapes)))
 }
 
 /// The argument that gives the scalar path `value`. Blank and errors have no
